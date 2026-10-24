@@ -1,16 +1,9 @@
 # 3. Input semantics and the schema DSL
 
-The previous chapter described the source model. This chapter describes how input
-formats produce one and what every format must preserve in doing so. A frontend
-translates source syntax into the shared model and retains what it needs to render
-and check source assignments; the pipeline then chooses solving mechanisms from
-that model. Parsing a constraint, finding a candidate and proving a result are
-separate steps, and source correspondence must survive each one.
-
-The chapter covers the rules all formats share (numeric authority, finite versus
-open models, current coverage) and the relations whose source forms recur across
-formats, then the first frontend: the Kotlin schema DSL. The next two chapters
-cover the file formats.
+A frontend preserves source declarations, relations, objective and names in a shared
+model. Numeric interpretation belongs to the captured semantics; execution selection
+belongs to the pipeline. This chapter defines the common contract and the Kotlin
+schema frontend. The next two chapters cover file formats.
 
 ## Source contracts
 
@@ -102,19 +95,11 @@ term false.
 
 ## Absolute-value source forms
 
-Absolute-value definitions keep their operand and result roles through aliases,
-Boolean scopes and remapping; a surrounding predicate can be reified while the
-function stays total. See [absolute-value relations](02-model.md#absolute-value-relations).
-
-| Source | Retained relation |
-|---|---|
-| Schema integer `abs` | `IntAbs` lowers to `Abs` |
-| FlatZinc integer `abs` | `int_abs` retains `Abs`, including optional and reified uses |
-| FlatZinc real `abs` | `float_abs` retains `RealAbs` in exact mode and `GridAbs` under the bucket policy |
-| SMT-LIB integer `abs` | `Abs`, or `AffineAbs` for wide affine values |
-| XCSP3 `abs` and `dist` | `Abs` after exact materialization of affine operands |
-| SMT-LIB real `abs` | Not admitted |
-| MPS, DIMACS/WCNF and OPB/WBO | No absolute-value syntax |
+Schema integer `abs`, FlatZinc `int_abs`, SMT-LIB integer `abs` and XCSP3
+`abs`/`dist` retain [absolute-value relations](02-model.md#absolute-value-relations).
+Wide SMT operands use `AffineAbs`; FlatZinc floats use `RealAbs` or `GridAbs`
+under their selected semantics. SMT-LIB real `abs` is unsupported; the other file
+formats have no absolute-value syntax.
 
 ## Execution metadata
 
@@ -125,9 +110,8 @@ backtracking owns selector allocation.
 
 ## Schema lowering
 
-The schema DSL is the only frontend that does not read a file. A schema declares named variables and constraints in Kotlin, compiles them into
-the shared source model and retains the metadata needed to decode solutions back
-into the caller's names and types.
+The Kotlin DSL compiles named declarations and constraints and retains typed handles
+for decoding source assignments.
 
 ### Declaring and compiling a schema
 
@@ -205,8 +189,20 @@ reconstructs and checks original coordinates before publication. See
 
 ### Product representations
 
-| Factor | Source relation | Execution boundary |
+| Factor | Source relation | Execution |
 |---|---|---|
+| `Product` | Int × Int → Int | Finite propagation and search |
+| `RealProduct` | Finite Int × Real → Real | Exact linear completion once the integer is fixed; LP relaxation otherwise |
+| `ContinuousProduct` | Real × Real → Real | Exact polynomial completion beside finite factors |
+
+The DSL admits product equalities such as `(x * x * y) eq z`, `(x * y) eq 2.0`
+and `((x + 0.5) * y) eq z`; multiplication by a constant stays affine.
+`ContinuousRealEquality` reuses equal subexpressions and lowers to products and
+exact affine rows without floating multiplication. Boolean reification of these
+equalities is unsupported. Private grids use `GridProduct` and `GridPower` under
+their captured approximation policy.
+
+---|---|---|
 | `Product` | Int × Int → Int | Finite integer propagation and search |
 | `RealProduct` | Finite Int × Real → Real | Fixing the integer operand gives an exact linear completion; unfixed operands can use LP relaxations |
 | `ContinuousProduct` | Real × Real → Real | Shared polynomial completion, with finite factors remaining in their engine projection |

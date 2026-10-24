@@ -1,15 +1,8 @@
 # 4. Finite formats and FlatZinc
 
-The schema of the previous chapter is built in Kotlin. The remaining frontends read
-files. This chapter covers the four whose problems are entirely Boolean or
-finite-integer, DIMACS CNF, weighted CNF (WCNF), pseudo-Boolean OPB/WBO and XCSP3,
-and then FlatZinc, which adds floats, annotations and an output model.
-They share one shape: a streaming parser turns the text into a source document, a
-lowering step turns it into factors, and the result keeps the source objective,
-its direction and the names needed to print a solution. No numeric interpretation
-is configurable in the finite formats, so they show the frontend contract from
-[input semantics](03-input-semantics.md) in its simplest form. The chapter takes
-the formats in order of growing expressiveness.
+DIMACS, WCNF, OPB/WBO and XCSP3 describe Boolean or finite-integer models. FlatZinc
+adds floats, search annotations and an output model. Each frontend streams a source
+document, lowers it to factors and keeps names and objective direction for rendering.
 
 ## Source models and objectives
 
@@ -159,16 +152,10 @@ without enumerating the domain span (see
 
 ## FlatZinc
 
-FlatZinc is the flat constraint language that the MiniZinc compiler emits for a
-solver, using the predicate declarations the solver advertises. Like the finite
-formats above, it is a file of declarations and constraints, but
-it adds float variables, annotations that steer search and output, and an output
-model that reconstructs the original MiniZinc variables. The frontend preserves
-source names, output annotations and constraints, and records whether each float
-component uses exact arithmetic or a finite approximation.
-
-A selected grid reports optima and refutations under the declared finite-grid
-semantics; these claims do not establish a continuous-source optimum or refutation.
+FlatZinc is MiniZinc's flat constraint language. The frontend keeps source names,
+constraints, search annotations and output reconstruction. Float components retain
+exact arithmetic or declared grid semantics; grid refutations and optima apply only
+to that finite interpretation.
 
 ### Declared semantics and caller ranges
 
@@ -189,21 +176,22 @@ singleton window cannot certify a finite choice. When effective endpoints differ
 from the defaults, the output protocol prints them and withholds default-source
 refutation, unboundedness and optimum markers.
 
-### Integer extrema and selection
+### Integer relations
 
-`int_min`/`int_max` and array minimum/maximum predicates retain `ArrayMinMax`.
-Integer and Boolean array selection retains `Element` with its one-based index
-range and ordered repeated entries. Set-array selection shares one index across
-`Element` relations for its membership indicators, so a selected member outside the
-result universe stays forbidden. Integer set membership retains the full
-signed-word domain of its variable.
+Integer min/max predicates retain `ArrayMinMax`; integer and Boolean array selection
+retain one-based `Element` relations with ordered repeated entries. Set selection
+shares one index across membership indicators and forbids members outside the result
+universe. Integer set membership keeps signed-word values.
 
-### Integer division
+`int_div` and `int_mod` share truncating
+[DivMod](02-model.md#integer-division-relations) relations for identical operands,
+linking separately declared outputs by exact equalities. A divisor domain containing
+zero keeps its nonzero alternatives.
 
-`int_div` and `int_mod` retain truncating `DivMod` factors. Matching calls share one
-quotient/remainder relation and link separate declared outputs by exact equalities.
-A divisor domain containing zero keeps its nonzero alternatives (see
-[integer division relations](02-model.md#integer-division-relations)).
+`all_different_int` and `alldifferent_except_0` retain native `AllDifferent`
+over signed-word domains. Fixed nonnegative integer powers retain `Power`; exact
+float powers use polynomial completion and bucketed powers use `GridPower`.
+Variable or negative exponents decline.
 
 ### FlatZinc Boolean channels
 
@@ -213,20 +201,6 @@ Boolean conjunctions over the complemented inputs; reified sums use the shared
 clause encoder. Positive bounds and signed sums keep arithmetic propagation. If the
 eligible rows would expand to more than 32,768 clauses in total, all of them keep
 arithmetic propagation, so constraint order never selects a partial encoding.
-
-### Wide integer distinctness
-
-`all_different_int` and `alldifferent_except_0` retain `AllDifferent` over finite
-signed-word ranges without a union window or pairwise rows. Native propagation and
-local search choose their own mechanisms (see
-[distinct integer positions](02-model.md#distinct-integer-positions)).
-
-### Fixed powers
-
-`int_pow`, `int_pow_fixed` and `klause_int_pow` retain `Power` for fixed
-nonnegative integer exponents; variable or negative exponents decline. Exact
-`float_pow` accepts fixed nonnegative integral exponents over real coordinates for
-polynomial completion, and grid components retain `GridPower`.
 
 ### Source annotation constraints
 
@@ -258,57 +232,36 @@ The `bin_packing_load` decomposition annotates each bin's load equality as the
 `defines_var` of that load, so local search derives loads from the assignment
 instead of searching them.
 
-Extending native coverage means implementing the factor and its lowering,
-declaring the predicate, and adding focused and end-to-end tests.
-
 #### Exact globals and real composition
 
-`--exact` keeps the advertised finite globals in their native finite projection.
-Connecting an integer argument to a real with `int2float` does not replace its
-global with linear relaxation rows. Linear completion respects the finite choices;
-polynomial completion conditions its exact formula on those same choices. Both
-paths enforce every finite factor before publishing a source witness. Complete
-traversal can refute all choices or combine their certified objective results.
+`--exact` keeps finite globals native. An `int2float` connection adds arithmetic
+participation without replacing a finite global by relaxation rows. Linear or
+polynomial completion respects the finite choices; complete traversal combines their
+certified results. [Factor ownership](02-model.md#factor-projection-selection)
+defines the composition rule.
 
-| Advertised global family | Enforced finite representation |
+| Family | Retained enforcement |
 |---|---|
-| `all_different_int`, `alldifferent_except_0`, `symmetric_all_different` | `AllDifferent` with its exceptions, or `SymmetricAllDifferent` |
-| `all_equal_int`, `member_int`, `sort` | Equality rows, reified membership with `Cardinality`, or `Sort` |
-| The four `global_cardinality` variants; `count_eq`, `among` | `GlobalCardinality` with closed-cover, count-variable and bound variants; `among` also sums its cover counts |
-| `exactly_int`, `at_least_int`, `at_most_int` | Reified integer equalities and `Cardinality`; variable counted values use MiniZinc's equality-sum decomposition |
-| `nvalue`, `atleast_nvalues`, `atmost_nvalues` | `NValue` with the requested count relation |
-| `inverse`, `inverse_offsets`; integer array minimum/maximum and their `minimum_int`/`maximum_int` aliases | `Inverse` with index offsets; `ArrayMinMax` |
-| Increasing/decreasing and strict integer ordering; `lex_less_int`, `lex_lesseq_int` | `Increasing`, reversing descending chains; `LexLess` |
-| `value_precede_int`, `value_precede_chain_int` | `ValuePrecede` relations |
-| `diffn`, `diffn_nonstrict`; `circuit`, `subcircuit` | `Diffn` with the declared zero-size semantics; `Circuit` with the declared cycle semantics |
-| `table_int`, `regular`, `mdd` | `Table`, `Regular`, `Mdd` |
-| `cumulative`, `disjunctive`, `disjunctive_strict`, `sliding_sum` | `Cumulative`, including variable durations/resources/capacity; unary cumulative for disjunctive scheduling; window sum rows |
-| `bin_packing`, `bin_packing_capa`, `bin_packing_load` | MiniZinc's exact assignment channels and weighted Boolean capacity/load rows |
-| Float array minimum/maximum | MiniZinc's chain of exact scalar real extrema |
-| Set membership, inclusion, equality, disequality and ordering, including reifications; cardinality, union, intersection and difference; set-array selection, `all_disjoint`, `set_partition_into` | Membership indicators, clauses and exact arithmetic channels; native `Element` for selection |
+| Distinctness, equality, membership, sorting and counts | `AllDifferent`, `SymmetricAllDifferent`, `Sort`, `GlobalCardinality`, `NValue`, equality channels and cardinalities |
+| Selection, extrema and permutations | `Element`, `ArrayMinMax`, `Inverse` with source index offsets |
+| Ordering and precedence | `Increasing`, `LexLess`, `ValuePrecede` |
+| Geometry, scheduling and circuits | `Diffn`, `Cumulative`, `Circuit` with the declared zero-size/cycle semantics |
+| Tables and languages | `Table`, `Regular`, `Mdd` |
+| Packing, window sums and sets | Exact assignment/membership indicators, clauses and weighted rows |
 
-The library normalizes circuit and symmetric-permutation index sets before
-flattening, and preserves both inverse index offsets. FlatZinc circuit successors
-are one-based independently of their declared value bounds. Empty counted arrays
-require zero occurrences. Count comparisons preserve signed-word counted values
-and intersect occurrence bounds with the array length before narrowing them.
-Strict disjunctive scheduling keeps unary cumulative
-propagation and adds `Diffn` enforcement when a duration can be zero: such a task
-may touch an endpoint but cannot lie inside another task. Ordinary disjunctive
-scheduling permits it there.
+The library normalizes circuit and symmetric-permutation indexes before flattening;
+FlatZinc successors are one-based independently of their value bounds. Empty counted
+arrays require zero occurrences, and occurrence bounds are intersected with array
+length before narrowing. Strict disjunctive scheduling adds separation for zero-duration
+tasks: they may touch an endpoint but cannot lie inside another task. Ordinary
+disjunctive scheduling permits that placement.
 
-These compositions require supported finite declarations and admitted real
-relations. They do not establish complete support for open integers in CP-only
-globals, variable or negative powers, or arbitrary real functions.
-Set-variable universes and set-predicate constant members must fit signed 32-bit integers; set
-ordering additionally requires every universe member to exceed `Int.MIN_VALUE`.
-Automaton state indexes, inverse offsets and constant GCC occurrence bounds use
-signed 32-bit parameters and decline wider values; window sums preserve signed-word
-bounds. Exact arithmetic and objective completion can return UNKNOWN on resource
-or representation limits;
-unsupported source forms decline explicitly. No such limit permits a grid,
-an omitted global or a relaxation to acquire enforcement authority. A heuristic
-worker's failure supplies no refutation or optimum.
+Set universes and constant members require signed 32-bit values; ordering excludes
+`Int.MIN_VALUE`. Automaton indexes, inverse offsets and constant GCC occurrence
+bounds also require signed 32-bit parameters. Window sums and counted values keep
+signed-word bounds. Open integers in CP-only globals, variable/negative powers and
+arbitrary real functions remain unsupported. The advertised predicate list lives in
+[redefinitions.mzn](../klause-mzn-lib/share/minizinc/klause/redefinitions.mzn).
 
 ### FlatZinc floats
 
@@ -343,16 +296,11 @@ binary64 cannot represent decline with a diagnostic.
 
 #### Rounded FlatZinc bounds
 
-Exact FlatZinc means mathematical arithmetic over the binary64 values of parsed
-literals, with every declared bound kept. No epsilon repairs a compiler-rounded
-interval. Components whose integer-image endpoints were rounded across a declared
-bound decline exact mode; default compilation records the approximation and uses
-the grid.
-
-For example, binary64 `0.01` times integer `200` is
-`144115188075855875/72057594037927936`, which exceeds a declared upper bound `2.0`
-by `3/72057594037927936`. The rational product violates the bound and substituting
-`2.0` violates the row, so neither assignment receives exact witness credit. See
+Exact mode checks mathematical arithmetic over parsed binary64 literals and keeps
+every declared bound. For example, binary64 `0.01 * 200` exceeds `2.0` by
+`3/72057594037927936`: rounding the result to `2.0` violates the defining row.
+A compiler-rounded integer image crossing a declared bound therefore declines exact
+mode; default compilation records the approximation and uses the grid. See
 [FlatZincFloatPolicy](../klause/src/commonMain/kotlin/com/eignex/klause/formats/flatzinc/FlatZincFloatPolicy.kt).
 
 ### MiniZinc output rendering

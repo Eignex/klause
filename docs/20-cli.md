@@ -1,35 +1,15 @@
-# 20. Command line and development
+# 20. Command line
 
-The command-line interface is the second public surface built on the
-[library API](19-api.md). It reads one input instance, admits its source model
-through the frontends of Part II, runs the selected solve route and renders
-assignments or a terminal verdict. All formats share the solve-control flags and
-driver; each frontend owns parsing and output semantics.
+The CLI parses one source, binds shared [source setup](19-api.md#source-setup) and
+renders its results. Common controls reach every mode; format frontends retain
+parsing and output semantics. The CLI adds no solving policy.
 
-The chapter starts with building and running the CLI, then covers format dispatch,
-how arithmetic results are published, and the flags and statistics it reports. It
-ends with the build targets, validation tasks and library entry points used during
-development.
+## CLI module
 
-## Build and run
-
-`klause-cli` is a Kotlin Multiplatform module: shared CLI logic lives in `commonMain`,
-with a small platform seam (`Platform.kt`) that has JVM and POSIX actuals.
-
-```
-./gradlew :klause-cli:installJvmDist
-klause-cli/build/install/klause-cli-jvm/bin/klause-cli [flags] <file>
-```
-
-The JVM distribution needs JDK 25 or newer at run time. The native executable
-needs no JVM:
-
-```
-./gradlew :klause-cli:linkReleaseExecutableLinuxX64
-klause-cli/build/bin/linuxX64/releaseExecutable/klause-cli.kexe [flags] <file>
-```
-
-Numerical kernel selection at run time is described in
+`klause-cli` is multiplatform: shared dispatch and protocols live in `commonMain`,
+with JVM and POSIX actuals for `Platform.kt`. The JVM distribution requires JDK 25
+or newer; native executables need no JVM. Build commands live in the
+[repository README](../README.md#build), and runtime numerical options in
 [numerical dependencies](18-exact-arithmetic.md#runtime-support).
 
 ## Formats and dispatch
@@ -53,13 +33,9 @@ first. The registry in
 flags in [CliMode.kt](../klause-cli/src/commonMain/kotlin/com/eignex/klause/cli/CliMode.kt)
 define supported names, aliases and help text.
 
-SMT-LIB optimization emits `; objective=<value>` for each published incumbent and
-`; optimizationStatus=<status>` at completion; `sat` alone does not establish
-optimality. Quadratic results separate the exact incumbent objective from its
-certified `objectiveBound`; unattained boundaries report `unattained-infimum` or
-`unattained-supremum`. FlatZinc carries that status in `%` comments and omits the
-`==========` terminator, which would assert an attained optimum. See
-[SMT-LIB result semantics](05-arithmetic-formats.md#smt-lib-source-semantics).
+Exact objective and unattained-limit rendering follow the
+[arithmetic format contracts](05-arithmetic-formats.md#results-and-objectives);
+[FlatZinc](04-finite-formats.md#minizinc-output-rendering) defines its completion markers.
 
 ## Finite Boolean publication
 
@@ -241,51 +217,6 @@ limits, and the preparation budget (`klause.presolve.budget.ms`,
 [resource allowances](06-sessions.md#configuration-and-lifetime)). Source
 interpretation is never an environment setting: it belongs to the format's typed
 `SemanticOverrides`.
-
-## Development
-
-The [repository modules](01-introduction.md#repository-modules) and
-[package boundaries](01-introduction.md#package-boundaries) of the introduction are
-the map for working on the code; the chapters in between describe the contract of
-each component you might change.
-
-### Modules and building
-
-The Gradle build includes `:klause` (model, DSL, compilation, formats and solving),
-`:klause-cli` (the command-line driver described [above](#build-and-run)) and
-`:klause-bench`, a JVM module that is not published. The default build targets JVM
-and Linux x64; releases opt into Linux arm64 and macOS arm64 with `-Ptargets.full`.
-
-```sh
-./gradlew :klause-cli:installJvmDist
-klause-cli/build/install/klause-cli-jvm/bin/klause-cli --help
-```
-
-`./gradlew check` compiles and runs the tests and light checks; `./gradlew lintDocs`
-runs detekt and Dokka link linting over the Kotlin sources and their KDoc. Kotlin
-test tasks report and fail individually through
-`kotlin.tests.individualTaskReports=true`. Exact arithmetic and lattice tests belong
-to `klause`; native tests run in CI alongside a smoke start of the release CLI
-executable.
-
-### Library entry points
-
-The [schema DSL](03-input-semantics.md#schema-lowering) owns the declaration,
-compilation and decoding example. [Library APIs](19-api.md) define source-aware
-strategies, finite sessions, extension surfaces and coordinate ownership.
-Enumeration, counting and near-uniform sampling use compiled finite models;
-[source result guarantees](01-introduction.md#results-and-completeness) and
-[LP certification](17-linear-programming.md#proof-packages) define the authority of
-their results.
-
-### Tests
-
-Unit tests cover parsing, lowering, ownership, rollback, explanations, exact
-arithmetic, publication and resource limits with local deterministic fixtures or
-fakes. Test execution and setup tasks make no network requests and provision no
-external tools; ordinary Gradle dependency resolution is separate.
-External-reference integration belongs in klause-lab. Full PR validation runs in
-GitHub CI; local targeted tests are optional.
 
 ---
 

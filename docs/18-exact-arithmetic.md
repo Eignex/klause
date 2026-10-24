@@ -1,19 +1,9 @@
 # 18. Exact arithmetic
 
-The theories of Part IV decide fragments that linear programming cannot express:
-quadratic objectives, polynomial constraints and real functions. This chapter
-describes the exact kernels they compute with and the external numerical libraries
-underneath them. Like the [LP engine](17-linear-programming.md), each kernel is a numerical mechanism: it
-certifies an arithmetic fact, while a source-aware caller decides what that fact
-establishes about a formula or objective. None of them reads factors, finite
-domains, search state or solver verdicts.
-
-The four kernels share one pattern: an immutable exact value or certificate, a
-check that is either completed or declined, and work charged to the caller's
-cancellation token. Quadratic certificates come first because they reuse only the
-rational simplex primitives. Polynomial and algebraic arithmetic and transcendental
-enclosures follow as independent kernels, and exact analytic reals combine those
-two. The chapter closes with the numerical dependencies the LP engine builds on.
+Exact kernels certify arithmetic facts for source-aware callers. They own immutable
+values, numerical certificates and private workspace; callers own formula truth,
+strategy and publication. Kernels read no factors, finite domains or solver verdicts
+and charge work to the containing token.
 
 ## Exact quadratic certificates
 
@@ -231,64 +221,16 @@ outlive the invocation that checked them.
 
 ## Numerical dependencies
 
-External libraries supply data containers and kernels within Klause's owned
-[LP engine](17-linear-programming.md). They do not select source models, solving
-routes or result semantics. This section covers what comes from each dependency,
-how it is pinned, and the consumer and runtime obligations at that boundary.
+Klause owns LU, reach, pivot policy, Forrest–Tomlin updates, checked arithmetic and
+scratch lifetime. Koblas supplies validated CSC containers, vector/indexed kernels
+and sparse primitives; Kumulant supplies online statistics and adaptive bandits.
+Neither selects models, routes or result semantics.
 
-Klause owns sparse and small dense LU, reach, pivot policy, Forrest–Tomlin updates, checked arithmetic and scratch
-lifetime. Koblas supplies validated CSC containers, indexed/vector Level 1 kernels and generic sparse
-primitives. There is one floating simplex with exact certification; vendor selection does not change
-numerical authority or create another solver.
-
-### Dependency provenance
-
-#### Koblas
-
-The [build](../build.gradle.kts) pins immutable timestamps for both the KMP root and every platform module. A root timestamp
-alone is insufficient because its Gradle metadata redirects to mutable platform snapshots. Strict
-platform constraints propagate into klause publications. Each module that directly
-consumes Kumulant declares these constraints at its own dependency root, taking
-precedence over Kumulant's transitive Koblas pins.
-
-The pins consume Koblas revision `3ce4036a5c2a17c911b01f052515baddf8e497b4`,
-published by its [snapshot workflow](https://github.com/Eignex/koblas/actions/runs/39904556100).
-Koblas coordinates use group `com.eignex`:
-
-| Module | Version | Binary SHA-256 |
-|---|---|---|
-| koblas | `0.1.1-20261023.051622-264` | `6d5165feffda2f4e9f3f854ae1862b6fbe85e5d33c06705e6b59d423983fa71f` |
-| koblas-jvm | `0.1.1-20261023.051622-267` | `682299d91c8cea739bca89d63960cd67e466cc6d8d6bf85d310fb186b3e6774a` |
-| koblas-linuxx64 | `0.1.1-20261023.051622-263` | `17462f0c3cfa302f278ef61befbdb16deb3a766da9ef9b66e72b85f8966ca0da` |
-| koblas-linuxarm64 | `0.1.1-20261023.051622-264` | `6c1827255bf924811bb7b0d79943050a8610fad0d18b90d8c037dd671388285b` |
-| koblas-macosarm64 | `0.1.1-20261023.051354-287` | `375180c0461aae5afa205fe26b403f0bfa0cfd1413de8c764f5cfd373533121a` |
-
-The build does not consult Maven Local. For source integration, use Gradle's supported composite
-substitution with an isolated checkout at the revision under test:
-
-```sh
-./gradlew --include-build /path/to/isolated/koblas :klause:jvmTest --max-workers=2
-```
-
-Dependency updates must update every platform pin together.
-
-#### Kumulant
-
-Kumulant supplies online statistics and adaptive bandits. Its contextual-bandit
-features use Koblas vector types, so Klause strictly pins the Koblas coordinates
-above for both direct and transitive consumers.
-
-The pins consume Kumulant revision `9df19df5c48e2cce2caf0a612e51e39430903352`,
-published by its [snapshot workflow](https://github.com/Eignex/kumulant/actions/runs/38456722493).
-Kumulant coordinates use group `com.eignex` and version prefix `0.3.4-20261013.194059-`:
-
-| Module | Build | Binary SHA-256 |
-|---|---:|---|
-| kumulant | 67 | `81bf47d09d6135b0857fc49510d17fbeac5dd958c5932753656d021bdfb78bae` |
-| kumulant-jvm | 67 | `0b8e8e18088fca26f6045879083cbc11bd1a571dffe36b8cf0a90a1f1fab4c23` |
-| kumulant-linuxx64 | 67 | `844f4b33057686b7ab47898757ae053f3aa377a508bc93cd0c7fbfc27ffa3a1a` |
-| kumulant-linuxarm64 | 67 | `a705527909d08e53a8b1a05f1051da970980a6183ed2aea315ba9cb8fa6f5416` |
-| kumulant-macosarm64 | 66 | `f0ce4c7f2f76c8aae200f8b443d4c4d2ad211733ebc540e7854916425ba1678c` |
+The [root build](../build.gradle.kts) pins immutable timestamps for KMP roots and
+platform modules. Modules consuming Kumulant declare strict Koblas constraints at
+their dependency roots, overriding transitive pins and preserving publication
+constraints. Root timestamps alone are insufficient because Gradle metadata redirects
+to platform snapshots. Concrete versions belong to the build.
 
 ### Consumer contracts
 

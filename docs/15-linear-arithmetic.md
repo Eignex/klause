@@ -134,11 +134,12 @@ Completed source checks admit witnesses. Exact conflicts, bounds and rays follow
 [LP certification](17-linear-programming.md#lp-certification); a floating status alone is
 insufficient. Strict infeasibility requires a completed strict-feasibility check.
 
-Open real objectives with complete affine source capture use
-`RationalTheoryDescent`. Attained witnesses, strict approach paths and feasible
-improving rays determine its result; `OpenTheoryOptimum.linearResult` separates the
-incumbent value from an unattained limit. Incomplete optimization withholds global
-claims while preserving checked incumbents.
+Complete affine source capture uses `LinearAuthorityInvocation` through
+`RationalTheoryDescent`: attained witnesses, checked strict approach paths and
+improving rays determine the result. `OpenTheoryOptimum.linearResult` separates
+incumbents from bounds and unattained limits. If numerical authority declines,
+exact strict-improvement rounds continue under the same allowance; a checked
+incumbent survives incomplete optimization.
 
 ### State and resources
 
@@ -163,13 +164,9 @@ this route `EXACT_LRA`.
 
 ## Linear integer arithmetic
 
-Linear integer constraints combine integer coordinates with constant coefficients
-and Boolean structure. The theory takes the [linear real component](#linear-real-arithmetic)
-and adds integrality: the rational relaxation is checked exactly, a fractional
-point causes integer branching, and an exact lattice reduction keeps unbounded
-problems finite where the source supports it. Open source bounds stay open instead
-of being replaced by a finite box. The [mixed theory](#linear-mixed-arithmetic) reuses
-everything here.
+The linear integer theory adds integrality to the [real component](#linear-real-arithmetic)
+through exact reductions and exhaustive splits. Open declarations remain open;
+the [mixed theory](#linear-mixed-arithmetic) reuses this machinery.
 
 ### Scope and boundaries
 
@@ -209,9 +206,8 @@ conflict learning can cite it like any Boolean.
 
 Branch and bound alone need not terminate on an unbounded integer problem: the
 relaxation can keep producing fractional points further out along an unbounded
-direction. The reduction (M. Bromberger, "A Reduction from Unbounded Linear Mixed
-Arithmetic Problems into Bounded Problems", IJCAR 2018) separates the part of the
-system that keeps the search finite from the part that does not.
+direction. Bromberger's double-bounded reduction separates bounded lattice directions
+from free ones, allowing finite branching where its admission conditions hold.
 
 1. **Split.** A selected row `a x <= b` is double-bounded when `a x` also has a
    finite lower bound, supplied by a paired opposite row or by an exact LP minimum
@@ -250,21 +246,18 @@ branches.
 
 #### Objectives
 
-An integer objective with no Boolean or continuous cost uses the integral descent.
-Each round asks the theory route to decide the model plus one bound row stating
-that the objective is at most the incumbent minus one. A witness tightens the row;
-a refutation proves the incumbent optimal, or infeasibility in the opening round,
-which has no bound row. The objective therefore enters as a constraint and needs no
-optimizing simplex. A portfolio can feed the descent an external bound from another
-worker, in which case a refutation proves only that nothing beats that value.
+Complete affine source capture uses the same
+[linear authority](#results-and-proof-authority) for integer, Boolean and real costs.
+When no such context is available, an integer objective without Boolean or continuous
+cost can use integral descent. Each round asks for a point with objective at most
+`incumbent - 1`; a completed refutation proves that incumbent optimal. The opening
+round has no cutoff and can refute the model. An external cutoff instead yields only
+a conditional bound. Improving integer rays require a feasible integral base and
+an integrality-preserving direction.
 
-Every witness is also asked for an improving ray within its branch: a direction
-preserving integrality along which the objective strictly decreases proves the
-objective unbounded.
-
-Other admitted linear objectives, including Boolean costs, use exact
-strict-improvement rounds through `RationalTheoryDescent`, which supplies no
-recession certificate and need not terminate on an unbounded objective.
+Other objectives without affine authority use exact strict-improvement rounds.
+That fallback supplies no recession certificate or termination guarantee for an
+unbounded objective.
 
 ### State and resources
 
@@ -290,13 +283,9 @@ implements the integral descent. The pipeline names the integer-containing route
 
 ## Linear mixed arithmetic
 
-Mixed linear constraints couple integer and real coordinates in one source model.
-This theory combines the two above: the
-[linear real](#linear-real-arithmetic) relaxation checks real feasibility, and the
-[linear integer](#linear-integer-arithmetic) branch order enforces integrality on the
-integer columns. A feasible continuous point is not enough to accept a mixed model,
-and the main addition here is how a complete integral and real point is recovered
-from what the LP returns. This chapter closes the linear part of the book.
+Mixed arithmetic combines exact real feasibility and integer branching in one coupled
+system. Its additional mechanism recovers an exact integral/real point from numerical
+proposals.
 
 ### Scope and boundaries
 
@@ -311,35 +300,16 @@ nonlinear products use [polynomial completion](16-nonlinear-arithmetic.md#polyno
 
 ### Solving and composition
 
-Shared Boolean choices select active rows, and the component runs the
-[integer branch order](#solving-and-composition-1): finite
-integers, then disjunctions and disequalities, then the reduction or plain
-fractional splits. Three mixed-specific mechanisms sit around that order.
+Shared Boolean choices select active rows in one LP containing integer and real
+columns. The [integer branch order](#solving-and-composition-1) applies unchanged.
+The double-bounded transform preserves integer/real sorts and branches only on
+integer coordinates.
 
-#### One LP for both kinds of column
-
-Integer and real source columns live in the same LP model; integer columns are
-marked integral and enter with their exact source bounds, so one relaxation solve
-checks the coupled system. The
-[double-bounded reduction](#the-double-bounded-reduction) never
-mixes an integer source column into a real transformed column, so integrality
-survives the transformation and only integer coordinates are branched.
-
-#### Finite and open integers together
-
-A mixed model often has bounded integers owned by finite search beside open ones
-owned by the theory. A finite integer counts as decided only when finite search has
-fixed it; until then the complete check is indeterminate and the first unfixed
-finite integer is the next branch. The theory never narrows a finite domain itself:
-it proposes alternatives, and finite propagation enforces bounds, holes and
-unrelated finite factors on each.
-
-A completed continuous point guides these splits: an integral coordinate selects a
-finite equality first, then its lower and upper remainders. With the default hint
-allowance, a complete worker can also prefer a disjunct or disequality side using
-an exact point or the prefix of an optimal float point. These preferences only
-order exhaustive choices; a float optimum supplies no witness, bound or
-refutation.
+Finite integers count as decided only when their finite owner fixes them. A completed
+point can guide an equality-first split followed by lower and upper remainders;
+finite propagation enforces holes and unrelated factors on each branch. Optional
+LP or graph hints order exhaustive disjuncts and disequality sides without supplying
+witness or proof authority.
 
 #### Witness recovery
 

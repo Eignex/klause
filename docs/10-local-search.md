@@ -1,24 +1,15 @@
 # 10. Local search
 
-Complete search explores the space exhaustively and can prove results. Local
-search gives that up in exchange for speed on large or loosely constrained models:
-it looks for feasible or improving assignments by changing values and measuring
-constraint violations. It keeps incremental scores so a candidate move can be
-evaluated without rebuilding the whole model. Defined outputs and coordinated moves
-keep related coordinates consistent as the walk progresses.
+Local search changes assignments to reduce constraint violations and improve an
+objective. Incremental scores guide moves; maintained definitions keep functional
+outputs consistent. Candidates require [source validation](07-presolve.md#source-witness-validation)
+and arithmetic completion before publication. Unsuccessful search supplies no
+refutation or optimum proof.
 
-A low score guides the walk; it does not prove feasibility, optimality or
-infeasibility. Every candidate still passes the same
-[source validation](07-presolve.md#source-witness-validation) as a complete-search witness, including
-arithmetic completion, before it is published, so local search can share incumbents
-with complete search in [portfolios](12-portfolio.md). Caller scopes follow
-[sessions](06-sessions.md), and work is charged against the
-[resource allowances](06-sessions.md#resource-allowances) of the containing solve.
-
-This chapter describes the walk, the strategies built over it and how a run
-prepares its projection, initial assignment and definitions. The
-[next chapter](11-neighborhoods.md) covers scoring, structured neighborhoods,
-continuous completion, restarts and ownership.
+This chapter describes strategies, preparation and definitions.
+[Neighborhoods and restarts](11-neighborhoods.md) covers scoring probes, structured
+moves and continuous completion. Sessions and containing resources follow
+[chapter 6](06-sessions.md).
 
 ## The walk
 
@@ -54,13 +45,9 @@ feasible point.
 
 ## Strategies and moves
 
-Every local-search arm is a recipe over one shared driver,
-`SourceDrivenStrategy`. The driver owns no generation loop of its own: it collects
-candidates from configured move sources, scores them, filters them and lets an
-acceptance rule choose. A recipe's behaviour is fully described by four axes —
-sources, scoring, acceptance and schedule — plus tabu, configuration checking and
-an optional perturbation hook. This section describes those axes, the move
-sources they draw from and the named recipes built from them.
+`SourceDrivenStrategy` collects, scores and filters candidates, then delegates the
+choice to acceptance. A recipe combines move sources, scoring, acceptance and
+schedule with tabu, configuration checking and optional perturbation.
 
 ### Move sources
 
@@ -196,14 +183,9 @@ consistently across both phases.
 
 ## Preparation and definitions
 
-Before the walk of [Strategies and moves](#strategies-and-moves) can start, a run
-needs an invariant projection of its model and an initial assignment. Many models
-also contain coordinates that are functions of others: a product's result, an
-Element's selected value, a channelled indicator. Searching those coordinates
-independently would waste moves and break relations the source states exactly, so
-local search maintains them as one-way definitions and backsolves repairs through
-them. This section follows preparation, initialization, the materialization of
-source definitions, and the repairs and channels built on them.
+A run prepares an invariant projection, an initial assignment and a definition
+network. Maintained outputs follow their inputs; inverse repairs turn requests on
+those outputs into admissible searched-coordinate moves.
 
 ### Projections and preparation
 
@@ -257,7 +239,8 @@ quotient and remainder outputs are still maintained.
 `PortfolioBuilder` requests the view only after composing the actual local-search or
 ALNS configurations, so a complete-only pool never builds it. Each worker constructs
 its own invariant network. Original coordinates map through the retained source plan
-and presolve mapping, excluding reconstructed coordinates. Construction spends the
+and [presolve hint mapping](07-presolve.md#guarantees-and-source-mappings), which
+admits exact alias and affine reconstruction where supported. Construction spends the
 containing allowance, cancellation discards the whole view, and a declined view
 keeps ordinary heuristic execution.
 
@@ -277,23 +260,15 @@ to change a maintained output become inverse repairs that change admissible sear
 inputs; every target must lie in its root domain and pass pin, frozen and
 implicit-owner filters, and the complete move is graded before acceptance.
 
-The node families share that contract:
-
-- **Absolute value** proposes the output magnitude or either operand sign.
-- **Integer power** offers every admissible exact signed root of the requested output.
-- **Minimum and maximum** backsolve affine rows and extrema into searched inputs;
-  non-witness operands receive the required bound.
-- **Unit Boolean folds** backsolve their signed source through nested folds.
-- **Integer division** (`DivMod`) offers quotient and remainder updates together,
-  reconstructs a dividend from the current pair, and repairs the divisor when exact;
-  a zero divisor leaves the factor violated. The rounding convention is in
-  [source semantics](02-model.md#integer-division-relations).
-- **Element results** follow their index and selected cell. Repairs change the
-  selected cell or backsolve a matching index, scanning at most 32 positions and
-  offering at most four alternatives.
-- **Affine inverses** backsolve definitions with one or two integer inputs and a unit
-  output coefficient, trying single-coordinate repairs before joint moves over at
-  most 64 values.
+| Definition | Inverse repair |
+|---|---|
+| Absolute value | Magnitude or either operand sign |
+| Integer power | Every admissible exact signed root |
+| Min/max | Affine input repairs and bounds on non-witness operands |
+| Unit Boolean fold | Signed source through nested folds |
+| DivMod | Correlated quotient/remainder, reconstructed dividend or exact divisor repair |
+| Element | Selected cell or matching index, with bounded alternatives |
+| Affine | One/two-input inverse with unit output coefficient; single repairs before bounded joint moves |
 
 Nested repairs follow at most 16 definitions. Overflow, nonintegral inverses and
 unsupported definitions decline the candidate without stopping the scan. Each state

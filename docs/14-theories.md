@@ -1,19 +1,9 @@
 # 14. Theory services and difference logic
 
-Part III followed a solve through sessions, presolve, search, local search and
-portfolios. Those chapters treated arithmetic as a participant that search
-consults. This part opens that participant. A theory service enforces one
-arithmetic fragment of the shared source model: search supplies Boolean choices
-or arithmetic decisions, and the theory checks their consequences and contributes
-authoritative coordinates or conflicts. Frontends select no concrete theory, and
-finite propagation keeps Bool+Int state only.
-
-This chapter defines the contract every theory shares and then describes the
-smallest theory, difference logic. [Linear arithmetic](15-linear-arithmetic.md) and
-[nonlinear arithmetic](16-nonlinear-arithmetic.md) follow in order of increasing
-expressiveness. Each theory is described in the same five parts: scope and
-boundaries, solving and composition, results and proof authority, state and
-resources, and implementation.
+A theory enforces an arithmetic fragment under shared search decisions and contributes
+coordinates or conflicts. The common contract below applies to difference, linear,
+polynomial, nonlinear-integer and transcendental services. Finite propagation keeps
+Boolean/integer domains; arithmetic components own open integers and reals.
 
 ## Theory directory
 
@@ -27,12 +17,10 @@ resources, and implementation.
 | [Polynomial real arithmetic](16-nonlinear-arithmetic.md#polynomial-real-arithmetic) | Polynomial real constraints, optionally beside finite factors | Exact algebraic completion and cylindrical algebraic decomposition |
 | [Transcendental real arithmetic](16-nonlinear-arithmetic.md#transcendental-real-arithmetic) | exp/log/sin/cos constraints with mixed declarations | Certified enclosures, polynomial relaxation and symbolic checks |
 
-Difference logic is the smallest fragment, and the linear real theory reuses its
-graph. The linear integer and mixed theories add integrality to the same linear
-machinery. Nonlinear integer arithmetic fixes integers and asks the polynomial real
-theory to complete the rest; the transcendental theory relaxes its functions into
-that same polynomial theory. [Input semantics](03-input-semantics.md) states the
-current route limits.
+Linear integer and mixed services add integrality to the real-linear machinery.
+Nonlinear integer search fixes candidates for polynomial real completion;
+transcendental reasoning weakens functions into polynomial constraints.
+[Input semantics](03-input-semantics.md#solving-coverage) records route limits.
 
 ## Extension roles and completeness
 
@@ -86,50 +74,31 @@ premise without copying the entire assignment for each installed factor.
 
 ## Shared composition contract
 
-The [factor and ownership contract](02-model.md#factor-projection-selection)
-allows finite propagation and theory encoding for the same source factor. Schema
-compilation, library preparations and format frontends select the same factor
-encoders; native nonlinear snapshots already contain theory formulas.
+[Prepared ownership](02-model.md#factor-projection-selection) lets propagation and
+encoding consume the same factor while retaining one primary coordinate owner.
+Arithmetic completion waits for authoritative finite choices. Native nonlinear
+snapshots already contain their formulas.
 
-The pipeline selects ownership from the source model. A theory-owned integer is not
-materialized as a guessed finite domain, and real coordinates remain
-arithmetic-owned. When a model also contains finite factors, each engine projection
-keeps the part it can enforce and completion checks the rest. Arithmetic completion
-waits for authoritative finite choices before contributing its final point.
-
-[Search](08-search.md) owns decisions, levels, retraction and shared reasons. Its
-neutral `SourceBoundAtom` describes exact source-coordinate predicates that each
-arithmetic adapter interprets with the same meaning. Registered arithmetic peers use
-[coordinate agreement](09-learning.md#arithmetic-coordinate-agreement)
-to check one authoritative typed point; unsupported combinations keep combined
-ownership or return indeterminate.
-
-[Local search](11-neighborhoods.md#continuous-candidate-completion) requests
-completion before publication, and [portfolios](12-portfolio.md) share only
-accepted witnesses and justified deductions. A contradiction in a pinned candidate
-or repair neighbourhood is not a global refutation.
+[Shared search](08-search.md) owns decisions, levels and retraction. Neutral
+`SourceBoundAtom` predicates mean the same thing in every adapter; multiple
+arithmetic groups use [coordinate agreement](09-learning.md#arithmetic-coordinate-agreement)
+to check one contributed point. [Heuristic completion](11-neighborhoods.md#continuous-candidate-completion)
+checks candidate restrictions without giving their refutations global authority.
 
 ## Results and proof authority
 
-An exact witness keeps its authoritative integer, rational or algebraic values and
-passes the required source checks. Refutation requires a completed proof over the
-relevant source scope and alternatives. A relaxation point is not a witness for
-omitted integrality or finite factors.
-
-Feasibility support does not imply support for an objective, an attained optimum or
-unboundedness; each theory chapter states those limits.
-[LP certification](17-linear-programming.md#lp-certification) owns linear numerical evidence. Current
-certificates are in-memory; there is no
-[independent proof export](01-introduction.md#independently-checkable-proof-files).
+Each theory states its feasibility and objective authority separately. Witnesses
+retain authoritative exact values; proofs must cover their invocation and every
+required alternative. [Result guarantees](01-introduction.md#results-and-completeness),
+[source validation](07-presolve.md#source-witness-validation) and
+[LP certification](17-linear-programming.md#lp-certification) define shared checks.
 
 ## State and resources
 
-Source descriptions are shared read-only; live query, arithmetic and traversal
-state belongs to an invocation or retained worker. Retraction invalidates evidence
-whose premises disappear, and published coordinates outlive the producing workspace.
-Each theory keeps its own native work units within the
-[resource allowances](06-sessions.md#resource-allowances). Cancellation and exhaustion never become
-refutation.
+Live assertions, arithmetic state and traversal belong to an invocation or worker;
+source snapshots are read-only and published values outlive the workspace.
+Retraction invalidates conclusions whose premises disappear. Native work spends the
+containing [resource allowance](06-sessions.md#resource-allowances).
 
 ## Implementation
 
@@ -143,11 +112,9 @@ factors into theory formulas. Each theory lives in its own subpackage:
 
 ## Difference logic
 
-Difference logic is the smallest arithmetic fragment. A difference constraint bounds the distance between two coordinates, such as
-`x - y <= c`. A graph represents each admitted row as an edge from `y` to `x` with
-weight `c`. Feasible potentials supply coordinates; a negative cycle supplies a
-contradiction. The [linear real theory](15-linear-arithmetic.md) in the next chapter
-reuses this graph for its pure-real difference fragments.
+A difference constraint `x - y <= c` is an edge from `y` to `x` of weight `c`.
+Feasible graph potentials supply coordinates and negative cycles supply conflicts.
+The linear real component reuses the graph for admitted real difference fragments.
 
 ### Scope and boundaries
 

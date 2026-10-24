@@ -1,20 +1,11 @@
 # 7. Presolve and validation
 
-With a scope and an allowance in place, the first thing a solve does is prepare
-the model. Presolve reduces it before search while retaining the information
-needed to interpret results in the original source. It can fix variables,
-substitute expressions, remove redundant constraints or strengthen bounds. The
-required preservation guarantee depends on the operation: satisfiability,
-optimization and counting need different contracts.
-
-Preparation applies only reductions justified for that query, records
-reconstruction and objective mappings, and charges its work to the preparation
-phase of the [resource allowance](06-sessions.md#resource-allowances). This
-chapter gives the shape of the pipeline, the guarantees each reduction must
-declare, and how rebuilt models and phase accounting are owned. It closes with
-source witness validation, the check every engine's assignments must pass. The
-search that runs on the prepared model is the subject of the
-[next chapter](08-search.md).
+Presolve fixes variables, rewrites relations and tightens bounds before search.
+Each reduction declares the preservation guarantee required by satisfaction,
+optimization, enumeration or counting, and retains source reconstruction. Preparation
+charges work to the [containing allowance](06-sessions.md#resource-allowances).
+[Source validation](#source-witness-validation) checks reconstructed engine points
+before publication.
 
 ## Pipeline
 
@@ -72,26 +63,20 @@ assignments. Objective preservation depends on the pass context protecting objec
 columns. A satisfiability reduction can keep an optimum while losing source
 multiplicity, so successful reconstruction does not establish a bijection.
 
-Affine elimination carries `AffineValue` records through source and finite presolve,
-evaluated with exact integer arithmetic and replayed in reverse elimination order.
-Finite Boolean elimination, blocked-clause repair, implication merging and singleton
-projection retain the same typed rebuild records as their source forms. Binary
-substitution records each integer's carrying literal and the source Boolean namespace
-size; reconstruction restores later Boolean reductions before reading those literals,
-then truncates appended Booleans. Composition preserves that order and the earliest
-source namespace.
-`SourceMapping` binds a phase and its reconstruction to the actual source and reduced
-model objects; composition requires the preceding target to be the following source,
-and equal variable or factor counts do not establish that association. A
-reconstructed column is excluded from direct definition hints, with two exact
-exceptions: a column rebuilt as an alias of a retained column is renamed onto it, and
-a linear definition substitutes a single affine reconstruction over retained columns,
-passing a rebuilt output to the reconstruction's single partner. Ordered search hints
-can follow integer aliases of the form `x = y + c` for translation-invariant variable
-selectors with minimum or maximum values; bound-based selectors and other value
-choices require direct coordinates. Untouched columns keep their source orientation
-and ordered branching hints. A custom
-reconstruction without direct correspondence withholds hint projection.
+`SourceMapping` binds reconstruction to the actual source and reduced objects;
+composition requires one stage's target to be the next stage's source. Matching
+counts do not establish identity. Affine values replay with exact arithmetic in
+reverse elimination order. Boolean elimination, blocked-clause repair, implication
+merging and singleton projection retain typed reconstruction too.
+
+Binary substitution restores later Boolean reductions before reading carrying
+literals, then truncates appended Booleans, preserving the earliest namespace.
+Definition hints can rename retained aliases and substitute a single affine
+reconstruction over retained columns; a rebuilt output passes to its single partner.
+Ordered search hints can follow `x = y + c` aliases only for translation-invariant
+variable selectors with minimum/maximum values. Bound-based selectors and other
+value choices require direct coordinates. Untouched columns retain their orientation;
+a custom reconstruction without correspondence withholds hint projection.
 
 Objective adjustments map reduced values into source units as `scale * value +
 offset`, with positive exact rational scale, and compose by multiplying scales.
@@ -391,15 +376,10 @@ are reconstructed from their literals, preserving source values and counts.
 
 ## Source routing and encoder selection
 
-Presolve also decides, together with routing, which owner enforces each part of the
-prepared model: finite propagation, an arithmetic theory or both.
-
-Routing attempts bound closing before rejecting a polynomial composition on open
-integer declarations. Proved bounds keep declared holes and factor identities,
-unrelated finite globals keep their finite owner, and a surviving open side stays
-arithmetic-owned. Invocation-local fixings are never permanent source bounds. A
-declined composition keeps its finite owners, and the missing completion withholds
-whole-query admission.
+Routing attempts bound closure before declining nonlinear composition. Proved bounds
+preserve declared holes and factor identities; surviving open sides remain
+arithmetic-owned and unrelated finite globals retain their finite owner.
+Invocation-local pins never become permanent source bounds.
 
 Optional passes and bound closing run under the presolve phase token, while required
 component installation runs under the containing invocation token. Exhausting the
@@ -425,21 +405,11 @@ allowance and retains an already checked publication if later work stops.
 
 ## Source witness validation
 
-Presolve hands search a transformed model, and the following chapters describe
-the engines that look for assignments of it. Before any of those engines can
-publish an assignment, it must be checked against the original source. Every engine
-in the rest of this part relies on this check: a solver's own view of the model is
-never the authority on whether a point is a solution.
-
-`solver.validation` owns reusable checks of proposed source coordinates. Search,
-local search, LP adapters, evidence and pipeline or portfolio orchestration call
-these services; checking does not require an orchestration owner. A check has three
-outcomes. Acceptance means the point satisfies every checked source obligation.
-Rejection refutes the proposed point, never the source. Indeterminate means a
-required checker was unavailable or the check was interrupted. Publication
-identity, restrictions, objective scope and certificate admission remain with the
-[portfolio](12-portfolio.md#witnesses-and-proof-scope) and [evidence](13-evidence.md) callers
-described later in this part.
+`solver.validation` checks proposed coordinates against original source obligations,
+independently of the engine's transformed view. Acceptance checks the point;
+rejection refutes only the point; unavailable or interrupted checking is
+indeterminate. [Portfolio admission](12-portfolio.md#witnesses-and-proof-scope) and
+[evidence](13-evidence.md) separately check identity, restrictions and claim scope.
 
 ### Finite points
 
@@ -495,14 +465,12 @@ and does not change exact evidence semantics. See
 [model ownership](02-model.md#published-assignments-and-objectives) for coordinate
 lifetimes.
 
-Original linear-source checking evaluates original rational rows and declaration
-bounds before normalization. Integrality stays exact; row slack is the larger of the
-absolute tolerance and the relative tolerance times the larger of bound magnitude and
-the sum of absolute term activities, with cancelling terms kept separate. Accepted
-points record whether nominal relations also hold, and tolerance acceptance never
-transfers nominal proofs. Unmetered checks poll cancellation at most every 64 visits.
-A captured acceptance check carries a separate permission for floating optimum
-completion, which zero tolerance withholds.
+Original linear checks use rational rows and declaration bounds before normalization.
+Relative slack keeps cancelling terms separate; integrality is exact. Accepted
+points record whether nominal relations also hold. Tolerance acceptance transfers
+no nominal proof and carries a separate floating-completion permission, withheld at
+zero tolerance. [MPS semantics](05-arithmetic-formats.md#tolerance-publication)
+defines the publication policy.
 
 ### Dependencies
 

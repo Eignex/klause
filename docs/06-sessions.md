@@ -1,21 +1,13 @@
 # 6. Sessions and resources
 
-Part II described the source model and the frontends that produce it. This part
-follows a solve of that model from the caller's request to a published result,
-starting with scope: which assumptions apply, which operation is live, and which
-state survives between calls.
+A session groups operations under caller assumptions. A stream keeps one operation
+alive while it is consumed; a resumable handle keeps it alive across slices. The
+session excludes overlapping mutations until that owner closes. Published results
+outlive the operation.
 
-A *session* groups operations under caller assumptions. A *stream* or *resumable
-handle* keeps one operation alive across consumption or across time slices. The
-session owns those scopes and prevents overlapping operations from mutating active
-state. The caller opens a session, establishes assumptions, starts an operation,
-consumes or resumes it, and closes its owner before changing scope. Published
-results remain readable after the live operation ends.
-
-This chapter defines capture, exclusion and cleanup, then the
-[resource allowances](#resource-allowances) attached to those scopes. The
-traversal and heuristic state an operation retains is described with
-[search](08-search.md) and [local search](10-local-search.md).
+Sessions own scope and cleanup; the [resource allowance](#resource-allowances) owns
+effort across nested work. [Search](08-search.md) and [local search](10-local-search.md)
+describe the state retained by each engine.
 
 ## Assumptions and conditioned queries
 
@@ -25,10 +17,9 @@ pins and per-call parameters; popping restores the previous scope. The source mo
 is unchanged. Parameters that cannot enforce assumptions reject non-empty pins
 explicitly, as do custom sessions for scoped operations they cannot implement.
 
-Optional native views, such as definition orientations, are requested only after
-heuristic admission and presolve, under the same cancellation and work meter. An
-interrupted construction publishes no partial view, and reusing a source attachment
-in a fresh invocation creates a fresh execution scope.
+Reusing a source attachment creates a fresh execution scope. Optional heuristic
+views are requested after admission and presolve under the containing token;
+interrupted construction publishes no partial view.
 
 ## Streams and exclusive ownership
 
@@ -43,13 +34,9 @@ owner, clears scopes and retained local-search weights, and rejects later operat
 Terminal resumable verdicts stay readable after close; a closed pending handle
 rejects further slices.
 
-Finite solve, sample and optimization results keep the model's captured source
-interpretation, including cancellation and refutation without an assignment. This
-metadata adds no proof authority. Resumable handles keep cancellation bound through
-`withLifetimeCancellation`, while each slice supplies its own invocation token; see
-[resource allowances](#resource-allowances) and
-[ALNS acquisition](11-neighborhoods.md#alns-incumbent-acquisition) for how wrapped
-handles keep their instruction charges.
+Results retain captured source semantics even without an assignment. Resumable
+handles keep lifetime cancellation across slices, while each slice supplies its own
+invocation token; neither wrapping nor resuming renews an allowance.
 
 ## Retained state and repair
 
@@ -95,49 +82,29 @@ count.
 
 ## Theory invocation scopes
 
-Arithmetic theories (Part IV) follow the same ownership rule as finite search:
-immutable source snapshots are shared, while each solve owns a fresh invocation. The
-native result and reconstructed source outcome stay in that call's completed
-envelope. Published exact scalars outlive the invocation; its traversal, query
-results and work ledger stay private. Conditioned queries capture their pins without
-changing the source model.
+Arithmetic invocations share immutable source snapshots and own their traversal,
+query results and work ledger. Published exact values outlive the workspace.
 
-A mutable `SearchComponentSet` has one session construction attempt. Prepared search
-openings instead support independent openings with fresh components and their own
-resource registry. Every closeable component and scratch resource joins that
-registry, and completion, close or partial failure release registrations once in
-reverse order, with cleanup failures suppressed onto a construction failure. Callers
-using resource-owning extensions must close abandoned streams.
+A mutable `SearchComponentSet` permits one session construction attempt. Prepared
+openings instead create fresh components and a resource registry per opening.
+Completion, close and partial failure release registrations once in reverse order;
+cleanup failures are suppressed onto a construction failure. Abandoned streams with
+resource-owning extensions must be closed.
 
-Conditioned linear queries keep one private prepared search and work ledger. Each
-query captures Boolean pins, exact coordinate bounds and a strict objective cutoff,
-retracted afterwards with its deadline and meter. The traversal keeps its opening
-decision level through restarts and backjumps, so exhaustion refutes only the active
-condition, never the source. Unpinned Boolean splits consult caller hints before
-the prepared component's live-point preferences; retraction, cancellation and close
-keep the component's validity checks. Both Boolean alternatives remain available; see
-[search](08-search.md#shared-component-search) and
-[resources](#native-arithmetic-allowances). Private auxiliary names
-never reach a published assignment. Polynomial and nonlinear integer invocations
-follow these rules; see
-[polynomial invocation ownership](16-nonlinear-arithmetic.md#invocation-ownership) and
-[nonlinear integer arithmetic](16-nonlinear-arithmetic.md).
+Conditioned linear queries keep one private prepared search and ledger. Each query
+asserts Boolean pins, exact bounds and a strict objective cutoff, then retracts them
+with its deadline and meter. Restarts and backjumps preserve the opening decision
+level, so exhaustion refutes only the condition. Unpinned Boolean splits consult
+caller hints before valid live-point preferences, retaining both alternatives.
+Polynomial and nonlinear integer invocations follow the same scope rule; their
+native units are described in [Part IV](14-theories.md).
 
 ## Resource allowances
 
-Every session operation runs under a containing deadline and work limits.
-Preparation phases, workers, resumable slices and arithmetic services each consume
-part of that allowance in their own units. This section describes how those units
-are configured, how they compose when one scope runs inside another, and what an
-exhausted allowance may and may not mean. Every later chapter in this part spends
-from the ledgers introduced here.
-
-The governing rule is that the ledger stays with its scope. Resuming a handle,
-reseeding a worker or rebuilding a model does not renew the containing allowance,
-so a restart or nested repair cannot silently receive a fresh solve budget.
-Completed atomic operations can overspend; their work stays charged and the next
-polling boundary stops optional work. An exhausted resource allowance never
-establishes that the search space was exhausted.
+One containing deadline and ledger bound preparation, workers, slices and nested
+arithmetic. Rebuilding, reseeding or resuming never renews them. Atomic work can
+overspend an allowance; its charge remains and the next polling boundary stops
+optional work. Resource exhaustion does not establish search-space exhaustion.
 
 ### Configuration and lifetime
 
@@ -225,27 +192,22 @@ turn and two seconds of cumulative active time; see
 
 ### Preparation progress
 
-Long preparations retain a private cursor across invocation expiry, so a cancelled
-invocation pauses rather than restarts them. Local-search initialization (buffers,
-seeding, definitions) and general CP optimization construction (indexes, state
-fills, assumption propagation, LP installation) checkpoint in fixed batches and
-spend wall time without decision/move charges. Closing discards the cursor.
-Individual allocations and factor calls stay atomic and may overrun; see
-[initialization](10-local-search.md#projections-and-preparation) and
-[private CP preparation](12-portfolio.md#private-cp-preparation).
+Local-search initialization and general CP optimization construction retain private
+cursors across slice expiry. Buffers, seeding, indexes, root propagation and LP
+installation advance in bounded batches, spending time without decision/move charges.
+Closing discards the cursor; individual allocations and factor calls stay atomic.
+[Local-search preparation](10-local-search.md#projections-and-preparation) and
+[CP preparation](12-portfolio.md#private-cp-preparation) own those mechanisms.
 
-Optional finite real-difference preparation charges its visits to the solve token
-under a cumulative 65,536-visit limit and a 10,000-column envelope; cancellation or
-decline discards the whole prefix without refund.
+Encoder construction charges row, term, factor and installer visits. Required
+post-presolve installation uses the containing token; optional source passes use
+presolve limits. Exhausting an optional allowance cannot skip required installation.
+Interrupted construction discards relations and retains charges. Completed immutable
+relations can be reused for one consultation unit; live assertions and query state
+remain private.
 
-Encoder construction charges row, term, factor and installer visits to the
-invocation meter. Required post-presolve installation uses the containing token
-while optional source passes keep presolve limits, so exhausting the optional
-allowance cannot retire a complete worker before installation. Interrupted
-construction discards emitted relations and keeps its charges; a preparation
-decline is not a refutation. Completed immutable relations can be reused across
-openings for one consultation unit. Live assertions, query results and native
-resources are never shared.
+Optional finite real-difference preparation has a cumulative 65,536-visit limit and
+10,000-column envelope. Decline discards its whole prefix without refund.
 
 ### Component execution controls
 
@@ -285,28 +247,23 @@ cap. Parallel scheduling and stopping order are not reproducible.
 
 ### Native arithmetic allowances
 
-Arithmetic services keep their own work currencies inside the containing solve. A
-conditioned check receives only its invocation's remaining allowance; branches,
-retractions and retries do not renew it. Native work is forwarded once to the caller
-meter and is not charged again as decisions; exhaustion withholds an incomplete
-verdict. Parallel arithmetic workers keep their quota by slot identity, so reopening
-a slot cannot renew it. A representation decline stops one worker; containing stops
-and cancellation stop all.
+Arithmetic work uses native units inside the containing solve. A conditioned check
+receives only the invocation's remaining allowance; branches and retries never
+renew it. Native work is forwarded once to the caller meter, separately from decision
+charges. Parallel slots retain their quota across reopening. Representation decline
+stops one worker; containing stops cancel all.
 
-Optional guidance, such as exact-linear polarity hints and gate recognition, reuses a
-completed check and charges its index construction to that check's token under a
-65,536-entry boundary. A private limit discards the hint; required work keeps its own
-limits. Native source setup prepays coordinate capture before building an immutable
-plan, and a fresh execution request cannot renew stopped preparation.
+Optional guidance reuses completed checks. Its index construction spends the check's
+token under a 65,536-entry boundary; a private stop discards only the hint. Native
+setup prepays source capture, and new controls cannot revive stopped preparation.
 
-Each theory chapter defines its own units and caps:
-[difference logic](14-theories.md#state-and-resources-1),
-[linear real](15-linear-arithmetic.md#state-and-resources),
+Theory-specific currencies and caps belong to [difference logic](14-theories.md#state-and-resources-1),
+[linear arithmetic](15-linear-arithmetic.md#state-and-resources),
 [nonlinear integer](16-nonlinear-arithmetic.md#state-and-resources),
 [polynomial real](16-nonlinear-arithmetic.md#state-and-resources-1) and
-[transcendental](16-nonlinear-arithmetic.md#state-and-resources-2), with shared rules in
-[theory services](14-theories.md#state-and-resources).
-[LP certification](17-linear-programming.md#lp-certification) defines what survives an interrupted LP solve.
+[transcendental arithmetic](16-nonlinear-arithmetic.md#state-and-resources-2).
+[LP certification](17-linear-programming.md#resources-and-cancellation) defines its
+own interruption boundary.
 
 ### Mechanism and compatibility
 

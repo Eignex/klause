@@ -1,39 +1,18 @@
 # 1. Introduction
 
-Klause is a Kotlin Multiplatform constraint solver. A caller describes one
-constraint model, from a Kotlin schema or a source file such as FlatZinc, MPS or
-SMT-LIB, and Klause solves it with whichever combination of complete search,
-local search and arithmetic reasoning fits the model. Choosing a strategy changes
-how the problem is searched; the meaning of the model and the guarantees attached
-to every published result stay the same.
-
-This chapter introduces the shared model, result guarantees and boundary between
-finite propagation and arithmetic, then maps them onto modules and packages.
-[Solving coverage](03-input-semantics.md#solving-coverage) records the supported
+Klause is a Kotlin Multiplatform constraint solver. Kotlin schemas and file
+frontends produce source models that complete search, local search and arithmetic
+services solve under one publication contract. Preparation selects the mechanisms;
+changing strategy preserves the source constraints, variable meanings and objective.
+[Solving coverage](03-input-semantics.md#solving-coverage) defines the admitted
 fragments and strategy limits.
-
-## Shared model breadth
-
-Complete search, local search and portfolios consume the same source constraints,
-variable meanings and objective. Preparation selects engine projections and any
-required arithmetic completion; changing strategy cannot drop a source relation.
-The mechanisms differ in filtering, scoring, completeness and proof authority.
-
-Not every route admits every strategy. Prepared capabilities report explicit
-declines, including heuristic execution over open numerical MPS models. The
-[coverage table](03-input-semantics.md#solving-coverage) and individual format
-chapters describe these limits.
 
 ## Results and completeness
 
-The complete-search arm is the portfolio's source of certified refutations, bounds
-and optimum claims. That role is distinct from mathematical completeness: an
-incomplete procedure can still produce sound proofs for individual instances, and
-any guarantee of eventual decision must name its fragment and procedure. Even a
-complete procedure can stop without a verdict under time, work or representation
-limits. Local search contributes checked witnesses and incumbents; unsuccessful
-local search is never a refutation. Support requires defined source semantics and
-sound publication, not decidability.
+Complete workers can certify refutations, bounds and optima. Procedure completeness
+is a separate property: a sound incomplete procedure may prove individual instances,
+while even a complete procedure can stop under resource limits. Local search supplies
+checked witnesses and incumbents; its failure never refutes the source.
 
 | Claim | Required authority |
 |---|---|
@@ -48,60 +27,24 @@ A zero heuristic score, a relaxation candidate or satisfaction of an approximate
 model never justifies an exact claim. Approximation and configured tolerance have
 separate contracts in [input semantics](03-input-semantics.md).
 
-## Finite propagation boundary
+## Model and execution
 
-Finite propagation owns Boolean and finite integer domains only. Real values and
-open integer state belong to arithmetic components. Shared search owns traversal,
-decisions, retraction and model assembly across those owners, so continuous
-support never places real domains in CP. See
-[shared component search](08-search.md#shared-component-search).
+A source model retains declarations, high-level factor relations, an objective and
+[typed semantics](02-model.md#typed-source-semantics). Format defaults define
+numeric authority, undeclared ranges and approximation policies. Caller overrides
+replace applicable defaults before lowering; results retain the effective policy.
+These semantics select no engine.
 
-## High-level factors and composed reasoning
+[Source setup](19-api.md#source-setup) binds the operation, strategy and resources,
+then prepares ownership and execution projections. A factor can participate in
+finite propagation, local scoring, relaxation and arithmetic encoding together.
+Only a complete enforcing mechanism owns its relation; a relaxation provides no
+feasibility authority. [Model representation](02-model.md) defines these roles.
 
-Source factors retain relations that preparation projects into propagation,
-scoring, relaxation and theory mechanisms. Frontends also use shared encodings in
-`lowering` where source syntax needs decomposition. An `Encoder` installs a whole
-factor relation into a selected theory, retaining source mappings for private
-auxiliaries. Native arithmetic snapshots carry formulas directly.
-
-Variable ownership is separate from factor participation. A factor can use a
-`Propagator`, an `Encoder`, an `Invariant` and relaxation views together: joint
-linear reasoning can complement finite bound propagation, and finite globals can
-stay native beside real completion. Theories consuming finite variables preserve
-integrality, bounds and holes. An arithmetic relation does not by itself transfer
-unrelated finite variables or factors to theory search.
-
-Providers distinguish direct, equivalent, conditioned, relaxation-only and
-unsupported support. Conditions retain their premises and retract with shared
-search, and live arithmetic systems belong to shared `SearchComponent` instances.
-Every source factor must be enforced under its declared semantics before a
-solution is published, and proof claims require agreement between all
-participating components.
-
-## Format semantics, caller settings and automatic setup
-
-A frontend produces a source model with declared semantics, and the library
-selects how to solve it. Three layers determine the effective setup, in order:
-
-1. **Format semantics.** Each format declares the defaults its syntax implies as
-   typed data carried with the model: numeric authority (exact rationals for
-   SMT-LIB, decimal rows under a published tolerance for MPS, binary64 floats with
-   a bounded grid for unranged FlatZinc floats), undeclared ranges and absent
-   optional values. These describe the solution set and result qualification;
-   they select no engine or route.
-2. **Caller settings.** Library parameters and CLI flags override individual
-   semantic defaults. An override means the same thing for every format with that
-   semantic and is rejected where it has no meaning. Results carry the effective
-   qualification, so an approximating override cannot publish an exact claim.
-3. **Automatic setup.** One library entry receives the model, its semantics, the
-   operation and the caller's strategy and resource settings, and selects the
-   route, theory composition, engines and portfolio from prepared capabilities.
-   An explicit engine request narrows that selection without bypassing admission.
-
-Frontends parse, lower source syntax, attach semantics and render results.
-[Source setup](19-api.md#source-setup) owns execution selection for all file formats,
-including MPS's numerical route. SMT-LIB admission selects a lossless factor or
-native formula representation before that setup.
+Finite propagation owns Boolean and finite integer domains. Arithmetic components
+own real values and open integer state. [Shared search](08-search.md) coordinates
+decisions, retraction and model assembly without inventing finite bounds for open
+coordinates. Frontends parse, lower and render; they never invoke concrete theories.
 
 ## Independently checkable proof files
 
@@ -113,56 +56,24 @@ source solve for a separate checker. In-memory engine attestations and checked
 original-source derivations have distinct authority; neither a reduced-model
 label nor a checked witness supplies a missing refutation or bound derivation.
 
-## Current execution contracts
-
-Each row links to the chapter that owns the contract.
-
-| Area | Implemented contract |
-|---|---|
-| Source execution planning | [Prepared source plans](02-model.md#engine-projections-and-factor-capabilities) retain original identity, coordinate mappings, component ownership and objectives for complete and heuristic construction. |
-| Strategy composition | [Portfolio invocation](12-portfolio.md#exact-theory-strategy-execution) builds finite, linear, polynomial, nonlinear-integer and quadratic portfolios through shared arm factories, seeds, quotas and admission. |
-| Conditioned completion | [Linear query owners](06-sessions.md#theory-invocation-scopes) retain prepared decomposition and search across repairs under [cumulative allowances](06-sessions.md#native-arithmetic-allowances). |
-| Strategy admission | [Prepared capabilities](12-portfolio.md#prepared-strategy-admission) expose arms, operations, completeness, claim authority and explicit declines. |
-| Source evidence | [Typed source-scoped evidence](13-evidence.md) checks supported derivations against original premises, separately from native admission. |
-
 ## System architecture
 
-The code base is arranged to keep those guarantees. This section follows a
-problem from source to result and maps each step onto modules and packages.
+Dependencies point from policy to mechanism. Model construction preserves source
+meaning; solving policy chooses when to search, check or combine strategies;
+reusable propagation, scoring and numerical kernels perform the work.
 
-The system has three layers. Model construction turns a Kotlin schema or a source
-file into an engine-neutral source model. Solving policy decides when to search,
-check or combine strategies. Reusable mechanisms supply propagation, scoring and
-arithmetic. Dependencies point from policy to mechanism, never back, so a mechanism
-can be replaced without touching the policy that calls it.
+A solve passes through four stages:
 
-### From source to result
+1. A schema compiler or format frontend captures declarations, constraints,
+   objective, names and semantics.
+2. [Presolve](07-presolve.md) reduces the model and retains reconstruction mappings;
+   source setup chooses finite, arithmetic or composed execution.
+3. Complete and heuristic workers run with private mutable state under the
+   containing [resource allowance](06-sessions.md#resource-allowances).
+4. Source checks and scoped evidence admit publications; the frontend renders them.
 
-1. A schema compiler or format frontend preserves declarations, constraints,
-   objective and source names in the shared representation, together with its
-   [typed source semantics](02-model.md#typed-source-semantics).
-2. [Presolve](07-presolve.md) applies sound reductions and retains the mappings
-   needed to rebuild source assignments. [Source setup](19-api.md#source-setup)
-   selects a finite, open-arithmetic or composed route without inventing bounds
-   for open variables.
-3. Complete search, local search and portfolio workers run with their own mutable
-   state. Finite propagation owns Bool+Int domains; arithmetic services own real
-   values and open integer state.
-4. Source checks admit witnesses, bounds and terminal verdicts. Frontends render
-   the result; they never invoke concrete theories.
-
-### Solving
-
-Finite backtracking combines Boolean learning, explainable CP propagators,
-combinatorial global bounds and optional LP relaxations; a Boolean-only path
-handles SAT and pseudo-Boolean structure. Local search exposes composable move,
-score and acceptance policies, and portfolios select arms from model structure,
-objectives and requested settings. LP adapters assemble relaxations and
-reconstruct source results; the LP engine has no presolver of its own.
-
-Part III follows these stages in the order a solve meets them, Part IV covers the
-[theory services](14-theories.md) search consults for arithmetic, and Part V the
-numerical mechanisms beneath them.
+Part III follows those stages. Part IV describes arithmetic services and Part V
+the numerical mechanisms beneath them.
 
 ### Repository modules
 
@@ -213,18 +124,11 @@ Packages below are under `com.eignex.klause` in
 | `solver.pipeline` | Source routing and one verdict surface | Selects theory once; frontends render assignments |
 | `solver.search` | Component protocol, decisions, traversal, retraction, learning and complete checks | No concrete theory, LP, propagation or backtracking dependencies |
 
-These rules all point from policy to mechanism. Enlarging a numerical package's
-closed dependency list couples reusable numerical work to model policy, so it is
-the change to refuse.
-
-### Numerical package ownership
-
-Numerical kernels own arithmetic and private working storage; they do not own source
-models, search strategy or verdict publication. The LP engine's closed dependency
-list keeps it independently replaceable, while model-facing adapters assemble rows,
-interpret certificates and preserve source scope outside it. See
-[LP architecture](17-linear-programming.md) and
-[exact arithmetic kernels](18-exact-arithmetic.md#exact-polynomial-and-algebraic-arithmetic).
+Numerical kernels own arithmetic and private storage, while model-facing adapters
+assemble relations, interpret certificates and preserve source scope. The closed
+dependency lists keep those kernels independently replaceable. See
+[linear programming](17-linear-programming.md) and
+[exact arithmetic](18-exact-arithmetic.md).
 
 ---
 

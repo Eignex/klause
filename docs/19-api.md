@@ -1,15 +1,9 @@
 # 19. Library API
 
-Library callers construct a source model, choose an operation and consume owned
-results. Extensions can add factors, search components, objectives or theories,
-provided they uphold the same source semantics and publication checks.
-
-Part VI turns from how Klause solves to how it is used and built. This chapter
-describes the library surface: which contracts are supported, how a
-caller moves from a model to a result, which roles extensions can fill, and who owns
-the values that cross the boundary. The underlying lifetimes come from
-[model representation](02-model.md) and [sessions](06-sessions.md); the
-[next chapter](20-cli.md) describes the command-line frontend built on this API.
+Library callers construct a source, choose an operation and consume owned results.
+Extensions supply factors, components, objectives or theories under the same semantic
+and publication contracts. [Model ownership](02-model.md) and [sessions](06-sessions.md)
+define lifetimes; this chapter identifies supported entry points and extension seams.
 
 ## Supported library and extension surfaces
 
@@ -36,9 +30,8 @@ pins every candidate coordinate when a propagation-only factor has no local chec
 
 ## Model construction and solving
 
-A schema declares variables and constraints, compilation produces a `Problem`, and
-solver entry points return assignments or optimization results for decoding. Direct
-model construction uses the same source declarations and factor semantics.
+Schemas and direct IR construction share source declarations and factor semantics;
+[the DSL chapter](03-input-semantics.md#schema-lowering) gives a decoding example.
 
 ### Source-aware strategy entry points
 
@@ -179,12 +172,10 @@ storage. A location is valid only with its owning model, projection or layout.
 
 ## Snapshot and buffer ownership
 
-`Problem` and `Factor` structures stay unchanged for every operation, plan or proof
-referring to them. `Sample`, exact assignments and rebuilt witnesses own immutable
-coordinates; public array getters return independent buffers. Replacing a coordinate
-in a sample copy drops its exact authority and requires a fresh check. Linear
-objectives own their coefficients; custom incumbent verifiers capture producer state
-before acceptance.
+Source structures stay borrowed read-only; samples and exact assignments own their
+coordinates. Changing coordinates discards acceptance and requires a fresh check.
+[Model ownership](02-model.md#published-assignments-and-objectives) defines the full
+buffer, objective and lifetime contract.
 
 ## Exact assignment values
 
@@ -231,4 +222,4 @@ installing an encoding supplies no proof certificate by itself.
 
 ---
 
-Previous: [18. Exact arithmetic](18-exact-arithmetic.md) · [Contents](README.md) · Next: [20. Command line and development](20-cli.md)
+Previous: [18. Exact arithmetic](18-exact-arithmetic.md) · [Contents](README.md) · Next: [20. Command line](20-cli.md)

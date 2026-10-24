@@ -1,23 +1,9 @@
 # 12. Portfolios
 
-Complete search and local search have complementary strengths, and Klause rarely
-runs just one of them. A portfolio runs multiple strategies over one source model
-and objective. Workers can improve incumbents, establish bounds or complete a
-proof; the coordinator schedules their work and admits shared results only with the
-authority required for that claim. One worker's failure to find a solution does not
-refute the model.
-
-Execution has three parts: prepare retained workers, give them bounded slices of
-the [resource allowance](06-sessions.md#resource-allowances), and verify their
-publications with [source validation](07-presolve.md#source-witness-validation)
-before sharing or returning them. Prepared admission determines which complete
-and heuristic arms can execute the source; a declined arm keeps its explicit cause.
-
-The chapter starts with how an invocation is assembled and which strategies it
-admits, then follows a worker's output: which [witnesses](#witnesses-and-proof-scope)
-it may publish and what exhaustion establishes, how the [scheduler](#scheduling)
-hands out slices, and the [worker recipes](#worker-recipes) chosen for particular
-model structures.
+A portfolio schedules retained workers over one source and objective. Workers share
+checked incumbents and certified deductions; the coordinator owns slice allocation,
+publication admission and cleanup. Prepared capabilities decide which arms can run,
+while proof scope decides which claims they may make.
 
 ## Invocations and recipes
 
@@ -55,28 +41,18 @@ invocation. Original-source derivation capture is the subject of
 
 ## Statistics
 
-The portfolio owns `SolveStats.run.wallMs` for each satisfaction or optimization
-invocation, spanning initialization, all segments, verification and disposal; it
-replaces worker run windows rather than summing them. Worker counters merge
-independently, and per-arm scheduled times can overlap across parallel lanes.
-
-| Field | Meaning |
-|---|---|
-| Arm `maxMs`, `initMs` | Longest elapsed segment and handle opening cost |
-| `portfolioReseedStaleThreshold`, arm `reseeds` | Effective stale threshold and reseed count |
-
-`initMs` measures opening the handle. Preparation deferred into slices contributes to
-segment time and live propagation counters; it is not included in opening time.
-[Search statistics](09-learning.md#statistics) define propagation and conflict
-accounting.
+`SolveStats.run.wallMs` spans initialization, slices, verification and disposal for
+one invocation; it replaces worker windows rather than summing them. Worker counters
+merge independently, and parallel arm times may overlap. Arm `initMs` measures
+handle opening; deferred preparation belongs to segment time and live counters.
+`maxMs` is the longest segment, and `reseeds` counts arm reseeds.
+[Search statistics](09-learning.md#statistics) owns propagation/conflict accounting.
 
 ## Witnesses and proof scope
 
-A portfolio is only as sound as what it lets workers share. Every publication
-carries an identity, checking it has three outcomes, and bounds, refutations and
-exhaustion need extra evidence. The checks themselves are
-[source validation](07-presolve.md#source-witness-validation); the portfolio
-supplies publication scope and tolerance policy.
+[Source validation](07-presolve.md#source-witness-validation) checks coordinates.
+Portfolio admission additionally checks publication identity, invocation conditions
+and the authority required by the claim.
 
 ### Publication identity
 
@@ -97,14 +73,11 @@ instead of acquiring another worker's identity.
 
 ### Owned assignments
 
-Open portfolios transport exact assignments in `Sample`: `exactInts` and
-`exactReals` carry immutable authoritative coordinates, and published incumbents
-cannot be mutated through constructor inputs or exported arrays (see
-[model ownership](02-model.md)). Changing coordinates or projecting a warm start
-discards acceptance and requires a fresh check. The exact objective is evaluated
-from the carried assignment, including integers outside `Long`, and incumbents are
-ordered by that source value, separately from the minimized execution value used by
-cutoffs.
+Incumbents carry immutable source coordinates in `Sample`, including exact integers
+and reals. The source objective orders them independently of native minimized cutoff
+units. Changing coordinates or projecting a warm start discards acceptance and
+requires a fresh check; [model ownership](02-model.md#published-assignments-and-objectives)
+defines buffer lifetimes.
 
 ### Verification outcomes
 
@@ -175,12 +148,9 @@ no worker materializes a finite domain for an open numerical declaration.
 
 ## Scheduling
 
-With publication rules fixed, the scheduler decides which retained worker runs next
-and for how long. It hands out bounded slices of one shared schedule, lets expensive
-preparation proceed across slices, guarantees complete search a share of time before
-the first witness, and reseeds workers whose progress has stalled. None of these
-decisions carries witness or proof authority; they only order work under the
-[resource allowances](06-sessions.md#resource-allowances).
+The scheduler assigns bounded slices, revisits pending preparation and reseeds stale
+workers under the containing [allowance](06-sessions.md#resource-allowances).
+Scheduling changes work order, never publication authority.
 
 ### Slice accounting and coverage
 
@@ -302,45 +272,22 @@ alone supplies no authority; source validation and conditional proof admission s
 
 ## Worker recipes
 
-Publication and scheduling apply to every pool. Recipes decide which workers a
-curated pool contains for particular model structures, and how exact arithmetic
-sources supply their workers. A recipe changes pool composition, never witness or
-proof authority.
-Explicit pools, backtrack edits and source annotations keep their requested
-composition throughout, and containing time, work and LP allowances stay shared.
+Recipes select workers from model structure. Explicit pools, backtrack edits and
+source annotations retain their requested composition. Defaults live in
+[portfolio construction](../klause/src/commonMain/kotlin/com/eignex/klause/portfolio).
 
 ### Model-specific worker recipes
 
-#### Scheduling neighborhood diversity
+Curated sequential mixed finite optimization pools diversify both neighborhoods and
+branching, without adding allowance:
 
-A curated sequential mixed optimization pool over a scheduling model pairs the
-original plateau local-search arm with a primary-repair variant in the preceding
-generic CBLS slot. Both use iterated local-search restarts (basin hopping over a
-population of three) from the original arm's seed. The variant routes supplemental
-Element repairs into an alternative list consulted only by improving fallback
-selection, while the original arm keeps its full repair neighborhood.
+| Structure | Additional diversity |
+|---|---|
+| Scheduling | A primary-repair CBLS variant beside the full neighborhood, both using iterated local-search restarts |
+| Annotated circuit/subcircuit with first-fail/min values | Unrestricted first-fail beside the annotation's tiered scope |
+| Finite objective without an initial LP recipe | A restart-level bandit over variable/value selectors (`selector-switch`) beside the SAT guard |
 
-#### Annotated finite-domain diversity
-
-A curated single-core mixed optimization pool with at least six configured arms
-keeps unrestricted first-fail search beside a source annotation on nonbinary
-finite-CP models with a circuit or subcircuit constraint, when the annotation selects
-integer first-fail with minimum values. A tiered annotation restricts candidate
-scope, so the unrestricted worker adds a distinct branching capability. Search tiers
-follow safe translated integer aliases through presolve, including circuit successor
-offsets, before admission and worker construction. It adds at
-most one complete worker and no allowance.
-
-#### Finite objective recipe diversity
-
-A curated single-core mixed finite-CP optimization pool with at least six configured
-slots admits the restart-level selector portfolio (`selector-switch`) beside the SAT
-guard when its initial backtrack pair has no LP recipe. The worker restarts on a Luby
-schedule with base 100 and, at each restart, a UCB1 bandit picks one of four
-variable/value pairs: VSIDS with minimum value, dom/wdeg with solution-guided minimum
-value, activity-based search with impact values, and conflict ordering over dom/wdeg
-with minimum value. A run is rewarded when it finds a solution. The worker occupies
-the conflict-driven slot, preserving pool size and allowances.
+The latter two require at least six configured slots and preserve pool size.
 
 #### LP arm admission
 
@@ -408,19 +355,15 @@ selects it directly.
 
 ### Exact theory strategy execution
 
-Polynomial, nonlinear-integer and open linear invocations use the same construction
-path as finite execution. Polynomial workers keep private arithmetic invocations,
-nonlinear integer traversal keeps its candidate state across slices, and quadratic
-adapters supply retained traversal and exact neighborhood factories. A typed terminal
-enters the schedule only after source, condition, objective, witness and exact
-attainment or strictness checks. Replicas keep private state and reservations.
+Linear, polynomial, nonlinear-integer and quadratic routes supply factories to the
+same invocation. Replicas keep private arithmetic state, traversal and quotas across
+slices. Typed terminals are admitted only after source, condition, objective,
+attainment and strictness checks.
 
-Supported linear sources pair complete traversal with exact-coordinate local search
-and adaptive block repair, including real-only models and arbitrary-width integers.
-Neighborhood windows restrict proposals rather than source domains, so neighborhood
-refutations carry no source proof. Exact neighborhood handles keep centers, radii and
-adaptive weights through slices and widen on stalls without reopening the native
-allowance.
+Linear sources can pair complete traversal with
+[exact-coordinate neighborhoods](11-neighborhoods.md#exact-coordinate-neighborhoods),
+including real-only models and wide integers. Those handles retain centers, radii
+and adaptive weights; window refutations never become source proofs.
 
 ---
 

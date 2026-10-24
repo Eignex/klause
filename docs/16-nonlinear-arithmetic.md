@@ -1,23 +1,15 @@
 # 16. Nonlinear arithmetic
 
-Nonlinear constraints multiply coordinates, raise them to powers or apply
-transcendental functions. These fragments are undecidable in general or need far
-heavier machinery than an LP, and all three theories in this chapter meet in one
-place: exact polynomial real completion. Nonlinear integer arithmetic searches
-integer candidates and asks the polynomial real theory to complete the reals;
-polynomial real arithmetic decides polynomial formulas exactly with a cylindrical
-algebraic decomposition; transcendental arithmetic relaxes exp, log, sin and cos
-into polynomial constraints and repairs candidates against the original functions.
+Nonlinear services meet at exact polynomial real completion. Nonlinear integer
+search fixes integer candidates before completing reals; the polynomial theory
+uses cylindrical algebraic decomposition (CAD); the transcendental theory weakens
+functions into polynomial constraints and checks proposals against the originals.
 
 ## Nonlinear integer arithmetic
 
-Nonlinear integer constraints multiply or raise integer coordinates to powers,
-alongside real and Boolean coordinates. Unlike the linear fragments, this fragment
-is undecidable in general, so the theory makes no termination promise. It searches
-integer candidates and, for each one, asks the
-[polynomial real theory](#polynomial-real-arithmetic) to complete the real
-coordinates exactly. This theory owns integer proposals and integrality; the
-polynomial theory owns exact real completion.
+Nonlinear integer satisfaction is undecidable in general. This sound incomplete
+service owns integer proposals and integrality, delegating exact real completion to
+the [polynomial theory](#polynomial-real-arithmetic).
 
 ### Scope and boundaries
 
@@ -112,15 +104,10 @@ delegates bound classification to the quadratic pipeline policy.
 
 ## Polynomial real arithmetic
 
-Polynomial real constraints multiply real coordinates, such as `x*y >= 1` or
-`x^2 + y^2 = 2`. Where the [linear theories](15-linear-arithmetic.md) check rows
-with an LP, this theory checks nonlinear real formulas exactly and completes
-continuous coordinates beside finite search. Nonlinear integer arithmetic uses it as
-the real completion service for fixed integer candidates, and the
-[transcendental theory](#transcendental-real-arithmetic) relaxes its functions into
-it. Its decision procedure is a cylindrical algebraic decomposition
-(CAD) over exact algebraic numbers. Real values remain theory-owned; CP remains
-Bool+Int only.
+The polynomial theory decides rational-coefficient real formulas by CAD and completes
+reals beside finite search. Nonlinear integer and transcendental services reuse its
+conditioned checks. The [polynomial kernel](18-exact-arithmetic.md#exact-polynomial-and-algebraic-arithmetic)
+owns arithmetic; this service owns formula decisions and projection policy.
 
 ### Scope and boundaries
 
@@ -137,19 +124,12 @@ procedure.
 
 #### Shared model composition
 
-`PreparedSourcePlan` owns the shared source decomposition. Its
-`SharedPolynomialModel` installs selected polynomial encoders and connected finite
-encoders: exact linear rows, Boolean reification, real bounds, integer/real
-products and `ContinuousProduct` become neutral polynomial formulas. Only integers
-that appear in encoded equations receive numeric slots; their finite domains and
-global constraints stay in CP, and relaxation rows cannot stand in for a factor's
-semantics. A scope with open integer declarations selects the
-[nonlinear integer adapter](#) instead; open integers are
-never boxed.
-
-Selected clauses retain their source Boolean disjunctions. Their literals enter
-Boolean region search directly, without real selector coordinates or numeric
-comparison predicates.
+`SharedPolynomialModel` installs selected polynomial encoders, source bounds and
+private definitions under the [prepared ownership plan](02-model.md#engine-projections-and-factor-capabilities).
+Only finite integers used by encoded equations receive numeric slots; their domains
+and globals remain finite-owned. Clauses keep Boolean disjunctions without numeric
+selectors. Surviving open integers select the
+[nonlinear integer adapter](#nonlinear-integer-arithmetic).
 
 Each strategy uses the plan in its own way:
 
@@ -243,153 +223,68 @@ implements the decision procedure. The pipeline uses
 
 #### Decision procedure
 
-`solveQfNra` decides a neutral `PolynomialRealFormula`. Normalization expands exact
-rational polynomial expressions and keeps each atom's sign, relation and Boolean
-structure. Scalar-equivalent numeric predicates share Boolean truth; complementary
-relations use opposite truth values. Exact rational scaling accounts for order
-reversal under a negative coefficient. Strict and weak comparisons retain their
-different zero boundaries, and variable factors retain singular fibres. The
-Boolean DAG retains original Boolean identities and the first numeric
-representative, including after graph substitution. Every normalization and atom
-rewrite removes duplicate gate children, complementary siblings and Boolean
-constants, then compacts unreachable nodes in retained predicate order. These
-identities apply without required Boolean definitions. Constant numeric atoms retain
-their exact polynomials; Boolean propagation evaluates their truth.
+`solveQfNra` normalizes exact polynomials and Boolean structure. Scalar-equivalent
+predicates share truth and complements use opposite truth, with exact negative-scale
+order reversal and distinct strict/weak zero boundaries. Rewrites preserve singular
+fibres, source Boolean identities and numeric predicate order, fold duplicate or
+complementary children and constants, and compact unreachable nodes.
 
-The root reducer substitutes Boolean variables defined by required numeric
-equivalences throughout the formula. Their tautologies
-are removed, so a source implicant need not choose truth values for unused
-definitions. Numeric predicates retain their input order through this rewrite.
-An equivalence in an optional guarded branch cannot define a global
-substitution. Remaining constraints, including other definitions of the same
-Boolean variable and condition pins, keep their numeric consequences. Reduced
-witnesses recover original Boolean values through the original normalized formula
-check, even when no real coordinate was eliminated.
+Root reduction substitutes Booleans defined by mandatory numeric equivalences, then
+mandatory total graph equalities into every atom. Opposite weak bounds can establish
+an equality; optional guards and variable-dependent leading coefficients cannot
+justify global elimination. Remaining definitions and condition pins stay enforced.
+Each completed rewrite commits an immutable formula snapshot with its own persistent
+reverse-fibre chain. Representation decline can retain a completed prefix; interrupted
+rewrites publish no snapshot.
 
-The root reducer extracts mandatory numeric predicates with Boolean propagation.
-Their exact total graph equalities are substituted into every atom, including
-optional branches. Opposite weak bounds may
-supply such an equality; an unforced guarded equation or an equation with a
-variable-dependent leading coefficient cannot eliminate a coordinate. Completed
-substitutions retain reverse fibres. Existing arithmetic representation limits can
-decline a substitution while preserving its completed prefix; cancellation and
-work exhaustion withhold the result. Expansion uses the caller's remaining work
-and representation limits.
+Reduction and search retain separate cursors under one allowance, advancing the one
+with less charged work. Search starts at the first committed rewrite or finished
+unchanged formula and survives intermediate commits. A finished different formula,
+or a representation decline with a newer snapshot, can replace its cursor. Only the
+latest snapshot and one search cursor survive; discarded work remains charged and
+regional refutations never transfer across snapshots. A containing stop ends both;
+optional probing keeps one cumulative allowance across retries.
 
-Root reduction exposes the normalized formula and immutable committed snapshots.
-Each snapshot retains its
-own formula and persistent reverse-fibre chain; later substitutions cannot change
-an earlier reconstruction. A snapshot is available only after an entire Boolean
-rewrite or numeric substitution commits. An interrupted rewrite publishes no
-snapshot. Query progress records committed snapshots, root and search work, and
-the first regional entry separately from completed projection and lifting.
-Region and projection counters accumulate actual attempts across snapshot
-replacements; they do not count distinct source regions.
+The decision procedure has four stages:
 
-Root reduction and exact search retain separate cursors under one arithmetic
-allowance. The cursor with less charged work advances at the next checkpoint;
-finished reduction leaves the remaining work to search. Search starts from the
-first completed rewrite, or from a finished unchanged formula, and retains its
-cursor while intermediate snapshots commit. A finished different root formula
-replaces that cursor; a representation decline can also retry the latest different
-snapshot. Only the latest snapshot and one search cursor are
-retained, and discarded work remains charged. Regional refutations do not cross
-snapshot boundaries. A containing stop terminates both cursors. Optional probing
-shares one cumulative allowance across retries.
+1. **Bounded probe.** Necessary sign/magnitude conditions can refute conjunctive
+   atoms; rational and algebraic repairs propose points. A proposal reconstructs
+   eliminated coordinates and checks the original normalized formula. This optional
+   small-formula prefix has a 65,536-unit slice.
+2. **Boolean regions.** `PolynomialBooleanRegions` enumerates source implicants
+   over Boolean leaves and signed numeric predicates. Numeric assignment/retraction
+   runs exact sign propagation before further decisions. Completed feasible fixpoints
+   extend with appended predicates and rebuild after changed premises; unchanged
+   conjunctions reuse them. A contradiction learns a private exclusion over all
+   assigned numeric premises, valid under any Boolean prefix in that enumerator.
+   Feasible overapproximations and unfinished checks learn nothing. Exclusions stay
+   within the query, condition and snapshot. Incremental gate support follows affected
+   nodes and parents; region capture keeps the first decisive child in source order
+   or all identity children. Separate visited-region exclusions prevent repetition.
+   Neither exclusion kind enters shared learning.
+3. **Reduction and projection.** Ordered remainders simplify predicates modulo
+   retained zero-equality premises. Linear equalities are substituted and linear-only
+   inequality coordinates eliminated. Affine endpoint comparisons can add
+   fewer-variable consequences while retaining original bounds and strictness;
+   variable coefficients are never divided out. Exact convex quadratic certificates
+   can refute conjunctions against affine premises; their anchors supply no witness.
+   `PolynomialProjection` then builds Collins families preserving delineability,
+   repeated roots and vanished leading coefficients. A required equality with a proved
+   nonzero leading coefficient restricts its level to its roots.
+4. **Lifting.** Specialized roots form sections and rational points form intervening
+   sectors. Exact partial substitution can prune impossible sign requirements when
+   remaining monomials have even powers and one coefficient sign; unresolved cases
+   stay open. Complete samples use certified coordinate enclosures before scalar
+   images, reconstruct eliminated coordinates and check the original formula.
 
-The procedure then runs in four stages; only the last two are needed for
-completeness.
-
-**1. Bounded probe.** An optional prefix tries to settle the query cheaply. It
-checks necessary conditions on conjunctive atoms (sign enclosures from coefficient
-signs and monomial parity, magnitude bounds, cancelled common monomials) and
-proposes exact points (rational centers, single-coordinate repairs from roots of a
-specialized equality, coupled lines, dyadic points). Every proposal must pass the
-complete formula check. A successful reduced point reconstructs all total graph
-coordinates and passes the original normalized formula before publication. The
-probe is limited to small formulas and one 65,536-unit slice; a decline leaves
-complete CAD available.
-
-**2. Boolean regions.** [PolynomialBooleanRegions](../klause/src/commonMain/kotlin/com/eignex/klause/theory/qfnra/PolynomialBooleanRegions.kt)
-enumerates source implicants: assignments of Boolean leaves and signed numeric
-predicates that make the formula true. Initial exact sign propagation derives
-numeric consequences and retains their premises for supporting regions. Numeric
-assignment or retraction during Boolean search triggers another exact sign check
-before further decisions. A completed feasible sign fixpoint retains its domains,
-constraints and variable adjacency while additional signed predicates are appended.
-Retracting or changing a retained premise rebuilds that state from the current
-numeric conjunction; a contradictory or unfinished check cannot supply reusable
-state. An unchanged numeric conjunction reuses its completed fixpoint.
-A completed contradiction learns a private exclusion
-containing every assigned signed numeric premise; that arithmetic impossibility
-holds under every Boolean prefix. A feasible sign overapproximation learns nothing.
-Pure Boolean changes do not repeat the numeric check, and interrupted or declined
-checks supply no exclusion. The Boolean trail retracts assignments while valid
-numeric exclusions remain available within that enumerator. They do not cross
-query, condition or root-snapshot boundaries. Trail changes update retained
-witness support only at affected nodes and parents. Each junction counts supported
-true and false children; a region captures the first supporting child in source
-order for a decisive gate and every child for an identity gate. Leaf selection
-advances a cursor in Boolean-then-numeric order and rewinds it on retraction.
-Retraction also invalidates affected witness support before another region can
-be captured. Separate visited-region exclusions prevent repeating an issued
-region. Neither exclusion kind enters shared learning.
-
-**3. Regional reduction and projection.** Each region's signed predicates form a
-conjunction. Ordered polynomial remainders simplify other predicates modulo the
-region's required zero equalities, which remain as premises. The conjunction
-retains one ordered divisor index for its predicate remainders. Linear required
-equalities are solved and substituted, coordinates
-occurring only linearly in inequalities are eliminated by affine pairing, and sign
-propagation can refute the region outright.
-For a coordinate retained by another nonlinear or non-inequality predicate,
-constant-coefficient affine lower and upper bounds also imply a comparison between
-their endpoints. Consequences with fewer variables than the larger premise are
-retained ahead of the original predicates, ordered by variable count. The original
-bounds and nonlinear constraints remain required; strictness in either endpoint
-makes the consequence strict. No variable-dependent coefficient is divided out.
-Convex quadratic predicates are also checked against each affine predicate on the
-same coordinates. Exact stationary certificates and the quadratic kernel's
-semidefiniteness check can prove a positive lower bound, or a zero lower bound
-excluded by a strict premise. These checks only refute the regional conjunction;
-their anchors do not become witness proposals, and a declined certificate leaves
-the predicates available for CAD.
-The reduced conjunction supplies projection predicates; the original regional
-predicates supply the witness check for both rewrites and coordinate elimination.
-[PolynomialProjection](../klause/src/commonMain/kotlin/com/eignex/klause/theory/qfnra/PolynomialProjection.kt)
-then builds one polynomial family per level using Collins projection, which
-preserves delineability including repeated roots and vanishing leading
-coefficients. A required equality with a provably nonzero leading coefficient
-restricts its level to that equation's roots.
-
-Projection and lifting alternate over an increasing family in source polynomial
-order. Every lifted sample is checked against all region predicates, including
-those whose boundaries have not been projected. Rejected samples from a partial
-family cannot exhaust the region: refutation requires the complete family's CAD
-or an exact contradiction between required equalities. A representation refusal
-on a partial family advances to the complete family under the same caller's
-remaining allowance. Projection counters accumulate completed stages.
-
-A rejected predicate over coordinates absent from a partial family's polynomials
-has the same truth at every sample of that family: each absent coordinate has one
-sector sample, or its fixed value. This rejection advances to the next source
-polynomial instead of enumerating the remaining Cartesian product. Predicates
-depending on a varying projected coordinate retain cell traversal.
-
-**4. Lifting and truth.** Traversal walks the levels in order. Each projection
-polynomial is specialized at the earlier coordinates, the
-[kernel](18-exact-arithmetic.md#algebraic-arithmetic-and-lifting) isolates its real
-roots, and roots become section samples with rational samples in the sectors
-between them. Partial substitution uses exact assigned coordinates to bound a
-predicate's sign when every remaining monomial has even powers and coefficients
-of one sign. A strict constant sign remains strict after adding terms of that
-sign; zero coefficients and boundary completions remain possible. An odd power,
-mixed signs or a representation refusal leaves the prefix open. A predicate
-whose required truth is impossible for every completion prunes the prefix.
-At a complete sample, predicate signs use certified coordinate enclosures before
-exact scalar images when those bounds establish the sign. Eliminated coordinates
-are reconstructed and the full assignment passes the original formula before
-capture. Exhausting every cell of the complete projection refutes the region.
+Projection and lifting alternate over increasing families in source order. Every
+sample checks all regional predicates, including unprojected ones. A rejection
+independent of varying projected coordinates advances the family without enumerating
+its remaining Cartesian product. Partial-family rejection cannot refute a region:
+exhaustion requires complete CAD or an exact equality contradiction. Representation
+decline advances to the complete family under the same remaining allowance. Region,
+projection and lifting counters record actual attempts across snapshot replacements.
+Only region coverage, projection and lifting are required for completeness.
 
 #### Objective-image traversal
 
@@ -400,13 +295,9 @@ sectors with invariant source feasibility. Those cells justify the
 
 ## Transcendental real arithmetic
 
-The transcendental theory checks constraints over exp, natural log, sin and cos,
-with Boolean, integer and continuous coordinates. Real arithmetic with these
-functions is not decidable in general, so the theory provides sound but incomplete
-satisfaction. It builds directly on the [polynomial real theory](#polynomial-real-arithmetic):
-each function application is weakened into exact polynomial constraints that the
-polynomial theory can refute, and candidate points are repaired and checked against
-the original functions. It supplies no optimization procedure.
+The transcendental service gives sound incomplete satisfaction for exp/log/sin/cos
+constraints. Polynomial relaxations can refute a scope; symbolic repairs and original
+function checks can establish witnesses. It supplies no optimization procedure.
 
 ### Scope and boundaries
 

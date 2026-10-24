@@ -1,21 +1,14 @@
 # 13. Original-source derivations
 
-The previous chapters established that every published witness is checked against
-the original source. Bounds, refutations and optimality claims need more than a
-checked point: they rest on reasoning an engine performed, often on a presolved or
-relaxed view of the model. This chapter describes how such claims are expressed as
-typed derivations over the original source and checked independently of the engine
-that produced them. It closes Part III: with it, every result a solve can return,
-whether a witness, a bound or a refutation, has a defined authority.
+`solver.evidence` checks typed witness, bound, refutation and optimum claims against
+an immutable original-source context supplied independently of the producer. That
+context holds coordinate namespaces, stable premise IDs, an exact affine objective
+and a semantics checker. A producer's revision label or row snapshot cannot replace
+it; an omitted objective supplies no bound authority.
 
-`solver.evidence` checks typed claims against an immutable original-source context
-that the consumer supplies independently of the producer. The context holds the
-declared coordinate namespaces, stable premise identifiers, the exact affine
-objective and a source semantics checker. A claimed revision or a producer's row
-snapshot cannot substitute for it, and an omitted affine objective has no bound
-authority. Capture retains evidence in memory; the
-[proof-file boundary](01-introduction.md#independently-checkable-proof-files)
-applies here too.
+Evidence capture is optional and retained in memory. Engine attestations remain
+separate from checked derivations, and the
+[proof-file boundary](01-introduction.md#independently-checkable-proof-files) applies.
 
 ## Source contexts and scopes
 
@@ -124,9 +117,8 @@ bound.
 
 ## In-search publications
 
-Workers in a [portfolio](12-portfolio.md) share bounds and witnesses while they run.
-Those publications carry the runtime binding that lets a consumer check them; the
-admission rules are in [portfolio witnesses and proof scope](12-portfolio.md#witnesses-and-proof-scope).
+[Portfolio admission](12-portfolio.md#witnesses-and-proof-scope) checks runtime
+publications while workers execute.
 
 `EngineInvocation` keeps the prepared plan, its original source and objective
 direction, the execution model and owned assumption snapshots, plus an optional
@@ -152,12 +144,9 @@ activity lattices to justify equivalence or derive an accepted objective bound.
 [MPS publication](05-arithmetic-formats.md#tolerance-publication) uses the checked qualification to
 scope native terminal and bound output.
 
-## Independent acceptance
-
-Independent acceptance checks the original source bytes and declared semantics,
-with separately retained caller conditions and actual claims. Runtime provenance
-and engine completion stay separate from mathematical verification, and missing
-retained inputs or checker reports cannot supply that acceptance.
+Independent acceptance additionally needs original source bytes, declared semantics,
+caller conditions and actual claims. Runtime provenance or missing checker reports
+cannot substitute for mathematical verification.
 
 ---
 

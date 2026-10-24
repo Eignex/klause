@@ -1,19 +1,11 @@
 # 8. Search and propagation
 
-This chapter describes the first of the engines that run on a prepared model:
-complete search. Search explores alternatives, restores state when a branch fails and
-checks complete assignments with the [source validation](07-presolve.md#source-witness-validation) service
-before publication. Finite propagation narrows Boolean and integer domains, and
-arithmetic components enforce the parts of the source model they own. Learning
-reuses conflicts only when their explanations remain valid in that scope.
-
-The traversal loop is shared by every complete strategy: establish a fixpoint,
-check or choose a decision, apply it, and retract to another alternative after a
-conflict. Exhausting alternatives supports a refutation only if all required checks
-completed; interruption leaves the unexplored space undecided. This chapter
-covers the shared search owners, traversal and branching, and finite propagation;
-the [next chapter](09-learning.md) covers explanations, learning and theory
-completion.
+Complete search explores alternatives, restores failed branches and checks leaves.
+Its shared loop establishes a fixpoint, checks or chooses a decision, applies it and
+retracts after conflict. Finite propagation narrows Boolean/integer domains;
+arithmetic components enforce their owned relations. Exhaustion proves a result
+only when every required check completed. [Learning](09-learning.md) reuses the
+reasons those mechanisms supply.
 
 ## Shared component search
 
@@ -59,11 +51,8 @@ until it completes; see
 
 ## Traversal and branching
 
-Every pass of the traversal loop starts by choosing what to decide next. This
-section describes how branching proposals are collected and ordered, how component
-hints choose which side of a split to try first, which columns a leaf completes
-without a decision, how arithmetic splits get stable Boolean names, and how
-components are registered and assembled into one session.
+Branch proposals determine the next exhaustive split. Component hints order its
+alternatives; source-bound atoms give arithmetic decisions stable Boolean names.
 
 ### Lazy branch selection
 
@@ -181,15 +170,9 @@ how those values are contributed.
 
 ## Finite propagation
 
-After a decision is applied, search runs the finite-domain fixpoint: every
-propagator narrows the Boolean and integer domains it watches until nothing changes
-or a conflict appears. This section describes who owns that state, how the
-propagation projection for each factor is selected, how propagation feeds the
-branching heuristics, and which checks a complete finite point must pass before it
-can be published. The reasons propagators record are the subject of the
-[next chapter](09-learning.md).
-
-### Finite propagation
+The finite-domain fixpoint runs watched propagators until no domain changes or a
+conflict appears. [Explanation lifetime](09-learning.md#explanation-lifetime)
+defines the reasons retained for its deductions.
 
 [PropagationSession](../klause/src/commonMain/kotlin/com/eignex/klause/propagation/PropagationSession.kt)
 owns the finite-domain trail and fixpoint. Sessions over one immutable model share
@@ -305,14 +288,10 @@ skipped.
 
 ### Complete finite checks
 
-Complete finite checks pin the full assignment and run a completed CP fixpoint;
-interrupted verification stays indeterminate. A zero local-search score is not an
-exact certificate.
-
-Selected partial or inert finite deduction keeps an original-source check at a
-complete point, using a private propagation state over original factors. Without a
-complete original checker the leaf stays indeterminate. Source-real checks belong to
-arithmetic completion.
+Complete points pass [source validation](07-presolve.md#source-witness-validation)
+under a private full-assignment fixpoint. Partial or inert deduction needs a complete
+original checker or enforcing arithmetic peer; unavailable checking leaves the leaf
+indeterminate.
 
 #### Custom factor publication checks
 

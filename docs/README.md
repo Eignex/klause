@@ -8,8 +8,8 @@ chapters afterwards. User documentation lives at
 
 ## Part I — Overview
 
-1. [Introduction](01-introduction.md): goals, shared guarantees and the system
-   architecture.
+1. [Introduction](01-introduction.md): result guarantees, execution stages and
+   package boundaries.
 
 ## Part II — Models and sources
 
@@ -54,7 +54,7 @@ chapters afterwards. User documentation lives at
 18. [Exact arithmetic](18-exact-arithmetic.md): exact kernels and numerical
     dependencies.
 
-## Part VI — Using and building Klause
+## Part VI — Library and command line
 
 19. [Library API](19-api.md)
-20. [Command line and development](20-cli.md)
+20. [Command line](20-cli.md)

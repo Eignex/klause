@@ -1,19 +1,9 @@
 # 2. Model representation and ownership
 
-The previous chapter followed a problem from source to result. This chapter
-describes the data that travels along that path. A source model is the
-engine-neutral description of a problem: its variable declarations, its factors
-(the constraint relations over those variables) and its objective. Engines never
-search the source model directly. Each builds its own view: finite domains for
-propagation, assignments for local search, arithmetic state for theory or
-relaxation checks. A view never authorizes a result by itself.
-
-One ownership rule runs through the chapter: source data stays unchanged while any
-solve uses it, each live operation owns its own mutable state, and results are
-published as immutable assignments. The chapter covers declarations and
-results first, then the [source relations](#source-relations) factors can hold,
-and finally the [engine projections](#engine-projections) preparation builds
-from them.
+A source model is an engine-neutral set of declarations, factors and an objective.
+Preparation builds finite, heuristic and arithmetic views of it. Source data stays
+unchanged while a solve uses it; live operations own mutable state and publish
+immutable assignments. A view alone authorizes no result.
 
 ## Source declarations and factor data
 
@@ -92,20 +82,17 @@ owns quadratic optimization results.
 
 ## Optional completed-result evidence
 
-Completed satisfaction and minimization results can retain `SourceResultEvidence`
-when requested through `SourceResultCapture`. Claims name the original revision,
-invocation restrictions, objective and declared semantics, with exact values kept
-apart from floating telemetry. Missing traversal or bound data is explicit;
-[derivation checking](13-evidence.md) owns coverage checks.
+Completed satisfaction and minimization results can retain optional
+`SourceResultEvidence`. It binds exact claims to the original revision, restrictions,
+objective and semantics; [derivation checking](13-evidence.md) owns proof coverage.
 
 ## Source relations
 
-Factors retain the relation the source stated, not an encoding chosen for one
-engine. Each relation below follows the same pattern: the factor keeps its exact
-source payload through remapping, finite propagation and local search build their
-own projections of it, and selected arithmetic encoders install an equivalent
-formula when a theory needs the relation. A relaxation derived from a factor never
-enforces it.
+Factors retain source relations through remapping. Propagation, scoring and
+arithmetic consumers build separate projections; a relaxation never enforces a
+factor. The relations below describe their semantic distinctions. Consumer mechanics
+belong to [propagation](08-search.md#finite-propagation),
+[local search](10-local-search.md) and [theory encoding](14-theories.md).
 
 ### Source definition hints
 
@@ -123,17 +110,10 @@ private view only when requested.
 ### Distinct integer positions
 
 `AllDifferent` retains integer positions, optional-presence literals and excepted
-values; excepted values may repeat and optional positions participate only when
-present. Finite propagation chooses sparse matching over enumerable domains,
-bounds filtering over wider ones, and fixed-value deductions where interval
-arithmetic would overflow. Local search uses sparse value counts and bounded repair
-sampling on wide domains.
-
-Hall and assignment cuts apply only to plain mandatory distinctness. Selected
-linear and polynomial encoders preserve the mandatory, optional and excepted forms
-with exact source values, and open integer declarations stay open. Finite globals
-compose with arithmetic completion through their finite owner, as described by
-[theory composition](14-theories.md#shared-composition-contract).
+values. Excepted values may repeat; optional positions participate only when present.
+Finite propagation uses matching, bounds or fixed-value deductions according to the
+domain representation. Linear and polynomial encoders preserve all three forms.
+Hall and assignment cuts require plain mandatory distinctness.
 
 `AllDifferentTuples` retains equal-width ordered rows, including repeated integer
 coordinates. Rows must differ in at least one position; values may repeat within a
@@ -149,53 +129,37 @@ linear scans between the engine's cancellation polls.
 
 ### Distinct-value counts
 
-`NValue` retains its counted positions, target, comparison mode, optional presence
-literals and excluded values. Exact fixed targets reduce to equality at one and
-to `AllDifferent` at the list arity, independently of numeric span; these reductions
-require mandatory positions and no exclusions. Finite propagation bounds the count of
-definitely-present non-excluded values, using matching and kernel filters for the
-mandatory form, and checks the exact count at a complete assignment. Local search
-maintains exact counts and move deltas. The optional LP value hull is a relaxation;
-open arithmetic encoders do not claim NValue coverage.
+`NValue` retains counted positions, target, comparison mode, optional presence and
+excluded values. For mandatory positions without exclusions, an exact fixed target
+of one reduces to equality and a target at the list arity to `AllDifferent`,
+independently of domain span. Finite consumers maintain exact counts; the LP value
+hull is a relaxation, and open arithmetic encoders claim no NValue coverage.
 
 ### Integer division relations
 
-`factor.arithmetic.DivMod` retains a dividend, a literal or variable divisor and
-both outputs. `DivisionConvention.TRUNCATING` rounds the quotient toward zero;
-`EUCLIDEAN` requires a nonnegative remainder. Both require a nonzero divisor and
-`dividend = divisor * quotient + remainder` with the remainder smaller in magnitude
-than the divisor. Arithmetic is exact and never wraps. The internal `WideDivMod`
-form retains exact affine digit views for values past the signed word.
+`DivMod` retains a dividend, literal or variable divisor, quotient and remainder.
+`TRUNCATING` rounds the quotient toward zero and gives a nonzero remainder the
+dividend's sign; `EUCLIDEAN` requires a nonnegative remainder. Both require a
+nonzero divisor, the exact equation
+`dividend = divisor * quotient + remainder`, and remainder magnitude smaller than
+the divisor's. `WideDivMod` keeps exact affine digit views beyond signed-word range.
 
-Frontends share quotient and remainder auxiliaries only for identical operands and
-convention. Each schema, FlatZinc or XCSP3 compilation owns a
-`lowering.DivModRelationIndex`, keyed by dividend coordinate, divisor coordinate
-or constant value, and convention. Retained relations stay present throughout
-lowering; additional output coordinates receive equality aliases. The index is
-discarded with the compiler before mutable solving state is created. Shared
-formulas live in `lowering.DivModEncoding`: the linear encoder
-handles a literal divisor or requires a variable-divisor fixing, and the
-polynomial encoder enforces the whole relation including the sign cases. An open
-variable-divisor relation has no general linear completion, and difference
-encoding is unsupported. Finite propagation combines signed bounds with support
-filtering over at most 4,096 operand pairs per call;
-[local search](10-local-search.md#definitions-and-repairs) maintains eligible
-outputs and correlated repairs.
+Frontends share outputs only for identical operands and convention. Schema,
+FlatZinc and XCSP3 compilation use a private `lowering.DivModRelationIndex`, keyed
+by dividend, divisor coordinate or constant, and convention. Additional outputs get
+equality aliases; the index is discarded before solving.
+`lowering.DivModEncoding` owns the formulas: linear encoding requires a literal or
+fixed divisor, polynomial encoding retains every sign case, and difference encoding
+is unsupported. [Local search](10-local-search.md#definitions-and-repairs) maintains
+eligible outputs and correlated repairs.
 
 ### Absolute-value relations
 
-`factor.arithmetic.Abs` retains the exact relation `result = |operand|`. Schema
-expressions, FlatZinc `int_abs`, SMT-LIB integer terms and XCSP3 `abs`/`dist`
-produce it. Linear consumers receive nonnegativity and the disjunction of the
-positive and negative equalities; polynomial consumers receive the equivalent
-formula. Finite propagation keeps sign-aware bounds and filters holes on domains of
-at most 1,024 values. Local search checks the full relation and repairs either role.
-
-Two variants share this contract. `AffineAbs` retains wide SMT absolute values over
-exact affine payloads. `RealAbs`, from exact FlatZinc `float_abs`, holds the
-relation over real coordinates and is enforced by selected linear alternatives.
-Bucketed `float_abs` instead retains `GridAbs` under the
-[grid policy](#grid-arithmetic-relations).
+`Abs` retains `result = |operand|`. Linear encoding requires nonnegativity and the
+disjunction of positive and negative equalities; polynomial encoding retains the
+same formula. `AffineAbs` supports wide exact affine operands, `RealAbs` exact
+real coordinates, and `GridAbs` the declared bucket relation. Aliases and remapping
+preserve operand and result roles.
 
 ### Extrema and element relations
 
@@ -276,11 +240,11 @@ larger encodings decline while native filtering and scoring remain.
 
 ### Private float projections
 
-An explicitly selected finite or heuristic consumer may request a private integer
-grid under the captured `FloatSemantics.Grid` permission; ordinary source setup
-never materializes it. Original real declarations, relations and objective remain
-on the attachment, and private helpers stay distinct from original coordinates.
-Unsupported factors or resource stops decline only this view.
+`FloatSemantics.Grid` permits a private finite or heuristic projection without
+selecting one. A requesting consumer binds that view to its prepared invocation;
+[FlatZinc](04-finite-formats.md#flatzinc-floats) defines its automatic fallback.
+Original declarations, relations and objective remain on the attachment, and private
+helpers stay distinct. Unsupported factors or stops decline only the view.
 
 Publication reconstructs engine coordinates into the private grid, then into
 original real coordinates. Source-qualified consumers check the original model;
@@ -291,29 +255,15 @@ exhaustion and optimization prove only grid claims, kept in
 See [source checking](07-presolve.md#source-witness-validation) and
 [reconstruction](07-presolve.md#guarantees-and-source-mappings).
 
-## Engine projections
+## Engine projections and factor capabilities
 
-The source model and its relations are never searched directly. Before a solve,
-preparation decides which engine owns each variable and factor, and each engine
-builds its own projection of the factors it receives. This section describes the
-execution plan, how factor capabilities are selected, and how engine state and
-options stay separate from the source.
+Preparation selects the primary owner of every coordinate and factor before opening
+engine state. Participation can overlap; primary ownership cannot.
+`SourceAttachment` retains the original model and semantics;
+[source setup](19-api.md#source-setup) binds the operation and prepares execution.
+Interrupted preparation exports no partial plan.
 
-### Engine projections and factor capabilities
-
-#### Binding a source to its execution
-
-`solver.pipeline.SourceAttachment` retains the original `Problem` or native source
-snapshot (polynomial, integer polynomial or real-function) with its captured
-semantics. `SourceSetup.prepare` binds the operation, objective, finite engine
-choice, providers and preparation token; `SourceSetup.execute` dispatches the
-finite or exact arithmetic operation. A bounded integer/Boolean source with
-supported native propagation selects finite ownership before any arithmetic
-installation, while real coordinates and exact-objective preferences keep
-arithmetic preparation. Every file frontend uses this policy, and interrupted
-preparation publishes no partial plan.
-
-#### The prepared plan
+### The prepared plan
 
 `Problem.prepareExecutionPlan()` selects immutable ownership and completion data
 before search, attempting sound open-bound closure before final nonlinear
@@ -333,7 +283,7 @@ indicator pins and affine objective before normalization. Plans belong to the
 actual source object, so a rewrite needs a new plan or the objective-round adapter,
 which checks that only the appended bound row changed.
 
-#### Opening components
+### Opening components
 
 Search preparation binds each component descriptor to its source and opening
 factory, checking unique primary ownership of factors and coordinates first.
@@ -373,23 +323,12 @@ complete check exists, and execution stays unknown otherwise.
 
 ### Search state ownership
 
-Shared search exchanges Boolean literals, integer bounds and typed opaque theory
-decisions; traversal and decision levels belong to the shared session.
-Source-keyed values (`SearchBoolValue`, `SearchExactIntValue`,
-`SearchExactRealValue` and the algebraic and symbolic real forms) let each
-component contribute only the coordinates it owns. The open pipeline assembles
-them into an exact snapshot; missing or multiply represented coordinates withhold
-publication. [Typed contributions](19-api.md#typed-contributions)
-define the decoding boundary.
-
-### Public strategy construction
-
-Source strategy factories retain the original `Problem` and schema metadata,
-consume the shared prepared route and arrange arithmetic completion before
-publishing original-coordinate witnesses. See the
-[library API](19-api.md#source-aware-strategy-entry-points). Registered arithmetic
-collections declare one owner per numeric coordinate; see
-[coordinate agreement](09-learning.md#arithmetic-coordinate-agreement).
+Shared search exchanges Boolean literals, exact integer bounds and typed theory
+decisions. Each component contributes only its owned source coordinates; missing or
+multiply represented coordinates withhold publication.
+[Typed contributions](19-api.md#typed-contributions) define the assembly boundary,
+and [coordinate agreement](09-learning.md#arithmetic-coordinate-agreement) defines
+checks between registered arithmetic peers.
 
 ### Finite execution options
 

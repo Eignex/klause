@@ -1,21 +1,10 @@
 # 17. Linear programming
 
-Part V describes the numerical mechanisms that search and the theories of Part IV
-call on. The linear programming engine comes first because it has the most
-consumers: finite CP/COP relaxations, mixed-integer models and the
-[open linear theories](15-linear-arithmetic.md) all run on one production floating
-revised simplex with exact certification. Shared search owns
-integer, comparison and disequality branches; LP feasibility alone does not
-establish integrality.
-
-The flow is to assemble a source-aware linear model, solve its floating working
-representation, certify the requested result, then let the consumer reconstruct
-or apply it. Bound changes and retraction update that same numerical scope. This
-chapter follows that flow: engine boundaries, exact authority and consumer
-integration come before private basis mechanics, and
-[certification](#lp-certification) closes the chapter with the proof packages a
-certified result carries. [Numerical dependencies](18-exact-arithmetic.md#numerical-dependencies)
-describes the external kernel interfaces.
+Finite relaxations, mixed-integer models and [linear theories](15-linear-arithmetic.md)
+share one floating revised simplex with exact certification. Model-facing adapters
+assemble source-aware rows; the engine solves and certifies them; consumers interpret
+the result in source coordinates. Shared search owns integer and Boolean alternatives.
+LP feasibility alone establishes no integrality.
 
 ## Boundaries
 
@@ -76,9 +65,8 @@ separate; see [MPS semantics](05-arithmetic-formats.md).
 
 ## Consumers, explanations and cuts
 
-Several consumers share the engine, each owning its own search state. The engine
-answers bound, fixing and conflict queries; the consumer decides when to ask, how
-to apply the answer and how to retract it.
+Consumers decide when to request certified bounds, fixings, conflicts or witnesses
+and how to apply and retract them. Their policy stays outside the engine.
 
 ### Bounding and explanations
 
@@ -240,18 +228,10 @@ their built-in descriptors.
 
 ## LP certification
 
-Certification is the step that gives a floating solve any authority: it turns a
-numerical candidate into evidence about the exact active linear model. Feasible points, objective bounds, infeasibility and
-unboundedness require different packages; one cannot substitute for another.
-
-The packages come first, then the mechanisms that produce them:
-safe objective bounds, exact reconstruction and refinement, Farkas and recession
-checks, and strict inequalities. The later sections cover deductions for mixed
-models, the model-facing optimization adapter, tolerance recovery and the
-resource rules every mechanism shares.
-[LpSolve](../klause/src/commonMain/kotlin/com/eignex/klause/lp/engine/LpSolve.kt)
-owns these checks. A floating optimum, failed check or resource decline cannot
-prune, exhaust search or prove an exact result.
+Certification checks numerical proposals against the exact active model. Different
+claims need different evidence packages; a floating optimum or failed check cannot
+prune or prove a result. [LpSolve](../klause/src/commonMain/kotlin/com/eignex/klause/lp/engine/LpSolve.kt)
+owns these checks.
 
 ### Proof packages
 
@@ -457,12 +437,6 @@ A completed continuous check that stays undecided is skipped without learning a 
 its incomplete flag prevents exhaustion or optimality publication. Numerical
 failure, singularity, work stops, precision declines and cancellation keep distinct
 diagnostics.
-
-### Validation
-
-Check original-source rows, bounds, integrality, objectives, rays and conflict
-antecedents independently, including scope after pop/remap. A production checker
-calling itself is not independent validation.
 
 ---
 

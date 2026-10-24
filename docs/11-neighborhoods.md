@@ -1,13 +1,8 @@
 # 11. Neighborhoods and restarts
 
-[Local search](10-local-search.md) values a candidate by its effect on the model,
-and with definitions in place that effect reaches beyond the coordinates a move
-writes. This chapter first describes how a candidate is graded exactly and
-reversibly, how factors select their scoring projection and how continuous
-arithmetic is scored, then the structured neighborhoods that NValue, Cumulative and
-Diffn contribute. It ends with what a walk needs before it publishes and across
-slices: continuous completion, exact coordinate neighborhoods, restart anchors,
-ALNS seeding and the handles that own a run's state.
+A local move can affect definition outputs and several factors. Scoring must grade
+that whole transition and restore every probe. This chapter describes those checks,
+structured global moves, arithmetic completion and the retained run owner.
 
 ## Scoring and probe restoration
 
@@ -155,10 +150,8 @@ the rest.
 
 ## Completion, restarts and ownership
 
-The walk moves discrete coordinates and scores them heuristically. Before anything
-is published, a candidate needs authoritative values for its continuous coordinates,
-and a run that lasts across portfolio slices needs state that survives suspension
-without leaking into other operations.
+A candidate needs authoritative continuous values before publication. Completion and
+restart state belong to the retained run.
 
 ### Continuous candidate completion
 
@@ -250,16 +243,12 @@ authority.
 
 ### Handles and exclusive ownership
 
-Local-search optimization handles keep the live assignment, random generator,
-factor payloads, restart progress and incumbent between slices. A slice pauses at an
-instruction checkpoint or cancellation poll, and the scheduler charges the observed
-instruction delta once. Closing or reseeding discards the state. Root refutations
-remain authoritative; an unsuccessful walk is incomplete.
-
-An active handle holds exclusive ownership of its solver: any other search through
-that solver throws `IllegalStateException` until completion, failure or close; a
-cancelled slice stays paused and keeps ownership. Portfolio workers use separate
-solvers.
+Optimization handles retain assignment, RNG, factor payloads, restart progress and
+incumbent across slices. The scheduler charges each observed instruction delta once;
+closing or reseeding discards the state. A cancelled slice stays paused and keeps
+exclusive solver ownership. Other searches throw until completion, failure or close;
+portfolio workers use separate solvers. [Sessions](06-sessions.md) define the outer
+lifetime contract.
 
 [LocalSearchEngine](../klause/src/commonMain/kotlin/com/eignex/klause/localsearch/LocalSearchEngine.kt)
 owns model preparation, exclusive acquisition, strategies and restart policies. Each

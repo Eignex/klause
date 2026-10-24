@@ -1,15 +1,9 @@
 # 9. Learning and theory completion
 
-The previous chapter followed the traversal loop up to the finite fixpoint. This
-chapter covers what search does with the reasons that fixpoint records, and how
-arithmetic owners finish the assignments finite search leaves open.
-
-A deduction is only useful to learning if its reason can be read back later. The
-chapter starts with the reasons propagators record and how long they stay valid,
-follows a conflict through first-UIP analysis, minimization and the two specialized
-learning lanes, and covers how learned constraints are retained and how restarts
-and inprocessing use them. It then describes theory completion and closes with the
-primal heuristics and statistics of complete search.
+Search learns from scoped deduction reasons and asks arithmetic owners to complete
+finite assignments. This chapter follows conflict analysis, clause retention and
+restarts, then theory completion and primal proposals. Traversal and propagation
+are described in [search](08-search.md).
 
 ## Explanation lifetime
 
@@ -102,42 +96,33 @@ shares the general trail, pins, antecedents and conflict analyzer.
 
 ## Pseudo-Boolean learning
 
-On pure-Boolean models, conflict analysis can learn pseudo-Boolean constraints
-instead of clauses. Cutting planes refute counting arguments, such as pigeonhole
-structure, that resolution needs exponentially many steps for. The `pbLearning`
-setting auto-dispatches on for pure-Boolean problems and is ignored when integer
-variables are present, because order-literal atoms carry no pseudo-Boolean reason.
+`pbLearning` auto-enables cutting-plane analysis for pure-Boolean models. Integer
+order literals have no pseudo-Boolean reason, so integer models use clause learning.
 
-The accumulated nogood is a linear `≥` constraint over Boolean literals seeded from
-the violated bound. Each resolution step cancels the pivot with the division rule:
-the reason is divided by its pivot coefficient, rounding up, then added to the
-conflict, which keeps coefficients bounded. Weakening and saturation keep the
-constraint canonical. Every step is a nonnegative combination with Chvátal-Gomory
-rounding, so the learned constraint is implied by its inputs. When a step cannot
-proceed soundly, including `Long` overflow, that conflict falls back to clause
-resolution. Learned pseudo-Boolean constraints share the clause retention policy.
+The resolvent is a linear `≥` nogood seeded from the violated bound. Each step
+rounds the reason up after division by its pivot coefficient, then adds it to cancel
+the pivot. Weakening and saturation keep coefficients bounded and canonical. These
+nonnegative combinations with Chvátal-Gomory rounding preserve implication. A step
+that declines, including signed-word overflow, falls back to clause resolution.
+Learned pseudo-Boolean constraints share clause retention.
 
 ## Learned-clause retention
 
-The native store forgets only when a learned-clause cap is configured. A forgetting
-pass then runs at restart boundaries once the database exceeds the cap: permanent
-clauses and glue clauses (LBD at most 2 by default) are always kept, and among the
-rest the lowest-LBD clauses are kept up to the cap.
+Native forgetting runs at restart boundaries only with a configured cap. Permanent
+and glue clauses (default LBD at most 2) survive; remaining space favors lower LBD.
+The SAT preset enables capped tiered retention:
 
-With the tiered database enabled, `ClauseTier` replaces that binary split. A clause is
-classified by LBD on first encounter: core at or below the glue threshold, mid up to
-LBD 6, local above. Core clauses are never deleted. Mid clauses survive reductions but
-are demoted to local when idle across one. Local clauses are deleted aggressively but
-promoted to mid when they take part in a later conflict. The tier is persistent
-per-clause state rather than a function of LBD, so reuse and idleness move clauses
-between tiers. The SAT-optimized preset enables a capped tiered database.
+| Tier | Initial classification | Lifetime |
+|---|---|---|
+| Core | At/below glue threshold | Never deleted |
+| Mid | Through LBD 6 | Survives reduction; idle clauses demote to local |
+| Local | Above LBD 6 | Aggressively deleted; conflict use promotes to mid |
 
-The shared store used by component search is uncapped by default. When capped,
-reduction at restart boundaries keeps glue clauses, units and recently used clauses,
-then lower LBD first. See
-[SearchSession](../klause/src/commonMain/kotlin/com/eignex/klause/solver/search/SearchSession.kt)
-and
-[ClauseDb](../klause/src/commonMain/kotlin/com/eignex/klause/backtrack/ClauseDb.kt).
+Tiers persist independently of later LBD. Shared component learning is uncapped by
+default; capped reduction retains glue clauses, units and recent clauses before
+ranking by LBD. [ClauseDb](../klause/src/commonMain/kotlin/com/eignex/klause/backtrack/ClauseDb.kt)
+and [SearchLearning](../klause/src/commonMain/kotlin/com/eignex/klause/solver/search/SearchLearning.kt)
+own the respective stores.
 
 ## Restarts, phases and inprocessing
 
@@ -173,13 +158,8 @@ inprocessing, since derivations under assumption pins would not hold globally.
 
 ## Theory completion
 
-Finite search assigns Boolean and integer variables; arithmetic theories complete or
-refute the remaining coordinates. This section describes how those theory owners
-take part in the shared traversal: the encoders they install, how several owners agree
-on shared coordinates, and how completed values reach the published model. The
-theories themselves are the subject of [Part IV](14-theories.md).
-
-### Theory completion
+Arithmetic owners complete or refute the coordinates left by finite search.
+[Theory services](14-theories.md) define their fragment-specific checks.
 
 A component's partial consistency check or relaxation witness does not accept a
 complete source assignment: every participating owner must finish its required check
@@ -247,12 +227,8 @@ whose payloads must be immutable. See
 
 ## Primal heuristics and statistics
 
-Complete search proves results, but it can also find good incumbents early. This
-section describes the two primal heuristics that run inside complete search, the
-root LP proposals on mixed models and the monotone clausal probe on pure-Boolean
-optimization, and closes with the counters search reports. Neither heuristic carries
-proof authority: every proposal passes full source verification before it becomes an
-incumbent.
+Primal heuristics propose incumbents inside complete search. Each proposal needs
+full source verification and supplies no proof authority.
 
 ### Root primal proposals
 
@@ -292,10 +268,20 @@ most half the remaining time and 5 seconds.
 
 ### Statistics
 
-Search reports what its traversal observed; counters are observations, not proofs.
+Counters describe observed work, never proof coverage.
+`propagations` counts deductions from completed finite fixpoints, excluding decision
+and root pins; `propagationWork` also counts dispatch, watcher and reason visits
+across undo. Root figures are subsets of totals. Fixpoint time excludes some counted
+reason scans.
 
-| Field | Meaning |
-|---|---|
+Native CP and shared first-UIP outcomes are reported separately. Non-asserting counts
+identify chronological fallback, while zero does not establish explanation coverage.
+Missing metrics stay absent, including root theory results that never enter traversal.
+`smtCompleteSearch*` stage observations overlap and cannot be summed as a work total.
+[SearchStats](../klause/src/commonMain/kotlin/com/eignex/klause/solver/result/SearchStats.kt)
+and [CLI statistics](20-cli.md#statistics) define the exported fields.
+
+---|---|
 | `propagations` | Finite Boolean, singleton, bound, hole and survivor-set deductions reported by completed search fixpoints; excludes decision and root pins |
 | `learned` | Learned consequences observed by the traversal, including native CP learning |
 | `caNotApplicable`, `caNonAsserting` | Native CP analyses declining a usable or asserting consequence; exported by every CLI format |
