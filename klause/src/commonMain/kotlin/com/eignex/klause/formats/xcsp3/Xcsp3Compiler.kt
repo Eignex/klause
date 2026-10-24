@@ -1302,7 +1302,7 @@ internal object Compiler {
         }
 
         private fun requireHardAttribute(name: String, value: String) {
-            if (name in GUARDED_ATTRIBUTES || name == "type" && value == "soft") {
+            if (name in GUARDED_ATTRIBUTES || (name == "type" && value == "soft")) {
                 throw UnsupportedXcsp3Exception("reified or soft constraint attribute '$name'")
             }
         }
