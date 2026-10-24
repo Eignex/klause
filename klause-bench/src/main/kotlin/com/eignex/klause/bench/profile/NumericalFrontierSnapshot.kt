@@ -149,7 +149,8 @@ internal class NumericalFrontierSnapshot(
         walk(checkNotNull(field(checkNotNull(field(invocation, "component")), "root")), null)
         check(nodes == stages.getValue("numericalRetainedNodes"))
         check(pending.size.toLong() == stages.getValue("numericalPendingLeaves"))
-        check(covered.size.toLong() == (stages["numericalIncumbentBoundClosures"] ?: 0L))
+        check(covered.size.toLong() == (stages["numericalIncumbentBoundClosures"] ?: 0L) +
+            (stages["numericalInheritedBoundClosures"] ?: 0L))
         return buildJsonObject {
             put("retainedNodes", nodes)
             put("pending", JsonArray(pending))
