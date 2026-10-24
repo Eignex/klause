@@ -16246,12 +16246,14 @@ final class com.eignex.klause.solver.result/SolveStats { // com.eignex.klause.so
 }
 
 final class com.eignex.klause.solver.result/SourceLpWorkStats { // com.eignex.klause.solver.result/SourceLpWorkStats|null[0]
-    constructor <init>(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ...) // com.eignex.klause.solver.result/SourceLpWorkStats.<init>|<init>(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long){}[0]
+    constructor <init>(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ...) // com.eignex.klause.solver.result/SourceLpWorkStats.<init>|<init>(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long){}[0]
 
     final val activeNs // com.eignex.klause.solver.result/SourceLpWorkStats.activeNs|{}activeNs[0]
         final fun <get-activeNs>(): kotlin/Long // com.eignex.klause.solver.result/SourceLpWorkStats.activeNs.<get-activeNs>|<get-activeNs>(){}[0]
     final val boundCertificationWork // com.eignex.klause.solver.result/SourceLpWorkStats.boundCertificationWork|{}boundCertificationWork[0]
         final fun <get-boundCertificationWork>(): kotlin/Long // com.eignex.klause.solver.result/SourceLpWorkStats.boundCertificationWork.<get-boundCertificationWork>|<get-boundCertificationWork>(){}[0]
+    final val conflictCertificationWork // com.eignex.klause.solver.result/SourceLpWorkStats.conflictCertificationWork|{}conflictCertificationWork[0]
+        final fun <get-conflictCertificationWork>(): kotlin/Long // com.eignex.klause.solver.result/SourceLpWorkStats.conflictCertificationWork.<get-conflictCertificationWork>|<get-conflictCertificationWork>(){}[0]
     final val continuationWork // com.eignex.klause.solver.result/SourceLpWorkStats.continuationWork|{}continuationWork[0]
         final fun <get-continuationWork>(): kotlin/Long // com.eignex.klause.solver.result/SourceLpWorkStats.continuationWork.<get-continuationWork>|<get-continuationWork>(){}[0]
     final val floatWork // com.eignex.klause.solver.result/SourceLpWorkStats.floatWork|{}floatWork[0]
@@ -16268,6 +16270,7 @@ final class com.eignex.klause.solver.result/SourceLpWorkStats { // com.eignex.kl
         final fun <get-refinementWork>(): kotlin/Long // com.eignex.klause.solver.result/SourceLpWorkStats.refinementWork.<get-refinementWork>|<get-refinementWork>(){}[0]
 
     final fun component1(): kotlin/Long // com.eignex.klause.solver.result/SourceLpWorkStats.component1|component1(){}[0]
+    final fun component10(): kotlin/Long // com.eignex.klause.solver.result/SourceLpWorkStats.component10|component10(){}[0]
     final fun component2(): kotlin/Long // com.eignex.klause.solver.result/SourceLpWorkStats.component2|component2(){}[0]
     final fun component3(): kotlin/Long // com.eignex.klause.solver.result/SourceLpWorkStats.component3|component3(){}[0]
     final fun component4(): kotlin/Long // com.eignex.klause.solver.result/SourceLpWorkStats.component4|component4(){}[0]
@@ -16276,7 +16279,7 @@ final class com.eignex.klause.solver.result/SourceLpWorkStats { // com.eignex.kl
     final fun component7(): kotlin/Long // com.eignex.klause.solver.result/SourceLpWorkStats.component7|component7(){}[0]
     final fun component8(): kotlin/Long // com.eignex.klause.solver.result/SourceLpWorkStats.component8|component8(){}[0]
     final fun component9(): kotlin/Long // com.eignex.klause.solver.result/SourceLpWorkStats.component9|component9(){}[0]
-    final fun copy(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ...): com.eignex.klause.solver.result/SourceLpWorkStats // com.eignex.klause.solver.result/SourceLpWorkStats.copy|copy(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long){}[0]
+    final fun copy(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ...): com.eignex.klause.solver.result/SourceLpWorkStats // com.eignex.klause.solver.result/SourceLpWorkStats.copy|copy(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/SourceLpWorkStats.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/SourceLpWorkStats.hashCode|hashCode(){}[0]
     final fun mergedWith(com.eignex.klause.solver.result/SourceLpWorkStats): com.eignex.klause.solver.result/SourceLpWorkStats // com.eignex.klause.solver.result/SourceLpWorkStats.mergedWith|mergedWith(com.eignex.klause.solver.result.SourceLpWorkStats){}[0]
