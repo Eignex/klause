@@ -57,10 +57,25 @@ internal object CliProfile {
         val cpuContexts = HashMap<String, Long>()
         val allocationContexts = HashMap<String, Long>()
         val cpuPolynomialCheckpoints = HashMap<String, Long>()
+        val nativeCallers = HashMap<String, Long>()
+        val eventCounts = HashMap<String, Long>()
+        val runtimeMaxMillis = HashMap<String, Long>()
+        val runtimeMillis = HashMap<String, Long>()
         RecordingFile(file.toPath()).use { recording ->
             while (recording.hasMoreEvents()) {
                 val event = recording.readEvent()
+                val type = event.eventType.name
+                eventCounts.merge(type, 1L, Long::plus)
+                if (type in setOf("jdk.GarbageCollection", "jdk.GCPhasePause", "jdk.ThreadPark",
+                    "jdk.ThreadSleep", "jdk.JavaMonitorEnter", "jdk.JavaMonitorWait", "jdk.Compilation",
+                    "jdk.SafepointBegin", "jdk.ExecuteVMOperation")
+                ) {
+                    val millis = event.duration.toMillis()
+                    runtimeMaxMillis.merge(type, millis, ::maxOf)
+                    runtimeMillis.merge(type, millis, Long::plus)
+                }
                 when (event.eventType.name) {
+                    "jdk.NativeMethodSample" -> nativeCallers.merge(cliOperationCallers(event), 1L, Long::plus)
                     "jdk.ExecutionSample" -> {
                         topMethod(event)?.let { cpu.merge(it, 1L, Long::plus) }
                         phases.merge(cliPhase(event), 1L, Long::plus)
@@ -81,6 +96,10 @@ internal object CliProfile {
                 }
             }
         }
+        printTable("$label: event counts", eventCounts, 40, output)
+        printTable("$label: runtime event durations by type (ms; overlapping types)", runtimeMillis, 40, output)
+        printTable("$label: maximum runtime event duration by type (ms)", runtimeMaxMillis, 40, output)
+        printTable("$label: native-method samples by captured callers", nativeCallers, 60, output)
         printTable("$label: CPU samples by phase (stack attribution)", phases, 40, output)
         printTable("$label: CPU self-samples", cpu, 60, output)
         printTable("$label: CPU samples by captured callers", cpuCallers, 60, output)
