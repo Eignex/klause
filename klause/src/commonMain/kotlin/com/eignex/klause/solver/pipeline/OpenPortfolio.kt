@@ -347,7 +347,9 @@ internal class OpenPortfolio(
                             if (exact != null) cutoffReads++
                             exact?.let(::roundedUpperBound) ?: Double.POSITIVE_INFINITY
                         }),
-                        objectiveLowerBoundSupplier = if (!shareCompanions || floorObjective == null) null else linear?.let {
+                        objectiveLowerBoundSupplier = if (!shareCompanions || floorObjective == null) {
+                            null
+                        } else linear?.let {
                             { it.sharedLowerBound().also { bound -> if (bound.isFinite()) floorReads++ } }
                         })
                     LinearCompanionSearch(solver.resumable(objective, params), context, binding, objective) {
