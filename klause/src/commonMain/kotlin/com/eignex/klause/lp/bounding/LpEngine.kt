@@ -487,6 +487,7 @@ internal class LpEngine(
 
     // Work the current node's LP has charged, across its base, cut-augmented and recovery solves.
     private var pendingSolveOps = 0L
+    private var nodeWorkStoppedAfterProgress = false
 
     /** Add one solve's work to the current node's total. */
     internal fun noteSolveOps(ops: Long) {
@@ -542,10 +543,12 @@ internal class LpEngine(
     }
 
     internal fun observeNodeWorkStop(solver: LpSolver) {
-        if (rootQueryPolicy == LpRootQueryPolicy.INTERRUPTED_WORK && adaptiveWork &&
+        if ((rootQueryPolicy == LpRootQueryPolicy.SHARED_WORK ||
+                rootQueryPolicy == LpRootQueryPolicy.INTERRUPTED_WORK) && adaptiveWork &&
             solver.lastTermination == LpFloatTermination.WORK && solver.lastPivots > 0
         ) {
             lpWorkBudget.observeWorkStop()
+            nodeWorkStoppedAfterProgress = true
         }
     }
 
@@ -938,6 +941,7 @@ internal class LpEngine(
             } else {
                 null
             }
+            nodeWorkStoppedAfterProgress = false
             val outcome = lpBoundAndFix(
                 lpRelaxerL,
                 session,
@@ -952,7 +956,8 @@ internal class LpEngine(
                 cutsAllowed = cutsAllowed,
             )
             // What this node's LP cost against the nodes explored; the allowance was charged as it spent.
-            lpEffortGovernor.observeSolve(pendingSolveOps, outcome.prune)
+            lpEffortGovernor.observeSolve(pendingSolveOps, outcome.prune,
+                nodeWorkStoppedAfterProgress && outcome.basis == null)
             pendingSolveOps = 0L
             if (lpEffortGovernor.isDemoted) sink.lp.observeDemoted()
             lpPivotBudget.observe(pruned = outcome.prune, couldPrune = effectiveBound.isFinite())

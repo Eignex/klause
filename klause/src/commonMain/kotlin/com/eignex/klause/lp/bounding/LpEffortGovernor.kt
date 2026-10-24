@@ -38,10 +38,9 @@ internal class LpEffortGovernor(
         nodes++
     }
 
-    /** Note one node LP solve: the [opsSpent] it charged and whether it [pruned]. */
-    fun observeSolve(opsSpent: Long, pruned: Boolean) {
+    /** Note one node LP solve. A [workStoppedAfterProgress] query has not supplied a point to assess. */
+    fun observeSolve(opsSpent: Long, pruned: Boolean, workStoppedAfterProgress: Boolean = false) {
         ops += opsSpent
-        solves++
         if (pruned) {
             // A prune lifts a ratio demotion (not an allowance one) and restarts the evidence window.
             demoted = allowanceSpent
@@ -50,6 +49,8 @@ internal class LpEffortGovernor(
             solves = 0
             return
         }
+        if (workStoppedAfterProgress) return
+        solves++
         if (demoted || solves < warmupSolves || opsPerNodeCap <= 0L) return
         // Divide rather than compare against `cap × nodes`, which overflows on a large cap and wraps
         // negative — demoting every LP instead of none.

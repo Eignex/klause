@@ -84,6 +84,13 @@ explanations cite the selected bound witnesses and all contributing row premises
 every learned literal is false at the conflict and implied by the cited antecedents.
 One integer or disjunction leaf cannot refute its sibling branches.
 
+A node query that makes pivots but stops on its work allowance before returning a
+point grows the adaptive request within its existing ceiling and remaining
+cumulative allowance. Such queries retain every work charge but do not consume
+the effort governor's point-assessment warmup. Completed queries assess that
+preceding work too; numerical stops, zero-pivot stops and infeasibility candidates
+provide no growth feedback.
+
 For mixed models, node bounding uses the
 [mixed deduction operations](#mixed-deduction-operations),
 keeps the strongest checked objective bound and applies only integral consequences
