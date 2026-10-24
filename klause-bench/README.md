@@ -1024,6 +1024,21 @@ the recorded witnesses against the original MiniZinc source.
 
 ## Design evidence
 
+### XCSP3 native scalar distinctness
+
+[Lab 7951](https://lab.eignex.com/jobs/7951) compares `5a8c2b0c13` with native
+scalar `AllDifferent` retention at `58e51bbab4`: mixed/P1, 10 seconds, seeds 1/3,
+three repeats, debug enabled, no JFR, Mac/aarch64. Source hashes, runtime,
+options and non-solver dependencies match. All 36 feasible witnesses pass the
+original XCSP3 checker; both arms leave BlockedQueens unresolved.
+
+CVRP source Booleans fall from 9315 to zero and factors from 19289 to 795;
+preparation takes 718–902 ms versus 170–210 ms. CVRP objective pairs have four
+wins and two losses; TankAllocation has three wins and three losses, and
+ProgressiveParty ties at seven in all six pairs. BlockedQueens retains its source
+shape. These diagnostics support native retention and reduced preparation cost,
+with mixed search quality; they establish no universal solve speedup.
+
 These summaries record current design decisions. The contracts live in the linked
 [docs](../docs/README.md) chapters; measurements behind them were klause-lab
 experiments and stay outside the repository.
