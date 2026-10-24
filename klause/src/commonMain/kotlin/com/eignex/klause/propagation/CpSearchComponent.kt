@@ -80,26 +80,44 @@ class CpSearchComponent(
         nativeLevelBySharedLevel.add(sharedRootLevel)
     }
 
-    override fun initialize(context: com.eignex.klause.solver.search.SearchContext): ComponentResult {
+    override fun initialize(context: com.eignex.klause.solver.search.SearchContext): ComponentResult =
+        session.withCancellation(context.executionControls.cancellation) {
+            session.explanationState.finiteWork.begin()
+            try {
+                initializeFacts(context)
+            } catch (_: FinitePropagationInterrupted) {
+                session.explanationState.runCancelled = true
+                ComponentResult.Indeterminate
+            }
+        }
+
+    private fun initializeFacts(context: com.eignex.klause.solver.search.SearchContext): ComponentResult {
         sharedContext = context
         if (session.fixpointCancelled) return ComponentResult.Indeterminate
         if (session.isUnsatAtRoot) return ComponentResult.Conflict()
         var result: ComponentResult = ComponentResult.Consistent
         for (variable in 0 until session.problem.numBoolVars) {
+            checkPublication()
             val value = session.boolValue(variable) ?: continue
             val publication = context.publish(Lit.make(variable, value))
             if (publication !is ComponentResult.Consistent) result = publication
         }
         for (variable in 0 until session.problem.numIntVars) {
+            checkPublication()
             val domain = session.intDomain(variable)
+            val lowerPremise = session.sharedBoundPremise(variable, false, context, ::sourceIntId, sharedRootLevel)
+            checkCompleteFixpoint()
             val lower = context.publish(
                 SearchDecision.IntAtLeast(sourceIntId(variable), domain.min),
-                session.sharedBoundPremise(variable, false, context, ::sourceIntId, sharedRootLevel),
+                lowerPremise,
             )
             if (lower !is ComponentResult.Consistent) result = lower
+            checkPublication()
+            val upperPremise = session.sharedBoundPremise(variable, true, context, ::sourceIntId, sharedRootLevel)
+            checkCompleteFixpoint()
             val upper = context.publish(
                 SearchDecision.IntAtMost(sourceIntId(variable), domain.max),
-                session.sharedBoundPremise(variable, true, context, ::sourceIntId, sharedRootLevel),
+                upperPremise,
             )
             if (upper !is ComponentResult.Consistent) result = upper
         }
@@ -154,8 +172,8 @@ class CpSearchComponent(
         context: com.eignex.klause.solver.search.SearchContext,
     ): ComponentResult {
         sharedContext = context
-        if (session.fixpointCancelled) return ComponentResult.Indeterminate
         lastResult = null
+        if (session.fixpointCancelled) return ComponentResult.Indeterminate
         if (decision is SearchDecision.Bool && Lit.variable(decision.literal) >= session.problem.numBoolVars) {
             return if (context.atomLiteral(decision) != null) {
                 ComponentResult.Consistent
@@ -286,8 +304,12 @@ class CpSearchComponent(
     }
 
     private fun checkPublication() {
-        if (session.fixpointCancelled) throw FinitePropagationInterrupted()
+        checkCompleteFixpoint()
         session.explanationState.checkFiniteWork()
+    }
+
+    private fun checkCompleteFixpoint() {
+        if (session.fixpointCancelled) throw FinitePropagationInterrupted()
     }
 
     private fun publishFixpoint(
@@ -315,21 +337,21 @@ class CpSearchComponent(
             val premise = SearchAtomPremise.All(
                 listOf(premises.bound(variable, false), premises.bound(variable, true)),
             )
-            if (session.fixpointCancelled) throw FinitePropagationInterrupted()
+            checkCompleteFixpoint()
             val publication = publish(SearchDecision.IntEqual(sourceIntId(variable), value), premise)
             if (publication !is ComponentResult.Consistent) published = publication
         }
         result.forEachIntMin { variable, value ->
             checkPublication()
             val premise = premises.bound(variable, false)
-            if (session.fixpointCancelled) throw FinitePropagationInterrupted()
+            checkCompleteFixpoint()
             val publication = publish(SearchDecision.IntAtLeast(sourceIntId(variable), value), premise)
             if (publication !is ComponentResult.Consistent) published = publication
         }
         result.forEachIntMax { variable, value ->
             checkPublication()
             val premise = premises.bound(variable, true)
-            if (session.fixpointCancelled) throw FinitePropagationInterrupted()
+            checkCompleteFixpoint()
             val publication = publish(SearchDecision.IntAtMost(sourceIntId(variable), value), premise)
             if (publication !is ComponentResult.Consistent) published = publication
         }
@@ -353,7 +375,8 @@ class CpSearchComponent(
         }
         val rolledBack = target < session.decisionLevel
         session.popToLevel(target)
-        if (rolledBack) session.explanationState.runCancelled = false
+        // A failed native pin already restored its completed parent before returning its conflict.
+        if (rolledBack || lastResult is PropagationResult.Unsat) session.explanationState.runCancelled = false
         nativeLevelBySharedLevel.truncateTo(decisionLevel + 1)
     }
 
