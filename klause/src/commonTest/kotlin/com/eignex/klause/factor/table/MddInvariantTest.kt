@@ -24,7 +24,9 @@ class MddInvariantTest {
             starts[layer] = records.size
             for (from in 0 until if (layer == 0) 1 else 2) {
                 for (symbol in 0..1) {
-                    records.addAll(listOf(from.toLong(), symbol.toLong(), (from xor symbol).toLong(), 2L + from + symbol))
+                    records.addAll(listOf(
+                        from.toLong(), symbol.toLong(), (from xor symbol).toLong(), 2L + from + symbol,
+                    ))
                 }
             }
         }
@@ -52,7 +54,8 @@ class MddInvariantTest {
             val accepted = words.firstOrNull { (word, _) ->
                 seq.indices.all { word[it] == state.assignment.intValue(seq[it]) }
             }
-            return distance + if (accepted == null) 0L else kotlin.math.abs(state.assignment.intValue(3) - accepted.second)
+            val gap = if (accepted == null) 0L else kotlin.math.abs(state.assignment.intValue(3) - accepted.second)
+            return distance + gap
         }
 
         val random = Random(29)
