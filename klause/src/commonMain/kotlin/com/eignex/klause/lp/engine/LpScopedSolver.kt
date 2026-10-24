@@ -74,6 +74,7 @@ internal class LpScopedSolver(
     private var pendingAppendSolveOwner: PersistentLpSolver? = null
 
     val state: LpExactState get() = trail.state
+    internal val proofPolicy: LpCertificationPolicy get() = context.certificationPolicy
     var lastResult: CertifiedLpResult? = null
         private set
     var lastMetrics: LpSolveMetrics = LpSolveMetrics()

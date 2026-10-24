@@ -40,6 +40,15 @@ internal data class SourceLpInput(
     val rhs: List<BigFraction>,
 )
 
+internal class SourceLpSparseAdmission internal constructor(
+    internal val budget: SourceLpBudget,
+    val prepared: SparseSourceLp,
+) : AutoCloseable {
+    internal var closed = false
+        private set
+    override fun close() { closed = true }
+}
+
 internal class SourceLpBudget(
     private val maxOperations: Int = 256,
     // Unset by default: operation count and each operation's work and pivot limits bound the work, and only a caller
@@ -68,14 +77,23 @@ internal class SourceLpBudget(
         private set
     var measuredRefinementWork: Long = 0L
         private set
+    var measuredBoundCertificationWork: Long = 0L
+        private set
 
     private var reported = SourceLpWorkStats()
 
-    fun observe(preparation: Long = 0L, floatWork: Long = 0L, continuation: Long = 0L, refinement: Long = 0L) {
+    fun observe(
+        preparation: Long = 0L,
+        floatWork: Long = 0L,
+        continuation: Long = 0L,
+        refinement: Long = 0L,
+        boundCertification: Long = 0L,
+    ) {
         measuredPreparationWork += minOf(preparation, Long.MAX_VALUE - measuredPreparationWork)
         measuredFloatWork += minOf(floatWork, Long.MAX_VALUE - measuredFloatWork)
         measuredContinuationWork += minOf(continuation, Long.MAX_VALUE - measuredContinuationWork)
         measuredRefinementWork += minOf(refinement, Long.MAX_VALUE - measuredRefinementWork)
+        measuredBoundCertificationWork += minOf(boundCertification, Long.MAX_VALUE - measuredBoundCertificationWork)
         if (activeStart == null) publish()
     }
 
@@ -89,6 +107,7 @@ internal class SourceLpBudget(
             measuredFloatWork,
             measuredContinuationWork,
             measuredRefinementWork,
+            measuredBoundCertificationWork,
         )
         val previous = reported
         reported = current
@@ -101,6 +120,7 @@ internal class SourceLpBudget(
             current.floatWork - previous.floatWork,
             current.continuationWork - previous.continuationWork,
             current.refinementWork - previous.refinementWork,
+            current.boundCertificationWork - previous.boundCertificationWork,
         )
         onWork(delta)
     }
@@ -144,6 +164,37 @@ internal class SourceLpBudget(
         block: (Cancellation) -> T?,
     ): T? = runAdmitted(emptyList(), 0, cancellation, emptyList(), emptyList(), false, block, prepare)
 
+    fun <T> runSparse(
+        cancellation: Cancellation,
+        prepare: (Cancellation) -> SparseSourceLpPreparation,
+        block: (SparseSourceLp, Cancellation) -> T?,
+    ): T? {
+        var prepared: SparseSourceLp? = null
+        return runAdmitted(
+            emptyList(), 0, cancellation, emptyList(), emptyList(), false,
+            block = { token -> prepared?.let { block(it, token) } },
+            sparse = { token -> prepare(token).also { prepared = it.prepared } },
+        )
+    }
+
+    fun admitSparse(
+        cancellation: Cancellation,
+        prepare: (Cancellation) -> SparseSourceLpPreparation,
+    ): SourceLpSparseAdmission? = runSparse(cancellation, prepare) { prepared, _ ->
+        SourceLpSparseAdmission(this, prepared)
+    }
+
+    fun <T> resumeSparse(
+        admission: SourceLpSparseAdmission,
+        cancellation: Cancellation,
+        block: (SparseSourceLp, Cancellation) -> T?,
+    ): T? {
+        require(admission.budget === this)
+        if (admission.closed) return null
+        return runAdmitted(emptyList(), 0, cancellation, emptyList(), emptyList(), false,
+            block = { token -> block(admission.prepared, token) }, resumed = admission)
+    }
+
     fun admitsDimensions(variables: Int, rows: Long): Boolean =
         variables >= 0 && rows >= 0L && variables.toLong() + rows <= 128L
 
@@ -156,12 +207,16 @@ internal class SourceLpBudget(
         pairing: Boolean,
         block: (Cancellation) -> T?,
         prepare: ((Cancellation) -> SourceLpInput?)? = null,
+        sparse: ((Cancellation) -> SparseSourceLpPreparation)? = null,
+        resumed: SourceLpSparseAdmission? = null,
     ): T? {
         val activeCap = maxActiveNanos
-        if (cancellation() || operations >= maxOperations) return null
+        if (cancellation() || (resumed == null && operations >= maxOperations)) return null
         if (activeCap != null && activeNanos >= activeCap) return null
-        operations++
-        reservedWork += 1024L
+        if (resumed == null) {
+            operations++
+            reservedWork += minOf(1024L, Long.MAX_VALUE - reservedWork)
+        }
         val outermost = activeStart == null
         if (outermost) activeStart = Monotonic.markNow()
         val start = checkNotNull(activeStart)
@@ -172,6 +227,15 @@ internal class SourceLpBudget(
             cancellation or Cancellation.until(start + (activeCap - activeNanos).nanoseconds)
         }
         try {
+            if (resumed != null) return block(token).takeUnless { token() || resumed.closed }
+            if (sparse != null) {
+                val preparation = sparse(token)
+                reservedWork += minOf(preparation.metrics.work, Long.MAX_VALUE - reservedWork)
+                reservedAllocation += minOf(preparation.metrics.allocation, Long.MAX_VALUE - reservedAllocation)
+                observe(preparation = preparation.metrics.work)
+                if (preparation.prepared == null || token()) return null
+                return block(token).takeUnless { token() }
+            }
             val prepared = prepare?.invoke(token)
             if (prepare != null && (prepared == null || token())) return null
             val admittedVariables = prepared?.variables ?: variables

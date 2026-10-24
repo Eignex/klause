@@ -18,6 +18,45 @@ import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
     @Test
+    fun `root guidance should retain heuristic coordinates when bound certification is exhausted`() {
+        LpScopedSolver(LpExactState(lowerBoundModel())).use { owner ->
+            val guide = owner.advanceRootGuidance(100_000L, LpFloatAllowance(100_000L, 100),
+                ReconstructionLimits(maxWork = 0L))
+
+            assertEquals(1.0, assertNotNull(guide.primal).single())
+            assertNull(guide.bound)
+            assertEquals(LpRootGuidancePhase.CERTIFICATE, guide.phase)
+            assertEquals(ReconstructionDecline.WORK, guide.certificateMetrics?.decline)
+            assertNull(owner.lastResult)
+        }
+    }
+
+    @Test
+    fun `paused root guidance should publish neither coordinates nor a bound`() {
+        LpScopedSolver(LpExactState(lowerBoundModel())).use { owner ->
+            val guide = owner.advanceRootGuidance(1L, LpFloatAllowance(100_000L, 100), ReconstructionLimits())
+
+            assertTrue(guide.paused)
+            assertEquals(LpRootGuidancePhase.FLOAT, guide.phase)
+            assertNull(guide.primal)
+            assertNull(guide.bound)
+            assertNull(guide.certificateMetrics)
+        }
+    }
+
+    @Test
+    fun `root guidance should inherit its owners proof policy`() {
+        val context = LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ -> false })
+        LpScopedSolver(LpExactState(lowerBoundModel()), context = context).use { owner ->
+            val guide = owner.advanceRootGuidance(100_000L, LpFloatAllowance(100_000L, 100), ReconstructionLimits())
+
+            assertNotNull(guide.primal)
+            assertNull(guide.bound)
+            assertEquals(LpRootGuidancePhase.CERTIFICATE, guide.phase)
+        }
+    }
+
+    @Test
     fun `checkpointed floating work should match uninterrupted work without publishing a paused result`() {
         val model = lowerBoundModel()
         val expected = LpScopedSolver(LpExactState(model)).use { owner ->
