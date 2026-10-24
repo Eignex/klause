@@ -1,23 +1,18 @@
 package com.eignex.klause.lp.optimization
 
-import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SparseSourceLpPolicy
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.evidence.IntegerPinStatus
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
-import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceValue
-import com.eignex.klause.solver.evidence.integerPinBounds
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.compareTo
@@ -45,9 +40,11 @@ internal class LinearAuthority(
     val preparations: Long get() = lp.preparations
     val reuses: Long get() = lp.reuses
     private var template: LinearAuthorityTemplate? = null
+    private var query: LinearAuthorityQuery? = null
 
     override fun close() {
         template = null
+        query = null
         lp.close()
     }
 
@@ -81,55 +78,40 @@ internal class LinearAuthority(
 
     private var relaxedPoint: Map<SourceCoordinate, Double> = emptyMap()
 
-    private fun checkSource(
-        source: SourceProofContext, cancellation: Cancellation, guidance: Boolean = false,
-    ): LinearAuthorityResult {
-        if (!source.affineObjectiveAvailable || !source.linearCoordinatesSupported()) return LinearAuthorityResult()
+    private fun prepareQuery(source: SourceProofContext, cancellation: Cancellation): LinearAuthorityQuery? {
+        if (!source.affineObjectiveAvailable || !source.linearCoordinatesSupported()) return null
         if ((source.scope.condition.lower.keys + source.scope.condition.upper.keys).any {
                 it !in source.coordinates
             } || source.scope.condition.bools.keys.any {
                 SourceCoordinate(SourceCoordinate.Kind.Boolean, it) !in source.coordinates
             }
-        ) return LinearAuthorityResult()
+        ) return null
         if (source.scope.objective == null || source.coordinates.any {
                 it.kind == SourceCoordinate.Kind.Boolean && it.id !in source.scope.condition.bools
             }
-        ) return LinearAuthorityResult()
-        val context = source.withLinearAuthority()
+        ) return null
         val prepared = if (retainLp) {
             template?.takeIf { it.matches(source) } ?: LinearAuthorityTemplate.prepare(source, cancellation)
-                ?.also { template = it } ?: return LinearAuthorityResult()
+                ?.also { template = it } ?: return null
         } else null
-        val coordinates = prepared?.coordinates ?: source.numericCoordinates()
-        val numeric = prepared?.numeric ?: source.numericContext()
-        val premises = numeric.premises
-        val integerBounds = if (premises.values.any { it.integerPins.isNotEmpty() }) {
-            numeric.integerPinBounds(source.scope.condition, cancellation) ?: return LinearAuthorityResult()
-        } else null
-        val cited = ArrayList<Pair<SourceInequality, SourceDerivation>>()
-        val inactive = HashSet<Int>()
-        for ((id, premise) in premises) {
-            if (cancellation()) return LinearAuthorityResult()
-            val active = premise.guards.all { (bool, value) -> source.scope.condition.bools[bool] == value } &&
-                (premise.integerPins.isEmpty() ||
-                    integerBounds?.status(premise.integerPins) == IntegerPinStatus.Established)
-            if (active || prepared != null) {
-                if (!active) inactive += cited.size
-                cited += premise.inequality to SourceDerivation.Premise(id)
-            }
-        }
-        for ((upper, bounds) in listOf(false to source.scope.condition.lower, true to source.scope.condition.upper)) {
-            val sign = if (upper) BigFraction.ONE else BigFraction.MINUS_ONE
-            for ((id, value) in bounds) cited += SourceInequality(mapOf(id to sign), value * sign) to
-                SourceDerivation.Assumption(id, upper)
-        }
-        val indices = prepared?.indices ?: coordinates.withIndex().associate { it.value to it.index }
-        val rows = if (prepared == null) cited.map { it.first.row(indices) }
-            else prepared.rows + cited.drop(prepared.rows.size).map { it.first.row(indices) }
-        val sign = if (source.scope.objective.sense == ObjectiveSense.MINIMIZE) BigFraction.ONE
-            else BigFraction.MINUS_ONE
-        val costs = coordinates.map { sign * (numeric.objective[it] ?: BigFraction.ZERO) }
-        val constant = numeric.objectiveConstant * sign
+        return LinearAuthorityQuery.prepare(source, prepared, cancellation)
+    }
+
+    private fun checkSource(
+        source: SourceProofContext, cancellation: Cancellation, guidance: Boolean = false,
+    ): LinearAuthorityResult {
+        val cached = if (retainLp || guidance) query?.takeIf { it.matches(source) } else null
+        val prepared = cached ?: prepareQuery(source, cancellation)?.also {
+            if (retainLp || guidance) query = it
+        } ?: return LinearAuthorityResult()
+        val coordinates = prepared.coordinates
+        val context = prepared.context
+        val cited = prepared.cited
+        val rows = prepared.rows
+        val inactive = prepared.inactive
+        val costs = prepared.costs
+        val constant = prepared.constant
+        val sign = prepared.sign
         fun combination(coefficients: List<BigFraction>, rhs: BigFraction, strict: Boolean): List<BigFraction>? {
             val selected = rows.indices.filter { it !in inactive }
             val weights = lp.combination(selected.map { rows[it] }, coefficients, rhs, strict, cancellation)
@@ -157,7 +139,7 @@ internal class LinearAuthority(
                 ?: combination(zeros, BigFraction.ZERO, true) ?: return null
             return checked(SourceClaim.Refutation, LinearPinnedRefutation(derivation(weights)))
         }
-        val closureRows = rows.map { ExactRationalInequality(it.columns, it.coefficients, it.rhs) }
+        val closureRows = prepared.closureRows
         val guide = if (guidance) lp.advance(closureRows, costs, constant, source.scope, cancellation, inactive)
             ?: return LinearAuthorityResult() else null
         if (guide?.paused == true) return LinearAuthorityResult(paused = true)
@@ -178,14 +160,15 @@ internal class LinearAuthority(
         }
         if (guide != null) {
             val point = guide.point?.map { BigFraction.ofDouble(it) ?: return LinearAuthorityResult(bound = bound) }
-            val fractions = fractional(coordinates, point).filter { candidate ->
-                val column = coordinates.indexOf(candidate.first)
+            val fractionalCoordinates = fractional(coordinates, point)
+            val fractions = fractionalCoordinates.filter { candidate ->
+                val column = prepared.indices.getValue(candidate.first)
                 val threshold = candidate.floorSplit().second
                 val bounds = guide.bounds[column]
                 (bounds.lower?.let { threshold >= it.number.value } != false) &&
                     (bounds.upper?.let { threshold + BigFraction.ONE <= it.number.value } != false)
             }
-            val candidate = point?.takeIf { fractional(coordinates, it).isEmpty() }
+            val candidate = point?.takeIf { fractionalCoordinates.isEmpty() }
                 ?.let { sample(source, coordinates, it) }?.takeIf {
                     checked(SourceClaim.Witness(it), SourceDerivation.SourceWitness) != null
                 }
