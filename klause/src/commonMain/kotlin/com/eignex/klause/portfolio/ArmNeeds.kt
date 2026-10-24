@@ -94,7 +94,8 @@ internal class ProblemFacts(
                         it.boolWeightValues.any { weight -> weight != 0L }
                 } == true,
                 circuit = problem.factors.any { it is Circuit },
-                extensionalSupports = problem.factors.any { factor ->
+                extensionalSupports = profile.problemClass == ProblemClass.FiniteCp && !profile.optimizing &&
+                    problem.factors.any { factor ->
                     factor is Table && factor.hi == null && factor.arity in 2..32 && factor.numTuples <= 65_536 &&
                         factor.xs.all { problem.rootIntDomain(it).spanOrNull(32L) != null }
                 },
