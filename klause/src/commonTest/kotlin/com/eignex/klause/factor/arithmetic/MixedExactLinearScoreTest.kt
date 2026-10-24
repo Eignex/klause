@@ -5,6 +5,8 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
+import com.eignex.klause.localsearch.DefinitionalSweep
+import com.eignex.klause.localsearch.InvariantNetwork
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
@@ -155,12 +157,13 @@ class MixedExactLinearScoreTest {
     fun `cancelled compound grading should restore activity before later candidates`() {
         val row = ExactLinear.of(intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
             listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.EQ, BigFraction.ZERO)
-        val state = LocalSearchState(LocalSearchModel.open(Problem(0, 1, arrayOf(IntDomain(0, 1)),
+        val state = LocalSearchState(LocalSearchModel.open(Problem(1, 1, arrayOf(IntDomain(0, 1)),
             arrayOf(row), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))), Random(3))
+        state.invariants = InvariantNetwork(listOf(DefinitionalSweep.SweepNode.Bool2Int(0, 0)), 1, 1)
         state.recompute()
         val before = state.assignment.snapshot()
         val cost = state.cost
-        val move = Move.Compound(listOf(Move.IntSet(0, 1), Move.RealSet(0, 2.0)))
+        val move = Move.Compound(listOf(Move.BoolFlip(0), Move.RealSet(0, 2.0)))
         val expected = state.netDelta(move)
         val objective = object : Objective {
             override fun evaluate(sample: Sample): Double {
