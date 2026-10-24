@@ -98,7 +98,7 @@ internal class LinearAuthorityTraversal(
             val claim = (node.coveredBound ?: node.result?.bound)?.claim as? SourceClaim.Bound
             val value = (claim?.value as? SourceValue.Rational)?.value
             if (minimizes) value else value?.negated()
-        }.maxOrNull()
+        }.reduceOrNull { left, right -> if (left >= right) left else right }
     }
 
     fun updateGlobalBound() {
