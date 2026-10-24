@@ -136,6 +136,23 @@ publishes no point, bound or conflict. Changed bounds, objectives, row authority
 trail scope discard the cursor before numerical adoption; cancellation and owner
 cleanup retire its factors. Ordinary admission remains independent of this policy.
 
+Sparse source preparation transposes emitted row support into exact CSC and retains
+row/column adjacency. Its explicit work, modeled allocation and scalar-width limits
+are independent of the exact-primal dimension guard. Admission reserves preparation
+once; resumed consultations keep the same admission and charge only active work
+and time. Closing that admission prevents further consultations.
+
+The scoped root-guidance operation advances the existing floating cursor under
+finite cumulative and per-consultation work limits. Pauses publish no coordinates
+or proofs. A completed point remains heuristic even when bound certification declines.
+Dual-only certification checks exact Lagrangian evidence under its own sparse input,
+arithmetic and allocation limits; it runs no primal recovery or exact feasibility
+continuation. Its accepted bound retains row multipliers for source lifting and
+rechecking. Preparation, floating stops, certificate declines and completed checked
+bounds have separate outcomes and costs; factor fill and density describe the
+completed numerical solve. Sparse preparation alone does not authorize ordinary
+admission or bound the fill of a numerical basis.
+
 ### Leaf completion
 
 Finite optimization keeps a pinned real-leaf request across portfolio slices.

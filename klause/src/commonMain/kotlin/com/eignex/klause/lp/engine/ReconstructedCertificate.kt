@@ -859,3 +859,54 @@ internal fun verifyRationalCertificate(
         run?.pointRejection.takeIf { decline == ReconstructionDecline.CANDIDATE },
     )
 }
+
+// Dual evidence has its own admission and spending; exact-primal reconstruction is not a prerequisite.
+internal fun certifyLpBoundOnly(
+    model: LpModel,
+    duals: DoubleArray,
+    limits: ReconstructionLimits,
+    cancellation: Cancellation = Cancellation.Never,
+    observer: LpCertificationObserver? = null,
+    policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
+): ReconstructedCertificate {
+    val timer = LpPhaseTimer(observer, LpSolvePhase.BOUND_CERTIFICATE)
+    val meter = ReconstructionMeter(limits, cancellation)
+    var run: ReconstructionRun? = null
+    var decline: ReconstructionDecline? = null
+    try {
+        meter.poll()
+        meter.step()
+        if (duals.size != model.m) throw ReconstructionStop(ReconstructionDecline.INVALID_INPUT)
+        val authority = ReconstructionAuthority(model, meter)
+        meter.phase = ReconstructionPhase.DUAL
+        meter.storage(model.m.toLong() * 32L)
+        val candidate = duals.mapIndexed { row, value ->
+            meter.step()
+            var multiplier = meter.fraction(BigFraction.ofDouble(value)
+                ?: throw ReconstructionStop(ReconstructionDecline.NONFINITE))
+            val slack = model.n + row
+            val cost = authority.costs[slack]
+            val sides = authority.bounds[slack]
+            if ((sides.lower == null && multiplier < cost) || (sides.upper == null && multiplier > cost)) {
+                multiplier = cost
+            }
+            multiplier
+        }
+        val current = ReconstructionRun(authority, meter)
+        run = current
+        current.dual(candidate, ray = false)
+        if (current.bound == null) decline = ReconstructionDecline.CANDIDATE
+    } catch (stop: ReconstructionStop) {
+        decline = stop.reason
+    }
+    if (decline == ReconstructionDecline.CANCELLED || cancellation()) {
+        decline = ReconstructionDecline.CANCELLED
+        run = null
+    }
+    val metrics = meter.snapshot(decline)
+    val bound = run?.bound
+    val accepted = policy.acceptNullable(LpCertifier.RATIONAL, bound)
+    observer?.observe(LpCertifier.RATIONAL, bound != null, LpCertifierCost.Metered(metrics.work))
+    timer.finish(decline?.name ?: if (accepted != null) "BOUND" else "REFUSED", metrics.work)
+    return ReconstructedCertificate(null, accepted, null, null, false, false, metrics)
+}

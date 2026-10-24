@@ -480,6 +480,7 @@ private fun smtStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pair<String
     out += "smtSourceLpFloatWork" to "${sourceLp.floatWork}"
     out += "smtSourceLpContinuationWork" to "${sourceLp.continuationWork}"
     out += "smtSourceLpRefinementWork" to "${sourceLp.refinementWork}"
+    out += "smtSourceLpBoundCertificationWork" to "${sourceLp.boundCertificationWork}"
     out += "smtRealGraphOpenings" to "$realGraphOpenings"
     out += "smtGraphPointHintCaptures" to "$graphPointHintCaptures"
     out += "smtLpPointHintCaptures" to "$lpPointHintCaptures"
