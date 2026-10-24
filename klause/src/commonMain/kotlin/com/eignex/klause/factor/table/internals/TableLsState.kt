@@ -5,6 +5,9 @@ internal class TableLsState(val dist: IntArray, arity: Int) {
     private val next = IntArray(dist.size) { -1 }
     private val previous = IntArray(dist.size) { -1 }
     private val counts = IntArray(arity + 1)
+    private val probeCounts = IntArray(arity + 1)
+    private var probeSeen: IntArray? = null
+    private var probeStamp = 0
     val minDist: Int get() = counts.indexOfFirst { it != 0 }
 
     init {
@@ -23,7 +26,33 @@ internal class TableLsState(val dist: IntArray, arity: Int) {
         insert(row)
     }
 
-    fun closestRows(): IntArray {
+    fun beginProbe(repeated: Boolean) {
+        counts.copyInto(probeCounts)
+        if (repeated) {
+            if (probeSeen == null) probeSeen = IntArray(dist.size)
+            if (probeStamp == Int.MAX_VALUE) {
+                probeSeen?.fill(0)
+                probeStamp = 0
+            }
+            probeStamp++
+        }
+    }
+
+    fun visitProbeRow(row: Int): Boolean {
+        val seen = checkNotNull(probeSeen)
+        if (seen[row] == probeStamp) return false
+        seen[row] = probeStamp
+        return true
+    }
+
+    fun scoreProbeRow(row: Int, delta: Int) {
+        probeCounts[dist[row]]--
+        probeCounts[dist[row] + delta]++
+    }
+
+    fun probeMinimum(): Int = probeCounts.indexOfFirst { it != 0 }
+
+    fun closestRows(poll: () -> Unit = {}): IntArray {
         val result = IntArray(minOf(2, dist.size))
         var size = 0
         for (distance in heads.indices) {
@@ -31,6 +60,7 @@ internal class TableLsState(val dist: IntArray, arity: Int) {
             var second = -1
             var row = heads[distance]
             while (row >= 0) {
+                poll()
                 if (first < 0 || row < first) {
                     second = first
                     first = row
