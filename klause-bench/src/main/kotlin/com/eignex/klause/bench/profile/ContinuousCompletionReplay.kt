@@ -179,7 +179,7 @@ internal object ContinuousCompletionReplay {
                 closeNs = System.nanoTime() - started
                 closeBytes = allocated() - before
             }
-        }.use {
+        }.use { _ ->
             for ((index, candidate) in candidates.withIndex()) {
                 if (stop()) break
                 lastStats = null
