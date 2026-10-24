@@ -83,7 +83,7 @@ internal class LeafRealCompletion(
             context = context, toleranceCheck = check, encoders = encoders, sourceEncoding = encoded)
         val stats = sink.snapshot()
         val pointWork = stats.phases["EXACT_POINT_RECOVERY_STANDALONE"]?.work?.toDouble() ?: 0.0
-        val work = movesFor(stats.standaloneWorkOps.sum + pointWork)
+        val work = movesFor(stats.standaloneWorkOps.sum + stats.componentWorkOps.sum + pointWork)
         observeLp?.invoke(real.verdict, stats)
         if (cancellation()) return Completion.Undecided(work)
         return when (real.verdict) {
