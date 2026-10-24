@@ -46,6 +46,7 @@ internal class LinearAuthorityInvocation(
     borrowedAuthority: LinearAuthority? = null,
     private val boundOrdered: Boolean = false,
     guidance: Boolean = false,
+    cuts: Boolean = true,
 ) : AutoCloseable {
     private val started = TimeSource.Monotonic.markNow()
     private var closed = false
@@ -76,7 +77,7 @@ internal class LinearAuthorityInvocation(
     private val component = LinearAuthorityTraversal(context,
         SourceLpBudget(onWork = state.smt::observeSourceLp), stop, ::paused, ::offer,
         { incumbent?.let { sample -> value?.let { sample to it } } }, useBranchHistory, borrowedAuthority,
-        useGuidance = boundOrdered || guidance, inheritBounds = boundOrdered)
+        useGuidance = boundOrdered || guidance, inheritBounds = boundOrdered, useCuts = cuts)
     private val session = SearchComponentSet(listOf(component)).session(params.maxLeaves, stop).also {
         it.bindOpenTheoryWork(state.work)
     }

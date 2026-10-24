@@ -37,6 +37,29 @@ class LinearAuthorityInvocationTest {
     )
 
     @Test
+    fun `checked source cuts should close a sparse integer contradiction at the root`() {
+        val reals = (0 until 128).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val source = SourceProofContext(scope, (listOf(integer) + reals).toSet(), mapOf(
+            "upper" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ofLong(2)), BigFraction.ONE)),
+            "lower" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ofLong(-2)),
+                BigFraction.MINUS_ONE)),
+        ), mapOf(integer to BigFraction.ONE))
+
+        val result = LinearAuthorityInvocation(source, TheoryParams(), boundOrdered = true).use {
+            it.run { _, _ -> }
+        }
+
+        val terminal = assertNotNull(result.terminal)
+        assertEquals(SourceClaim.Refutation, terminal.claim)
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
+        val stages = assertNotNull(result.stats.smt.completeSearchStages)
+        assertEquals(1L, stages["numericalChecks"])
+        assertEquals(1L, stages["numericalClosedLeaves"])
+        assertEquals(2L, stages["numericalActiveCuts"])
+    }
+
+    @Test
     fun `unsliced numerical execution should resume sparse guidance pauses`() {
         val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
         val source = SourceProofContext(scope, setOf(real, other), mapOf(
@@ -70,7 +93,8 @@ class LinearAuthorityInvocationTest {
                 BigFraction.MINUS_ONE), mapOf(0 to true)),
         ), mapOf(integer to BigFraction.ONE))
 
-        val result = LinearAuthorityInvocation(source, TheoryParams(maxLeaves = 2), boundOrdered = true).use {
+        val result = LinearAuthorityInvocation(source, TheoryParams(maxLeaves = 2), boundOrdered = true,
+            cuts = false).use {
             assertNotNull(it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _, _ -> })
         }
 
@@ -94,8 +118,8 @@ class LinearAuthorityInvocationTest {
                 BigFraction.MINUS_ONE)),
         ), mapOf(integer to BigFraction.ONE, other to BigFraction.ONE))
 
-        val result = LinearAuthorityInvocation(source, TheoryParams(), boundOrdered = true).use { invocation ->
-            assertNotNull(invocation.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _, _ -> })
+        val result = LinearAuthorityInvocation(source, TheoryParams(), boundOrdered = true, cuts = false).use {
+            assertNotNull(it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _, _ -> })
         }
 
         val terminal = assertNotNull(result.terminal)
@@ -120,8 +144,8 @@ class LinearAuthorityInvocationTest {
                 BigFraction.MINUS_ONE)),
         ), mapOf(integer to BigFraction.ONE, other to BigFraction.ONE))
 
-        val result = LinearAuthorityInvocation(source, TheoryParams(), boundOrdered = true).use { invocation ->
-            assertNotNull(invocation.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _, _ -> })
+        val result = LinearAuthorityInvocation(source, TheoryParams(), boundOrdered = true, cuts = false).use {
+            assertNotNull(it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _, _ -> })
         }
 
         val terminal = assertNotNull(result.terminal)

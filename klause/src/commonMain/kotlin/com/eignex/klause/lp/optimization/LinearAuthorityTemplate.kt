@@ -21,7 +21,9 @@ internal class LinearAuthorityTemplate private constructor(
         source.objectiveConstant == other.objectiveConstant
 
     companion object {
-        fun prepare(source: SourceProofContext, cancellation: Cancellation, cuts: Boolean = false): LinearAuthorityTemplate? {
+        fun prepare(
+            source: SourceProofContext, cancellation: Cancellation, cuts: Boolean = false,
+        ): LinearAuthorityTemplate? {
             val numeric = source.numericContext()
             val coordinates = source.numericCoordinates()
             val indices = coordinates.withIndex().associate { it.value to it.index }
