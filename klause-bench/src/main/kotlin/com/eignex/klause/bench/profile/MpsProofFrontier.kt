@@ -38,6 +38,7 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -88,7 +89,8 @@ internal object MpsProofFrontier {
         val system = NumericalFrontierSnapshot.system(context)
         Reports.writeJson(out.resolve("native-system.json").path, system)
         val invocation = NumericalFrontierSnapshot.open(context, params)
-        val history = ArrayList<kotlinx.serialization.json.JsonObject>()
+        val history = ArrayList<JsonObject>()
+        out.resolve("incumbents.jsonl").writeText("")
         val started = System.nanoTime()
         try {
             val result = NumericalFrontierSnapshot.run(invocation) { _, value ->
