@@ -15,6 +15,25 @@ import kotlin.test.assertTrue
 class MutatorsTest {
 
     @Test
+    fun `pending maintenance should preserve an unrelated cancellation latch`() {
+        val state = freshState(255)
+        state.finiteMutationInterruptible = true
+        state.finiteWork.cancellation = Cancellation {
+            state.pendingFiniteMutation != null && state.holeHistHas(0, 16)
+        }
+        assertFailsWith<FinitePropagationInterrupted> {
+            state.excludeInteriorIntValues(0, LongArray(128) { it.toLong() + 1 }) { null }
+        }
+        state.runCancelled = true
+
+        assertNull(state.runToFixpoint(allFactors = false))
+
+        assertTrue(state.runCancelled)
+        assertNotNull(state.pendingFiniteMutation)
+        assertEquals(false, state.holeHistHas(0, 128))
+    }
+
+    @Test
     fun `interrupted batched hole history should complete before later propagation`() {
         for (logging in listOf(false, true)) {
             val state = freshState(255)
