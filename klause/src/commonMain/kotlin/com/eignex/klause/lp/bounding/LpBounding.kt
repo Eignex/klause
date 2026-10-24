@@ -1317,7 +1317,7 @@ internal fun LpEngine.rootLpRelaxationBound(
                 solveContext.certificationPolicy,
             )
         }
-        relaxation.projectCertifiedLowerBound(lower)
+        projectCertifiedLowerBound(relaxation, lower)
     }
 } catch (_: CheckedLongOverflowException) {
     Double.NaN
@@ -1333,16 +1333,16 @@ private fun LpEngine.recordRootQueryBound(relaxation: LpRelaxation, result: Floa
         sink.lp.certificationObserver(LpRoute.NODE),
         solveContext.certificationPolicy,
     )
-    if (!params.cancellation()) recordRootLowerBound(relaxation.projectCertifiedLowerBound(lower))
+    if (!params.cancellation()) recordRootLowerBound(projectCertifiedLowerBound(relaxation, lower))
 }
 
-private fun LpRelaxation.projectCertifiedLowerBound(lower: Double?): Double {
-    val full = lower?.let { BigFraction.ofDouble(it) }?.plus(BigFraction.ofLong(objectiveConstant))
+private fun LpEngine.projectCertifiedLowerBound(relaxation: LpRelaxation, lower: Double?): Double {
+    val full = lower?.let { BigFraction.ofDouble(it) }?.plus(BigFraction.ofLong(relaxation.objectiveConstant))
     val projected = full?.lowerBoundDouble()
-    val integral = model.hasIntegralObjective()
+    val integral = relaxation.model.hasIntegralObjective()
     return when {
         projected == null -> Double.NaN
-        integral && sourceObjectiveRange(this) == null -> Double.NaN
+        integral && sourceObjectiveRange(relaxation) == null -> Double.NaN
         integral && abs(projected) >= EXACT_INTEGER_DOUBLE_LIMIT -> projected.nextDown()
         else -> projected
     }
