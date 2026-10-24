@@ -192,6 +192,17 @@ class PresolveRoundEngineTest {
     }
 
     @Test
+    fun `a completed parked analysis without a premise revision should ignore later changes`() {
+        val parked = PresolvePass.BREAK_SYMMETRIES
+        val cheap = PresolvePass.STRENGTHEN_COEFFICIENTS
+        val host = ScriptedHost(1_000, mapOf(cheap to listOf(100L)))
+
+        val runs = runs(listOf(parked, cheap), host)
+
+        assertEquals(1, runs.count { it == parked })
+    }
+
+    @Test
     fun `an interrupted parity analysis should retry rather than park after another pass changes the model`() {
         val parity = PresolvePass.DERIVE_XOR_UNITS
         val cheap = PresolvePass.STRENGTHEN_COEFFICIENTS
