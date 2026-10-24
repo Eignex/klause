@@ -64,12 +64,13 @@ class Xcsp3CompilerTest {
 
     @Test
     fun `distance disequalities should preserve exact signed word boundary comparisons`() {
-        for ((x, y, constant, feasible) in listOf(
-            listOf(Long.MIN_VALUE, Long.MAX_VALUE, 1L, 1L),
-            listOf(Long.MIN_VALUE, Long.MIN_VALUE + 1, 1L, 0L),
-            listOf(Long.MAX_VALUE, Long.MAX_VALUE, 0L, 0L),
-            listOf(Long.MAX_VALUE, Long.MIN_VALUE, Int.MAX_VALUE.toLong(), 1L),
+        for ((input, expectedCount) in listOf(
+            Triple(Long.MIN_VALUE, Long.MAX_VALUE, 1L) to 1,
+            Triple(Long.MIN_VALUE, Long.MIN_VALUE + 1, 1L) to 0,
+            Triple(Long.MAX_VALUE, Long.MAX_VALUE, 0L) to 0,
+            Triple(Long.MAX_VALUE, Long.MIN_VALUE, Int.MAX_VALUE.toLong()) to 1,
         )) {
+            val (x, y, constant) = input
             val parsed = Xcsp3.parse(
                 """<instance><variables><var id="x">$x</var><var id="y">$y</var>
                     </variables><constraints><intension>ne(dist(x,y),$constant)</intension>
@@ -78,7 +79,7 @@ class Xcsp3CompilerTest {
 
             val actual = BruteForceSolver(parsed.problem.bake()).enumerate(BruteForceParams(randomSeed = 0L)).toList()
 
-            assertEquals(feasible.toInt(), actual.size)
+            assertEquals(expectedCount, actual.size)
         }
     }
 
