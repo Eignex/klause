@@ -1086,7 +1086,7 @@ and 6.43/6.85/9.61/19.34 ms with the index. Coprime-24_c25 construction fell fro
 Source hashes, factor kinds and runtime identities matched across the profiles;
 the actual profile JVM exposed ten processors and executed no solver.
 
-The uninstrumented [7955 controls](https://lab.eignex.com/jobs/7955) reported
+The unprofiled debug-mode [7955 controls](https://lab.eignex.com/jobs/7955) reported
 Coprime load times of 37.3 s and 0.67 s; both runs stayed unknown at a ten-second
 solve limit. The signed division fixtures retained their reported outcomes.
 The maintained checker accepted both linear SMT witnesses, declined the four
@@ -1094,6 +1094,12 @@ SMT witnesses containing division and could not locate the vendored XCSP3 and
 MiniZinc sources. Native refutation and optimum reports therefore receive no
 independent proof credit from this job. Construction gains establish neither
 solver recovery nor a corpus-wide solve speedup.
+
+The four spot-host debug-mode [7958 corpus controls](https://lab.eignex.com/jobs/7958) retained
+Coprime-08_c25 CP objective 31 and local-search objective 53 in both revisions at
+seed 3 and five-second limits. The maintained [7962 recheck](https://lab.eignex.com/jobs/7962)
+accepted all four original-source instantiations. These witness checks establish
+source feasibility; they do not certify the CP optimum reports.
 
 ### Elective LP harvest controls
 
