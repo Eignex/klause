@@ -112,6 +112,19 @@ internal class LinearAuthority(
                 it.kind == SourceCoordinate.Kind.Boolean && it.id !in source.scope.condition.bools
             }
         ) return null
+        if (budget.funding != null) {
+            val condition = source.scope.condition
+            var work = source.coordinates.size.toLong() + condition.bools.size + condition.lower.size +
+                condition.upper.size
+            try {
+                for (premise in source.premises.values) {
+                    if (cancellation()) return null
+                    work += 1L + premise.inequality.coefficients.size + premise.guards.size + premise.integerPins.size
+                }
+            } finally {
+                budget.observe(preparation = work)
+            }
+        }
         val prepared = if (retainLp || cuts) {
             template?.takeIf { it.matches(source) && (it.cuts != null) == cuts }
                 ?: LinearAuthorityTemplate.prepare(source, cancellation, cuts) { work ->
