@@ -23,8 +23,8 @@ Mandatory unit-integer `Distinct` deductions retain the Hall source positions in
 lazy payload. Explanation reconstructs their bounds and holes at the deduction's
 trail boundary; later carves cannot enter the earlier reason. Offset identities are
 immutable, so the premises name only original integer coordinates. Matching failures
-retain the deficient Hall set. On enumerable roots, bounds can lift across values
-already occupied by that set, and holes inside its union need no premise.
+retain the deficient Hall set. Within the value-walk allowance, bounds can lift
+across values already occupied by that set, and holes inside its union need no premise.
 
 Assumption cores keep the applied seed prefix when propagation refutes it, or the full
 assumption set when the tree is exhausted. Cores are jointly refuted with the hard

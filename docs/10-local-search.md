@@ -41,7 +41,7 @@ A source move updates every operand reading that coordinate, including aliases;
 probes restore the counts and discard zero-count keys. Its excess grade matches
 full exact collision grading. Bounded repair proposals choose unused affine values
 through source-domain moves and the ordinary move sink's ownership filters.
-Other affine and reified operands retain complete exact scoring.
+Other affine and reified operands retain their complete grading path.
 
 Optimization uses two phases. While the hard cost is positive, the walk fights for
 feasibility. At zero cost it descends on the objective, either through the
