@@ -2028,6 +2028,8 @@ consultations ending in preparation, floating solve, certification or completion
 Paused consultations publish neither coordinates nor a bound. Source-LP operation
 counts advance on changed authority, while work fields contain only new work from
 each continuation.
+`numericalCoordinateConflicts` counts source-checked contradictions between opposed
+coordinate sides; these closures spend no floating solve operation.
 
 Numerical traversal's `smtCompleteSearchStage_numerical*` fields count checked nodes,
 certified bounds, strict child-bound improvements, fractional/indicator splits,

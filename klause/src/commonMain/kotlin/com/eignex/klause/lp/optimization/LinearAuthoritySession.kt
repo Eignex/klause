@@ -116,7 +116,8 @@ internal class LinearAuthoritySession(private val budget: SourceLpBudget) : Auto
                     costs, constant, policy.preparation, active)
             } ?: return null
             sparse = checkNotNull(admission).prepared
-        } else if (authority != scope || sides != packed.columns || inactive != packed.inactiveRows) {
+        } else if (admission == null || authority != scope || sides != packed.columns ||
+            inactive != packed.inactiveRows) {
             admission?.close()
             admission = budget.admitSparse(checkNotNull(sparse), cancellation) ?: return null
             completed = null
@@ -142,6 +143,16 @@ internal class LinearAuthoritySession(private val budget: SourceLpBudget) : Auto
             }
         }.also {
             if (cancellation()) close()
+        }
+    }
+
+    fun invalidateGuidance() {
+        if (owner?.floatPaused == true) {
+            close()
+        } else {
+            admission?.close()
+            admission = null
+            completed = null
         }
     }
 

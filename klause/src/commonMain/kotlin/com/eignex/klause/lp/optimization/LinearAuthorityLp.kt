@@ -38,9 +38,9 @@ internal data class LinearAuthorityLpResult(
 internal class LinearAuthorityLpGuidance(
     val result: LinearAuthorityLpResult,
     val point: DoubleArray?,
-    val bounds: List<ExactLpBounds>,
     val workingRows: Int,
     val paused: Boolean,
+    val coordinateConflictWeights: List<BigFraction>? = null,
 )
 
 internal class LinearAuthorityLp(
@@ -151,6 +151,12 @@ internal class LinearAuthorityLp(
             guidanceInactive = inactive
             guidancePacked = it
         } ?: return null
+        packed.coordinateConflictWeights?.let { weights ->
+            retained.invalidateGuidance()
+            val result = CertifiedLpResult(null, null, null, null, null, false, { null })
+            return LinearAuthorityLpGuidance(LinearAuthorityLpResult(result, null, null), null,
+                packed.rows.size, false, weights)
+        }
         var phase: String? = null
         return retained.advance(
             packed, costs, constant, scope, cancellation, guidancePolicy, observer,
@@ -161,7 +167,7 @@ internal class LinearAuthorityLp(
                 ?.let { packed.lift(it, costs.map { cost -> cost.negated() }, token) }
             val result = CertifiedLpResult(null, bound, null, null, null, false, { null })
             LinearAuthorityLpGuidance(LinearAuthorityLpResult(result, weights, null), guide.primal,
-                packed.columns.map { it.bounds }, packed.rows.size, guide.paused)
+                packed.rows.size, guide.paused)
         }.also {
             onShape(LinearAuthorityLpShape(rows.size, packed.rows.size, costs.size, it != null,
                 sparse = true, phase = phase))

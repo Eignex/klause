@@ -33,6 +33,29 @@ class LinearAuthorityInvocationTest {
     )
 
     @Test
+    fun `sparse frontier should close coordinate conflicts outside exact primal admission`() {
+        val other = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
+        val reals = (0 until 127).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val source = SourceProofContext(scope, (listOf(integer, other) + reals).toSet(), mapOf(
+            "first" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ofLong(-2)),
+                BigFraction.MINUS_ONE)),
+            "second" to SourcePremise(SourceInequality(mapOf(other to BigFraction.ofLong(-2)),
+                BigFraction.MINUS_ONE)),
+        ), mapOf(integer to BigFraction.ONE, other to BigFraction.ONE))
+
+        val result = LinearAuthorityInvocation(source, TheoryParams(), boundOrdered = true).use { invocation ->
+            assertNotNull(invocation.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _, _ -> })
+        }
+
+        val terminal = assertNotNull(result.terminal)
+        assertEquals(SourceValue.Rational(BigFraction.ofLong(2)), assertIs<SourceClaim.Optimal>(terminal.claim).value)
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
+        assertEquals(2L, result.stats.smt.completeSearchStages["numericalCoordinateConflicts"])
+        assertEquals(1L, result.stats.smt.completeSearchStages["numericalLpPreparations"])
+    }
+
+    @Test
     fun `bound frontier should preserve complete sibling proofs across slices`() {
         val other = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
         for (sense in ObjectiveSense.entries) {

@@ -16,6 +16,7 @@ internal class LinearAuthorityModel private constructor(
     private val lower: List<Side?>,
     private val upper: List<Side?>,
     inactive: Set<Int>,
+    val coordinateConflictWeights: List<BigFraction>? = null,
 ) {
     private class Side(val row: Int, val value: BigFraction)
 
@@ -87,8 +88,8 @@ internal class LinearAuthorityModel private constructor(
             cancellation: Cancellation,
             inactive: Set<Int> = emptySet(),
         ): LinearAuthorityModel? {
-            fun identity() = LinearAuthorityModel(rows, rows.indices.toList(), List(variables) { null },
-                List(variables) { null }, inactive)
+            fun identity(conflict: List<BigFraction>? = null) = LinearAuthorityModel(
+                rows, rows.indices.toList(), List(variables) { null }, List(variables) { null }, inactive, conflict)
             val lower = MutableList<Side?>(variables) { null }
             val upper = MutableList<Side?>(variables) { null }
             val retained = ArrayList<Int>()
@@ -112,8 +113,15 @@ internal class LinearAuthorityModel private constructor(
                 if (previous == null || if (coefficient < BigFraction.ZERO) value > previous.value
                     else value < previous.value) bounds[column] = Side(id, value)
             }
-            if (lower.indices.any { id -> lower[id]?.let { lo -> upper[id]?.let { lo.value > it.value } } == true }) {
-                return identity()
+            for (column in lower.indices) {
+                if (cancellation()) return null
+                val lo = lower[column] ?: continue
+                val hi = upper[column] ?: continue
+                if (lo.value <= hi.value) continue
+                val weights = MutableList(rows.size) { BigFraction.ZERO }
+                weights[lo.row] = rows[lo.row].coefficients.single().reciprocal().negated()
+                weights[hi.row] = rows[hi.row].coefficients.single().reciprocal()
+                return identity(weights.takeIf { it.admittedSourcePoint() })
             }
             return LinearAuthorityModel(rows, retained, lower, upper, inactive)
         }
