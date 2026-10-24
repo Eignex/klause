@@ -268,7 +268,8 @@ exact integer assignment and complete
 connected continuous residuals with the source LP owner. Strict rows remain strict;
 inactive premises stay excluded. Residual solves share the invocation's source
 operation allowance. Recovery bounds input entries, scalar width, work and modeled
-allocation, and retains its result only for an unchanged query and guide. Every
+allocation, debits their cumulative source funding, and retains completed components
+across funding pauses for an unchanged query and guide. Every
 recovered point requires a fresh complete original-source witness check. Frontier
 leaves and joint repair consume those checked incumbents through the same authority.
 Residual completion seeks feasibility; attainment still requires checked objective agreement.

@@ -223,6 +223,7 @@ internal class LinearAuthorityLp(
             }
         }, observe = { stage, count ->
             if (stage == "PrimalRecoveryWork") budget.observe(refinement = count)
+            if (stage == "PrimalRecoveryAllocation") budget.funding?.charge(0L, count)
             observe(stage, count)
         }, progress = progress)
     }

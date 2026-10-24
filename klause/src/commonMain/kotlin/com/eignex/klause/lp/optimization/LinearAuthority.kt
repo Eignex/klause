@@ -129,7 +129,7 @@ internal class LinearAuthority(
             cancellation, ::observePrimal, attempt.progress)
         if (!cancellation()) {
             attempt.recovered = recovered
-            attempt.finished = true
+            attempt.finished = recovered != null || budget.funding?.paused != true
         }
         return recovered
     }
