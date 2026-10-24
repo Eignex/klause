@@ -16,8 +16,8 @@ import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.result.SolveStats
-import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.div
 import com.eignex.klause.util.minus
 import java.util.IdentityHashMap
