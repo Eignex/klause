@@ -34,7 +34,8 @@ class JointLinearRepairTest {
             ), numRealVars = 1, realLower = doubleArrayOf(0.75), realUpper = doubleArrayOf(2.0))
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
-        val repair = JointLinearRepair(model, source, objective, TheoryParams(maxFlips = 1, nodeBudget = NodeBudget(1000)))
+        val repair = JointLinearRepair(model, source, objective,
+            TheoryParams(maxFlips = 1, nodeBudget = NodeBudget(1000)))
 
         val result = repair.use {
             it.search(adaptive = false).use { search ->
