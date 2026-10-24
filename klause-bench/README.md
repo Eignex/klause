@@ -2840,10 +2840,18 @@ Modglob and rgn retain no point. Their 119 and 113 unavailable component attempt
 spend 4,385,144 and 2,567,399 modeled work, and 149.9 and 96.4 MB cumulative modeled
 allocation. Additional source LP consultations reduce candidate coverage from
 229 to 121 and 215 to 124 at the same 256-operation allowance. Their shorter
-elapsed times therefore establish no throughput gain. Connected residual admission
-is the remaining recovery boundary; fractional wider frontier guides retain their
+elapsed times therefore establish no throughput gain. Connected residual completion
+is a remaining recovery boundary; fractional wider frontier guides retain their
 ordinary split path. This comparison measures standalone recovery under that
 operation policy and preserves automatic routing.
+
+[Probe 8170](https://lab.eignex.com/jobs/8170) runs the funding-integrated
+`9cc78dd97a` on modglob and rgn with exact/P1/10 s and the same source hashes.
+Both remain unresolved. Modglob's prepared residual maxima are 323 columns and
+188 rows, outside small exact admission; rgn's 81 columns and 42 rows fit its
+dimension guard but still decline completion. The probe makes no paired timing
+claim. [#3568](https://github.com/Eignex/klause/issues/3568) tracks larger residual
+completion and deeper diagnosis of the within-dimension decline.
 
 `bench.profile.MpsProofFrontier` takes `suite=ID problem=NAME sha256=HEX exact=true|false`
 for one hash-matched original source. It uses the same numerical source setup and
