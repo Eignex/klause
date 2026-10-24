@@ -15,6 +15,7 @@ import com.eignex.klause.presolve.structural.DuplicateColumns
 import com.eignex.klause.presolve.structural.RedundantConstraints
 import com.eignex.klause.presolve.structural.StructuralReduction
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 
 /**
@@ -81,6 +82,7 @@ object Presolve {
         capWide: Boolean = false,
         incrementalTouchedVars: IntArray? = null,
         pivotOrder: AffinePivotOrder = AffinePivotOrder.MARKOWITZ,
+        objective: LinearObjective? = null,
     ): PassDelta = AffineSingletons.eliminateAffineSingletons(
         problem,
         objectiveIntVars,
@@ -89,6 +91,7 @@ object Presolve {
         capWide,
         incrementalTouchedVars,
         pivotOrder = pivotOrder,
+        objective = objective,
     )
 
     /** Affine elimination over a canonical source model. See
@@ -98,11 +101,13 @@ object Presolve {
         objectiveIntVars: Set<Int>,
         cancellation: Cancellation,
         pivotOrder: AffinePivotOrder,
+        objective: LinearObjective? = null,
     ): SourceDelta = AffineSingletons.eliminateSourceAffineSingletons(
         problem,
         objectiveIntVars,
         cancellation,
         pivotOrder = pivotOrder,
+        objective = objective,
     )
 
     /** Constraint subsumption / redundant-constraint removal. See [RedundantConstraints]. */

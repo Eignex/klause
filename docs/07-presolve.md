@@ -65,8 +65,8 @@ default round cap; an explicit zero round cap still suppresses those schedules.
 
 `PresolvePass.guarantees` separates equisatisfiability, objective preservation,
 witness reconstruction, bijection and complete coverage by reconstructed source
-assignments. Objective preservation depends on the pass context protecting objective
-columns. A satisfiability reduction can keep an optimum while losing source
+assignments. Objective preservation requires protecting objective columns or carrying
+an exact replacement objective with the factor delta. A satisfiability reduction can keep an optimum while losing source
 multiplicity, so successful reconstruction does not establish a bijection.
 
 `SourceMapping` binds reconstruction to the actual source and reduced objects;
@@ -86,7 +86,15 @@ a custom reconstruction without correspondence withholds hint projection.
 
 Objective adjustments map reduced values into source units as `scale * value +
 offset`, with positive exact rational scale, and compose by multiplying scales.
-Current reductions protect objective columns and use the identity adjustment.
+Finite preparation can substitute exact integral aliases and translations `x = y + c`
+in a linear objective, combining coefficients and retaining the constant in that
+objective. Source and finite rounds, LP harvest and search use the replacement;
+later passes protect its remaining nonzero columns. The adjustment stays identity,
+so bounds and incumbents retain their original units and normalized direction.
+Checked coefficient and constant arithmetic declines overflow and the non-negatable
+signed minimum. Wider affine expressions, approximate semantics, open-theory
+preparation and protection-only objectives retain objective-column protection.
+Finite holes and projected hints follow the same reconstruction as factor substitution.
 Independent source evaluation checks the composed adjustment against reconstructed
 witnesses. A mapping never issues a proof certificate. Optional
 `SourceMapping.captureSolve`, `captureMinimize` and `justification` retain reduced

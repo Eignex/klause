@@ -36,7 +36,15 @@ data class PresolveContext(
     /** Whether comparison-clause folding leaves a clause reified when binary-column substitution would turn
      *  one of its comparisons into a literal. */
     val keepBinaryComparisons: Boolean = false,
+    /** Exact objective available for substitution, or null for protection-only contexts. */
+    val linearObjective: LinearObjective? = null,
 ) {
+    internal fun withObjective(objective: LinearObjective?): PresolveContext {
+        if (objective == null) return this
+        val coefficients = objective.intCoefficientValues.withIndex().filter { it.value != 0L }
+            .associate { it.index to it.value }
+        return copy(objectiveIntCoeffs = coefficients, linearObjective = objective.takeIf { linearObjective != null })
+    }
     /** Integer variables read by the objective. */
     val objectiveIntVars: Set<Int> get() = objectiveIntCoeffs.keys
 
@@ -88,6 +96,7 @@ data class PresolveContext(
             objective: LinearObjective?,
             solutionSetSensitive: Boolean = false,
             modelBreaksSymmetry: Boolean = false,
+            transformObjective: Boolean = false,
         ): PresolveContext {
             if (objective == null) {
                 return PresolveContext(
@@ -105,7 +114,8 @@ data class PresolveContext(
                 val w = objective.boolWeightValues[b]
                 if (w != 0L) boolCoeffs[b] = w
             }
-            return PresolveContext(solutionSetSensitive, intCoeffs, boolCoeffs, modelBreaksSymmetry)
+            return PresolveContext(solutionSetSensitive, intCoeffs, boolCoeffs, modelBreaksSymmetry,
+                linearObjective = objective.takeIf { transformObjective })
         }
     }
 }

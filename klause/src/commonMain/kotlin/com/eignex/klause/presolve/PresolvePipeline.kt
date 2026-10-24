@@ -37,11 +37,8 @@ class PresolveOutcome(
     val stats: PresolveStats,
     val changed: Boolean,
     /**
-     * The caller's objective re-fitted to [problem]'s variable space, or `null` when it needs no change (no
-     * objective, or a transform that left the variable counts alone). Only
-     * [PresolvePass.SUBSTITUTE_BINARY_COLUMNS] moves them: it extends the Boolean namespace, which an
-     * objective's `boolWeights` must span. The new variables carry no objective weight — a column the
-     * objective reads is never substituted — so this is the same objective, zero-extended.
+     * The objective after exact affine substitution and Boolean namespace extension, or `null` when
+     * the caller can retain its objective. Constants remain in source objective units.
      */
     val objective: LinearObjective? = null,
 ) {
@@ -77,12 +74,16 @@ object PresolvePipeline {
         cancellation: Cancellation = Cancellation.Never,
         presolveBudget: PresolveBudget? = null,
         finiteLane: Boolean = false,
+        transformObjective: Boolean = true,
     ): PreparedSource {
         // An already-baked model reached this boundary through a finite preparation that ran the phase,
         // so running it again would re-derive the same fixpoint at full cost.
-        if (problem is BakedProblem) return PreparedSource.unchanged(problem, presolveBudget)
+        val rewriteObjective = finiteLane && transformObjective && !solutionSetSensitive &&
+            !problem.semantics.isApproximate
+        if (problem is BakedProblem) return PreparedSource.unchanged(problem, presolveBudget, rewriteObjective)
         val mark = TimeSource.Monotonic.markNow()
-        val context = PresolveContext.of(linearObjective, solutionSetSensitive, problem.hasSymmetryBreaking)
+        val context = PresolveContext.of(linearObjective, solutionSetSensitive, problem.hasSymmetryBreaking,
+            transformObjective = rewriteObjective)
             .withPresolveBudget(presolveBudget)
             .withKeepBinaryComparisons(config.keepsBinaryComparisons(finiteLane))
         val presolved = Presolver.runSource(problem, config, context, phaseCancellation(cancellation, presolveBudget))
@@ -90,12 +91,13 @@ object PresolvePipeline {
             source = problem,
             problem = presolved.problem,
             infeasible = presolved.infeasible,
-            objective = refit(linearObjective, presolved.problem),
+            objective = refit(presolved.objective ?: linearObjective, presolved.problem),
             passesFired = presolved.passesFired,
             rebuild = presolved.rebuild,
             budget = presolveBudget,
             config = config,
             elapsed = mark.elapsedNow(),
+            transformObjective = rewriteObjective,
         )
     }
 
@@ -149,7 +151,9 @@ object PresolvePipeline {
         // Root-bake probing (failed-literal / SAC) runs in the presolve lane via [RootBaker]: resolve it
         // from the config once and thread it through the context so every rebuild re-derives it.
         val bakeConfig = BakeConfig.from(config)
-        val context = PresolveContext.of(linearObjective, solutionSetSensitive, sourceProblem.hasSymmetryBreaking)
+        var currentObjective = prepared.objective ?: linearObjective
+        var context = PresolveContext.of(currentObjective, solutionSetSensitive, sourceProblem.hasSymmetryBreaking,
+            transformObjective = prepared.transformObjective)
             .withBakeConfig(bakeConfig)
             .withPresolveBudget(presolveBudget)
             .withKeepBinaryComparisons(config.keepsBinaryComparisons(finiteLane = true))
@@ -163,7 +167,7 @@ object PresolvePipeline {
         }
         val automaticClausalSatisfaction = harvestPlan != null &&
             config.overrides[PresolvePass.LP_HARVEST] != true && linearObjective == null && problem.isClausal()
-        val objective = linearObjective ?: LinearObjective()
+        val objective = currentObjective ?: LinearObjective()
 
         // Coefficient strengthening runs in the source phase, before [RootBaker.reseed] forces the
         // root bake: a gcd-indivisible equality is infeasible regardless of the (possibly very wide)
@@ -206,7 +210,7 @@ object PresolvePipeline {
                     lpStats = prepared.stats.lpStats.mergedWith(rootInfeasible.stats),
                 ),
                 changed = true,
-                objective = refit(linearObjective, sourceProblem),
+                objective = refit(currentObjective, sourceProblem),
             ).also { it.mapping = prepared.mapping }
         }
 
@@ -275,6 +279,8 @@ object PresolvePipeline {
             }
         }
         var current = substitution?.problem ?: seeded
+        currentObjective = refit(currentObjective, current)
+        context = context.withObjective(currentObjective)
         substitution?.let {
             mappings.add(SourceMapping(seeded, it.problem, TransformationGuarantees.IDENTITY, it.rebuild))
             firedPasses.add(PresolvePass.SUBSTITUTE_BINARY_COLUMNS.id)
@@ -287,6 +293,8 @@ object PresolvePipeline {
         var round = 0
         while (!infeasible && round++ < MAX_PRESOLVE_HARVEST_ROUNDS && !cancellation()) {
             val pre = Presolver.run(current, config, context, cancellation)
+            currentObjective = pre.objective ?: currentObjective
+            context = context.withObjective(currentObjective)
             infeasible = infeasible || pre.infeasible
             val harvestResult = if (infeasible) null else harvestPlan?.let {
                 presolveBudget.observeTransform(
@@ -303,7 +311,8 @@ object PresolvePipeline {
                     },
                 ) {
                     lpHarvestReporting(
-                        pre.problem, objective, it, bakeConfig, cancellation, zeroObjectivePricing, randomSeed,
+                        pre.problem, currentObjective ?: LinearObjective(), it, bakeConfig, cancellation,
+                        zeroObjectivePricing, randomSeed,
                     ).also { result ->
                         presolveBudget?.activeInvocation?.let { invocation ->
                             invocation.narrowedColumns = result.report.boundsShaved
@@ -381,14 +390,13 @@ object PresolvePipeline {
         if (posted !== current) mappings.add(SourceMapping(current, posted, TransformationGuarantees.IDENTITY))
         val mapping = mappings.reduce { acc, next -> acc.then(next) }
         return PresolveOutcome(posted, { mapping.reconstructFrom(posted, it) }, stats,
-            changed = true, objective = refit(linearObjective, posted)).also { it.mapping = mapping }
+            changed = true, objective = refit(currentObjective, posted)).also { it.mapping = mapping }
     }
 }
 
-/** [objective] zero-extended to cover [problem]'s Boolean namespace, or `null` when it already does (so the
- *  caller keeps its own). See [PresolveOutcome.objective]. */
+/** [objective] zero-extended to cover [problem]'s Boolean namespace. */
 private fun refit(objective: LinearObjective?, problem: Problem): LinearObjective? {
-    if (objective == null || objective.boolWeightValues.size >= problem.numBoolVars) return null
+    if (objective == null || objective.boolWeightValues.size >= problem.numBoolVars) return objective
     return objective.copy(boolWeights = objective.boolWeightValues.copyOf(problem.numBoolVars))
 }
 

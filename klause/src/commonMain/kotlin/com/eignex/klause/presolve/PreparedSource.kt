@@ -26,9 +26,8 @@ internal class PreparedSource(
     /** Whether preparation refuted the model. */
     val infeasible: Boolean,
     /**
-     * The caller's objective re-fitted to [problem]'s variable space, or null when the caller's own
-     * already spans it. Carried for the same reason [PresolveOutcome.objective] is: whoever runs the next
-     * phase has to hand it an objective that fits the model this one produced.
+     * The caller's objective after substitution and namespace extension. The next phase must use it
+     * with [problem]; reconstruction restores the original coordinates and objective value.
      */
     val objective: LinearObjective?,
     /** Source passes that changed the model, in first-fire order. */
@@ -39,6 +38,7 @@ internal class PreparedSource(
     val budget: PresolveBudget?,
     private val config: PresolveConfig = PresolveConfig.NONE,
     internal var elapsed: Duration = Duration.ZERO,
+    val transformObjective: Boolean = false,
 ) {
     val mapping: SourceMapping = SourceMapping(source, problem, passesFired.transformationGuarantees(), rebuild)
 
@@ -56,7 +56,9 @@ internal class PreparedSource(
     /** Preparations that did not run a pass. */
     companion object {
         /** [problem] as its own preparation, for an input that has already passed this phase. */
-        fun unchanged(problem: Problem, budget: PresolveBudget?): PreparedSource = PreparedSource(
+        fun unchanged(
+            problem: Problem, budget: PresolveBudget?, transformObjective: Boolean = false,
+        ): PreparedSource = PreparedSource(
             source = problem,
             problem = problem,
             infeasible = false,
@@ -64,6 +66,7 @@ internal class PreparedSource(
             passesFired = emptyList(),
             rebuild = SourceRebuilds.NONE,
             budget = budget,
+            transformObjective = transformObjective,
         )
     }
 }
