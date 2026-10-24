@@ -4,8 +4,10 @@ import com.eignex.klause.factor.table.Mdd
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.AtomKind
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.holeReasonFor
 import com.eignex.klause.propagation.mark
@@ -103,7 +105,11 @@ class MddTableCompositionTest {
         assertNull(state.runToFixpoint(allFactors = false))
         val reason = assertNotNull(state.holeReasonFor(1, 1))
 
-        assertNotNull(state.reasonOf(reason))
+        val premises = assertNotNull(state.reasonOf(reason)).map { literal ->
+            val atom = Lit.variable(literal) - problem.numBoolVars
+            Triple(state.atoms.intVar[atom], state.atoms.kind[atom], state.atoms.threshold[atom])
+        }
+        assertEquals(listOf(Triple(0, AtomKind.EQ, 1L)), premises)
         assertFalse(1L in state.intDomains[1])
         state.undoTo(root)
         state.currentLevel = 1
