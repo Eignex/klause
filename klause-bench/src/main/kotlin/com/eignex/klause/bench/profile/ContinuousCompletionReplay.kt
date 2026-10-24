@@ -22,6 +22,7 @@ import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.validation.LinearSourceWitness
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.parseBigInt
+import com.eignex.klause.util.unaryMinus
 import com.sun.management.ThreadMXBean
 import java.io.File
 import java.lang.management.ManagementFactory
