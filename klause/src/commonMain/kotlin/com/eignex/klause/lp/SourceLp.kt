@@ -97,7 +97,8 @@ internal class SourceLpBudget(
         measuredContinuationWork += minOf(continuation, Long.MAX_VALUE - measuredContinuationWork)
         measuredRefinementWork += minOf(refinement, Long.MAX_VALUE - measuredRefinementWork)
         measuredBoundCertificationWork += minOf(boundCertification, Long.MAX_VALUE - measuredBoundCertificationWork)
-        measuredConflictCertificationWork += minOf(conflictCertification, Long.MAX_VALUE - measuredConflictCertificationWork)
+        measuredConflictCertificationWork += minOf(conflictCertification,
+            Long.MAX_VALUE - measuredConflictCertificationWork)
         if (activeStart == null) publish()
     }
 

@@ -157,7 +157,10 @@ internal class LinearAuthority(
         val closure = solved.result
         if (closure.verdict == LpVerdict.INFEASIBLE) {
             val evidence = refutation(solved)
-            return LinearAuthorityResult(evidence = evidence, lpConflict = evidence != null)
+            if (evidence != null) return LinearAuthorityResult(evidence = evidence, lpConflict = true)
+            return if (guide != null && budget.admitsDimensions(costs.size, guide.workingRows.toLong())) {
+                checkSource(source, cancellation)
+            } else LinearAuthorityResult()
         }
         guide?.point?.let { point ->
             val projected = point.map { it.toDouble() }

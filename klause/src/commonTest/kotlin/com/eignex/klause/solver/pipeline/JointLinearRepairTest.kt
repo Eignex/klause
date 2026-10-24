@@ -39,7 +39,9 @@ class JointLinearRepairTest {
                 val condition = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ZERO),
                     mapOf(0 to BigFraction.ZERO))
                 var result = repair.check(condition, Cancellation.Never)
-                repeat(64) { if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, Cancellation.Never) }
+                repeat(64) {
+                    if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, Cancellation.Never)
+                }
 
                 assertEquals(ExactNeighborhoodResult.Refuted, result)
                 assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairLpConflicts"))
@@ -47,7 +49,9 @@ class JointLinearRepairTest {
                 val feasible = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ONE, 1 to BigFraction.ONE),
                     mapOf(0 to BigFraction.ONE, 1 to BigFraction.ONE))
                 result = repair.check(feasible, Cancellation.Never)
-                repeat(64) { if (result == ExactNeighborhoodResult.Paused) result = repair.check(feasible, Cancellation.Never) }
+                repeat(64) {
+                    if (result == ExactNeighborhoodResult.Paused) result = repair.check(feasible, Cancellation.Never)
+                }
 
                 val witness = assertIs<ExactNeighborhoodResult.Witness>(result).sample
                 assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
