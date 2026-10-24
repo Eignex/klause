@@ -103,6 +103,29 @@ class PresolverTest {
     }
 
     @Test
+    fun `a SAC refutation during incremental materialization should be terminal`() {
+        val source = Problem(
+            0, 4, Array(4) { IntDomain(0, 1) },
+            listOf(
+                Table(intArrayOf(0, 1), longArrayOf(0, 1, 1, 0)),
+                Table(intArrayOf(1, 2), longArrayOf(0, 1, 1, 0)),
+                Table(intArrayOf(2, 0), longArrayOf(0, 1, 1, 0)),
+                Linear(intArrayOf(2), intArrayOf(3), LinearOp.LE, 3),
+            ),
+        ).bake()
+        assertIs<PropagationResult.Implied>(source.baked)
+
+        val prepared = Presolver.run(
+            source, PresolveConfig.parse("off,+strengthen"),
+            PresolveContext.EMPTY.withBakeConfig(BakeConfig(probeIntBounds = true)),
+        )
+
+        assertTrue(prepared.infeasible)
+        assertEquals(listOf(PresolvePass.STRENGTHEN_COEFFICIENTS), prepared.passesFired)
+        assertIs<PropagationResult.Unsat>(prepared.problem.baked)
+    }
+
+    @Test
     fun `a completed root refutation should survive an empty finite schedule`() {
         val source = Problem(
             0, 3, Array(3) { IntDomain(0, 1) },
