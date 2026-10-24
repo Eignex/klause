@@ -108,7 +108,8 @@ internal object MpsSparseRoot {
             put("revision", Reports.readGitSha())
             put("problem", options.getValue("problem"))
             put("sourceSha256", sha256(bytes))
-            put("sourceSemantics", source.semantics.toString())
+            put("sourceSemantics", source.semantics.declared.toString())
+            put("sourceTolerance", source.semantics.effective.feasibilityTolerance.toString())
             put("inputRows", rows.size)
             put("workingRows", workingRows.size)
             put("columns", columns.size)
@@ -131,7 +132,9 @@ internal object MpsSparseRoot {
 
     private fun run(model: Any, out: File, bean: ThreadMXBean, thread: Long) {
         val stop = Cancellation.after(10.seconds)
-        val trail = Class.forName(ENGINE + "LpBoundTrail").constructors.single { it.parameterCount == 1 }
+        val trail = Class.forName(ENGINE + "LpBoundTrail").constructors.single {
+            it.parameterCount == 1 && it.parameterTypes.single().isInstance(model)
+        }
             .newInstance(model)
         val context = Class.forName(ENGINE + "LpSolveContext").getConstructor().newInstance()
         val pricing = Class.forName(ENGINE + "LpPricingOptions").constructors.single { it.parameterCount == 2 }
