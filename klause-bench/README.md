@@ -1175,8 +1175,13 @@ Cap64 improves in all six default pairs. In LS declared mode its objective inste
 changes from 1129864.4 to 1146638.65 in all three repeats, and median completed
 candidate checks fall from 15 to 13. LS exact mode ties its objective while completed
 checks fall from 16 to 13 and first-witness median grows from 1034 to 1123 ms.
-Blend2 records no LS completion calls; cold LS gesa2 has none either. These runs
-retain the negative cold-start conclusions from [completion-aware scoring](https://github.com/Eignex/klause/issues/2997).
+Blend2 records no LS completion calls; cold LS gesa2 has none either. Earlier
+[cold control 5162](https://lab.eignex.com/jobs/5162) keeps qnet1/blend2 objectives
+tied and records one win, four losses and one tie on default gesa2-o; exact
+qnet1/gesa remain unknown. Earlier timed gains were hardware-confounded;
+[equal-work controls](https://lab.eignex.com/jobs/5140) instead regress by 9417.3.
+The positive seeded controls from [completion-aware scoring](https://github.com/Eignex/klause/issues/2997)
+remain separate from cold-search quality.
 
 [Matched CLI stage profiles](https://lab.eignex.com/jobs/7936) put 57.3% of cold
 and 68.2% of retained execution samples in move selection, dominated by exact-linear
