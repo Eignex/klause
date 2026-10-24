@@ -297,7 +297,10 @@ object PresolvePipeline {
                     },
                     unchanged = { LpHarvestResult(pre.problem, LpHarvestReport(), LpStats()) },
                     output = { result -> result.problem },
-                    refuted = { result -> result.report.rootInfeasible || result.problem.baked is PropagationResult.Unsat },
+                    refuted = { result ->
+                        result.report.rootInfeasible ||
+                            result.problem.baked is PropagationResult.Unsat
+                    },
                 ) {
                     lpHarvestReporting(
                         pre.problem, objective, it, bakeConfig, cancellation, zeroObjectivePricing, randomSeed,
