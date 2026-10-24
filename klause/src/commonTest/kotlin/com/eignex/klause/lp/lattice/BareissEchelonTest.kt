@@ -10,6 +10,28 @@ import kotlin.test.assertTrue
 
 class BareissEchelonTest {
 
+    @Test
+    fun `fill limits should discard unfinished block deductions`() {
+        val rows = sparseRows(longArrayOf(1, 1, 1, 0, 0), longArrayOf(1, 0, 0, 1, 1))
+        for (limits in listOf(EchelonLimits(3, 20, 64), EchelonLimits(5, 6, 64))) {
+            val result = bareissEchelon(rows, 5, vec(1, 2), limits = limits)
+
+            assertTrue(result.dependentRows.isEmpty())
+            assertTrue(result.rows.isEmpty())
+            assertFalse(result.inconsistent)
+        }
+    }
+
+    @Test
+    fun `product bit limits should decline before multiplying wide pivot scales`() {
+        val result = bareissEchelon(sparseRows(longArrayOf(15, 1, 0), longArrayOf(13, 0, 1)),
+            3, vec(1, 2), limits = EchelonLimits(4, 20, 8))
+
+        assertTrue(result.rows.isEmpty())
+        assertTrue(result.dependentRows.isEmpty())
+        assertFalse(result.inconsistent)
+    }
+
     private fun echelon(vararg rows: LongArray): BareissEchelon =
         bareissEchelon(sparseRows(*rows), rows.maxOf { it.size })
 

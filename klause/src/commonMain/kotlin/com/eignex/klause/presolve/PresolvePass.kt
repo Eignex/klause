@@ -197,7 +197,7 @@ enum class PresolvePass(
             )
     },
 
-    /** Drop the integer equalities the other equalities imply, by exact elimination over the equality
+    /** Drop the exact equalities the other equalities imply, by exact elimination over the equality
      *  block, and refute a block with no rational solution. Catches a row dependent through three or more
      *  others, which pairwise fusion and subsumption cannot; runs after them so duplicates are gone.
      *  Binary partition equations retain their finite search structure while supplying premises.
@@ -580,10 +580,11 @@ enum class PresolvePass(
         PROBE_OPEN_RANGES -> problem.numRealVars > 0 || problem.intBounds.hasOpenSides
         AGGREGATE_SUB_SUMS -> problem.numIntVars >= 3
         FOLD_COMPARISON_CLAUSES -> problem.numBoolVars > 0 && problem.numIntVars > 0
+        DROP_DEPENDENT_EQUALITIES -> problem.numIntVars > 0 || problem.numRealVars > 0
         ELIMINATE_BOOL_VARS, ELIMINATE_BLOCKED_CLAUSES, IMPLICATION_GRAPH,
         PROBE_FAILED_LITERALS -> problem.numBoolVars > 0
         ELIMINATE_AFFINE_SINGLETONS, REDUCE_DIOPHANTINE, PROJECT_SINGLETON_INEQUALITIES,
-        FUSE_LINEAR_BOUNDS, DROP_DEPENDENT_EQUALITIES, SPARSIFY_LINEAR_ROWS,
+        FUSE_LINEAR_BOUNDS, SPARSIFY_LINEAR_ROWS,
         VALUE_PRECEDENCE, PROBE_INT_BOUNDS, PROBE_INT_HOLES, SUBSTITUTE_BINARY_COLUMNS -> problem.numIntVars > 0
         MERGE_DUPLICATE_COLUMNS -> problem.numIntVars >= 2
         else -> true
