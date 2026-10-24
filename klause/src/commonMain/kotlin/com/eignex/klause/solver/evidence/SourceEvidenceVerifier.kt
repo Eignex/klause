@@ -121,6 +121,9 @@ class SourceEvidenceVerifier(
         private val allowance: SourceProofAllowance,
     ) {
         private val integerScopes = mutableMapOf<SourceCondition, SourceIntegerBounds>()
+        private val coordinates by lazy { context.coordinates }
+        private val premises by lazy { context.premises }
+        private val objective by lazy { context.objective }
 
         private fun step(depth: Int) {
             if (cancellation() || !allowance.consume(depth)) {
@@ -140,8 +143,8 @@ class SourceEvidenceVerifier(
         }
 
         private fun validCondition(condition: SourceCondition): Boolean =
-            condition.bools.keys.all { SourceCoordinate(SourceCoordinate.Kind.Boolean, it) in context.coordinates } &&
-                (condition.lower.keys + condition.upper.keys).all { it in context.coordinates }
+            condition.bools.keys.all { SourceCoordinate(SourceCoordinate.Kind.Boolean, it) in coordinates } &&
+                (condition.lower.keys + condition.upper.keys).all { it in coordinates }
 
         private fun claim(
             claim: SourceClaim, derivation: SourceDerivation, scope: SourceScope, depth: Int,
@@ -169,7 +172,7 @@ class SourceEvidenceVerifier(
                 is SourceDerivation.BooleanSplit -> {
                     if (derivation.id < 0) return reject("Boolean coverage references an invalid coordinate")
                     val coordinate = SourceCoordinate(SourceCoordinate.Kind.Boolean, derivation.id)
-                    if (coordinate !in context.coordinates || derivation.id in scope.condition.bools) {
+                    if (coordinate !in coordinates || derivation.id in scope.condition.bools) {
                         return reject("Boolean coverage must split an unpinned declared coordinate")
                     }
                     return both(
@@ -182,7 +185,7 @@ class SourceEvidenceVerifier(
                 }
                 is SourceDerivation.IntegerSplit -> {
                     val id = derivation.coordinate
-                    if (id.kind != SourceCoordinate.Kind.Integer || id !in context.coordinates ||
+                    if (id.kind != SourceCoordinate.Kind.Integer || id !in coordinates ||
                         derivation.threshold.den != BIG_ONE
                     ) return reject("integer coverage requires a declared integer and integral threshold")
                     return both(
@@ -214,7 +217,7 @@ class SourceEvidenceVerifier(
                     if (!context.affineObjectiveAvailable) {
                         return SourceEvidenceCheck.Unavailable("original affine objective derivation unavailable")
                     }
-                    if (derived.coefficients != context.objective.mapValues { (_, value) -> sign * value }) {
+                    if (derived.coefficients != objective.mapValues { (_, value) -> sign * value }) {
                         return reject("derivation does not establish the source objective coefficients")
                     }
                     val algebraic = AlgebraicArithmetic(PolynomialArithmetic(cancellation))
@@ -246,7 +249,7 @@ class SourceEvidenceVerifier(
                     val discharged = derivation as? SourceDerivation.Discharge
                         ?: return reject("clause requires a checked conditional refutation")
                     if (claim.literals.keys.any {
-                            SourceCoordinate(SourceCoordinate.Kind.Boolean, it) !in context.coordinates ||
+                            SourceCoordinate(SourceCoordinate.Kind.Boolean, it) !in coordinates ||
                                 it in scope.condition.bools
                         }
                     ) return reject("clause discharge requires unpinned declared source Booleans")
@@ -266,7 +269,7 @@ class SourceEvidenceVerifier(
                     SourceEvidenceCheck.Checked
                 } else reject("derivation is not a contradiction")
                 is SourceClaim.Consequence -> if (claim.inequality.coefficients.keys.any {
-                        it !in context.coordinates
+                        it !in coordinates
                     }
                 ) {
                     reject("consequence references undeclared source coordinates")
@@ -282,7 +285,7 @@ class SourceEvidenceVerifier(
             step(depth)
             return when (derivation) {
                 is SourceDerivation.Premise -> {
-                    val premise = context.premises[derivation.id]
+                    val premise = premises[derivation.id]
                         ?: rejectProof("unknown original-source premise ${derivation.id}")
                     if (premise.guards.any { (id, value) -> scope.condition.bools[id] != value }) {
                         rejectProof("original-source premise guard is not established")
@@ -298,7 +301,7 @@ class SourceEvidenceVerifier(
                     premise.inequality
                 }
                 is SourceDerivation.Assumption -> {
-                    if (derivation.coordinate !in context.coordinates) {
+                    if (derivation.coordinate !in coordinates) {
                         rejectProof("assumption references an undeclared coordinate")
                     }
                     val restrictions = if (derivation.upper) scope.condition.upper else scope.condition.lower

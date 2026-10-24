@@ -51,6 +51,8 @@ A check yields `Checked`, `Rejected` or `Unavailable`. Missing support, cancella
 and traversal limits all give `Unavailable`, never proof coverage from the producer's
 type. Imports and branches spend one containing verification allowance. Engine
 attestations and reference agreement stay distinct from checked derivations.
+Each verification run lazily captures the immutable context's coordinate, premise
+and objective views once, so individual proof lookups do not copy the full source.
 
 ## Result capture
 
