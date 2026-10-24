@@ -2,6 +2,7 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.factor.circuit.Circuit
 import com.eignex.klause.factor.symmetry.SymmetryHandling
+import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
@@ -28,6 +29,8 @@ internal sealed interface ArmNeed {
 
     data object BooleanObjective : ArmNeed
 
+    data object ExtensionalSupports : ArmNeed
+
     /** An LP relaxation with some technique to enable at [emphasis] under the run's `--lp` ceiling; without
      *  one the arm is a copy of the conflict-driven arm it is built on. */
     data class Relaxation(val emphasis: LpEmphasis) : ArmNeed
@@ -47,6 +50,7 @@ internal class ProblemFacts(
     val circuit: Boolean = false,
     val binaryPackingObjective: Boolean = false,
     val binaryEqualityObjective: Boolean = false,
+    val extensionalSupports: Boolean = false,
     private val relaxation: (LpEmphasis) -> Boolean,
 ) {
     private val relaxations = HashMap<LpEmphasis, Boolean>()
@@ -56,6 +60,8 @@ internal class ProblemFacts(
         ArmNeed.Clausal -> profile.problemClass == ProblemClass.Sat
         ArmNeed.Objective -> profile.optimizing
         ArmNeed.BooleanObjective -> booleanObjective
+        ArmNeed.ExtensionalSupports -> extensionalSupports && !profile.optimizing &&
+            profile.problemClass == ProblemClass.FiniteCp
         is ArmNeed.Relaxation -> relaxations.getOrPut(need.emphasis) { relaxation(need.emphasis) }
     }
 
@@ -88,6 +94,10 @@ internal class ProblemFacts(
                         it.boolWeightValues.any { weight -> weight != 0L }
                 } == true,
                 circuit = problem.factors.any { it is Circuit },
+                extensionalSupports = problem.factors.any { factor ->
+                    factor is Table && factor.hi == null && factor.arity in 2..32 && factor.numTuples <= 65_536 &&
+                        factor.xs.all { problem.rootIntDomain(it).spanOrNull(32L) != null }
+                },
                 relaxation = { emphasis ->
                     LpAutoConfig.resolve(problem, LpConfig(emphasis).cappedUnder(lpCeiling)) != LpPlan()
                 },

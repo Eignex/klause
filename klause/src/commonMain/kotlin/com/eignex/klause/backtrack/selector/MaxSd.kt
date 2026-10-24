@@ -13,21 +13,27 @@ import kotlin.random.Random
  *
  * Unavailable counters and larger domains probe each candidate and score the log-product of its
  * remaining domain sizes. This fallback uses [Impact]'s probing machinery with the order reversed.
+ * A supplied [fallback] replaces those probes when a recipe requires cheap declines.
  */
-internal class MaxSd(private val maxProbes: Int = 32) : ValueSelector {
+internal class MaxSd(
+    private val maxProbes: Int = 32,
+    private val fallback: ValueSelector? = null,
+    private val maxSupportVisits: Int = 65_536,
+) : ValueSelector {
 
-    override fun fresh() = MaxSd(maxProbes)
+    override fun fresh() = MaxSd(maxProbes, fallback?.fresh(), maxSupportVisits)
     override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Long> {
         if (varRef is VarRef.IntVar) {
             val domain = session.intDomain(varRef.varId).spanOrNull(maxProbes.toLong())
             if (domain != null) {
                 val values = LongArray(domain.size) { domain.valueAt(it) }
-                val densities = session.extensionalDensities(varRef.varId, values)
+                val densities = session.extensionalDensities(varRef.varId, values, maxSupportVisits)
                 if (densities != null) {
                     return values.indices.sortedByDescending { densities[it] }.asSequence().map { values[it] }
                 }
             }
         }
-        return probeAndOrder(session, varRef, rng, maxProbes, ascending = false)
+        return fallback?.values(session, varRef, rng)
+            ?: probeAndOrder(session, varRef, rng, maxProbes, ascending = false)
     }
 }

@@ -320,6 +320,16 @@ annotated, or execution is parallel or single-engine. See
 
 #### Satisfaction pools
 
+Finite CSP palettes admit `support-aware` after the SAT guard and conflict-driven
+core when a ground Table has 2–32 positions, at most 65,536 tuples and at most 32
+root values per position. It uses conflict-driven variable selection and completed
+extensional support densities for value order, with the ordinary 65,536-visit
+ranking allowance. Unavailable counts and wider domains fall back to random value
+order without propagation probes. The recipe uses ordinary complete-worker slices
+and family coverage; other recipes retain their value orders. Explicit pools keep
+their requested recipes, and optimization and other model classes decline automatic
+admission. MDD-only models retain their ordinary default palette.
+
 Curated sequential mixed finite-CP satisfaction pools of at least six slots keep
 dom/wdeg and first-fail in the free and selector-switch slots when the selected
 complete workers contain no LP recipe. Wider pools swap an existing matching
