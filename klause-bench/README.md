@@ -1118,7 +1118,9 @@ Owner close time/allocation and final owner counts are recorded separately.
 `phase1=compare values=recompute` compares first-bound and long-step feasibility
 ratios; `phase1=long-step values=compare` isolates incremental basic values.
 Both options accept their named single policy, and the defaults are
-`phase1=long-step values=incremental`. Comparisons warm up in round zero and
+`phase1=long-step values=incremental`. `start=compare` isolates the retained
+all-logical opening from the free-singleton opening; `start=singleton` is the
+default and `start=logical` retains the control. Comparisons warm up in round zero and
 reverse policy order in round one. The bounded trace separates numerical phases,
 scaled objective and infeasibility samples, zero steps, passed crossings, pricing,
 basis-solve work and rebuild triggers. Owner preparation has its own report.
@@ -1197,6 +1199,21 @@ misc04inf rises from 184.2 MB to 191.1 MB. These are instrumented phase allocati
 not RSS or a speedup claim. Cap6000 and p0033 retain identical pivots, work and
 checked native source bounds in both comparisons. All owners close to zero;
 observed sparse fill remains below 1.064 and density below 0.00165.
+
+Integrated factorial [8160](https://lab.eignex.com/jobs/8160), at `82384c9e`,
+repeats the original-limit equality comparison after rebasing current main.
+Both first dual-feasibility failures are free singletons on fixed logical rows:
+column 9557 for rentacar and 4897 for misc04inf. The completed control bounds and
+the combined ratio/value-update progress repeat.
+
+The separate four-times-funded [8161](https://lab.eignex.com/jobs/8161) uses the
+same revision with 600M work and 4096 iterations. Misc04inf reaches floating
+candidates in both the legacy and combined arms, at 300225414/272080437 work;
+both bound certificates decline as `CANDIDATE`. Rentacar remains in feasibility
+repair: the combined arm takes 1532 pivots against 1246, but its last sampled
+infeasibility is worse, 150129.16 against 130734.68, with fewer violated basics,
+1240 against 1399. The original-limit gain is not uniform under larger funding.
+These observations motivate the separately controlled singleton opening.
 
 ### CLI profile tables
 

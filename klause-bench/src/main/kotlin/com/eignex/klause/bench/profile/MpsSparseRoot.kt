@@ -43,12 +43,13 @@ internal object MpsSparseRoot {
     private const val LP = "com.eignex.klause.lp."
     private const val ENGINE = LP + "engine."
     private val defaultPolicy = Class.forName(LP + "SparseSourceLpPolicy").getConstructor().newInstance()
+    private data class Variant(val layout: String, val phaseOne: String, val values: String, val start: String)
 
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.size in 1..6 && args[0].startsWith("batch64="))
+        require(args.size in 1..7 && args[0].startsWith("batch64="))
         val options = args.drop(1).associate { it.substringBefore('=') to it.substringAfter('=') }
-        require(options.keys.all { it in setOf("layout", "phase1", "values", "work", "iterations") })
+        require(options.keys.all { it in setOf("layout", "phase1", "values", "start", "work", "iterations") })
         require(("work" in options) == ("iterations" in options))
         val work = options["work"]?.toLong() ?: 150_000_000L
         val iterations = options["iterations"]?.toInt() ?: 1024
@@ -73,22 +74,26 @@ internal object MpsSparseRoot {
             "compare" -> listOf("RECOMPUTE", "INCREMENTAL")
             else -> error("unsupported primal value policy")
         }
+        val startPolicies = when (options["start"]) {
+            null, "singleton" -> listOf("FREE_SINGLETON")
+            "logical" -> listOf("LOGICAL")
+            "compare" -> listOf("LOGICAL", "FREE_SINGLETON")
+            else -> error("unsupported numerical opening")
+        }
+        val variants = layouts.flatMap { layout -> phaseOnePolicies.flatMap { phaseOne ->
+            valuePolicies.flatMap { values -> startPolicies.map { start -> Variant(layout, phaseOne, values, start) } }
+        } }
         val requests = Json.decodeFromString<List<List<String>>>(
             Base64.getDecoder().decode(args[0].substringAfter('=')).decodeToString())
         require(requests.size in 1..16)
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         Reports.writeJson(out.resolve("build-provenance.json").path, InstalledBuild.reference)
-        val rounds = if (layouts.size == 1 && phaseOnePolicies.size == 1 && valuePolicies.size == 1)
-            listOf(1) else listOf(0, 1)
+        val rounds = if (variants.size == 1) listOf(1) else listOf(0, 1)
         for (round in rounds) {
             requests.forEachIndexed { index, request ->
-                for (layout in if (round == 0) layouts else layouts.reversed()) {
-                    for (phaseOne in if (round == 0) phaseOnePolicies else phaseOnePolicies.reversed()) {
-                        for (values in if (round == 0) valuePolicies else valuePolicies.reversed()) {
-                            inspect(request, out.resolve("$index/$round/$layout/$phaseOne/$values").apply { mkdirs() },
-                                layout, round, phaseOne, values, floating)
-                        }
-                    }
+                for (variant in if (round == 0) variants else variants.reversed()) {
+                    val path = "$index/$round/${variant.layout}/${variant.phaseOne}/${variant.values}/${variant.start}"
+                    inspect(request, out.resolve(path).apply { mkdirs() }, round, variant, floating)
                 }
             }
         }
@@ -97,10 +102,8 @@ internal object MpsSparseRoot {
     private fun inspect(
         request: List<String>,
         out: File,
-        layout: String,
         round: Int,
-        phaseOne: String,
-        values: String,
+        variant: Variant,
         floating: Any,
     ) {
         val options = request.associate { it.substringBefore('=') to it.substringAfter('=') }
@@ -151,7 +154,7 @@ internal object MpsSparseRoot {
         val columns = call(packed, "getColumns") as List<*>
         val sparseType = Class.forName(LP + "SparseSourceLp")
         val rowPolicy = Class.forName(LP + "SparseSourceLpRowPolicy").enumConstants.single {
-            it.toString() == layout
+            it.toString() == variant.layout
         }
         val policy = defaultPolicy.javaClass.constructors.single { it.parameterCount == 5 }.newInstance(
             call(defaultPolicy, "getPreparation"), floating,
@@ -171,8 +174,9 @@ internal object MpsSparseRoot {
             put("revision", Reports.readGitSha())
             put("problem", options.getValue("problem"))
             put("round", round)
-            put("phaseOnePolicy", phaseOne)
-            put("primalValuePolicy", values)
+            put("phaseOnePolicy", variant.phaseOne)
+            put("primalValuePolicy", variant.values)
+            put("startPolicy", variant.start)
             put("warmup", round == 0)
             put("sourceSha256", sha256(bytes))
             put("sourceSemantics", NumericalResidualProfile.json(source.semantics.declared))
@@ -200,7 +204,7 @@ internal object MpsSparseRoot {
         out.resolve("preparation.json").writeText(report.toString() + "\n")
         println(report)
         if (prepared != null && !stop()) {
-            run(checkNotNull(call(prepared, "getModel")), out, bean, thread, policy, phaseOne, values) { guide ->
+            run(checkNotNull(call(prepared, "getModel")), out, bean, thread, policy, variant) { guide ->
                 val bound = call(guide, "getBound") ?: return@run buildJsonObject { put("available", false) }
                 val startedLift = System.nanoTime()
                 val beforeLift = bean.getThreadAllocatedBytes(thread)
@@ -249,8 +253,7 @@ internal object MpsSparseRoot {
         bean: ThreadMXBean,
         thread: Long,
         policy: Any,
-        phaseOne: String,
-        values: String,
+        variant: Variant,
         checkBound: (Any) -> JsonObject,
     ) {
         val stop = Cancellation.after(10.seconds)
@@ -282,9 +285,11 @@ internal object MpsSparseRoot {
             if (!admitted) return
             val numericalOwner = checkNotNull(NumericalFrontierSnapshot.field(owner, "solver"))
             numericalOwner.javaClass.getDeclaredField("phaseOneLongSteps").apply { isAccessible = true }
-                .set(numericalOwner, phaseOne == "LONG_STEP")
+                .set(numericalOwner, variant.phaseOne == "LONG_STEP")
             numericalOwner.javaClass.getDeclaredField("phaseOneIncrementalValues").apply { isAccessible = true }
-                .set(numericalOwner, values == "INCREMENTAL")
+                .set(numericalOwner, variant.values == "INCREMENTAL")
+            numericalOwner.javaClass.getDeclaredField("singletonStart").apply { isAccessible = true }
+                .set(numericalOwner, variant.start == "FREE_SINGLETON")
             call(numericalOwner, "enableProgressTrace")
             out.resolve("guidance.jsonl").bufferedWriter().use { output ->
                 var iteration = 0
