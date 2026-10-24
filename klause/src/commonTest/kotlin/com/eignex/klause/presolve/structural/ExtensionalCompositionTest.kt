@@ -9,6 +9,7 @@ import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolveContext
 import com.eignex.klause.presolve.PresolvePass
+import com.eignex.klause.presolve.Presolver
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.util.Cancellation
@@ -98,5 +99,17 @@ class ExtensionalCompositionTest {
         val config = PresolveConfig.parse("off,+extensional")
 
         assertTrue(config.resolved(PresolvePass.COMPOSE_EXTENSIONAL, PresolveContext(solutionSetSensitive = true)))
+    }
+
+    @Test
+    fun `source presolve should retain the completed shared tuple refutation`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) }, arrayOf<Factor>(
+            Table(intArrayOf(0, 1), longArrayOf(0, 0, 1, 1)),
+            Table(intArrayOf(0, 1), longArrayOf(0, 1, 1, 0)),
+        ))
+
+        val result = Presolver.runSource(problem, PresolveConfig.parse("off,+extensional"))
+
+        assertTrue(result.infeasible)
     }
 }

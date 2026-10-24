@@ -12,6 +12,7 @@ declaration. See [corpus management](../README.md#catalog-and-corpus).
 | `schema` | Self-authored campaign and roster schemas; regenerate campaign with `:klause-bench:dumpSchema` |
 | `smtlib` | Self-authored linear integer/real satisfaction, optimization, infeasibility, disjunction and exact-rational cases |
 | `xcsp3` | Self-authored magic-series, sum optimization, magic-square and graph-colouring cases |
+| `extensional-overlap` | Self-authored Apache-2.0 table/MDD shared-tuple contradiction and reconvergence controls |
 | `mps` | Self-authored integer and continuous optimization, equality feasibility, infeasibility, unboundedness and open decimal witness controls |
 | `mps-linear-source-v1` | Self-authored Apache-2.0 exact decimal, indicator, wide-coordinate and mixed primal-point source controls; original sense, constants and integral LP columns retain their source mappings |
 | `product-aliases` | Self-authored MiniZinc repeated-role products and fixed powers, including reified comparisons, zero/identity powers and standard truncated negative powers; Apache-2.0 |

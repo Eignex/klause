@@ -736,6 +736,10 @@ internal object Suites {
         vendored("sum-opt-tiny", Category.OPTIMIZATION, Expected.Unknown, relPath = "xcsp3/sum-opt-tiny.xml")
         vendored("magic-square-3", Category.CSP, Expected.Sat, relPath = "xcsp3/magic-square-3.xml")
         vendored("graph-coloring-tiny", Category.CSP, Expected.Sat, relPath = "xcsp3/graph-coloring-tiny.xml")
+        for (name in listOf("overlap-tables-unsat", "overlap-mdd-unsat", "overlap-mdd-sat")) {
+            vendored(name, Category.CSP, if (name.endsWith("unsat")) Expected.Unsat else Expected.Sat,
+                relPath = "extensional-overlap/$name.xml")
+        }
     }
 
     private val lpComponentSplit = suite("lp-component-split", "Targeted separable and linked dense LP models") {
