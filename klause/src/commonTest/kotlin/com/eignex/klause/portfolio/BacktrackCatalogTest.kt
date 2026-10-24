@@ -1,7 +1,7 @@
 package com.eignex.klause.portfolio
 
-import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.backtrack.selector.MaxSd
+import com.eignex.klause.solver.ProblemClass
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

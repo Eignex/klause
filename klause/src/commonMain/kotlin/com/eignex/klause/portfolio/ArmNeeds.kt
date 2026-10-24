@@ -96,9 +96,9 @@ internal class ProblemFacts(
                 circuit = problem.factors.any { it is Circuit },
                 extensionalSupports = profile.problemClass == ProblemClass.FiniteCp && !profile.optimizing &&
                     problem.factors.any { factor ->
-                    factor is Table && factor.hi == null && factor.arity in 2..32 && factor.numTuples <= 65_536 &&
-                        factor.xs.all { problem.rootIntDomain(it).spanOrNull(32L) != null }
-                },
+                        factor is Table && factor.hi == null && factor.arity in 2..32 && factor.numTuples <= 65_536 &&
+                            factor.xs.all { problem.rootIntDomain(it).spanOrNull(32L) != null }
+                    },
                 relaxation = { emphasis ->
                     LpAutoConfig.resolve(problem, LpConfig(emphasis).cappedUnder(lpCeiling)) != LpPlan()
                 },
