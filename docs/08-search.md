@@ -225,8 +225,13 @@ interrupted factor stays queued: Table clears its completed-sweep marker, and MD
 invalidates private reachability before another delta can read it. Completed domain
 deductions remain sound. Root preparation can retry the queued work; interruption
 in an ordinary search fixpoint latches incompleteness and withholds model and fact
-publication. Bulk allocations and domain mutations, including atom maintenance,
-remain atomic.
+publication. Batched Table/MDD exclusions retain a cursor through their hole
+history and atom maintenance. Root preparation finishes that cursor before firing
+another factor; undo discards it with the domain and atom trail. Atom wakes retain
+their first establishment while a resumed cursor repeats completed wakes. Fresh
+decision atom cascades use the same pending completion and retract with their pin.
+Bulk allocations, immutable domain construction and non-interruptible propagator
+internals remain atomic.
 
 Shared CP assertions also poll the search context's containing allowance. A cancelled
 assertion retracts to its completed parent and retains the same alternative for a
