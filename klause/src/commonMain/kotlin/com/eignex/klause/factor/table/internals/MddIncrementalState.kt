@@ -362,10 +362,18 @@ internal class MddIncrementalState(
         else -> coarse
     }
 
+    private var pathWeights: MddPathWeights? = null
+    private var pathWeightsAttempted = false
+
     fun supportCounts(variable: Int, values: LongArray, visit: () -> Boolean): ExtensionalSupportCounts? {
         if (valid.value == 0) return null
         val pos = seq.indexOf(variable)
         if (pos < 0) return null
+        if (!pathWeightsAttempted && cost < 0) {
+            pathWeights = MddPathWeights.build(owner, seq, numStatesPerLayer, transitions, idx, initial, accepting, visit)
+            pathWeightsAttempted = true
+        }
+        pathWeights?.supportCounts(owner, pos, values, visit)?.let { return it }
         val snapshot = if (snapshotOnly.value == 1) idx.rootSnapshot ?: return null else null
         val counts = IntArray(values.size)
         val domain = owner.intDomains[seq[pos]]

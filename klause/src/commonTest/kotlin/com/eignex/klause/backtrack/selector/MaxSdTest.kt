@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
 
 class MaxSdTest {
     @Test
-    fun `MaxSd should rank live mdd edges without propagation probes`() {
+    fun `MaxSd should rank live mdd assignments without propagation probes`() {
         val states = intArrayOf(1, 2, 4, 1)
         val starts = intArrayOf(0, 6, 18, 39)
         val transitions = longArrayOf(
