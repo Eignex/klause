@@ -55,7 +55,9 @@ class Xcsp3AffineDistinctnessTest {
             <intension>ne(x,add(y,1))</intension><intension>ne(x,sub(z,1))</intension>
             <intension>ne(add(y,1),sub(z,1))</intension></constraints></instance>"""
 
-        assertFalse(PropagationSession(Xcsp3.parse(source, recoveryCancellation = Cancellation { true }).problem).isUnsatAtRoot)
+        assertFalse(
+            PropagationSession(Xcsp3.parse(source, recoveryCancellation = Cancellation { true }).problem).isUnsatAtRoot,
+        )
         assertTrue(PropagationSession(Xcsp3.parse(source).problem).isUnsatAtRoot)
     }
 
@@ -164,6 +166,21 @@ class Xcsp3AffineDistinctnessTest {
     }
 
     @Test
+    fun `large adjacent offsets should retain exact collective distinctness`() {
+        val parsed = Xcsp3.parse(
+            """<instance><variables><var id="x">0..1</var>
+                <var id="y">-4611686014132420609..-4611686014132420608</var>
+                <var id="z">-4611686014132420608..-4611686014132420607</var></variables>
+                <constraints><intension>ne(sub(x,y),mul(2147483647,2147483647))</intension>
+                <intension>ne(sub(x,z),sub(mul(2147483647,2147483647),1))</intension>
+                <intension>ne(sub(y,z),-1)</intension></constraints></instance>""",
+        )
+
+        assertEquals(1, parsed.problem.factors.count { it is AllDifferent })
+        assertTrue(PropagationSession(parsed.problem).isUnsatAtRoot)
+    }
+
+    @Test
     fun `unsafe shifted domains should keep their exact source rows`() {
         val parsed = Xcsp3.parse(
             """<instance><variables><array id="x" size="[3]">0..${Long.MAX_VALUE}</array></variables>
@@ -184,6 +201,21 @@ class Xcsp3AffineDistinctnessTest {
         }
 
         assertTrue(index.groups(Cancellation.Never).isEmpty())
+    }
+
+    @Test
+    fun `excess pair alternatives should retain every source constraint without recovery`() {
+        val rows = (0..8).joinToString("") { "<intension>ne(sub(x,y),$it)</intension>" }
+        val parsed = Xcsp3.parse(
+            """<instance><variables><var id="x">0..10</var><var id="y">0..10</var>
+                <var id="z">0..10</var></variables><constraints>$rows
+                <intension>ne(sub(x,z),2)</intension><intension>ne(sub(y,z),1)</intension>
+                </constraints></instance>""",
+        )
+
+        assertEquals(3, parsed.problem.numIntVars)
+        assertEquals(11, parsed.problem.factors.size)
+        assertTrue(parsed.problem.factors.none { it is AllDifferent })
     }
 
     @Test

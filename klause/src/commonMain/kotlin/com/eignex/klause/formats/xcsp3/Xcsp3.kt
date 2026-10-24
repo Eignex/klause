@@ -43,13 +43,27 @@ data class Xcsp3Problem(
 
 /** XCSP3 integer format facade. */
 object Xcsp3 {
+    /** Decode and lower XCSP3 [text]. */
+    fun parse(
+        text: String,
+        settings: ProblemSettings = KlauseConfig.current.problemSettings(),
+        semanticOverrides: SemanticOverrides = SemanticOverrides(),
+    ): Xcsp3Problem = parse(text, settings, semanticOverrides, Cancellation.Never)
+
     /** Decode and lower XCSP3 [text]; [recoveryCancellation] stops optional collective recovery. */
     fun parse(
         text: String,
         settings: ProblemSettings = KlauseConfig.current.problemSettings(),
         semanticOverrides: SemanticOverrides = SemanticOverrides(),
-        recoveryCancellation: Cancellation = Cancellation.Never,
+        recoveryCancellation: Cancellation,
     ): Xcsp3Problem = parse(StringCharSource(text), settings, semanticOverrides, recoveryCancellation)
+
+    /** Decode and lower a streamed XCSP3 [source], retaining only bounded subtrees. */
+    fun parse(
+        source: CharSource,
+        settings: ProblemSettings = KlauseConfig.current.problemSettings(),
+        semanticOverrides: SemanticOverrides = SemanticOverrides(),
+    ): Xcsp3Problem = parse(source, settings, semanticOverrides, Cancellation.Never)
 
     /** Decode and lower a streamed XCSP3 [source]; [recoveryCancellation] stops optional collective recovery. */
     @Suppress("SwallowedException")
@@ -57,7 +71,7 @@ object Xcsp3 {
         source: CharSource,
         settings: ProblemSettings = KlauseConfig.current.problemSettings(),
         semanticOverrides: SemanticOverrides = SemanticOverrides(),
-        recoveryCancellation: Cancellation = Cancellation.Never,
+        recoveryCancellation: Cancellation,
     ): Xcsp3Problem = try {
         Compiler.Builder(settings, xcsp3Semantics.resolve(semanticOverrides), recoveryCancellation).run {
             val reader = XmlReader(source)
