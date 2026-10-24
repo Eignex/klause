@@ -2250,8 +2250,7 @@ certification itself stays inside its retained operation. The supported foundati
 is source-session reuse, resumable wide guidance and consumed complete frontier
 coverage, with a gr4x6 proof/cost improvement and weaker feasibility progress on
 p0033 and the held-outs. Joint repair consumes the same authority in the comparisons
-below. Wide checked scoped LP refutations remain separate under
-[#3533](https://github.com/Eignex/klause/issues/3533). Native optimum/refutation
+below. Checked scoped LP refutations are qualified below as well. Native optimum/refutation
 claims have no independent proof certificate here.
 
 [Joint repair qualification 8045](https://lab.eignex.com/jobs/8045) compares initial
@@ -2290,7 +2289,7 @@ The weaker depth-first objectives reject a general improvement claim.
 
 All seven wider sources receive sparse root guides, but none yields a joint
 incumbent. Bell3a completes 241 depth-first candidates as undecided, with no checked
-refutation; wide scoped Farkas evidence remains outside the shared service.
+refutation; these runs supply no wide scoped Farkas refutations.
 Finite LP retains flugpl's proof and feasible egout, pp08a and rgn points; finite
 LS also finds bell5 points. The evidence supports the explicit joint operator and
 frontier option, while retaining automatic routing and the wide-neighborhood
@@ -2310,6 +2309,50 @@ All seven wider roots retain guides but have no joint incumbent. Finite LP produ
 21 final points across 33 cases, finite LS nine, and each joint arm three.
 The operator therefore remains explicit: it provides coordinated checked repair
 and local bound closure, with no global proof or general performance claim.
+
+#### Checked sparse refutations
+
+[Qualification 8087](https://lab.eignex.com/jobs/8087) compares `2e30af709f` with
+`ce2e9e65f0`: fifteen frozen MPS sources, frontier, joint LS and joint ALNS,
+three seeds, exact/P1/10 s, presolve off and debug/source validation enabled.
+All 270 CLI processes exit successfully on Mac/aarch64 with matching original
+hashes, runtime, non-solver dependencies and 3 GiB Serial-GC JVM options. All 135
+pairs preserve feasibility, objective and native proof outcomes; all 26 published
+final witnesses pass independent solchecker. Native proofs have no independent
+proof certificate here.
+
+Scoped Farkas evidence closes additional wide alternatives under the unchanged
+256-operation allowance. These frontier counts repeat in all three seeds:
+
+| Source | Checks | Checked LP conflicts | Closed leaves, baseline → candidate | Pending, baseline → candidate |
+| --- | ---: | ---: | ---: | ---: |
+| bell3a | 403 | 55 | 36 → 91 | 166 → 111 |
+| bell5 | 453 | 30 | 47 → 77 | 180 → 150 |
+| egout | 329 | 92 | 2 → 94 | 163 → 71 |
+| dcmulti | 423 | 45 | 16 → 61 | 196 → 151 |
+| enigma | 371 | 68 | 52 → 120 | 134 → 66 |
+
+Bell3a separately spends 1,843,912 Farkas certification work units. Its joint LS
+arm refutes 171 of the same 212 repair candidates, against none in the baseline;
+those refutations cover only their respective repair scopes. The 111 remaining
+frontier consultations are refused after the operation allowance is spent, with
+whole solves finishing near 1.4 s. They carry no refutation authority.
+
+[Initial comparison 8082](https://lab.eignex.com/jobs/8082) loses dcmulti's ALNS
+witness in all three seeds. [Profile 8086](https://lab.eignex.com/jobs/8086) points
+to repeated numeric-context reconstruction and source proof checking through its
+sampled caller/allocation tables; sample shares establish no speedup. Reusing an
+invocation's checked bound for equal or weaker coverage restores objective 194049
+in every 8087 seed. Median physical CLI wall time remains 7.38 → 8.13 s, with peak
+RSS 299,776 → 312,464 KiB. Bell3a frontier changes 1.32 → 1.43 s and
+243,504 → 270,128 KiB. These are measured costs alongside stronger coverage.
+
+Modglob and pp08a gain no LP conflicts. Flugplinf explores deeper, from 227 to 319
+checks and 71 to 97 closed leaves, while pending leaves rise from 43 to 63 and
+the native result remains unknown. Bound availability, the operation allowance and
+incumbent acquisition remain limits; automatic routing is unchanged. This
+qualification supports consumed scoped refutations, not a general runtime or
+optimization improvement.
 
 `bench.profile.MpsProofFrontier` takes `suite=ID problem=NAME sha256=HEX exact=true|false`
 for one hash-matched original source. It uses the same numerical source setup and
