@@ -1,8 +1,8 @@
 package com.eignex.klause.presolve.linear
 
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.addExact
 import com.eignex.klause.util.mulExact

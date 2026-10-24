@@ -93,7 +93,10 @@ internal object AffineSingletons {
             out.factors,
             domains,
             rebuild.asSampleLift(),
-        ).also { it.rebuild = rebuild; it.objective = out.objective }
+        ).also {
+            it.rebuild = rebuild
+            it.objective = out.objective
+        }
     }
 
     /**
@@ -150,8 +153,7 @@ internal object AffineSingletons {
         objective: LinearObjective?,
     ): Eliminated? {
         if (problem.numIntVars == 0) return null
-        // Membership is tested per candidate variable, so the caller's boxed set is unpacked once here
-        // rather than boxing an Int on every check.
+        // The entry scan alone can dominate optional preparation on very large models.
         if (problem.factors.size > maxFactors) return null
         val objectiveRewrite = objective?.takeUnless { problem.semantics.isApproximate }
             ?.let { AffineObjective(it, cancellation) }
@@ -164,8 +166,6 @@ internal object AffineSingletons {
                 }
             }
         }
-        // On multi-million-factor models the candidate scan alone can run for seconds while barely
-        // simplifying. Skipping is sound: the affine-defined variables stay and are solved directly.
         val eliminated = BooleanArray(problem.numIntVars)
         // Once `x` is gone only its range survives, as the bound rows on its terms, so a pivot with interior
         // holes could be rebuilt onto a value the model excludes. A source declaration has nowhere to carry

@@ -91,7 +91,10 @@ internal class SourceDelta(
         val lift = rebuild.asSampleLift()
         val proved = bounds
             ?: return PassDelta(droppedIndices, addedFactors, reconstruct = lift, infeasible = infeasible)
-                .also { it.rebuild = rebuild; it.objective = objective }
+                .also {
+                    it.rebuild = rebuild
+                    it.objective = objective
+                }
         require(proved.size == rootDomains.size) {
             "proved ranges for ${proved.size} columns over a model of ${rootDomains.size}"
         }
@@ -99,12 +102,18 @@ internal class SourceDelta(
         for (v in rootDomains.indices) {
             val next = rootDomains[v].narrowedBy(proved, v)
                 ?: return PassDelta(droppedIndices, addedFactors, reconstruct = lift, infeasible = true)
-                    .also { it.rebuild = rebuild; it.objective = objective }
+                    .also {
+                        it.rebuild = rebuild
+                        it.objective = objective
+                    }
             if (next === rootDomains[v]) continue
             (narrowed ?: rootDomains.copyOf().also { narrowed = it })[v] = next
         }
         return PassDelta(droppedIndices, addedFactors, narrowed, lift, infeasible = infeasible)
-            .also { it.rebuild = rebuild; it.objective = objective }
+            .also {
+                it.rebuild = rebuild
+                it.objective = objective
+            }
     }
 }
 

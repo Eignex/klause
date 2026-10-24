@@ -11,12 +11,12 @@ import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
 import com.eignex.klause.solver.pipeline.FinitePipelineRequest
 import com.eignex.klause.solver.pipeline.FiniteSolveOutcome
 import com.eignex.klause.solver.pipeline.FiniteSolveVerdict
-import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.SourceAttachment
 import com.eignex.klause.solver.pipeline.SourceExecutionRequest
 import com.eignex.klause.solver.pipeline.SourceExecutionResult
