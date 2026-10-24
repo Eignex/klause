@@ -1249,6 +1249,18 @@ per-operation polling metadata binding against `0b087c2a89`; its 30 ordinary run
 and twelve valid witnesses preserve trajectories with similar times, establishing
 no separate throughput gain.
 
+Retain immediate publication exit and retryable shared-assertion interruption.
+[8061](https://lab.eignex.com/jobs/8061) compares `e36eb235ac` with `29ed910b19`
+using two sequential conflictDriven CP arms, maxSD, LP off, 2-second and 20-second
+deadlines, 2000 nodes, seed 3 and three repeats on Mac/aarch64. All 60 commands
+return; all 22 reported witnesses pass independent checks, with matching sources,
+runtime, options and non-solver dependencies. WordSquare's 20-second tail remains
+20.87–20.97 s in both revisions. Eternity's 2001 reached-node control grows from
+3.50–3.55 to 3.54–3.68 s; the 2-second candidate reaches fewer nodes. Table Nonogram
+has different sliced paths and modest overhead; Regular preserves its work.
+These controls establish neither a deadline-tail fix nor a throughput gain for
+publication alone. Atomic hole-history and atom maintenance remain separate work.
+
 Retain shared sparse/dense ground support postings for historical reasons.
 [8029](https://lab.eignex.com/jobs/8029) compares `3e8ac3841` with `b7547b3f50` on
 Mac/aarch64: one conflictDriven CP arm, LP off, 2000 nodes, 20 seconds, seed 3,
