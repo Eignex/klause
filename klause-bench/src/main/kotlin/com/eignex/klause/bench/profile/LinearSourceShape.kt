@@ -9,7 +9,11 @@ import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.LinearRow
+import com.eignex.klause.ir.IntegralConstants
+import com.eignex.klause.ir.LinearForm
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.StructuralKey
+import com.eignex.klause.ir.impliedLinearRows
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
@@ -62,6 +66,28 @@ internal object LinearSourceShape {
         ))
         val model = requireNotNull(invocation.preparedPlan?.model) { "source has no factor inspection view" }
         val exactRows = model.factors.filterIsInstance<ExactLinear>()
+        var capturedEntries = 0L
+        val equalities = buildJsonArray {
+            model.factors.forEachIndexed { factorIndex, factor ->
+                val rows = factor.impliedLinearRows
+                for (row in rows) {
+                    if (row.relation != LinearOp.EQ || row.activator != LinearRow.ALWAYS || row.strict) continue
+                    val constants = row.constants as? IntegralConstants ?: continue
+                    capturedEntries += row.size
+                    require(capturedEntries <= 262144) { "equality capture exceeds entry limit" }
+                    add(buildJsonObject {
+                        put("factor", factorIndex)
+                        put("singleEqualityMeaning", factor.linearForm is LinearForm.Conjunction && rows.size == 1)
+                        put("taggedRefs", buildJsonArray { repeat(row.size) { add(JsonPrimitive(row.ref(it))) } })
+                        put("coefficients", buildJsonArray {
+                            repeat(row.size) { add(JsonPrimitive(constants.exactCoeff(it).toString())) }
+                        })
+                        put("bound", constants.exactBound.toString())
+                    })
+                }
+            }
+        }
+        out.resolve("equality-candidates.json").writeText(equalities.toString() + "\n")
         val activatedRows = exactRows.filter { it.activator != LinearRow.ALWAYS }
         val predicates = HashSet<StructuralKey>()
         for (row in exactRows) {
@@ -102,6 +128,8 @@ internal object LinearSourceShape {
             put("entryScope", "Raw source coordinates and activated exact rows; not an internal admission trace")
             put("constantExactRows", exactRows.count { it.size == 0 })
             put("unconditionalExactRows", exactRows.count { it.activator == LinearRow.ALWAYS })
+            put("capturedIntegralEqualities", equalities.size)
+            put("capturedIntegralEqualityEntries", capturedEntries)
             put("distinctExactPredicatesIgnoringActivators", predicates.size)
             put("predicateEquivalence",
                 "ExactLinear structural identity after removing activators; no sign or implication reasoning")

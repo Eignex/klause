@@ -7,6 +7,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.abs
 import com.eignex.klause.util.div
 import com.eignex.klause.util.isZero
+import com.eignex.klause.util.magnitudeBitLength
 import com.eignex.klause.util.minus
 import com.eignex.klause.util.rem
 import com.eignex.klause.util.times
@@ -43,6 +44,8 @@ internal class BareissEchelon(
     val dependentRows: IntArray = IntArray(0),
 )
 
+internal data class EchelonLimits(val maxRowEntries: Int, val maxTotalEntries: Int, val maxBits: Int)
+
 /**
  * Row echelon form of [a] by fraction-free elimination over the sparse rows.
  *
@@ -67,6 +70,7 @@ internal fun bareissEchelon(
     cols: Int,
     rhsIn: Array<BigInt>? = null,
     cancellation: Cancellation = Cancellation.Never,
+    limits: EchelonLimits? = null,
 ): BareissEchelon {
     val m = a.size
     if (m == 0 || cols == 0) return BareissEchelon(emptyList(), IntArray(0))
@@ -74,6 +78,12 @@ internal fun bareissEchelon(
     // The right-hand side is just another column: it must take every swap and every elimination the
     // coefficients take, or the reduced rows end up paired with bounds that belong to other rows.
     val rhs = rhsIn?.copyOf()
+    var entries = a.sumOf { it.index.size.toLong() }
+    if (limits != null && (entries > limits.maxTotalEntries || a.any { row ->
+            row.index.size > limits.maxRowEntries || row.value.any { it.magnitudeBitLength() > limits.maxBits }
+        } || rhs?.any { it.magnitudeBitLength() > limits.maxBits } == true)) {
+        return BareissEchelon(emptyList(), IntArray(0))
+    }
 
     // Rows bucketed by their leading column. A row's lead only ever moves right, so sweeping the columns
     // in order visits each bucket once and never has to scan the rows that do not reach the column.
@@ -105,8 +115,16 @@ internal fun bareissEchelon(
             val g = gcdOf(pivotValue, factor)
             val scaleQ = pivotValue / g
             val scaleP = factor / g
+            if (limits != null && (!productFits(w[q], scaleQ, rhs?.get(q), limits.maxBits) ||
+                    !productFits(w[p], scaleP, rhs?.get(p), limits.maxBits))) {
+                return BareissEchelon(emptyList(), IntArray(0))
+            }
             val combined = combine(w[q], scaleQ, w[p], scaleP, cancellation)
                 ?: return BareissEchelon(emptyList(), IntArray(0))
+            entries += combined.index.size - w[q].index.size
+            if (limits != null && (combined.index.size > limits.maxRowEntries || entries > limits.maxTotalEntries)) {
+                return BareissEchelon(emptyList(), IntArray(0))
+            }
             var combinedRhs = if (rhs == null) BIG_ZERO else scaleQ * rhs[q] - scaleP * rhs[p]
             val content = content(combined, if (rhs == null) null else combinedRhs)
             val reduced = if (content == BIG_ONE) combined else divide(combined, content)
@@ -128,6 +146,12 @@ internal fun bareissEchelon(
 
     dependent.sort()
     return BareissEchelon(kept, pivots.toIntArray(), keptRhs.toTypedArray(), inconsistent, dependent.toIntArray())
+}
+
+private fun productFits(row: SparseIntRow, scale: BigInt, rhs: BigInt?, maxBits: Int): Boolean {
+    val scaleBits = scale.magnitudeBitLength()
+    return row.value.all { it.magnitudeBitLength().toLong() + scaleBits + 1 <= maxBits } &&
+        (rhs == null || rhs.magnitudeBitLength().toLong() + scaleBits + 1 <= maxBits)
 }
 
 /** The candidate with the fewest non-zeros, ties broken by row order so the reduction is reproducible. */

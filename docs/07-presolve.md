@@ -217,13 +217,20 @@ only when a nonfixed coefficient exceeds the threshold. Diophantine tightening
 restricts each coordinate of `sum(a_i * x_i) = b` to its implied residue class,
 narrowing bounds and, in finite state, carving off-class values.
 
-Dependent-equality removal uses fraction-free elimination over unconditional integer
-equalities and refutes rationally inconsistent blocks. It drops only factors whose
+Dependent-equality removal uses fraction-free elimination over unconditional exact
+integer, real and mixed equalities and refutes rationally inconsistent blocks. Tagged
+source coordinates keep the namespaces disjoint. Integral constants retain arbitrary
+width; finite binary64 constants are read as exact rationals and their denominators
+are cleared. Nonzero source feasibility tolerance excludes the pass. It drops only factors whose
 whole meaning is one redundant equality; conjunctions and relaxations can supply
 premises but remain intact. Binary partition equations retain their propagation and
 branching structure, including scaled equations equivalent to `sum(x_i) = 1` over
 declared integer bounds within zero and one. They still supply elimination premises.
-Guarded or disjunctive rows are excluded, and interrupted elimination publishes no deduction.
+Guarded or disjunctive rows are excluded. Rows admit at most 4096 terms and 4096-bit
+constants, with at most 262144 entries across the block. Sparse elimination bounds
+row fill, total entries and intermediate product bit lengths by the same limits;
+an exceeded bound discards the unfinished elimination. Candidate and term visits
+charge the phase allowance. Interrupted elimination publishes no deduction.
 
 Sub-sum aggregation contracts a defining equality's partner terms to its output
 variable, retaining the equality. A unit pivot and two distinct integer partners
