@@ -301,6 +301,27 @@ internal class AllDifferentInvariant(
 
     internal val swapCoordinateCount: Int get() = vars.size
 
+    internal fun proposeOwnedSwaps(state: LocalSearchState, factorId: Int, variable: Int, sink: MoveSink) {
+        if (presents.isNotEmpty() || !exceptValues.isEmpty()) return
+        if (state.seeding.ownerInt?.get(variable) != factorId || isViolated(state, factorId)) return
+        val left = vars.indexOf(variable)
+        if (left < 0) return
+        val previous = sink.proposer
+        val before = sink.size
+        val start = state.rng.nextInt(vars.size)
+        try {
+            sink.proposer = factorId
+            if (!allowsSwapCoordinate(state, left, sink)) return
+            val attempts = minOf(vars.size, MAX_STRUCTURED_SWAPS * SWAP_ATTEMPT_STRIDE)
+            for (step in 0 until attempts) {
+                proposeSwap(state, left, (start + step) % vars.size, sink)
+                if (sink.size - before >= MAX_STRUCTURED_SWAPS) break
+            }
+        } finally {
+            sink.proposer = previous
+        }
+    }
+
     internal fun allowsSwapCoordinate(state: LocalSearchState, index: Int, sink: MoveSink): Boolean =
         presentInvFn(state, index) && sink.allowsInt(vars[index]) &&
             state.rootDomains[vars[index]].min != state.rootDomains[vars[index]].max

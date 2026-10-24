@@ -82,6 +82,11 @@ internal class AffineDistinctInvariant(private val vars: IntArray, private val o
         }
         if (occupant < 0) return
         val variable = vars[occupant]
+        val owner = state.seeding.ownerInt?.get(variable) ?: -1
+        if (owner >= 0) {
+            (state.factors[owner] as? AllDifferentInvariant)?.proposeOwnedSwaps(state, owner, variable, sink)
+            return
+        }
         val domain = state.rootDomains[variable]
         val targets = LongArray(AllDifferentInvariant.MAX_REPAIR_TARGETS)
         var filled = 0

@@ -7,6 +7,7 @@ import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.bigIntOf
@@ -17,6 +18,53 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class AffineDistinctInvariantTest {
+    @Test
+    fun `owned affine collision repairs should preserve the seeded distinctness`() {
+        val factor = Distinct((0..3).map { i ->
+            Distinct.Operand(intArrayOf(Term.ofIntVar(i)), listOf(BigFraction.ONE),
+                BigFraction.ofLong(if (i == 1) -1 else 0))
+        })
+        val source = Problem(0, 4, Array(4) { IntDomain(0, 3) },
+            arrayOf(AllDifferent(intArrayOf(0, 1, 2, 3)), factor))
+        val state = LocalSearchState(LocalSearchModel.open(source), Random(3))
+        state.seedImplicitFeasible()
+        state.recompute()
+        val sink = state.moveSink
+        sink.proposer = 1
+
+        state.factors[1].proposeRepairMoves(state, 1, sink)
+
+        assertTrue(sink.list.any { state.netDelta(it) < 0 })
+        assertEquals(1, sink.proposer)
+        for (move in sink.list) {
+            val delta = state.netDelta(move)
+            state.apply(move)
+            assertEquals(4, (0..3).map { state.assignment.intValue(it) }.toSet().size)
+            assertEquals(1L + delta, state.cost)
+            state.seedImplicitFeasible()
+            state.recompute()
+        }
+    }
+
+    @Test
+    fun `owned affine collision repairs should honor frozen coordinates`() {
+        val factor = Distinct((0..1).map { i ->
+            Distinct.Operand(intArrayOf(Term.ofIntVar(i)), listOf(BigFraction.ONE),
+                BigFraction.ofLong(-i.toLong()))
+        })
+        val source = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            arrayOf(AllDifferent(intArrayOf(0, 1)), factor))
+        val state = LocalSearchState(LocalSearchModel.open(source), Random(3), Assumptions.None.withInt(0, 0))
+        state.seedImplicitFeasible()
+        state.recompute()
+        state.moveSink.proposer = 1
+
+        state.factors[1].proposeRepairMoves(state, 1, state.moveSink)
+
+        assertTrue(state.moveSink.list.isEmpty())
+        assertEquals(1, state.moveSink.proposer)
+    }
+
     @Test
     fun `incremental affine deltas should agree with exact grading across aliases and wide offsets`() {
         val wide = BigFraction.of(parseBigInt("1000000000000000000000000000001"), BIG_ONE)
