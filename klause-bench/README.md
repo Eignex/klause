@@ -1137,6 +1137,18 @@ original-MPS tolerance proofs. The retained consumer's separate
 [gr4x6 certificate qualification](https://lab.eignex.com/jobs/8068), described
 below, exercises bounded rational dual reconstruction and inherited bound closure.
 
+[Control 8073](https://lab.eignex.com/jobs/8073) at `56da14bf` includes that merged
+dual schedule and structured declared/effective semantics. It reproduces the
+four-source pivot counts, floating stops and checked bounds; the cap6000 native
+source recheck allocates 8.30 GB and takes 2.19–2.21 seconds in round one.
+[Matched capture 8075](https://lab.eignex.com/jobs/8075) at `18cf97c3` reuses each
+immutable source-context view within a verification run. Its cap6000 rechecks
+retain the same exact bound, with 122.6–122.7 MB of measured thread allocation and
+39–49 ms in round one. All four sources retain their numerical outcomes and
+recorded pivot counts. The proof traversal allowance, public defensive snapshots
+and source authority are unchanged. This single warmed pair measures the native
+recheck phase, not a general whole-solve speedup or physical memory bound.
+
 ### CLI profile tables
 
 A lab `profileCli` case sets `KLAUSE_LAB_PROFILE_DIR`; after the subprocess timing
