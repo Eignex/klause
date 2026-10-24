@@ -370,7 +370,9 @@ internal class MddIncrementalState(
         val pos = seq.indexOf(variable)
         if (pos < 0) return null
         if (!pathWeightsAttempted && cost < 0) {
-            pathWeights = MddPathWeights.build(owner, seq, numStatesPerLayer, transitions, idx, initial, accepting, visit)
+            pathWeights = MddPathWeights.build(
+                owner, seq, numStatesPerLayer, transitions, idx, initial, accepting, visit,
+            )
             pathWeightsAttempted = true
         }
         pathWeights?.supportCounts(owner, pos, values, visit)?.let { return it }
