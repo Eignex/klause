@@ -144,7 +144,7 @@ completion, and the configured source tolerance callback reaches every worker ki
 Exact MPS invocations supply no tolerance callback, so a floating completion cannot
 acquire exact authority through sharing. Open numerical fallback admits complete
 numerical workers whose typed terminals pass the same invocation and evidence checks;
-no worker materializes a finite domain for an open numerical declaration.
+numerical workers keep open declarations in arithmetic state.
 
 The opt-in numerical companion recipe adds admitted finite search and joint linear
 repair to a retained numerical frontier. Finite admission uses proved source bounds
