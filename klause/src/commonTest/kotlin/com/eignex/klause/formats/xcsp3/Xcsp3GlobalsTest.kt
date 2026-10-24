@@ -2,6 +2,7 @@ package com.eignex.klause.formats.xcsp3
 
 import com.eignex.klause.brute.BruteForceParams
 import com.eignex.klause.brute.BruteForceSolver
+import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.AllDifferentTuples
 import com.eignex.klause.factor.global.Increasing
 import com.eignex.klause.factor.global.NValue
@@ -59,6 +60,52 @@ class Xcsp3GlobalsTest {
     }
 
     private val threeVars = """<var id="x">1..3</var><var id="y">1..3</var><var id="z">1..3</var>"""
+
+    @Test
+    fun `distinctness should retain one native relation across wide domains`() {
+        for (except in listOf("", "<except>0 2</except>")) {
+            val parsed = parse(
+                "<allDifferent><list>x[]</list>$except</allDifferent>",
+                """<array id="x" size="[4]">0..2147483648</array>""",
+            )
+            val relation = factorsOf(parsed).single() as AllDifferent
+
+            assertContentEquals(intArrayOf(0, 1, 2, 3), relation.vars)
+            assertContentEquals(if (except.isEmpty()) longArrayOf() else longArrayOf(0, 2), relation.exceptSet)
+            assertEquals(4, parsed.problem.numIntVars)
+            assertEquals(0, parsed.problem.numBoolVars)
+        }
+    }
+
+    @Test
+    fun `excepted distinctness should permit only exempt repetitions through reconstruction`() {
+        val parsed = parse(
+            "<allDifferent><list>x y</list><except>0 2 2</except></allDifferent>",
+            """<var id="x">0..2</var><var id="y">0..2</var>""",
+        )
+
+        assertEquals((0L..2L).flatMap { x -> (0L..2L).map { y -> listOf(x, y) } }
+            .filter { it != listOf(1L, 1L) }.toSet(), solutions(parsed, 2))
+    }
+
+    @Test
+    fun `repeated distinctness positions should require an excepted value`() {
+        val parsed = parse(
+            "<allDifferent><list>x x</list><except>0</except></allDifferent>",
+            """<var id="x">0..1</var>""",
+        )
+
+        assertEquals(setOf(listOf(0L)), solutions(parsed, 1))
+    }
+
+    @Test
+    fun `singleton distinctness should impose no constraint`() {
+        for (except in listOf("", "<except>0</except>")) {
+            val parsed = parse("<allDifferent><list>x</list>$except</allDifferent>", """<var id="x">0..1</var>""")
+
+            assertTrue(factorsOf(parsed).isEmpty())
+        }
+    }
 
     @Test
     fun `tuple distinctness should preserve repeated coordinates through source reconstruction`() {
