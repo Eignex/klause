@@ -124,6 +124,7 @@ internal class RevisedSimplex(
     private val primalPricingTolerance: Double = TOL,
     private val syntheticWorkEnabled: Boolean = false,
     private val phaseOneLongSteps: Boolean = true,
+    private val phaseOneIncrementalValues: Boolean = true,
 ) : TableauCutSolver,
     PersistentLpSolver,
     ResumableLpSolver {
@@ -2706,6 +2707,7 @@ internal class RevisedSimplex(
         val pi = phaseOneDuals
         val alphaBuf = alphaValues
         val maxIter = maxIterations
+        var valueUpdates = 0
         while (progress.iterations < maxIter) {
             if (activeSolve != null) pauseAtIteration()
             val iteration = progress.primalIterations++
@@ -2717,24 +2719,15 @@ internal class RevisedSimplex(
                 observations.termination = LpFloatTermination.WORK
                 return IterationResult.FAILED
             }
-            var w = 0.0
-            for (i in 0 until m) {
-                val v = basicVar[i]
-                val hi = if (model.hasFiniteUpper(v)) numerical.upperD(v) else Double.MAX_VALUE
-                val lo = if (model.hasFiniteLower(v)) numerical.lowerD(v) else -Double.MAX_VALUE
-                gamma[i] = when {
-                    beta[i] < lo - feasibilityTolerance -> {
-                        w += lo - beta[i]
-                        -1.0
-                    }
-
-                    beta[i] > hi + feasibilityTolerance -> {
-                        w += beta[i] - hi
-                        1.0
-                    }
-
-                    else -> 0.0
+            var w = phaseOneViolation(beta, gamma)
+            if (w <= feasibilityTolerance && valueUpdates > 0) {
+                basicValues(beta)
+                valueUpdates = 0
+                if (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit) {
+                    observations.termination = LpFloatTermination.WORK
+                    return IterationResult.FAILED
                 }
+                w = phaseOneViolation(beta, gamma)
             }
             traceProgress(SimplexPhase.PRIMAL_FEASIBILITY, beta)
             if (w <= feasibilityTolerance) return IterationResult.CONTINUE // feasible
@@ -2748,6 +2741,7 @@ internal class RevisedSimplex(
                 RefactorResult.UNCHANGED -> {
                     if (!routineRefactor) return IterationResult.RESTART
                     basicValues(beta)
+                    valueUpdates = 0
                     continue
                 }
 
@@ -2772,6 +2766,11 @@ internal class RevisedSimplex(
                 }
             }
             if (q == -1) {
+                if (valueUpdates > 0) {
+                    basicValues(beta)
+                    valueUpdates = 0
+                    continue
+                }
                 if (model.exactState != null) {
                     infeasibleRay = DoubleArray(m) { numerical.sourceDual(it, pi[it]) }
                     solvedExactState = model.exactState
@@ -2829,16 +2828,21 @@ internal class RevisedSimplex(
                     leavingToUpper = step.toUpper
                     progressTrace?.let { it.passedPhaseOneBreakpoints += step.passed }
                 }
-                if (cancellation() || (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit)) {
-                    observations.termination = if (cancellation()) LpFloatTermination.CANCELLED else LpFloatTermination.WORK
+                val cancelled = cancellation()
+                if (cancelled || (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit)) {
+                    observations.termination = if (cancelled) LpFloatTermination.CANCELLED else LpFloatTermination.WORK
                     return IterationResult.FAILED
                 }
             }
             if (tMax >= Double.MAX_VALUE) return IterationResult.FAILED // no blocker
             progressTrace?.step(SimplexPhase.PRIMAL_FEASIBILITY, tMax, tolerance, flip = leaving == -1)
             if (leaving == -1) {
+                if (phaseOneIncrementalValues) advancePhaseOneValues(beta, dir * tMax)
                 status[q] = if (qAtLower) VarStatus.AT_UPPER else VarStatus.AT_LOWER
-                basicValues(beta)
+                if (!phaseOneIncrementalValues || ++valueUpdates >= PRIMAL_VALUE_REFRESH_INTERVAL) {
+                    basicValues(beta)
+                    valueUpdates = 0
+                }
                 continue
             }
             if (abs(alpha[leaving]) < tolerance) {
@@ -2846,20 +2850,77 @@ internal class RevisedSimplex(
                 numericalFailure = true
                 return IterationResult.FAILED
             }
+            if (phaseOneIncrementalValues) {
+                val enteringValue = currentSeat(status[q], q) + dir * tMax
+                advancePhaseOneValues(beta, dir * tMax, leaving, enteringValue)
+            }
             val evicted = basicVar[leaving]
             status[evicted] = sideStatus(evicted, leavingToUpper)
             basicVar[leaving] = q
             status[q] = VarStatus.BASIC
             observations.pivots++
             when (foldPivot(leaving, q, evicted, withPivotEta = false)) {
-                PivotFold.UPDATED, PivotFold.REBUILT -> Unit
+                PivotFold.UPDATED -> {
+                    if (!phaseOneIncrementalValues || ++valueUpdates >= PRIMAL_VALUE_REFRESH_INTERVAL) {
+                        basicValues(beta)
+                        valueUpdates = 0
+                    }
+                }
+                PivotFold.REBUILT -> {
+                    basicValues(beta)
+                    valueUpdates = 0
+                }
                 PivotFold.BASIS_CHANGED -> return IterationResult.BASIS_CHANGED
                 PivotFold.FAILED -> return IterationResult.FAILED
             }
-            basicValues(beta)
         }
         observations.termination = LpFloatTermination.PIVOTS
         return IterationResult.FAILED // budget exhausted
+    }
+
+    private fun phaseOneViolation(beta: DoubleArray, gradient: DoubleArray): Double {
+        var violation = 0.0
+        for (i in 0 until m) {
+            val column = basicVar[i]
+            val lower = if (model.hasFiniteLower(column)) numerical.lowerD(column) else -Double.MAX_VALUE
+            val upper = if (model.hasFiniteUpper(column)) numerical.upperD(column) else Double.MAX_VALUE
+            gradient[i] = when {
+                beta[i] < lower - feasibilityTolerance -> {
+                    violation += lower - beta[i]
+                    -1.0
+                }
+                beta[i] > upper + feasibilityTolerance -> {
+                    violation += beta[i] - upper
+                    1.0
+                }
+                else -> 0.0
+            }
+        }
+        return violation
+    }
+
+    private fun advancePhaseOneValues(
+        beta: DoubleArray,
+        delta: Double,
+        leaving: Int = -1,
+        enteringValue: Double = 0.0,
+    ) {
+        if (delta != 0.0) {
+            // A dimension charge keeps the allowance independent of the backend's indexed storage.
+            work.add(2L * m)
+            spikeVec.forEachStored { row, value ->
+                if (row != leaving) {
+                    beta[row] -= value * delta
+                    if (!beta[row].isFinite()) throw BasisArithmeticException("nonfinite primal value")
+                }
+            }
+        }
+        if (leaving >= 0) {
+            if (!enteringValue.isFinite()) throw BasisArithmeticException("nonfinite entering value")
+            beta[leaving] = enteringValue
+            work.add(1)
+        }
+        progressTrace?.let { it.primalValueUpdates++ }
     }
 
     /**
@@ -3084,6 +3145,7 @@ internal class RevisedSimplex(
         /** Degenerate-pivot count (beyond `2·(m+numVars)`) after which [solvePrimal] switches to Bland's
          *  ordering. The iteration allowance still bounds floating-point cycling. */
         const val BLAND_STALL_BASE: Int = 50
+        const val PRIMAL_VALUE_REFRESH_INTERVAL: Int = 8
 
         /** Iterations between cooperative cancellation polls. */
         const val CANCEL_POLL: Int = 32

@@ -46,9 +46,9 @@ internal object MpsSparseRoot {
 
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.size in 1..3 && args[0].startsWith("batch64="))
+        require(args.size in 1..4 && args[0].startsWith("batch64="))
         val options = args.drop(1).associate { it.substringBefore('=') to it.substringAfter('=') }
-        require(options.keys.all { it in setOf("layout", "phase1") })
+        require(options.keys.all { it in setOf("layout", "phase1", "values") })
         val layouts = when (options["layout"]) {
             null, "identity" -> listOf("IDENTITY")
             "equalities" -> listOf("UNCONDITIONAL_EQUALITIES")
@@ -61,25 +61,34 @@ internal object MpsSparseRoot {
             "compare" -> listOf("FIRST_BOUND", "LONG_STEP")
             else -> error("unsupported phase one policy")
         }
+        val valuePolicies = when (options["values"]) {
+            null, "incremental" -> listOf("INCREMENTAL")
+            "recompute" -> listOf("RECOMPUTE")
+            "compare" -> listOf("RECOMPUTE", "INCREMENTAL")
+            else -> error("unsupported primal value policy")
+        }
         val requests = Json.decodeFromString<List<List<String>>>(
             Base64.getDecoder().decode(args[0].substringAfter('=')).decodeToString())
         require(requests.size in 1..16)
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         Reports.writeJson(out.resolve("build-provenance.json").path, InstalledBuild.reference)
-        val rounds = if (layouts.size == 1 && phaseOnePolicies.size == 1) listOf(1) else listOf(0, 1)
+        val rounds = if (layouts.size == 1 && phaseOnePolicies.size == 1 && valuePolicies.size == 1)
+            listOf(1) else listOf(0, 1)
         for (round in rounds) {
             requests.forEachIndexed { index, request ->
                 for (layout in if (round == 0) layouts else layouts.reversed()) {
                     for (phaseOne in if (round == 0) phaseOnePolicies else phaseOnePolicies.reversed()) {
-                        inspect(request, out.resolve("$index/$round/$layout/$phaseOne").apply { mkdirs() },
-                            layout, round, phaseOne)
+                        for (values in if (round == 0) valuePolicies else valuePolicies.reversed()) {
+                            inspect(request, out.resolve("$index/$round/$layout/$phaseOne/$values").apply { mkdirs() },
+                                layout, round, phaseOne, values)
+                        }
                     }
                 }
             }
         }
     }
 
-    private fun inspect(request: List<String>, out: File, layout: String, round: Int, phaseOne: String) {
+    private fun inspect(request: List<String>, out: File, layout: String, round: Int, phaseOne: String, values: String) {
         val options = request.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.keys == setOf("suite", "problem", "sha256"))
         val selected = Catalog.uncapped(options.getValue("suite")).problems
@@ -149,6 +158,7 @@ internal object MpsSparseRoot {
             put("problem", options.getValue("problem"))
             put("round", round)
             put("phaseOnePolicy", phaseOne)
+            put("primalValuePolicy", values)
             put("warmup", round == 0)
             put("sourceSha256", sha256(bytes))
             put("sourceSemantics", NumericalResidualProfile.json(source.semantics.declared))
@@ -176,7 +186,7 @@ internal object MpsSparseRoot {
         out.resolve("preparation.json").writeText(report.toString() + "\n")
         println(report)
         if (prepared != null && !stop()) {
-            run(checkNotNull(call(prepared, "getModel")), out, bean, thread, policy, phaseOne) { guide ->
+            run(checkNotNull(call(prepared, "getModel")), out, bean, thread, policy, phaseOne, values) { guide ->
                 val bound = call(guide, "getBound") ?: return@run buildJsonObject { put("available", false) }
                 val startedLift = System.nanoTime()
                 val beforeLift = bean.getThreadAllocatedBytes(thread)
@@ -226,6 +236,7 @@ internal object MpsSparseRoot {
         thread: Long,
         policy: Any,
         phaseOne: String,
+        values: String,
         checkBound: (Any) -> JsonObject,
     ) {
         val stop = Cancellation.after(10.seconds)
@@ -258,6 +269,8 @@ internal object MpsSparseRoot {
             val numericalOwner = checkNotNull(NumericalFrontierSnapshot.field(owner, "solver"))
             numericalOwner.javaClass.getDeclaredField("phaseOneLongSteps").apply { isAccessible = true }
                 .set(numericalOwner, phaseOne == "LONG_STEP")
+            numericalOwner.javaClass.getDeclaredField("phaseOneIncrementalValues").apply { isAccessible = true }
+                .set(numericalOwner, values == "INCREMENTAL")
             call(numericalOwner, "enableProgressTrace")
             out.resolve("guidance.jsonl").bufferedWriter().use { output ->
                 var iteration = 0
