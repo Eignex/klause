@@ -220,6 +220,14 @@ owns sparse and small dense elimination, DFS reach, Forrest-Tomlin updates, logi
 repair, indexed forward/transpose solves and rational factors. Each owner has fixed
 dimension, both permutations and three-valued update results.
 
+Basis scatter checks slice windows and disjoint input buffers before traversal,
+then combines index access and checked multiply/add in one pass. Slice arrays
+carry no cached validation: initial support is copied from validated CSC, while
+Forrest-Tomlin replacements come from owner-local scratch. Private workspace
+marks register each slot once until clear, including exact cancellations, so
+dimension-sized touched storage needs no capacity-counting prepass. A failed
+arithmetic operation leaves every modified slot registered for cleanup.
+
 Empty indexed right-hand sides return zero after checking the owner and factors;
 the basis meter records a successful solve with zero entry visits. The engine's
 backend-independent allowance charge still follows the requested solve.
