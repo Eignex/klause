@@ -35,8 +35,9 @@ internal class NumericalFrontierSnapshot(
         val stages = stats(invocation).smt.completeSearchStages.orEmpty()
         val pending = ArrayList<JsonObject>()
         val covered = ArrayList<JsonObject>()
+        val branches = ArrayList<JsonObject>()
         var nodes = 0L
-        fun walk(node: Any, inherited: SourceEvidence?) {
+        fun walk(node: Any, inherited: SourceEvidence?, parent: SourceEvidence? = null) {
             require(remaining-- > 0 && !stop()) { "frontier capture allowance exhausted" }
             nodes++
             val nodeCondition = field(node, "condition") as SourceCondition
@@ -50,14 +51,36 @@ internal class NumericalFrontierSnapshot(
             }
             val closure = field(node, "coveredBound", optional = true) as SourceEvidence?
             val split = field(node, "split")
+            if (result != null) branches += buildJsonObject {
+                put("condition", condition(nodeCondition))
+                own?.let { put("bound", bound(it)) }
+                parent?.let { put("parentBound", bound(it)) }
+                if (own != null && parent != null) {
+                    val after = ((own.claim as SourceClaim.Bound).value as SourceValue.Rational).value
+                    val before = ((parent.claim as SourceClaim.Bound).value as SourceValue.Rational).value
+                    val gain = if (context.scope.objective?.sense == ObjectiveSense.MINIMIZE) after - before
+                        else before - after
+                    put("checkedBoundGain", gain.toString())
+                }
+                @Suppress("UNCHECKED_CAST")
+                val candidates = field(result, "fractional", optional = true)
+                    as? List<Pair<SourceCoordinate, BigFraction>>
+                put("fractional", coefficients(candidates.orEmpty().toMap()))
+                if (split != null && field(split, "coordinate", optional = true) != null) {
+                    put("coordinate", (field(split, "coordinate") as SourceCoordinate).id)
+                    put("threshold", field(split, "threshold").toString())
+                }
+                put("terminal", (field(result, "evidence") as SourceEvidence?)?.claim?.let { it::class.simpleName })
+                put("boundClosed", closure != null)
+            }
             when {
                 closure != null -> covered += buildJsonObject {
                     put("condition", condition(nodeCondition))
                     put("bound", bound(closure))
                 }
                 split != null -> {
-                    walk(checkNotNull(field(split, "below")), best)
-                    walk(checkNotNull(field(split, "above")), best)
+                    walk(checkNotNull(field(split, "below")), best, own)
+                    walk(checkNotNull(field(split, "above")), best, own)
                 }
                 result?.let { field(it, "evidence") } == null -> pending += buildJsonObject {
                     put("condition", condition(nodeCondition))
@@ -78,6 +101,7 @@ internal class NumericalFrontierSnapshot(
             put("pending", JsonArray(pending))
             put("boundClosures", JsonArray(covered))
             put("checkedBounds", checked.size)
+            put("checkedNodes", JsonArray(branches))
         }
     }
 
