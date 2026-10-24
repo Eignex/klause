@@ -1,6 +1,5 @@
 package com.eignex.klause.presolve.structural
 
-import com.eignex.klause.factor.table.Mdd
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -15,7 +14,6 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
-import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
@@ -97,7 +95,7 @@ class ExtensionalCompositionTest {
 
     @Test
     fun `extensional pass should preserve solution sensitive admission`() {
-        val config = PresolveConfig.parse("+extensional")
+        val config = PresolveConfig.parse("off,+extensional")
 
         assertTrue(config.resolved(PresolvePass.COMPOSE_EXTENSIONAL, PresolveContext(solutionSetSensitive = true)))
     }
