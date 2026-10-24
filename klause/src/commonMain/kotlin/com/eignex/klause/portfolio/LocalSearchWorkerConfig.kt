@@ -101,7 +101,7 @@ internal class LocalSearchWorkerConfig private constructor(
             problem to null
         }
         val completion = if (problem.numRealVars > 0) {
-            LeafRealCompletion(problem, objective, toleranceCheck, retained = false)
+            LeafRealCompletion(problem, objective, toleranceCheck, retained = true)
         } else null
         val session = LocalSearchSolver(
             effectiveProblem,

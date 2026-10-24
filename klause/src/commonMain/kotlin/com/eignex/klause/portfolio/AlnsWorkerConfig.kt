@@ -93,7 +93,7 @@ internal class AlnsWorkerConfig private constructor(
         // hold only under those pins and are not shared.
         val repairClauses = SharedClausePool()
         val completion = if (numericalCompletion && problem.numRealVars > 0) {
-            LeafRealCompletion(problem, objective, toleranceCheck, retained = false)
+            LeafRealCompletion(problem, objective, toleranceCheck, retained = true)
         } else null
         val alns = Alns(
             inner = LocalSearchSolver(
