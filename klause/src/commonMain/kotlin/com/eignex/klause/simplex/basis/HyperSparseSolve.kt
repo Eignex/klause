@@ -17,7 +17,6 @@ internal class BasisWorkspace(val size: Int) {
     val values = DoubleArray(size)
     val indices = IntArray(size)
     private val marks = IntArray(size)
-    private val arithmeticStatus = IntArray(1)
     var count = 0
         private set
 
@@ -35,12 +34,17 @@ internal class BasisWorkspace(val size: Int) {
     }
 
     fun scatter(alpha: Double, slice: BasisSlice, start: Int = 0, length: Int = slice.count) {
-        arithmeticStatus[0] = 0
-        count = SparseSlices.scatterAxpyChecked(
-            alpha, slice.indices, slice.offset + start, slice.values, slice.offset + start, length,
-            values, marks, 1, indices, 0, count, arithmeticStatus, 0,
-        )
-        if (arithmeticStatus[0] != 0) throw BasisArithmeticException("checked basis scatter breakdown")
+        require(start >= 0 && length >= 0 && start.toLong() + length <= slice.count)
+        val offset = slice.offset.toLong() + start
+        require(offset >= 0 && offset + length <= slice.indices.size && offset + length <= slice.values.size)
+        require(slice.values !== values && slice.indices !== indices)
+        // Bounds are checked on access, not cached for mutable slice buffers. Private marks register each
+        // slot once, so dimension-sized support cannot overflow, even after cancellation or repeated indices.
+        for (k in offset.toInt() until offset.toInt() + length) {
+            val i = slice.indices[k]
+            val updated = basisFinite(values[i] + basisProduct(alpha, slice.values[k]))
+            set(i, updated)
+        }
     }
 
     fun load(slice: BasisSlice) {

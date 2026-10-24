@@ -236,7 +236,7 @@ to platform snapshots. Concrete versions belong to the build.
 
 | Consumer | Integration contract |
 |---|---|
-| `simplex.basis` | Zero-based sorted unique CSC, owned factor copies, explicit stored zeros, retained permutations and fixed-dimension ownership. Dense LU uses windowed GER in owner-local buffers; arithmetic guards and failed-attempt work stay in Klause. |
+| `simplex.basis` | Zero-based sorted unique CSC, owned factor copies, explicit stored zeros, retained permutations and fixed-dimension ownership. Workspace scatter fuses index access with checked arithmetic under private unique-touch membership. Dense LU uses windowed GER in owner-local buffers; arithmetic guards and failed-attempt work stay in Klause. |
 | `util.SparseSlices` | Validated slice workflows shared by the LP engine and basis: windows, indices and overlap are checked before mutation, and checked dot keeps input order and nonfinite diagnostics. |
 | `lp.engine` | Selected-column pricing reuses the current owned CSC's validated support through `dotColumn`; column updates use indexed kernels. Scaling and refinement keep guarded powers of two and exact accumulation. No dense vendor Level 2/3 call is required. |
 
