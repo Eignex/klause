@@ -75,13 +75,7 @@ internal class ParityInputRevision(problem: Problem, private val cancellation: C
         val bools = HashMap<Int, Int>()
         for (v in boolColumns.keys) {
             if (!work.visit(1L)) return null
-            val positive = if (units.containsKey(Lit.make(v, true))) 1 else 0
-            val negative = if (units.containsKey(Lit.make(v, false))) 2 else 0
-            bools[v] = positive + negative + when (boolValue(v)) {
-                null -> 0
-                false -> 4
-                true -> 8
-            }
+            bools[v] = booleanPremise(v, boolValue(v))
         }
         val ranges = HashMap<Int, Pair<Long?, Long?>>()
         for (v in intColumns.keys) {
@@ -94,6 +88,17 @@ internal class ParityInputRevision(problem: Problem, private val cancellation: C
         previousRanges = ranges
         dirty = false
         return revision
+    }
+
+    private fun booleanPremise(v: Int, root: Boolean?): Int {
+        val positive = units.containsKey(Lit.make(v, true))
+        val negative = units.containsKey(Lit.make(v, false))
+        return when {
+            (positive && negative) || (positive && root == false) || (negative && root == true) -> 3
+            positive || root == true -> 2
+            negative || root == false -> 1
+            else -> 0
+        }
     }
 
     private fun record(factor: Factor, direction: Int, work: ScanMeter): Boolean {
