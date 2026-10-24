@@ -60,6 +60,7 @@ internal class LinearAuthorityTraversal(
             if (!shape.admitted) observe("numericalSparseLpDeclines")
         } else if (!shape.admitted) observe("numericalLpShapesOutsideDimensionGuard")
     }, retainLp = true)
+    private val initialCutObservations = authority.cutObservations()
 
     override fun close() {
         if (ownsAuthority) authority.close()
@@ -79,7 +80,9 @@ internal class LinearAuthorityTraversal(
     private var peakPending = 1L
     private var retained = 1L
 
-    fun observations(): Map<String, Long> = observations + authority.cutObservations() + mapOf(
+    fun observations(): Map<String, Long> = observations + authority.cutObservations().mapValues { (key, value) ->
+        if (key.endsWith("Work")) value - (initialCutObservations[key] ?: 0L) else value
+    } + mapOf(
         "numericalPendingLeaves" to pending,
         "numericalPeakPendingLeaves" to peakPending,
         "numericalRetainedNodes" to retained,
