@@ -141,6 +141,7 @@ internal class LinearAuthorityInvocation(
                 is SearchRunEvent.Indeterminate -> finish(null, when {
                     params.timeout() -> TerminationReason.Timeout
                     stop() -> TerminationReason.Cancelled
+                    event == SearchRunEvent.Indeterminate.Budget -> TerminationReason.BudgetExhausted
                     session.workExhausted() || session.checkBudgetExhausted() ||
                         session.decisionBudgetExhausted() -> TerminationReason.BudgetExhausted
                     else -> TerminationReason.Unsupported
