@@ -181,7 +181,14 @@ internal object ContinuousCompletionProfile {
         val tokens = witness.removePrefix("v ").trim().split(Regex("\\s+"))
         val values = tokens.associate { token ->
             require('=' in token)
-            token.substringBefore('=') to BigDecimal(token.substringAfter('='))
+            val parts = token.substringAfter('=').split('/')
+            require(parts.size in 1..2)
+            val value = if (parts.size == 2) BigFraction.of(parseBigInt(parts[0]), parseBigInt(parts[1])) else {
+                val decimal = BigDecimal(parts.single()).let { it.setScale(maxOf(0, it.scale())) }
+                BigFraction.of(parseBigInt(decimal.unscaledValue().toString()),
+                    parseBigInt(BigDecimal.ONE.scaleByPowerOfTen(decimal.scale()).toBigIntegerExact().toString()))
+            }
+            token.substringBefore('=') to value
         }
         require(values.size == tokens.size && values.keys == compiled.columns.map { it.name }.toSet())
         val ints = LongArray(compiled.model.numIntVars)
@@ -190,11 +197,12 @@ internal object ContinuousCompletionProfile {
         for (column in compiled.columns) {
             val value = values.getValue(column.name)
             if (column.real) {
-                val decimal = value.setScale(maxOf(0, value.scale()))
-                reals[column.id] = decimal.toDouble()
-                exact[column.id] = BigFraction.of(parseBigInt(decimal.unscaledValue().toString()),
-                    parseBigInt(BigDecimal.ONE.scaleByPowerOfTen(decimal.scale()).toBigIntegerExact().toString()))
-            } else ints[column.id] = value.longValueExact()
+                reals[column.id] = value.toDouble()
+                exact[column.id] = value
+            } else {
+                require(value.den.toString() == "1")
+                ints[column.id] = value.num.toString().toLong()
+            }
         }
         require(compiled.model.numBoolVars == 0)
         return Sample(BooleanArray(0), ints, reals, exactReals = exact)
