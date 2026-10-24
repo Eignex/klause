@@ -90,7 +90,7 @@ internal class PortfolioIncumbents<V>(
     }
 }
 
-private fun roundedUpperBound(exact: BigFraction): Double {
+internal fun roundedUpperBound(exact: BigFraction): Double {
     val approximate = exact.toDouble()
     return when {
         approximate == Double.NEGATIVE_INFINITY -> -Double.MAX_VALUE
