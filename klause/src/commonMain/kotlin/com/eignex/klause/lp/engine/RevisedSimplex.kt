@@ -650,6 +650,7 @@ internal class RevisedSimplex(
      *
      * Both terms are the model's shape and the pivot path, never the solver's fill, so the meter reads
      * the same on a deployment that found an accelerated backend and one that did not.
+     * An empty right-hand side requires no traversal through the factors or updates.
      */
     private fun chargeSolve(rhs: IndexedVector) {
         if (rhs.count == 0) return

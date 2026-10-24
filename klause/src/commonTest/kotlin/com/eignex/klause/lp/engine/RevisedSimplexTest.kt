@@ -13,6 +13,27 @@ import kotlin.test.assertTrue
 class RevisedSimplexTest {
 
     @Test
+    fun `zero right hand sides should complete within the factorization allowance`() {
+        for (size in listOf(2, 8)) {
+            val model = LpBuilder().apply {
+                repeat(size) {
+                    val variable = addVar(0L, 1L)
+                    addRow(intArrayOf(variable), longArrayOf(1L), Relation.EQ, 0L)
+                }
+            }.build(Sense.MINIMIZE)
+            val allowance = size + 1L
+
+            RevisedSimplex(model, workLimit = allowance).use { solver ->
+                val result = assertNotNull(solver.solve())
+
+                assertTrue(result.optimal)
+                assertTrue(result.primal.all { it == 0.0 })
+                assertTrue(solver.lastMetrics.workOps in 1L..allowance)
+            }
+        }
+    }
+
+    @Test
     fun `sliced solves should preserve the numerical path and certified result`() {
         for (original in listOf(coverModel(), infeasibleModel(), halfIntegralModel())) {
             val model = assertNotNull(LpExactState(assertNotNull(original.authoritativeModel())).ownerWorkingModel())
