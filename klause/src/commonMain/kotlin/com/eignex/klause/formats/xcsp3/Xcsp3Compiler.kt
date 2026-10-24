@@ -108,6 +108,7 @@ internal object Compiler {
         internal val arrayDims = HashMap<String, IntArray>() // array id -> declared dimension sizes
         internal val domains = ArrayList<IntDomain>()
         private val divModOperands = HashMap<FExpr, Int>()
+        private val divModRelations = com.eignex.klause.lowering.DivModRelationIndex()
         override val factors = ArrayList<Factor>()
         internal var nextBool = 0
         internal var objective: LinearObjectiveSpec? = null
@@ -938,8 +939,8 @@ internal object Compiler {
         }
 
         private fun retainedDivMod(a: Int, b: Int, mod: Boolean): IntComb {
-            val relation = com.eignex.klause.lowering.retainDivMod(a, b, domains[a], domains[b],
-                quotient = null, remainder = null, existing = factors,
+            val relation = divModRelations.retain(a, b, domains[a], domains[b],
+                quotient = null, remainder = null,
                 freshInt = { domain -> newAuxVar(domain.min, domain.max) })
             factors.addAll(relation.factors)
             return IntComb.Narrow(LinComb(mapOf((if (mod) relation.remainder else relation.quotient) to 1L), 0L))

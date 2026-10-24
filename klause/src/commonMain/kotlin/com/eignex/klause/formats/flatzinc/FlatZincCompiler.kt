@@ -86,6 +86,7 @@ internal class FlatZincCompiler(
     internal val floatVars = HashMap<String, FloatBucketing>()
     internal val arrays = HashMap<String, FlatZincArray>()
     internal val intDomains = ArrayList<IntDomain>()
+    internal val divModRelations = com.eignex.klause.lowering.DivModRelationIndex()
     override val factors: MutableList<Factor> = ArrayList()
     internal var numBoolVars: Int = 0
 

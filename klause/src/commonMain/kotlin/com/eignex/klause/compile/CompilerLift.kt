@@ -66,7 +66,7 @@ internal fun Lowering.liftDivMod(num: IntExpr, den: IntExpr, returnRemainder: Bo
         remainder = null,
         freshInt = { d -> intVarOf(newAuxIntVar(d)) },
         freshBool = { newBoolVar() },
-        existing = factors,
+        relations = divModRelations,
     )
     factors += res.factors
     val resultId = if (returnRemainder) res.remainder else res.quotient
