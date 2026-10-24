@@ -19,6 +19,7 @@ import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.linearRows
 import com.eignex.klause.presolve.PresolveBudget
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
@@ -132,6 +133,9 @@ internal object AffineObjectiveProfile {
         })
         put("domains", buildJsonArray {
             for (variable in 0 until model.numIntVars) add(JsonPrimitive(model.intDomainOrNull(variable).toString()))
+        })
+        if (model is BakedProblem) put("rootDomains", buildJsonArray {
+            for (domain in model.rootIntDomains()) add(JsonPrimitive(domain.toString()))
         })
         put("factors", buildJsonArray {
             for (factor in model.factors) add(buildJsonObject {

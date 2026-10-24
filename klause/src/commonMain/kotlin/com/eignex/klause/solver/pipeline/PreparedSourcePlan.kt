@@ -229,6 +229,12 @@ class PreparedSourcePlan private constructor(
     internal val workingLinearObjective: LinearObjective?
         get() = operation.workingLinearObjective ?: operation.objective
 
+    internal fun withWorkingLinearObjective(objective: LinearObjective?): PreparedSourcePlan = PreparedSourcePlan(
+        preparation,
+        PreparedOperationBinding(operation.objective, maximize, quadraticObjective, quadraticSense,
+            operation.decline, objective),
+    )
+
     /** Direction of [objective]. */
     val maximize: Boolean get() = operation.maximize
 

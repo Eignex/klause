@@ -146,14 +146,16 @@ object FinitePipeline {
             ) { token, observation ->
                 prepared.problem.prepareExecutionPlan(
                     original = requireNotNull(request.preparedPlan.sourceModel),
-                    objective = (prepared.objective ?: request.objective)?.let {
-                        if (request.preparedPlan.maximize) it.negated() else it
-                    },
+                    objective = request.preparedPlan.workingLinearObjective,
                     maximize = request.preparedPlan.maximize,
                     preferFinite = true,
                     providers = request.preparedPlan.factorProjections?.providers ?: FactorProjectionProviders.Default,
                     cancellation = token,
-                ).retainingLinearSource(request.preparedPlan).also {
+                ).retainingLinearSource(request.preparedPlan).withWorkingLinearObjective(
+                    (prepared.objective ?: request.objective)?.let {
+                        if (request.preparedPlan.maximize) it.negated() else it
+                    },
+                ).also {
                     if (it.decline == PreparedPlanDecline.RESOURCE) observation.preparationInterrupted()
                 }
             }
@@ -233,15 +235,17 @@ object FinitePipeline {
             ) { token, observation ->
                 model.prepareExecutionPlan(
                     original = requireNotNull(request.preparedPlan.sourceModel),
-                    objective = (outcome.objective ?: objective)?.let {
-                        if (request.preparedPlan.maximize) it.negated() else it
-                    },
+                    objective = request.preparedPlan.workingLinearObjective,
                     maximize = request.preparedPlan.maximize,
                     preferFinite = true,
                     providers = providers,
                     projections = projections,
                     cancellation = token,
-                ).retainingLinearSource(request.preparedPlan).also {
+                ).retainingLinearSource(request.preparedPlan).withWorkingLinearObjective(
+                    (outcome.objective ?: objective)?.let {
+                        if (request.preparedPlan.maximize) it.negated() else it
+                    },
+                ).also {
                     if (it.decline == PreparedPlanDecline.RESOURCE) observation.preparationInterrupted()
                 }
             }
