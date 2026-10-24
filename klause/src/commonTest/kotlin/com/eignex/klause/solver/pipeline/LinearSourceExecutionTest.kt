@@ -41,6 +41,26 @@ import kotlin.test.assertTrue
 
 class LinearSourceExecutionTest {
     @Test
+    fun `numerical frontier policy should consume bounded integer sibling coverage`() {
+        val source = LinearSourceProblem(
+            listOf(LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE)),
+            listOf(LinearSourceRow(listOf(LinearSourceTerm(0, SemanticRational.ofLong(3))),
+                lower = SemanticRational.ONE)),
+            LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
+        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED,
+            linearTraversal = LinearTraversal.NUMERICAL_FRONTIER,
+        ))
+
+        val result = assertIs<SourceExecutionResult.Numerical>(SourceSetup.execute(SourceExecutionRequest(invocation)))
+
+        assertEquals(SourceValue.Rational(BigFraction.ONE),
+            assertIs<SourceClaim.Optimal>(assertNotNull(result.result.terminal).claim).value)
+        assertEquals(LinearSourceConclusion.OPTIMAL, result.linearSource?.conclusion)
+    }
+
+    @Test
     fun `an interrupted bounded numerical split should withhold terminal authority`() {
         val source = LinearSourceProblem(
             listOf(LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE)),
