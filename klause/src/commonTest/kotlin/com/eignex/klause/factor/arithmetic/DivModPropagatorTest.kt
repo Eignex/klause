@@ -88,6 +88,32 @@ class DivModPropagatorTest {
     }
 
     @Test
+    fun `aliased operand roles should retain valid sibling assignments`() {
+        for (convention in DivisionConvention.entries) {
+            for ((relation, first, second) in listOf(
+                Triple(DivMod(0, 0, 1, 2, convention), longArrayOf(-3, 1, 0), longArrayOf(3, 1, 0)),
+                Triple(DivMod(0, 1, 0, 2, convention), longArrayOf(-2, 1, 0), longArrayOf(2, 1, 0)),
+                Triple(DivMod(0, 1, 2, 0, convention), longArrayOf(1, 3, 0), longArrayOf(2, 3, 0)),
+                Triple(DivMod(0, 1, 1, 2, convention), longArrayOf(4, 2, 0), longArrayOf(5, 2, 1)),
+            )) {
+                val session = PropagationSession(Problem(0, 3, Array(3) { IntDomain(-8, 8) }, arrayOf(relation)))
+                for (variable in first.indices) {
+                    assertIs<PropagationResult.Implied>(session.pinInt(variable, first[variable]))
+                }
+                session.popToLevel(0)
+
+                for (variable in second.indices) {
+                    assertIs<PropagationResult.Implied>(session.pinInt(variable, second[variable]))
+                }
+
+                for (variable in second.indices) {
+                    assertEquals(IntDomain(second[variable], second[variable]), session.intDomain(variable))
+                }
+            }
+        }
+    }
+
+    @Test
     fun `shared projection should isolate branch support construction`() {
         val source = Problem(0, 3, arrayOf(
             IntDomain(0, 10000), IntDomain(0, 5000), IntDomain(0, 1),
