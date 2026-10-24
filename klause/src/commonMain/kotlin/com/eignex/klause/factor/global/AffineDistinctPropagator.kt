@@ -94,8 +94,9 @@ internal class AffineDistinctPropagator(private val vars: IntArray, private val 
         val domains = Array(n) { state.intDomains[vars[it]] }
         val lo = List(n) { bigIntOf(domains[it].min) + offsets[it] }
         val hi = List(n) { bigIntOf(domains[it].max) + offsets[it] }
-        val origin = lo.minOrNull() ?: return true
-        val compact = (requireNotNull(hi.maxOrNull()) - origin).fitsLong()
+        val origin = lo.reduce { a, b -> if (a < b) a else b }
+        val ceiling = hi.reduce { a, b -> if (a > b) a else b }
+        val compact = (ceiling - origin).fitsLong()
         val result = if (domains.any { it.spanOrNull(DEFAULT_DOMAIN_WALK_CAP) == null }) {
             bounds(state, lo, hi, origin, compact)
         } else {
