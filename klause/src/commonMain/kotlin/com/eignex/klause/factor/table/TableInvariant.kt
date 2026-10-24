@@ -134,9 +134,11 @@ internal class TableInvariant(
         val columns = if (single >= 0) intArrayOf(single) else multiColumnsByVar.getValue(intVar)
         s.beginProbe(columns.size > 1)
         fun row(row: Int) {
+            state.checkScoringWork()
             if (columns.size > 1 && !s.visitProbeRow(row)) return
             var delta = 0
             for (column in columns) {
+                state.checkScoringWork()
                 val value = tuples[row * arity + column]
                 delta += (if (value == newValue) 0 else 1) - (if (value == old) 0 else 1)
             }
@@ -253,6 +255,7 @@ internal fun tableRescanForChange(
             poll()
             var d = s.dist[row]
             for (c in cols) {
+                poll()
                 val miss = if (tableCellContains(tuples, hi, arity, row, c, newV)) 0 else 1
                 val was = if (tableCellContains(tuples, hi, arity, row, c, oldV)) 0 else 1
                 d += miss - was
