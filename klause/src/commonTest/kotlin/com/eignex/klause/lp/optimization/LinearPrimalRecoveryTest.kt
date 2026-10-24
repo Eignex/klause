@@ -40,6 +40,24 @@ class LinearPrimalRecoveryTest {
     }
 
     @Test
+    fun `reconstruction should retain exact real source endpoints`() {
+        val coordinates = (0..2).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val third = BigFraction.ofLong(3).reciprocal()
+        val wide = BigFraction.ofLong(9007199254740993L)
+        val dyadic = checkNotNull(BigFraction.ofDouble(0.1))
+        val rows = listOf(third, wide, dyadic).flatMapIndexed { id, value -> listOf(
+            ExactRationalInequality(intArrayOf(id), listOf(BigFraction.ONE), value),
+            ExactRationalInequality(intArrayOf(id), listOf(BigFraction.MINUS_ONE), value.negated()),
+        ) }
+
+        val guess = listOf(checkNotNull(BigFraction.ofDouble(1.0 / 3)), wide, dyadic)
+        val point = recoverLinearPrimal(coordinates, guess, rows, emptySet(), Cancellation.Never,
+            complete = { _, _, _ -> null }, observe = { _, _ -> })
+
+        assertEquals(listOf(third, wide, dyadic), point)
+    }
+
+    @Test
     fun `inactive source rows should not restrict continuous recovery`() {
         val rows = listOf(
             ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.MINUS_ONE),
