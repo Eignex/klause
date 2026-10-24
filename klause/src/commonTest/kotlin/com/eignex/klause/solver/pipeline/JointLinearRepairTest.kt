@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
@@ -25,6 +26,26 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class JointLinearRepairTest {
+    @Test
+    fun `joint repair should find a checked point within a priced LP node allowance`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(2), null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.GE, 0.0),
+            ), numRealVars = 1, realLower = doubleArrayOf(0.75), realUpper = doubleArrayOf(2.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val repair = JointLinearRepair(model, source, objective, TheoryParams(maxFlips = 1, nodeBudget = NodeBudget(1000)))
+
+        val result = repair.use {
+            it.search(adaptive = false).use { search ->
+                while (!search.advance(Cancellation.Never, 1000)) Unit
+                search.minimizeResult(TerminationReason.BudgetExhausted)
+            }
+        }
+
+        assertEquals(1L, assertNotNull(result.assignment).intValue(0))
+    }
+
     @Test
     fun `wide repair refutations should discharge only their pinned candidate and account certificate work`() {
         val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(1, 1), null, null),
