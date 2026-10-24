@@ -2,54 +2,71 @@ package com.eignex.klause.bench.profile
 
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.evidence.SourceClaim
+import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceCoordinate
+import com.eignex.klause.solver.evidence.SourceDerivation
+import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourceObjective
 import com.eignex.klause.solver.evidence.SourcePremise
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
-import com.eignex.klause.solver.pipeline.TheoryParams
+import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlinx.serialization.json.boolean
+import kotlin.test.assertFailsWith
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 class NumericalFrontierSnapshotTest {
+    private val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+    private val half = BigFraction.ofLong(2).reciprocal()
+    private val context = SourceProofContext(
+        SourceScope(SourceRevision("frontier", "exact"),
+            objective = SourceObjective("x", ObjectiveSense.MINIMIZE)),
+        setOf(integer),
+        mapOf("half" to SourcePremise(SourceInequality(
+            mapOf(integer to BigFraction.ofLong(-2)), BigFraction.MINUS_ONE))),
+        mapOf(integer to BigFraction.ONE),
+    )
+    private val evidence = SourceEvidence(
+        context.scope.copy(condition = SourceCondition(lower = mapOf(integer to BigFraction.ZERO))),
+        SourceClaim.Bound(SourceValue.Rational(half)),
+        SourceDerivation.Combination(listOf(SourceDerivation.Combination.Term(half, SourceDerivation.Premise("half")))),
+    )
+
     @Test
-    fun `unvisited alternatives should retain their checked ancestor bound without another solve`() {
-        val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
-        val context = SourceProofContext(
-            SourceScope(SourceRevision("frontier", "exact"),
-                objective = SourceObjective("x", ObjectiveSense.MINIMIZE)),
-            setOf(integer),
-            mapOf("half" to SourcePremise(SourceInequality(
-                mapOf(integer to BigFraction.ofLong(-2)), BigFraction.MINUS_ONE))),
-            mapOf(integer to BigFraction.ONE),
-        )
-        val invocation = NumericalFrontierSnapshot.open(context, TheoryParams(maxDecisions = 0))
-        try {
-            NumericalFrontierSnapshot.run(invocation) { _, _ -> error("unexpected incumbent") }
-            val before = NumericalFrontierSnapshot.stats(invocation).smt.sourceLp.operations
+    fun `a captured bound should retain its checked scope and original objective units`() {
+        val snapshot = NumericalFrontierSnapshot(context, Cancellation.Never, BigFraction.ofLong(2))
 
-            val result = NumericalFrontierSnapshot(context, Cancellation.Never).capture(invocation)
+        val result = snapshot.bound(evidence)
 
-            val pending = result.getValue("pending").jsonArray
-            assertEquals(2, pending.size)
-            for (node in pending) {
-                assertEquals("unvisited", node.jsonObject.getValue("state").jsonPrimitive.content)
-                assertEquals(true, node.jsonObject.getValue("inherited").jsonPrimitive.boolean)
-                val bound = node.jsonObject.getValue("bound").jsonObject
-                assertEquals("1/2", bound.getValue("nativeValue").jsonPrimitive.content)
-                assertEquals(true, bound.getValue("checked").jsonPrimitive.boolean)
-            }
-            assertEquals(1L, before)
-            assertEquals(before, NumericalFrontierSnapshot.stats(invocation).smt.sourceLp.operations)
-        } finally {
-            (invocation as AutoCloseable).close()
-        }
+        assertEquals("1/2", result.getValue("nativeValue").jsonPrimitive.content)
+        assertEquals("1/4", result.getValue("sourceUnitValue").jsonPrimitive.content)
+        val lower = result.getValue("scope").jsonObject.getValue("condition").jsonObject
+            .getValue("lower").jsonArray.single().jsonObject
+        assertEquals("0", lower.getValue("value").jsonPrimitive.content)
+    }
+
+    @Test
+    fun `a stronger captured claim should fail its certificate check`() {
+        val snapshot = NumericalFrontierSnapshot(context, Cancellation.Never)
+        val forged = SourceEvidence(evidence.scope, SourceClaim.Bound(SourceValue.Rational(BigFraction.ONE)),
+            evidence.derivation)
+
+        assertFailsWith<IllegalStateException> { snapshot.bound(forged) }
+    }
+
+    @Test
+    fun `a foreign captured revision should fail before certificate reuse`() {
+        val snapshot = NumericalFrontierSnapshot(context, Cancellation.Never)
+        val foreign = SourceEvidence(evidence.scope.copy(revision = SourceRevision("foreign", "exact")),
+            evidence.claim, evidence.derivation)
+
+        assertFailsWith<IllegalStateException> { snapshot.bound(foreign) }
     }
 }
