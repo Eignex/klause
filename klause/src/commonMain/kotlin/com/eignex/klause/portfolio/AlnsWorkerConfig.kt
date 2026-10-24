@@ -92,13 +92,15 @@ internal class AlnsWorkerConfig private constructor(
         // pins and an incumbent, so its permanent (objective-bound, blocking) clauses and LP Farkas nogoods
         // hold only under those pins and are not shared.
         val repairClauses = SharedClausePool()
+        val completion = if (numericalCompletion && problem.numRealVars > 0) {
+            LeafRealCompletion(problem, objective, toleranceCheck, retained = false)
+        } else null
         val alns = Alns(
             inner = LocalSearchSolver(
                 problem,
                 definitionalSweep = definitionalSweep,
                 perMoveInvariants = definitionalSweep != null,
-                completion = if (numericalCompletion && problem.numRealVars > 0)
-                    LeafRealCompletion(problem, objective, toleranceCheck) else null,
+                completion = completion,
             ).apply {
                 matchedPools?.localSearchProjection?.let { engine.projection = it }
                 matchedPools?.localSearchInvariants?.let { engine.invariantNetwork = it }
@@ -124,10 +126,11 @@ internal class AlnsWorkerConfig private constructor(
             onEvent = onEvent?.let { sink -> { e -> sink(workerLabel, e) } },
             nodeBudget = nodeBudget,
         )
+        val session = alns.session()
         return PortfolioWorker.of(
             workerLabel,
             armId,
-            alns.session(),
+            completion?.ownSession(session) ?: session,
             params,
             objective = objective,
             withWarmStart = { p, sample -> p.copy(initialAssignment = sample) },

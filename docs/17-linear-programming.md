@@ -149,6 +149,9 @@ the traversal.
 query supplies its current source encoding and a separate statistics sink; no
 point, bound or source acceptance survives the query. Cancellation retires the
 numerical and certification owners, and closing the completion ends their lifetime.
+Portfolio materializers bind each private completion to its worker session, which
+closes active search ownership before the completion. User-supplied completion
+services retain their caller's ownership.
 
 Mixed witness recovery can submit a connected real residual to `SourceLp` after
 fixing integer guesses, within its `SourceLpBudget`. Only exact primal coordinates

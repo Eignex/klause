@@ -5,18 +5,21 @@ import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.CandidateCompletion
 import com.eignex.klause.localsearch.Completion
+import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.relaxation.LeafRealResult
 import com.eignex.klause.lp.relaxation.LeafRealSolver
 import com.eignex.klause.lp.relaxation.leafRealFeasibility
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.Session
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.resources.LS_INSTRUCTIONS_PER_WORK
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.LpStatsSink
+import com.eignex.klause.solver.search.SearchInvocationResources
 import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.solver.validation.FiniteSourceAcceptance
 import com.eignex.klause.solver.validation.permitsToleranceOptimum
@@ -51,6 +54,16 @@ internal class LeafRealCompletion(
     private var closed = false
     var observeLp: ((LpVerdict, LpStats) -> Unit)? = null
     var observeFloat: ((Sample) -> Unit)? = null
+
+    fun ownSession(session: Session<LocalSearchParams>): Session<LocalSearchParams> =
+        object : Session<LocalSearchParams> by session {
+            private val resources = SearchInvocationResources().apply {
+                own(this@LeafRealCompletion)
+                own(session)
+            }
+
+            override fun close() = resources.close()
+        }
 
     override fun complete(candidate: Sample, cancellation: Cancellation): Completion {
         check(!closed) { "real completion is closed" }

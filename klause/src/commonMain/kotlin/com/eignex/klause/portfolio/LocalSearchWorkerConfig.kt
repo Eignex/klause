@@ -100,6 +100,9 @@ internal class LocalSearchWorkerConfig private constructor(
         } else {
             problem to null
         }
+        val completion = if (problem.numRealVars > 0) {
+            LeafRealCompletion(problem, objective, toleranceCheck, retained = false)
+        } else null
         val session = LocalSearchSolver(
             effectiveProblem,
             strategy = recipe.strategy,
@@ -108,7 +111,7 @@ internal class LocalSearchWorkerConfig private constructor(
             perMoveInvariants = definitionalSweep != null && recipe.perMoveInvariants,
             seedImplicitOnRestart = recipe.seedImplicitOnRestart,
             // Floating scores guide candidates; the residual LP retains the configured source guarantee.
-            completion = if (problem.numRealVars > 0) LeafRealCompletion(problem, objective, toleranceCheck) else null,
+            completion = completion,
         ).apply {
             objectiveBound = boundHandle
             if (effectiveProblem === problem) {
@@ -136,7 +139,7 @@ internal class LocalSearchWorkerConfig private constructor(
         return PortfolioWorker.of(
             workerLabel,
             armId,
-            session,
+            completion?.ownSession(session) ?: session,
             params,
             objective = objective,
             withWarmStart = { p, sample -> p.copy(initialAssignment = sample) },

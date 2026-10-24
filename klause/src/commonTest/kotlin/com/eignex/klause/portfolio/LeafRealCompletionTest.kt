@@ -10,6 +10,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.localsearch.Completion
+import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpVerdict
@@ -52,6 +53,20 @@ class LeafRealCompletionTest {
     )
 
     private fun candidate(k: Long, x: Double) = Sample(BooleanArray(0), longArrayOf(k), doubleArrayOf(x))
+
+    @Test
+    fun `closing an owned session should end its private completion lifetime`() {
+        val completion = LeafRealCompletion(problem, null, null, retained = true)
+        val session = completion.ownSession(LocalSearchSolver(problem).session())
+        assertIs<Completion.Witness>(completion.complete(candidate(2, 0.4), Cancellation.Never))
+
+        session.close()
+        session.close()
+
+        assertFailsWith<IllegalStateException> {
+            completion.complete(candidate(2, 0.4), Cancellation.Never)
+        }
+    }
 
     @Test
     fun `a candidate whose discrete part admits a completion should get exact reals`() {
