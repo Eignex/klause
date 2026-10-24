@@ -374,11 +374,11 @@ class TablePropagatorTest {
     @Test
     fun `delayed table reasons should retain historical holes across sibling branches`() {
         for (base in listOf(1L, 5_000_000_000L)) {
-            val values = longArrayOf(0, base, base + 1, base + 2)
+            val values = longArrayOf(0, base, base + 1, base + 2, base + 3)
             val problem = Problem(
                 numBoolVars = 0,
                 numIntVars = 2,
-                intDomains = Array(2) { SurvivorsDomain(0, base + 2, values) },
+                intDomains = Array(2) { SurvivorsDomain(0, base + 3, values) },
                 factors = arrayOf<Factor>(
                     Table(xs = intArrayOf(0, 1), tuples = values.flatMap { listOf(it, it) }.toLongArray()),
                 ),
@@ -389,10 +389,11 @@ class TablePropagatorTest {
             val mark = state.mark()
             state.levelToDecisionVar.add(problem.numBoolVars)
             state.currentLevel = 1
-            check(state.excludeIntValue(0, base))
+            check(state.excludeIntValue(0, base) && state.excludeIntValue(0, base + 1))
             assertNull(state.runToFixpoint(allFactors = false))
             val reason = assertNotNull(state.holeReasonFor(1, base))
-            check(state.excludeIntValue(0, base + 1) && state.tightenIntMax(0, base + 1))
+            val second = assertNotNull(state.holeReasonFor(1, base + 1))
+            check(state.excludeIntValue(0, base + 2) && state.tightenIntMax(0, base + 2))
 
             val cited = assertNotNull(state.reasonOf(reason)).map { lit ->
                 val atom = Lit.variable(lit) - problem.numBoolVars
@@ -400,16 +401,22 @@ class TablePropagatorTest {
             }
 
             assertEquals(listOf(Triple(0, AtomKind.EQ, base)), cited)
-            state.undoTo(mark)
-            state.levelToDecisionVar.add(problem.numBoolVars)
-            state.currentLevel = 1
-            check(state.excludeIntValue(0, base + 1))
-            assertNull(state.runToFixpoint(allFactors = false))
-            val sibling = assertNotNull(state.reasonOf(state.holeReasonFor(1, base + 1))).map { lit ->
+            val secondCited = assertNotNull(state.reasonOf(second)).map { lit ->
                 val atom = Lit.variable(lit) - problem.numBoolVars
                 Triple(state.atoms.intVar[atom], state.atoms.kind[atom], state.atoms.threshold[atom])
             }
-            assertEquals(listOf(Triple(0, AtomKind.EQ, base + 1)), sibling)
+            assertEquals(listOf(Triple(0, AtomKind.EQ, base + 1)), secondCited)
+            state.undoTo(mark)
+            state.levelToDecisionVar.add(problem.numBoolVars)
+            state.currentLevel = 1
+            check(state.excludeIntValue(0, base + 2))
+            assertNull(state.runToFixpoint(allFactors = false))
+            assertTrue(base in state.intDomains[1] && base + 1 in state.intDomains[1])
+            val sibling = assertNotNull(state.reasonOf(state.holeReasonFor(1, base + 2))).map { lit ->
+                val atom = Lit.variable(lit) - problem.numBoolVars
+                Triple(state.atoms.intVar[atom], state.atoms.kind[atom], state.atoms.threshold[atom])
+            }
+            assertEquals(listOf(Triple(0, AtomKind.EQ, base + 2)), sibling)
         }
     }
 

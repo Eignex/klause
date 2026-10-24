@@ -561,6 +561,36 @@ internal fun PropagationState.excludeIntValues(v: Int, values: LongArray, antece
     return true
 }
 
+// Values are sorted, distinct and strictly interior. Each reason belongs to the pre-batch
+// trail boundary; one domain snapshot restores both the domain and all per-value witnesses.
+internal fun PropagationState.excludeInteriorIntValues(
+    v: Int,
+    values: LongArray,
+    antecedents: (Long) -> IntArray?,
+): Boolean {
+    if (values.isEmpty()) return true
+    val d = intDomains[v]
+    require(values.first() > d.min && values.last() < d.max)
+    val newDomain = checkNotNull(d.excludeValues(values))
+    if (newDomain === d) return true
+    val interior = LongArrayList(initialCapacity = values.size)
+    val reasons = ArrayList<IntArray?>(values.size)
+    for (value in values) {
+        if (value !in d) continue
+        interior.add(value)
+        reasons.add(antecedents(value))
+    }
+    if (undoLogging) logIntChange(v)
+    intDomains[v] = newDomain
+    intLevel[v] = maxOf(intLevel[v], currentLevel)
+    if (currentFactor >= 0) propagations += interior.size
+    for (i in 0 until interior.size) pushHoleHist(v, interior[i], currentLevel, reasons[i])
+    markIntDirty(v, IntEvent.VALUE_REMOVED_BIT)
+    // Equality atoms read their individual carve witnesses rather than a shared move reason.
+    propagateAtomsForExclusionBatch(v, d.min, d.max, null, null, interior, null)
+    return true
+}
+
 internal fun PropagationState.seedConflictFactor(fid: Int) {
     if (fid < 0) return
     noteLearnedUse(fid) // a learned clause that detects a conflict counts as reused

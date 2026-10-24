@@ -10,6 +10,7 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -109,6 +110,36 @@ class PropagationStateTest {
                 batch.atoms.lvl[id],
                 "atom level mismatch at $where: id=$id kind=${seq.atoms.kind[id]} k=${seq.atoms.threshold[id]}",
             )
+        }
+    }
+
+    @Test
+    fun `interior batch exclusions should keep per-value reasons for early and late atoms`() {
+        val s = freshState(2, 9)
+        enterLevel(s, 1)
+        check(s.tightenIntMax(1, 4))
+        val firstReason = intArrayOf(Lit.make(s.atomVarLe(1, 4), false))
+        val secondReason = intArrayOf(Lit.make(s.atomVarLe(1, 5), false))
+        val first = s.atomVarEq(0, 1)
+        val second = s.atomVarEq(0, 3)
+        val mark = s.mark()
+        val before = s.undo.size
+
+        assertTrue(
+            s.excludeInteriorIntValues(0, longArrayOf(1, 3, 5)) { value ->
+                if (value == 3L) secondReason else firstReason
+            },
+        )
+
+        val late = s.atomVarEq(0, 5)
+        assertEquals(firstReason.toList(), assertNotNull(s.atomAntecedentsDerived(first)).toList())
+        assertEquals(secondReason.toList(), assertNotNull(s.atomAntecedentsDerived(second)).toList())
+        assertEquals(firstReason.toList(), assertNotNull(s.atomAntecedentsDerived(late)).toList())
+        assertTrue(s.inDomainAt(0, 3, before))
+        s.undoTo(mark)
+        for (value in longArrayOf(1, 3, 5)) {
+            assertTrue(value in s.intDomains[0])
+            assertFalse(s.holeHistHas(0, value))
         }
     }
 
