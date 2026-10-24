@@ -301,7 +301,9 @@ internal class LpScopedSolver(
         }
         if (!prepare(token)) return null
         val current = requireNotNull(solver)
-        if (current !is ResumableLpSolver) return solveFloat(token = token, allowance = allowance.copy(work = quantum))
+        if (current !is ResumableLpSolver) {
+            return solveFloat(token = token, allowance = allowance.copy(work = minOf(quantum, allowance.work)))
+        }
         var pending = pendingFloat
         if (pending == null) {
             if (!current.adopt(state, token)) return null
