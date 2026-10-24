@@ -1337,6 +1337,7 @@ internal object Compiler {
 
         fun build(): Xcsp3Problem {
             recoverAffineDistinctness(affineDistinctness, recoveryCancellation)
+            objective = objective?.let { it.copy(intCoefficients = it.intCoefficients.copyOf(domains.size)) }
             return Xcsp3Problem(
                 Problem(
                     settings = settings,
