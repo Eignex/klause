@@ -1158,9 +1158,10 @@ ChainReaction source and settings. In its first pair, sampled search allocation
 weight falls 27.83→13.95 GB while reached nodes increase. Weights are statistical
 estimates, and sample shares alone establish no speedup. The ordinary elapsed
 portfolio runs do not establish identical search trajectories. The focused
-[7994 ordinary](https://lab.eignex.com/jobs/7994) and
-[7995 JFR](https://lab.eignex.com/jobs/7995) comparisons isolate dividend-indexed
-filtering against retained full scanning; they are separate from the main control.
+[7995 JFR](https://lab.eignex.com/jobs/7995) comparison isolates dividend-indexed
+filtering against retained full scanning. Ordinary
+[8004](https://lab.eignex.com/jobs/8004) compares bounded indexed retention with
+main, including the large Coprime-40 resource control.
 These focused measurements establish no corpus-wide speed or verdict gain.
 
 ### Elective LP harvest controls
