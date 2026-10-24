@@ -92,6 +92,22 @@ internal class LinearAuthorityTraversal(
     var rootBound: SourceEvidence? = null
         private set
 
+    fun frontierRank(): BigFraction? {
+        val minimizes = source.scope.objective?.sense == com.eignex.klause.ir.ObjectiveSense.MINIMIZE
+        return path.mapNotNull { (_, node) ->
+            val claim = (node.coveredBound ?: node.result?.bound)?.claim as? SourceClaim.Bound
+            val value = (claim?.value as? SourceValue.Rational)?.value
+            if (minimizes) value else value?.negated()
+        }.maxOrNull()
+    }
+
+    fun updateGlobalBound() {
+        val minimizes = source.scope.objective?.sense == com.eignex.klause.ir.ObjectiveSense.MINIMIZE
+        val coverage = root.boundCoverage(null, minimizes, cancellation) ?: return
+        val value = coverage.value ?: return
+        checked(SourceClaim.Bound(value), coverage.proof)?.let { rootBound = it }
+    }
+
     override fun initialize(context: SearchContext): ComponentResult {
         for ((id, value) in source.scope.condition.bools) {
             val result = context.publish(Lit.make(id, value))
@@ -135,6 +151,18 @@ internal class LinearAuthorityTraversal(
             }
         ) return SearchNodeDisposition.Expand
         current.result?.let {
+            if (it.evidence == null && current.coveredBound == null && current.split == null) {
+                val bound = it.bound
+                val value = ((bound?.claim as? SourceClaim.Bound)?.value as? SourceValue.Rational)?.value
+                val standing = incumbent()?.second
+                val minimizes = source.scope.objective?.sense == com.eignex.klause.ir.ObjectiveSense.MINIMIZE
+                if (value != null && standing != null && if (minimizes) value >= standing else value <= standing) {
+                    current.coveredBound = bound
+                    pending--
+                    observe("numericalIncumbentBoundClosures")
+                    observe("numericalClosedLeaves")
+                }
+            }
             return when {
                 it.evidence != null || current.coveredBound != null -> SearchNodeDisposition.Prune
                 current.split != null -> SearchNodeDisposition.Expand
@@ -273,6 +301,32 @@ private class CoverageNode(val condition: SourceCondition) {
     var result: LinearAuthorityResult? = null
     var coveredBound: SourceEvidence? = null
 
+    fun boundCoverage(inherited: SourceEvidence?, minimizes: Boolean, cancellation: Cancellation): BoundCoverage? {
+        if (cancellation()) return null
+        fun value(evidence: SourceEvidence): BigFraction =
+            ((evidence.claim as SourceClaim.Bound).value as SourceValue.Rational).value
+        val bound = listOfNotNull(inherited, coveredBound, result?.bound).reduceOrNull { left, right ->
+            if (if (minimizes) value(left) >= value(right) else value(left) <= value(right)) left else right
+        }
+        val children = split
+        if (children != null) {
+            val below = children.below.boundCoverage(bound, minimizes, cancellation) ?: return null
+            val above = children.above.boundCoverage(bound, minimizes, cancellation) ?: return null
+            val selected = listOfNotNull(below.value, above.value).reduceOrNull { left, right ->
+                if (if (minimizes) left <= right else left >= right) left else right
+            }
+            val proof = when (children) {
+                is CoverageSplit.Boolean -> SourceDerivation.BooleanSplit(children.id, below.proof, above.proof)
+                is CoverageSplit.Integer -> SourceDerivation.IntegerSplit(children.coordinate,
+                    children.threshold, below.proof, above.proof)
+            }
+            return BoundCoverage(selected, proof)
+        }
+        val terminal = result?.evidence
+        if (terminal?.claim == SourceClaim.Refutation) return BoundCoverage(null, terminal.derivation)
+        return bound?.let { BoundCoverage(value(it), it.derivation) }
+    }
+
     fun completedLeaves(): List<LinearAuthorityResult>? {
         val children = split
         if (children != null) {
@@ -305,6 +359,8 @@ private class CoverageNode(val condition: SourceCondition) {
         }
     }
 }
+
+private class BoundCoverage(val value: BigFraction?, val proof: SourceDerivation)
 
 private sealed class CoverageSplit(below: SourceCondition, above: SourceCondition) {
     val below = CoverageNode(below)

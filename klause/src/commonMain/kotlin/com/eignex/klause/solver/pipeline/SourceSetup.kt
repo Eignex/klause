@@ -130,6 +130,9 @@ enum class LinearTraversal {
 
     /** Use numerical LP/MIP traversal without finite bound closure or finite search. */
     NUMERICAL,
+
+    /** Use numerical LP/MIP traversal with a retained bound-ordered frontier. */
+    NUMERICAL_FRONTIER,
 }
 
 /** Captures one source route and retains its operation binding for execution. */

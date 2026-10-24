@@ -137,6 +137,10 @@ selected by `engine`, keeps the original tolerance and objective, and supplies n
 finite or arithmetic-theory fallback. Numerical traversal retains sibling coverage
 and withholds terminals for interrupted or uncertified leaves.
 
+`NUMERICAL_FRONTIER`, exposed as `--param linear-traversal=numerical-frontier`,
+uses a retained bound-ordered alternative queue. The same source checking and
+tolerance contracts apply to its shared-search and portfolio consumers.
+
 ## SMT-LIB source semantics
 
 The SMT-LIB frontend preserves declarations, formulas, names and objective direction.

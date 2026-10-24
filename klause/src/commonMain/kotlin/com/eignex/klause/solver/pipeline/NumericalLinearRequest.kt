@@ -32,6 +32,7 @@ class NumericalLinearRequest(
     /** Whether the original objective is maximized. */
     val maximize: Boolean = false,
     private val cancellation: Cancellation = Cancellation.Never,
+    private val boundOrdered: Boolean = false,
 ) {
     /** Whether native exact rows admit finite working coefficients without losing a nonzero source term. */
     fun numericalRowsSupported(stop: Cancellation = Cancellation.Never): Boolean {
@@ -96,7 +97,8 @@ class NumericalLinearRequest(
     ): LinearOptimizationResult {
         val stop = cancellation or params.timeout or params.cancellation
         val context = authorityContext(objective ?: LinearObjective(), stop) ?: return unavailable(params, stop)
-        return LinearAuthorityInvocation(context, params.copy(cancellation = stop)).use { invocation ->
+        return LinearAuthorityInvocation(context, params.copy(cancellation = stop),
+            boundOrdered = boundOrdered).use { invocation ->
             val result = requireNotNull(invocation.runSlice(Cancellation.Never, Long.MAX_VALUE, -1, onIncumbent))
             LinearOptimizationResult(
                 context.scope,
@@ -136,6 +138,7 @@ class NumericalLinearRequest(
             model, null, params.copy(cancellation = stop), seed = params.randomSeed, lanes = cores,
             sourceObjective = OpenSourceObjective(executionObjective, originalObjective, maximize, context, stop),
             publication = publication, preparedSource = workingPlan, completeOnly = true, numericalOnly = true,
+            boundOrdered = boundOrdered,
         )
         val result = portfolio.minimize(executionObjective, null, stop).linearResult ?: return unavailable(params, stop)
         return LinearOptimizationResult(
