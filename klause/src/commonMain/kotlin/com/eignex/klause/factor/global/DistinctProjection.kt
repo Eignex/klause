@@ -16,7 +16,6 @@ import com.eignex.klause.util.bigIntOf
 
 internal fun Distinct.propagationView(): Propagator {
     if (variables.reals.isNotEmpty()) return NoPropagator
-    affinePropagationView()?.let { return it }
     val inputBooleans = operands.flatMap { it.references.toList() }.filter(Term::isBool)
         .map { Lit.variable(Term.lit(it)) }.distinct()
     return object : Propagator {
