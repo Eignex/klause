@@ -4,6 +4,7 @@ import com.eignex.klause.factor.PropagationReasonOracle
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.intdomain.intDomainFromSurvivors
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationResult
@@ -40,22 +41,41 @@ class DivModPropagatorTest {
 
     @Test
     fun `small branch supports should rebuild after restoring an operand hole`() {
-        val source = Problem(0, 4, arrayOf(
-            IntDomain(0, 64), IntDomain(1, 65), IntDomain(0, 64), IntDomain(0, 64),
-        ), arrayOf(DivMod(0, 1, 2, 3)))
-        val state = PropagationState(source, Assumptions.None)
-        val propagator = DivModPropagator(source.factors[0] as DivMod)
-        assertTrue(propagator.propagate(state, 0))
-        val original = state.intDomains.copyOf()
-        state.intDomains[0] = original[0].excludeValue(32)
-        state.intDomains[1] = original[1].excludeValue(32)
-        assertTrue(propagator.propagate(state, 0))
-        for (variable in original.indices) state.intDomains[variable] = original[variable]
-        state.intDomains[1] = original[1].excludeValue(32).excludeValue(33)
+        for (restoredOperand in 0..1) {
+            val source = Problem(0, 4, arrayOf(
+                IntDomain(0, 64), IntDomain(1, 65), IntDomain(0, 64), IntDomain(0, 64),
+            ), arrayOf(DivMod(0, 1, 2, 3)))
+            val state = PropagationState(source, Assumptions.None)
+            val propagator = DivModPropagator(source.factors[0] as DivMod)
+            assertTrue(propagator.propagate(state, 0))
+            val original = state.intDomains.copyOf()
+            state.intDomains[0] = original[0].excludeValue(32)
+            state.intDomains[1] = original[1].excludeValue(32)
+            assertTrue(propagator.propagate(state, 0))
+            for (variable in original.indices) state.intDomains[variable] = original[variable]
+            val otherOperand = 1 - restoredOperand
+            state.intDomains[otherOperand] = original[otherOperand].excludeValue(32).excludeValue(33)
 
-        assertTrue(propagator.propagate(state, 0))
+            assertTrue(propagator.propagate(state, 0))
 
-        assertTrue(32L in state.intDomains[0])
+            assertTrue(32L in state.intDomains[restoredOperand])
+        }
+    }
+
+    @Test
+    fun `sparse dividend buckets should preserve distant sibling values`() {
+        val high = 1_000_000_000_000L
+        val source = Problem(0, 3, arrayOf(
+            intDomainFromSurvivors(longArrayOf(0, high)),
+            IntDomain(0, high / 2), IntDomain(0, 1),
+        ), arrayOf(DivMod(0, bigIntOf(2), 1, 2)))
+        val session = PropagationSession(source)
+        assertIs<PropagationResult.Implied>(session.pinInt(0, 0))
+        session.popLast()
+
+        assertIs<PropagationResult.Implied>(session.pinInt(0, high))
+
+        assertEquals(IntDomain(high / 2, high / 2), session.intDomain(1))
     }
 
     @Test
