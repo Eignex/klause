@@ -301,10 +301,13 @@ calls consume the same operation without suspension.
 Primal feasibility repair minimizes the convex sum of basic-bound violations
 along an entering edge. It passes bound crossings while the directional slope
 remains negative, then pivots at the minimizing crossing or flips the entering
-column at its opposite side. Tied crossings prefer a larger pivot. Basic values
-and feasibility gradients are recomputed after the step; a positive residual
-infeasibility never supplies a primal point. The sparse breakpoint workspace and
-ordering consume the same floating work and iteration allowance as other pivots.
+column at its opposite side. Tied crossings prefer a larger pivot. The entering
+spike updates basic values between fresh RHS solves, with a refresh after eight
+updates or a factor rebuild. Feasibility and terminal pricing are rechecked on
+fresh values; a positive residual infeasibility never supplies a primal point.
+Feasibility gradients are recomputed after each step. The sparse breakpoint
+workspace, ordering and value updates consume the same floating work and
+iteration allowance as other pivots.
 
 Selected structural-column pricing passes the current owned CSC matrix to Koblas's
 validated column dot, reusing its support without copying columns. An unscaled
