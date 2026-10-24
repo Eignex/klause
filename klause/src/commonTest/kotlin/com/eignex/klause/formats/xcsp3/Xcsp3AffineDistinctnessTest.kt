@@ -99,6 +99,49 @@ class Xcsp3AffineDistinctnessTest {
     }
 
     @Test
+    fun `noncontiguous affine Hall deductions should restore across sibling branches`() {
+        val parsed = Xcsp3.parse(
+            """<instance><variables><var id="x">1 3</var><var id="y">0 2 4</var>
+                <var id="z">-1..1</var></variables><constraints>
+                <intension>ne(x,add(y,1))</intension><intension>ne(x,add(z,2))</intension>
+                <intension>ne(add(y,1),add(z,2))</intension></constraints></instance>""",
+        )
+        val session = PropagationSession(parsed.problem)
+
+        session.pinIntAtMost(1, 2)
+        assertEquals(0L, session.intDomain(2).min)
+        assertEquals(0L, session.intDomain(2).max)
+        session.popToLevel(0)
+        assertEquals(-1L, session.intDomain(2).min)
+        assertEquals(1L, session.intDomain(2).max)
+        session.pinIntAtLeast(1, 4)
+        assertTrue(0L in session.intDomain(2))
+        assertEquals(-1L, session.intDomain(2).min)
+        assertEquals(1L, session.intDomain(2).max)
+    }
+
+    @Test
+    fun `affine channel hole reasons should be entailed by their source relation`() {
+        val parsed = Xcsp3.parse(
+            """<instance><variables><var id="x">1 3</var><var id="y">0..2</var>
+                <var id="z">-1..1</var></variables><constraints>
+                <intension>ne(x,add(y,1))</intension><intension>ne(x,add(z,2))</intension>
+                <intension>ne(add(y,1),add(z,2))</intension></constraints></instance>""",
+        ).problem
+        val channel = parsed.factors.filterIsInstance<Element>().single { it.idx == 1 }
+        val problem = Problem(
+            numBoolVars = parsed.numBoolVars,
+            numIntVars = parsed.numIntVars,
+            declaredIntDomains = parsed.declaredIntDomains,
+            factors = (listOf(channel) + parsed.factors.filter { it !== channel }).toTypedArray(),
+        )
+
+        PropagationReasonOracle.assertReasonsImply(problem, "affine channel hole") { state ->
+            state.excludeIntValue(1, 1)
+        }
+    }
+
+    @Test
     fun `wide affine channels should retain exact rows without enumerating their span`() {
         val parsed = Xcsp3.parse(
             """<instance><variables><array id="x" size="[3]">0..1000000000000</array></variables>
@@ -208,6 +251,24 @@ class Xcsp3AffineDistinctnessTest {
 
         assertEquals(1, parsed.problem.factors.count { it is AllDifferent })
         assertTrue(PropagationSession(parsed.problem).isUnsatAtRoot)
+    }
+
+    @Test
+    fun `finite affine channels should preserve signed word boundary assignments`() {
+        val offset = "add(mul(2,mul(2147483647,2147483647)),mul(4,2147483647))"
+        val parsed = Xcsp3.parse(
+            """<instance><variables><array id="x" size="[3]">0..1</array></variables>
+                <constraints><intension>ne(sub(x[0],x[1]),$offset)</intension>
+                <intension>ne(sub(x[0],x[2]),sub($offset,1))</intension>
+                <intension>ne(sub(x[1],x[2]),-1)</intension></constraints></instance>""",
+        )
+        val actual = BruteForceSolver(parsed.problem.bake()).enumerate(BruteForceParams(randomSeed = 0L))
+            .map { it.ints.take(3) }.toSet()
+        val expected = (0L..1L).flatMap { x ->
+            (0L..1L).flatMap { y -> (0L..1L).filter { z -> y - z != -1L }.map { z -> listOf(x, y, z) } }
+        }.toSet()
+
+        assertEquals(expected, actual)
     }
 
     @Test
