@@ -91,6 +91,7 @@ internal class LpPropagator(
     private val onEdit: (Long) -> Unit = {},
     private val queryWorkAllowance: () -> Long? = { null },
     private val onPreparation: ((LpSolveMetrics) -> Unit)? = null,
+    private val continuationAllowance: () -> Long? = { null },
 ) : SearchComponent,
     SearchBrancher,
     SearchBranchProposal,
@@ -115,6 +116,7 @@ internal class LpPropagator(
     val state: LpExactState? get() = owner?.state
     val metrics: LpScopedMetrics? get() = owner?.metrics
     val floatTermination get() = owner?.lastFloatTermination
+    val floatPaused: Boolean get() = owner?.floatPaused == true
 
     fun boundPremise(witness: Long): SearchAtomPremise = witnesses[witness] ?: SearchAtomPremise.Unavailable
 
@@ -398,6 +400,14 @@ internal class LpPropagator(
     fun solveFloat(warm: Basis? = null, token: Cancellation = cancellation): Pair<LpSolver, FloatLpResult?>? =
         solveOwned { current ->
             val offered = queryWorkAllowance()
+            val continuation = continuationAllowance()
+            if (continuation != null && current.state.depth == 0) {
+                val profile = effort()
+                return@solveOwned current.advanceFloat(
+                    (offered ?: profile.work).coerceAtLeast(1L),
+                    LpFloatAllowance(continuation.coerceAtLeast(1L), profile.iterations), token,
+                ).also { solved = true }
+            }
             val allowance = if (solved || offered != null) {
                 effort().let { LpFloatAllowance(offered ?: it.work, it.iterations) }
             } else null

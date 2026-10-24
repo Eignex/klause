@@ -468,6 +468,7 @@ internal fun LpEngine.sparseSafePrune(
     if (attempted == null) {
         sink.lp.observeEngineCost(LpRoute.NODE, propagator.lastMetrics)
         noteSolveOps(propagator.lastMetrics.workOps)
+        observeNodePause()
         return LpNodeOutcome(false, null)
     }
     val (simplex, floatResult) = attempted

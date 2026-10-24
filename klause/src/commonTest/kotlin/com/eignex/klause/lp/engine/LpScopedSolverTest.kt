@@ -18,6 +18,148 @@ import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
     @Test
+    fun `checkpointed floating work should match uninterrupted work without publishing a paused result`() {
+        val model = lowerBoundModel()
+        val expected = LpScopedSolver(LpExactState(model)).use { owner ->
+            assertNotNull(owner.solveFloat()).second to owner.lastMetrics
+        }
+        LpScopedSolver(LpExactState(model)).use { owner ->
+            val allowance = LpFloatAllowance(100_000L, 100)
+            var work = LpSolveMetrics()
+
+            assertNull(owner.advanceFloat(1L, allowance))
+            work += owner.lastMetrics
+            assertTrue(owner.floatPaused)
+            assertNull(owner.lastResult)
+            assertNull(owner.lastFloatTermination)
+            var result: FloatLpResult? = null
+            var attempts = 0
+            while (result == null && attempts++ < 64) {
+                result = owner.advanceFloat(1L, allowance)?.second
+                work += owner.lastMetrics
+            }
+
+            assertEquals(assertNotNull(expected.first).objective, assertNotNull(result).objective)
+            assertEquals(expected.second.workOps, work.workOps)
+            assertEquals(expected.second.pivots, work.pivots)
+            assertFalse(owner.floatPaused)
+            assertEquals(1L, owner.metrics.createdOwners)
+        }
+    }
+
+    @Test
+    fun `unchanged authority should retain a paused numerical owner`() {
+        LpScopedSolver(LpExactState(lowerBoundModel())).use { owner ->
+            assertNull(owner.advanceFloat(1L, LpFloatAllowance(100_000L, 100)))
+
+            assertTrue(owner.adopt(owner.state))
+            assertTrue(owner.assertBounds(emptyList()) is LpBoundBatchResult.Applied)
+
+            assertTrue(owner.floatPaused)
+            assertEquals(0L, owner.metrics.closedOwners)
+        }
+    }
+
+    @Test
+    fun `changed bounds should discard paused progress before solving the new authority`() {
+        LpScopedSolver(LpExactState(lowerBoundModel())).use { owner ->
+            assertNull(owner.advanceFloat(1L, LpFloatAllowance(100_000L, 100)))
+
+            assertTrue(owner.assertBound(0, false, ExactLpSide(ExactLpNumber.of(3L)), 1L))
+            val result = owner.solve()
+
+            assertFalse(owner.floatPaused)
+            assertEquals(BigFraction.ofLong(3L), assertNotNull(result).lowerBound)
+            assertEquals(1L, owner.metrics.closedOwners)
+            assertEquals(2L, owner.metrics.createdOwners)
+        }
+    }
+
+    @Test
+    fun `changed objectives and rows should discard paused progress before numerical adoption`() {
+        for (objectiveEdit in listOf(false, true)) {
+            LpScopedSolver(LpExactState(lowerBoundModel())).use { owner ->
+                assertNull(owner.advanceFloat(1L, LpFloatAllowance(100_000L, 100)))
+
+                if (objectiveEdit) {
+                    assertTrue(owner.replaceObjective(
+                        ExactLpObjective(listOf(ExactLpNumber.of(2L), ExactLpNumber.of(0L))),
+                    ))
+                } else {
+                    assertTrue(owner.append(LpScopedRow(1L, listOf(0 to ExactLpNumber.of(-1L)),
+                        ExactLpNumber.of(-2L), ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L))))), false))
+                }
+                val result = owner.solve()
+
+                assertFalse(owner.floatPaused)
+                assertEquals(BigFraction.ofLong(2L), assertNotNull(result).lowerBound)
+                assertEquals(1L, owner.metrics.closedOwners)
+                assertEquals(2L, owner.metrics.createdOwners)
+            }
+        }
+    }
+
+    @Test
+    fun `global cancellation should retire a paused owner without a result`() {
+        var cancelled = false
+        val owner = LpScopedSolver(LpExactState(lowerBoundModel()), Cancellation { cancelled })
+        owner.use {
+            assertNull(owner.advanceFloat(1L, LpFloatAllowance(100_000L, 100)))
+            cancelled = true
+
+            assertNull(owner.advanceFloat(1L, LpFloatAllowance(100_000L, 100)))
+
+            assertFalse(owner.floatPaused)
+            assertNull(owner.lastResult)
+            assertEquals(owner.metrics.createdOwners, owner.metrics.closedOwners)
+        }
+    }
+
+    @Test
+    fun `retraction should discard a paused scoped solve`() {
+        for (reset in listOf(false, true)) {
+            LpScopedSolver(LpExactState(lowerBoundModel())).use { owner ->
+                assertTrue(owner.push())
+                assertTrue(owner.assertBound(0, false, ExactLpSide(ExactLpNumber.of(3L)), 1L))
+                assertNull(owner.advanceFloat(1L, LpFloatAllowance(100_000L, 100)))
+
+                assertTrue(if (reset) owner.resetRoot() else owner.pop(0))
+                val result = owner.solve()
+
+                assertFalse(owner.floatPaused)
+                assertEquals(BigFraction.ONE, assertNotNull(result).lowerBound)
+            }
+        }
+    }
+
+    @Test
+    fun `checkpoint advances should preserve the cumulative numerical work limit`() {
+        LpScopedSolver(LpExactState(lowerBoundModel())).use { owner ->
+            val allowance = LpFloatAllowance(1L, 100)
+            var attempts = 0
+
+            do {
+                owner.advanceFloat(1L, allowance)
+            } while (owner.floatPaused && attempts++ < 8)
+
+            assertFalse(owner.floatPaused)
+            assertEquals(LpFloatTermination.WORK, owner.lastFloatTermination)
+            assertNull(owner.lastResult)
+        }
+    }
+
+    @Test
+    fun `closing a paused owner should release its numerical factors`() {
+        val owner = LpScopedSolver(LpExactState(lowerBoundModel()))
+        assertNull(owner.advanceFloat(1L, LpFloatAllowance(100_000L, 100)))
+
+        owner.close()
+
+        assertFalse(owner.floatPaused)
+        assertEquals(owner.metrics.createdOwners, owner.metrics.closedOwners)
+    }
+
+    @Test
     fun `new columns rows and bound assertions should publish in one preparation`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)

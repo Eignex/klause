@@ -974,6 +974,22 @@ bound origin and the skipped standalone phase. Compare this sequence when judgin
 the query policy's cost and deductions, keeping the paired modes' diagnostic work
 separate.
 
+`checkpoint-session` uses the same retained root and governor with a numerical
+cursor. Query allowances pause at iteration boundaries instead of terminating the
+operation; cumulative limits and changed-authority invalidation still apply.
+`floatPaused` distinguishes a pause from a completed work stop. No paused point or
+proof is consumed, and work/pivot counters sum disjoint advance deltas.
+
+Use `queries=checkpoint` instead of `queries=true` for the numerical control: one
+immutable full prepared root, production pricing seed 3, 150M floating work units
+per arm, uninterrupted, repeatedly stopped and checkpointed execution. Round zero
+warms up and round one reverses arm order. The report separates floating work,
+scaling preparation and observer counters; full ordered headings stay beside each
+checkpoint. Per-advance timing/allocation excludes report formatting and source
+projection. Pauses retain the artificial-phase continuation without publishing a
+result. The same cumulative limit can overshoot by one atomic numerical operation;
+compare actual work and final headings, rather than aggregate repeated pivots.
+
 The frozen `cap6000`, `rentacar` and `misc04inf` comparison rejects an automatic
 admission bypass based on sparsity or successful preparation alone
 ([diagnosis](https://lab.eignex.com/jobs/7846),

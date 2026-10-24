@@ -98,6 +98,7 @@ internal enum class LpRootQueryPolicy {
     SHARED_WORK,
     SEPARATE_PREPARATION,
     INTERRUPTED_WORK,
+    CHECKPOINTED_WORK,
 }
 
 /**
@@ -548,7 +549,14 @@ internal class LpEngine(
         }
     }
 
-    internal val measuresRootQueries: Boolean get() = rootQueryPolicy == LpRootQueryPolicy.INTERRUPTED_WORK
+    internal fun observeNodePause() {
+        if (rootQueryPolicy == LpRootQueryPolicy.CHECKPOINTED_WORK && adaptiveWork &&
+            propagator.floatPaused && propagator.lastMetrics.pivots > 0
+        ) lpWorkBudget.observeWorkStop()
+    }
+
+    internal val measuresRootQueries: Boolean get() = rootQueryPolicy == LpRootQueryPolicy.INTERRUPTED_WORK ||
+        rootQueryPolicy == LpRootQueryPolicy.CHECKPOINTED_WORK
     internal var measuredRootLowerBound: Double? = null
         private set
 
@@ -632,6 +640,9 @@ internal class LpEngine(
             sink.lp.observeEngineCost(LpRoute.NODE, metrics)
             noteSolveOps(metrics.workOps)
         } else null,
+        continuationAllowance = {
+            lpEffortGovernor.remainingWork()?.takeIf { rootQueryPolicy == LpRootQueryPolicy.CHECKPOINTED_WORK }
+        },
     )
 
     internal fun nodeRelaxation(relaxer: CpToLpRelaxation, session: PropagationSession): LpRelaxation? {

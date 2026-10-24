@@ -128,6 +128,14 @@ certificate policy and the same objective projection used by the standalone root
 operation. Recording this bound supplies no additional pruning authority.
 Ordinary admission and node preparation use the shared adaptive allowance.
 
+The internal checkpointed root policy keeps one numerical operation across
+consultations of unchanged exact authority. Adaptive allowances limit each advance;
+the operation retains its cumulative work and iteration limits, scaling, phase,
+artificial bounds and basis. Each consultation reports only its new work. A pause
+publishes no point, bound or conflict. Changed bounds, objectives, row authority or
+trail scope discard the cursor before numerical adoption; cancellation and owner
+cleanup retire its factors. Ordinary admission remains independent of this policy.
+
 ### Leaf completion
 
 Finite optimization keeps a pinned real-leaf request across portfolio slices.
