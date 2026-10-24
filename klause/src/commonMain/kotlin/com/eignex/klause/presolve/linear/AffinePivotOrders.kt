@@ -48,6 +48,10 @@ internal object AffinePivotOrders {
         override fun onFolded(minRewrittenId: Int) {
             scanFrom = minRewrittenId
         }
+
+        override fun onRejected(definitionId: Int) {
+            scanFrom = definitionId
+        }
     }
 
     /**
@@ -107,6 +111,10 @@ internal object AffinePivotOrders {
         }
 
         override fun onFolded(minRewrittenId: Int) = Unit
+
+        override fun onRejected(definitionId: Int) {
+            heap.push(estimatedCost(definitionId), definitionId)
+        }
 
         private fun seed() {
             var count = 0

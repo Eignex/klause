@@ -28,6 +28,8 @@ internal class AffineObjective(private val source: LinearObjective, private val 
         }
     }
 
+    fun permits(variable: Int, partners: Int): Boolean = partners == 1 || variable !in coefficients
+
     fun substitute(candidate: AffineSingletons.AffineCandidate): (() -> Unit)? {
         val coefficient = coefficients[candidate.x] ?: return {}
         if (candidate.termVars.size != 1 || candidate.termCoeffs[0] != 1L) return null
