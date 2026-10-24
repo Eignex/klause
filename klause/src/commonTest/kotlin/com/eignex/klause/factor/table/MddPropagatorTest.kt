@@ -10,6 +10,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.AtomKind
 import com.eignex.klause.propagation.PropagationState
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.factorAt
 import com.eignex.klause.propagation.holeReasonFor
 import com.eignex.klause.propagation.mark
@@ -26,6 +27,33 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class MddPropagatorTest {
+
+    @Test
+    fun `restored sparse arc words should support a different sibling range`() {
+        val size = 192
+        val diagram = Mdd(
+            intArrayOf(0, 1), intArrayOf(1, size, 1), intArrayOf(0, size * 3, size * 6),
+            LongArray(size * 6) { cell ->
+                val row = (cell % (size * 3) / 3).toLong()
+                when (cell % 3) {
+                    0 -> if (cell < size * 3) 0L else row
+                    1 -> row
+                    else -> if (cell < size * 3) row else 0L
+                }
+            },
+            0, intArrayOf(0), 3,
+        )
+        val session = PropagationSession(
+            Problem(0, 2, Array(2) { IntDomain(0, size.toLong() - 1) }, arrayOf<Factor>(diagram)),
+        )
+        session.pinIntAtMost(0, 127)
+        session.pinIntAtMost(0, 31)
+        session.popLast()
+
+        session.pinIntAtLeast(0, 96)
+
+        assertEquals(IntDomain(96, 127), session.intDomain(1))
+    }
 
     @Test
     fun `interrupted cold mdd preparation should rebuild before completing its root`() {
