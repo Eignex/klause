@@ -46,7 +46,7 @@ internal class LinearAuthorityInvocation(
     borrowedAuthority: LinearAuthority? = null,
     private val boundOrdered: Boolean = false,
     guidance: Boolean = false,
-    cuts: Boolean = true,
+    cuts: Boolean = boundOrdered,
 ) : AutoCloseable {
     private val started = TimeSource.Monotonic.markNow()
     private var closed = false
