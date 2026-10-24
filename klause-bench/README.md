@@ -1495,8 +1495,8 @@ a pure per-node throughput claim; the seven capped queen sources remain unknown.
 
 Coarse source-domain reasons in [8083](https://lab.eignex.com/jobs/8083) also reduce
 cost, but [8084](https://lab.eignex.com/jobs/8084) loses all three small-source native
-refutations and the parent's one checked 56-queen witness. Those reasons are not
-retained. [8092](https://lab.eignex.com/jobs/8092) separates historical Hall-union
+refutations and the parent's one checked 56-queen witness. Coarse-only matching is
+not retained; larger roots keep exact source-domain fallbacks. [8092](https://lab.eignex.com/jobs/8092) separates historical Hall-union
 reasons from their combination with incremental source collision scoring on the
 ordinary mixed/P1/10-second route. The combined arm retains all three small-source
 native refutations; native proof labels are not independently certificate-checked.
