@@ -2,6 +2,7 @@ package com.eignex.klause.lp.optimization
 
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.SourceLpBudget
+import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.SparseSourceLpPolicy
 import com.eignex.klause.lp.SparseSourceLpRowPolicy
 import com.eignex.klause.lp.engine.ReconstructionLimits
@@ -356,6 +357,44 @@ class LinearAuthorityTest {
         assertNull(result.incumbent)
         assertNull(result.evidence)
         assertEquals(1L, result.primalStages["PrimalRecoveryComponentUnavailable"])
+    }
+
+    @Test
+    fun `funding paused recovery should resume without caching a missing point`() {
+        val coordinates = (0 until 129).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val other = coordinates[1]
+        val value = checkNotNull(BigFraction.ofDouble(0.1))
+        val coefficients = mapOf(real to BigFraction.ofLong(3), other to BigFraction.ofLong(3))
+        val source = SourceProofContext(scope, coordinates.toSet(), mapOf(
+            "upper" to SourcePremise(SourceInequality(coefficients, value)),
+            "lower" to SourcePremise(SourceInequality(coefficients.mapValues { it.value.negated() }, value.negated())),
+        ), emptyMap())
+        val funding = SourceLpFunding(1_000_000_000L, Long.MAX_VALUE)
+        var pauseGuide = true
+        val budget = SourceLpBudget(maxOperations = 2, funding = funding, onWork = { work ->
+            if (pauseGuide && work.floatWork > 0L) {
+                pauseGuide = false
+                funding.charge(100_000_000L)
+            }
+        })
+        funding.grant(100_000_000L)
+
+        LinearAuthority(budget, retainLp = true).use { authority ->
+            val paused = authority.advance(source, Cancellation.Never)
+            assertTrue(paused.paused)
+            assertNull(paused.incumbent)
+            val allocation = funding.allocated
+            funding.grant(100_000_000L)
+            val resumed = authority.advance(source, Cancellation.Never)
+
+            assertNotNull(resumed.incumbent)
+            assertEquals(1L, resumed.primalStages["PrimalRecoverySourceChecked"])
+            assertEquals(2, budget.operations)
+            assertEquals(1L, authority.preparations)
+            assertEquals(resumed.primalStages["PrimalRecoveryAllocation"], funding.allocated - allocation)
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(resumed.evidence)))
+        }
     }
 
     @Test
