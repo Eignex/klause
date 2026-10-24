@@ -1955,6 +1955,34 @@ are rechecked together before an optimum can be reported.
 units; it does not certify the feasible set enlarged by a positive tolerance.
 Independent source witness validation remains separate from solver proof claims.
 
+The scalar session [qualification 8040](https://lab.eignex.com/jobs/8040) compares
+cold `3e8ac384` with retained `6aef3fdd` and an automatic finite control over
+opt1217, p0201, gr4x6, flugpl, p0033, enigma, enlight4 and flugplinf. Each has
+default/exact arms, P1, a 10-second allowance, seed 3 repeated three times,
+presolve off and debug on: 144 runs on Mac/aarch64. Original source hashes,
+runtime hashes, non-solver dependencies and JVM options match; MPS has no external
+compiler identity. All 60 reported witnesses pass the lab's original-source
+solchecker. Native proof claims have no independent proof certificate here.
+
+Both numerical modes preserve gr4x6's 107 checks, zero pending leaves and native
+optimum 202.35, and p0033's 257 checks, nine pending leaves and incumbent 3447.
+Retained preparation work falls from 1,201,824 to 8,890 on gr4x6 and from
+1,283,584 to 3,903 on p0033, using one preparation each. Floating work falls from
+10,715,823 to 3,115,592 on gr4x6 but rises from 576,285 to 1,083,929 on p0033.
+Median physical whole-CLI measurements expose the retention cost:
+
+| Source / arm | Cold wall (s) | Retained wall (s) | Cold peak RSS (KiB) | Retained peak RSS (KiB) |
+| --- | ---: | ---: | ---: | ---: |
+| gr4x6 default | 0.76 | 0.78 | 213,008 | 251,120 |
+| gr4x6 exact | 0.75 | 0.79 | 212,000 | 235,088 |
+| p0033 default | 0.65 | 0.70 | 209,536 | 236,992 |
+| p0033 exact | 0.66 | 0.70 | 209,040 | 239,184 |
+
+The finite control proves p0033 at 3089 but leaves gr4x6 at 229.05 after its
+allowance. This comparison supports preparation reuse with complete source
+coverage, alongside higher retained memory and no observed wall-time improvement;
+it does not measure the sparse bound-ordered consumer.
+
 `bench.profile.MpsProofFrontier` takes `suite=ID problem=NAME sha256=HEX exact=true|false`
 for one hash-matched original source. It uses the same numerical source setup and
 invocation, seed 3 and a ten-second solve deadline under the existing LP allowances.
