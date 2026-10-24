@@ -82,6 +82,13 @@ internal class NumericalFrontierSnapshot(
     }
 
     fun bound(evidence: SourceEvidence): JsonObject = checked.getOrPut(evidence) {
+        val capturedScope = evidence.scope
+        val root = context.scope
+        check(capturedScope.revision == root.revision && capturedScope.objective == root.objective &&
+            root.condition.bools.all { (id, value) -> capturedScope.condition.bools[id] == value } &&
+            root.condition.lower.all { (id, value) -> capturedScope.condition.lower[id]?.let { it >= value } == true } &&
+            root.condition.upper.all { (id, value) -> capturedScope.condition.upper[id]?.let { it <= value } == true }
+        ) { "captured bound has a foreign source scope" }
         val scoped = SourceProofContext(evidence.scope, context.coordinates, context.premises,
             context.objective, context.objectiveConstant, LinearAuthoritySemantics(context), context.semantics)
         check(SourceEvidenceVerifier(scoped).verify(evidence, stop) == SourceEvidenceCheck.Checked) {
