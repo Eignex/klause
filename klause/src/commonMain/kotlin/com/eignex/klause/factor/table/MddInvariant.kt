@@ -337,7 +337,7 @@ internal class MddInvariant(
         if (!isViolated(state, factorId)) return
         if (cost >= 0) {
             // An accepted word whose cost is off is repaired by setting the cost to the path's weight.
-            val weight = acceptedWeight { state.assignment.intValue(seq[it]) }
+            val weight = acceptedWeight(state::checkScoringWork) { state.assignment.intValue(seq[it]) }
             if (weight != null) {
                 if (weight in state.rootDomains[cost]) sink.addChannelingIntSet(state, cost, weight)
                 return
