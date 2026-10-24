@@ -122,6 +122,7 @@ class MddPropagatorTest {
                 state, diagonal.seq, diagonal.numStatesPerLayer, diagonal.layerStarts, diagonal.transitions,
                 diagonal.initial, diagonal.accepting, diagonal.recordStride, diagonal.cost, index,
             )
+            state.refPayload[0] = inc
 
             assertTrue(inc.propagate(state, 0))
 
@@ -130,15 +131,17 @@ class MddPropagatorTest {
             if (step == 3) {
                 state.undoLogging = true
                 val mark = state.mark()
+                state.levelToDecisionVar.add(0)
                 state.currentLevel = 1
                 check(state.excludeIntValue(0, 1))
-                assertTrue(inc.propagate(state, 0))
+                assertNull(state.runToFixpoint(allFactors = false))
                 assertFalse(1L in state.intDomains[1])
                 state.undoTo(mark)
+                state.levelToDecisionVar.add(0)
                 state.currentLevel = 1
                 check(state.excludeIntValue(0, 2))
 
-                assertTrue(inc.propagate(state, 0))
+                assertNull(state.runToFixpoint(allFactors = false))
 
                 assertTrue(1L in state.intDomains[1])
                 assertFalse(2L in state.intDomains[1])
@@ -162,6 +165,7 @@ class MddPropagatorTest {
         val state = PropagationState(problem, Assumptions.None)
         assertNull(state.runToFixpoint(allFactors = true))
         state.undoLogging = true
+        state.levelToDecisionVar.add(0)
         state.currentLevel = 1
         check(state.excludeIntValue(0, 1))
 
