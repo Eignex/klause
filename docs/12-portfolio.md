@@ -158,7 +158,8 @@ the captured affine source before publication. The frontier imports accepted
 incumbents for scoped dominance closure. Finite search reads conservative minimized
 incumbent cutoffs. Its existing floor channel accepts source-checked frontier
 bounds for an ascending unit integer objective without an offset; other objective
-forms retain their numerical bounds. Joint repair can center a fresh proposal on a checked pooled incumbent;
+forms retain their numerical bounds. Joint repair can center a fresh proposal on a
+checked pooled incumbent;
 pending proposals keep their scope until completion. Global proofs remain numerical
 derivations with complete sibling coverage. The independent companion recipe keeps
 the same workers and quotas while withholding incumbent and bound imports.
