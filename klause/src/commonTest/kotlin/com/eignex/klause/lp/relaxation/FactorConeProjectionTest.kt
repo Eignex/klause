@@ -3,6 +3,7 @@ package com.eignex.klause.lp.relaxation
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearIndicator
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -10,9 +11,9 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
-import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.CutSource
 import com.eignex.klause.lp.engine.CutSourceKind
+import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.engine.solveAndCertify
 import com.eignex.klause.simplex.exact.BigFraction
@@ -24,6 +25,23 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
 class FactorConeProjectionTest {
+    @Test
+    fun `ordinary and exact integer reifications should stay outside the big M free cone`() {
+        val variants = listOf<Factor>(
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 5),
+            ExactLinear.of(intArrayOf(Term.ofIntVar(0)), listOf(BigFraction.ONE), LinearOp.LE,
+                BigFraction.ofLong(5), activator = 0),
+        )
+        for (row in variants) {
+            val problem = Problem(1, 1, arrayOf(IntDomain(0, 10)), arrayOf(row))
+
+            val cone = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1)),
+                objectiveCone = true).build(RootDomains(problem))
+
+            assertEquals(0, cone.model.m)
+        }
+    }
+
     @Test
     fun `ordinary and exact integer rows should preserve the connected objective bound`() {
         val variants = listOf(
