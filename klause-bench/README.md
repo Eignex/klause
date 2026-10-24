@@ -607,6 +607,12 @@ leaf completion; the default scoped entry prepares factors before its first quer
 These are distinct numerical openings. The session entry excludes caller model
 projection from lifecycle timing and retains its default pivot allowance. Both
 entries reuse the existing exact-state shape inspector outside timed calls.
+`entry="cursor"` uses that session's suspended solve with an optional `quantum`
+of modeled floating work per advance; zero consumes it without yielding. The hard
+invocation `workLimit` remains separate. Observed rounds record advance times,
+checkpoint work deltas and cumulative numerical metrics, with a bounded trace.
+Certification work remains in its own observer records. Compare session, unlimited
+cursor and partitioned cursor with identical backend settings and allowances.
 
 Profile mains live in `com.eignex.klause.bench.profile` and run as a `lab profile`
 job: the lab builds the named commit and runs the class once under JFR, keeping what
