@@ -1911,15 +1911,29 @@ internal class RevisedSimplex(
         for (j in 0 until numVars) {
             if (status[j] == VarStatus.BASIC || model.fixed(j)) continue
             val reduced = cost(j) - dotColumn(y, j)
-            if (!reduced.isFinite()) return false
+            if (!reduced.isFinite()) return recordDualFailure(j, reduced)
             when (status[j]) {
-                VarStatus.AT_LOWER -> if (reduced < -tolerance) return false
-                VarStatus.AT_UPPER -> if (reduced > tolerance) return false
-                VarStatus.FREE -> if (abs(reduced) > tolerance) return false
+                VarStatus.AT_LOWER -> if (reduced < -tolerance) return recordDualFailure(j, reduced)
+                VarStatus.AT_UPPER -> if (reduced > tolerance) return recordDualFailure(j, reduced)
+                VarStatus.FREE -> if (abs(reduced) > tolerance) return recordDualFailure(j, reduced)
                 else -> Unit
             }
         }
         return true
+    }
+
+    private fun recordDualFailure(column: Int, reduced: Double): Boolean {
+        progressTrace?.let { trace ->
+            if (trace.dualStart == null) {
+                val singleton = columnNnz(column) == 1
+                val start = colPtr[column]
+                trace.dualStart = SimplexDualStart(column, status[column], reduced,
+                    finiteLowerAt(column), finiteUpperAt(column), columnNnz(column),
+                    if (singleton) colVal[start] else null,
+                    if (singleton) model.fixed(n + rowIdx[start]) else null)
+            }
+        }
+        return false
     }
 
     /*

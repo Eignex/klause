@@ -4,6 +4,17 @@ internal enum class SimplexPhase { DUAL, BOXED_DUAL, PRIMAL_FEASIBILITY, PRIMAL_
 
 internal enum class SimplexBasisOperation { DENSE_FTRAN, DENSE_BTRAN, ENTERING_FTRAN, PIVOTAL_BTRAN }
 
+internal data class SimplexDualStart(
+    val column: Int,
+    val status: VarStatus,
+    val scaledReducedCost: Double,
+    val hasLower: Boolean,
+    val hasUpper: Boolean,
+    val entries: Int,
+    val singletonCoefficient: Double?,
+    val singletonFixedLogical: Boolean?,
+)
+
 internal data class SimplexProgressSample(
     val phase: SimplexPhase,
     val pivots: Int,
@@ -26,6 +37,7 @@ internal class SimplexProgressTrace {
     var lastStep = 0.0
     var passedPhaseOneBreakpoints = 0L
     var primalValueUpdates = 0
+    var dualStart: SimplexDualStart? = null
 
     fun basisSolve(operation: SimplexBasisOperation, work: Long) {
         basisSolves[operation] = basisSolves.getOrElse(operation) { 0 } + 1
