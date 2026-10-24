@@ -234,6 +234,20 @@ enum class PresolvePass(
             Presolve.reduceStructural(problem, ctx.cancellation)
     },
 
+    /** Bounded joint-tuple filtering of overlapping tables and table-to-MDD root composition. */
+    COMPOSE_EXTENSIONAL(
+        "extensional",
+        Stage.PROBLEM,
+        Capability.SOURCE,
+        PresolveTiming.MEDIUM,
+        preservesSolutionSet = true,
+        autoEligible = false,
+        skipAfterEmpty = true,
+    ) {
+        override fun applySource(problem: Problem, ctx: PresolveContext) =
+            Presolve.composeExtensional(problem, ctx.cancellation).asSourceDelta()
+    },
+
     /** Fold a reified comparison disjunction — a clause over sole-use single-variable reified-comparison
      *  indicators — into one [com.eignex.klause.factor.arithmetic.ComparisonClause], dropping the
      *  indicator definitions and rebuilding their truth from the comparisons. The XCSP3 front-end emits

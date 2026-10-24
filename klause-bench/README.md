@@ -1173,6 +1173,14 @@ does not change the CLI recording configuration.
 
 ### Table profiling
 
+`bench.profile.ExtensionalCompositionProfile` accepts `suite=ID problem=NAME
+sha256=HEX` for one XCSP3 source. It retains original bytes and build identity and
+reports table/MDD scope shapes, shared positions, bounded composition work,
+current-thread allocation and resulting diagram records. Full-source and isolated
+first-diagram overlaps use the production root-composition mechanism. Three
+iterations include cold preparation; these instrumented observations establish
+neither a source verdict nor ordinary search throughput.
+
 `TableReductionProfile` measures current-thread allocated bytes around the production
 `Table.structuralReduce` hook after warmup. Run it as a lab profile job; its
 `table-reduction.csv` separates unchanged and half-pruned ground tables at arities
