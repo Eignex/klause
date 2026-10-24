@@ -1,0 +1,8 @@
+(set-logic QF_LIA)
+(declare-const x Int)
+(declare-const y Int)
+(declare-const z Int)
+(assert (= (+ (* 1208925819614629174706176 x) y) 1208925819614629174706177))
+(assert (= (+ y z) 2))
+(assert (= (+ (* 1208925819614629174706176 x) (* 2 y) z) 1208925819614629174706179))
+(check-sat)
