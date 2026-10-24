@@ -27,6 +27,11 @@ internal class LinearCompanionSearch(
     private val observations: () -> Map<String, Long> = { emptyMap() },
 ) : InstructionSlicedSearch, ReseedGuard, ResumableSearch by search {
     private val context = context.withLinearAuthority()
+    init {
+        require(binding.scope == context.scope && binding.executionObjective === objective) {
+            "linear companion has another source scope or execution objective"
+        }
+    }
     override val stats get() = search.stats.let { stats ->
         stats.copy(smt = stats.smt.copy(completeSearchStages =
             stats.smt.completeSearchStages.orEmpty() + observations()))
