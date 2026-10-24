@@ -58,7 +58,7 @@ internal class CompactMddState(
                 val src = transitions[p].toInt()
                 val dst = transitions[p + 2].toInt()
                 if (src !in 0 until sizes[pos] || dst !in 0 until sizes[pos + 1]) continue
-                if (pos == 0 && src != initial || pos == seq.lastIndex && dst !in accepting) continue
+                if ((pos == 0 && src != initial) || (pos == seq.lastIndex && dst !in accepting)) continue
                 if (transitions[p + 1] !in domains[pos]) continue
                 kept[row ushr 6] = kept[row ushr 6] or (1L shl (row and 63))
             }
