@@ -29,7 +29,9 @@ import com.eignex.klause.util.minus
 import com.eignex.klause.util.plus
 import com.eignex.klause.util.toLongExact
 
-internal fun Distinct.affinePropagationView(): Propagator? {
+internal class AffineDistinctOperands(val vars: IntArray, val offsets: List<BigInt>)
+
+internal fun Distinct.affineIntegerOperands(): AffineDistinctOperands? {
     if (activator != LinearRow.ALWAYS) return null
     val positions = operands
     if (positions.any {
@@ -39,10 +41,14 @@ internal fun Distinct.affinePropagationView(): Propagator? {
     ) {
         return null
     }
-    return AffineDistinctPropagator(
+    return AffineDistinctOperands(
         IntArray(positions.size) { Term.intVar(positions[it].references.single()) },
         positions.map { it.constant.num },
     )
+}
+
+internal fun Distinct.affinePropagationView(): Propagator? = affineIntegerOperands()?.let {
+    AffineDistinctPropagator(it.vars, it.offsets)
 }
 
 internal class AffineDistinctPropagator(private val vars: IntArray, private val offsets: List<BigInt>) : Propagator {
