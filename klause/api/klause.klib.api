@@ -3687,6 +3687,19 @@ sealed interface com.eignex.klause.solver.evidence/SourceDerivation { // com.eig
         final fun toString(): kotlin/String // com.eignex.klause.solver.evidence/SourceDerivation.Import.toString|toString(){}[0]
     }
 
+    final class IntegerRounding : com.eignex.klause.solver.inequality/SourceDerivation { // com.eignex.klause.solver.inequality/SourceDerivation.IntegerRounding|null[0]
+        constructor <init>(com.eignex.klause.solver.inequality/SourceDerivation) // com.eignex.klause.solver.inequality/SourceDerivation.IntegerRounding.<init>|<init>(com.eignex.klause.solver.inequality.SourceDerivation){}[0]
+
+        final val inequality // com.eignex.klause.solver.inequality/SourceDerivation.IntegerRounding.inequality|{}inequality[0]
+            final fun <get-inequality>(): com.eignex.klause.solver.inequality/SourceDerivation // com.eignex.klause.solver.inequality/SourceDerivation.IntegerRounding.inequality.<get-inequality>|<get-inequality>(){}[0]
+
+        final fun component1(): com.eignex.klause.solver.inequality/SourceDerivation // com.eignex.klause.solver.inequality/SourceDerivation.IntegerRounding.component1|component1(){}[0]
+        final fun copy(com.eignex.klause.solver.inequality/SourceDerivation = ...): com.eignex.klause.solver.inequality/SourceDerivation.IntegerRounding // com.eignex.klause.solver.inequality/SourceDerivation.IntegerRounding.copy|copy(com.eignex.klause.solver.inequality.SourceDerivation){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.inequality/SourceDerivation.IntegerRounding.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.solver.inequality/SourceDerivation.IntegerRounding.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.solver.inequality/SourceDerivation.IntegerRounding.toString|toString(){}[0]
+    }
+
     final class IntegerSplit : com.eignex.klause.solver.evidence/SourceDerivation { // com.eignex.klause.solver.evidence/SourceDerivation.IntegerSplit|null[0]
         constructor <init>(com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.klause.simplex.exact/BigFraction, com.eignex.klause.solver.evidence/SourceDerivation, com.eignex.klause.solver.evidence/SourceDerivation) // com.eignex.klause.solver.evidence/SourceDerivation.IntegerSplit.<init>|<init>(com.eignex.klause.solver.evidence.SourceCoordinate;com.eignex.klause.simplex.exact.BigFraction;com.eignex.klause.solver.evidence.SourceDerivation;com.eignex.klause.solver.evidence.SourceDerivation){}[0]
 

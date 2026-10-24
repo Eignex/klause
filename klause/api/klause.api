@@ -10796,6 +10796,17 @@ public final class com/eignex/klause/solver/evidence/SourceDerivation$Import : c
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/eignex/klause/solver/evidence/SourceDerivation$IntegerRounding : com/eignex/klause/solver/evidence/SourceDerivation {
+	public fun <init> (Lcom/eignex/klause/solver/evidence/SourceDerivation;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/evidence/SourceDerivation;
+	public final fun copy (Lcom/eignex/klause/solver/evidence/SourceDerivation;)Lcom/eignex/klause/solver/evidence/SourceDerivation$IntegerRounding;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/evidence/SourceDerivation$IntegerRounding;Lcom/eignex/klause/solver/evidence/SourceDerivation;ILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceDerivation$IntegerRounding;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getInequality ()Lcom/eignex/klause/solver/evidence/SourceDerivation;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/eignex/klause/solver/evidence/SourceDerivation$IntegerSplit : com/eignex/klause/solver/evidence/SourceDerivation {
 	public fun <init> (Lcom/eignex/klause/solver/evidence/SourceCoordinate;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/evidence/SourceDerivation;Lcom/eignex/klause/solver/evidence/SourceDerivation;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/evidence/SourceCoordinate;
