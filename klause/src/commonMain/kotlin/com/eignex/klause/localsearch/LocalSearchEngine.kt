@@ -240,6 +240,7 @@ internal class LocalSearchEngine(
         params: LocalSearchParams,
         checkpoint: LocalSearchCheckpoint?,
         timing: LocalSearchPhaseTimer?,
+        onPause: () -> Unit,
     ) {
         if (checkpoint == null || !state.hasSteppedInvariants) {
             timing.inPhase("application") { state.apply(move) }
@@ -247,7 +248,10 @@ internal class LocalSearchEngine(
         }
         val cursor = state.applySteps(move).iterator()
         while (true) {
-            while (params.cancellation()) yield(null)
+            while (params.cancellation()) {
+                onPause()
+                yield(null)
+            }
             val remaining = timing.inPhase("application") { cursor.hasNext() }
             if (!remaining) return
             cursor.next()
@@ -709,7 +713,11 @@ internal class LocalSearchEngine(
                         }
                         continue
                     }
-                    applyMoveSteps(state, move, params, checkpoint, timing)
+                    applyMoveSteps(state, move, params, checkpoint, timing) {
+                        progress.charge(moves)
+                        progress.publishResidual()
+                        sink?.ls?.recordWork(moves = moves, restarts = restartCount, stalls = 0L)
+                    }
                     moves++
                     if (state.cost < bestCost) {
                         bestCost = state.cost
@@ -1117,7 +1125,11 @@ internal class LocalSearchEngine(
                 roundFeedback?.endRound() // a restart ends the round; don't span it
                 continue
             }
-            applyMoveSteps(state, move, params, checkpoint, timing)
+            applyMoveSteps(state, move, params, checkpoint, timing) {
+                progress.charge(totalFlips)
+                progress.publishResidual()
+                sink.ls.recordWork(moves = totalFlips, restarts = restartCount, stalls = stallCount)
+            }
             liveCompletion = null
             if (state.cost in 1 until bestCostInfeasible) {
                 bestCostInfeasible = state.cost
