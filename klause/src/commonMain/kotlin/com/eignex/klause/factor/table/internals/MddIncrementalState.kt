@@ -7,6 +7,7 @@ import com.eignex.klause.propagation.checkFiniteWork
 import com.eignex.klause.propagation.RevInt
 import com.eignex.klause.propagation.RevLongArray
 import com.eignex.klause.propagation.lazyReason
+import com.eignex.klause.util.binarySearchLong
 
 /*
  * Reversible, delta-driven layered-MDD filtering. Each layer keeps forward reachability from
@@ -388,7 +389,7 @@ internal class MddIncrementalState(
                     val backward = if (snapshot == null) bwd[slot] else snapshot.bwd[slot]
                     if (backward and (1L shl (dst and 63)) == 0L) continue
                     total++
-                    val candidate = values.binarySearch(sym)
+                    val candidate = values.binarySearchLong(sym)
                     if (candidate >= 0) counts[candidate]++
                 }
             }
