@@ -59,8 +59,33 @@ class LinearAuthorityTest {
                 assertIs<SourceClaim.Optimal>(terminal.claim).value)
             assertEquals(SourceEvidenceCheck.Checked,
                 SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
+            val floatWork = budget.measuredFloatWork
+            val certificateWork = budget.measuredBoundCertificationWork
+            authority.advance(source, Cancellation.Never)
             assertEquals(1, budget.operations)
             assertEquals(1L, authority.preparations)
+            assertEquals(floatWork, budget.measuredFloatWork)
+            assertEquals(certificateWork, budget.measuredBoundCertificationWork)
+        }
+    }
+
+    @Test
+    fun `sparse source guidance should check a source beyond exact primal admission`() {
+        val coordinates = (0 until 129).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val premises = coordinates.withIndex().associate { (id, coordinate) ->
+            "lower$id" to SourcePremise(SourceInequality(mapOf(coordinate to BigFraction.MINUS_ONE), BigFraction.ZERO))
+        } + ("sum" to SourcePremise(SourceInequality(coordinates.associateWith { BigFraction.MINUS_ONE },
+            BigFraction.MINUS_ONE)))
+        val source = SourceProofContext(scope, coordinates.toSet(), premises,
+            coordinates.associateWith { BigFraction.ONE })
+
+        LinearAuthority(SourceLpBudget(maxOperations = 1), retainLp = true).use { authority ->
+            val result = authority.advance(source, Cancellation.Never)
+
+            val terminal = assertNotNull(result.evidence)
+            assertEquals(SourceValue.Rational(BigFraction.ONE), assertIs<SourceClaim.Optimal>(terminal.claim).value)
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
         }
     }
 
