@@ -45,11 +45,13 @@ internal class LinearAuthority(
     private var query: LinearAuthorityQuery? = null
     private var cutPreparationWork = 0L
     private var cutVerificationWork = 0L
+    private var retainedCutPeak = 0L
+    private var activeCutPeak = 0L
     fun cutObservations(): Map<String, Long> = mapOf(
         "numericalCutPreparationWork" to cutPreparationWork,
         "numericalCutVerificationWork" to cutVerificationWork,
-        "numericalRetainedCuts" to (template?.cuts?.rows?.size?.toLong() ?: 0L),
-        "numericalActiveCuts" to (query?.activeCuts?.toLong() ?: 0L),
+        "numericalMaxRetainedCuts" to retainedCutPeak,
+        "numericalMaxActiveCuts" to activeCutPeak,
     )
 
     fun invalidateGuidance() = lp.invalidateGuidance()
@@ -109,12 +111,15 @@ internal class LinearAuthority(
                 ?: LinearAuthorityTemplate.prepare(source, cancellation, cuts) { work ->
                     cutPreparationWork += work
                     budget.observe(preparation = work)
-                }?.also { template = it } ?: return null
+                }?.also {
+                    template = it
+                    retainedCutPeak = maxOf(retainedCutPeak, it.cuts?.rows?.size?.toLong() ?: 0L)
+                } ?: return null
         } else null
         return LinearAuthorityQuery.prepare(source, prepared, cancellation) { work ->
             cutVerificationWork += work
             budget.observe(boundCertification = work)
-        }
+        }?.also { activeCutPeak = maxOf(activeCutPeak, it.activeCuts.toLong()) }
     }
 
     private fun checkSource(

@@ -56,7 +56,7 @@ class LinearAuthorityInvocationTest {
         val stages = assertNotNull(result.stats.smt.completeSearchStages)
         assertEquals(1L, stages["numericalChecks"])
         assertEquals(1L, stages["numericalClosedLeaves"])
-        assertEquals(2L, stages["numericalActiveCuts"])
+        assertEquals(2L, stages["numericalMaxActiveCuts"])
     }
 
     @Test
