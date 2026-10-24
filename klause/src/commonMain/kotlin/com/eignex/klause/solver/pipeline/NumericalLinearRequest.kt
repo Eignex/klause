@@ -25,15 +25,23 @@ import com.eignex.klause.util.Cancellation
 import kotlin.uuid.Uuid
 
 /** Numerical LP/MIP execution with source certification and no arithmetic-theory fallback. */
-class NumericalLinearRequest(
+class NumericalLinearRequest internal constructor(
     private val model: Problem,
     /** Original-direction objective, or null for feasibility. */
-    val objective: LinearObjective? = null,
+    val objective: LinearObjective?,
     /** Whether the original objective is maximized. */
-    val maximize: Boolean = false,
-    private val cancellation: Cancellation = Cancellation.Never,
-    private val boundOrdered: Boolean = false,
+    val maximize: Boolean,
+    private val cancellation: Cancellation,
+    private val boundOrdered: Boolean,
 ) {
+    /** Construct numerical traversal with its original source objective and cancellation scope. */
+    constructor(
+        model: Problem,
+        objective: LinearObjective? = null,
+        maximize: Boolean = false,
+        cancellation: Cancellation = Cancellation.Never,
+    ) : this(model, objective, maximize, cancellation, false)
+
     /** Whether native exact rows admit finite working coefficients without losing a nonzero source term. */
     fun numericalRowsSupported(stop: Cancellation = Cancellation.Never): Boolean {
         val token = cancellation or stop
