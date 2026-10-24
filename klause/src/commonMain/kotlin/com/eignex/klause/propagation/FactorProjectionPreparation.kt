@@ -11,8 +11,7 @@ internal class FactorProjectionPreparation {
 
     fun tableCache(table: Table): TableGroupCache = tables.getOrPut(
         TableRelation(table.arity, table.tuples, table.hi),
-        ::TableGroupCache,
-    )
+    ) { TableGroupCache(table.arity, table.tuples, table.hi) }
 
     fun mddIndex(mdd: Mdd): MddTransitionIndex = diagrams.getOrPut(
         DiagramRelation(
