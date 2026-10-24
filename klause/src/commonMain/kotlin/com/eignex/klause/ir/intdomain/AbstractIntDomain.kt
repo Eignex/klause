@@ -47,6 +47,7 @@ internal abstract class AbstractIntDomain(val storage: DomainStorageSettings) : 
     override fun equals(other: Any?): Boolean {
         if (other !is IntDomain) return false
         if (min != other.min || max != other.max) return false
+        if (valueCount != other.valueCount) return false
         if (holeCount != other.holeCount) return false
         val span = spanOrNull()
         if (span == null) {

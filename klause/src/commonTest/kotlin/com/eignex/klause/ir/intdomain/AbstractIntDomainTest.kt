@@ -10,6 +10,17 @@ import kotlin.test.assertTrue
 
 class AbstractIntDomainTest {
     @Test
+    fun `equals should distinguish sparse sets with saturated hole counts`() {
+        val a = intDomainFromSurvivors(
+            longArrayOf(Long.MIN_VALUE, Long.MIN_VALUE + 1, Long.MAX_VALUE - 1, Long.MAX_VALUE),
+        )
+        val b = a.includeInteriorValue(0)
+
+        assertTrue(a != b)
+        assertTrue(b != a)
+    }
+
+    @Test
     fun `domain narrowing should use its captured bitset threshold`() {
         val small = IntDomain(0, 100, DomainStorageSettings(8))
         val large = IntDomain(0, 100, DomainStorageSettings(128))
