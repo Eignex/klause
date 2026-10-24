@@ -9011,6 +9011,7 @@ public final class com/eignex/klause/presolve/PassDelta {
 	public final fun getDomains ()[Lcom/eignex/klause/ir/IntDomain;
 	public final fun getDroppedIndices ()[I
 	public final fun getInfeasible ()Z
+	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
 	public final fun getReconstruct ()Lkotlin/jvm/functions/Function1;
 	public final fun isEmpty ()Z
 }
@@ -9024,8 +9025,8 @@ public final class com/eignex/klause/presolve/Presolve {
 	public final fun breakValuePrecedence (Lcom/eignex/klause/propagation/BakedProblem;Ljava/util/Set;)Lcom/eignex/klause/presolve/PassDelta;
 	public static synthetic fun breakValuePrecedence$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/propagation/BakedProblem;Ljava/util/Set;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PassDelta;
 	public final fun deriveXorUnits (Lcom/eignex/klause/propagation/BakedProblem;)Lcom/eignex/klause/presolve/PassDelta;
-	public final fun eliminateAffineSingletons (Lcom/eignex/klause/propagation/BakedProblem;Ljava/util/Set;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/SharedIntOccurrence;Z[ILcom/eignex/klause/presolve/AffinePivotOrder;)Lcom/eignex/klause/presolve/PassDelta;
-	public static synthetic fun eliminateAffineSingletons$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/propagation/BakedProblem;Ljava/util/Set;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/SharedIntOccurrence;Z[ILcom/eignex/klause/presolve/AffinePivotOrder;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PassDelta;
+	public final fun eliminateAffineSingletons (Lcom/eignex/klause/propagation/BakedProblem;Ljava/util/Set;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/SharedIntOccurrence;Z[ILcom/eignex/klause/presolve/AffinePivotOrder;Lcom/eignex/klause/solver/objective/LinearObjective;)Lcom/eignex/klause/presolve/PassDelta;
+	public static synthetic fun eliminateAffineSingletons$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/propagation/BakedProblem;Ljava/util/Set;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/SharedIntOccurrence;Z[ILcom/eignex/klause/presolve/AffinePivotOrder;Lcom/eignex/klause/solver/objective/LinearObjective;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PassDelta;
 	public final fun eliminateBlockedClauses (Lcom/eignex/klause/ir/Problem;Ljava/util/Set;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/presolve/PassDelta;
 	public static synthetic fun eliminateBlockedClauses$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/ir/Problem;Ljava/util/Set;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PassDelta;
 	public final fun eliminateBoolVars (Lcom/eignex/klause/ir/Problem;Ljava/util/Set;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/presolve/PassDelta;
@@ -9103,14 +9104,15 @@ public final class com/eignex/klause/presolve/PresolveConfig$Companion {
 public final class com/eignex/klause/presolve/PresolveContext {
 	public static final field Companion Lcom/eignex/klause/presolve/PresolveContext$Companion;
 	public fun <init> ()V
-	public fun <init> (ZLjava/util/Map;Ljava/util/Map;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/BakeConfig;Lcom/eignex/klause/presolve/SharedIntOccurrence;ZLcom/eignex/klause/presolve/AffinePivotOrder;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/presolve/SubsumeState;[I[IZ)V
-	public synthetic fun <init> (ZLjava/util/Map;Ljava/util/Map;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/BakeConfig;Lcom/eignex/klause/presolve/SharedIntOccurrence;ZLcom/eignex/klause/presolve/AffinePivotOrder;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/presolve/SubsumeState;[I[IZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (ZLjava/util/Map;Ljava/util/Map;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/BakeConfig;Lcom/eignex/klause/presolve/SharedIntOccurrence;ZLcom/eignex/klause/presolve/AffinePivotOrder;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/presolve/SubsumeState;[I[IZLcom/eignex/klause/solver/objective/LinearObjective;)V
+	public synthetic fun <init> (ZLjava/util/Map;Ljava/util/Map;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/BakeConfig;Lcom/eignex/klause/presolve/SharedIntOccurrence;ZLcom/eignex/klause/presolve/AffinePivotOrder;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/presolve/SubsumeState;[I[IZLcom/eignex/klause/solver/objective/LinearObjective;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Z
 	public final fun component10 ()Lcom/eignex/klause/presolve/PresolveBudget;
 	public final fun component11 ()Lcom/eignex/klause/presolve/SubsumeState;
 	public final fun component12 ()[I
 	public final fun component13 ()[I
 	public final fun component14 ()Z
+	public final fun component15 ()Lcom/eignex/klause/solver/objective/LinearObjective;
 	public final fun component2 ()Ljava/util/Map;
 	public final fun component3 ()Ljava/util/Map;
 	public final fun component4 ()Z
@@ -9119,8 +9121,8 @@ public final class com/eignex/klause/presolve/PresolveContext {
 	public final fun component7 ()Lcom/eignex/klause/presolve/SharedIntOccurrence;
 	public final fun component8 ()Z
 	public final fun component9 ()Lcom/eignex/klause/presolve/AffinePivotOrder;
-	public final fun copy (ZLjava/util/Map;Ljava/util/Map;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/BakeConfig;Lcom/eignex/klause/presolve/SharedIntOccurrence;ZLcom/eignex/klause/presolve/AffinePivotOrder;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/presolve/SubsumeState;[I[IZ)Lcom/eignex/klause/presolve/PresolveContext;
-	public static synthetic fun copy$default (Lcom/eignex/klause/presolve/PresolveContext;ZLjava/util/Map;Ljava/util/Map;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/BakeConfig;Lcom/eignex/klause/presolve/SharedIntOccurrence;ZLcom/eignex/klause/presolve/AffinePivotOrder;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/presolve/SubsumeState;[I[IZILjava/lang/Object;)Lcom/eignex/klause/presolve/PresolveContext;
+	public final fun copy (ZLjava/util/Map;Ljava/util/Map;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/BakeConfig;Lcom/eignex/klause/presolve/SharedIntOccurrence;ZLcom/eignex/klause/presolve/AffinePivotOrder;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/presolve/SubsumeState;[I[IZLcom/eignex/klause/solver/objective/LinearObjective;)Lcom/eignex/klause/presolve/PresolveContext;
+	public static synthetic fun copy$default (Lcom/eignex/klause/presolve/PresolveContext;ZLjava/util/Map;Ljava/util/Map;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/BakeConfig;Lcom/eignex/klause/presolve/SharedIntOccurrence;ZLcom/eignex/klause/presolve/AffinePivotOrder;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/presolve/SubsumeState;[I[IZLcom/eignex/klause/solver/objective/LinearObjective;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PresolveContext;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAffinePivotOrder ()Lcom/eignex/klause/presolve/AffinePivotOrder;
 	public final fun getAffineTouchedVars ()[I
@@ -9129,6 +9131,7 @@ public final class com/eignex/klause/presolve/PresolveContext {
 	public final fun getCancellation ()Lcom/eignex/klause/util/Cancellation;
 	public final fun getDupColumnsTouchedVars ()[I
 	public final fun getKeepBinaryComparisons ()Z
+	public final fun getLinearObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
 	public final fun getModelBreaksSymmetry ()Z
 	public final fun getObjectiveBoolCoeffs ()Ljava/util/Map;
 	public final fun getObjectiveBoolVars ()Ljava/util/Set;
@@ -9154,8 +9157,8 @@ public final class com/eignex/klause/presolve/PresolveContext {
 
 public final class com/eignex/klause/presolve/PresolveContext$Companion {
 	public final fun getEMPTY ()Lcom/eignex/klause/presolve/PresolveContext;
-	public final fun of (Lcom/eignex/klause/solver/objective/LinearObjective;ZZ)Lcom/eignex/klause/presolve/PresolveContext;
-	public static synthetic fun of$default (Lcom/eignex/klause/presolve/PresolveContext$Companion;Lcom/eignex/klause/solver/objective/LinearObjective;ZZILjava/lang/Object;)Lcom/eignex/klause/presolve/PresolveContext;
+	public final fun of (Lcom/eignex/klause/solver/objective/LinearObjective;ZZZ)Lcom/eignex/klause/presolve/PresolveContext;
+	public static synthetic fun of$default (Lcom/eignex/klause/presolve/PresolveContext$Companion;Lcom/eignex/klause/solver/objective/LinearObjective;ZZZILjava/lang/Object;)Lcom/eignex/klause/presolve/PresolveContext;
 }
 
 public final class com/eignex/klause/presolve/PresolveEffortKt {
@@ -9269,6 +9272,7 @@ public final class com/eignex/klause/presolve/Presolved {
 	public fun <init> (Lcom/eignex/klause/propagation/BakedProblem;Lkotlin/jvm/functions/Function1;Ljava/util/List;Z)V
 	public synthetic fun <init> (Lcom/eignex/klause/propagation/BakedProblem;Lkotlin/jvm/functions/Function1;Ljava/util/List;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getInfeasible ()Z
+	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
 	public final fun getPassesFired ()Ljava/util/List;
 	public final fun getProblem ()Lcom/eignex/klause/propagation/BakedProblem;
 	public final fun getReconstruct ()Lkotlin/jvm/functions/Function1;
@@ -11647,20 +11651,21 @@ public final class com/eignex/klause/solver/pipeline/FinitePipelinePreparation {
 }
 
 public final class com/eignex/klause/solver/pipeline/FinitePipelineRequest {
-	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/presolve/PresolveConfig;ZZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Ljava/lang/Long;Lcom/eignex/klause/solver/pipeline/ComponentPlan;Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;)V
-	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/presolve/PresolveConfig;ZZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Ljava/lang/Long;Lcom/eignex/klause/solver/pipeline/ComponentPlan;Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/presolve/PresolveConfig;ZZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Ljava/lang/Long;Lcom/eignex/klause/solver/pipeline/ComponentPlan;Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;Z)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/presolve/PresolveConfig;ZZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Ljava/lang/Long;Lcom/eignex/klause/solver/pipeline/ComponentPlan;Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getCancellation ()Lcom/eignex/klause/util/Cancellation;
 	public final fun getComponentPlan ()Lcom/eignex/klause/solver/pipeline/ComponentPlan;
 	public final fun getEngine ()Lcom/eignex/klause/solver/pipeline/FiniteEngine;
 	public final fun getExplicitPresolveConfig ()Z
 	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
-	public final fun getPreparedPlan ()Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
+	public final fun getPreparedPlan ()Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;Z
 	public final fun getPresolveBudget ()Lcom/eignex/klause/presolve/PresolveBudget;
 	public final fun getPresolveConfig ()Lcom/eignex/klause/presolve/PresolveConfig;
 	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
 	public final fun getRandomSeed ()Ljava/lang/Long;
 	public final fun getSolutionSetSensitive ()Z
 	public final fun getSolveCancellation ()Lcom/eignex/klause/util/Cancellation;
+	public final fun getTransformObjective ()Z
 	public final fun getZeroObjectivePricing ()Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;
 }
 
