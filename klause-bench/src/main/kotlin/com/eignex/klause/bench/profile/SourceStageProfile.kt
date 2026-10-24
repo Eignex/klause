@@ -75,8 +75,16 @@ internal object SourceStageProfile {
         require(engine in setOf("default", "cp", "ls"))
         val exact = input.getValue("exact").jsonPrimitive.content.toBooleanStrict()
         val recording = out.resolve("cli.jfr")
+        val settings = out.resolve("profile.jfc")
+        val configuration = File(System.getProperty("java.home"), "lib/jfr/profile.jfc").readText()
+        val nativeEvent = Regex("<event name=\"jdk.NativeMethodSample\">.*?</event>", RegexOption.DOT_MATCHES_ALL)
+        require(nativeEvent.containsMatchIn(configuration))
+        settings.writeText(nativeEvent.replace(configuration) { match ->
+            Regex("<setting name=\"enabled\"[^>]*>.*?</setting>").replace(match.value,
+                "<setting name=\"enabled\">true</setting>")
+        })
         val options = "-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=1 " +
-            "-XX:StartFlightRecording=filename=$recording,settings=profile,dumponexit=true"
+            "-XX:StartFlightRecording=filename=$recording,settings=$settings,dumponexit=true"
         val command = buildList {
             add(SolverInvocation.klauseCliBin().absolutePath)
             addAll(listOf("--format", "mps", source.absolutePath, "-t", "10000", "-r", "3", "-s",
