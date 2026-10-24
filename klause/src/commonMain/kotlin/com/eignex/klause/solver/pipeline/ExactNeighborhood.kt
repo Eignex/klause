@@ -24,10 +24,18 @@ internal sealed interface ExactNeighborhoodResult {
     data class Witness(val sample: Sample) : ExactNeighborhoodResult
     data object Refuted : ExactNeighborhoodResult
     data object Undecided : ExactNeighborhoodResult
+    data object Paused : ExactNeighborhoodResult
 }
 
 internal fun interface ExactNeighborhoodCompletion {
     fun check(condition: ExactNeighborhoodCondition, cancellation: Cancellation): ExactNeighborhoodResult
+}
+
+internal fun interface ExactNeighborhoodProposal {
+    fun propose(
+        centers: List<BigFraction>, bools: BooleanArray, count: Int, round: Long,
+        radius: BigFraction, cutoff: BigFraction?,
+    ): ExactNeighborhoodCondition
 }
 
 internal class ExactNeighborhood(
@@ -47,9 +55,11 @@ internal class ExactNeighborhood(
     private val onClose: () -> Unit = {},
     private val prepareBooleanCenter: ((Cancellation) -> Boolean)? = null,
     private val rootBooleanValue: (Int) -> Boolean? = { null },
+    private val rootCoordinateValue: ((Int) -> BigFraction?)? = null,
+    private val proposal: ExactNeighborhoodProposal? = null,
 ) : AutoCloseable {
     private val random = Random(seed)
-    private var centers = centers.toList()
+    private var centers = centers.toMutableList()
     private var bools = BooleanArray(boolCount)
     private var radius = BigFraction.ONE
     private var round = 0L
@@ -64,6 +74,8 @@ internal class ExactNeighborhood(
     private var closed = false
     private var booleanCenterPrepared = prepareBooleanCenter == null
     private var nextCenterBoolean = 0
+    private var nextCenterCoordinate = 0
+    private var pending: Pair<Int, ExactNeighborhoodCondition>? = null
     val stats: SolveStats get() = sink.snapshot().mergedWith(completionStats())
     val work: Long get() = charged
 
@@ -109,22 +121,36 @@ internal class ExactNeighborhood(
                     nextCenterBoolean++
                     charge(1)
                 }
+                while (rootCoordinateValue != null && nextCenterCoordinate < centers.size) {
+                    if (cancellation() || charged >= end || charged >= maximumInstructions ||
+                        nodeBudget?.exhausted() == true) return searchAllowanceSpent()
+                    val coordinate = nextCenterCoordinate++
+                    rootCoordinateValue.invoke(coordinate)?.let { centers[coordinate] = it }
+                    charge(1)
+                }
                 booleanCenterPrepared = true
                 continue
             }
             val total = centers.size + boolCount
-            val operator = operator()
+            val operator = pending?.first ?: operator()
             val count = when (operator) { 0 -> 1; 1 -> maxOf(1, total / 2); else -> total }
-            val selected = if (moves == 0L) emptySet() else (0 until total).shuffled(random).take(count).toSet()
-            val lower = centers.indices.associateWith { if (it in selected) centers[it] - radius else centers[it] }
-            val upper = centers.indices.associateWith { if (it in selected) centers[it] + radius else centers[it] }
-            val pins = (0 until boolCount).filter { centers.size + it !in selected }.associateWith { bools[it] }
-            if (incumbent != null) improvementMoves++
+            val condition = pending?.second ?: proposal?.propose(centers, bools, count,
+                moves, radius, value) ?: run {
+                val selected = if (moves == 0L) emptySet() else (0 until total).shuffled(random).take(count).toSet()
+                val lower = centers.indices.associateWith { if (it in selected) centers[it] - radius else centers[it] }
+                val upper = centers.indices.associateWith { if (it in selected) centers[it] + radius else centers[it] }
+                val pins = (0 until boolCount).filter { centers.size + it !in selected }.associateWith { bools[it] }
+                ExactNeighborhoodCondition(pins, lower, upper, value)
+            }
+            pending = operator to condition
             val before = nativeWork()
-            val result = completion.check(ExactNeighborhoodCondition(pins, lower, upper, value), cancellation)
-            moves++
+            val result = completion.check(condition, cancellation)
             val cost = 1 + ceil((nativeWork() - before).coerceAtLeast(0) * 0.8).toLong()
             charge(cost)
+            if (result == ExactNeighborhoodResult.Paused) return searchAllowanceSpent()
+            pending = null
+            if (incumbent != null) improvementMoves++
+            moves++
             sink.ls.recordCompletion(
                 result is ExactNeighborhoodResult.Refuted, result is ExactNeighborhoodResult.Undecided,
             )
@@ -166,7 +192,7 @@ internal class ExactNeighborhood(
         if (value != null && candidateValue != null && candidateValue >= requireNotNull(value)) return false
         incumbent = sample
         value = candidateValue
-        centers = coordinateValues(sample).toList()
+        centers = coordinateValues(sample).toMutableList()
         bools = sample.bools
         sink.ls.recordIncumbent(candidateValue?.toDouble() ?: Double.NaN, 0.0, sink.elapsedMs())
         onIncumbent(sample, candidateValue)
