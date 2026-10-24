@@ -362,7 +362,7 @@ internal class TablePropagator(
      * interval intersects the live domain (hole-aware), and supports every live domain value it covers.
      */
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        state.finiteWork.checkNow()
+        state.finiteWork.begin()
         val payload = state.refPayload[factorId]
         val existing = payload as? TableStr2State
         val dirty = state.drainIntEventDirtyVars(factorId)

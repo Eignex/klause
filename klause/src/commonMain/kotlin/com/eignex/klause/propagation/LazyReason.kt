@@ -75,8 +75,8 @@ internal fun PropagationState.reasonOf(reason: IntArray?): IntArray? {
     if (!isLazyReason(reason)) return reason
     val marker = requireNotNull(reason)
     val built = try {
-        finiteWork.checkNow()
         if (lazyReasonMemo.containsKey(marker)) return lazyReasonMemo[marker]
+        finiteWork.begin()
         buildLazyReason(marker)
     } catch (_: FinitePropagationInterrupted) {
         runCancelled = true
