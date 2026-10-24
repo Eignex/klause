@@ -272,27 +272,28 @@ internal class LinearAuthority(
                 (lower == null || threshold + BigFraction.ONE > lower) &&
                     (upper == null || threshold < upper)
             }
-            fun witness(values: List<BigFraction>): Sample? {
+            fun witness(values: List<BigFraction>, recovered: Boolean): Sample? {
                 val proposed = sample(source, coordinates, values)
                 val evidence = SourceEvidence(source.scope, SourceClaim.Witness(proposed),
                     SourceDerivation.SourceWitness)
+                val stage = if (recovered) "PrimalRecoverySource" else "PrimalSource"
                 return when (SourceEvidenceVerifier(context).verify(evidence, cancellation)) {
                     SourceEvidenceCheck.Checked -> proposed
                     is SourceEvidenceCheck.Rejected -> {
-                        observePrimal("PrimalSourceRejected")
+                        observePrimal("${stage}Rejected")
                         null
                     }
                     is SourceEvidenceCheck.Unavailable -> {
-                        observePrimal("PrimalSourceUnavailable")
+                        observePrimal("${stage}Unavailable")
                         null
                     }
                 }
             }
-            var candidate = point?.takeIf { fractionalCoordinates.isEmpty() }?.let(::witness)
+            var candidate = point?.takeIf { fractionalCoordinates.isEmpty() }?.let { witness(it, false) }
             if (candidate != null) observePrimal("PrimalSourceChecked")
             if (candidate == null && point != null && fractionalCoordinates.isEmpty()) {
                 val recovered = recover(prepared, point, cancellation)
-                candidate = recovered?.let(::witness)
+                candidate = recovered?.let { witness(it, true) }
                 if (candidate != null) {
                     point = recovered
                     observePrimal("PrimalRecoverySourceChecked")
