@@ -1207,6 +1207,55 @@ These summaries record current design decisions. The contracts live in the linke
 [docs](../docs/README.md) chapters; measurements behind them were klause-lab
 experiments and stay outside the repository.
 
+### XCSP3 recovered affine distinctness
+
+Retain bounded complete-group recognition and exact affine channels into native
+matching/Hall propagation. Constant `Element` channels transfer live holes in both
+directions; wide windows keep linear equalities. The
+[format contract](../docs/04-finite-formats.md#arithmetic-relations) owns admission.
+
+[8047](https://lab.eignex.com/jobs/8047) compares pairwise main `2f228a33b2`,
+linear channels `8e803014ee` and bounded Element channels `cca1b1ad8e` on all
+eight BlockedQueens sources and Fischer, GracefulGraph, QuasiGroup and
+SportsScheduling holdouts. CP/LP-off uses one conflict-driven arm, P1, 2000 nodes,
+a 20-second deadline, seeds 1/2/3 and three repeats on Mac/aarch64. External time
+measures ordinary CLI runs with debug statistics and no JFR. All 81 SAT witnesses
+pass original-source checking; source, runtime/options and dependency hashes match.
+Counters agree across seeds and repeats within each arm, rather than representing
+independent search paths. Source suffixes below denote `BlockedQueens-<suffix>_c22`.
+
+| Source suffix | Nodes: pairwise / linear / Element | Median CLI seconds: pairwise / linear / Element |
+|---|---|---|
+| 28-1449787798 | 2000 / 2000 / 2000 | 1.80 / 2.66 / 2.68 |
+| 28-1449787894 | 1310 / 428 / 1294 | 1.30 / 0.96 / 1.82 |
+| 48-1721237620 | 2000 / 2000 / 2000 | 2.27 / 3.37 / 3.38 |
+| 48-1721237798 | 2000 / 2000 / 2000 | 2.30 / 3.37 / 3.30 |
+| 50-1642398261 | 2000 / 2000 / 2000 | 2.36 / 3.41 / 3.37 |
+| 50-1642399343 | 2000 / 2000 / 2000 | 2.47 / 3.82 / 3.57 |
+| 56-1860436781 | 2000 / 2000 / 2000 | 2.61 / 3.95 / 3.81 |
+| 56-1860437025 | 2000 / 2000 / 2000 | 2.54 / 4.01 / 3.47 |
+
+Only the second source has a witness at this allowance; the other seven remain
+unknown. All four holdouts retain search counters and nearly equal CLI medians.
+The hard 56-source integers increase from 56 to 166 and factors from 5815 to 5927;
+median peak RSS changes from 225152 to 235984 KiB with Element channels. These
+are representation and trajectory tradeoffs, with no general throughput gain.
+
+[8053](https://lab.eignex.com/jobs/8053) uses the same sources and revisions on
+ordinary mixed/P1, ten seconds, seeds 1/2/3 and one repeat. All 28 SAT witnesses
+pass source checking. Pairwise and Element arms retain the small UNSAT source's
+native refutation in all three seeds; linear channels leave all three unknown.
+Element finds a checked witness for `56-1860437025` at seed 1, with both controls
+unknown in all three seeds. `56-1860436781` remains unknown in every arm, and
+heldout feasibility/proof outcomes agree. Native refutations are not independently
+proof-checked; one ordinary-route repeat establishes no timing speedup.
+
+Adoption retains collective interval and noncontiguous deductions with exact
+reasons and source semantics. It does not establish hard-family recovery or isolate
+matching from representation and worker effects. [Source-coordinate affine
+views](https://github.com/Eignex/klause/issues/3531) consume the recognizer while
+targeting its materialized-coordinate cost.
+
 ### Table and MDD historical domains
 
 Retain shared sparse/dense ground support postings for historical reasons.
