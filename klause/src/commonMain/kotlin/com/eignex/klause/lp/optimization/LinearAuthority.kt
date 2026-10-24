@@ -36,13 +36,17 @@ internal data class LinearAuthorityResult(
 internal class LinearAuthority(
     private val budget: SourceLpBudget,
     onLpShape: (LinearAuthorityLpShape) -> Unit = {},
-    retainLp: Boolean = false,
+    private val retainLp: Boolean = false,
 ) : AutoCloseable {
     private val lp = LinearAuthorityLp(budget, onLpShape, retainLp)
     val preparations: Long get() = lp.preparations
     val reuses: Long get() = lp.reuses
+    private var template: LinearAuthorityTemplate? = null
 
-    override fun close() = lp.close()
+    override fun close() {
+        template = null
+        lp.close()
+    }
 
     fun check(source: SourceProofContext, cancellation: Cancellation): LinearAuthorityResult {
         relaxedPoint = emptyMap()
@@ -65,17 +69,24 @@ internal class LinearAuthority(
             }
         ) return LinearAuthorityResult()
         val context = source.withLinearAuthority()
-        val numeric = source.numericContext()
+        val prepared = if (retainLp) {
+            template?.takeIf { it.matches(source) } ?: LinearAuthorityTemplate.prepare(source, cancellation)
+                ?.also { template = it } ?: return LinearAuthorityResult()
+        } else null
+        val numeric = prepared?.numeric ?: source.numericContext()
         val premises = numeric.premises
         val integerBounds = if (premises.values.any { it.integerPins.isNotEmpty() }) {
             numeric.integerPinBounds(source.scope.condition, cancellation) ?: return LinearAuthorityResult()
         } else null
         val cited = ArrayList<Pair<SourceInequality, SourceDerivation>>()
+        val inactive = HashSet<Int>()
         for ((id, premise) in premises) {
             if (cancellation()) return LinearAuthorityResult()
-            if (premise.guards.all { (bool, value) -> source.scope.condition.bools[bool] == value } &&
+            val active = premise.guards.all { (bool, value) -> source.scope.condition.bools[bool] == value } &&
                 (premise.integerPins.isEmpty() ||
-                    integerBounds?.status(premise.integerPins) == IntegerPinStatus.Established)) {
+                    integerBounds?.status(premise.integerPins) == IntegerPinStatus.Established)
+            if (active || prepared != null) {
+                if (!active) inactive += cited.size
                 cited += premise.inequality to SourceDerivation.Premise(id)
             }
         }
@@ -84,14 +95,21 @@ internal class LinearAuthority(
             for ((id, value) in bounds) cited += SourceInequality(mapOf(id to sign), value * sign) to
                 SourceDerivation.Assumption(id, upper)
         }
-        val rows = cited.map { (row, _) ->
-            val ids = row.coefficients.keys.map(coordinates::indexOf).sorted().toIntArray()
-            ExactRationalInequality(ids, ids.map { row.coefficients.getValue(coordinates[it]) }, row.rhs, row.strict)
-        }
+        val indices = coordinates.withIndex().associate { it.value to it.index }
+        val rows = if (prepared == null) cited.map { it.first.row(indices) }
+            else prepared.rows + cited.drop(prepared.rows.size).map { it.first.row(indices) }
         val sign = if (source.scope.objective.sense == ObjectiveSense.MINIMIZE) BigFraction.ONE
             else BigFraction.MINUS_ONE
         val costs = coordinates.map { sign * (numeric.objective[it] ?: BigFraction.ZERO) }
         val constant = numeric.objectiveConstant * sign
+        fun combination(coefficients: List<BigFraction>, rhs: BigFraction, strict: Boolean): List<BigFraction>? {
+            val selected = rows.indices.filter { it !in inactive }
+            val weights = lp.combination(selected.map { rows[it] }, coefficients, rhs, strict, cancellation)
+                ?: return null
+            return MutableList(rows.size) { BigFraction.ZERO }.also { lifted ->
+                for (id in selected.indices) lifted[selected[id]] = weights[id]
+            }
+        }
         fun derivation(weights: List<BigFraction>): SourceDerivation = SourceDerivation.Combination(
             weights.mapIndexedNotNull { id, weight -> if (weight.isZero) null
                 else SourceDerivation.Combination.Term(weight, cited[id].second) })
@@ -107,12 +125,12 @@ internal class LinearAuthority(
                 checked(SourceClaim.Refutation, LinearPinnedRefutation(derivation(weights)))?.let { return it }
             }
             val zeros = List(coordinates.size) { BigFraction.ZERO }
-            val weights = lp.combination(rows, zeros, BigFraction.MINUS_ONE, false, cancellation)
-                ?: lp.combination(rows, zeros, BigFraction.ZERO, true, cancellation) ?: return null
+            val weights = combination(zeros, BigFraction.MINUS_ONE, false)
+                ?: combination(zeros, BigFraction.ZERO, true) ?: return null
             return checked(SourceClaim.Refutation, LinearPinnedRefutation(derivation(weights)))
         }
         val closureRows = rows.map { ExactRationalInequality(it.columns, it.coefficients, it.rhs) }
-        val solved = lp.solve(closureRows, costs, constant, cancellation) ?: return LinearAuthorityResult()
+        val solved = lp.solve(closureRows, costs, constant, cancellation, inactive) ?: return LinearAuthorityResult()
         val closure = solved.result
         closure.float?.primal?.takeIf { it.size == coordinates.size && it.all(Double::isFinite) }?.let { point ->
             relaxedPoint = coordinates.indices.associate { coordinates[it] to point[it] }
@@ -121,7 +139,7 @@ internal class LinearAuthority(
             fun checkBound(weights: List<BigFraction>): SourceEvidence? =
                 checked(SourceClaim.Bound(value * sign), LinearPinnedObjective(derivation(weights)))
             val retained = solved.boundWeights?.let(::checkBound)
-            retained ?: lp.combination(rows, costs.map { it.negated() }, constant - value, false, cancellation)
+            retained ?: combination(costs.map { it.negated() }, constant - value, false)
                 ?.let(::checkBound)
         }
         if (closure.verdict == LpVerdict.INFEASIBLE) {
@@ -142,7 +160,8 @@ internal class LinearAuthority(
             if (proof != null) return LinearAuthorityResult(proof, bound, endpointAccepted)
         }
         val feasible = if (endpointAccepted != null) endpointAccepted else {
-            val original = lp.solve(rows, List(costs.size) { BigFraction.ZERO }, BigFraction.ZERO, cancellation)
+            val original = lp.solve(rows, List(costs.size) { BigFraction.ZERO }, BigFraction.ZERO,
+                cancellation, inactive)
             original?.let { refutation(it) }?.let { return LinearAuthorityResult(it, bound) }
             val primal = original?.result?.exactPrimal?.take(coordinates.size)
             fractional(coordinates, primal).takeIf { it.isNotEmpty() }?.let {
@@ -180,7 +199,7 @@ internal class LinearAuthority(
                 }
             }
             val value = requireNotNull(closure.lowerBound)
-            val weights = lp.combination(rows, costs.map { it.negated() }, constant - value, true, cancellation)
+            val weights = combination(costs.map { it.negated() }, constant - value, true)
             if (weights != null) {
                 val proof = checked(SourceClaim.Limit(feasible, SourceValue.Rational(value * sign)),
                     LinearApproach(endpointSample, LinearPinnedObjective(derivation(weights))))

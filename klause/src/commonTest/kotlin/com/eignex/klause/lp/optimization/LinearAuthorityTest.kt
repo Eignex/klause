@@ -62,6 +62,33 @@ class LinearAuthorityTest {
     }
 
     @Test
+    fun `conditional source rows should retract across retained sibling queries`() {
+        val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val source = SourceProofContext(scope, setOf(integer, real, other), mapOf(
+            "conditional" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE,
+                other to BigFraction.MINUS_ONE), BigFraction.ofLong(-3)), emptyMap(),
+                mapOf(integer to BigFraction.ZERO)),
+            "x" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "y" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ), mapOf(real to BigFraction.ONE, other to BigFraction.ofLong(2)))
+
+        LinearAuthority(SourceLpBudget(), retainLp = true).use { retained ->
+            for (pin in listOf(BigFraction.ZERO, BigFraction.ONE, BigFraction.ZERO)) {
+                val condition = SourceCondition(lower = mapOf(integer to pin), upper = mapOf(integer to pin))
+                val branch = source.atScope(scope.copy(condition = condition))
+                val result = retained.check(branch, Cancellation.Never)
+
+                assertEquals(SourceValue.Rational(if (pin.isZero) BigFraction.ofLong(3) else BigFraction.ZERO),
+                    assertIs<SourceClaim.Optimal>(assertNotNull(result.evidence).claim).value)
+                assertEquals(SourceEvidenceCheck.Checked,
+                    SourceEvidenceVerifier(branch.withLinearAuthority()).verify(result.evidence))
+            }
+            assertEquals(1L, retained.preparations)
+            assertEquals(2L, retained.reuses)
+        }
+    }
+
+    @Test
     fun `retained objective replacement should not reuse a preceding bound`() {
         val source = SourceProofContext(scope, setOf(real), mapOf(
             "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),

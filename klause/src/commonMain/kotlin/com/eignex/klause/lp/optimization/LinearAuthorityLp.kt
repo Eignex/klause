@@ -51,10 +51,11 @@ internal class LinearAuthorityLp(
         costs: List<BigFraction>,
         constant: BigFraction,
         cancellation: Cancellation,
+        inactive: Set<Int> = emptySet(),
     ): LinearAuthorityLpResult? {
         var prepared: LinearAuthorityModel? = null
         return budget.runPrepared(cancellation, prepare = { token ->
-            LinearAuthorityModel.prepare(rows, costs.size, token)?.also { prepared = it }
+            LinearAuthorityModel.prepare(rows, costs.size, token, inactive)?.also { prepared = it }
                 ?.input(costs, constant)
         }) { token ->
             val packed = checkNotNull(prepared)

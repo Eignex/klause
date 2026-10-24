@@ -172,8 +172,11 @@ hold bound trails, active-row identity and verification caches.
 Numerical source traversal retains a `LinearAuthoritySession` per invocation.
 Its fixed matrix has free structural columns; extracted source sides are asserted
 in a replaceable scope. Child and sibling queries retract that scope and retain
-compatible factors. Objective edits invalidate dependent certificates; changed
-structural rows replace the owner. Each query lifts multipliers through its own
+compatible factors. Source row templates and numeric coordinate addresses are
+prepared once per Boolean substitution. Conditional rows remain in the matrix;
+their logical sides are suspended while their pins are unestablished and restored
+on retraction. Objective edits invalidate dependent certificates; changed
+structural authority replaces the owner. Each query lifts multipliers through its own
 source-side mapping and checks the resulting derivation in its source scope.
 Auxiliary multiplier searches own separate temporary solvers. Neighborhood
 invocations can borrow a retained authority, leaving its cleanup to the caller.
