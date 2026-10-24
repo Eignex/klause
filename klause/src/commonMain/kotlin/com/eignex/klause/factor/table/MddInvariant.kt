@@ -1,6 +1,7 @@
 package com.eignex.klause.factor.table
 
 import com.eignex.klause.factor.compressViolation
+import com.eignex.klause.localsearch.LOCAL_SEARCH_OPERATION_BATCH
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.localsearch.SteppedIntInvariant
@@ -142,7 +143,7 @@ internal class MddInvariant(
         for (position in accepting.indices) {
             val q = accepting[position]
             if (q < st.forward[seq.size].size) best = minOf(best, st.forward[seq.size][q])
-            if (position % 256 == 0) yield(Unit)
+            if (position % LOCAL_SEARCH_OPERATION_BATCH == 0) yield(Unit)
         }
         st.distance = best
         st.weight = null
@@ -155,7 +156,7 @@ internal class MddInvariant(
                 val symbol = state.assignment.intValue(seq[layer])
                 var record = layerStarts[layer]
                 while (record < layerStarts[layer + 1]) {
-                    if (++work == 256) {
+                    if (++work == LOCAL_SEARCH_OPERATION_BATCH) {
                         yield(Unit)
                         work = 0
                     }
@@ -169,7 +170,13 @@ internal class MddInvariant(
                 if (next < 0) return@sequence
                 current = next
             }
-            if (accepting.any { it == current }) st.weight = weight
+            for (position in accepting.indices) {
+                if (accepting[position] == current) {
+                    st.weight = weight
+                    break
+                }
+                if (position % LOCAL_SEARCH_OPERATION_BATCH == 0) yield(Unit)
+            }
         }
     }
 
@@ -183,8 +190,8 @@ internal class MddInvariant(
         val target = if (forward) st.forward[layer + 1] else st.backward[layer]
         val scratch = st.scratch
         val inf = seq.size + 1
-        for (start in target.indices step 256) {
-            scratch.fill(inf, start, minOf(start + 256, target.size))
+        for (start in target.indices step LOCAL_SEARCH_OPERATION_BATCH) {
+            scratch.fill(inf, start, minOf(start + LOCAL_SEARCH_OPERATION_BATCH, target.size))
             yield(null)
         }
         val symbol = state.assignment.intValue(seq[layer])
@@ -198,7 +205,7 @@ internal class MddInvariant(
             val distance = source[input] + if (transitions[record + 1] == symbol) 0 else 1
             if (distance < scratch[output]) scratch[output] = distance
             record += recordStride
-            if (++work == 256) {
+            if (++work == LOCAL_SEARCH_OPERATION_BATCH) {
                 yield(null)
                 work = 0
             }
@@ -209,7 +216,7 @@ internal class MddInvariant(
                 target[q] = scratch[q]
                 changed = true
             }
-            if (q % 256 == 0) yield(null)
+            if (q % LOCAL_SEARCH_OPERATION_BATCH == 0) yield(null)
         }
         yield(changed)
     }
@@ -257,7 +264,10 @@ internal class MddInvariant(
             if (next < 0) return null
             current = next
         }
-        return if (accepting.any { it == current }) weight else null
+        return if (accepting.any {
+                poll()
+                it == current
+            }) weight else null
     }
 
     private fun buildState(state: LocalSearchState): MddLsState {
@@ -415,7 +425,10 @@ internal class MddInvariant(
         val path = IntArray(n + 1)
         path[0] = initial
         for (i in 0 until n) {
-            val nxt = mddStep(layerStarts, transitions, recordStride, path[i], state.assignment.intValue(seq[i]), i)
+            val nxt = mddStep(
+                layerStarts, transitions, recordStride, path[i], state.assignment.intValue(seq[i]), i,
+                state::checkScoringWork,
+            )
             if (nxt < 0) return
             path[i + 1] = nxt
         }
@@ -428,13 +441,16 @@ internal class MddInvariant(
             val cur = state.assignment.intValue(seq[i])
             val from = path[i]
             val to = path[i + 1]
-            val curWeight = mddRecordWeight(layerStarts, transitions, recordStride, from, cur, i)
+            val curWeight = mddRecordWeight(
+                layerStarts, transitions, recordStride, from, cur, i, state::checkScoringWork,
+            )
             val d = state.rootDomains[seq[i]]
             var pick = -1L
             var seen = 0
             var p = layerStarts[i]
             val end = layerStarts[i + 1]
             while (p < end) {
+                state.checkScoringWork()
                 val sym = transitions[p + 1]
                 val sameCost = recordStride < 4 || transitions[p + 3] == curWeight
                 if (transitions[p].toInt() == from && transitions[p + 2].toInt() == to && sameCost &&
@@ -531,10 +547,12 @@ internal fun mddStep(
     from: Int,
     symbol: Long,
     i: Int,
+    poll: () -> Unit = {},
 ): Int {
     var p = layerStarts[i]
     val end = layerStarts[i + 1]
     while (p < end) {
+        poll()
         if (transitions[p].toInt() == from && transitions[p + 1] == symbol) return transitions[p + 2].toInt()
         p += recordStride
     }
@@ -549,11 +567,13 @@ internal fun mddRecordWeight(
     from: Int,
     symbol: Long,
     i: Int,
+    poll: () -> Unit = {},
 ): Long {
     if (recordStride < 4) return 0L
     var p = layerStarts[i]
     val end = layerStarts[i + 1]
     while (p < end) {
+        poll()
         if (transitions[p].toInt() == from && transitions[p + 1] == symbol) return transitions[p + 3]
         p += recordStride
     }
@@ -657,6 +677,7 @@ internal fun mddRepairPath(
     var best = inf
     var bestState = -1
     for (s in accepting) {
+        state.checkScoringWork()
         if (s < dp[n].size && dp[n][s] < best) {
             best = dp[n][s]
             bestState = s
