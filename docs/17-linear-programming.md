@@ -220,6 +220,8 @@ without another numerical query. Integral-looking
 points require original-source witness checking, and checked bounds are lifted into
 the current source scope. Small unresolved queries can use bounded exact completion;
 wide guidance does not acquire exact-primal or infeasibility authority.
+Source reconstruction restores exact fixed coordinates and matching projected
+bound endpoints before checking a proposed witness.
 
 Rows have stable identities. Deactivation removes slack bounds, strictness and
 integrality, and is rejected while surviving assertions need the row; global
