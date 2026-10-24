@@ -46,6 +46,21 @@ import kotlin.test.assertTrue
 
 class CompilerLiftTest {
     @Test
+    fun `a repeated quotient and remainder alias should reject inconsistent source roles`() {
+        val parsed = parseFlatZinc(
+            """
+            var -7..-7: a; var -3..-3: b; var -4..4: q; var -4..4: both;
+            constraint int_div(a,b,q); constraint int_div(a,b,both);
+            constraint int_mod(a,b,both); solve satisfy;
+            """.trimIndent(),
+        )
+
+        val session = PropagationSession(parsed.problem)
+
+        assertTrue(session.isUnsatAtRoot)
+    }
+
+    @Test
     fun `repeated FlatZinc division outputs should preserve aliases across compilations`() {
         for ((a, q, r) in listOf(Triple(-7L, 2L, -1L), Triple(7L, -2L, 1L))) {
             val parsed = parseFlatZinc(
