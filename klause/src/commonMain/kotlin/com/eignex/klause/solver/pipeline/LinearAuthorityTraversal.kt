@@ -40,6 +40,7 @@ internal class LinearAuthorityTraversal(
     private val incumbent: () -> Pair<Sample, BigFraction>?,
     private val useBranchHistory: Boolean = false,
     borrowedAuthority: LinearAuthority? = null,
+    private val useGuidance: Boolean = false,
 ) : SearchBrancher, SearchBranchProposal, SearchNodePolicy, AutoCloseable {
     override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
 
@@ -52,7 +53,10 @@ internal class LinearAuthorityTraversal(
             maxOf(observations["numericalLpMaxColumns"] ?: 0L, shape.columns.toLong())
         observations["numericalLpExtractedBoundRows"] =
             (observations["numericalLpExtractedBoundRows"] ?: 0L) + shape.inputRows - shape.rows
-        if (!shape.admitted) observe("numericalLpShapesOutsideDimensionGuard")
+        if (shape.sparse) {
+            shape.phase?.let { observe("numericalSparseLpPhase$it") }
+            if (!shape.admitted) observe("numericalSparseLpDeclines")
+        } else if (!shape.admitted) observe("numericalLpShapesOutsideDimensionGuard")
     }, retainLp = true)
 
     override fun close() {
@@ -169,9 +173,15 @@ internal class LinearAuthorityTraversal(
                 else -> SearchNodeDisposition.Indeterminate
             }
         }
-        if (!context.consumeCheck()) return SearchNodeDisposition.Indeterminate
+        if (!current.pending && !context.consumeCheck()) return SearchNodeDisposition.Indeterminate
         val branch = source.atScope(source.scope.copy(condition = current.condition))
-        val result = authority.check(branch, cancellation)
+        val result = if (useGuidance) authority.advance(branch, cancellation) else authority.check(branch, cancellation)
+        if (result.paused) {
+            current.pending = true
+            observe("numericalLpPauses")
+            return SearchNodeDisposition.Pause
+        }
+        current.pending = false
         current.result = result
         observe("numericalChecks")
         if (result.bound != null) {
@@ -300,6 +310,7 @@ private class CoverageNode(val condition: SourceCondition) {
     var split: CoverageSplit? = null
     var result: LinearAuthorityResult? = null
     var coveredBound: SourceEvidence? = null
+    var pending: Boolean = false
 
     fun boundCoverage(inherited: SourceEvidence?, minimizes: Boolean, cancellation: Cancellation): BoundCoverage? {
         if (cancellation()) return null

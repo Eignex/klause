@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.optimization
 
 import com.eignex.klause.lp.SourceLpBudget
+import com.eignex.klause.lp.SparseSourceLpPolicy
 import com.eignex.klause.lp.admittedSourcePoint
 import com.eignex.klause.lp.engine.CertifiedLpResult
 import com.eignex.klause.lp.engine.ExactLpBounds
@@ -20,9 +21,13 @@ import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.simplex.exact.ExactRationalInequality
+import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.util.Cancellation
 
-internal data class LinearAuthorityLpShape(val inputRows: Int, val rows: Int, val columns: Int, val admitted: Boolean)
+internal data class LinearAuthorityLpShape(
+    val inputRows: Int, val rows: Int, val columns: Int, val admitted: Boolean,
+    val sparse: Boolean = false, val phase: String? = null,
+)
 
 internal data class LinearAuthorityLpResult(
     val result: CertifiedLpResult,
@@ -30,12 +35,21 @@ internal data class LinearAuthorityLpResult(
     val conflictWeights: List<BigFraction>?,
 )
 
+internal class LinearAuthorityLpGuidance(
+    val result: LinearAuthorityLpResult,
+    val point: DoubleArray?,
+    val bounds: List<ExactLpBounds>,
+    val workingRows: Int,
+    val paused: Boolean,
+)
+
 internal class LinearAuthorityLp(
     private val budget: SourceLpBudget,
     private val onShape: (LinearAuthorityLpShape) -> Unit = {},
     retain: Boolean = false,
+    private val guidancePolicy: SparseSourceLpPolicy = SparseSourceLpPolicy(),
 ) : AutoCloseable {
-    private val session = if (retain) LinearAuthoritySession(budget) else null
+    private var session = if (retain) LinearAuthoritySession(budget) else null
     val preparations: Long get() = session?.preparations ?: 0L
     val reuses: Long get() = session?.reuses ?: 0L
     private val observer = object : LpCertificationObserver {
@@ -53,6 +67,7 @@ internal class LinearAuthorityLp(
         cancellation: Cancellation,
         inactive: Set<Int> = emptySet(),
     ): LinearAuthorityLpResult? {
+        val retained = session
         var prepared: LinearAuthorityModel? = null
         return budget.runPrepared(cancellation, prepare = { token ->
             LinearAuthorityModel.prepare(rows, costs.size, token, inactive)?.also { prepared = it }
@@ -72,7 +87,7 @@ internal class LinearAuthorityLp(
                     }
                 } },
                 workingRows.map { ExactLpNumber.of(it.rhs) },
-                (if (session == null) packed.columns else packed.columns.map {
+                (if (retained == null) packed.columns else packed.columns.map {
                     it.copy(bounds = ExactLpBounds())
                 }) + workingRows.map {
                     ExactLpColumn(ExactLpBounds(ExactLpSide(zero, it.strict)), integral = false)
@@ -80,7 +95,7 @@ internal class LinearAuthorityLp(
                 workingRows.map { ExactLpRow(strict = it.strict) },
                 objective,
             )
-            val owner = if (session != null) session.bind(packed, objective, token, ::model)
+            val owner = if (retained != null) retained.bind(packed, objective, token, ::model)
                 ?: return@runPrepared null else LpScopedSolver(LpExactState(model()), token, context = budget.context,
                     iterationLimit = 1024, workLimit = 2_000_000L)
             val preparation = owner.metrics.preparationWork
@@ -104,12 +119,41 @@ internal class LinearAuthorityLp(
             } finally {
                 budget.observe(preparation = owner.metrics.preparationWork - preparation,
                     floatWork = owner.lastMetrics.workOps, refinement = owner.refinementCache.work - refinement)
-                if (session == null) budget.closeOwner(owner)
+                if (retained == null) budget.closeOwner(owner)
             }
         }.also {
             val workingRows = prepared?.rows?.size ?: rows.size
             onShape(LinearAuthorityLpShape(rows.size, workingRows, costs.size,
                 budget.admitsDimensions(costs.size, workingRows.toLong())))
+        }
+    }
+
+    fun advance(
+        rows: List<ExactRationalInequality>,
+        costs: List<BigFraction>,
+        constant: BigFraction,
+        scope: SourceScope,
+        cancellation: Cancellation,
+        inactive: Set<Int>,
+    ): LinearAuthorityLpGuidance? {
+        val retained = session ?: LinearAuthoritySession(budget).also { session = it }
+        if (cancellation()) {
+            retained.close()
+            return null
+        }
+        val packed = LinearAuthorityModel.prepare(rows, costs.size, cancellation, inactive) ?: return null
+        var phase: String? = null
+        return retained.advance(packed, costs, constant, scope, cancellation, guidancePolicy, observer) { guide, token ->
+            phase = guide.phase.name
+            val bound = guide.bound?.takeIf { listOf(it.value).admittedSourcePoint() }
+            val weights = bound?.dualMultipliers?.map { it.negated() }
+                ?.let { packed.lift(it, costs.map { cost -> cost.negated() }, token) }
+            val result = CertifiedLpResult(null, bound, null, null, null, false, { null })
+            LinearAuthorityLpGuidance(LinearAuthorityLpResult(result, weights, null), guide.primal,
+                packed.columns.map { it.bounds }, packed.rows.size, guide.paused)
+        }.also {
+            onShape(LinearAuthorityLpShape(rows.size, packed.rows.size, costs.size, it != null,
+                sparse = true, phase = phase))
         }
     }
 

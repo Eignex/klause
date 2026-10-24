@@ -253,6 +253,12 @@ renew it. Native work is forwarded once to the caller meter, separately from dec
 charges. Parallel slots retain their quota across reopening. Representation decline
 stops one worker; containing stops cancel all.
 
+Retained numerical source queries reserve one LP operation per changed authority.
+Consultations of the same suspended query retain its reservation and cumulative
+numerical allowance, charging active work and elapsed time without charging the
+pause between slices. Caller cancellation retires the operation; a cooperative
+quantum pause leaves it available for the next slice.
+
 Optional guidance reuses completed checks. Its index construction spends the check's
 token under a 65,536-entry boundary; a private stop discards only the hint. Native
 setup prepays source capture, and new controls cannot revive stopped preparation.

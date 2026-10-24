@@ -2,6 +2,7 @@ package com.eignex.klause.lp.optimization
 
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.SourceLpBudget
+import com.eignex.klause.lp.SparseSourceLpPolicy
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
@@ -31,14 +32,16 @@ internal data class LinearAuthorityResult(
     val split: Pair<SourceCoordinate, BigFraction>? = null,
     val fractional: List<Pair<SourceCoordinate, BigFraction>> = emptyList(),
     val relaxedPoint: Map<SourceCoordinate, Double> = emptyMap(),
+    val paused: Boolean = false,
 )
 
 internal class LinearAuthority(
     private val budget: SourceLpBudget,
     onLpShape: (LinearAuthorityLpShape) -> Unit = {},
     private val retainLp: Boolean = false,
+    guidancePolicy: SparseSourceLpPolicy = SparseSourceLpPolicy(),
 ) : AutoCloseable {
-    private val lp = LinearAuthorityLp(budget, onLpShape, retainLp)
+    private val lp = LinearAuthorityLp(budget, onLpShape, retainLp, guidancePolicy)
     val preparations: Long get() = lp.preparations
     val reuses: Long get() = lp.reuses
     private var template: LinearAuthorityTemplate? = null
@@ -53,9 +56,20 @@ internal class LinearAuthority(
         return checkSource(source, cancellation).copy(relaxedPoint = relaxedPoint)
     }
 
+    fun advance(source: SourceProofContext, cancellation: Cancellation): LinearAuthorityResult {
+        relaxedPoint = emptyMap()
+        if (cancellation()) {
+            lp.close()
+            return LinearAuthorityResult()
+        }
+        return checkSource(source, cancellation, guidance = true).copy(relaxedPoint = relaxedPoint)
+    }
+
     private var relaxedPoint: Map<SourceCoordinate, Double> = emptyMap()
 
-    private fun checkSource(source: SourceProofContext, cancellation: Cancellation): LinearAuthorityResult {
+    private fun checkSource(
+        source: SourceProofContext, cancellation: Cancellation, guidance: Boolean = false,
+    ): LinearAuthorityResult {
         if (!source.affineObjectiveAvailable || !source.linearCoordinatesSupported()) return LinearAuthorityResult()
         if ((source.scope.condition.lower.keys + source.scope.condition.upper.keys).any {
                 it !in source.coordinates
@@ -130,17 +144,50 @@ internal class LinearAuthority(
             return checked(SourceClaim.Refutation, LinearPinnedRefutation(derivation(weights)))
         }
         val closureRows = rows.map { ExactRationalInequality(it.columns, it.coefficients, it.rhs) }
-        val solved = lp.solve(closureRows, costs, constant, cancellation, inactive) ?: return LinearAuthorityResult()
+        val guide = if (guidance) lp.advance(closureRows, costs, constant, source.scope, cancellation, inactive)
+            ?: return LinearAuthorityResult() else null
+        if (guide?.paused == true) return LinearAuthorityResult(paused = true)
+        val solved = guide?.result ?: lp.solve(closureRows, costs, constant, cancellation, inactive)
+            ?: return LinearAuthorityResult()
         val closure = solved.result
-        closure.float?.primal?.takeIf { it.size == coordinates.size && it.all(Double::isFinite) }?.let { point ->
+        (guide?.point ?: closure.float?.primal)?.takeIf {
+            it.size == coordinates.size && it.all(Double::isFinite)
+        }?.let { point ->
             relaxedPoint = coordinates.indices.associate { coordinates[it] to point[it] }
         }
         val bound = closure.lowerBound?.let { value ->
             fun checkBound(weights: List<BigFraction>): SourceEvidence? =
                 checked(SourceClaim.Bound(value * sign), LinearPinnedObjective(derivation(weights)))
             val retained = solved.boundWeights?.let(::checkBound)
-            retained ?: combination(costs.map { it.negated() }, constant - value, false)
-                ?.let(::checkBound)
+            if (retained != null || guidance) retained else
+                combination(costs.map { it.negated() }, constant - value, false)?.let(::checkBound)
+        }
+        if (guide != null) {
+            val point = guide.point?.map { BigFraction.ofDouble(it) ?: return LinearAuthorityResult(bound = bound) }
+            val fractions = fractional(coordinates, point).filter { candidate ->
+                val column = coordinates.indexOf(candidate.first)
+                val threshold = candidate.floorSplit().second
+                val bounds = guide.bounds[column]
+                (bounds.lower?.let { threshold >= it.number.value } != false) &&
+                    (bounds.upper?.let { threshold + BigFraction.ONE <= it.number.value } != false)
+            }
+            val candidate = point?.takeIf { fractional(coordinates, it).isEmpty() }
+                ?.let { sample(source, coordinates, it) }?.takeIf {
+                    checked(SourceClaim.Witness(it), SourceDerivation.SourceWitness) != null
+                }
+            if (candidate != null && bound != null && point != null) {
+                val value = (point.indices.fold(constant) { value, id -> value + costs[id] * point[id] }) * sign
+                val proof = checked(SourceClaim.Optimal(candidate, SourceValue.Rational(value)),
+                    SourceDerivation.Optimum(SourceDerivation.SourceWitness, bound.derivation))
+                if (proof != null) return LinearAuthorityResult(proof, bound, candidate)
+            }
+            if (fractions.isNotEmpty()) return LinearAuthorityResult(bound = bound, incumbent = candidate,
+                split = fractions.first().floorSplit(), fractional = fractions)
+            if (budget.admitsDimensions(costs.size, guide.workingRows.toLong())) {
+                val exact = checkSource(source, cancellation)
+                return exact.copy(bound = exact.bound ?: bound, incumbent = exact.incumbent ?: candidate)
+            }
+            return LinearAuthorityResult(bound = bound, incumbent = candidate)
         }
         if (closure.verdict == LpVerdict.INFEASIBLE) {
             return LinearAuthorityResult(refutation(solved), bound)

@@ -209,6 +209,16 @@ Auxiliary multiplier searches own separate temporary solvers. Neighborhood
 invocations can borrow a retained authority, leaving its cleanup to the caller.
 Floating source coordinates are guidance and supply no witness or proof authority.
 
+`LinearAuthority.advance` consumes the shared sparse preparation, floating and
+bound-certificate policy through that same scoped owner. One admitted operation
+survives unchanged consultations; changed source scope, sides or active rows revoke
+its admission and numerical cursor before another query. A pause publishes no
+coordinates or certificate. Completed coordinates propose exhaustive integer splits
+only where both sides tighten the current coordinate bounds. Integral-looking
+points require original-source witness checking, and checked bounds are lifted into
+the current source scope. Small unresolved queries can use bounded exact completion;
+wide guidance does not acquire exact-primal or infeasibility authority.
+
 Rows have stable identities. Deactivation removes slack bounds, strictness and
 integrality, and is rejected while surviving assertions need the row; global
 source-valid cuts can survive pop. Appends and compaction prepare a fresh
