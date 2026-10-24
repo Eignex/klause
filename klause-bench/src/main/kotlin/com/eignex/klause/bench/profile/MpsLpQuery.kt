@@ -17,6 +17,7 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 internal object MpsLpQuery {
@@ -109,11 +110,15 @@ internal object MpsLpQuery {
                 val rootUnchanged = !sameRoot || (
                     rootDomains.indices.all { session.intDomain(it) === rootDomains[it] } &&
                         rootBooleans.indices.all { session.boolValue(it) == rootBooleans[it] })
+                val floatTermination = (afterPrune["scopedPreparation"] as? JsonObject)
+                    ?.get("floatTermination")?.jsonPrimitive?.content
+                val completedRoot = nodeOnly && lower.isFinite() && floatTermination == "OPTIMAL_CANDIDATE"
                 val stopReason = when {
                     !sameRoot && repeat == 2 -> "three-repeats"
                     sameRoot && !rootUnchanged -> "root-deduction"
                     sameRoot && prune -> "certified-prune"
                     sameRoot && token() -> "cancelled"
+                    sameRoot && completedRoot -> "completed-root-with-checked-bound"
                     sameRoot && afterPrune["workAllowanceSpent"].toString() == "true" -> "work-allowance"
                     sameRoot && afterPrune["demoted"].toString() == "true" -> "governor-demotion"
                     else -> null

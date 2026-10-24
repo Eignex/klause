@@ -148,7 +148,9 @@ internal object MpsLpCheckpoint {
                     put("floatTermination", call(solver, "getLastTermination")?.toString())
                     put("verdict", result?.let { call(it, "getVerdict").toString() })
                     put("checkedNativeBound", result?.let { call(it, "getLowerBound")?.toString() })
-                    put("exactPoint", result?.let { NumericalResidualProfile.json(call(it, "getExactPrimal")) } ?: JsonNull)
+                    put("exactPoint", result?.let {
+                        NumericalResidualProfile.json(call(it, "getExactPrimal"))
+                    } ?: JsonNull)
                     put("observerCounters", NumericalResidualProfile.json(call(sink, "snapshot")))
                 })
                 iteration++
