@@ -19,6 +19,13 @@ deductions stay eager. Reasons are built only when a bound actually tightens the
 domain. A reified equality whose target value is a hole keeps that removal as a
 premise, because bounds alone cannot justify the conflict.
 
+Mandatory unit-integer `Distinct` deductions retain the Hall source positions in a
+lazy payload. Explanation reconstructs their bounds and holes at the deduction's
+trail boundary; later carves cannot enter the earlier reason. Offset identities are
+immutable, so the premises name only original integer coordinates. Matching failures
+retain the deficient Hall set. On enumerable roots, bounds can lift across values
+already occupied by that set, and holes inside its union need no premise.
+
 Assumption cores keep the applied seed prefix when propagation refutes it, or the full
 assumption set when the tree is exhausted. Cores are jointly refuted with the hard
 model and need not be minimal; an interrupted seeding cannot certify the full seed.

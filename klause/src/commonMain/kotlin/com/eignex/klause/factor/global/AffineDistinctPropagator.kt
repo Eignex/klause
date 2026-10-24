@@ -4,6 +4,7 @@ import com.eignex.klause.config.DEFAULT_DOMAIN_WALK_CAP
 import com.eignex.klause.factor.global.internals.computeBoundsAllDifferent
 import com.eignex.klause.factor.global.internals.reginHopcroftKarp
 import com.eignex.klause.factor.global.internals.reginTarjanScc
+import com.eignex.klause.factor.global.internals.reginTryAugment
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Lit
@@ -36,8 +37,8 @@ internal fun Distinct.affinePropagationView(): Propagator? {
                 it.coefficients.single() != BigFraction.ONE || it.constant.den != BIG_ONE
         }
     ) {
-            return null
-        }
+        return null
+    }
     return AffineDistinctPropagator(
         IntArray(positions.size) { Term.intVar(positions[it].references.single()) },
         positions.map { it.constant.num },
@@ -61,11 +62,17 @@ internal class AffineDistinctPropagator(private val vars: IntArray, private val 
         atTrail: Int,
         atLevel: Int,
     ): IntArray {
+        val positions = payload.copyOfRange(1, payload.size)
+        if (payload[0] == 1) hallReason(state, positions, atTrail, atLevel)?.let { return it }
+        return sourceReason(state, positions, atTrail, atLevel)
+    }
+
+    private fun sourceReason(state: PropagationState, positions: IntArray, atTrail: Int, atLevel: Int): IntArray {
         val out = linkedSetOf<Int>()
         fun add(lit: Int) {
             if (lit != Lit.NONE) out.add(lit)
         }
-        for (v in payload.distinct()) {
+        for (v in positions.map { vars[it] }.distinct()) {
             val d = state.domainAt(v, atTrail)
             val root = state.rootDomains[v]
             add(state.boundLiteral(v, true, d.min, atTrail, atLevel))
@@ -81,21 +88,66 @@ internal class AffineDistinctPropagator(private val vars: IntArray, private val 
         return out.toIntArray()
     }
 
-    private fun reason(state: PropagationState, positions: IntArray): IntArray? {
+    private fun hallReason(state: PropagationState, positions: IntArray, atTrail: Int, atLevel: Int): IntArray? {
+        val roots = positions.map { state.rootDomains[vars[it]].spanOrNull(DEFAULT_DOMAIN_WALK_CAP) ?: return null }
+        val domains = positions.map { state.domainAt(vars[it], atTrail) }
+        val union = HashSet<BigInt>()
+        for (k in positions.indices) {
+            val i = positions[k]
+            val d = domains[k]
+            roots[k].forEach { value ->
+                if (value in d.min..d.max && state.inDomainAt(vars[i], value, atTrail, d)) {
+                    union.add(bigIntOf(value) + offsets[i])
+                }
+            }
+        }
+        val out = linkedSetOf<Int>()
+        fun add(lit: Int) {
+            if (lit != Lit.NONE) out.add(lit)
+        }
+        for (k in positions.indices) {
+            val i = positions[k]
+            val v = vars[i]
+            val d = domains[k]
+            val root = state.rootDomains[v]
+            var lower = d.min
+            while (lower > root.min) {
+                val previous = root.lower(lower)
+                if (bigIntOf(previous) + offsets[i] !in union) break
+                lower = previous
+            }
+            var upper = d.max
+            while (upper < root.max) {
+                val next = root.higher(upper)
+                if (bigIntOf(next) + offsets[i] !in union) break
+                upper = next
+            }
+            add(state.boundLiteral(v, true, lower, atTrail, atLevel))
+            add(state.boundLiteral(v, false, upper, atTrail, atLevel))
+            roots[k].forEach { value ->
+                if (value in d.min..d.max && !state.inDomainAt(v, value, atTrail, d) &&
+                    bigIntOf(value) + offsets[i] !in union
+                ) add(state.exclusionLiteral(v, value, atTrail, d))
+            }
+        }
+        return out.toIntArray()
+    }
+
+    private fun reason(state: PropagationState, positions: IntArray, hall: Boolean = false): IntArray? {
         if (state.currentLevel == 0) return null
-        val sources = IntArray(positions.size) { vars[positions[it]] }
+        val payload = intArrayOf(if (hall) 1 else 0) + positions
         return if (state.undoLogging) {
-            state.lazyReason(sources)
+            state.lazyReason(payload)
         } else {
-            explain(state, state.currentFactor, sources, state.undo.size, state.currentLevel)
+            explain(state, state.currentFactor, payload, state.undo.size, state.currentLevel)
         }
     }
 
-    private fun fail(state: PropagationState, positions: IntArray): Boolean {
+    private fun fail(state: PropagationState, positions: IntArray, hall: Boolean = false): Boolean {
         state.propagatorFailures[this] = explain(
             state,
             state.currentFactor,
-            IntArray(positions.size) { vars[positions[it]] },
+            intArrayOf(if (hall) 1 else 0) + positions,
             state.undo.size,
             state.currentLevel,
         )
@@ -110,8 +162,8 @@ internal class AffineDistinctPropagator(private val vars: IntArray, private val 
         if (cache.domains?.let { old -> vars.indices.all { old[it] === state.intDomains[vars[it]] } } ==
             true
         ) {
-                return true
-            }
+            return true
+        }
         val domains = Array(n) { state.intDomains[vars[it]] }
         val lo = List(n) { bigIntOf(domains[it].min) + offsets[it] }
         val hi = List(n) { bigIntOf(domains[it].max) + offsets[it] }
@@ -148,16 +200,16 @@ internal class AffineDistinctPropagator(private val vars: IntArray, private val 
                     reason(state, all),
                 )
             ) {
-                    return fail(state, all)
-                }
+                return fail(state, all)
+            }
             if (newUpper[i] < upper[i] && !state.tightenIntMax(
                     vars[i],
                     (origin + bigIntOf(newUpper[i]) - offsets[i]).toLongExact(),
                     reason(state, all),
                 )
             ) {
-                    return fail(state, all)
-                }
+                return fail(state, all)
+            }
         }
         return fixed(state, lo, hi)
     }
@@ -167,7 +219,7 @@ internal class AffineDistinctPropagator(private val vars: IntArray, private val 
         for (i in vars.indices) {
             if (lo[i] != hi[i]) continue
             val previous = owners.put(lo[i], i)
-            if (previous != null) return fail(state, intArrayOf(previous, i))
+            if (previous != null) return fail(state, intArrayOf(previous, i), hall = true)
         }
         for ((value, owner) in owners) {
             for (i in vars.indices) {
@@ -176,7 +228,7 @@ internal class AffineDistinctPropagator(private val vars: IntArray, private val 
                 if (source.fitsLong() && !state.excludeIntValue(
                         vars[i],
                         source.toLongExact(),
-                        reason(state, intArrayOf(owner)),
+                        reason(state, intArrayOf(owner), hall = true),
                     )
                 ) {
                     return fail(state, intArrayOf(owner, i))
@@ -219,7 +271,7 @@ internal class AffineDistinctPropagator(private val vars: IntArray, private val 
             }
         }
         val all = IntArray(n) { it }
-        if (count < n) return fail(state, all)
+        if (count < n) return fail(state, all, hall = true)
         val matchVar = IntArray(n) { -1 }
         val matchVal = IntArray(count) { -1 }
         cache.matched?.let { old ->
@@ -232,7 +284,17 @@ internal class AffineDistinctPropagator(private val vars: IntArray, private val 
                 matchVal[id] = i
             }
         }
-        if (!reginHopcroftKarp(n, values, matchVar, matchVal, IntArray(n), IntArray(n))) return fail(state, all)
+        if (!reginHopcroftKarp(n, values, matchVar, matchVal, IntArray(n), IntArray(n))) {
+            val first = matchVar.indexOf(-1)
+            val visited = BooleanArray(count)
+            reginTryAugment(first, values, matchVar, matchVal, visited)
+            val hall = IntArrayList()
+            hall.add(first)
+            for (id in visited.indices) {
+                if (visited[id] && matchVal[id] >= 0) hall.add(matchVal[id])
+            }
+            return fail(state, hall.toIntArray(), hall = true)
+        }
         val total = n + count
         val adj = Array(total) { IntArrayList() }
         val reverse = Array(total) { IntArrayList() }
@@ -269,7 +331,7 @@ internal class AffineDistinctPropagator(private val vars: IntArray, private val 
                 val id = values[i][k]
                 val node = n + id
                 if (matchVar[i] == id || reached[node] || scc[i] == scc[node]) continue
-                val ant = reasons.getOrPut(scc[node]) { reason(state, hall(adj, node, n)) }
+                val ant = reasons.getOrPut(scc[node]) { reason(state, hall(adj, node, n), hall = true) }
                 if (!state.excludeIntValue(vars[i], sourceValues[i][k], ant)) return fail(state, all)
             }
         }
