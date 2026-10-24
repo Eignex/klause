@@ -14,8 +14,8 @@ import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.lp.optimization.LinearPinnedObjective
 import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceClaim
+import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
@@ -84,6 +84,9 @@ internal object MpsSparseRoot {
             it.name == "authorityContext" && it.parameterCount == 2
         }.apply { isAccessible = true }.invoke(numerical, checkNotNull(call(numerical, "getObjective")), stop)
             as SourceProofContext
+        val linear = checkNotNull(NumericalFrontierSnapshot.field(plan, "linearSource"))
+        val view = checkNotNull(NumericalFrontierSnapshot.field(linear, "view"))
+        val objectiveScale = NumericalFrontierSnapshot.field(view, "objectiveScale") as BigFraction
         require(context.coordinates.none { it.kind == SourceCoordinate.Kind.Boolean })
         require(context.premises.values.all { it.guards.isEmpty() && it.integerPins.isEmpty() })
         val coordinates = context.coordinates.sortedWith(compareBy({ it.kind.ordinal }, { it.id }))
@@ -132,6 +135,8 @@ internal object MpsSparseRoot {
             put("sourceSha256", sha256(bytes))
             put("sourceSemantics", source.semantics.declared.toString())
             put("sourceTolerance", source.semantics.effective.feasibilityTolerance.toString())
+            put("nativeSourceScope", NumericalFrontierSnapshot.scope(context.scope))
+            put("objectiveScale", objectiveScale.toString())
             put("inputRows", rows.size)
             put("workingRows", workingRows.size)
             put("emittedRows", prepared?.let { call(it, "getEmittedRowCount") } as Int?)
@@ -146,6 +151,7 @@ internal object MpsSparseRoot {
             put("javaVersion", System.getProperty("java.version"))
             put("os", System.getProperty("os.name"))
             put("arch", System.getProperty("os.arch"))
+            put("processors", Runtime.getRuntime().availableProcessors())
             put("jvmMaxHeapBytes", Runtime.getRuntime().maxMemory())
         }
         out.resolve("preparation.json").writeText(report.toString() + "\n")
@@ -159,6 +165,9 @@ internal object MpsSparseRoot {
                 buildJsonObject {
                     put("available", true)
                     put("check", check)
+                    val value = call(bound, "getValue") as BigFraction
+                    put("originalDirectionNativeBound", (value * sign).toString())
+                    put("nominalSourceUnitBound", (value * sign * objectiveScale.reciprocal()).toString())
                     put("elapsedNs", System.nanoTime() - startedLift)
                     put("threadBytes", bean.getThreadAllocatedBytes(thread) - beforeLift)
                 }
