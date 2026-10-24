@@ -1147,6 +1147,45 @@ unsupported external check. Witness checking does not establish native optimalit
 Encoding, assembly, factorization and certification remain atomic and can overrun
 a slice.
 
+### Continuous candidate owner reuse
+
+Continuous local-search candidates use fresh numerical owners. The
+[retained-owner prototype](https://github.com/Eignex/klause/tree/codex/mps-completion-reuse-prototype-3456)
+passed current-pin, conditioned-row, indicator, cancellation and cleanup controls,
+but its cold-search evidence does not support enabling it unconditionally.
+
+[Identical-sequence replays](https://lab.eignex.com/jobs/7921) preserve candidate
+order, source policy and checks while alternating cold and retained owners after
+warmup. Gesa2's three-query declared sequence falls from 687 to 293 ms and 728 to
+367 MB of Java thread allocations, with two warm hits. That trajectory starts from
+a saved incumbent. [Cold cap64 sequences](https://lab.eignex.com/jobs/7923) have two
+queries and one warm hit: 392 to 245 ms declared and 395 to 231 ms exact. A one-query
+seeded blend2 sequence instead grows from 10 to 25 ms declared. These JFR profile
+costs exclude source parsing equally and do not establish cold-search quality.
+
+[Cold-start comparison 7931](https://lab.eignex.com/jobs/7931) contains 144 runs
+over six frozen sources, seed 3, three repeats, one processor, debug statistics and
+ten seconds. Default/LS and exact/declared modes remain separate. Both arms charge
+component work at the existing instruction price. There is no paired witness
+loss; objectives have nine wins, seven losses and twenty ties, with 36 pairs
+undecided in both arms. The external checker accepts 66 points; six exact cap64
+points remain unsupported because their rational coordinates have no exact decimal.
+
+Cap64 improves in all six default pairs. In LS declared mode its objective instead
+changes from 1129864.4 to 1146638.65 in all three repeats, and median completed
+candidate checks fall from 15 to 13. LS exact mode ties its objective while completed
+checks fall from 16 to 13 and first-witness median grows from 1034 to 1123 ms.
+Blend2 records no LS completion calls; cold LS gesa2 has none either. These runs
+retain the negative cold-start conclusions from [completion-aware scoring](https://github.com/Eignex/klause/issues/2997).
+
+[Matched CLI stage profiles](https://lab.eignex.com/jobs/7936) put 57.3% of cold
+and 68.2% of retained execution samples in move selection, dominated by exact-linear
+scoring; retained thread snapshots at four and six seconds show the same stage.
+Profile instrumentation excludes a throughput claim. The `lsMoves` counter includes
+completion work, so its rate alone cannot measure ordinary move throughput. Warm
+numerical savings remain useful evidence, while production keeps per-candidate
+numerical ownership.
+
 ### Numerical kernel decisions
 
 [Session replay 7872](https://lab.eignex.com/jobs/7872) compares cumulative-work

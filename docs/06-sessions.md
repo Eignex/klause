@@ -199,6 +199,9 @@ ALNS charges each outer iteration's declared flip allowance once. CLI statistics
 expose `nodeBudgetLimit`, `nodeBudgetSpent` and `nodeBudgetRemaining`, including
 overspend.
 
+Continuous candidate completion converts standalone and component LP work, plus
+exact point recovery, into LS instructions using the slice prices below.
+
 Slice pricing is solver policy: LP work costs one node per 600 units, propagation
 one per 4000 visits, inprocessing probes one per 12 and subsumption visits one per
 18000. Fractional marks survive slices and the preparation-to-search transition.
