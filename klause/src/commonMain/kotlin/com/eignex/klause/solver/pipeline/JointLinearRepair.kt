@@ -35,6 +35,7 @@ internal class JointLinearRepair(
     private val params: TheoryParams,
     guidancePolicy: SparseSourceLpPolicy = SparseSourceLpPolicy(),
     private val boundOrdered: Boolean = false,
+    private val external: () -> Sample? = { null },
 ) : ExactNeighborhoodCompletion, AutoCloseable {
     private val stop = params.timeout or params.cancellation
     private val state = OpenTheorySolveState(params)
@@ -106,7 +107,18 @@ internal class JointLinearRepair(
         completionExhausted = { exhausted },
         centerPreparationPending = { rootPreparationPending },
         proposal = ExactNeighborhoodProposal { centers, bools, count, round, radius, cutoff ->
-            requireNotNull(selection).propose(centers, bools, count, round, radius, cutoff)
+            val pooled = external()?.takeIf { sample ->
+                val value = objective?.evaluateExact(sample)
+                (model.numRealVars == 0 || sample.exactReals?.size == model.numRealVars) &&
+                    (cutoff == null || (value != null && value < cutoff)) &&
+                    SourceEvidenceVerifier(source.withLinearAuthority()).verify(SourceEvidence(source.scope,
+                        SourceClaim.Witness(sample), SourceDerivation.SourceWitness), stop) == SourceEvidenceCheck.Checked
+            }
+            val from = pooled?.let { sample ->
+                List(model.numIntVars) { BigFraction.of(sample.exactIntValue(it), BIG_ONE) } + sample.exactReals.orEmpty()
+            } ?: centers
+            requireNotNull(selection).propose(from, pooled?.bools ?: bools, count, round, radius,
+                pooled?.let { objective?.evaluateExact(it) } ?: cutoff)
         },
     )
 
@@ -192,7 +204,7 @@ internal class JointLinearRepair(
             }
             pending = condition
             query = LinearAuthorityInvocation(source.atScope(source.scope.copy(condition = bounds)), params,
-                external = { anchor }, state = state, borrowedAuthority = authority,
+                external = { external() ?: anchor }, state = state, borrowedAuthority = authority,
                 boundOrdered = boundOrdered, guidance = true, funding = funding)
             observe("jointRepairCandidates")
         }

@@ -38,9 +38,20 @@ internal fun prepareLinearSource(
     if (stop()) return interrupted()
     val prepared = PreparedLinearSource(view, objective, covers, acceptedBound)
     val maximize = source.objective?.sense == ObjectiveSense.MAXIMIZE
+    val companions = request.linearTraversal == LinearTraversal.NUMERICAL_COMPANIONS ||
+        request.linearTraversal == LinearTraversal.NUMERICAL_COMPANIONS_INDEPENDENT
     val native = NumericalLinearRequest(view.model, objective, maximize, stop,
-        boundOrdered = request.linearTraversal == LinearTraversal.NUMERICAL_FRONTIER)
-    val route = if (request.linearTraversal == LinearTraversal.AUTOMATIC && native.numericalRowsSupported(stop)) {
+        boundOrdered = request.linearTraversal == LinearTraversal.NUMERICAL_FRONTIER || companions)
+    val route = if (companions) {
+        val finite = native.finiteRoute(request.boundCancellation or stop, onLpStats ?: {})
+        val companion = (finite as? SourceProblemRoute.Finite)?.problem?.takeUnless {
+            it.requiresExactObjectiveRoute(objective, stop)
+        }
+        SourceProblemRoute.NativeFormula(NativeSourceExecution.Numerical(
+            native.withCompanions(companion,
+                sharing = request.linearTraversal == LinearTraversal.NUMERICAL_COMPANIONS),
+            view.numericalPlan(objective)))
+    } else if (request.linearTraversal == LinearTraversal.AUTOMATIC && native.numericalRowsSupported(stop)) {
         val finite = native.finiteRoute(request.boundCancellation or stop, onLpStats ?: {})
         if (finite is SourceProblemRoute.Finite && finite.problem.requiresExactObjectiveRoute(objective, stop)) {
             SourceProblemRoute.NativeFormula(NativeSourceExecution.Numerical(native, view.numericalPlan(objective)))

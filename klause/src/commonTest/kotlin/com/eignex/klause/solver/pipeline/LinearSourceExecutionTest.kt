@@ -41,6 +41,27 @@ import kotlin.test.assertTrue
 
 class LinearSourceExecutionTest {
     @Test
+    fun `a finite companion should supply an original source incumbent after numerical funding stops`() {
+        val source = LinearSourceProblem(
+            listOf(LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE)),
+            emptyList(), LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
+        )
+        for (traversal in listOf(LinearTraversal.NUMERICAL_COMPANIONS,
+            LinearTraversal.NUMERICAL_COMPANIONS_INDEPENDENT)) {
+            val invocation = SourceSetup.prepare(SourceSetupRequest(
+                SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED,
+                linearTraversal = traversal))
+
+            val result = assertIs<SourceExecutionResult.Numerical>(SourceSetup.execute(SourceExecutionRequest(
+                invocation, ExecutionOptions(ExecutionOption.sourceLpWorkLimit(0), ExecutionOption.maxFlips(0)))))
+
+            assertEquals(BigFraction.ZERO, assertNotNull(result.linearSource?.incumbent).objective)
+            assertEquals(LinearSourceConclusion.SATISFIABLE, result.linearSource?.conclusion)
+            assertNull(result.result.terminal)
+        }
+    }
+
+    @Test
     fun `numerical frontier policy should consume bounded integer sibling coverage`() {
         val source = LinearSourceProblem(
             listOf(LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE)),

@@ -33,7 +33,12 @@ class NumericalLinearRequest internal constructor(
     val maximize: Boolean,
     private val cancellation: Cancellation,
     private val boundOrdered: Boolean,
+    private val companionModel: Problem? = null,
+    private val companions: Boolean = false,
+    private val sharing: Boolean = true,
 ) {
+    internal fun withCompanions(finite: Problem?, sharing: Boolean): NumericalLinearRequest =
+        NumericalLinearRequest(model, objective, maximize, cancellation, boundOrdered, finite, true, sharing)
     /** Construct numerical traversal with its original source objective and cancellation scope. */
     constructor(
         model: Problem,
@@ -132,12 +137,12 @@ class NumericalLinearRequest internal constructor(
         if (engine == FiniteEngine.LOCAL_SEARCH || engine == FiniteEngine.ALNS) {
             return repair(params, engine == FiniteEngine.ALNS, publication)
         }
-        if (engine == FiniteEngine.FIXED) {
+        if (engine == FiniteEngine.FIXED && !companions) {
             return solve(params, onIncumbent = { sample, value ->
                 publication.accepted(sample, SourceValue.Rational(value))
             })
         }
-        if (engine != FiniteEngine.BACKTRACK && engine != FiniteEngine.MIXED) {
+        if (engine != FiniteEngine.BACKTRACK && engine != FiniteEngine.MIXED && engine != FiniteEngine.FIXED) {
             return unavailable(params, cancellation or params.timeout or params.cancellation)
         }
         val originalObjective = objective ?: LinearObjective()
@@ -150,6 +155,7 @@ class NumericalLinearRequest internal constructor(
             sourceObjective = OpenSourceObjective(executionObjective, originalObjective, maximize, context, stop),
             publication = publication, preparedSource = workingPlan, completeOnly = true, numericalOnly = true,
             boundOrdered = boundOrdered,
+            finiteCompanion = companionModel, jointCompanion = companions, shareCompanions = sharing,
         )
         val result = portfolio.minimize(executionObjective, null, stop).linearResult ?: return unavailable(params, stop)
         return LinearOptimizationResult(

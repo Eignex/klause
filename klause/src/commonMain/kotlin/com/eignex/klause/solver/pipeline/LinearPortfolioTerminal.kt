@@ -1,14 +1,19 @@
+@file:OptIn(ExperimentalAtomicApi::class)
+
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.portfolio.PortfolioTerminalCheck
 import com.eignex.klause.portfolio.PortfolioTerminalPublication
 import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.solver.ResumableSearch
+import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.util.Cancellation
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 internal class LinearPortfolioSearch(
     private val descent: RationalTheoryDescent,
@@ -21,7 +26,14 @@ internal class LinearPortfolioSearch(
             throw failure
         }
     }
-    val result: LinearOptimizationResult? get() = descent.linearResult
+    private val snapshot = AtomicReference<LinearOptimizationResult?>(null)
+    val result: LinearOptimizationResult? get() = snapshot.load()
+
+    override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+        onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? =
+        descent.runSlice(global, sliceMillis, sliceNodes, onIncumbent).also {
+            snapshot.store(descent.linearSnapshot())
+        }
 }
 
 internal class LinearPortfolioTerminal(

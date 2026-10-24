@@ -178,7 +178,10 @@ private fun CommonOptions.takeLinearTraversal(): LinearTraversal {
             "automatic" -> LinearTraversal.AUTOMATIC
             "numerical" -> LinearTraversal.NUMERICAL
             "numerical-frontier" -> LinearTraversal.NUMERICAL_FRONTIER
-            else -> usageError("linear-traversal expects automatic, numerical or numerical-frontier")
+            "numerical-companions" -> LinearTraversal.NUMERICAL_COMPANIONS
+            "numerical-companions-independent" -> LinearTraversal.NUMERICAL_COMPANIONS_INDEPENDENT
+            else -> usageError("linear-traversal expects automatic, numerical, numerical-frontier, " +
+                "numerical-companions or numerical-companions-independent")
         }
     }.distinct()
     if (choices.size > 1) usageError("linear-traversal cannot be set to conflicting values")

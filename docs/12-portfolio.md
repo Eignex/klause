@@ -146,6 +146,21 @@ acquire exact authority through sharing. Open numerical fallback admits complete
 numerical workers whose typed terminals pass the same invocation and evidence checks;
 no worker materializes a finite domain for an open numerical declaration.
 
+The opt-in numerical companion recipe adds admitted finite search and joint linear
+repair to a retained numerical frontier. Finite admission uses proved source bounds
+and unchanged working coordinates; a declined finite projection leaves the other
+workers available. Each worker owns its traversal, LP state and cumulative quota
+under the containing portfolio deadline and decision/move allowance.
+
+Companions publish witnesses only, rechecking their complete coordinates against
+the captured affine source before publication. The frontier imports accepted
+incumbents for scoped dominance closure. Finite search reads conservative minimized
+incumbent cutoffs and source-checked objective floors from published frontier
+snapshots. Joint repair can center a fresh proposal on a checked pooled incumbent;
+pending proposals keep their scope until completion. Global proofs remain numerical
+derivations with complete sibling coverage. The independent companion recipe keeps
+the same workers and quotas while withholding incumbent and bound imports.
+
 ## Scheduling
 
 The scheduler assigns bounded slices, revisits pending preparation and reseeds stale
