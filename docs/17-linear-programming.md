@@ -141,6 +141,9 @@ row/column adjacency. Its explicit work, modeled allocation and scalar-width lim
 are independent of the exact-primal dimension guard. Admission reserves preparation
 once; resumed consultations keep the same admission and charge only active work
 and time. Closing that admission prevents further consultations.
+A changed scoped query spends a fresh operation and can reuse the prepared matrix
+without reserving its construction again. `SparseSourceLpPolicy` carries the
+preparation, floating, consultation and certificate allowances together.
 
 The scoped root-guidance operation advances the existing floating cursor under
 finite cumulative and per-consultation work limits. Pauses publish no coordinates
