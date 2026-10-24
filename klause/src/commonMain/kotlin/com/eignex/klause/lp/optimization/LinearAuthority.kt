@@ -31,6 +31,7 @@ internal data class LinearAuthorityResult(
     val paused: Boolean = false,
     val coordinateConflict: Boolean = false,
     val lpConflict: Boolean = false,
+    val primalStages: Map<String, Long> = emptyMap(),
 )
 
 internal class LinearAuthority(
@@ -83,6 +84,7 @@ internal class LinearAuthority(
 
     fun advance(source: SourceProofContext, cancellation: Cancellation, cuts: Boolean = false): LinearAuthorityResult {
         relaxedPoint = emptyMap()
+        primalStages.clear()
         if (cancellation()) {
             lp.close()
             return LinearAuthorityResult()
@@ -93,12 +95,17 @@ internal class LinearAuthority(
             lp.close()
             return LinearAuthorityResult()
         }
-        return result.copy(relaxedPoint = relaxedPoint,
+        return result.copy(relaxedPoint = relaxedPoint, primalStages = primalStages.toMap(),
             paused = result.paused || (result.evidence == null && result.split == null &&
                 result.incumbent == null && budget.funding?.paused == true))
     }
 
     private var relaxedPoint: Map<SourceCoordinate, Double> = emptyMap()
+    private val primalStages = linkedMapOf<String, Long>()
+
+    private fun observePrimal(stage: String) {
+        primalStages[stage] = (primalStages[stage] ?: 0L) + 1L
+    }
 
     private fun prepareQuery(
         source: SourceProofContext, cancellation: Cancellation, cuts: Boolean,
@@ -226,6 +233,11 @@ internal class LinearAuthority(
         if (guide != null) {
             val point = guide.point
             val fractionalCoordinates = fractional(coordinates, point)
+            observePrimal(when {
+                point == null -> "PrimalUnavailable"
+                fractionalCoordinates.isNotEmpty() -> "PrimalFractional"
+                else -> "PrimalIntegral"
+            })
             val fractions = fractionalCoordinates.filter { candidate ->
                 val threshold = candidate.floorSplit().second
                 val lower = source.scope.condition.lower[candidate.first]
@@ -237,6 +249,9 @@ internal class LinearAuthority(
                 ?.let { sample(source, coordinates, it) }?.takeIf {
                     checked(SourceClaim.Witness(it), SourceDerivation.SourceWitness) != null
                 }
+            if (point != null && fractionalCoordinates.isEmpty()) {
+                observePrimal(if (candidate == null) "PrimalSourceRejected" else "PrimalSourceChecked")
+            }
             if (candidate != null && bound != null) {
                 val value = (point.indices.fold(constant) { value, id -> value + costs[id] * point[id] }) * sign
                 val proof = checked(SourceClaim.Optimal(candidate, SourceValue.Rational(value)),
@@ -246,9 +261,11 @@ internal class LinearAuthority(
             if (fractions.isNotEmpty()) return LinearAuthorityResult(bound = bound, incumbent = candidate,
                 split = fractions.first().floorSplit(), fractional = fractions)
             if (budget.admitsDimensions(costs.size, guide.workingRows.toLong())) {
+                observePrimal("PrimalExactFallback")
                 val exact = checkSource(source, cancellation, cuts = cuts)
                 return exact.copy(bound = exact.bound ?: bound, incumbent = exact.incumbent ?: candidate)
             }
+            if (candidate == null) observePrimal("PrimalRecoveryDimension")
             return LinearAuthorityResult(bound = bound, incumbent = candidate)
         }
         val endpoint = closure.exactPrimal?.take(coordinates.size)
