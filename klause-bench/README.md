@@ -1307,9 +1307,12 @@ weight falls 27.83→13.95 GB while reached nodes increase. Weights are statisti
 estimates, and sample shares alone establish no speedup. The ordinary elapsed
 portfolio runs do not establish identical search trajectories. The focused
 [7995 JFR](https://lab.eignex.com/jobs/7995) comparison isolates dividend-indexed
-filtering against retained full scanning. Ordinary
-[8004](https://lab.eignex.com/jobs/8004) compares bounded indexed retention with
-main, including the large Coprime-40 resource control.
+filtering against retained full scanning on AWS/Linux/amd64. Its median node
+increase is about 0.5%, while sampled search allocation rises 8.43→9.10 GB;
+the lower filtering sample share establishes no whole-solver speedup. Ordinary
+[8009](https://lab.eignex.com/jobs/8009) compares bounded full scanning and indexed
+retention with main, including the large Coprime-40 resource control. Keep its
+actual platform cohorts separate.
 These focused measurements establish no corpus-wide speed or verdict gain.
 
 ### Elective LP harvest controls
