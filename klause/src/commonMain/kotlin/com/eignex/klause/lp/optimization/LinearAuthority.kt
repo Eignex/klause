@@ -113,7 +113,8 @@ internal class LinearAuthority(
     private val primalStages = linkedMapOf<String, Long>()
 
     private fun observePrimal(stage: String, count: Long = 1L) {
-        primalStages[stage] = (primalStages[stage] ?: 0L) + count
+        val previous = primalStages[stage] ?: 0L
+        primalStages[stage] = if ("Max" in stage) maxOf(previous, count) else previous + count
     }
 
     private fun recover(

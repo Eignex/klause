@@ -199,7 +199,8 @@ internal class LinearAuthorityTraversal(
             else authority.check(branch, cancellation)
         for ((stage, count) in result.primalStages) {
             val key = "numerical$stage"
-            observations[key] = (observations[key] ?: 0L) + count
+            val previous = observations[key] ?: 0L
+            observations[key] = if ("Max" in stage) maxOf(previous, count) else previous + count
         }
         if (result.paused) {
             current.pending = true

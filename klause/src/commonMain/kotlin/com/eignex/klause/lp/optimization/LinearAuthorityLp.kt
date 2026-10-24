@@ -29,6 +29,7 @@ import com.eignex.klause.util.Cancellation
 internal data class LinearAuthorityLpShape(
     val inputRows: Int, val rows: Int, val columns: Int, val admitted: Boolean,
     val sparse: Boolean = false, val phase: String? = null,
+    val prepared: Boolean = true,
 )
 
 internal data class LinearAuthorityLpResult(
@@ -130,7 +131,7 @@ internal class LinearAuthorityLp(
         }.also {
             val workingRows = prepared?.rows?.size ?: rows.size
             onShape(LinearAuthorityLpShape(rows.size, workingRows, costs.size,
-                budget.admitsDimensions(costs.size, workingRows.toLong())))
+                budget.admitsDimensions(costs.size, workingRows.toLong()), prepared = prepared != null))
         }
     }
 
@@ -217,7 +218,14 @@ internal class LinearAuthorityLp(
         progress: LinearPrimalRecoveryProgress,
     ): List<BigFraction>? = session?.withGuidance(cancellation) { token ->
         recoverLinearPrimal(coordinates, point, rows, inactive, token, complete = { residual, columns, active ->
-            LinearAuthorityLp(budget, onShape).use { completion ->
+            LinearAuthorityLp(budget, { shape ->
+                onShape(shape)
+                if (shape.prepared) {
+                    observe("PrimalRecoveryComponentMaxColumns", shape.columns.toLong())
+                    observe("PrimalRecoveryComponentMaxRows", shape.rows.toLong())
+                    if (!shape.admitted) observe("PrimalRecoveryComponentDimension", 1L)
+                }
+            }).use { completion ->
                 completion.solve(residual, List(columns) { BigFraction.ZERO }, BigFraction.ZERO, active)
                     ?.result?.exactPrimal?.take(columns)
             }
