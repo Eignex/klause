@@ -623,10 +623,8 @@ internal class CpToLpRelaxation(
     /**
      * Build only the **objective cone** — the rows and variables transitively connected to the
      * objective through the linear/Boolean constraints — and **drop every big-M [ReifiedLinear] row**.
-     * The result is a small structural sub-relaxation that always fits the dense-tableau cap (no
-     * disjunctive ordering bools), yet is a genuine lower bound: for scheduling it is the
-     * critical-path / longest-path bound (precedence + objective, machine-disjunctions removed). Any
-     * subset of constraints is a relaxation, so the bound is sound; this is just a cheaper, looser one.
+     * The result is a structural sub-relaxation subject to the ordinary size and work guards. For
+     * scheduling it supplies the critical-path bound with machine-disjunction rows removed.
      * When set, the column-heavy hull / circuit / cut / cumulative features are forced off — the cone
      * probe is deliberately the minimal linear+Boolean relaxation.
      */
@@ -716,57 +714,8 @@ internal class CpToLpRelaxation(
         }
     }.iterator()
 
-    /**
-     * Objective-cone membership, structural (depends only on `Problem.factors` and the
-     * objective, never on live domains), so it is computed once and reused across nodes. `first` is
-     * per-int-var, `second` per-bool-var: `true` when the variable is transitively connected to the
-     * objective through a cone-relevant factor (every LP-emittable type except the dropped big-M
-     * [ReifiedLinear]). A factor is emitted in cone mode iff it touches the cone — and by closure a
-     * factor that touches the cone has all its variables in the cone. Null when [objectiveCone] is off.
-     */
-    private val cone: Pair<BooleanArray, BooleanArray>? by lazy {
-        if (objectiveCone) computeObjectiveCone() else null
-    }
-
-    /** Fixpoint closure from the objective's support over the cone-relevant factors (see [cone]). */
-    private fun computeObjectiveCone(): Pair<BooleanArray, BooleanArray> {
-        val intIn = BooleanArray(problem.numIntVars)
-        val boolIn = BooleanArray(problem.numBoolVars)
-        objective?.let { obj ->
-            for (i in obj.intCoefficientValues.indices) if (obj.intCoefficientValues[i] != 0L) intIn[i] = true
-            for (b in obj.boolWeightValues.indices) if (obj.boolWeightValues[b] != 0L) boolIn[b] = true
-        }
-        var changed = true
-        while (changed) {
-            changed = false
-            for (f in problem.factors) {
-                if (coneTouches(f, intIn, boolIn)) changed = coneMark(f, intIn, boolIn) || changed
-            }
-        }
-        return intIn to boolIn
-    }
-
-    /** Whether [f] extends the LP cone and shares a variable with it. */
-    private fun coneTouches(f: Factor, intIn: BooleanArray, boolIn: BooleanArray): Boolean =
-        f.extendsLpObjectiveCone() && (f.intVars.any { intIn[it] } || f.boolVars.any { boolIn[it] })
-
-    /** Add every variable of a cone-extending [f] to the cone; true when anything joins the cone. */
-    private fun coneMark(f: Factor, intIn: BooleanArray, boolIn: BooleanArray): Boolean {
-        if (!f.extendsLpObjectiveCone()) return false
-        var changed = false
-        for (v in f.intVars) {
-            if (!intIn[v]) {
-                intIn[v] = true
-                changed = true
-            }
-        }
-        for (b in f.boolVars) {
-            if (!boolIn[b]) {
-                boolIn[b] = true
-                changed = true
-            }
-        }
-        return changed
+    private val cone: FactorConeProjection? by lazy {
+        if (objectiveCone) FactorConeProjection(problem, objective) else null
     }
 
     /** Per-hull dense-tableau caps, shared with [com.eignex.klause.lp.bounding.LpAutoConfig]'s size
@@ -829,7 +778,7 @@ internal class CpToLpRelaxation(
             val coneL = cone
             for (id in problem.factors.indices) {
                 val factor = problem.factors[id]
-                if (coneL != null && !coneTouches(factor, coneL.first, coneL.second)) continue
+                if (coneL != null && !coneL.contains(id)) continue
                 if (realResidual && !touchesReals(factor)) continue
                 add(LpEmissionRegion(LpEmissionKind.FACTOR, id))
             }
@@ -1278,9 +1227,7 @@ internal class CpToLpRelaxation(
             for (factorId in if (emits(LpEmissionKind.FACTOR)) factorIndices() else emptyList()) {
                 val factor = problem.factors[factorId]
                 checkCancellation()
-                // In cone mode emit only factors connected to the objective; this also drops
-                // every big-M ReifiedLinear row (they never extend the cone — see [coneTouches]).
-                if (coneL != null && !coneTouches(factor, coneL.first, coneL.second)) continue
+                if (coneL != null && !coneL.contains(factorId)) continue
                 if (realResidual && !touchesReals(factor)) continue
                 currentFactorId = factorId
                 currentEmissionRoute = 0L
