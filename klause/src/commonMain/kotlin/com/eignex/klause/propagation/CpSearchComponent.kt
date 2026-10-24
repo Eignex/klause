@@ -268,6 +268,7 @@ class CpSearchComponent(
         publish: (SearchDecision, SearchAtomPremise) -> ComponentResult,
     ): ComponentResult {
         if (session.fixpointCancelled) return ComponentResult.Indeterminate
+        session.explanationState.finiteWork.begin()
         fun publishCompleted(decision: SearchDecision, premise: SearchAtomPremise): ComponentResult {
             if (session.fixpointCancelled) return ComponentResult.Indeterminate
             return try {

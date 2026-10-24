@@ -53,6 +53,7 @@ internal class MddPropagator(
         }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
+        state.finiteWork.begin()
         val inc = (state.refPayload[factorId] as? MddIncrementalState) ?: run {
             val fresh = MddIncrementalState(
                 state, seq, numStatesPerLayer, layerStarts, transitions, initial, accepting, recordStride, cost,

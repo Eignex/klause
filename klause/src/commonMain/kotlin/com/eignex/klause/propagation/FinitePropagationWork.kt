@@ -10,7 +10,11 @@ internal interface InterruptiblePropagator : Propagator {
 
 internal class FinitePropagationWork {
     var cancellation: Cancellation = Cancellation.Never
-    private var remaining = 0
+    private var remaining = 63
+
+    fun begin() {
+        remaining = 63
+    }
 
     fun check() {
         if (cancellation === Cancellation.Never) return
@@ -25,6 +29,6 @@ internal class FinitePropagationWork {
 }
 
 internal fun PropagationState.checkFiniteWork() {
-    work++
     finiteWork.check()
+    work++
 }
