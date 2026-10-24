@@ -33,7 +33,7 @@ import com.eignex.klause.util.Cancellation
 
 internal class LinearAuthorityTraversal(
     private val source: SourceProofContext,
-    budget: SourceLpBudget,
+    private val budget: SourceLpBudget,
     private val cancellation: Cancellation,
     private val pause: () -> Boolean,
     private val onIncumbent: (Sample) -> Unit,
@@ -97,6 +97,9 @@ internal class LinearAuthorityTraversal(
     private fun splitCreated() {
         pending++
         retained += 2
+        val condition = current.condition
+        budget.funding?.charge(0L, 1024L + 256L *
+            (condition.bools.size.toLong() + condition.lower.size + condition.upper.size))
         peakPending = maxOf(peakPending, pending)
     }
     var ray: SourceEvidence? = null

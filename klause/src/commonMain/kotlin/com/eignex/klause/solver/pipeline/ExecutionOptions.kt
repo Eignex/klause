@@ -122,7 +122,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** Cumulative source LP work, including preparation, numerical advances and certificates. */
         val sourceLpWorkLimit: ExecutionOption<Long?> = ExecutionOption("source-lp-work-limit", ValueKind.ALLOWANCE)
 
-        /** Cumulative sparse source preparation allocation in bytes. */
+        /** Cumulative sparse preparation and modeled retained coverage allocation in bytes. */
         val sourceLpAllocationLimit: ExecutionOption<Long?> =
             ExecutionOption("source-lp-allocation-limit", ValueKind.ALLOWANCE)
 
