@@ -1262,7 +1262,7 @@ internal object Compiler {
                 val tag = reader.nextChildTag() ?: return
                 when (tag) {
                     "group" -> streamGroup(reader)
-                    "block" -> if (reader.enterPeeked()) streamConstraints(reader)
+                    "block" -> if (reader.enterPeeked(::requireHardAttribute)) streamConstraints(reader)
                     else -> constraint(reader.materializeChild())
                 }
             }
@@ -1271,7 +1271,7 @@ internal object Compiler {
         /** Stream a `<group>`: materialize the (first, bounded) template, then instantiate one `<args>` row
          *  at a time, so a group over millions of rows never holds them all at once. */
         private fun streamGroup(reader: XmlReader) {
-            require(reader.enterPeeked()) { "group without a template constraint" }
+            require(reader.enterPeeked(::requireHardAttribute)) { "group without a template constraint" }
             val firstTag = reader.nextChildTag()
                 ?: throw UnsupportedXcsp3Exception("group without a template constraint")
             require(firstTag != "args") { "group template must precede its <args> rows" }
@@ -1298,8 +1298,13 @@ internal object Compiler {
         }
 
         private fun requireHardConstraint(element: XmlElement) {
-            if (element.attributes.keys.any { it in GUARDED_ATTRIBUTES } || element.attr("type") == "soft"
-            ) throw UnsupportedXcsp3Exception("reified or soft constraint '${element.tag}'")
+            for ((name, value) in element.attributes) requireHardAttribute(name, value)
+        }
+
+        private fun requireHardAttribute(name: String, value: String) {
+            if (name in GUARDED_ATTRIBUTES || name == "type" && value == "soft") {
+                throw UnsupportedXcsp3Exception("reified or soft constraint attribute '$name'")
+            }
         }
 
         private fun argsTokens(args: XmlElement): List<String> = args.textContent.splitWs().flatMap { expandNames(it) }

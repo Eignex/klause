@@ -226,6 +226,27 @@ class Xcsp3AffineDistinctnessTest {
     }
 
     @Test
+    fun `streamed group and block guards should reject unsupported source semantics`() {
+        for (attribute in listOf("reifiedBy=\"b\"", "hreifiedFrom=\"b\"", "hreifiedTo=\"b\"", "type=\"soft\"")) {
+            for (container in listOf("group", "block")) {
+                val body = if (container == "group") {
+                    """<intension>ne(%0,%1)</intension><args>x[0] x[1]</args>
+                        <args>x[0] x[2]</args><args>x[1] x[2]</args>"""
+                } else {
+                    """<intension>ne(x[0],x[1])</intension><intension>ne(x[0],x[2])</intension>
+                        <intension>ne(x[1],x[2])</intension>"""
+                }
+                assertFailsWith<UnsupportedXcsp3Exception>("$container $attribute") {
+                    Xcsp3.parse(
+                        """<instance><variables><array id="x" size="[3]">0..1</array></variables>
+                            <constraints><$container $attribute>$body</$container></constraints></instance>""",
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
     fun `recovered channels should have zero objective coefficients`() {
         val parsed = Xcsp3.parse(
             """<instance><variables><array id="x" size="[3]">0..3</array></variables>
