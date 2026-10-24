@@ -18,7 +18,8 @@ so the engine never depends on presolve. Finite rounds follow under one
 bounded-fixpoint scheduler shared with the source lane: a pass above the cheapest
 tier reruns only after other passes changed at least 1% of the model and met its
 observed cost/yield threshold. Charged analysis and rebuild work, divided by the
-pass's entry weight and retained yield, estimates the intervening changes needed
+pass's entry weight (unit weight for self-metered passes) and retained yield,
+estimates the intervening changes needed
 before another analysis. Yield is the largest of net occurrences removed, factors
 removed, reported columns narrowed or columns fixed, with a floor of one. Distinct
 new Boolean unit pins count as fixed columns; existing units and finite root fixings
@@ -48,7 +49,7 @@ guarantee.
 | Family | Passes |
 |---|---|
 | Linear | Coefficient strengthening, Diophantine tightening, bound fusion, affine elimination, sub-sum aggregation, row sparsification, dependent equalities, singleton projection |
-| Structural | Redundancy and subsumption, structural reduction, comparison-clause folding, duplicate-column merging, dual fixing |
+| Structural | Redundancy and subsumption, structural reduction, extensional composition, comparison-clause folding, duplicate-column merging, dual fixing |
 | Boolean | Original-clause subsumption, implication graph, bounded variable elimination, blocked clause elimination, at-most-one clique merging, XOR unit derivation |
 | Symmetry | Symmetry breaking and value precedence |
 | Probing | Failed literals, integer bounds and holes, open ranges |
