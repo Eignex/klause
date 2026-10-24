@@ -312,7 +312,7 @@ internal class LinearAuthority(
                 val exact = checkSource(source, cancellation, cuts = cuts)
                 return exact.copy(bound = exact.bound ?: bound, incumbent = exact.incumbent ?: candidate)
             }
-            if (candidate == null) observePrimal("PrimalRecoveryDimension")
+            if (candidate == null) observePrimal("PrimalExactDimension")
             return LinearAuthorityResult(bound = bound, incumbent = candidate)
         }
         val endpoint = closure.exactPrimal?.take(coordinates.size)
