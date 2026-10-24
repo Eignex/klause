@@ -204,6 +204,10 @@ internal class LinearAuthorityTraversal(
         }
         current.pending = false
         current.result = result
+        for ((stage, count) in result.primalStages) {
+            val key = "numerical$stage"
+            observations[key] = (observations[key] ?: 0L) + count
+        }
         observe("numericalChecks")
         if (result.coordinateConflict) observe("numericalCoordinateConflicts")
         if (result.lpConflict) observe("numericalLpConflicts")
