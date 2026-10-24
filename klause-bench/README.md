@@ -2412,6 +2412,50 @@ incumbent acquisition remain limits; automatic routing is unchanged. This
 qualification supports consumed scoped refutations, not a general runtime or
 optimization improvement.
 
+#### Checked source rounding cuts
+
+[Qualification 8117](https://lab.eignex.com/jobs/8117) compares `f59091a21a` with
+`b0c559df3a`: the same fifteen source hashes as 8087 plus p0201, p0282, stein27
+and stein45 holdouts, frontier and joint LS, three seeds, exact/P1/10 s, presolve
+off and source validation enabled. All 228 cases complete on Mac/aarch64 with
+matching source hashes, runtime and 3 GiB Serial-GC options. All 114 pairs retain
+feasibility, objective and native proof outcomes; all twelve published final
+witnesses pass solchecker. Native cut and bound checks are separate from these
+independent witness checks and provide no exported proof certificate.
+
+The single-row rounding family retains four checked cuts on p0033, whose source
+SHA-256 is `8ccff819023237c79ef32e238a5da9348725ce9a4425d48888baf3a0b3b42628`.
+Its frontier results repeat in all three seeds under 256 LP operations:
+
+| Observation | Baseline | Rounding |
+| --- | ---: | ---: |
+| Checks / fractional splits | 295 / 147 | 359 / 179 |
+| Checked coordinate conflicts | 12 | 22 |
+| Closed / pending alternatives | 121 / 27 | 99 / 81 |
+| Preparation work | 5,154 | 7,133 |
+| Floating work | 1,227,470 | 1,764,384 |
+| Bound certification work | 644,562 | 946,059 |
+| Farkas certification work | 705,814 | 676,113 |
+
+The final checked lower bound weakens from
+`3270739229377822693/1125899906842624` to
+`12811164679999481365/4503599627370496`. Cut construction spends 1,067 modeled
+support operations; query proof checking spends 27,284 steps, included in bound
+certification work. Joint LS also consumes the cuts, but its separate uncut root
+guide and cut query require two matrix preparations instead of one. The other
+eighteen sources, including all four holdouts, retain no eligible cuts. The
+holdouts preserve frontier checks, splits and pending counts. These observations
+justify the source-checked integration as an explicit frontier option, with no
+general search or runtime improvement claim; ordinary guidance leaves cuts off.
+Small deterministic controls check a bound increase from 3/2 to 2 and a checked
+root refutation beyond exact-primal admission.
+
+The qualification revision reports borrowed-authority cut stage counters
+cumulatively in joint repair; use its canonical `smtSourceLp*` counters for costs.
+Traversal work deltas and maximum retained/active-cut gauges avoid that repeated
+sum. Interrupted cut preparation and checking report their consumed work. The
+rounding family and proof rules are unchanged by those accounting corrections.
+
 `bench.profile.MpsProofFrontier` takes `suite=ID problem=NAME sha256=HEX exact=true|false`
 for one hash-matched original source. It uses the same numerical source setup and
 invocation, seed 3 and a ten-second solve deadline under the existing LP allowances.
