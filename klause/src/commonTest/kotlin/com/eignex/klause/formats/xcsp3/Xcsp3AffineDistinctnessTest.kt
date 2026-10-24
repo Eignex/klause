@@ -3,7 +3,7 @@ package com.eignex.klause.formats.xcsp3
 import com.eignex.klause.brute.BruteForceParams
 import com.eignex.klause.brute.BruteForceSolver
 import com.eignex.klause.factor.PropagationReasonOracle
-import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.factor.global.Distinct
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
@@ -30,9 +30,9 @@ class Xcsp3AffineDistinctnessTest {
                     </group></constraints></instance>""",
             )
 
-            assertEquals(2, parsed.problem.factors.count { it is AllDifferent }, expression)
-            assertEquals(10, parsed.problem.numIntVars, expression)
-            assertEquals(6, parsed.definitionHints.size, expression)
+            assertEquals(2, parsed.problem.factors.count { it is Distinct }, expression)
+            assertEquals(4, parsed.problem.numIntVars, expression)
+            assertTrue(parsed.definitionHints.isEmpty(), expression)
         }
     }
 
@@ -121,28 +121,28 @@ class Xcsp3AffineDistinctnessTest {
     }
 
     @Test
-    fun `affine channel hole reasons should be entailed by their source relation`() {
+    fun `affine hole reasons should be entailed by their source relation`() {
         val parsed = Xcsp3.parse(
             """<instance><variables><var id="x">1 3</var><var id="y">0..2</var>
                 <var id="z">-1..1</var></variables><constraints>
                 <intension>ne(x,add(y,1))</intension><intension>ne(x,add(z,2))</intension>
                 <intension>ne(add(y,1),add(z,2))</intension></constraints></instance>""",
         ).problem
-        val channel = parsed.factors.filterIsInstance<Element>().single { it.idx == 1 }
+        val global = parsed.factors.filterIsInstance<Distinct>().single()
         val problem = Problem(
             numBoolVars = parsed.numBoolVars,
             numIntVars = parsed.numIntVars,
             declaredIntDomains = parsed.declaredIntDomains,
-            factors = (listOf(channel) + parsed.factors.filter { it !== channel }).toTypedArray(),
+            factors = (listOf(global) + parsed.factors.filter { it !== global }).toTypedArray(),
         )
 
-        PropagationReasonOracle.assertReasonsImply(problem, "affine channel hole") { state ->
+        PropagationReasonOracle.assertReasonsImply(problem, "affine source hole") { state ->
             state.excludeIntValue(1, 1)
         }
     }
 
     @Test
-    fun `wide affine channels should retain exact rows without enumerating their span`() {
+    fun `wide affine views should retain source coordinates without enumerating their span`() {
         val parsed = Xcsp3.parse(
             """<instance><variables><array id="x" size="[3]">0..1000000000000</array></variables>
                 <constraints><intension>ne(x[0],add(x[1],1))</intension>
@@ -150,20 +150,20 @@ class Xcsp3AffineDistinctnessTest {
                 <intension>ne(add(x[1],1),add(x[2],2))</intension></constraints></instance>""",
         )
 
-        assertEquals(5, parsed.problem.numIntVars)
-        assertEquals(1, parsed.problem.factors.count { it is AllDifferent })
+        assertEquals(3, parsed.problem.numIntVars)
+        assertEquals(1, parsed.problem.factors.count { it is Distinct })
         assertTrue(parsed.problem.factors.none { it is Element })
     }
 
     @Test
-    fun `recovered matching reasons should be entailed by affine source channels`() {
+    fun `recovered matching reasons should be entailed by affine source operands`() {
         val parsed = Xcsp3.parse(
             """<instance><variables><array id="x" size="[3]">0..3</array></variables>
                 <constraints><intension>ne(x[0],add(x[1],1))</intension>
                 <intension>ne(x[0],add(x[2],2))</intension>
                 <intension>ne(add(x[1],1),add(x[2],2))</intension></constraints></instance>""",
         ).problem
-        val global = parsed.factors.filterIsInstance<AllDifferent>().single()
+        val global = parsed.factors.filterIsInstance<Distinct>().single()
         val problem = Problem(
             numBoolVars = parsed.numBoolVars,
             numIntVars = parsed.numIntVars,
@@ -172,8 +172,8 @@ class Xcsp3AffineDistinctnessTest {
         )
 
         PropagationReasonOracle.assertReasonsImply(problem, "affine Hall") { state ->
-            state.tightenIntMin(global.vars[0], 1) && state.tightenIntMax(global.vars[0], 2) &&
-                state.tightenIntMax(global.vars[1], 2)
+            state.tightenIntMin(0, 1) && state.tightenIntMax(0, 2) &&
+                state.tightenIntMax(1, 2)
         }
     }
 
@@ -207,7 +207,7 @@ class Xcsp3AffineDistinctnessTest {
                     <intension>$last</intension></constraints></instance>""",
             )
 
-            assertTrue(parsed.problem.factors.none { it is AllDifferent }, last)
+            assertTrue(parsed.problem.factors.none { it is Distinct }, last)
         }
     }
 
@@ -247,7 +247,7 @@ class Xcsp3AffineDistinctnessTest {
     }
 
     @Test
-    fun `recovered channels should have zero objective coefficients`() {
+    fun `recovery should preserve source objective coefficients`() {
         val parsed = Xcsp3.parse(
             """<instance><variables><array id="x" size="[3]">0..3</array></variables>
                 <constraints><intension>ne(x[0],add(x[1],1))</intension>
@@ -256,7 +256,7 @@ class Xcsp3AffineDistinctnessTest {
                 <objectives><minimize type="sum"><list>x[]</list></minimize></objectives></instance>""",
         )
 
-        assertContentEquals(longArrayOf(1, 1, 1, 0, 0), parsed.objective!!.intCoefficients)
+        assertContentEquals(longArrayOf(1, 1, 1), parsed.objective!!.intCoefficients)
     }
 
     @Test
@@ -270,12 +270,12 @@ class Xcsp3AffineDistinctnessTest {
                 <intension>ne(sub(y,z),-1)</intension></constraints></instance>""",
         )
 
-        assertEquals(1, parsed.problem.factors.count { it is AllDifferent })
+        assertEquals(1, parsed.problem.factors.count { it is Distinct })
         assertTrue(PropagationSession(parsed.problem).isUnsatAtRoot)
     }
 
     @Test
-    fun `finite affine channels should preserve signed word boundary assignments`() {
+    fun `finite affine views should preserve signed word boundary assignments`() {
         val offset = "add(mul(2,mul(2147483647,2147483647)),mul(4,2147483647))"
         val parsed = Xcsp3.parse(
             """<instance><variables><array id="x" size="[3]">0..1</array></variables>
@@ -293,7 +293,7 @@ class Xcsp3AffineDistinctnessTest {
     }
 
     @Test
-    fun `unsafe shifted domains should keep their exact source rows`() {
+    fun `shifted domains outside signed words should retain source coordinates`() {
         val parsed = Xcsp3.parse(
             """<instance><variables><array id="x" size="[3]">0..${Long.MAX_VALUE}</array></variables>
                 <constraints><intension>ne(sub(x[0],x[1]),1)</intension>
@@ -302,7 +302,7 @@ class Xcsp3AffineDistinctnessTest {
         )
 
         assertEquals(3, parsed.problem.numIntVars)
-        assertTrue(parsed.problem.factors.none { it is AllDifferent })
+        assertEquals(1, parsed.problem.factors.count { it is Distinct })
     }
 
     @Test
@@ -327,7 +327,7 @@ class Xcsp3AffineDistinctnessTest {
 
         assertEquals(3, parsed.problem.numIntVars)
         assertEquals(11, parsed.problem.factors.size)
-        assertTrue(parsed.problem.factors.none { it is AllDifferent })
+        assertTrue(parsed.problem.factors.none { it is Distinct })
     }
 
     @Test

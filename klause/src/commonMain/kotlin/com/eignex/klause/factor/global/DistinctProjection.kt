@@ -16,15 +16,19 @@ import com.eignex.klause.util.bigIntOf
 
 internal fun Distinct.propagationView(): Propagator {
     if (variables.reals.isNotEmpty()) return NoPropagator
+    affinePropagationView()?.let { return it }
     val inputBooleans = operands.flatMap { it.references.toList() }.filter(Term::isBool)
         .map { Lit.variable(Term.lit(it)) }.distinct()
     return object : Propagator {
         override fun propagate(state: PropagationState, factorId: Int): Boolean {
             if (variables.ints.any { state.intDomains[it].min != state.intDomains[it].max } ||
                 inputBooleans.any { state.boolValues[it] == null }
-            ) return true
+            ) {
+                return true
+            }
             val holds = collisions(
-                { bigIntOf(state.intDomains[it].min) }, { requireNotNull(state.boolValues[it]) },
+                { bigIntOf(state.intDomains[it].min) },
+                { requireNotNull(state.boolValues[it]) },
                 { error("finite distinct operand has a real coordinate") },
             ) == 0
             return if (activator == LinearRow.ALWAYS) holds else state.pinLit(Lit.make(activator, holds))
@@ -32,7 +36,9 @@ internal fun Distinct.propagationView(): Propagator {
     }
 }
 
-internal fun Distinct.scoringView(): Invariant = DistinctInvariant(this)
+internal fun Distinct.scoringView(): Invariant = affineIntegerOperands()?.let {
+    AffineDistinctInvariant(it.vars, it.offsets)
+} ?: DistinctInvariant(this)
 
 private class DistinctInvariant(private val factor: Distinct) : Invariant {
     private fun score(
@@ -47,7 +53,8 @@ private class DistinctInvariant(private val factor: Distinct) : Invariant {
         if (factor.variables.reals.any { !realValue(it).isFinite() }) return state.violationSoftCap
         fun boolean(id: Int): Boolean = state.assignment.boolValue(id) xor (id == flippedBoolean)
         val collisions = factor.collisions(
-            { bigIntOf(if (it == changedInteger) integer else state.assignment.intValue(it)) }, ::boolean,
+            { bigIntOf(if (it == changedInteger) integer else state.assignment.intValue(it)) },
+            ::boolean,
             { requireNotNull(BigFraction.ofDouble(realValue(it))) },
         )
         val holds = collisions == 0
