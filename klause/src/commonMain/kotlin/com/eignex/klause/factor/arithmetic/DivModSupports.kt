@@ -4,7 +4,6 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.LongHashSet
-import com.eignex.klause.util.MutableLongIntMap
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.fitsLong
 import com.eignex.klause.util.toLongExact
@@ -20,8 +19,6 @@ internal class DivModSupports(relation: DivMod, state: PropagationState) {
     private val supports = Array(variables.size) { LongHashSet() }
     private val minima = LongArray(variables.size)
     private val maxima = LongArray(variables.size)
-    private val dividendIndices = MutableLongIntMap()
-    private val dividendOffsets: IntArray
     private val tuples: LongArray
     val storageCells: Int = 64 + sourceDividend.span().size * (sourceDivisor?.span()?.size ?: 1) * roles.size
 
@@ -31,11 +28,8 @@ internal class DivModSupports(relation: DivMod, state: PropagationState) {
         val constant = relation.constantDivisor
         val constantWord = constant?.takeIf { it.fitsLong() }?.toLongExact()
         val rows = LongArrayList()
-        dividendOffsets = IntArray(dividends.size + 1)
         for (i in 0 until dividends.size) {
             val av = dividends.valueAt(i)
-            dividendIndices.put(av, i)
-            dividendOffsets[i] = rows.size
             for (j in 0 until (divisors?.size ?: 1)) {
                 val bv = divisors?.valueAt(j)
                 val wordDivisor = bv ?: constantWord
@@ -54,7 +48,6 @@ internal class DivModSupports(relation: DivMod, state: PropagationState) {
                 for (value in values) rows.add(value)
             }
         }
-        dividendOffsets[dividends.size] = rows.size
         tuples = rows.toLongArray()
     }
 
@@ -77,32 +70,10 @@ internal class DivModSupports(relation: DivMod, state: PropagationState) {
         for (values in supports) values.clear()
         minima.fill(Long.MAX_VALUE)
         maxima.fill(Long.MIN_VALUE)
-        val dividends = state.intDomains[dividend].span()
-        for (i in 0 until dividends.size) {
-            val index = dividendIndices.getOrDefault(dividends.valueAt(i), -1)
-            check(index >= 0)
-            collectSupports(state, dividendOffsets[index], dividendOffsets[index + 1])
-        }
-        for (column in variables.indices) {
-            val values = supports[column]
-            if (values.isEmpty()) return false
-            val variable = variables[column]
-            if (!state.tightenIntMin(variable, minima[column], reason) ||
-                !state.tightenIntMax(variable, maxima[column], reason)) return false
-            val domain = state.intDomains[variable].spanOrNull(limit.toLong()) ?: continue
-            for (i in 0 until domain.size) {
-                val value = domain.valueAt(i)
-                if (value !in values && !state.excludeIntValue(variable, value, reason)) return false
-            }
-        }
-        return true
-    }
-
-    private fun collectSupports(state: PropagationState, start: Int, end: Int) {
-        var row = start
-        while (row < end) {
+        var row = 0
+        while (row < tuples.size) {
             var live = true
-            for (role in 1 until roles.size) {
+            for (role in roles.indices) {
                 if (tuples[row + role] !in state.intDomains[roles[role]]) {
                     live = false
                     break
@@ -119,5 +90,18 @@ internal class DivModSupports(relation: DivMod, state: PropagationState) {
             }
             row += roles.size
         }
+        for (column in variables.indices) {
+            val values = supports[column]
+            if (values.isEmpty()) return false
+            val variable = variables[column]
+            if (!state.tightenIntMin(variable, minima[column], reason) ||
+                !state.tightenIntMax(variable, maxima[column], reason)) return false
+            val domain = state.intDomains[variable].spanOrNull(limit.toLong()) ?: continue
+            for (i in 0 until domain.size) {
+                val value = domain.valueAt(i)
+                if (value !in values && !state.excludeIntValue(variable, value, reason)) return false
+            }
+        }
+        return true
     }
 }
