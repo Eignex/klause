@@ -432,6 +432,13 @@ A checked incumbent can close a numerical node whose scoped bound excludes a
 better objective. Coverage retains that bound without requiring a local optimum
 or another split; a global optimum still requires the checked root witness and
 the complete composed bound. Missing bounds and uncovered siblings remain unresolved.
+Fractional branching retains every eligible exact integer coordinate. Invocation-owned
+history records nonnegative checked immediate-child bound gains per unit movement,
+separately for the lower and upper split. Two observations in each direction permit
+a balanced gain estimate to choose a coordinate; absent, nonfinite or zero estimates
+retain source order. These estimates guide exhaustive splits only and supply no
+pruning or proof authority. Indicator splits and integral strict-limit proposals
+do not train fractional history.
 `NumericalLinearRequest.solve` serves MPS through the same numerical authority, and
 these adapters never confer source semantics on a rounded or tolerance model.
 

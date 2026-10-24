@@ -2,6 +2,7 @@ package com.eignex.klause.bench.profile
 
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.optimization.LinearAuthoritySemantics
+import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
@@ -16,6 +17,9 @@ import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.div
+import com.eignex.klause.util.minus
 import java.util.IdentityHashMap
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -30,6 +34,54 @@ internal class NumericalFrontierSnapshot(
 ) {
     private val checked = IdentityHashMap<SourceEvidence, JsonObject>()
     private var remaining = 4096
+
+    fun probeRoot(invocation: Any, emit: (JsonObject) -> Unit) {
+        val root = checkNotNull(field(checkNotNull(field(invocation, "component")), "root"))
+        val result = checkNotNull(field(root, "result"))
+        @Suppress("UNCHECKED_CAST")
+        val candidates = field(result, "fractional") as List<Pair<SourceCoordinate, BigFraction>>
+        require(candidates.size <= 128)
+        for ((coordinate, value) in candidates) {
+            val integer = value.num / value.den
+            val floor = BigFraction.of(if (value.signum() < 0) integer - BIG_ONE else integer, BIG_ONE)
+            for (upper in listOf(true, false)) {
+                if (stop()) return
+                val threshold = if (upper) floor else floor + BigFraction.ONE
+                val condition = context.scope.condition
+                val childCondition = SourceCondition(condition.bools,
+                    condition.lower + if (upper) emptyMap() else mapOf(coordinate to threshold),
+                    condition.upper + if (upper) mapOf(coordinate to threshold) else emptyMap())
+                val child = SourceProofContext(context.scope.copy(condition = childCondition), context.coordinates,
+                    context.premises, context.objective, context.objectiveConstant,
+                    LinearAuthoritySemantics(context), context.semantics)
+                val probe = open(child, TheoryParams(maxLeaves = 1, timeout = stop, cancellation = stop, randomSeed = 3L))
+                try {
+                    run(probe) { _, _ -> }
+                    val node = checkNotNull(field(checkNotNull(field(probe, "component")), "root"))
+                    val checked = field(node, "result") ?: continue
+                    val bound = field(checked, "bound") as SourceEvidence?
+                    val evidence = field(checked, "evidence") as SourceEvidence?
+                    emit(buildJsonObject {
+                        put("coordinate", coordinate.id)
+                        put("value", value.toString())
+                        put("upper", upper)
+                        put("threshold", threshold.toString())
+                        put("diagnosticOnly", true)
+                        put("sharedTraversalAllowance", false)
+                        put("operations", stats(probe).smt.sourceLp.operations)
+                        put("floatWork", stats(probe).smt.sourceLp.floatWork)
+                        bound?.let { put("bound", bound(it)) }
+                        evidence?.let {
+                            put("claim", it.claim::class.simpleName)
+                            put("check", SourceEvidenceVerifier(child.withLinearAuthority()).verify(it, stop).toString())
+                        }
+                    })
+                } finally {
+                    (probe as AutoCloseable).close()
+                }
+            }
+        }
+    }
 
     fun capture(invocation: Any): JsonObject {
         val stages = stats(invocation).smt.completeSearchStages.orEmpty()
