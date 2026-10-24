@@ -149,7 +149,7 @@ object Presolver {
     ): SourcePresolved {
         val passes = problemPasses(problem, config, context, PresolvePass.Capability.SOURCE)
         if (passes.isEmpty() || config.maxRounds == 0) return SourcePresolved(problem)
-        val ctx = context.withCancellation(cancellation)
+        var ctx = context.withCancellation(cancellation)
             .withPresolveBudget(context.presolveBudget)
             .withSubsumeIncremental(SubsumeMemo())
         val host = object : PresolveRoundEngine.RoundHost {
@@ -197,6 +197,7 @@ object Presolver {
                         deductionsChanged = delta.bounds != null,
                     )
                     current = current.withSourcePassDelta(delta) ?: return@observeRoundPass PassOutcome.INFEASIBLE
+                    ctx = ctx.withObjective(delta.objective)
                     booleanPins.record(invocation, delta.addedFactors, entrySize::isBooleanPinned)
                     if (!delta.rebuild.isEmpty) rebuilds.add(delta.rebuild)
                     changed += delta.droppedIndices.size + delta.addedFactors.size + narrowed
@@ -218,7 +219,8 @@ object Presolver {
             host,
             config.abortFraction,
         )
-        return SourcePresolved(host.current, rounds.fired, rounds.infeasible, SourceRebuilds.compose(host.rebuilds))
+        return SourcePresolved(host.current, rounds.fired, rounds.infeasible, SourceRebuilds.compose(host.rebuilds),
+            ctx.linearObjective)
     }
 
     private fun problemPasses(
@@ -282,7 +284,7 @@ object Presolver {
         // shrink the factor set, so a per-round ratio would spuriously read as underdetermined.
         val underdetermined = problem.factors.isNotEmpty() &&
             problem.numIntVars.toLong() > problem.factors.size.toLong() * UNDERDETERMINED_RATIO
-        val ctx = context.withCancellation(cancellation)
+        var ctx = context.withCancellation(cancellation)
             .withAffineUnderdetermined(underdetermined)
             .withAffinePivotOrder(config.affinePivotOrder)
             .withPresolveBudget(context.presolveBudget)
@@ -335,6 +337,7 @@ object Presolver {
                     booleanPins.record(invocation, delta.addedFactors) { root?.boolValueOrNull(it) != null }
                     parityInputs?.recordDelta(current.factors, delta.droppedIndices, delta.addedFactors)
                     current = current.withPassDelta(delta, ctx.bakeConfig)
+                    ctx = ctx.withObjective(delta.objective)
                     PassOutcome.CHANGED
                 }
             }
@@ -359,7 +362,7 @@ object Presolver {
             { mapping.reconstructFrom(host.current, it) },
             rounds.fired,
             rounds.infeasible || host.current.baked is PropagationResult.Unsat,
-        ).also { it.mapping = mapping }
+        ).also { it.mapping = mapping; it.objective = ctx.linearObjective }
     }
 
     /**
@@ -374,10 +377,11 @@ object Presolver {
         problem: BakedProblem,
         passes: List<PresolvePass>,
         maxRounds: Int,
-        ctx: PresolveContext,
+        initialContext: PresolveContext,
         cancellation: Cancellation,
         abortFraction: Double,
     ): Presolved {
+        var ctx = initialContext
         val session = ctx.presolveBudget.observePreparation(
             PresolvePreparationStage.FINITE_SESSION, PresolveLane.FINITE, problem, cancellation,
         ) { token, observation ->
@@ -447,6 +451,7 @@ object Presolver {
                     booleanPins.record(invocation, delta.addedFactors) { session.boolValueOf(it) != null }
                     parityInputs?.recordDelta(input.factors, delta.droppedIndices, delta.addedFactors)
                     session.applyDelta(delta)
+                    ctx = ctx.withObjective(delta.objective)
                     PassOutcome.CHANGED
                 }
             }
@@ -528,7 +533,7 @@ object Presolver {
             { mapping.reconstructFrom(transformed, it) },
             rounds.fired,
             rounds.infeasible || session.infeasible || transformed.baked is PropagationResult.Unsat,
-        ).also { it.mapping = mapping }
+        ).also { it.mapping = mapping; it.objective = ctx.linearObjective }
     }
 
     /** Compose per-pass reconstructs (application order) into the single solution-mapping function,

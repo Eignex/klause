@@ -69,6 +69,8 @@ class FinitePipelineRequest(
     } else {
         problem.preparedWithComponents(componentPlan, objective = objective)
     },
+    /** Whether the objective is the complete cost and permits exact affine substitution. */
+    val transformObjective: Boolean = true,
 ) {
     /** Finite projection data selected by [preparedPlan]. */
     val componentPlan: ComponentPlan = requireNotNull(preparedPlan.execution.finiteLinear) {
@@ -133,6 +135,7 @@ object FinitePipeline {
             request.cancellation,
             request.presolveBudget,
             finiteLane = true,
+            transformObjective = request.transformObjective,
         )
         // A source rewrite moves factor ownership with the factors, so the routing plan does not index the
         // model the engine is built from; an untouched model keeps the plan routing already built.
@@ -143,7 +146,9 @@ object FinitePipeline {
             ) { token, observation ->
                 prepared.problem.prepareExecutionPlan(
                     original = requireNotNull(request.preparedPlan.sourceModel),
-                    objective = request.preparedPlan.workingLinearObjective,
+                    objective = (prepared.objective ?: request.objective)?.let {
+                        if (request.preparedPlan.maximize) it.negated() else it
+                    },
                     maximize = request.preparedPlan.maximize,
                     preferFinite = true,
                     providers = request.preparedPlan.factorProjections?.providers ?: FactorProjectionProviders.Default,
@@ -228,7 +233,9 @@ object FinitePipeline {
             ) { token, observation ->
                 model.prepareExecutionPlan(
                     original = requireNotNull(request.preparedPlan.sourceModel),
-                    objective = request.preparedPlan.workingLinearObjective,
+                    objective = (outcome.objective ?: objective)?.let {
+                        if (request.preparedPlan.maximize) it.negated() else it
+                    },
                     maximize = request.preparedPlan.maximize,
                     preferFinite = true,
                     providers = providers,

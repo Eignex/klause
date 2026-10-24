@@ -525,6 +525,7 @@ internal fun FinitePipeline.solve(
             preparedPlan = request.shape.preparedPlan,
             engine = request.engine,
             objective = request.shape.linearObjective,
+            transformObjective = request.shape.localSearchObjective == null,
             presolveConfig = request.presolveConfig,
             explicitPresolveConfig = request.explicitPresolveConfig,
             solutionSetSensitive = request.solutionSetSensitive ||

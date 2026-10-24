@@ -21,6 +21,7 @@ import com.eignex.klause.presolve.SourceRebuilds
 import com.eignex.klause.presolve.asSampleLift
 import com.eignex.klause.presolve.equivalentLinear
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.IntArrayList
@@ -58,8 +59,8 @@ internal object AffineSingletons {
      * represent it. The contained slice (`x` in no other factor) is the zero-fold special case,
      * and is what lets an `n`-term definition be projected out.
      *
-     * Variables in [objectiveIntVars] are never eliminated: the objective reads them directly and
-     * the engine optimises over the presolved problem where an eliminated variable is unconstrained.
+     * Variables in [objectiveIntVars] stay protected unless [objective] supplies an exact objective
+     * whose aliases and translations can be substituted with checked coefficient arithmetic.
      */
     fun eliminateAffineSingletons(
         problem: BakedProblem,
@@ -70,6 +71,7 @@ internal object AffineSingletons {
         incrementalTouchedVars: IntArray? = null,
         maxFactors: Int = AFFINE_MAX_FACTORS,
         pivotOrder: AffinePivotOrder = AffinePivotOrder.MARKOWITZ,
+        objective: LinearObjective? = null,
     ): PassDelta {
         val domains = problem.rootIntDomains()
         val out = run(
@@ -83,6 +85,7 @@ internal object AffineSingletons {
             incrementalTouchedVars,
             maxFactors,
             pivotOrder,
+            objective,
         ) ?: return PassDelta()
         val rebuild = out.subs.asRebuilds()
         return PresolveShared.identityDelta(
@@ -90,7 +93,7 @@ internal object AffineSingletons {
             out.factors,
             domains,
             rebuild.asSampleLift(),
-        ).also { it.rebuild = rebuild }
+        ).also { it.rebuild = rebuild; it.objective = out.objective }
     }
 
     /**
@@ -108,6 +111,7 @@ internal object AffineSingletons {
         cancellation: Cancellation = Cancellation.Never,
         maxFactors: Int = AFFINE_MAX_FACTORS,
         pivotOrder: AffinePivotOrder = AffinePivotOrder.MARKOWITZ,
+        objective: LinearObjective? = null,
     ): SourceDelta {
         val out = run(
             problem,
@@ -120,12 +124,16 @@ internal object AffineSingletons {
             incrementalTouchedVars = null,
             maxFactors = maxFactors,
             pivotOrder = pivotOrder,
+            objective = objective,
         ) ?: return SourceDelta()
         return PresolveShared.sourceIdentityDelta(problem.factors, out.factors, out.subs.asRebuilds())
+            .also { it.objective = out.objective }
     }
 
     /** What one run of the elimination produced: the surviving factors and the substitutions it recorded. */
-    private class Eliminated(val factors: List<Factor>, val subs: List<AffineSub>)
+    private class Eliminated(
+        val factors: List<Factor>, val subs: List<AffineSub>, val objective: LinearObjective?,
+    )
 
     @Suppress("LongParameterList") // one body serves both lanes; the parameters are the lane's differences
     private fun run(
@@ -139,14 +147,19 @@ internal object AffineSingletons {
         incrementalTouchedVars: IntArray?,
         maxFactors: Int,
         pivotOrder: AffinePivotOrder,
+        objective: LinearObjective?,
     ): Eliminated? {
         if (problem.numIntVars == 0) return null
         // Membership is tested per candidate variable, so the caller's boxed set is unpacked once here
         // rather than boxing an Int on every check.
-        val objVars = IntHashSet().apply { for (v in objectiveIntVars) add(v) }
+        if (problem.factors.size > maxFactors) return null
+        val objectiveRewrite = objective?.takeUnless { problem.semantics.isApproximate }
+            ?.let { AffineObjective(it, cancellation) }
+        val objVars = IntHashSet().apply {
+            if (objectiveRewrite == null) for (v in objectiveIntVars) add(v)
+        }
         // On multi-million-factor models the candidate scan alone can run for seconds while barely
         // simplifying. Skipping is sound: the affine-defined variables stay and are solved directly.
-        if (problem.factors.size > maxFactors) return null
         val eliminated = BooleanArray(problem.numIntVars)
         // Once `x` is gone only its range survives, as the bound rows on its terms, so a pivot with interior
         // holes could be rebuilt onto a value the model excludes. A source declaration has nowhere to carry
@@ -217,6 +230,11 @@ internal object AffineSingletons {
         var fillIn = 0L
         while (!cancellation()) {
             val cand = order.next() ?: break
+            val replacement = objectiveRewrite?.substitute(cand)
+            if (objectiveRewrite != null && replacement == null) {
+                objVars.add(cand.x)
+                continue
+            }
             val holed = domains != null && domains[cand.x].holeCount > 0L
             val partnerDomain = if (holed) holedPivotPartner(checkNotNull(domains), cand) else null
             if (holed && partnerDomain == null) {
@@ -228,6 +246,7 @@ internal object AffineSingletons {
             cancellation.charge(AFFINE_WORK_WEIGHT * (1L + foldCost))
             fillIn += foldCost
             order.onFolded(foldOutVariable(problem, ranges, ws, cand))
+            replacement?.invoke()
             if (partnerDomain != null) checkNotNull(domains)[cand.termVars[0]] = partnerDomain
             eliminated[cand.x] = true
             subs.add(AffineSub(cand.x, cand.constTerm, cand.termVars, cand.termCoeffs))
@@ -238,6 +257,7 @@ internal object AffineSingletons {
         // integer. Restrict `y` to those values (a domain modification, not a folded factor) and
         // reconstruct `x` with the divisor. Runs after the unit-pivot loop, so a residue partner `y`
         // is always a surviving variable.
+        objectiveRewrite?.protectRemaining(objVars)
         while (domains != null && !cancellation()) {
             val r = findResidueCandidate(ws, eliminated, objVars, domains, cancellation) ?: break
             ws.drop(r.defIdx)
@@ -249,7 +269,7 @@ internal object AffineSingletons {
         // The eliminations rebuilt the factor list in place; recover the delta against the input by
         // identity — every survivor is === an input factor, so the drops are the inputs absent from
         // [factors] and the adds are the factors [foldOutVariable] introduced (rewrites + domain bounds).
-        return Eliminated(ws.liveFactors(), subs)
+        return Eliminated(ws.liveFactors(), subs, objectiveRewrite?.result())
     }
 
     /**

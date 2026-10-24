@@ -132,6 +132,7 @@ enum class PresolvePass(
             ctx.objectiveIntVars,
             ctx.cancellation,
             ctx.affinePivotOrder,
+            ctx.linearObjective,
         )
 
         override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) = Presolve.eliminateAffineSingletons(
@@ -142,6 +143,7 @@ enum class PresolvePass(
             ctx.affineUnderdetermined,
             ctx.affineTouchedVars,
             ctx.affinePivotOrder,
+            ctx.linearObjective,
         )
     },
 

@@ -6,6 +6,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.EmptyIntArray
 
 /** A presolve transformation together with its solution reconstruction. */
@@ -19,6 +20,10 @@ class Presolved(
     /** Whether presolve proved the input infeasible. */
     val infeasible: Boolean = false,
 ) {
+    /** Objective over [problem], when a pass substituted an objective coordinate. */
+    var objective: LinearObjective? = null
+        internal set
+
     internal var mapping: SourceMapping =
         SourceMapping(problem, problem, TransformationGuarantees.IDENTITY, lift = reconstruct)
 }
@@ -38,6 +43,7 @@ internal class SourcePresolved(
     val infeasible: Boolean = false,
     /** Recovers the columns the passes eliminated, in the order they are recovered. */
     val rebuild: SourceRebuilds = SourceRebuilds.NONE,
+    val objective: LinearObjective? = null,
 )
 
 /**
@@ -61,6 +67,8 @@ internal class SourceDelta(
     /** Recovers the columns this pass eliminated, or [SourceRebuilds.NONE] when it eliminated none. */
     val rebuild: SourceRebuilds = SourceRebuilds.NONE,
 ) {
+    var objective: LinearObjective? = null
+
     /**
      * Whether the pass left the factor list, every column's range and every column unchanged.
      *
@@ -83,7 +91,7 @@ internal class SourceDelta(
         val lift = rebuild.asSampleLift()
         val proved = bounds
             ?: return PassDelta(droppedIndices, addedFactors, reconstruct = lift, infeasible = infeasible)
-                .also { it.rebuild = rebuild }
+                .also { it.rebuild = rebuild; it.objective = objective }
         require(proved.size == rootDomains.size) {
             "proved ranges for ${proved.size} columns over a model of ${rootDomains.size}"
         }
@@ -91,12 +99,12 @@ internal class SourceDelta(
         for (v in rootDomains.indices) {
             val next = rootDomains[v].narrowedBy(proved, v)
                 ?: return PassDelta(droppedIndices, addedFactors, reconstruct = lift, infeasible = true)
-                    .also { it.rebuild = rebuild }
+                    .also { it.rebuild = rebuild; it.objective = objective }
             if (next === rootDomains[v]) continue
             (narrowed ?: rootDomains.copyOf().also { narrowed = it })[v] = next
         }
         return PassDelta(droppedIndices, addedFactors, narrowed, lift, infeasible = infeasible)
-            .also { it.rebuild = rebuild }
+            .also { it.rebuild = rebuild; it.objective = objective }
     }
 }
 
@@ -127,6 +135,10 @@ class PassDelta(
     /** Whether the pass proved infeasibility. */
     val infeasible: Boolean = false,
 ) {
+    /** Replacement objective committed with this delta. */
+    var objective: LinearObjective? = null
+        internal set
+
     // Nonempty steps describe the entire finite reconstruction, including every written column.
     internal var rebuild: SourceRebuilds = SourceRebuilds.NONE
 
