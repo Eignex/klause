@@ -37,6 +37,39 @@ import kotlin.test.assertSame
 
 class CpSearchComponentTest {
     @Test
+    fun `a rejected publication should stop before later facts`() {
+        for (mode in listOf("initial", "prepared", "fixpoint")) {
+            for (rejection in listOf(ComponentResult.Indeterminate, ComponentResult.Conflict())) {
+                val native = PropagationSession(
+                    Problem(3, 0, emptyArray(), Array(3) { Clause(intArrayOf(Lit.make(it, true))) }),
+                )
+                val cp = CpSearchComponent(native)
+                var publications = 0
+                val context = object : SearchContext by SearchSession(emptyList()) {
+                    override fun publish(literal: Int): ComponentResult {
+                        publications++
+                        return rejection
+                    }
+                    override fun publish(decision: SearchDecision, premise: SearchAtomPremise): ComponentResult {
+                        publications++
+                        return rejection
+                    }
+                }
+                val observed = when (mode) {
+                    "initial" -> cp.initialize(context)
+                    "prepared" -> cp.prepareInitialization(context).asSequence().filterNotNull().first()
+                    else -> cp.publish(PropagationResult.Implied(
+                        intArrayOf(0, 1, 2), booleanArrayOf(true, true, true), intArrayOf(), longArrayOf(),
+                    ), context)
+                }
+
+                assertSame(rejection, observed)
+                assertEquals(1, publications)
+            }
+        }
+    }
+
+    @Test
     fun `a cancelled decision atom cascade should retract before its retry`() {
         val native = PropagationSession(Problem(0, 1, arrayOf(IntDomain(0, 255)), emptyArray()))
         val state = native.explanationState
