@@ -1532,3 +1532,42 @@ Bound-closed subtrees remain explicit. Inspection has a separate ten-second,
 stage counters. Reflection fails on an internal shape mismatch. The report does
 not claim an independently validated witness, proof or configured-tolerance source
 verdict; retain ordinary source validation and native/source conclusions alongside it.
+
+#### Bounded comparison evidence
+
+[7932](https://lab.eignex.com/jobs/7932) compares eight frozen
+[7241](https://lab.eignex.com/jobs/7241) source identities on the `eeb2518` base:
+main/candidate finite workers and column-only/scoped-coverage numerical owners.
+Each default/exact arm has three repeats at seed 3, P1, ten seconds, presolve off
+and debug enabled on Mac/aarch64. All 192 source hashes match; all 96 reported
+witnesses pass independent solchecker. Native optimality and infeasibility claims
+are not independently proof-checked.
+
+| Source | Finite main/candidate | Numerical column / scoped coverage |
+| --- | --- | --- |
+| gr4x6 | 229.05, unproved | 202.35 unproved / 202.35 optimal |
+| p0033 | 3089 optimal | 3447 unproved / 3447 unproved |
+| flugpl | 1201500 optimal | No incumbent in either arm |
+| opt1217 | -8 default, -6 exact, unproved | Root unavailable in either arm |
+| p0201 | 7665–7735, unproved | Root unavailable in either arm |
+| enigma | 0 optimal | Root unavailable in either arm |
+| enlight4, flugplinf | Infeasible | No proof in either arm |
+
+On gr4x6, scoped coverage closes 25 subtrees: checks fall from 257 to 107,
+pending leaves from five to zero and retained nodes from 261 to 107. Exact-arm
+floating work falls from 23,965,152 to 10,715,823. Physical CLI wall time is
+1.30–1.35 seconds for the unproved control and 0.75–0.76 seconds for the completed
+candidate. These observations support checked dominance coverage under unchanged
+LP allowances. They do not justify switching automatic finite ownership: wider
+roots remain unsupported, while finite traversal proves p0033, flugpl, enigma and
+both infeasible controls. Finite p0201 objectives vary near the wall-budget cutoff;
+the comparison establishes no general finite throughput improvement.
+
+Exact captures [7933](https://lab.eignex.com/jobs/7933) and
+[7934](https://lab.eignex.com/jobs/7934) retain the stalled incumbent, remaining
+conditions and remotely rechecked bounds with matching library/CLI bytes and
+stage counts. The gr4x6 control stops improving at check 184 with 202.35; two of
+five remaining bounds already dominate it. The p0033 candidate reaches 3447 at
+check 249, but all nine remaining bounds are weaker, ranging from 1159463/460 to
+68893/20. Scoped closure cannot discharge those alternatives. No probing or
+bound-ordered queue policy is adopted from these observations.
