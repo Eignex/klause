@@ -118,9 +118,10 @@ declines. Preparation visits at most 65,536 modeled row/support operations with
 4,096-bit input and denominator limits. Cut definitions and source-row ownership
 stay in the retained template, ahead of changing invocation-bound rows. Every
 query rechecks active cuts against the exact numeric source context under one
-shared proof allowance and premise view; inactive
+shared 100,000-step proof allowance and premise view; inactive
 Boolean guards or integer pins disable the owner and its cuts together. Retraction
-restores those activation masks. LP certificates cite the nested source rounding
+restores those activation masks. Unverified cuts remain inactive and require an
+identity row layout. LP certificates cite the nested source rounding
 derivation, and final source checking repeats Boolean substitution independently.
 Preparation and proof traversal report separate work observations, including
 interrupted queries. Separation and
