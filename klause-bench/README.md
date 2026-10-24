@@ -2172,6 +2172,18 @@ p0033 and the held-outs. Incumbent integration under
 under [#3533](https://github.com/Eignex/klause/issues/3533) are the next integration
 steps. Native optimum/refutation claims have no independent proof certificate here.
 
+[Joint repair qualification 8045](https://lab.eignex.com/jobs/8045) compares initial
+rounding, joint LS/ALNS and automatic finite LS/LP over eight frozen mixed sources
+at `a4121e1c37`: exact policy, P1, ten seconds, presolve off, three seeds and
+debug enabled on Mac/aarch64. All 16 reported final witnesses pass independent
+solchecker; native proof claims have no independent proof certificate here.
+On gr4x6, rounding finds no incumbent while both joint arms produce five checked
+improvements ending at 210 in every seed. Finite LP reaches 226.35–229.05 and
+finite LS 311.55–375.4. Joint repair finds no flugpl incumbent, where finite LP
+proves 1201500. Four wider roots supply no scalar guide. Each gr4x6 joint run uses
+one LP preparation and 255 reuses; the operation allowance ends search before
+the finite controls' wall allowance, so elapsed times establish no general speedup.
+
 `bench.profile.MpsProofFrontier` takes `suite=ID problem=NAME sha256=HEX exact=true|false`
 for one hash-matched original source. It uses the same numerical source setup and
 invocation, seed 3 and a ten-second solve deadline under the existing LP allowances.
