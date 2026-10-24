@@ -12,6 +12,7 @@ import com.eignex.klause.presolve.linear.LinearSubSumAggregation
 import com.eignex.klause.presolve.linear.SingletonInequalityProjection
 import com.eignex.klause.presolve.structural.ComparisonClauseFold
 import com.eignex.klause.presolve.structural.DuplicateColumns
+import com.eignex.klause.presolve.structural.ExtensionalComposition
 import com.eignex.klause.presolve.structural.RedundantConstraints
 import com.eignex.klause.presolve.structural.StructuralReduction
 import com.eignex.klause.propagation.BakedProblem
@@ -30,6 +31,10 @@ import com.eignex.klause.util.Cancellation
  * entry surface the presolve pipeline and tests call.
  */
 object Presolve {
+
+    /** Intersect bounded shared tuples of ground tables and compose their projections into MDDs. */
+    fun composeExtensional(problem: Problem, cancellation: Cancellation = Cancellation.Never): PassDelta =
+        ExtensionalComposition.reduce(problem.factors, cancellation)
 
     /** GCD plus bounded-integer coefficient strengthening for
      *  [com.eignex.klause.factor.arithmetic.Linear] and pseudo-Boolean constraints. */

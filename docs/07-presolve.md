@@ -272,6 +272,23 @@ occurrence index supplies no projection, and completed rows survive a later stop
 
 ### Structural reductions
 
+Opt-in `+extensional` preserves shared tuples across ground Tables and MDDs. Table
+semijoins retain rows with a matching tuple on at least two shared columns. MDD
+composition intersects the diagram with a trie of the table's shared-column
+projection, in diagram order, retaining its edge weights and cost coordinate.
+Private table columns stay in the original table. The composed diagram uses ordinary
+MDD filtering and explanations; every restriction follows from unconditional source
+factors, independently of transient domains. Repeated roles and interval tables
+decline this mechanism.
+
+Each attempt admits scopes up to 64, tables up to 262,144 cells and diagrams up to
+65,536 states and 131,072 records. Product states and records have the same caps;
+an attempt has 2,097,152 visits, and a call has 8,388,608 visits and 1,048,576 retained
+cells. Visits charge and poll the invocation token. An unfinished intersection
+publishes nothing, while completed replacements survive a later interruption.
+Dead product states are removed before publication; a diagram already satisfying
+the projection stays unchanged, preventing repeated root products.
+
 Structural reduction calls each factor's `structuralReduce` hook under current
 domains; source execution restricts this to closed integer columns. Both lanes skip
 the final `Clause` type's unchanged hook before visiting its columns, retaining the
