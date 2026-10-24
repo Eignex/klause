@@ -2297,6 +2297,45 @@ no speedup. The complete 65-source MIPLIB 3 scan
 whose two integer columns both have nonzero source objective weights; all offsets
 are zero. Candidate shapes alone establish neither retained contraction nor solve benefit.
 
+The full residual capture [8154](https://lab.eignex.com/jobs/8154), at `f9e35299f2`
+on Mac/aarch64, finishes all eight preparations without interruption or refutation.
+Default-tolerance enabled/disabled residuals are byte-identical. Exact cap6000
+contracts 33 objective terms and 33 factors (5,995 to 5,962 terms; 2,171 to 2,138
+factors), with preparation work rising from 52,623,382 to 58,214,539. Exact fiber
+contracts 51 objective terms and 58 factors (1,254 to 1,203 terms; 364 to 306
+factors), with work falling from 34,368,838 to 32,246,299. Objective constants stay
+zero. Fixed-order instrumented preparation takes 110.5 versus 423.2 ms on cap6000
+and 149.7 versus 133.4 ms on fiber; these observations qualify cost rather than
+establishing a speedup. Original MPS bytes, hashes and complete residuals are
+retained with the job.
+
+The ordinary solve comparison [8145](https://lab.eignex.com/jobs/8145) compares
+`0fffa679f2` with `f9e35299f2` on one Linux/amd64 c7i.2xlarge spot worker: the
+eight controls plus cap6000 and fiber, default/exact semantics, P1, one backtrack
+arm, debug on, a 10-second allowance and seed 3 repeated three times. All 120 runs finish;
+all 96 feasible witnesses pass the original-source solchecker. Source hashes,
+runtime, non-solver dependencies and JVM options match. MPS has no external
+compiler identity. Native optimum/refutation claims agree on all completed
+controls; the lab checks witnesses, without an independent proof certificate.
+Default arms retain the same incumbent, proof status and preparation work.
+
+Exact fiber improves its incumbent from 1,458,797.07 to 1,029,093.08 in all three
+repeats, with preparation work falling from 34,398,629 to 32,276,090. Exact
+cap6000 retains incumbent -2,442,801; two translated runs interrupt affine
+preparation under the ordinary allowance, retaining 28 and 21 contractions,
+and the third retains all 33. Its smaller charged work therefore does not mean
+cheaper complete preparation. Median exact observations show the tradeoff:
+
+| Source | Protected preparation (ms) | Translated preparation (ms) | Protected nodes | Translated nodes |
+| --- | ---: | ---: | ---: | ---: |
+| cap6000 | 1,080 | 1,705 | 35 | 31 |
+| fiber | 1,270 | 1,141 | 26,230 | 18,869 |
+
+Neither source proves optimality within the allowance. The remaining controls
+retain their objective and verdict; completed searches retain their node counts.
+This qualifies exact finite objective substitution with a fiber quality gain and
+a cap6000 preparation cost, without a general speedup claim.
+
 The scalar session [qualification 8040](https://lab.eignex.com/jobs/8040) compares
 cold `3e8ac384` with retained `6aef3fdd` and an automatic finite control over
 opt1217, p0201, gr4x6, flugpl, p0033, enigma, enlight4 and flugplinf. Each has
