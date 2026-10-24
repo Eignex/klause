@@ -128,6 +128,9 @@ selection decline.
 Boolean-valued arithmetic terms use fresh 0/1 integers tied to their source literal
 by a reified equality. Unit equality terms `x = v` of sums and sum objectives and
 `binPacking` memberships share one such indicator per `(x, v)` within a compile.
+Counts reuse those indicators, and counting ones over a declared binary integer
+uses the integer itself. An eligible declared count result owns the sum directly;
+count results and reused channels carry typed definitions.
 Direct products of a Boolean and an integer use their declared equality output
 instead, and an extremum whose condition is `(eq, v)` posts its `ArrayMinMax`
 onto `v`. The frontend records which auxiliaries, selection results and affine
