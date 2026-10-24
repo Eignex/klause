@@ -46,29 +46,40 @@ internal object MpsSparseRoot {
 
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.size in 1..2 && args[0].startsWith("batch64="))
-        val layouts = when (args.getOrNull(1)) {
-            null, "layout=identity" -> listOf("IDENTITY")
-            "layout=equalities" -> listOf("UNCONDITIONAL_EQUALITIES")
-            "layout=compare" -> listOf("IDENTITY", "UNCONDITIONAL_EQUALITIES")
+        require(args.size in 1..3 && args[0].startsWith("batch64="))
+        val options = args.drop(1).associate { it.substringBefore('=') to it.substringAfter('=') }
+        require(options.keys.all { it in setOf("layout", "phase1") })
+        val layouts = when (options["layout"]) {
+            null, "identity" -> listOf("IDENTITY")
+            "equalities" -> listOf("UNCONDITIONAL_EQUALITIES")
+            "compare" -> listOf("IDENTITY", "UNCONDITIONAL_EQUALITIES")
             else -> error("unsupported sparse root layout")
+        }
+        val phaseOnePolicies = when (options["phase1"]) {
+            null, "long-step" -> listOf("LONG_STEP")
+            "first-bound" -> listOf("FIRST_BOUND")
+            "compare" -> listOf("FIRST_BOUND", "LONG_STEP")
+            else -> error("unsupported phase one policy")
         }
         val requests = Json.decodeFromString<List<List<String>>>(
             Base64.getDecoder().decode(args[0].substringAfter('=')).decodeToString())
         require(requests.size in 1..16)
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         Reports.writeJson(out.resolve("build-provenance.json").path, InstalledBuild.reference)
-        val rounds = if (layouts.size == 1) listOf(1) else listOf(0, 1)
+        val rounds = if (layouts.size == 1 && phaseOnePolicies.size == 1) listOf(1) else listOf(0, 1)
         for (round in rounds) {
             requests.forEachIndexed { index, request ->
                 for (layout in if (round == 0) layouts else layouts.reversed()) {
-                    inspect(request, out.resolve("$index/$round/$layout").apply { mkdirs() }, layout, round)
+                    for (phaseOne in if (round == 0) phaseOnePolicies else phaseOnePolicies.reversed()) {
+                        inspect(request, out.resolve("$index/$round/$layout/$phaseOne").apply { mkdirs() },
+                            layout, round, phaseOne)
+                    }
                 }
             }
         }
     }
 
-    private fun inspect(request: List<String>, out: File, layout: String, round: Int) {
+    private fun inspect(request: List<String>, out: File, layout: String, round: Int, phaseOne: String) {
         val options = request.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.keys == setOf("suite", "problem", "sha256"))
         val selected = Catalog.uncapped(options.getValue("suite")).problems
@@ -137,6 +148,7 @@ internal object MpsSparseRoot {
             put("revision", Reports.readGitSha())
             put("problem", options.getValue("problem"))
             put("round", round)
+            put("phaseOnePolicy", phaseOne)
             put("warmup", round == 0)
             put("sourceSha256", sha256(bytes))
             put("sourceSemantics", NumericalResidualProfile.json(source.semantics.declared))
@@ -164,7 +176,7 @@ internal object MpsSparseRoot {
         out.resolve("preparation.json").writeText(report.toString() + "\n")
         println(report)
         if (prepared != null && !stop()) {
-            run(checkNotNull(call(prepared, "getModel")), out, bean, thread, policy) { guide ->
+            run(checkNotNull(call(prepared, "getModel")), out, bean, thread, policy, phaseOne) { guide ->
                 val bound = call(guide, "getBound") ?: return@run buildJsonObject { put("available", false) }
                 val startedLift = System.nanoTime()
                 val beforeLift = bean.getThreadAllocatedBytes(thread)
@@ -213,6 +225,7 @@ internal object MpsSparseRoot {
         bean: ThreadMXBean,
         thread: Long,
         policy: Any,
+        phaseOne: String,
         checkBound: (Any) -> JsonObject,
     ) {
         val stop = Cancellation.after(10.seconds)
@@ -243,6 +256,8 @@ internal object MpsSparseRoot {
             }.toString() + "\n")
             if (!admitted) return
             val numericalOwner = checkNotNull(NumericalFrontierSnapshot.field(owner, "solver"))
+            numericalOwner.javaClass.getDeclaredField("phaseOneLongSteps").apply { isAccessible = true }
+                .set(numericalOwner, phaseOne == "LONG_STEP")
             call(numericalOwner, "enableProgressTrace")
             out.resolve("guidance.jsonl").bufferedWriter().use { output ->
                 var iteration = 0

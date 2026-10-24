@@ -123,6 +123,7 @@ internal class RevisedSimplex(
     private val scalingOptions: LpScalingOptions = LpScalingOptions(),
     private val primalPricingTolerance: Double = TOL,
     private val syntheticWorkEnabled: Boolean = false,
+    private val phaseOneLongSteps: Boolean = true,
 ) : TableauCutSolver,
     PersistentLpSolver,
     ResumableLpSolver {
@@ -217,6 +218,7 @@ internal class RevisedSimplex(
     private val phaseOneBeta = workspace.phaseOneBeta
     private val phaseOneGradient = workspace.phaseOneGradient
     private val phaseOneDuals = workspace.phaseOneDuals
+    private var phaseOneRatio: PrimalPhaseOneRatio? = null
     private val alphaValues = workspace.alphaValues
     private val pivotRowEntries = workspace.pivotRowEntries
     private val enteringRatios = workspace.enteringRatios
@@ -2816,6 +2818,20 @@ internal class RevisedSimplex(
                     tMax = t
                     leaving = i
                     leavingToUpper = toUpper
+                }
+            }
+            if (phaseOneLongSteps) {
+                val ratio = phaseOneRatio ?: PrimalPhaseOneRatio(m).also { phaseOneRatio = it }
+                val step = ratio.choose(model, numerical, basicVar, beta, alpha, dir, boundRange(q), tolerance, work)
+                if (step != null) {
+                    tMax = step.length
+                    leaving = step.leaving
+                    leavingToUpper = step.toUpper
+                    progressTrace?.let { it.passedPhaseOneBreakpoints += step.passed }
+                }
+                if (cancellation() || (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit)) {
+                    observations.termination = if (cancellation()) LpFloatTermination.CANCELLED else LpFloatTermination.WORK
+                    return IterationResult.FAILED
                 }
             }
             if (tMax >= Double.MAX_VALUE) return IterationResult.FAILED // no blocker
