@@ -1,5 +1,6 @@
 package com.eignex.klause.presolve.structural
 
+import com.eignex.klause.factor.table.Mdd
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -109,6 +110,28 @@ class ExtensionalCompositionTest {
         ))
 
         val result = Presolver.runSource(problem, PresolveConfig.parse("off,+extensional"))
+
+        assertTrue(result.infeasible)
+    }
+
+    @Test
+    fun `an unrelated diagram payload should not consume the composition allowance`() {
+        val records = 131_073
+        val diagram = Mdd(
+            intArrayOf(2, 3), intArrayOf(1, 1, 1), intArrayOf(0, (records - 1) * 3, records * 3),
+            LongArray(records * 3), 0, intArrayOf(0), 3,
+        )
+        val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) }, arrayOf<Factor>(
+            Table(intArrayOf(0, 1), longArrayOf(0, 0, 1, 1)),
+            Table(intArrayOf(0, 1), longArrayOf(0, 1, 1, 0)),
+            diagram,
+        ))
+        val budget = PresolveBudget(10_000)
+
+        val result = Presolver.runSource(
+            problem, PresolveConfig.parse("off,+extensional"), PresolveContext(presolveBudget = budget),
+            budget.orSpent(Cancellation.Never),
+        )
 
         assertTrue(result.infeasible)
     }
