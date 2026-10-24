@@ -61,11 +61,12 @@ internal fun PreparedFactorProjections.linearTheoryModel(
     val factors = ArrayList<Factor>(request.indices.size)
     val origins = ArrayList<Int>()
     val allocator = EncodingRealAllocator(problem.numRealVars)
+    val conditions = EncodingConditions(request.fixedIntegers, request.fixedBooleans)
     for (position in request.indices.indices) {
         val index = request.indices[position]
         val relations = installSelectedLinearFactor(index, request.target, request.encoders[position],
             request.fixedIntegers, request.fixedBooleans, stop, allocator,
-            onDecline, request.completeFiniteConditions) ?: return null
+            onDecline, request.completeFiniteConditions, conditions) ?: return null
         factors += relations
         repeat(relations.size) { origins += index }
     }
@@ -106,6 +107,7 @@ private fun PreparedFactorProjections.installSelectedLinearFactor(
     allocator: EncodingRealAllocator,
     onDecline: (EncoderDecline) -> Unit,
     completeFiniteConditions: Boolean,
+    conditions: EncodingConditions = EncodingConditions(integerPins, booleanPins),
 ): List<EncodedTheoryFactor>? {
     if (cancellation()) {
         onDecline(EncoderDecline.RESOURCE)
@@ -159,7 +161,7 @@ private fun PreparedFactorProjections.installSelectedLinearFactor(
         reals.sorted().map(::SourceRealId), integerConditions = integerPins,
         booleanConditions = booleanPins, auxiliaries = encoding.realAuxiliaries,
         affineAuxiliaries = encoding.auxiliaryDefinitions(),
-        linearGuards = encoding.guardDefinitions())
+        linearGuards = encoding.guardDefinitions(), conditions = conditions)
     return forms.map { EncodedTheoryFactor(source, it, attribution) }
 }
 
