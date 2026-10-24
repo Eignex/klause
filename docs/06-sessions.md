@@ -258,6 +258,8 @@ Consultations of the same suspended query retain its reservation and cumulative
 numerical allowance, charging active work and elapsed time without charging the
 pause between slices. Caller cancellation retires the operation; a cooperative
 quantum pause leaves it available for the next slice.
+Single-shot numerical execution resumes these pauses until it obtains a result or
+the containing cancellation stops it.
 
 Optional guidance reuses completed checks. Its index construction spends the check's
 token under a 65,536-entry boundary; a private stop discards only the hint. Native
