@@ -57,7 +57,6 @@ internal class LinearAuthority(
 
     private fun checkSource(source: SourceProofContext, cancellation: Cancellation): LinearAuthorityResult {
         if (!source.affineObjectiveAvailable || !source.linearCoordinatesSupported()) return LinearAuthorityResult()
-        val coordinates = source.numericCoordinates()
         if ((source.scope.condition.lower.keys + source.scope.condition.upper.keys).any {
                 it !in source.coordinates
             } || source.scope.condition.bools.keys.any {
@@ -73,6 +72,7 @@ internal class LinearAuthority(
             template?.takeIf { it.matches(source) } ?: LinearAuthorityTemplate.prepare(source, cancellation)
                 ?.also { template = it } ?: return LinearAuthorityResult()
         } else null
+        val coordinates = prepared?.coordinates ?: source.numericCoordinates()
         val numeric = prepared?.numeric ?: source.numericContext()
         val premises = numeric.premises
         val integerBounds = if (premises.values.any { it.integerPins.isNotEmpty() }) {
@@ -95,7 +95,7 @@ internal class LinearAuthority(
             for ((id, value) in bounds) cited += SourceInequality(mapOf(id to sign), value * sign) to
                 SourceDerivation.Assumption(id, upper)
         }
-        val indices = coordinates.withIndex().associate { it.value to it.index }
+        val indices = prepared?.indices ?: coordinates.withIndex().associate { it.value to it.index }
         val rows = if (prepared == null) cited.map { it.first.row(indices) }
             else prepared.rows + cited.drop(prepared.rows.size).map { it.first.row(indices) }
         val sign = if (source.scope.objective.sense == ObjectiveSense.MINIMIZE) BigFraction.ONE
