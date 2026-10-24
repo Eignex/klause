@@ -10,7 +10,6 @@ import com.eignex.klause.util.abs
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.compareTo
 import com.eignex.klause.util.div
-import com.eignex.klause.util.fitsLong
 import com.eignex.klause.util.maxOf
 import com.eignex.klause.util.minOf
 import com.eignex.klause.util.minus
@@ -63,7 +62,7 @@ internal class DivModPropagator(private val relation: DivMod) : Propagator {
         if (!tighten(state, relation.remainder, bigIntOf(currentA.min) - upperProduct,
                 bigIntOf(currentA.max) - lowerProduct, reason)) return false
         if (divisor != null && !filterDivisor(state, divisor, reason)) return false
-        return filterTuples(state, constant, reason)
+        return filterTuples(state, factorId, reason)
     }
 
     private fun filterDivisor(state: PropagationState, divisor: Int, reason: IntArray?): Boolean {
@@ -91,61 +90,15 @@ internal class DivModPropagator(private val relation: DivMod) : Propagator {
         return true
     }
 
-    private fun filterTuples(state: PropagationState, constant: BigInt?, reason: IntArray?): Boolean {
+    private fun filterTuples(state: PropagationState, factorId: Int, reason: IntArray?): Boolean {
         val dividends = state.intDomains[relation.dividend].spanOrNull(MAX_PAIRS.toLong()) ?: return true
         val divisors = relation.divisor?.let { state.intDomains[it].spanOrNull(MAX_PAIRS.toLong()) ?: return true }
         if (dividends.size.toLong() * (divisors?.size ?: 1) > MAX_PAIRS) return true
-        val variables = relation.intVars.distinct()
-        val supports = variables.associateWith { HashSet<Long>() }
-        val roles = relation.divisor?.let { intArrayOf(relation.dividend, it, relation.quotient, relation.remainder) }
-            ?: intArrayOf(relation.dividend, relation.quotient, relation.remainder)
-        for (i in 0 until dividends.size) {
-            val av = dividends.valueAt(i)
-            for (j in 0 until (divisors?.size ?: 1)) {
-                val bv = divisors?.valueAt(j)
-                val wordDivisor = bv ?: constant?.takeIf { it.fitsLong() }?.toLongExact()
-                val outputs = if (wordDivisor != null) relation.wordOutputs(av, wordDivisor) else {
-                    val exact = relation.outputs(bigIntOf(av), checkNotNull(constant)) ?: continue
-                    if (!exact.first.fitsLong() || !exact.second.fitsLong()) continue
-                    exact.first.toLongExact() to exact.second.toLongExact()
-                } ?: continue
-                val values = if (relation.divisor == null) longArrayOf(av, outputs.first, outputs.second)
-                    else longArrayOf(av, checkNotNull(bv), outputs.first, outputs.second)
-                if (roles.indices.any { role -> values[role] !in state.intDomains[roles[role]] ||
-                        (0 until role).any { previous ->
-                            roles[previous] == roles[role] && values[previous] != values[role]
-                        }
-                    }) continue
-                for (role in roles.indices) supports.getValue(roles[role]).add(values[role])
-            }
+        val cached = state.refPayload[factorId] as? DivModSupports
+        val supports = if (cached != null && cached.covers(state)) cached else {
+            DivModSupports(relation, state).also { state.refPayload[factorId] = it }
         }
-        return filterSupportedDomains(state, variables, supports, reason)
-    }
-
-    private fun filterSupportedDomains(
-        state: PropagationState,
-        variables: List<Int>,
-        supports: Map<Int, Set<Long>>,
-        reason: IntArray?,
-    ): Boolean {
-        for (v in variables) {
-            val values = supports.getValue(v)
-            if (values.isEmpty()) return false
-            var minimum = Long.MAX_VALUE
-            var maximum = Long.MIN_VALUE
-            for (value in values) {
-                if (value < minimum) minimum = value
-                if (value > maximum) maximum = value
-            }
-            if (!state.tightenIntMin(v, minimum, reason) ||
-                !state.tightenIntMax(v, maximum, reason)) return false
-            val domain = state.intDomains[v].spanOrNull(MAX_PAIRS.toLong()) ?: continue
-            for (i in 0 until domain.size) {
-                val value = domain.valueAt(i)
-                if (value !in values && !state.excludeIntValue(v, value, reason)) return false
-            }
-        }
-        return true
+        return supports.filter(state, reason, MAX_PAIRS)
     }
 
     private fun divideBound(numerator: BigInt, denominator: BigInt, roundUp: Boolean): BigInt {

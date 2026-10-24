@@ -256,6 +256,15 @@ projection uses the general CP lane. AllDifferent tries its cached incremental p
 before full matching. Assignment-dependent payloads such as live tuples and diagram
 reachability stay state-owned.
 
+DivMod retains complete signed tuples for at most 4096 live operand pairs in each
+state's factor payload. Each fire recomputes live supports in reusable primitive
+sets against all operand and output domains, including holes and aliased roles.
+Output narrowing does not remove stored tuples. The payload survives retraction;
+restored operand values outside its construction domains require rebuilding it.
+Larger products keep bounds filtering without tuple enumeration, and a later small
+branch can construct its own bounded relation. Deductions cite the current bound
+and hole premises rather than retained branch assumptions.
+
 An inert descriptor requires an explicit reason and cannot claim an exact check, so
 its absent mechanism needs an enforcing peer or separate source certification.
 Objective-bound overlays omit CP propagation, and a sound LP family may decline
