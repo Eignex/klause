@@ -11,6 +11,16 @@ internal class ExtensionalSupportIndex private constructor(val columns: Array<Co
         private val words: Int,
         val retainedBytes: Long,
     ) {
+        fun valueCount(lower: Long, upper: Long): Int {
+            var lo = 0
+            var hi = values.size
+            while (lo < hi) {
+                val mid = (lo + hi) ushr 1
+                if (values[mid] <= upper) lo = mid + 1 else hi = mid
+            }
+            return (lo - lowerBound(lower)).coerceAtLeast(0)
+        }
+
         fun forEachValue(lower: Long, upper: Long, visit: (Long, Int) -> Unit) {
             var bucket = lowerBound(lower)
             while (bucket < values.size && values[bucket] <= upper) {
