@@ -58,6 +58,17 @@ must cover the factor. Unsupported scoring refuses construction, and returning
 
 ## Continuous arithmetic scores
 
+Mixed `ExactLinear` rows scale their exact constants into a floating heuristic.
+Each state owns a balanced tree of coefficient-value products. Single-coordinate
+proposals replace one leaf and reduce its path without writing the tree; committed
+moves and probe rollback rebuild that same path. Reinitialization rebuilds all
+leaves after restarts or external writes. The fixed reduction order bounds work
+to one coefficient and a logarithmic number of additions per proposal and avoids
+history-dependent drift, so no periodic drift correction is needed by this score.
+Its rounding can differ from a sequential row sum. Strict boundaries, reification
+and integer indicators use the resulting activity; nonfinite enabled activities
+remain violated. These degrees grant no source acceptance authority.
+
 `ContinuousProduct`, real `Power`, `RealProduct` and `RealAbs` grade floating
 assignments with native invariants while retaining their exact source relations.
 Scores substitute every aliased role together, repairs respect declared real bounds
