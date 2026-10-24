@@ -1178,8 +1178,10 @@ sha256=HEX` for one XCSP3 source. It retains original bytes and build identity a
 reports table/MDD scope shapes, shared positions, bounded composition work,
 current-thread allocation and resulting diagram records. Full-source and isolated
 first-diagram overlaps use the production root-composition mechanism. Three
-iterations include cold preparation; these instrumented observations establish
-neither a source verdict nor ordinary search throughput.
+iterations include factor-view construction and cold preparation; these instrumented
+observations establish neither a source verdict nor ordinary search throughput.
+Use `presolve=off,+extensional` for isolated CLI comparisons and
+`presolve=default,+extensional` alongside the default presolve passes.
 
 `TableReductionProfile` measures current-thread allocated bytes around the production
 `Table.structuralReduce` hook after warmup. Run it as a lab profile job; its
@@ -1244,6 +1246,42 @@ Original `miplib/fixnet-5000` loses one row but remains UNKNOWN; its default
 preparation median rises from 241 to 366 ms, within a 10-second solve budget.
 Retain exact representation and earlier refutation with these preparation costs;
 row reduction alone establishes neither search benefit nor a general speedup.
+
+### Joint extensional root composition
+
+Bounded root composition is opt-in. Ground-table semijoins and table-to-MDD
+products preserve joint restrictions through ordinary Table/MDD propagation and
+explanations.
+
+[Lab 8129](https://lab.eignex.com/jobs/8129), at `51ff71ae08` on Mac/aarch64,
+Java 25.0.4.1, retains the original WordDesign2-words-mdd-015_c23 source hash and
+build identities. Its 15 eight-column tables each have 17,440 rows; its 105
+sixteen-column MDDs each have 525,721 states and 1,978,996 transition records.
+Each diagram overlaps two tables at positions 0–7 and 8–15. These diagrams exceed
+the bounded input admission, so every sampled intersection retains its inputs.
+The full-source call spends 4,064 visits, replaces no factor and takes
+0.36–2.27 ms with 308,872–589,264 measured thread-allocated bytes across three
+iterations, including factor-view construction and cold preparation. JFR phase
+observations establish neither a source verdict nor ordinary solve throughput.
+No WordDesign recovery or larger-product admission follows from this capture.
+
+[Lab 8130](https://lab.eignex.com/jobs/8130) isolates `off` versus
+`off,+extensional` at the same revision on Linux/amd64 spot, CP/satOptimized/P1,
+15 seconds, seed 3 and three repeats. All five source hashes and the build,
+runtime and JVM options match between arms. Table/table and table/MDD
+contradictions refute in source presolve, avoiding two native failures and
+194/238 CP propagation visits respectively; preparation work falls from
+852/1647 to 169/337. These are native refutations, without independent proof
+checking. All six satisfiable-control witnesses pass the external XCSP3 checker.
+Both arms use two nodes there, while composition raises preparation work from
+2,178 to 5,949 and CP propagation visits from 257 to 262.
+
+Both original word sources remain unknown without witnesses. WordDesign reaches
+11 nodes with composition versus 11–12 without; WordSquare reaches 35–37 in both
+arms. Deadline prefixes establish no throughput equivalence. WordDesign's pass
+interrupts on payload-wide entry accounting before relation admission. The
+composition pass meters its own visits so declined diagrams need no payload-wide
+entry charge; the bounded relation and product limits remain independent.
 
 ### XCSP3 declared intension extrema
 

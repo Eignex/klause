@@ -276,7 +276,8 @@ Each attempt admits scopes up to 64, tables up to 262,144 cells and diagrams up 
 65,536 states and 131,072 records. Product states and records have the same caps;
 an attempt has 2,097,152 visits, and a call has 8,388,608 visits and 1,048,576 retained
 cells. A metered variable-occurrence index selects overlapping tables. Visits charge
-and poll the invocation token. An unfinished intersection
+and poll the invocation token; declined payloads incur no payload-wide entry charge.
+An unfinished intersection
 publishes nothing, while completed replacements survive a later interruption.
 Dead product states are removed before publication; a diagram already satisfying
 the projection stays unchanged, preventing repeated root products.
