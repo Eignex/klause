@@ -1230,7 +1230,7 @@ class MpsModeTest {
     }
 
     @Test
-    fun `unavailable open numerical heuristics should not publish decimal incumbents`() {
+    fun `open numerical heuristics should publish decimal incumbents without optimum claims`() {
         val mps = File.createTempFile("mpssourceheuristic", ".mps").apply {
             writeText(
                 "ROWS\n N COST\n E R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I R 0\n" +
@@ -1252,9 +1252,9 @@ class MpsModeTest {
                 )
             }
 
-            assertTrue("s UNKNOWN" in text.lines(), text)
-            assertFalse(text.lines().any { it.startsWith("v ") }, text)
-            assertFalse(text.lines().any { it.startsWith("o ") }, text)
+            assertTrue("s SATISFIABLE" in text.lines(), text)
+            assertTrue(text.lines().any { it.startsWith("v ") }, text)
+            assertTrue("o 0.1" in text.lines(), text)
             assertFalse("s OPTIMUM FOUND" in text.lines(), text)
         }
     }
