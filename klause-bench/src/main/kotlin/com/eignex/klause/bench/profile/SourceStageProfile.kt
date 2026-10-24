@@ -40,10 +40,12 @@ internal object SourceStageProfile {
     }
 
     private fun summarize(input: JsonObject, out: File) {
-        require(input.keys == setOf("job", "sha256"))
+        require(input.keys - "recording" == setOf("job", "sha256"))
         val job = input.getValue("job").jsonPrimitive.content.toLong().also { require(it > 0) }
         val jobs = File(requireNotNull(System.getenv("JOB_DIR"))).canonicalFile.parentFile
-        val recording = jobs.resolve("$job/cases/0/out/profile.jfr").canonicalFile
+        val relative = input["recording"]?.jsonPrimitive?.content ?: "profile.jfr"
+        require(Regex("([0-7]/)?(cli|profile)\\.jfr").matches(relative))
+        val recording = jobs.resolve("$job/cases/0/out/$relative").canonicalFile
         require(recording.toPath().startsWith(jobs.toPath()))
         require(recording.length() in 1..128L * 1024 * 1024)
         val hash = sha256(recording.readBytes())
@@ -51,6 +53,7 @@ internal object SourceStageProfile {
         out.resolve("identity.json").writeText(buildJsonObject {
             put("revision", Reports.readGitSha())
             put("sourceJob", job)
+            put("recording", relative)
             put("sha256", hash)
             put("solverExecuted", false)
         }.toString())
