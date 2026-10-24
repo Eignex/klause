@@ -20,6 +20,7 @@ import com.eignex.klause.portfolio.PortfolioIncumbents
 import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.portfolio.SourceWorkerBinding
 import com.eignex.klause.portfolio.kind
+import com.eignex.klause.portfolio.roundedUpperBound
 import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
@@ -54,7 +55,6 @@ import com.eignex.klause.util.toLongExact
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.math.abs
-import kotlin.math.nextUp
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -341,10 +341,8 @@ internal class OpenPortfolio(
                         cancellation = lifetime or slot.cancellation,
                         objectiveBoundSupplier = if (!shareCompanions) null else ({
                             val exact = incumbents.exchange.current()?.objective?.execution
-                            val value = exact?.toDouble() ?: Double.POSITIVE_INFINITY
                             if (exact != null) cutoffReads++
-                            if (exact == null || !value.isFinite() ||
-                                BigFraction.ofDouble(value)?.let { it >= exact } == true) value else value.nextUp()
+                            exact?.let(::roundedUpperBound) ?: Double.POSITIVE_INFINITY
                         }),
                         objectiveLowerBoundSupplier = if (!shareCompanions) null else linear?.let {
                             { it.sharedLowerBound().also { bound -> if (bound.isFinite()) floorReads++ } }
