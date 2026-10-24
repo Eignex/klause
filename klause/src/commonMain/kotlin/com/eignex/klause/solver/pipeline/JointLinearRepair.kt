@@ -43,7 +43,7 @@ internal class JointLinearRepair(
     val work: Long get() = state.work.spent + budget.measuredPreparationWork + budget.measuredFloatWork +
         budget.measuredContinuationWork
     val stats: SolveStats get() = SolveStats(openTheory = state.work.snapshot(), smt = state.smt.snapshot().copy(
-        completeSearchStages = stages + mapOf(
+        completeSearchStages = observations() + mapOf(
             "jointRepairSelectedIntegers" to (selection?.selectedIntegers ?: 0),
             "jointRepairConnectivityVisits" to (selection?.visitedEntries ?: 0),
             "jointRepairLpPreparations" to authority.preparations,
@@ -51,6 +51,11 @@ internal class JointLinearRepair(
         )))
 
     private fun observe(stage: String) { stages[stage] = (stages[stage] ?: 0) + 1 }
+
+    private fun observations(): Map<String, Long> {
+        val current = query?.stats?.smt?.completeSearchStages.orEmpty()
+        return (stages.keys + current.keys).associateWith { (stages[it] ?: 0) + (current[it] ?: 0) }
+    }
 
     fun search(adaptive: Boolean, seed: Long = params.randomSeed): ExactNeighborhood = ExactNeighborhood(
         model.numBoolVars, List(model.numIntVars + model.numRealVars) { BigFraction.ZERO }, this, objective,
@@ -142,6 +147,8 @@ internal class JointLinearRepair(
     }
 
     private fun retire() {
+        val observations = query?.stats?.smt?.completeSearchStages.orEmpty()
+        for ((key, value) in observations) stages[key] = (stages[key] ?: 0) + value
         query?.close()
         query = null
         pending = null

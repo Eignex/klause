@@ -61,6 +61,35 @@ class LinearSourceExecutionTest {
     }
 
     @Test
+    fun `numerical heuristic strategies should publish checked mixed source points without terminal claims`() {
+        val source = LinearSourceProblem(
+            listOf(LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE),
+                LinearSourceVariable("y", true, SemanticRational.ZERO, SemanticRational.ONE),
+                LinearSourceVariable("r", false, SemanticRational.of(BIG_ONE, bigIntOf(4)), SemanticRational.ONE)),
+            listOf(0, 1).map { integer ->
+                LinearSourceRow(listOf(LinearSourceTerm(integer, SemanticRational.ONE),
+                    LinearSourceTerm(2, SemanticRational.ofLong(-2))),
+                    lower = SemanticRational.ZERO, upper = SemanticRational.ZERO)
+            },
+            LinearSourceObjective(listOf(LinearSourceTerm(2, SemanticRational.ONE))),
+        )
+        for (engine in listOf(FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS)) {
+            val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
+                ExecutionOperation.OPTIMIZE, engine, linearTraversal = LinearTraversal.NUMERICAL))
+
+            val result = assertIs<SourceExecutionResult.Numerical>(SourceSetup.execute(
+                SourceExecutionRequest(invocation, theory = TheoryParams(maxFlips = 3))))
+
+            val outcome = assertNotNull(result.linearSource)
+            assertEquals(LinearSourceConclusion.SATISFIABLE, outcome.conclusion)
+            assertEquals(BigFraction.ofLong(2).reciprocal(), outcome.incumbent?.objective)
+            assertNull(result.result.terminal)
+            assertNull(result.result.bound)
+            assertTrue(result.result.stats.ls.completions.sum > 0)
+        }
+    }
+
+    @Test
     fun `an interrupted bounded numerical split should withhold terminal authority`() {
         val source = LinearSourceProblem(
             listOf(LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE)),

@@ -68,6 +68,7 @@ internal class JointRepairNeighborhood private constructor(
         fun prepare(
             source: SourceProofContext, integers: Int, reals: Int, cancellation: Cancellation,
         ): JointRepairNeighborhood? {
+            if (cancellation()) return null
             val rows = ArrayList<IntArray>()
             val occurrences = Array(integers + reals) { ArrayList<Int>() }
             var entries = 0
@@ -86,7 +87,8 @@ internal class JointRepairNeighborhood private constructor(
                 for (column in columns) occurrences[column] += rows.size
                 rows += columns.toIntArray()
             }
-            return JointRepairNeighborhood(integers, rows, Array(occurrences.size) { occurrences[it].toIntArray() })
+            return if (cancellation()) null else
+                JointRepairNeighborhood(integers, rows, Array(occurrences.size) { occurrences[it].toIntArray() })
         }
     }
 }
