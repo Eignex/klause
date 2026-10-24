@@ -62,6 +62,88 @@ class Xcsp3GlobalsTest {
     private val threeVars = """<var id="x">1..3</var><var id="y">1..3</var><var id="z">1..3</var>"""
 
     @Test
+    fun `binary one counts should preserve source multiplicities without equality channels`() {
+        val parsed = parse(
+            "<count><list>x x y</list><values>1</values><condition>(eq,n)</condition></count>",
+            """<var id="x">0..1</var><var id="y">0..1</var><var id="n">0..3</var>""",
+        )
+
+        assertEquals(3, parsed.problem.numIntVars)
+        assertEquals(0, parsed.problem.numBoolVars)
+        assertEquals(setOf(listOf(0L, 0L, 0L), listOf(0L, 1L, 1L),
+            listOf(1L, 0L, 2L), listOf(1L, 1L, 3L)), solutions(parsed, 3))
+    }
+
+    @Test
+    fun `counts and equality terms should share one indicator per variable value`() {
+        val parsed = parse(
+            """
+            <count><list>x x y</list><values>2</values><condition>(eq,a)</condition></count>
+            <count><list>x y</list><values>2</values><condition>(eq,b)</condition></count>
+            <sum><list>eq(x,2) eq(y,2)</list><condition>(eq,b)</condition></sum>
+            """.trimIndent(),
+            """<var id="x">0..2</var><var id="y">0..2</var><var id="a">0..3</var><var id="b">0..2</var>""",
+        )
+
+        assertEquals(6, parsed.problem.numIntVars)
+        assertEquals(2, parsed.problem.numBoolVars)
+        val expected = (0L..2L).flatMap { x ->
+            (0L..2L).map { y ->
+                val cx = if (x == 2L) 1L else 0L
+                val cy = if (y == 2L) 1L else 0L
+                listOf(x, y, 2 * cx + cy, cx + cy)
+            }
+        }.toSet()
+        assertEquals(expected, solutions(parsed, 4))
+    }
+
+    @Test
+    fun `self referential and clipped count outputs should preserve source solutions`() {
+        for ((condition, expected) in listOf(
+            "x" to setOf(listOf(0L, 0L, 0L), listOf(0L, 0L, 1L), listOf(1L, 0L, 0L), listOf(1L, 0L, 1L)),
+            "n" to setOf(listOf(0L, 0L, 0L), listOf(0L, 1L, 1L), listOf(1L, 0L, 1L)),
+        )) {
+            val parsed = parse(
+                "<count><list>x y</list><values>1</values><condition>(eq,$condition)</condition></count>",
+                """<var id="x">0..1</var><var id="y">0..1</var><var id="n">0..1</var>""",
+            )
+
+            assertEquals(expected, solutions(parsed, 3))
+        }
+    }
+
+    @Test
+    fun `count outputs and shared indicators should follow source moves through typed definitions`() {
+        for (value in listOf(1, 2)) {
+            val parsed = parse(
+                "<count><list>x x y</list><values>$value</values><condition>(eq,n)</condition></count>",
+                """<var id="x">0..$value</var><var id="y">0..$value</var><var id="n">0..3</var>""",
+            )
+            val problem = parsed.problem
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            val sweep = assertNotNull(DefinitionalSweep.fromSource(problem, parsed.definitionHints))
+            state.invariants = sweep.network(problem.numIntVars, problem.numBoolVars)
+            state.assignment.setInt(0, 0L)
+            state.assignment.setInt(1, 0L)
+            sweep.sweep(state.assignment, state.rootDomains, problem.factors)
+            state.recompute()
+
+            for ((variable, choice, expected) in listOf(
+                Triple(0, value.toLong(), 2L), Triple(1, value.toLong(), 3L), Triple(0, 0L, 1L),
+            )) {
+                val move = Move.IntSet(variable, choice)
+                val predicted = state.netDelta(move)
+
+                state.apply(move)
+
+                assertEquals(expected, state.assignment.intValue(2))
+                assertEquals(0L, predicted)
+                assertEquals(0L, state.cost)
+            }
+        }
+    }
+
+    @Test
     fun `distinctness should retain one native relation across wide domains`() {
         for (except in listOf("", "<except>0 2</except>")) {
             val parsed = parse(

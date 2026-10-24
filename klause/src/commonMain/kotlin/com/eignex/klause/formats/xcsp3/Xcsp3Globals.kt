@@ -36,19 +36,20 @@ internal fun Compiler.Builder.count(e: XmlElement) {
     val values = parseInts(e.child("values")?.textContent)
         ?: throw UnsupportedXcsp3Exception("count: only constant <values> supported")
     if (values.size != 1) throw UnsupportedXcsp3Exception("count: only a single value supported")
-    val cnt = newAuxVar(0L, vars.size.toLong())
-    // Reify equalities and sum their 0/1 channels into `cnt`.
+    val condition = requireNotNull(e.child("condition")).textContent.trim()
+    val target = equalityTarget(condition)?.takeIf { it !in vars }
+    val cnt = target ?: newAuxVar(0L, vars.size.toLong())
     val channels = IntArray(vars.size) { i ->
-        val aux = newBool()
-        factors.add(ReifiedLinear(aux, intArrayOf(1), intArrayOf(vars[i]), LinearOp.EQ, values[0]))
-        val ch = newAuxVar(0L, 1L)
-        factors.add(ReifiedLinear(aux, intArrayOf(1), intArrayOf(ch), LinearOp.EQ, 1))
-        ch
+        val x = vars[i]
+        val domain = domains[x]
+        if (values[0] == 1 && domain.min >= 0L && domain.max <= 1L) x else eqValue01(x, values[0].toLong())
     }
     val sumCoeffs = IntArray(channels.size + 1) { if (it < channels.size) 1 else -1 }
     val sumVars = IntArray(channels.size + 1) { if (it < channels.size) channels[it] else cnt }
     factors.add(Linear(sumCoeffs, sumVars, LinearOp.EQ, 0))
-    postCondition(intArrayOf(1), intArrayOf(cnt), requireNotNull(e.child("condition")).textContent.trim())
+    definedVars.add(cnt)
+    defineLinear(cnt, sumCoeffs.widenToLong(), sumVars, 0L)
+    if (target == null) postCondition(intArrayOf(1), intArrayOf(cnt), condition)
 }
 
 internal fun Compiler.Builder.element(e: XmlElement) {
