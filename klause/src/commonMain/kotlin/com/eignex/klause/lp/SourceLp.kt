@@ -184,6 +184,11 @@ internal class SourceLpBudget(
         SourceLpSparseAdmission(this, prepared)
     }
 
+    fun admitSparse(prepared: SparseSourceLp, cancellation: Cancellation): SourceLpSparseAdmission? =
+        admitSparse(cancellation) {
+            SparseSourceLpPreparation(prepared, null, SparseSourceLpMetrics(0L, 0L, 0L, 0L, 0L))
+        }
+
     fun <T> resumeSparse(
         admission: SourceLpSparseAdmission,
         cancellation: Cancellation,
