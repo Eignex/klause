@@ -234,7 +234,7 @@ object Presolver {
         val passes = problemPasses(problem, config, context, PresolvePass.Capability.FINITE)
         val maxRounds = config.maxRounds
         if (passes.isEmpty() || maxRounds == 0) {
-            return Presolved(problem, { it }).also {
+            return Presolved(problem, { it }, infeasible = problem.baked is PropagationResult.Unsat).also {
                 it.mapping = SourceMapping(problem, problem, TransformationGuarantees.IDENTITY)
             }
         }
@@ -468,7 +468,7 @@ object Presolver {
 
         // No pass fired: return the input problem itself, matching the fresh path's identity on a no-op.
         if (rounds.fired.isEmpty()) {
-            return Presolved(problem, { it }, emptyList()).also {
+            return Presolved(problem, { it }, emptyList(), rounds.infeasible || session.infeasible).also {
                 it.mapping = SourceMapping(problem, problem, TransformationGuarantees.IDENTITY)
             }
         }

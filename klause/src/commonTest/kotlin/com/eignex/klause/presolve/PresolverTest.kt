@@ -3,13 +3,16 @@ package com.eignex.klause.presolve
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
+import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.baked
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.isClausal
 import com.eignex.klause.solver.objective.LinearObjective
@@ -17,10 +20,34 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class PresolverTest {
+    @Test
+    fun `a completed root refutation should survive an empty finite schedule`() {
+        val source = Problem(
+            0, 3, Array(3) { IntDomain(0, 1) },
+            listOf(
+                Table(intArrayOf(0, 1), longArrayOf(0, 1, 1, 0)),
+                Table(intArrayOf(1, 2), longArrayOf(0, 1, 1, 0)),
+                Table(intArrayOf(2, 0), longArrayOf(0, 1, 1, 0)),
+            ),
+        ).bake()
+        assertIs<PropagationResult.Implied>(source.baked)
+        val root = RootBaker.reseed(source, BakeConfig(probeIntBounds = true))
+        assertIs<PropagationResult.Unsat>(root.baked)
+
+        for (config in listOf(PresolveConfig.NONE, PresolveConfig.parse("off,+strengthen"))) {
+            val prepared = Presolver.run(root, config)
+
+            assertTrue(prepared.infeasible)
+            assertTrue(prepared.passesFired.isEmpty())
+            assertSame(root, prepared.problem)
+        }
+    }
+
     @Test
     fun `explicit source strengthening under off should refute an indivisible equality`() {
         val problem = Problem(

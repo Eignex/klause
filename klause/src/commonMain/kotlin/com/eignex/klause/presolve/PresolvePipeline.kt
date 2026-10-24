@@ -258,7 +258,9 @@ object PresolvePipeline {
         // elimination, clause subsumption) apply where only the integer-column ones could before. It also
         // has to precede symmetry breaking, whose added handling factor reads the columns value-wise and
         // would hold every one of them in the integer lane.
-        val substitution = if (!config.resolved(PresolvePass.SUBSTITUTE_BINARY_COLUMNS, context)) {
+        val substitution = if (seeded.baked is PropagationResult.Unsat ||
+            !config.resolved(PresolvePass.SUBSTITUTE_BINARY_COLUMNS, context)
+        ) {
             null
         } else {
             presolveBudget.observeTransform(
@@ -281,9 +283,9 @@ object PresolvePipeline {
         var harvestStats = prepared.stats.lpStats
             .mergedWith(rootInfeasible.stats)
             .mergedWith(rootBounds.stats)
-        var infeasible = false
+        var infeasible = current.baked is PropagationResult.Unsat
         var round = 0
-        while (round++ < MAX_PRESOLVE_HARVEST_ROUNDS && !cancellation()) {
+        while (!infeasible && round++ < MAX_PRESOLVE_HARVEST_ROUNDS && !cancellation()) {
             val pre = Presolver.run(current, config, context, cancellation)
             infeasible = infeasible || pre.infeasible
             val harvestResult = harvestPlan?.let {
