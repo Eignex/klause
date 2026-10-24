@@ -145,7 +145,8 @@ internal class LinearAuthority(
             return checked(SourceClaim.Refutation, LinearPinnedRefutation(derivation(weights)))
         }
         val closureRows = prepared.closureRows
-        val guide = if (guidance) lp.advance(closureRows, costs, constant, source.scope, cancellation, inactive)
+        val guide = if (guidance) lp.advance(closureRows, costs, constant, source.scope, cancellation, inactive,
+            prepared.unconditionalRows)
             ?: return LinearAuthorityResult() else null
         if (guide?.paused == true) return LinearAuthorityResult(paused = true)
         guide?.coordinateConflictWeights?.let { weights ->
