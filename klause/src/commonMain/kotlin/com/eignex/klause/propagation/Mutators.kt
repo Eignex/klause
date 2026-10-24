@@ -497,6 +497,7 @@ internal fun PropagationState.excludeIntValues(v: Int, values: LongArray, antece
     var interior: LongArrayList? = null
     var excluded = 0
     for (i in values.indices) {
+        checkFiniteMutationWork()
         val value = values[i]
         if (value !in d) continue
         excluded++
@@ -542,12 +543,6 @@ internal fun PropagationState.excludeIntValues(v: Int, values: LongArray, antece
         intMaxReason[v] = currentFactor
         intMaxAntecedents[v] = antMax
     }
-    interior?.let { iv ->
-        // The carved values' domain is restored wholesale by the single [logIntChange] record above,
-        // and each carved value's `[v = value]` eq atom flips back on the reversible atom trail
-        // (the batch wakes it false through [propagateAtomsForExclusionBatch]); no per-carve record.
-        for (i in 0 until iv.size) pushHoleHist(v, iv[i], currentLevel, antecedents)
-    }
     // A batched exclusion can move both endpoints and carve interior holes at once; raise every
     // event kind that actually occurred so typed-event advisors (e.g. a bounds-consistent [Linear]
     // subscribed to LB_RAISED / UB_LOWERED, dropped from this var's occurrence-list wakeup) wake.
@@ -556,8 +551,12 @@ internal fun PropagationState.excludeIntValues(v: Int, values: LongArray, antece
     if (newMin != d.min) kindMask = kindMask or IntEvent.LB_RAISED_BIT
     if (newMax != d.max) kindMask = kindMask or IntEvent.UB_LOWERED_BIT
     if (interior != null) kindMask = kindMask or IntEvent.VALUE_REMOVED_BIT
-    markIntDirty(v, kindMask)
-    propagateAtomsForExclusionBatch(v, d.min, d.max, antMin, antMax, interior, antecedents)
+    completeDomainMutation(interior?.size ?: 0, { i ->
+        pushHoleHist(v, requireNotNull(interior)[i], currentLevel, antecedents)
+    }) {
+        markIntDirty(v, kindMask)
+        propagateAtomsForExclusionBatch(v, d.min, d.max, antMin, antMax, interior, antecedents)
+    }
     return true
 }
 
@@ -576,6 +575,7 @@ internal fun PropagationState.excludeInteriorIntValues(
     val interior = LongArrayList(initialCapacity = values.size)
     val reasons = ArrayList<IntArray?>(values.size)
     for (value in values) {
+        checkFiniteMutationWork()
         if (value !in d) continue
         interior.add(value)
         reasons.add(antecedents(value))
@@ -584,10 +584,13 @@ internal fun PropagationState.excludeInteriorIntValues(
     intDomains[v] = newDomain
     intLevel[v] = maxOf(intLevel[v], currentLevel)
     if (currentFactor >= 0) propagations += interior.size
-    for (i in 0 until interior.size) pushHoleHist(v, interior[i], currentLevel, reasons[i])
-    markIntDirty(v, IntEvent.VALUE_REMOVED_BIT)
-    // Equality atoms read their individual carve witnesses rather than a shared move reason.
-    propagateAtomsForExclusionBatch(v, d.min, d.max, null, null, interior, null)
+    completeDomainMutation(interior.size, { i ->
+        pushHoleHist(v, interior[i], currentLevel, reasons[i])
+    }) {
+        markIntDirty(v, IntEvent.VALUE_REMOVED_BIT)
+        // Equality atoms read their individual carve witnesses rather than a shared move reason.
+        propagateAtomsForExclusionBatch(v, d.min, d.max, null, null, interior, null)
+    }
     return true
 }
 

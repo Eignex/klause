@@ -380,6 +380,12 @@ internal fun PropagationState.propagateAtomsForVar(
     // NOT list that atom; [antFar] does (via [antecedentsAcrossHoles]), so giving it [antFar] would be
     // the same-var cycle 1UIP cannot collapse.
     val idx = atoms.byIntVar[v] ?: return
+    if (finiteMutationInterruptible && !finiteMaintenanceActive) {
+        completeDomainMutation(0, {}) {
+            propagateAtomsForVar(v, antNear, antFar, reqMin, reqMax, oldMin, oldMax, carved)
+        }
+        return
+    }
     val d = intDomains[v]
     val newMin = d.min
     val newMax = d.max
@@ -466,6 +472,7 @@ internal fun PropagationState.propagateAtomsForExclusionBatch(
     if (interiorVals != null) {
         atoms.pendingMoveAnt = interiorAnt
         for (i in 0 until interiorVals.size) {
+            checkFiniteAtomWork()
             val x = interiorVals[i]
             idx.eq.visitRange(x, x) { id -> wakeAtom(id, false) }
         }
@@ -490,6 +497,12 @@ internal fun PropagationState.propagateAtomsForSetRestriction(
     ant: IntArray?,
 ) {
     val idx = atoms.byIntVar[v] ?: return
+    if (finiteMutationInterruptible && !finiteMaintenanceActive) {
+        completeDomainMutation(0, {}) {
+            propagateAtomsForSetRestriction(v, oldMin, oldMax, survivors, ant)
+        }
+        return
+    }
     val d = intDomains[v]
     val newMin = d.min
     val newMax = d.max
@@ -501,6 +514,7 @@ internal fun PropagationState.propagateAtomsForSetRestriction(
     }
     atoms.pendingMoveAnt = ant
     idx.eq.visitRange(newMin, newMax) { id ->
+        checkFiniteAtomWork()
         if (survivors.binarySearchLong(atoms.threshold[id]) < 0) wakeAtom(id, false)
     }
     if (newMin == newMax && (newMin > oldMin || newMax < oldMax)) {
@@ -547,6 +561,7 @@ internal fun PropagationState.recordAtomTruthChange(atomId: Int) {
  *  (a crossing at level L *is* the level the bound first reached the threshold). The prior slot is
  *  pushed on the reversible atom trail first ([recordAtomTruthChange]) so backtrack restores it. */
 internal fun PropagationState.wakeAtom(atomId: Int, newT: Boolean) {
+    checkFiniteAtomWork()
     val targetState = if (newT) 1 else 2
     // Single establishment: stamp the trail slot only when the atom's truth actually flips into
     // [targetState]. A later bound move that merely re-crosses an atom already at this truth (a
@@ -558,27 +573,27 @@ internal fun PropagationState.wakeAtom(atomId: Int, newT: Boolean) {
     // dependent factors re-examine the re-crossed literal.
     if (atoms.truth[atomId] == targetState) {
         val ww = atoms.watchersByLit[(atomId shl 1) or (if (!newT) 0 else 1)] ?: return
-        for (j in 0 until ww.size) atoms.dirtyFactors.addLast(ww[j])
+        for (j in 0 until ww.size) {
+            checkFiniteAtomWork()
+            atoms.dirtyFactors.addLast(ww[j])
+        }
         return
     }
-    recordAtomTruthChange(atomId)
-    boolPinOrder.add(problem.numBoolVars + atomId)
-    atoms.truth[atomId] = targetState
-    atoms.lvl[atomId] = currentLevel
+    var establishedLevel = currentLevel
     // Record the establishment reason on the trail slot: a true eq atom (the var just became
     // the singleton {k}) rests on BOTH endpoint bounds, so cite them; a crossed hole (false eq)
     // rests on why its value was excluded — its per-value carve reason ([holeReasonFor]), which
     // cites other variables. The bound move's reason ([AtomStore.pendingMoveAnt]) lists this very eq-atom
     // when it snapped across the hole ([antecedentsAcrossHoles]); citing it back would form the
     // same-var cycle 1UIP cannot collapse. Every other crossed literal rests on the move.
-    atoms.ant[atomId] = when {
+    val antecedents = when {
         newT && atoms.kind[atomId] == AtomKind.EQ ->
             composeIntVarAtomAntecedents(intArrayOf(atoms.intVar[atomId]))
 
         !newT && atoms.kind[atomId] == AtomKind.EQ && holeHistHas(atoms.intVar[atomId], atoms.threshold[atomId]) -> {
             // The value left at its carve, which may be well before this move woke the atom: its level is the
             // carve's, matching the carve's reason, or a root carve would sit at this level with no reason.
-            atoms.lvl[atomId] = holeLevelFor(atoms.intVar[atomId], atoms.threshold[atomId])
+            establishedLevel = holeLevelFor(atoms.intVar[atomId], atoms.threshold[atomId])
             holeReasonFor(atoms.intVar[atomId], atoms.threshold[atomId])
         }
 
@@ -589,9 +604,18 @@ internal fun PropagationState.wakeAtom(atomId: Int, newT: Boolean) {
         // valid standalone clause the analyzer can resolve through.
         else -> channelingReasonAtWake(atomId, newT)
     }
+    if (finiteMaintenanceActive && runCancelled) throw FinitePropagationInterrupted()
+    recordAtomTruthChange(atomId)
+    boolPinOrder.add(problem.numBoolVars + atomId)
+    atoms.truth[atomId] = targetState
+    atoms.lvl[atomId] = establishedLevel
+    atoms.ant[atomId] = antecedents
     // The false literal has polarity `!newT`; see [atomLitWatchIndex] for the slot layout.
     val w = atoms.watchersByLit[(atomId shl 1) or (if (!newT) 0 else 1)] ?: return
-    for (j in 0 until w.size) atoms.dirtyFactors.addLast(w[j])
+    for (j in 0 until w.size) {
+        checkFiniteAtomWork()
+        atoms.dirtyFactors.addLast(w[j])
+    }
 }
 
 /**

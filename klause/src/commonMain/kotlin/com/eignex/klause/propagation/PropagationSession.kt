@@ -597,8 +597,11 @@ class PropagationSession private constructor(
     fun pinIntAtMost(v: Int, hi: Long): PropagationResult {
         bakedUnsat?.let { return it }
         val base = state.undoTop
-        if (!state.setIntMaxAsDecision(v, hi)) return revertAndUnsat(state.conflictLevels ?: EmptyIntArray)
-        val conflict = state.runToFixpoint(allFactors = false, cancellation = cancellation)
+        val pinned = applyDecision { state.setIntMaxAsDecision(v, hi) }
+        if (pinned == false) return revertAndUnsat(state.conflictLevels ?: EmptyIntArray)
+        val conflict = if (pinned == null) null else {
+            state.runToFixpoint(allFactors = false, cancellation = cancellation)
+        }
         if (conflict != null) return revertAndUnsat(conflict)
         trail.add(encInt(v))
         levelPush(state.mark())
@@ -609,8 +612,11 @@ class PropagationSession private constructor(
     fun pinIntAtLeast(v: Int, lo: Long): PropagationResult {
         bakedUnsat?.let { return it }
         val base = state.undoTop
-        if (!state.setIntMinAsDecision(v, lo)) return revertAndUnsat(state.conflictLevels ?: EmptyIntArray)
-        val conflict = state.runToFixpoint(allFactors = false, cancellation = cancellation)
+        val pinned = applyDecision { state.setIntMinAsDecision(v, lo) }
+        if (pinned == false) return revertAndUnsat(state.conflictLevels ?: EmptyIntArray)
+        val conflict = if (pinned == null) null else {
+            state.runToFixpoint(allFactors = false, cancellation = cancellation)
+        }
         if (conflict != null) return revertAndUnsat(conflict)
         trail.add(encInt(v))
         levelPush(state.mark())
@@ -662,6 +668,7 @@ class PropagationSession private constructor(
         // level's baseline: re-snapshot the top mark. Otherwise the next failed pin's revert — which
         // restores to the top mark — silently rewinds them while the constraint stays registered, and the
         // search can re-derive the same conflict forever.
+        if (state.runCancelled) return PropagationResult.Implied.EMPTY
         levelStates[levelTop - 1] = state.mark()
         return impliedSince(base)
     }
@@ -727,6 +734,7 @@ class PropagationSession private constructor(
         if (conflict != null) return revertAndUnsat(conflict)
         // Fold into the current level's baseline so a later same-level revert keeps it, and so
         // popLast of this level — and only this level — discards it. Mirrors addLearnedClause.
+        if (state.runCancelled) return PropagationResult.Implied.EMPTY
         levelStates[levelTop - 1] = state.mark()
         return impliedSince(base)
     }
@@ -911,8 +919,11 @@ class PropagationSession private constructor(
         val want = if (value) 1 else 0
         if (boolPinned[v] == want) return PropagationResult.Implied.EMPTY
         val base = state.undoTop
-        if (!state.pinBoolAsDecision(v, value)) return revertAndUnsat(state.conflictLevels ?: EmptyIntArray)
-        val conflict = state.runToFixpoint(allFactors = false, cancellation = cancellation)
+        val pinned = applyDecision { state.pinBoolAsDecision(v, value) }
+        if (pinned == false) return revertAndUnsat(state.conflictLevels ?: EmptyIntArray)
+        val conflict = if (pinned == null) null else {
+            state.runToFixpoint(allFactors = false, cancellation = cancellation)
+        }
         if (conflict != null) return revertAndUnsat(conflict)
         boolPinned[v] = want
         trail.add(encBool(v))
@@ -923,14 +934,30 @@ class PropagationSession private constructor(
     private fun pushInt(v: Int, value: Long, reportImplied: Boolean = true): PropagationResult {
         if (intPinnedSet[v] && intPinnedVal[v] == value) return PropagationResult.Implied.EMPTY
         val base = state.undoTop
-        if (!state.setIntAsDecision(v, value)) return revertAndUnsat(state.conflictLevels ?: EmptyIntArray)
-        val conflict = state.runToFixpoint(allFactors = false, cancellation = cancellation)
+        val pinned = applyDecision { state.setIntAsDecision(v, value) }
+        if (pinned == false) return revertAndUnsat(state.conflictLevels ?: EmptyIntArray)
+        val conflict = if (pinned == null) null else {
+            state.runToFixpoint(allFactors = false, cancellation = cancellation)
+        }
         if (conflict != null) return revertAndUnsat(conflict)
         intPinnedSet[v] = true
         intPinnedVal[v] = value
         trail.add(encInt(v))
         levelPush(state.mark())
         return if (reportImplied) impliedSince(base) else PropagationResult.Implied.EMPTY
+    }
+
+    private fun applyDecision(operation: () -> Boolean): Boolean? {
+        state.finiteWork.cancellation = cancellation
+        state.finiteMutationInterruptible = true
+        return try {
+            operation()
+        } catch (_: FinitePropagationInterrupted) {
+            state.runCancelled = true
+            null
+        } finally {
+            state.finiteMutationInterruptible = false
+        }
     }
 
     /**
@@ -1082,6 +1109,7 @@ class PropagationSession private constructor(
      * [PropagationResult.Implied]'s binary-search lookups require.
      */
     private fun impliedSince(base: Int): PropagationResult.Implied {
+        if (state.runCancelled) return PropagationResult.Implied.EMPTY
         val top = state.undoTop
         if (top <= base) return PropagationResult.Implied.EMPTY
         val bRaw = IntArrayList()

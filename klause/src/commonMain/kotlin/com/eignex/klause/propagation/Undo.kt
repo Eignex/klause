@@ -128,6 +128,7 @@ internal fun PropagationState.prepareMark(): Iterator<PropagationState.LevelMark
  * caller only ever marks / undoes between propagation cycles, when those are idle.
  */
 internal fun PropagationState.undoTo(mark: PropagationState.LevelMark) {
+    pendingFiniteMutation = null
     replayVarUndo(mark.undoSize)
     undo.truncateTo(mark.undoSize)
     restoreReversibleCells(mark.revSize)
