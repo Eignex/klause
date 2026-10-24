@@ -8,6 +8,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.linearRows
+import com.eignex.klause.lp.ExactComparison
 import com.eignex.klause.lp.bounding.LpEffortProfile
 import com.eignex.klause.lp.bounding.LpPropagator
 import com.eignex.klause.lp.bounding.LpSearchPolicy
@@ -27,15 +28,188 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundTerm
 import com.eignex.klause.solver.search.explainAtoms
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class QfLraSystemTest {
+    @Test
+    fun `batched source sides should keep strict strengthening premises and retract with their scope`() {
+        for (upper in listOf(false, true)) {
+            LpPropagator(object : LpSearchPolicy {}).use { lp ->
+                val system = LiveQfLraSystem(source(), lp)
+                assertTrue(system.install())
+                val session = SearchSession(listOf(lp))
+                session.initialize()
+                session.push(SearchDecision.Bool(Lit.make(0, true)))
+                session.publish(SearchDecision.Bool(Lit.make(1, true)))
+                val op = if (upper) LinearOp.LE else LinearOp.GE
+                val comparisons = listOf(false, true, false).mapIndexed { index, strict ->
+                    PremisedSmtComparison(ExactComparison(mapOf(0 to BigFraction.ONE), BigFraction.ONE,
+                        op, strict, hasReals = true), premise(if (index == 1) 1 else 0))
+                }
+                val committed = ArrayList<Int>()
+
+                assertTrue(system.assertComparisons(comparisons, Cancellation.Never, committed::add))
+
+                assertEquals(listOf(0, 1, 2), committed)
+                val active = assertNotNull(lp.state?.activeSide(0, upper))
+                assertTrue(active.side.strict)
+                assertEquals(listOf(Lit.make(1, false)),
+                    assertNotNull(session.explainAtoms(lp.boundPremise(active.witness))).literals.toList())
+                session.popTo(0)
+                assertNull(lp.state?.activeSide(0, upper))
+            }
+        }
+    }
+
+    @Test
+    fun `a conflicting source batch should commit only fully asserted comparisons`() {
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source(), lp)
+            assertTrue(system.install())
+            val session = SearchSession(listOf(lp))
+            session.initialize()
+            session.push(SearchDecision.Bool(Lit.make(0, true)))
+            session.publish(SearchDecision.Bool(Lit.make(1, true)))
+            val comparisons = listOf(
+                PremisedSmtComparison(ExactComparison(mapOf(0 to BigFraction.ONE), BigFraction.ONE,
+                    LinearOp.GE, false, true), premise(0)),
+                PremisedSmtComparison(ExactComparison(mapOf(0 to BigFraction.ONE), BigFraction.ZERO,
+                    LinearOp.EQ, false, true), premise(1)),
+                PremisedSmtComparison(ExactComparison(mapOf(1 to BigFraction.ONE), BigFraction.ONE,
+                    LinearOp.LE, false, true), axiom),
+            )
+            val committed = ArrayList<Int>()
+
+            assertTrue(system.assertComparisons(comparisons, Cancellation.Never, committed::add))
+
+            assertEquals(listOf(0), committed)
+            assertNull(lp.state?.activeSide(1, true))
+            val conflict = assertIs<ComponentResult.Conflict>(lp.propagate(session))
+            assertEquals((0..1).map { Lit.make(it, false) }, assertNotNull(conflict.explanation).literals.sorted())
+        }
+    }
+
+    @Test
+    fun `a declined source batch should publish no bounds witnesses or row completions`() {
+        var armed = false
+        var stopped = false
+        var spent = 0L
+        LpPropagator(object : LpSearchPolicy {}, cancellation = Cancellation { stopped }, onEdit = {
+            if (armed) {
+                spent += it
+                stopped = true
+            }
+        }).use { lp ->
+            val system = LiveQfLraSystem(source(), lp)
+            assertTrue(system.install())
+            assertTrue(lp.atLevel(1))
+            val before = lp.state
+            val comparisons = listOf(LinearOp.LE, LinearOp.GE).map {
+                PremisedSmtComparison(ExactComparison(mapOf(0 to BigFraction.ONE), BigFraction.ONE,
+                    it, false, true), axiom)
+            }
+            val committed = ArrayList<Int>()
+            armed = true
+
+            assertFalse(system.assertComparisons(comparisons, Cancellation.Never, committed::add))
+
+            assertSame(before, lp.state)
+            assertTrue(committed.isEmpty())
+            assertEquals(SearchAtomPremise.Unavailable, lp.boundPremise(0))
+            assertEquals(4L, spent)
+            armed = false
+            stopped = false
+            assertTrue(system.assertComparisons(comparisons, Cancellation.Never, committed::add))
+            assertEquals(listOf(0, 1), committed)
+            assertEquals(BigFraction.ONE, assertNotNull(lp.state?.activeSide(0, false)).side.number.value)
+            assertEquals(BigFraction.ONE, assertNotNull(lp.state?.activeSide(0, true)).side.number.value)
+        }
+    }
+
+    @Test
+    fun `a refused definition should retain the committed source prefix and permit a sibling retry`() {
+        var limit = 0
+        LpPropagator(object : LpSearchPolicy {}, effort = { LpEffortProfile(maxRows = limit) }).use { lp ->
+            val system = LiveQfLraSystem(source(), lp)
+            assertTrue(system.install())
+            assertTrue(lp.atLevel(1))
+            val comparisons = listOf(
+                PremisedSmtComparison(ExactComparison(mapOf(0 to BigFraction.ONE), BigFraction.ONE,
+                    LinearOp.LE, false, true), axiom),
+                PremisedSmtComparison(ExactComparison(mapOf(0 to BigFraction.ONE, 1 to BigFraction.ONE), BigFraction.ONE,
+                    LinearOp.LE, false, true), axiom),
+            )
+            val committed = ArrayList<Int>()
+
+            assertFalse(system.assertComparisons(comparisons, Cancellation.Never, committed::add))
+
+            assertEquals(listOf(0), committed)
+            assertEquals(BigFraction.ONE, assertNotNull(lp.state?.activeSide(0, true)).side.number.value)
+            assertEquals(0, assertNotNull(lp.state).model.m)
+            assertTrue(lp.atLevel(0))
+            assertTrue(lp.atLevel(1))
+            limit = 1
+            committed.clear()
+            assertTrue(system.assertComparisons(comparisons, Cancellation.Never, committed::add))
+            assertEquals(listOf(0, 1), committed)
+            assertEquals(1, assertNotNull(lp.state).model.m)
+            assertEquals(BigFraction.ONE, assertNotNull(lp.state?.activeSide(2, true)).side.number.value)
+        }
+    }
+
+    @Test
+    fun `root source comparisons should substitute an earlier equality before preparing later rows`() {
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source(), lp)
+            assertTrue(system.install())
+            val session = SearchSession(listOf(lp))
+            session.initialize()
+            for (variable in 0..1) session.publish(SearchDecision.Bool(Lit.make(variable, true)))
+            val comparisons = listOf(
+                PremisedSmtComparison(ExactComparison(mapOf(0 to BigFraction.ONE), BigFraction.ONE,
+                    LinearOp.EQ, false, true), premise(0)),
+                PremisedSmtComparison(ExactComparison(mapOf(0 to BigFraction.ONE, 1 to BigFraction.ONE), BigFraction.ONE,
+                    LinearOp.LE, false, true), premise(1)),
+            )
+            val committed = ArrayList<Int>()
+
+            assertTrue(system.assertComparisons(comparisons, Cancellation.Never, committed::add))
+
+            assertEquals(listOf(0, 1), committed)
+            assertEquals(0, assertNotNull(lp.state).model.m)
+            val active = assertNotNull(lp.state?.activeSide(1, true))
+            assertEquals(BigFraction.ZERO, active.side.number.value)
+            assertEquals((0..1).map { Lit.make(it, false) },
+                assertNotNull(session.explainAtoms(lp.boundPremise(active.witness))).literals.sorted())
+        }
+    }
+
+    @Test
+    fun `constant true comparisons should complete without asserting a source side`() {
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source(), lp)
+            assertTrue(system.install())
+            assertTrue(lp.atLevel(1))
+            val before = lp.state
+            val committed = ArrayList<Int>()
+
+            assertTrue(system.assertComparisons(listOf(PremisedSmtComparison(
+                ExactComparison(emptyMap(), BigFraction.ZERO, LinearOp.EQ, false, true), axiom,
+            )), Cancellation.Never, committed::add))
+
+            assertEquals(listOf(0), committed)
+            assertSame(before, lp.state)
+        }
+    }
+
     @Test
     fun `sparse shared definitions should preserve exact source equalities`() {
         val factors = arrayOf<Factor>(

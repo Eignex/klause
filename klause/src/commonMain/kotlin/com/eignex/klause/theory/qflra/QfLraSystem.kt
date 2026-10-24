@@ -11,6 +11,7 @@ import com.eignex.klause.lp.ExactComparison
 import com.eignex.klause.lp.ExactRowForm
 import com.eignex.klause.lp.asFraction
 import com.eignex.klause.lp.bounding.LpPropagator
+import com.eignex.klause.lp.bounding.LpPremisedBound
 import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.ExactLpColumn
 import com.eignex.klause.lp.engine.ExactLpEntry
@@ -20,6 +21,8 @@ import com.eignex.klause.lp.engine.ExactLpObjective
 import com.eignex.klause.lp.engine.ExactLpRow
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.LpScopedRow
+import com.eignex.klause.lp.engine.LpBoundBatchResult
+import com.eignex.klause.lp.engine.strongerThan
 import com.eignex.klause.lp.exactColumnLower
 import com.eignex.klause.lp.exactColumnUpper
 import com.eignex.klause.lp.exactComparison
@@ -30,6 +33,8 @@ import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SourceBoundAtom
+import com.eignex.klause.util.Cancellation
+import kotlin.time.TimeSource
 
 internal class QfLraSystem(private val model: Problem) {
     fun build(booleanValue: (Int) -> Boolean?): QfLraRelaxation {
@@ -169,6 +174,9 @@ internal class LiveQfLraSystem(
     private val terms = normalized.filterKeys { it in initialTerms }.values
         .map { it.term.coefficients }.filter { it.size != 1 }.distinct()
     private val definitions = terms.withIndex().associate { (index, term) -> term to columns + index }.toMutableMap()
+    var batchSourceBounds = true
+    var observeAssertionCost = false
+    val assertionCost = SmtSourceAssertionCost()
 
     fun install(): Boolean {
         val structural = sourceColumns.map { column ->
@@ -223,6 +231,43 @@ internal class LiveQfLraSystem(
             if (!assertTerms(key, true, row.rhs, row.strict, premise)) return false
         }
         return true
+    }
+
+    fun assertComparisons(
+        comparisons: List<PremisedSmtComparison>,
+        stop: Cancellation,
+        committed: (Int) -> Unit,
+    ): Boolean {
+        if (lp.state == null) return false
+        val batch = SmtSourceBoundBatch(lp, ::assertBounds, committed)
+        for ((index, input) in comparisons.withIndex()) {
+            if (stop()) return false
+            if (lp.state?.conflict != null) return true
+            require(input.comparison.op != LinearOp.NE)
+            if (!batchSourceBounds || lp.state?.depth == 0) {
+                if (!assertComparison(input.comparison, null, input.premise)) return false
+                committed(index)
+                continue
+            }
+            val comparison = input.comparison
+            val keys = preparedTerms[comparison.ordered] ?: SmtRowKeys(comparison.terms)
+            val rows = ArrayList<ExactRationalInequality>(2)
+            comparison.rowsInto(rows)
+            for ((side, row) in rows.withIndex()) {
+                if (stop()) return false
+                val negated = comparison.op == LinearOp.GE || (comparison.op == LinearOp.EQ && side == 1)
+                val bound = prepareBound(if (negated) keys.negative else keys.positive,
+                    true, row.rhs, row.strict, input.premise, { !stop() && batch.flush() })
+                    ?: return batch.conflict
+                val consistent = batch.add(bound)
+                if (!consistent) {
+                    if (side == rows.lastIndex) batch.complete(index)
+                    return !stop() && (batch.flush() || batch.conflict)
+                }
+            }
+            batch.complete(index)
+        }
+        return !stop() && (batch.flush() || batch.conflict)
     }
 
     fun disequalitySide(comparison: ExactComparison): DerivedDisequalitySide? {
@@ -280,6 +325,34 @@ internal class LiveQfLraSystem(
         strict: Boolean,
         premise: SearchAtomPremise,
     ): Boolean {
+        val bound = prepareBound(key, upper, threshold, strict, premise) ?: return false
+        return measureAssertion({ assertionCost.boundNs += it }) {
+            if (observeAssertionCost) {
+                assertionCost.boundCalls++
+                val previous = lp.state?.activeSide(bound.column, bound.upper)?.side
+                if (previous == null || bound.side.strongerThan(previous, bound.upper)) assertionCost.boundSides++
+            }
+            lp.assertBound(bound.column, bound.upper, bound.side, bound.premise)
+        }
+    }
+
+    private fun assertBounds(bounds: List<LpPremisedBound>): LpBoundBatchResult =
+        measureAssertion({ assertionCost.boundNs += it }) {
+            if (observeAssertionCost && bounds.isNotEmpty()) {
+                assertionCost.boundCalls++
+                assertionCost.boundSides += bounds.size
+            }
+            lp.assertBounds(bounds)
+        }
+
+    private fun prepareBound(
+        key: SmtTermKey,
+        upper: Boolean,
+        threshold: BigFraction,
+        strict: Boolean,
+        premise: SearchAtomPremise,
+        beforeDefinition: () -> Boolean = { true },
+    ): LpPremisedBound? {
         val fixed = rootFixedColumns(key.columns)
         val slot = if (fixed.isEmpty()) {
             key.slot ?: normalized.getOrPut(key) { SmtTermSlot(intern(key.expression(), declaredFixed)) }
@@ -288,9 +361,9 @@ internal class LiveQfLraSystem(
             SmtTermSlot(intern(key.expression(), declaredFixed + fixed))
         }
         val term = slot.term
-        val column = slot.column.takeIf { it >= 0 } ?: (definitionColumn(term.coefficients) ?: return false)
+        val column = slot.column.takeIf { it >= 0 } ?: (definitionColumn(term.coefficients, beforeDefinition) ?: return null)
         slot.column = column
-        return lp.assertBound(
+        return LpPremisedBound(
             column,
             if (term.scale.signum() < 0) !upper else upper,
             ExactLpSide(ExactLpNumber.of(term.bound(threshold)), strict),
@@ -298,12 +371,15 @@ internal class LiveQfLraSystem(
         )
     }
 
-    private fun definitionColumn(coefficients: Map<Int, BigFraction>): Int? =
+    private fun definitionColumn(coefficients: Map<Int, BigFraction>, beforeAppend: () -> Boolean): Int? =
         coefficients.keys.singleOrNull() ?: definitions[coefficients] ?: run {
+            if (!beforeAppend()) return null
             val state = lp.state ?: return null
             val id = state.rows.lastId + 1L
             val next = state.model.numVars
-            if (!lp.append(
+            val appended = measureAssertion({ assertionCost.definitionNs += it }) {
+                if (observeAssertionCost) assertionCost.definitionAppends++
+                lp.append(
                     LpScopedRow(
                         id,
                         coefficients.map { it.key to ExactLpNumber.of(it.value.negated()) },
@@ -312,12 +388,21 @@ internal class LiveQfLraSystem(
                     ),
                     scoped = false,
                 )
-            ) {
-                return null
             }
+            if (!appended) return null
             definitions[coefficients] = next
             next
         }
+
+    private inline fun <T> measureAssertion(record: (Long) -> Unit, action: () -> T): T {
+        if (!observeAssertionCost) return action()
+        val started = TimeSource.Monotonic.markNow()
+        return try {
+            action()
+        } finally {
+            record(started.elapsedNow().inWholeNanoseconds)
+        }
+    }
 
     private fun intern(expression: Map<Int, BigFraction>, fixed: Map<Int, FixedSmtColumn>): NormalizedSmtTerm {
         val term = normalizeSmtTerm(expression, fixed)
@@ -347,6 +432,56 @@ internal class LiveQfLraSystem(
                 ),
             )
         }
+    }
+}
+
+internal data class PremisedSmtComparison(val comparison: ExactComparison, val premise: SearchAtomPremise)
+
+internal class SmtSourceAssertionCost {
+    var definitionAppends = 0L
+    var definitionNs = 0L
+    var boundCalls = 0L
+    var boundSides = 0L
+    var boundNs = 0L
+}
+
+private class SmtSourceBoundBatch(
+    private val lp: LpPropagator,
+    private val assertBounds: (List<LpPremisedBound>) -> LpBoundBatchResult,
+    private val committed: (Int) -> Unit,
+) {
+    private val bounds = ArrayList<LpPremisedBound>()
+    private val completions = ArrayList<Pair<Int, Int>>()
+    private val sides = HashMap<Pair<Int, Boolean>, ExactLpSide>()
+    var conflict = false
+        private set
+
+    fun add(bound: LpPremisedBound): Boolean {
+        val key = bound.column to bound.upper
+        val previous = sides[key] ?: lp.state?.activeSide(bound.column, bound.upper)?.side
+        if (previous != null && !bound.side.strongerThan(previous, bound.upper)) return true
+        bounds += bound
+        sides[key] = bound.side
+        return ExactLpBounds(
+            sides[bound.column to false] ?: lp.state?.activeSide(bound.column, false)?.side,
+            sides[bound.column to true] ?: lp.state?.activeSide(bound.column, true)?.side,
+        ).consistent
+    }
+
+    fun complete(index: Int) {
+        completions += index to bounds.size
+    }
+
+    fun flush(): Boolean {
+        val result = assertBounds(bounds)
+        if (result is LpBoundBatchResult.Declined) return false
+        // Counts address strengthened sides, including both sides of an equality, rather than source rows.
+        for ((index, end) in completions) if (end <= result.count) committed(index)
+        bounds.clear()
+        completions.clear()
+        sides.clear()
+        conflict = result is LpBoundBatchResult.Conflict
+        return !conflict
     }
 }
 

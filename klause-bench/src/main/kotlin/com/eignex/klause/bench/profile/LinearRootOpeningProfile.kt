@@ -59,7 +59,8 @@ internal object LinearRootOpeningProfile {
         require(options.keys == required || options.keys == required + "inspect")
         val inspection = options["inspect"]
         val inspections = setOf("disjunction-names", "partial-arithmetic", "partial-implication",
-            "partial-propagation", "partial-propagation-cache", "partial-propagation-cached")
+            "partial-propagation", "partial-propagation-cache", "partial-propagation-cached",
+            "partial-source-batching", "partial-source-batching-plain")
         require(inspection == null || inspection in inspections)
         val expected = options.getValue("sha256")
         require(expected.matches(Regex("[0-9a-f]{64}")))
@@ -80,8 +81,9 @@ internal object LinearRootOpeningProfile {
         require(compiled.objective == null) { "only satisfaction openings are supported" }
         if (inspection != null && inspection.startsWith("partial-")) {
             LinearPrefixInspection.inspect(compiled, out, actual, probe = inspection == "partial-implication",
-                integrated = inspection.startsWith("partial-propagation"),
-                cached = inspection == "partial-propagation-cache", reuse = inspection == "partial-propagation-cached")
+                integrated = inspection.startsWith("partial-propagation") || inspection == "partial-source-batching",
+                cached = inspection == "partial-propagation-cache", reuse = inspection == "partial-propagation-cached",
+                batching = inspection.startsWith("partial-source-batching"))
             return
         }
         val deadlineStarted = System.nanoTime()
