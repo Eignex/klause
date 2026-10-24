@@ -86,6 +86,11 @@ internal class JointRepairNeighborhood private constructor(
                         else integers + coordinate.id
                     columns += column
                 }
+                for (coordinate in premise.integerPins.keys) {
+                    cancellation.charge(1)
+                    if (cancellation() || ++entries > MAX_INDEX_ENTRIES) return null
+                    if (coordinate.id !in columns) columns += coordinate.id
+                }
                 if (columns.size < 2) continue
                 for (column in columns) occurrences[column] += rows.size
                 rows += columns.toIntArray()
