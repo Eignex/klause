@@ -227,6 +227,8 @@ internal object MpsSparseRoot {
         val owner = Class.forName(ENGINE + "LpScopedSolver").constructors.single { it.parameterCount == 9 }
             .newInstance(call(trail, "getState"), stop, context, 50, call(allowance, "getIterations"),
                 call(allowance, "getWork"), false, Int.MAX_VALUE, pricing)
+        val numericalOwner = checkNotNull(NumericalFrontierSnapshot.field(owner, "solver"))
+        call(numericalOwner, "enableProgressTrace")
         val limits = checkNotNull(call(policy, "getCertificate"))
         val advance = Class.forName(ENGINE + "LpRootGuidanceKt").methods.single {
             it.name == "advanceRootGuidance" && it.parameterCount == 7
@@ -263,6 +265,9 @@ internal object MpsSparseRoot {
                         put("numericalProgress", NumericalResidualProfile.json(numerical?.let {
                             call(it, "getLastNumericalMetrics")
                         }))
+                        put("simplexProgress", NumericalResidualProfile.json(call(numericalOwner, "getProgressTrace")))
+                        put("refactorPolicy", NumericalResidualProfile.json(
+                            call(numericalOwner, "getLastRefactorPolicyMetrics")))
                         put("floatMetrics", NumericalResidualProfile.json(call(owner, "getLastMetrics")))
                         put("ownerMetrics", NumericalResidualProfile.json(call(owner, "getMetrics")))
                     }
