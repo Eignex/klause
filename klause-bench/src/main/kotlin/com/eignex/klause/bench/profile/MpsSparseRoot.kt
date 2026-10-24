@@ -34,6 +34,7 @@ import java.util.Base64
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -211,7 +212,7 @@ internal object MpsSparseRoot {
         bean: ThreadMXBean,
         thread: Long,
         policy: Any,
-        checkBound: (Any) -> kotlinx.serialization.json.JsonObject,
+        checkBound: (Any) -> JsonObject,
     ) {
         val stop = Cancellation.after(10.seconds)
         val trail = Class.forName(ENGINE + "LpBoundTrail").constructors.single {
