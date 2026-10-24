@@ -152,7 +152,9 @@ internal class LinearAuthorityLp(
             guidancePacked = it
         } ?: return null
         var phase: String? = null
-        return retained.advance(packed, costs, constant, scope, cancellation, guidancePolicy, observer) { guide, token ->
+        return retained.advance(
+            packed, costs, constant, scope, cancellation, guidancePolicy, observer,
+        ) { guide, token ->
             phase = guide.phase.name
             val bound = guide.bound?.takeIf { listOf(it.value).admittedSourcePoint() }
             val weights = bound?.dualMultipliers?.map { it.negated() }
