@@ -1073,6 +1073,28 @@ These summaries record current design decisions. The contracts live in the linke
 [docs](../docs/README.md) chapters; measurements behind them were klause-lab
 experiments and stay outside the repository.
 
+### Division relation lookup
+
+Retain the compilation-owned index described in [integer division relations](../docs/02-model.md#integer-division-relations).
+Matched Mac aarch64/JDK 25.0.4.1 construction profiles
+[7952](https://lab.eignex.com/jobs/7952) and [7953](https://lab.eignex.com/jobs/7953)
+used identical profile source at `e397788d9` and `7d6298534`, one warmup and three
+measured iterations. Median parsing/lowering times for 1,024/2,048/4,096/8,192
+repeated modular expressions were 7.14/13.58/42.83/154.43 ms with factor scanning
+and 6.43/6.85/9.61/19.34 ms with the index. Coprime-24_c25 construction fell from
+53.75 s to 0.189 s, retaining 28,199 integer coordinates and 172,524 factors.
+Source hashes, factor kinds and runtime identities matched across the profiles;
+the actual profile JVM exposed ten processors and executed no solver.
+
+The uninstrumented [7955 controls](https://lab.eignex.com/jobs/7955) reported
+Coprime load times of 37.3 s and 0.67 s; both runs stayed unknown at a ten-second
+solve limit. The signed division fixtures retained their reported outcomes.
+The maintained checker accepted both linear SMT witnesses, declined the four
+SMT witnesses containing division and could not locate the vendored XCSP3 and
+MiniZinc sources. Native refutation and optimum reports therefore receive no
+independent proof credit from this job. Construction gains establish neither
+solver recovery nor a corpus-wide solve speedup.
+
 ### Elective LP harvest controls
 
 `sets/lp-harvest-controls-v1.txt` fixes the SAT and positive controls for the

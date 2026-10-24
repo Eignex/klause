@@ -7,9 +7,9 @@ import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.formats.xcsp3.Xcsp3
-import java.io.File
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
 
 internal object DivModConstructionProfile {
     @JvmStatic
@@ -60,10 +60,13 @@ internal object DivModConstructionProfile {
                     put("booleans", problem.numBoolVars)
                     put("integers", problem.numIntVars)
                     put("factors", problem.factors.size)
-                    put("factorKinds", buildJsonObject {
-                        problem.factors.groupingBy { it::class.simpleName ?: "Factor" }.eachCount().toSortedMap()
-                            .forEach { (kind, count) -> put(kind, count) }
-                    })
+                    put(
+                        "factorKinds",
+                        buildJsonObject {
+                            problem.factors.groupingBy { it::class.simpleName ?: "Factor" }.eachCount().toSortedMap()
+                                .forEach { (kind, count) -> put(kind, count) }
+                        },
+                    )
                 }
                 observations.appendText("$observation\n")
                 println(observation)
@@ -76,7 +79,7 @@ internal object DivModConstructionProfile {
         repeat(size) { append("<var id=\"x$it\">-7..7</var>") }
         append("</variables><constraints>")
         repeat(2) {
-            repeat(size) { append("<intension>eq(mod(x$it,3),1)</intension>") }
+            repeat(size) { index -> append("<intension>eq(mod(x$index,3),1)</intension>") }
         }
         append("</constraints></instance>")
     }

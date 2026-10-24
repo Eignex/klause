@@ -64,12 +64,22 @@ internal class DivModRelationIndex {
         val qMagnitude = aMagnitude + BIG_ONE
         val q = quotient ?: freshInt(bounded(BIG_ZERO - qMagnitude, qMagnitude))
         val rMagnitude = maxOf(BIG_ZERO, bMagnitude - BIG_ONE)
-        val lowerR = if (convention == DivisionConvention.EUCLIDEAN || dividendDomain.min >= 0L)
-            BIG_ZERO else BIG_ZERO - rMagnitude
-        val upperR = if (convention == DivisionConvention.TRUNCATING && dividendDomain.max <= 0L) BIG_ZERO else rMagnitude
+        val lowerR = if (convention == DivisionConvention.EUCLIDEAN || dividendDomain.min >= 0L) {
+            BIG_ZERO
+        } else {
+            BIG_ZERO - rMagnitude
+        }
+        val upperR = if (convention == DivisionConvention.TRUNCATING && dividendDomain.max <= 0L) {
+            BIG_ZERO
+        } else {
+            rMagnitude
+        }
         val r = remainder ?: freshInt(bounded(lowerR, upperR))
-        val factor = if (constant != null) DivMod(dividend, bigIntOf(constant), q, r, convention)
-            else DivMod(dividend, divisor, q, r, convention)
+        val factor = if (constant != null) {
+            DivMod(dividend, bigIntOf(constant), q, r, convention)
+        } else {
+            DivMod(dividend, divisor, q, r, convention)
+        }
         relations[key] = factor
         return DivModRelation(q, r, listOf(factor))
     }
