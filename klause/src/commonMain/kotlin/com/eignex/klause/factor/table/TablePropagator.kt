@@ -12,6 +12,8 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.carvedAt
 import com.eignex.klause.propagation.domainAt
+import com.eignex.klause.propagation.excludeInteriorIntValues
+import com.eignex.klause.propagation.excludeIntValues
 import com.eignex.klause.propagation.lazyReason
 import com.eignex.klause.propagation.restrictIntToSurvivors
 import com.eignex.klause.util.IntArrayList
@@ -536,12 +538,8 @@ internal class TablePropagator(
                     toRemove[toRemoveCount++] = value
                 }
             }
-            for (k in 0 until toRemoveCount) {
-                val value = toRemove[k]
-                if (!state.excludeIntValue(xs[col], value, deductionReason(state, col, VALUE, value, ant) { coarse })) {
-                    return false
-                }
-            }
+            val removed = if (toRemoveCount == toRemove.size) toRemove else toRemove.copyOf(toRemoveCount)
+            if (!excludeUnsupported(state, col, removed, ant) { coarse }) return false
         }
         return true
     }
@@ -632,20 +630,40 @@ internal class TablePropagator(
                 state.intDomains[xs[col]].values.forEach { value ->
                     if (value !in sup) toRemove.add(value)
                 }
-                for (k in 0 until toRemove.size) {
-                    val value = toRemove[k]
-                    if (!state.excludeIntValue(
-                            xs[col],
-                            value,
-                            deductionReason(state, col, VALUE, value, ant) { coarse },
-                        )
-                    ) {
-                        return false
-                    }
-                }
+                if (!excludeUnsupported(state, col, toRemove.toLongArray(), ant) { coarse }) return false
             }
         }
         return true
+    }
+
+    private inline fun excludeUnsupported(
+        state: PropagationState,
+        col: Int,
+        values: LongArray,
+        intervalReason: IntArray?,
+        crossinline coarse: () -> IntArray?,
+    ): Boolean {
+        if (values.isEmpty()) return true
+        val v = xs[col]
+        val d = state.intDomains[v]
+        // Repeated coordinates can expose an endpoint after another column has pruned the same variable.
+        if (values.size == 1 || values.first() <= d.min || values.last() >= d.max) {
+            for (value in values) {
+                val reason = deductionReason(state, col, VALUE, value, intervalReason, coarse)
+                if (!state.excludeIntValue(v, value, reason)) return false
+            }
+            return true
+        }
+        if (hi != null || state.currentLevel == 0 || !state.undoLogging) {
+            return state.excludeIntValues(
+                v,
+                values,
+                deductionReason(state, col, VALUE, values[0], intervalReason, coarse),
+            )
+        }
+        return state.excludeInteriorIntValues(v, values) { value ->
+            deductionReason(state, col, VALUE, value, intervalReason, coarse)
+        }
     }
 
     // The reason [col]'s prune records: built only if conflict analysis reads it ([supportLoss]), which needs the
