@@ -139,7 +139,7 @@ internal class JointLinearRepair(
             val result = authority.advance(source, stop)
             for ((stage, count) in result.primalStages) {
                 val key = "jointRepairRoot$stage"
-                stages[key] = (stages[key] ?: 0L) + count
+                stages[key] = combine(key, stages[key] ?: 0L, count)
             }
             observe("jointRepairRootConsultations")
             rootPreparationPending = result.paused

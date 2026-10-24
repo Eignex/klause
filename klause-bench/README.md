@@ -2508,6 +2508,9 @@ existing counters. These are distinct from physical time, RSS and allocation.
 Frontier observations use the `numerical` prefix; joint candidate traversals use
 `jointRepair`, and root preparation uses `jointRepairRoot`. Retained attempt or
 component reuse has its own counter, and consultations are not distinct incumbents.
+`PrimalRecoveryComponentMaxColumns` and `PrimalRecoveryComponentMaxRows` retain
+prepared residual shapes. `PrimalRecoveryComponentDimension` counts those outside
+small exact admission; attempts stopped before preparation have no such classification.
 
 [Diagnosis 8121](https://lab.eignex.com/jobs/8121) pins diagnostic-only `78b9c16d48`
 on eleven sources from 8072: frontier and joint repair, exact/P1/10 s, presolve off,
@@ -2519,6 +2522,34 @@ source-rejected proposals on bell3a, modglob and rgn at 18, 222 and 206 consulta
 respectively. These observations select real reconstruction and continuous
 residual completion for integral assignments; fractional guides continue to order
 exhaustive integer splits.
+
+[Comparison 8151](https://lab.eignex.com/jobs/8151) pairs `78b9c16d48` with
+`ae162bf8fe` over those eleven sources, both consumers, default/exact policies and
+three repeats at seed 1: 264 completed cases on one Linux/amd64 spot node.
+Original hashes, runtime, non-solver dependencies and 3 GiB Serial-GC options match;
+all 30 reported final witnesses pass solchecker. Twelve of 132 pairs improve and
+the other 120 retain feasibility, objective and native proof outcomes. Native
+proofs remain separate from independent witness validation.
+
+In every repeat and policy, gr4x6 joint repair improves 210 to 202.35, with six
+checked incumbents instead of five. Seventeen reconstructions spend 58,493 modeled
+work units and 2,210,109 cumulative allocation bytes. Its peak candidate tree stays
+at 57 nodes; frontier retains its 45-check native optimum. Bell3a gains a joint
+incumbent of 899922.1 in all six runs. Recovery spends 749,371–789,353 work and
+28.8–30.3 MB modeled allocation; the peak candidate tree falls from 19 to three
+nodes. Exact-arm median process elapsed rises from 4.639 to 10.249 s, with the
+candidate using 157–162 source operations before its wall allowance instead of
+the baseline's 256-operation stop. These are checked-point gains with costs,
+without a general runtime improvement claim.
+
+Modglob and rgn retain no point. Their 119 and 113 unavailable component attempts
+spend 4,385,144 and 2,567,399 modeled work, and 149.9 and 96.4 MB cumulative modeled
+allocation. Additional source LP consultations reduce candidate coverage from
+229 to 121 and 215 to 124 at the same 256-operation allowance. Their shorter
+elapsed times therefore establish no throughput gain. Connected residual admission
+is the remaining recovery boundary; fractional wider frontier guides retain their
+ordinary split path. This comparison measures standalone recovery under that
+operation policy and preserves automatic routing.
 
 `bench.profile.MpsProofFrontier` takes `suite=ID problem=NAME sha256=HEX exact=true|false`
 for one hash-matched original source. It uses the same numerical source setup and
