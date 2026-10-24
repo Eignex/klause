@@ -10,6 +10,7 @@ import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.checkMpsWitness
 import com.eignex.klause.formats.mps.toLinearSourceProblem
 import com.eignex.klause.formats.mps.toProblem
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.localsearch.CandidateCompletion
@@ -19,6 +20,7 @@ import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.util.Cancellation
@@ -76,14 +78,10 @@ internal object ContinuousCompletionProfile {
             if (compiled.maximize) it.negated() else it
         }
         val accepts: (Sample) -> Boolean = { sample -> compiled.withinTolerance(sample.ints, sample.reals) }
-        val acceptanceType = Class.forName("com.eignex.klause.solver.validation.FiniteSourceAcceptance")
-        val acceptance = acceptanceType.constructors.single().newInstance(accepts, !exact)
-        val type = Class.forName("com.eignex.klause.portfolio.LeafRealCompletion")
-        val completion = type.constructors.single { it.parameterCount == 7 }
-            .newInstance(problem, objective, acceptance, null, false, 8, null) as CandidateCompletion
+        val completion = newCompletion(problem, objective, accepts, exact, retained = false)
         val probe = CaptureProbe(completion, out)
         var stats: JsonElement = JsonNull
-        val observe: (Any, LpStats) -> Unit = { verdict, value ->
+        val onLp: (Any, LpStats) -> Unit = { verdict, value ->
             stats = buildJsonObject {
                 put("verdict", verdict.toString())
                 put("standaloneWork", value.standaloneWorkOps.sum)
@@ -94,7 +92,7 @@ internal object ContinuousCompletionProfile {
                 put("componentPivots", value.componentPivots.sum)
             }
         }
-        type.methods.single { it.name == "setObserveLp" }.invoke(completion, observe)
+        observe(completion, onLp)
         var count = 0
         val containing = Cancellation.after(10.seconds)
         val stop = containing or Cancellation { count >= LIMIT }
@@ -167,6 +165,25 @@ internal object ContinuousCompletionProfile {
         }
     }
 
+    internal fun newCompletion(
+        problem: Problem,
+        objective: LinearObjective,
+        accepts: (Sample) -> Boolean,
+        exact: Boolean,
+        retained: Boolean,
+    ): CandidateCompletion {
+        val acceptanceType = Class.forName("com.eignex.klause.solver.validation.FiniteSourceAcceptance")
+        val acceptance = acceptanceType.constructors.single().newInstance(accepts, !exact)
+        val type = Class.forName("com.eignex.klause.portfolio.LeafRealCompletion")
+        return type.constructors.single { it.parameterCount == 7 }
+            .newInstance(problem, objective, acceptance, null, retained, 8, null) as CandidateCompletion
+    }
+
+    internal fun observe(completion: CandidateCompletion, observer: (Any, LpStats) -> Unit) {
+        completion.javaClass.methods.single { it.name.substringBefore('$') == "setObserveLp" }
+            .invoke(completion, observer)
+    }
+
     private fun sample(value: Sample): JsonElement = buildJsonObject {
         put("bools", JsonArray(value.bools.map(::JsonPrimitive)))
         put("ints", JsonArray(value.ints.map { JsonPrimitive(it.toString()) }))
@@ -198,7 +215,9 @@ internal object ContinuousCompletionProfile {
                     throw failure.targetException
                 }
             }
-            val copy = context.javaClass.methods.single { it.name == "copy" && it.parameterCount == 4 }.invoke(
+            val copy = context.javaClass.methods.single {
+                it.name.substringBefore('$') == "copy" && it.parameterCount == 4
+            }.invoke(
                 context, wrapped, call(context, "getCertificationPolicy"),
                 call(context, "getOnRefinementBasisVerification"), call(context, "getSparsePointRecovery"),
             )
@@ -235,5 +254,6 @@ internal object ContinuousCompletionProfile {
     )
 
     private fun call(owner: Any, name: String, vararg args: Any?): Any? =
-        owner.javaClass.methods.single { it.name == name && it.parameterCount == args.size }.invoke(owner, *args)
+        owner.javaClass.methods.single { it.name.substringBefore('$') == name && it.parameterCount == args.size }
+            .invoke(owner, *args)
 }

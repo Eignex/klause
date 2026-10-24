@@ -1361,3 +1361,15 @@ same saved candidate sequence for cold and retained-owner comparisons, including
 setup, allocation, certification and close. A captured numerical block carries no
 original-factor proof, and an undecided or omitted capture does not decide its
 candidate. These direct-search records do not establish a portfolio source verdict.
+
+`bench.profile.ContinuousCompletionReplay` takes the same argument form with
+`{job, source, sha256, candidatesSha256, summarySha256}` objects identifying a
+completed capture job and its output index. It verifies all three hashes, restores
+the captured source policy and candidate order, then alternates cold and retained
+owners through a warmup and three recorded rounds. Each sequence has a ten-second
+containing deadline; compare their common candidate prefix as well as completed
+and source-checked counts. Both arms retain their encoding cache. Reports include
+completion construction, per-query time and thread allocation, warm-start counts,
+original-source checks and owner close; source parsing and input decoding are
+excluded equally, and JSON serialization follows the measured interval. These are
+owner-lifetime comparisons, not cold-search or portfolio quality results.
