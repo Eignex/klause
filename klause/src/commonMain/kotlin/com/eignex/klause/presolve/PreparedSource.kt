@@ -56,17 +56,16 @@ internal class PreparedSource(
     /** Preparations that did not run a pass. */
     companion object {
         /** [problem] as its own preparation, for an input that has already passed this phase. */
-        fun unchanged(
-            problem: Problem, budget: PresolveBudget?, transformObjective: Boolean = false,
-        ): PreparedSource = PreparedSource(
-            source = problem,
-            problem = problem,
-            infeasible = false,
-            objective = null,
-            passesFired = emptyList(),
-            rebuild = SourceRebuilds.NONE,
-            budget = budget,
-            transformObjective = transformObjective,
-        )
+        fun unchanged(problem: Problem, budget: PresolveBudget?, transformObjective: Boolean = false): PreparedSource =
+            PreparedSource(
+                source = problem,
+                problem = problem,
+                infeasible = false,
+                objective = null,
+                passesFired = emptyList(),
+                rebuild = SourceRebuilds.NONE,
+                budget = budget,
+                transformObjective = transformObjective,
+            )
     }
 }

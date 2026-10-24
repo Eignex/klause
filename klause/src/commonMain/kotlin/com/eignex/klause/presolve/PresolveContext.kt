@@ -45,6 +45,7 @@ data class PresolveContext(
             .associate { it.index to it.value }
         return copy(objectiveIntCoeffs = coefficients, linearObjective = objective.takeIf { linearObjective != null })
     }
+
     /** Integer variables read by the objective. */
     val objectiveIntVars: Set<Int> get() = objectiveIntCoeffs.keys
 
@@ -114,8 +115,13 @@ data class PresolveContext(
                 val w = objective.boolWeightValues[b]
                 if (w != 0L) boolCoeffs[b] = w
             }
-            return PresolveContext(solutionSetSensitive, intCoeffs, boolCoeffs, modelBreaksSymmetry,
-                linearObjective = objective.takeIf { transformObjective })
+            return PresolveContext(
+                solutionSetSensitive,
+                intCoeffs,
+                boolCoeffs,
+                modelBreaksSymmetry,
+                linearObjective = objective.takeIf { transformObjective },
+            )
         }
     }
 }

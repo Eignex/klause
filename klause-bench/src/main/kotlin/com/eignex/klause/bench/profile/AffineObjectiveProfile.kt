@@ -13,6 +13,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.RealConstants
 import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SourceTolerance
@@ -62,7 +63,7 @@ internal object AffineObjectiveProfile {
                     if (exact) SemanticOverrides(feasibilityTolerance = SourceTolerance()) else SemanticOverrides(),
                 ))
                 val invocation = SourceSetup.prepare(SourceSetupRequest(
-                    SourceAttachment(original), ExecutionOperation.OPTIMIZE, FiniteEngine.BACKTRACK,
+                    SourceAttachment(original, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.BACKTRACK,
                     maximize = original.objective?.sense == ObjectiveSense.MAXIMIZE,
                 ))
                 val plan = requireNotNull(invocation.preparedPlan)
