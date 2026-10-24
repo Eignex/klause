@@ -12,7 +12,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
-import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class ExactNeighborhoodTest {
@@ -55,16 +54,22 @@ class ExactNeighborhoodTest {
     @Test
     fun `a paused completion should resume the same candidate before drawing another move`() {
         val conditions = ArrayList<ExactNeighborhoodCondition>()
+        var proposals = 0L
         val search = ExactNeighborhood(0, listOf(BigFraction.ZERO), ExactNeighborhoodCompletion { condition, _ ->
             conditions += condition
             if (conditions.size == 1) ExactNeighborhoodResult.Paused else ExactNeighborhoodResult.Refuted
-        }, coordinateValues = { emptyList() }, maximumMoves = 1)
+        }, coordinateValues = { emptyList() }, maximumMoves = 1,
+            proposal = ExactNeighborhoodProposal { _, _, _, _, _, _ ->
+                val pins = mapOf(0 to BigFraction.ofLong(++proposals))
+                ExactNeighborhoodCondition(emptyMap(), pins, pins)
+            })
 
         assertFalse(search.advance(Cancellation.Never, 10))
         assertEquals(0.0, search.stats.ls.completions.sum)
         assertTrue(search.advance(Cancellation.Never, 10))
 
-        assertSame(conditions[0], conditions[1])
+        assertEquals(conditions[0], conditions[1])
+        assertEquals(1L, proposals)
         assertEquals(1.0, search.stats.ls.completionsRefuted.sum)
         assertEquals(2L, search.work)
     }

@@ -2089,7 +2089,9 @@ candidate allowance, and retain automatic finite LS and LP/pumping controls at t
 same source hashes, revision and settings. `smtCompleteSearchStage_jointRepair*`
 counts root guidance, candidate queries, selected integer coordinates, connectivity
 and preparation work, compatible owner reuse, paused consultations and checked
-improvements. Incumbent trajectories measure accepted source objectives; independent
+improvements. Traversal counts span candidates; peak sizes retain the largest
+candidate tree, and unresolved leaves include retired local alternatives.
+Incumbent trajectories measure accepted source objectives; independent
 witness validation still checks each retained final point separately. Neighborhood
 exhaustion supplies no global bound or refutation, and a guidance miss supplies no
 performance comparison with an admitted repair.

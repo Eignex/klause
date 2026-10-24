@@ -191,8 +191,10 @@ class NumericalLinearRequest internal constructor(
                     stop() -> TerminationReason.Cancelled
                     else -> TerminationReason.BudgetExhausted
                 }
+                search.close()
+                val stats = search.stats
                 LinearOptimizationResult(context.scope, null, null, incumbent, value, reason,
-                    search.stats.copy(run = search.stats.run.copy(backend = "numerical-joint-repair")),
+                    stats.copy(run = stats.run.copy(backend = "numerical-joint-repair")),
                     context.semantics)
             }
         }
