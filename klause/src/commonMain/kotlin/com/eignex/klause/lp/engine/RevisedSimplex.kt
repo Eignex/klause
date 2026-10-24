@@ -1786,6 +1786,7 @@ internal class RevisedSimplex(
                 (atLower && a > 0) || (!atLower && a < 0)
             }
             if (!eligible) continue
+            progressTrace?.let { it.pricedColumns++ }
             enteringRatios[j] = abs((cost(j) - dotColumn(y, j)) / a)
             eligibleColumns.add(j)
         }
