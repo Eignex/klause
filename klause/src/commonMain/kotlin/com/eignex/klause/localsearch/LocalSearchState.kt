@@ -254,6 +254,7 @@ class LocalSearchState private constructor(
     private var moveActive = false
     private var scoringCancellation: Cancellation = Cancellation.Never
     private var scoringCountdown = 0
+    private var restoringProbe = false
 
     internal fun scoringPick(cancellation: Cancellation, pick: () -> Move?): Move? {
         scoringCancellation = cancellation
@@ -272,6 +273,12 @@ class LocalSearchState private constructor(
         if (scoringCountdown-- > 0) return
         scoringCountdown = LOCAL_SEARCH_OPERATION_BATCH - 1
         if (scoringCancellation()) throw LocalSearchScoringInterrupted
+    }
+
+    private fun checkProbeWork() {
+        if (probeActive && !restoringProbe && scoringCancellation !== Cancellation.Never && scoringCancellation()) {
+            throw LocalSearchScoringInterrupted
+        }
     }
 
     // Break-count probe scratch. While breakProbeActive, updateViolation records each factor whose
@@ -601,7 +608,10 @@ class LocalSearchState private constructor(
         is Move.RealSet -> applyRealSet(move.varId, move.newValue)
 
         is Move.Compound -> {
-            for (p in move.parts) applyCore(p)
+            for (p in move.parts) {
+                applyCore(p)
+                checkProbeWork()
+            }
         }
     }
 
@@ -659,6 +669,7 @@ class LocalSearchState private constructor(
             }
         }
         values.pending.clear(idx)
+        checkProbeWork()
     }
 
     /**
@@ -1240,6 +1251,7 @@ class LocalSearchState private constructor(
      *  (factorId, delta) pair to [action]. Inline so callers stay allocation-free. */
     internal inline fun forEachBoolFactorDelta(v: Int, action: (factorId: Int, delta: Int) -> Unit) {
         for (factorId in projection.boolOccurrences[v]) {
+            checkScoringWork()
             action(factorId, factors[factorId].deltaIfBoolFlipped(this, factorId, v))
         }
     }
@@ -1248,6 +1260,7 @@ class LocalSearchState private constructor(
      *  target value [newValue]. */
     internal inline fun forEachIntFactorDelta(v: Int, newValue: Long, action: (factorId: Int, delta: Int) -> Unit) {
         for (factorId in projection.intOccurrences[v]) {
+            checkScoringWork()
             action(factorId, factors[factorId].deltaIfIntSet(this, factorId, v, newValue))
         }
     }
@@ -1255,6 +1268,7 @@ class LocalSearchState private constructor(
     /** Same as [forEachBoolFactorDelta] but for a `RealSet` move on real var `v` with target [newValue]. */
     internal inline fun forEachRealFactorDelta(v: Int, newValue: Double, action: (factorId: Int, delta: Int) -> Unit) {
         for (factorId in projection.realOccurrences[v]) {
+            checkScoringWork()
             action(factorId, factors[factorId].deltaIfRealSet(this, factorId, v, newValue))
         }
     }
@@ -1463,7 +1477,9 @@ class LocalSearchState private constructor(
             return MoveEval(breaks, makeCount, delta, weighted, objectiveDelta, cumulativeDelta, elementRepairs)
         } finally {
             breakProbeActive = false
+            restoringProbe = true
             restoreProbeCoordinates()
+            restoringProbe = false
             // Restoration returns every probed coordinate to its committed value, so the cached value stands.
             if (oldExactObjective != null) committedObjectiveRevision = assignmentRevision
             for (i in 0 until probeTouchedList.size) probeTouched[probeTouchedList[i]] = false
