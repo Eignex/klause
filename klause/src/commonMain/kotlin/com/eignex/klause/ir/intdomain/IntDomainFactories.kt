@@ -112,8 +112,9 @@ internal fun intDomainFromRuns(
     while (k < runs.size) {
         var v = runs[k]
         val hi = runs[k + 1]
-        while (v <= hi) {
+        while (true) {
             sv[idx++] = v
+            if (v == hi) break
             v++
         }
         k += 2

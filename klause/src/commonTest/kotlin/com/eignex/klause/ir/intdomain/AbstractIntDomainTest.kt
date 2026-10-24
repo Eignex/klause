@@ -14,7 +14,9 @@ class AbstractIntDomainTest {
         val a = intDomainFromSurvivors(
             longArrayOf(Long.MIN_VALUE, Long.MIN_VALUE + 1, Long.MAX_VALUE - 1, Long.MAX_VALUE),
         )
-        val b = a.includeInteriorValue(0)
+        val b = intDomainFromSurvivors(
+            longArrayOf(Long.MIN_VALUE, Long.MIN_VALUE + 1, 0, Long.MAX_VALUE - 1, Long.MAX_VALUE),
+        )
 
         assertTrue(a != b)
         assertTrue(b != a)
