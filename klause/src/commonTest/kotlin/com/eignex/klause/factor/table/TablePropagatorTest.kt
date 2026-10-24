@@ -34,6 +34,28 @@ import kotlin.test.assertTrue
 class TablePropagatorTest {
 
     @Test
+    fun `indexed delta deductions should be implied by their historical reasons`() {
+        val tuples = LongArray(9 * 16 * 3) { cell ->
+            val row = cell / 3 % 9
+            when (cell % 3) {
+                0 -> (row / 3).toLong()
+                1 -> (row % 3).toLong()
+                else -> ((row / 3 + row % 3) % 3).toLong()
+            }
+        }
+        val problem = Problem(
+            0, 3, Array(3) { IntDomain(0, 2) }, arrayOf<Factor>(Table(intArrayOf(0, 1, 2), tuples)),
+        )
+
+        PropagationReasonOracle.assertReasonsImply(problem, "indexed-delta") { state ->
+            state.currentFactor = 0
+            check(state.factorAt(0).propagate(state, 0))
+            state.currentFactor = -1
+            state.setInt(0, 0) && state.excludeIntValue(1, 1)
+        }
+    }
+
+    @Test
     fun `aliased table positions should filter the domains changed by their own pruning`() {
         val relation = longArrayOf(0, 1, 1, 0, 2, 1)
         val problem = Problem(
