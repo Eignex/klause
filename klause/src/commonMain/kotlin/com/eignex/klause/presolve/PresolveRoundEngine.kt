@@ -174,9 +174,9 @@ private fun PresolveInvocationStats.changeForCost(pass: PresolvePass): Long {
         1L, removedOccurrences, (input.factors - output.factors).toLong(),
         narrowedColumns.toLong(), fixedColumns.toLong(),
     )
-    // Normalize charged analysis and rebuild work into entry visits before dividing by retained yield.
+    // Self-metered passes charge visits directly; other passes normalize by their entry weight.
     // Ceiling divisions avoid overflow and make a costly empty or interrupted call require more change.
-    val entries = work.ceilDiv(pass.baseWorkWeight)
+    val entries = work.ceilDiv(pass.baseWorkWeight.coerceAtLeast(1L))
     return entries.ceilDiv(yield)
 }
 
