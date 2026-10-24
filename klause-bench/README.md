@@ -1370,6 +1370,33 @@ not collected. Equal seed prefixes are not independent trajectories. Adoption is
 for bounded exact guidance capability, with no demonstrated hard-family recovery
 or general cost improvement.
 
+Retain selectively admitted `support-aware` CSP search beside ordinary complete
+recipes; [portfolios](../docs/12-portfolio.md) owns its structural gate and cheap
+declines. [8162](https://lab.eignex.com/jobs/8162) compares `1725d79c0e` with
+`a660856bac` on Linux/amd64: nine frozen original/held-out sources, CP and mixed/P1,
+15 seconds and seeds 3/17. All 72 cases return, all 36 pairs retain feasibility and
+all 32 witnesses pass independent source checks. Paired source hashes, runtime,
+options and non-solver dependencies match; compiler identity is unavailable.
+[8119](https://lab.eignex.com/jobs/8119) retains the earlier admission prototype's
+separate Mac/aarch64 and Linux/amd64 controls.
+
+CarSequencing `75-02` reaches depth 437–441 instead of 383–415 across the four
+CP/mixed pairs; `80-01` reaches 402–403 instead of 362–398. Both remain unresolved.
+Eternity mixed depth rises from 29/32 to 37, while CP seed 17 falls from 40 to 37.
+On Nonogram `039`, CP nodes change from 2,572 to 2,140 at seed 3 and from 2,454 to
+2,565 at seed 17. Its mixed seed-3 run grows from 1,576 to 2,312 nodes and from
+6.794 to 13.567 seconds, with peak RSS 263,340 to 315,260 KiB. Whole-process RSS
+ratios span 0.849–1.197 across all pairs; allocations were not collected.
+
+Nonadmitted BlockedQueens and WordSquare CP controls retain their palettes, but
+elapsed scheduling still changes sampled paths. Equal seed settings establish no
+trajectory independence. WordDesign has ancillary small Tables and is admitted;
+it remains unresolved. Eight WordDesign/WordSquare mixed cases hit the roughly
+50-second hard process cap without search statistics, leaving the stopped phase
+unconfirmed. Native work includes discovery visits in the candidate, so raw work
+totals are different currencies. Adoption is for bounded complementary coverage,
+with observed search and cost tradeoffs and no general speedup or recovery claim.
+
 Retain adaptive live tuple masks and bounded support-count ordering as consumers of
 the shared index. [8055](https://lab.eignex.com/jobs/8055) compares `e5028472dd`
 (the retained algorithms on parent `e467739f4e`, with maxSD exposed) and `e36eb235ac`
