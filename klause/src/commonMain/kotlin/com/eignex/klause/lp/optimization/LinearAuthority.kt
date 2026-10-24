@@ -154,7 +154,10 @@ internal class LinearAuthority(
             ?: return LinearAuthorityResult()
         val closure = solved.result
         guide?.point?.let { point ->
-            relaxedPoint = coordinates.indices.associate { coordinates[it] to point[it].toDouble() }
+            val projected = point.map { it.toDouble() }
+            if (projected.all(Double::isFinite)) {
+                relaxedPoint = coordinates.indices.associate { coordinates[it] to projected[it] }
+            }
         }
         if (guide == null) closure.float?.primal?.takeIf {
             it.size == coordinates.size && it.all(Double::isFinite)
