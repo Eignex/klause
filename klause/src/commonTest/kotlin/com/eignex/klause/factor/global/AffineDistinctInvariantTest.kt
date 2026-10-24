@@ -19,6 +19,33 @@ import kotlin.test.assertTrue
 
 class AffineDistinctInvariantTest {
     @Test
+    fun `affine collision repairs should offer improving atomic swaps without implicit seeding`() {
+        val factor = Distinct((0..3).map { i ->
+            Distinct.Operand(intArrayOf(Term.ofIntVar(i)), listOf(BigFraction.ONE),
+                BigFraction.ofLong(if (i == 1) -1 else 0))
+        })
+        val source = Problem(0, 4, Array(4) { IntDomain(0, 3) },
+            arrayOf(AllDifferent(intArrayOf(0, 1, 2, 3)), factor))
+        val state = LocalSearchState(LocalSearchModel.open(source), Random(3))
+        for (i in 0..3) state.assignment.setInt(i, i.toLong())
+        state.recompute()
+        val sink = state.moveSink
+
+        state.factors[1].proposeRepairMoves(state, 1, sink)
+
+        val swaps = sink.list.filterIsInstance<Move.Compound>()
+        assertTrue(swaps.any { state.netDelta(it) < 0 })
+        for (move in swaps) {
+            val delta = state.netDelta(move)
+            state.apply(move)
+            assertEquals(4, (0..3).map { state.assignment.intValue(it) }.toSet().size)
+            assertEquals(1L + delta, state.cost)
+            for (i in 0..3) state.assignment.setInt(i, i.toLong())
+            state.recompute()
+        }
+    }
+
+    @Test
     fun `owned affine collision repairs should preserve the seeded distinctness`() {
         val factor = Distinct((0..3).map { i ->
             Distinct.Operand(intArrayOf(Term.ofIntVar(i)), listOf(BigFraction.ONE),
