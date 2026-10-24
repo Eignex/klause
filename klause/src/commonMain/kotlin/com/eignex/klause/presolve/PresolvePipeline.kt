@@ -288,7 +288,7 @@ object PresolvePipeline {
         while (!infeasible && round++ < MAX_PRESOLVE_HARVEST_ROUNDS && !cancellation()) {
             val pre = Presolver.run(current, config, context, cancellation)
             infeasible = infeasible || pre.infeasible
-            val harvestResult = harvestPlan?.let {
+            val harvestResult = if (infeasible) null else harvestPlan?.let {
                 presolveBudget.observeTransform(
                     PresolvePass.LP_HARVEST, pre.problem, cancellation,
                     // Cardinality rewrites strengthen clause relaxations; propagator-only symmetry adds no LP rows.
@@ -297,7 +297,7 @@ object PresolvePipeline {
                     },
                     unchanged = { LpHarvestResult(pre.problem, LpHarvestReport(), LpStats()) },
                     output = { result -> result.problem },
-                    refuted = { result -> result.report.rootInfeasible },
+                    refuted = { result -> result.report.rootInfeasible || result.problem.baked is PropagationResult.Unsat },
                 ) {
                     lpHarvestReporting(
                         pre.problem, objective, it, bakeConfig, cancellation, zeroObjectivePricing, randomSeed,
@@ -313,6 +313,8 @@ object PresolvePipeline {
                 harvestStats = harvestStats.mergedWith(it.stats)
             }
             val harvested = harvestResult?.problem ?: pre.problem
+            infeasible = infeasible || harvested.baked is PropagationResult.Unsat ||
+                harvestResult?.report?.rootInfeasible == true
             mappings.add(pre.mapping)
             if (harvested !== pre.problem) {
                 mappings.add(SourceMapping(pre.problem, harvested, TransformationGuarantees.IDENTITY))
