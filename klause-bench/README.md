@@ -628,6 +628,16 @@ it writes to `$OUT` (see the lab's
 [profile jobs guide](https://github.com/Eignex/klause-lab/blob/main/deploy/SETUP.md#profile-jobs)).
 The lab runs no shell scripts, so a new measurement is a class in that package.
 
+`SourceStageProfile` accepts `request64=<base64 JSON array>` for stage attribution.
+A source request has `suite`, `problem`, decoded-source `sha256`, `engine`
+(`default`, `cp`, or `ls`) and `exact`. It profiles the installed CLI for ten seconds
+at seed 3 with one active processor, a 3 GiB heap, Serial GC and debug statistics,
+then runs the existing JFR phase/caller analyzer. It retains the command, source,
+streams and recording. These instrumented runs diagnose stages without a throughput
+or source-verdict claim. A `{job, sha256}` request instead checks and summarizes an
+existing profile job's `cases/0/out/profile.jfr` without executing a solver. Use a
+local profile job with an explicit `profile.runTimeoutSec` for either form.
+
 `CoefficientLiftingProfile` records Java thread allocations for the coefficient
 strengthening pass on unchanged and productive 64-, 512- and 4096-term inequalities,
 with LE and GE inputs. Model construction and root propagation precede warmup and
