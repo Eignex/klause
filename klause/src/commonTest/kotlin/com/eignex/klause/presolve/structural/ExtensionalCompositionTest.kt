@@ -19,6 +19,7 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class ExtensionalCompositionTest {
@@ -134,5 +135,26 @@ class ExtensionalCompositionTest {
         )
 
         assertTrue(result.infeasible)
+    }
+
+    @Test
+    fun `an oversized diagram should remain available after a completed source decline`() {
+        val records = 131_073
+        val diagram = Mdd(
+            intArrayOf(0, 1), intArrayOf(1, 1, 1), intArrayOf(0, (records - 1) * 3, records * 3),
+            LongArray(records * 3), 0, intArrayOf(0), 3,
+        )
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) }, arrayOf<Factor>(
+            diagram, Table(intArrayOf(0, 1), longArrayOf(0, 0, 1, 1)),
+        ))
+        val budget = PresolveBudget(10_000)
+
+        val result = Presolver.runSource(
+            problem, PresolveConfig.parse("off,+extensional"), PresolveContext(presolveBudget = budget),
+            budget.orSpent(Cancellation.Never),
+        )
+
+        assertSame(problem, result.problem)
+        assertFalse(result.infeasible)
     }
 }
