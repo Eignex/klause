@@ -100,5 +100,6 @@ internal fun PropagationState.checkFiniteMutationWork() {
 }
 
 internal fun PropagationState.checkFiniteAtomWork() {
-    if (finiteMaintenanceActive) checkFiniteWork()
+    if (finiteMaintenanceActive) finiteWork.check()
+    work++
 }
