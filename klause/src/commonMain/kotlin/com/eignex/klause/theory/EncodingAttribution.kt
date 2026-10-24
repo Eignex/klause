@@ -6,6 +6,17 @@ import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.util.BigInt
 import kotlin.jvm.JvmInline
 
+internal class EncodingConditions(
+    integers: Map<SourceIntId, BigInt>,
+    booleans: Map<SourceBoolId, Boolean>,
+) {
+    private val integerPins = integers.toMap()
+    private val booleanPins = booleans.toMap()
+
+    fun integers(): Map<SourceIntId, BigInt> = integerPins.toMap()
+    fun booleans(): Map<SourceBoolId, Boolean> = booleanPins.toMap()
+}
+
 /** A real coordinate in a private theory projection, distinct from a source declaration. */
 @JvmInline
 value class TheoryRealId(
@@ -29,6 +40,7 @@ class EncodingAttribution internal constructor(
     booleanConditions: Map<SourceBoolId, Boolean> = emptyMap(),
     affineAuxiliaries: List<EncodingAffineExpression> = emptyList(),
     linearGuards: List<LinearEncodingFormula> = emptyList(),
+    private val conditions: EncodingConditions = EncodingConditions(integerConditions, booleanConditions),
 ) {
     private val boolIds = booleans.toList()
     private val intIds = integers.toList()
@@ -36,8 +48,6 @@ class EncodingAttribution internal constructor(
     private val intMap = integerEmbeddings.toMap()
     private val realMap = realEmbeddings.toMap()
     private val auxiliaryIds = auxiliaries.toList()
-    private val intPins = integerConditions.toMap()
-    private val boolPins = booleanConditions.toMap()
     private val affineDefinitions = affineAuxiliaries.toList()
     private val guardDefinitions = linearGuards.toList()
 
@@ -59,7 +69,7 @@ class EncodingAttribution internal constructor(
     /** Private defining coordinates omitted from source witness publication. */
     val auxiliaries: List<TheoryRealId> get() = auxiliaryIds.toList()
     /** Exact source integer pins supporting a conditioned relation. */
-    val integerConditions: Map<SourceIntId, BigInt> get() = intPins.toMap()
+    val integerConditions: Map<SourceIntId, BigInt> get() = conditions.integers()
     /** Source Boolean pins supporting a conditioned relation. */
-    val booleanConditions: Map<SourceBoolId, Boolean> get() = boolPins.toMap()
+    val booleanConditions: Map<SourceBoolId, Boolean> get() = conditions.booleans()
 }
