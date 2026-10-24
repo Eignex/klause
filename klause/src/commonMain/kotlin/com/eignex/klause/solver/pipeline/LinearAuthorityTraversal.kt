@@ -36,7 +36,7 @@ internal class LinearAuthorityTraversal(
     private val cancellation: Cancellation,
     private val pause: () -> Boolean,
     private val onIncumbent: (Sample) -> Unit,
-    private val incumbentValue: () -> BigFraction?,
+    private val incumbent: () -> Pair<Sample, BigFraction>?,
 ) : SearchBrancher, SearchBranchProposal, SearchNodePolicy {
     override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
 
@@ -53,7 +53,10 @@ internal class LinearAuthorityTraversal(
     private val root = CoverageNode(source.scope.condition)
     private val path = arrayListOf(0 to root)
     private val current: CoverageNode get() = path.last().second
-    private val observations = linkedMapOf("numericalIncumbentDominatedSplits" to 0L)
+    private val observations = linkedMapOf(
+        "numericalIncumbentDominatedSplits" to 0L,
+        "numericalIncumbentBoundClosures" to 0L,
+    )
     private var pending = 1L
     private var peakPending = 1L
     private var retained = 1L
@@ -120,8 +123,13 @@ internal class LinearAuthorityTraversal(
                 it.kind == SourceCoordinate.Kind.Boolean && context.boolValue(it.id) == null
             }
         ) return SearchNodeDisposition.Expand
-        current.result?.let { return if (it.evidence != null) SearchNodeDisposition.Prune
-            else if (current.split != null) SearchNodeDisposition.Expand else SearchNodeDisposition.Indeterminate }
+        current.result?.let {
+            return when {
+                it.evidence != null || current.coveredBound != null -> SearchNodeDisposition.Prune
+                current.split != null -> SearchNodeDisposition.Expand
+                else -> SearchNodeDisposition.Indeterminate
+            }
+        }
         if (!context.consumeCheck()) return SearchNodeDisposition.Indeterminate
         val branch = source.atScope(source.scope.copy(condition = current.condition))
         val result = authority.check(branch, cancellation)
@@ -133,16 +141,20 @@ internal class LinearAuthorityTraversal(
             val bound = result.bound.claim as SourceClaim.Bound
             val after = (bound.value as SourceValue.Rational).value
             val minimizes = source.scope.objective?.sense == com.eignex.klause.ir.ObjectiveSense.MINIMIZE
-            val standing = incumbentValue()
-            if (result.evidence == null && result.split != null && standing != null &&
+            val standing = incumbent()?.second
+            if (result.evidence == null && standing != null &&
                 if (minimizes) after >= standing else after <= standing
-            ) observe("numericalIncumbentDominatedSplits")
+            ) {
+                if (result.split != null) observe("numericalIncumbentDominatedSplits")
+                current.coveredBound = result.bound
+                observe("numericalIncumbentBoundClosures")
+            }
             if (parent != null) {
                 val before = (parent.value as SourceValue.Rational).value
                 if (if (minimizes) after > before else after < before) observe("numericalChildBoundGains")
             }
         }
-        if (result.evidence != null) {
+        if (result.evidence != null || current.coveredBound != null) {
             observe("numericalClosedLeaves")
             pending--
         } else if (result.split == null) {
@@ -154,6 +166,7 @@ internal class LinearAuthorityTraversal(
             ray = checked(result.evidence.claim, SourceDerivation.SourceRay)
             return SearchNodeDisposition.Indeterminate
         }
+        if (current.coveredBound != null) return SearchNodeDisposition.Prune
         result.split?.let { (coordinate, threshold) ->
             current.split = CoverageSplit.Integer(coordinate, threshold, current.condition)
             splitCreated()
@@ -188,8 +201,19 @@ internal class LinearAuthorityTraversal(
     fun completed(): SourceEvidence? {
         ray?.let { return it }
         val leaves = root.completedLeaves() ?: return null
+        val bound = root.proof(strict = false) ?: return null
+        incumbent()?.let { (sample, value) ->
+            val optimum = checked(SourceClaim.Optimal(sample, SourceValue.Rational(value)),
+                SourceDerivation.Optimum(SourceDerivation.SourceWitness, bound))
+            if (optimum != null) {
+                rootBound = checked(SourceClaim.Bound(value), bound)
+                return optimum
+            }
+        }
         val feasible = leaves.mapNotNull { it.evidence }.filter { it.claim != SourceClaim.Refutation }
-        if (feasible.isEmpty()) return checked(SourceClaim.Refutation, root.proof(strict = false) ?: return null)
+        if (feasible.isEmpty()) return if (leaves.all { it.evidence?.claim == SourceClaim.Refutation }) {
+            checked(SourceClaim.Refutation, bound)
+        } else null
         fun value(evidence: SourceEvidence): BigFraction = when (val claim = evidence.claim) {
             is SourceClaim.Optimal -> (claim.value as SourceValue.Rational).value
             is SourceClaim.Limit -> (claim.value as SourceValue.Rational).value
@@ -199,7 +223,6 @@ internal class LinearAuthorityTraversal(
         val best = feasible.reduce { left, right ->
             if (if (minimizes) value(left) <= value(right) else value(left) >= value(right)) left else right
         }
-        val bound = root.proof(strict = false) ?: return null
         checked(SourceClaim.Bound(value(best)), bound)?.let { rootBound = it }
         val optimum = feasible.firstOrNull { it.claim is SourceClaim.Optimal && value(it) == value(best) }
         return if (optimum != null) {
@@ -227,6 +250,7 @@ private data class IntegerAlternative(
 private class CoverageNode(val condition: SourceCondition) {
     var split: CoverageSplit? = null
     var result: LinearAuthorityResult? = null
+    var coveredBound: SourceEvidence? = null
 
     fun completedLeaves(): List<LinearAuthorityResult>? {
         val children = split
@@ -235,10 +259,11 @@ private class CoverageNode(val condition: SourceCondition) {
             val above = children.above.completedLeaves() ?: return null
             return below + above
         }
-        return result?.takeIf { it.evidence != null }?.let(::listOf)
+        return result?.takeIf { it.evidence != null || coveredBound != null }?.let(::listOf)
     }
 
     fun proof(strict: Boolean): SourceDerivation? {
+        coveredBound?.let { return it.derivation }
         val children = split
         if (children != null) {
             val below = children.below.proof(strict) ?: return null

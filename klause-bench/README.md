@@ -1506,9 +1506,12 @@ are observations rather than proof authority or a retained best-bound queue.
 `numericalLpMaxRows` measures working rows and `numericalLpExtractedBoundRows`
 sums extracted rows over prepared attempts. An exhausted operation allowance can
 skip preparation, so such an attempt reports its unprepared shape.
-`numericalIncumbentDominatedSplits` counts unclosed fractional nodes whose checked
-bound already dominates the invocation's checked incumbent. Observation retains
-the ordinary split and confers no pruning or terminal authority.
+`numericalIncumbentDominatedSplits` counts proposed fractional splits whose checked
+bound already dominates the invocation's checked incumbent.
+`numericalIncumbentBoundClosures` counts unexpanded subtrees closed with those
+scoped bounds, including nodes without a fractional proposal. Their derivations
+remain in complete sibling coverage; the final bound and original-source witness
+are rechecked together before an optimum can be reported.
 `nativeNominalObjectiveBound` is the checked native bound in original objective
 units; it does not certify the feasible set enlarged by a positive tolerance.
 Independent source witness validation remains separate from solver proof claims.
