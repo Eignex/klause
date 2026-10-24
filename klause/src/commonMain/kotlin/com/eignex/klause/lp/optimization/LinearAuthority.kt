@@ -106,15 +106,15 @@ internal class LinearAuthority(
         ) return null
         val prepared = if (retainLp || cuts) {
             template?.takeIf { it.matches(source) && (it.cuts != null) == cuts }
-                ?: LinearAuthorityTemplate.prepare(source, cancellation, cuts)
-                    ?.also {
-                        template = it
-                        val work = it.cuts?.work ?: 0L
-                        cutPreparationWork += work
-                        budget.observe(preparation = work)
-                    } ?: return null
+                ?: LinearAuthorityTemplate.prepare(source, cancellation, cuts) { work ->
+                    cutPreparationWork += work
+                    budget.observe(preparation = work)
+                }?.also { template = it } ?: return null
         } else null
-        return LinearAuthorityQuery.prepare(source, prepared, cancellation)
+        return LinearAuthorityQuery.prepare(source, prepared, cancellation) { work ->
+            cutVerificationWork += work
+            budget.observe(boundCertification = work)
+        }
     }
 
     private fun checkSource(
@@ -122,8 +122,6 @@ internal class LinearAuthority(
     ): LinearAuthorityResult {
         val cached = if (retainLp || guidance) query?.takeIf { it.matches(source, cuts) } else null
         val prepared = cached ?: prepareQuery(source, cancellation, cuts)?.also {
-            cutVerificationWork += it.cutVerificationWork
-            budget.observe(boundCertification = it.cutVerificationWork)
             if (retainLp || guidance) query = it
         } ?: return LinearAuthorityResult()
         val coordinates = prepared.coordinates

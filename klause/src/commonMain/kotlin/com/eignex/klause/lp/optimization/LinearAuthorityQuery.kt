@@ -26,7 +26,6 @@ internal class LinearAuthorityQuery private constructor(
     val sign: BigFraction,
     val cuts: Boolean,
     val activeCuts: Int,
-    val cutVerificationWork: Long,
 ) {
     val context: SourceProofContext = source.withLinearAuthority()
     val closureRows: List<ExactRationalInequality> = rows.map {
@@ -44,6 +43,7 @@ internal class LinearAuthorityQuery private constructor(
     companion object {
         fun prepare(
             source: SourceProofContext, template: LinearAuthorityTemplate?, cancellation: Cancellation,
+            onCutWork: (Long) -> Unit = {},
         ): LinearAuthorityQuery? {
             val coordinates = template?.coordinates ?: source.numericCoordinates()
             val numeric = template?.numeric ?: source.numericContext()
@@ -77,6 +77,7 @@ internal class LinearAuthorityQuery private constructor(
                 cutVerificationWork++
                 cancellation()
             })
+            onCutWork(cutVerificationWork)
             val accepted = active.indices.filter { checks[it] == SourceEvidenceCheck.Checked }
                 .mapTo(HashSet()) { active[it].owner }
             for (cut in cuts) {
@@ -97,7 +98,7 @@ internal class LinearAuthorityQuery private constructor(
                 else BigFraction.MINUS_ONE
             val costs = coordinates.map { sign * (numeric.objective[it] ?: BigFraction.ZERO) }
             return LinearAuthorityQuery(source, coordinates, cited, rows, inactive, unconditional,
-                costs, numeric.objectiveConstant * sign, sign, template?.cuts != null, activeCuts, cutVerificationWork)
+                costs, numeric.objectiveConstant * sign, sign, template?.cuts != null, activeCuts)
         }
     }
 }

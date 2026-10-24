@@ -119,4 +119,18 @@ class LinearAuthorityCutsTest {
 
         assertNull(cuts)
     }
+
+    @Test
+    fun `cancelled separation should report its completed work`() {
+        val source = SourceProofContext(scope, setOf(x), mapOf(
+            "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2)), BigFraction.ONE)),
+        ), emptyMap())
+        var polls = 0
+        var work = 0L
+
+        val cuts = LinearAuthorityCuts.prepare(source, Cancellation { ++polls > 2 }) { work += it }
+
+        assertNull(cuts)
+        assertTrue(work > 0)
+    }
 }
