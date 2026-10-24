@@ -1496,10 +1496,40 @@ a pure per-node throughput claim; the seven capped queen sources remain unknown.
 Coarse source-domain reasons in [8083](https://lab.eignex.com/jobs/8083) also reduce
 cost, but [8084](https://lab.eignex.com/jobs/8084) loses all three small-source native
 refutations and the parent's one checked 56-queen witness. Coarse-only matching is
-not retained; larger roots keep exact source-domain fallbacks. [8092](https://lab.eignex.com/jobs/8092) separates historical Hall-union
+not retained; larger roots keep exact source-domain fallbacks.
+[8092](https://lab.eignex.com/jobs/8092) separates historical Hall-union
 reasons from their combination with incremental source collision scoring on the
 ordinary mixed/P1/10-second route. The combined arm retains all three small-source
 native refutations; native proof labels are not independently certificate-checked.
+
+[8125](https://lab.eignex.com/jobs/8125) qualifies atomic source repairs `582db383d7`
+against the materialized parent on all twelve originals: mixed/P1, ten seconds,
+consecutive seeds 1–10 and one repeat. All 240 commands return and all 61 SAT
+witnesses pass original-source checks. The small UNSAT source has 8/10 native
+refutations with materialization and 10/10 with source projections; the four
+holdouts retain verdict coverage. On `56-1860437025`, the parent finds a checked
+witness at seed 1 while source projections remain unknown in all ten seeds.
+
+[8165](https://lab.eignex.com/jobs/8165) measures this remaining gap over the
+prespecified complete seeds 1–100, once per arm, with the same ordinary settings.
+All 300 commands return and all five SAT witnesses pass original-source checks.
+Each seed's three-arm group matches source hashes, runtime/options, non-solver
+dependencies and platform: 71 groups on Mac/aarch64 and 29 on Linux/amd64 Spot.
+Compiler identity is unreported; earlier overlapping seeds are not additional
+independent trials.
+
+| View | Revision | Checked witnesses / 100 seeds |
+|---|---|---|
+| Materialized | `e77e09a7e4` | 4: seeds 1, 32, 36, 84, all on Mac |
+| Incremental source counts | `d9a304064a` | 0 |
+| Counts and atomic source swaps | `582db383d7` | 1: seed 70, on Linux |
+
+Retain atomic source repairs with the lower representation cost and observed
+ordinary feasibility on this original input. Witness frequency is lower: all four
+parent winning seeds remain unknown with source swaps, while both controls are
+unknown at seed 70. These data establish neither identical walks nor a uniform
+ordinary-route speedup. The CP projection is unchanged by the repair additions;
+the cost control above does not isolate local-search operator throughput.
 
 ### Table and MDD historical domains
 
