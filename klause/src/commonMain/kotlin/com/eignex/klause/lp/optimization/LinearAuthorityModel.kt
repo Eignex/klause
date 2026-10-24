@@ -89,7 +89,6 @@ internal class LinearAuthorityModel private constructor(
         ): LinearAuthorityModel? {
             fun identity() = LinearAuthorityModel(rows, rows.indices.toList(), List(variables) { null },
                 List(variables) { null }, inactive)
-            if (variables > 128) return identity()
             val lower = MutableList<Side?>(variables) { null }
             val upper = MutableList<Side?>(variables) { null }
             val retained = ArrayList<Int>()
