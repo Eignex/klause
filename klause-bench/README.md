@@ -2021,8 +2021,13 @@ consumer with the same source semantics. Compare it with both numerical traversa
 and the automatic finite control. `numericalFrontierPending` includes the selected,
 queued and unresolved alternatives; `numericalFrontierPeakPending` records their
 maximum retained count. `numericalLpPreparations` and `numericalLpReuses` distinguish
-source matrix preparations from compatible scoped queries. Record their checked
+source matrix preparations from compatible scoped consultations. Record their checked
 bound/incumbent trajectories and replay work alongside memory and wall time.
+`numericalLpPauses` counts source operation suspensions; sparse phase fields count
+consultations ending in preparation, floating solve, certification or completion.
+Paused consultations publish neither coordinates nor a bound. Source-LP operation
+counts advance on changed authority, while work fields contain only new work from
+each continuation.
 
 Numerical traversal's `smtCompleteSearchStage_numerical*` fields count checked nodes,
 certified bounds, strict child-bound improvements, fractional/indicator splits,

@@ -2,6 +2,7 @@ package com.eignex.klause.lp.optimization
 
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.SourceLpBudget
+import com.eignex.klause.lp.SparseSourceLpPolicy
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCondition
@@ -23,6 +24,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class LinearAuthorityTest {
     private val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
@@ -31,6 +33,65 @@ class LinearAuthorityTest {
         SourceRevision("affine-fixture", "exact-affine"),
         objective = SourceObjective("x", ObjectiveSense.MINIMIZE),
     )
+
+    @Test
+    fun `paused source guidance should retain one admitted operation across slices`() {
+        val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val source = SourceProofContext(scope, setOf(real, other), mapOf(
+            "sum" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE,
+                other to BigFraction.MINUS_ONE), BigFraction.ofLong(-3))),
+            "x" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "y" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ), mapOf(real to BigFraction.ONE, other to BigFraction.ofLong(2)))
+        val budget = SourceLpBudget(maxOperations = 1)
+
+        LinearAuthority(budget, retainLp = true, guidancePolicy = SparseSourceLpPolicy(quantum = 1L)).use { authority ->
+            var result = authority.advance(source, Cancellation.Never)
+            assertTrue(result.paused)
+            assertNull(result.bound)
+            assertTrue(result.relaxedPoint.isEmpty())
+            repeat(32) {
+                if (result.paused) result = authority.advance(source, Cancellation.Never)
+            }
+
+            val terminal = assertNotNull(result.evidence)
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(3)),
+                assertIs<SourceClaim.Optimal>(terminal.claim).value)
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
+            assertEquals(1, budget.operations)
+            assertEquals(1L, authority.preparations)
+        }
+    }
+
+    @Test
+    fun `changed source conditions should discard a suspended guidance cursor`() {
+        val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val source = SourceProofContext(scope, setOf(real, other), mapOf(
+            "sum" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE,
+                other to BigFraction.MINUS_ONE), BigFraction.ofLong(-3))),
+            "x" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "y" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ), mapOf(real to BigFraction.ONE, other to BigFraction.ofLong(2)))
+        val changed = source.atScope(scope.copy(condition = SourceCondition(
+            lower = mapOf(real to BigFraction.ofLong(4)))))
+        val budget = SourceLpBudget(maxOperations = 2)
+
+        LinearAuthority(budget, retainLp = true, guidancePolicy = SparseSourceLpPolicy(quantum = 1L)).use { authority ->
+            assertTrue(authority.advance(source, Cancellation.Never).paused)
+            var result = authority.advance(changed, Cancellation.Never)
+            repeat(32) {
+                if (result.paused) result = authority.advance(changed, Cancellation.Never)
+            }
+
+            val terminal = assertNotNull(result.evidence)
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(4)),
+                assertIs<SourceClaim.Optimal>(terminal.claim).value)
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(changed.withLinearAuthority()).verify(terminal))
+            assertEquals(2, budget.operations)
+        }
+    }
 
     @Test
     fun `retained branch bounds should match cold queries after sibling retraction`() {

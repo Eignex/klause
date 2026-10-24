@@ -67,8 +67,8 @@ internal class LinearAuthorityModel private constructor(
                 if (cancellation()) return null
                 val column = row.columns[entry]
                 residual[column] -= weight * row.coefficients[entry]
+                if (!listOf(residual[column]).admittedSourcePoint()) return null
             }
-            if (!residual.admittedSourcePoint()) return null
         }
         for (column in residual.indices) {
             if (cancellation()) return null
