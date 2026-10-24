@@ -326,8 +326,13 @@ holds under every Boolean prefix. A feasible sign overapproximation learns nothi
 Pure Boolean changes do not repeat the numeric check, and interrupted or declined
 checks supply no exclusion. The Boolean trail retracts assignments while valid
 numeric exclusions remain available within that enumerator. They do not cross
-query, condition or root-snapshot boundaries. A proof scan keeps supporting
-literals, and separate visited-region exclusions prevent repeating an issued
+query, condition or root-snapshot boundaries. Trail changes update retained
+witness support only at affected nodes and parents. Each junction counts supported
+true and false children; a region captures the first supporting child in source
+order for a decisive gate and every child for an identity gate. Leaf selection
+advances a cursor in Boolean-then-numeric order and rewinds it on retraction.
+Retraction also invalidates affected witness support before another region can
+be captured. Separate visited-region exclusions prevent repeating an issued
 region. Neither exclusion kind enters shared learning.
 
 **3. Regional reduction and projection.** Each region's signed predicates form a
