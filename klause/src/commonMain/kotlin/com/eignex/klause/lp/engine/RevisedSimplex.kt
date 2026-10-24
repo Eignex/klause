@@ -690,9 +690,11 @@ internal class RevisedSimplex(
      * the same on a deployment that found an accelerated backend and one that did not.
      * An empty right-hand side requires no traversal through the factors or updates.
      */
-    private fun chargeSolve(rhs: IndexedVector) {
+    private fun chargeSolve(rhs: IndexedVector, operation: SimplexBasisOperation) {
         if (rhs.count == 0) return
-        work.add(nnzB.toLong() + (basisLifecycle.current?.updateCount ?: 0).toLong() * m)
+        val charge = nnzB.toLong() + (basisLifecycle.current?.updateCount ?: 0).toLong() * m
+        work.add(charge)
+        progressTrace?.basisSolve(operation, charge)
     }
 
     private fun operationDelta(
@@ -775,7 +777,7 @@ internal class RevisedSimplex(
     ): DoubleArray {
         requireFiniteRhs(b)
         carrier.scatter(b)
-        chargeSolve(carrier)
+        chargeSolve(carrier, SimplexBasisOperation.DENSE_FTRAN)
         val solver = solver()
         val before = operationWork(solver)
         solver.ftran(carrier, expectedDensity = 1.0)
@@ -795,7 +797,7 @@ internal class RevisedSimplex(
     private fun btranDense(b: DoubleArray, out: DoubleArray, carrier: IndexedVector): DoubleArray {
         requireFiniteRhs(b)
         carrier.scatter(b)
-        chargeSolve(carrier)
+        chargeSolve(carrier, SimplexBasisOperation.DENSE_BTRAN)
         val solver = solver()
         val before = operationWork(solver)
         solver.btran(carrier, expectedDensity = 1.0)
@@ -812,7 +814,7 @@ internal class RevisedSimplex(
      */
     private fun spike(q: Int) {
         scatterColumn(q, spikeVec)
-        chargeSolve(spikeVec)
+        chargeSolve(spikeVec, SimplexBasisOperation.ENTERING_FTRAN)
         val solver = solver()
         val before = operationWork(solver)
         solver.ftran(spikeVec, ftranDensity)
@@ -839,7 +841,7 @@ internal class RevisedSimplex(
     /** The pivotal row `ρ = eᵣᵀB⁻¹ = B⁻ᵀeᵣ` into [pivotEtaVec], likewise left as the solver filled it. */
     private fun pivotalRow(r: Int) {
         pivotEtaVec.unit(r)
-        chargeSolve(pivotEtaVec)
+        chargeSolve(pivotEtaVec, SimplexBasisOperation.PIVOTAL_BTRAN)
         val solver = solver()
         val before = operationWork(solver)
         solver.btran(pivotEtaVec, btranDensity)
