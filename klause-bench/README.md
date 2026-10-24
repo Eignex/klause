@@ -1350,8 +1350,8 @@ capture stays optional and unsupported capture withholds mathematical coverage. 
 
 `bench.profile.ContinuousCompletionProfile` accepts `request64=<base64 JSON>` with
 an array of `{suite, problem, sha256, exact}` objects. It records the first sixteen
-consecutive completions in a direct, cold local-search run with seed 3, at most
-50,000 instructions and a ten-second containing deadline. Each request saves its
+consecutive completions in a direct, cold local-search run with seed 3 and a
+ten-second containing deadline. Each request saves its
 hashed MPS source, discrete pins, completion outcome, work, numerical-block exact
 captures and an independent original-source witness check. `exact=true` removes
 source feasibility slack; the other mode retains the declared source policy.

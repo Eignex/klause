@@ -145,7 +145,7 @@ internal object ContinuousCompletionProfile {
             val search = LocalSearchSolver(problem, completion = recording)
             search.session().use { session ->
                 val result = session.minimize(objective, LocalSearchParams(
-                    randomSeed = 3L, cancellation = stop, maxInstructions = 50_000L,
+                    randomSeed = 3L, cancellation = stop,
                 ))
                 out.resolve("summary.json").writeText(buildJsonObject {
                     put("revision", Reports.readGitSha())
@@ -156,7 +156,7 @@ internal object ContinuousCompletionProfile {
                     put("seed", 3)
                     put("candidateLimit", LIMIT)
                     put("containingTimeoutSeconds", 10)
-                    put("instructionLimit", 50_000)
+                    put("instructionLimit", JsonNull)
                     put("candidates", count)
                     put("cancelled", containing())
                     put("result", result::class.simpleName)
