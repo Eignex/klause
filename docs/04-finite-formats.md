@@ -133,7 +133,9 @@ uses the integer itself. An eligible declared count result owns the sum directly
 count results and reused channels carry typed definitions.
 Direct products of a Boolean and an integer use their declared equality output
 instead, and an extremum whose condition is `(eq, v)` posts its `ArrayMinMax`
-onto `v`. The frontend records which auxiliaries, selection results and affine
+onto `v`. Top-level intension equalities with `min` or `max` also retain the
+declared result in either orientation, unless it occurs within the operands.
+The frontend records which auxiliaries, selection results and affine
 outputs are functionally defined, so
 [local search](10-local-search.md#maintained-literal-channels) can derive them
 from their inputs instead of searching them. `Xcsp3Problem.definitionHints` adds

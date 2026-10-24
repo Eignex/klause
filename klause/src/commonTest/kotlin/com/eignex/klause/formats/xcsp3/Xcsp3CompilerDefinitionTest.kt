@@ -2,7 +2,9 @@ package com.eignex.klause.formats.xcsp3
 
 import com.eignex.klause.brute.BruteForceParams
 import com.eignex.klause.brute.BruteForceSolver
+import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Product
+import com.eignex.klause.ir.DefinitionHint
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
@@ -25,6 +27,120 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class Xcsp3CompilerDefinitionTest {
+    @Test
+    fun `intension extrema should retain declared outputs in either equality orientation`() {
+        for (function in listOf("min", "max")) {
+            for (expression in listOf("eq(r,$function(x,y))", "eq($function(x,y),r)")) {
+                val parsed = Xcsp3.parse(
+                    """<instance><variables><var id="x">0..2</var><var id="y">0..2</var><var id="r">0..2</var>
+                        </variables><constraints><intension>$expression</intension></constraints></instance>""",
+                )
+
+                assertEquals(3, parsed.problem.numIntVars)
+                assertEquals(2, assertIs<ArrayMinMax>(parsed.problem.factors.single()).result)
+                assertEquals(2, assertIs<DefinitionHint.Extreme>(parsed.definitionHints.single()).output)
+            }
+        }
+    }
+
+    @Test
+    fun `declared extrema should preserve clipped output solutions`() {
+        for (function in listOf("min", "max")) {
+            for (expression in listOf("eq(r,$function(x,y))", "eq($function(x,y),r)")) {
+                val parsed = Xcsp3.parse(
+                    """<instance><variables><var id="x">0..2</var><var id="y">0..2</var><var id="r">1</var>
+                        </variables><constraints><intension>$expression</intension></constraints></instance>""",
+                )
+                val expected = (0L..2L).flatMap { x ->
+                    (0L..2L).filter { y -> (if (function == "max") maxOf(x, y) else minOf(x, y)) == 1L }
+                        .map { y -> listOf(x, y, 1L) }
+                }.toSet()
+
+                val actual = BruteForceSolver(parsed.problem.bake()).enumerate(BruteForceParams(randomSeed = 0L))
+                    .map { it.ints.toList() }.toSet()
+
+                assertEquals(expected, actual, expression)
+            }
+        }
+    }
+
+    @Test
+    fun `self referential extrema should preserve direct and affine source constraints`() {
+        for ((expression, expected) in listOf(
+            "eq(x,max(x,y))" to setOf(listOf(0L, 0L), listOf(1L, 0L), listOf(1L, 1L)),
+            "eq(min(x,y),x)" to setOf(listOf(0L, 0L), listOf(0L, 1L), listOf(1L, 1L)),
+            "eq(x,max(sub(x,1),y))" to setOf(listOf(0L, 0L), listOf(1L, 1L)),
+            "eq(min(add(x,1),y),x)" to setOf(listOf(0L, 0L), listOf(1L, 1L)),
+        )) {
+            val parsed = Xcsp3.parse(
+                """<instance><variables><var id="x">0..1</var><var id="y">0..1</var>
+                    </variables><constraints><intension>$expression</intension></constraints></instance>""",
+            )
+
+            val actual = BruteForceSolver(parsed.problem.bake()).enumerate(BruteForceParams(randomSeed = 0L))
+                .map { it.ints.take(2) }.toSet()
+
+            assertEquals(expected, actual, expression)
+        }
+    }
+
+    @Test
+    fun `typed intension extrema should maintain outputs after source moves`() {
+        for (function in listOf("min", "max")) {
+            val parsed = Xcsp3.parse(
+                """<instance><variables><var id="x">0..2</var><var id="y">0..2</var><var id="r">0..2</var>
+                    </variables><constraints><intension>eq($function(x,y),r)</intension></constraints></instance>""",
+            )
+            val problem = parsed.problem
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            val sweep = assertNotNull(DefinitionalSweep.fromSource(problem, parsed.definitionHints))
+            state.invariants = sweep.network(problem.numIntVars, problem.numBoolVars)
+            state.assignment.setInt(0, 0L)
+            state.assignment.setInt(1, 0L)
+            sweep.sweep(state.assignment, state.rootDomains, problem.factors)
+            state.recompute()
+
+            for ((variable, value) in listOf(0 to 2L, 1 to 1L, 0 to 0L)) {
+                val move = Move.IntSet(variable, value)
+                val predicted = state.netDelta(move)
+
+                state.apply(move)
+
+                val x = state.assignment.intValue(0)
+                val y = state.assignment.intValue(1)
+                assertEquals(if (function == "max") maxOf(x, y) else minOf(x, y), state.assignment.intValue(2))
+                assertEquals(0L, predicted)
+                assertEquals(0L, state.cost)
+            }
+        }
+    }
+
+    @Test
+    fun `typed extrema should retain violations when the output domain clips a source move`() {
+        for (function in listOf("min", "max")) {
+            val parsed = Xcsp3.parse(
+                """<instance><variables><var id="x">0..2</var><var id="y">0..2</var><var id="r">1</var>
+                    </variables><constraints><intension>eq(r,$function(x,y))</intension></constraints></instance>""",
+            )
+            val problem = parsed.problem
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            val sweep = assertNotNull(DefinitionalSweep.fromSource(problem, parsed.definitionHints))
+            state.invariants = sweep.network(problem.numIntVars, problem.numBoolVars)
+            state.assignment.setInt(0, 1L)
+            state.assignment.setInt(1, 1L)
+            sweep.sweep(state.assignment, state.rootDomains, problem.factors)
+            state.recompute()
+            val move = Move.IntSet(0, if (function == "max") 2L else 0L)
+            val predicted = state.netDelta(move)
+
+            state.apply(move)
+
+            assertEquals(1L, state.assignment.intValue(2))
+            assertTrue(state.cost > 0L)
+            assertEquals(predicted, state.cost)
+        }
+    }
+
     @Test
     fun `predicate product objectives should agree with original XCSP expressions`() {
         for (relation in listOf("eq", "ne", "le", "ge")) {
