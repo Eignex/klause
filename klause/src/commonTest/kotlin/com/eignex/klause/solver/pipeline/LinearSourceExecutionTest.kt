@@ -57,7 +57,7 @@ class LinearSourceExecutionTest {
                 linearTraversal = LinearTraversal.NUMERICAL_COMPANIONS))
 
             val result = assertIs<SourceExecutionResult.Numerical>(SourceSetup.execute(SourceExecutionRequest(
-                invocation, ExecutionOptions(ExecutionOption.openWorkLimit(4), ExecutionOption.maxFlips(0)))))
+                invocation, theory = TheoryParams(maxLeaves = 3, maxFlips = 0), presolveConfig = PresolveConfig.NONE)))
 
             assertEquals(BigFraction.ofLong(weight + offset), assertNotNull(result.linearSource?.incumbent).objective)
             val reads = result.result.stats.smt.completeSearchStages.orEmpty()["finiteCompanionBoundReads"] ?: 0L
