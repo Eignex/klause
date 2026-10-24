@@ -133,6 +133,44 @@ class AffineObjectiveTest {
     }
 
     @Test
+    fun `constant overflow should retain the defining equality`() {
+        val model = Problem(0, 2, Array(2) { IntDomain(0, 2) },
+            listOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1)))
+        val cost = LinearObjective(intCoefficients = longArrayOf(1, -1), constant = Long.MAX_VALUE)
+
+        val outcome = PresolvePipeline.run(model, cost, PresolveConfig.parse("affine"), false)
+
+        assertTrue(outcome.mapping.rebuild.isEmpty)
+        assertEquals(cost, outcome.objective ?: cost)
+    }
+
+    @Test
+    fun `translation should extend a partial objective to its retained partner`() {
+        val model = Problem(0, 2, Array(2) { IntDomain(0, 2) },
+            listOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1)))
+        val cost = LinearObjective(intCoefficients = longArrayOf(1))
+
+        val outcome = PresolvePipeline.run(model, cost, PresolveConfig.parse("affine"), false)
+        val values = BacktrackSolver(outcome.problem.bake()).enumerate().map { reduced ->
+            outcome.mapping.requireObjectivePreserved(cost, assertNotNull(outcome.objective), reduced)
+            cost.evaluateLong(outcome.reconstruct(reduced))
+        }.toSet()
+
+        assertEquals(setOf(1L, 2L), values)
+        assertTrue(outcome.mapping.rebuild.steps.any { it is RebuildStep.AffineValue })
+    }
+
+    @Test
+    fun `wider affine expressions should retain objective column protection`() {
+        val model = Problem(0, 3, Array(3) { IntDomain(0, 2) },
+            listOf(Linear(intArrayOf(1, -1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0)))
+
+        val outcome = PresolvePipeline.run(model, objective, PresolveConfig.parse("affine"), false)
+
+        assertTrue(outcome.mapping.rebuild.isEmpty)
+    }
+
+    @Test
     fun `approximate source semantics should retain objective column protection`() {
         val semantics = SourceSemantics(SourceFormat.IR,
             feasibilityTolerance = SourceTolerance(absolute = SemanticRational.ofLong(1))).resolve()
