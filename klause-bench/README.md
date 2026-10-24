@@ -1345,3 +1345,19 @@ input-change outcomes while preserving the operator and its following walk.
 Retain typed original-source derivations separately from native engine completion;
 capture stays optional and unsupported capture withholds mathematical coverage. See
 [source evidence](../docs/13-evidence.md).
+
+### Continuous completion candidate capture
+
+`bench.profile.ContinuousCompletionProfile` accepts `request64=<base64 JSON>` with
+an array of `{suite, problem, sha256, exact}` objects. It records the first sixteen
+consecutive completions in a direct, cold local-search run with seed 3, at most
+50,000 instructions and a ten-second containing deadline. Each request saves its
+hashed MPS source, discrete pins, completion outcome, work, numerical-block exact
+captures and an independent original-source witness check. `exact=true` removes
+source feasibility slack; the other mode retains the declared source policy.
+
+Capture is observed and its elapsed times are not throughput measurements. Use the
+same saved candidate sequence for cold and retained-owner comparisons, including
+setup, allocation, certification and close. A captured numerical block carries no
+original-factor proof, and an undecided or omitted capture does not decide its
+candidate. These direct-search records do not establish a portfolio source verdict.
