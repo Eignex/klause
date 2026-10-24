@@ -162,13 +162,14 @@ cooperative cancellation. Exceeding collection limits discards the optional inde
 no source row is removed. Reified and soft constraint attributes are unsupported
 and rejected, including group templates.
 
-Each admitted signed-word-safe affine view has an exact equality channel and a
-functional definition hint. Native `AllDifferent` over these channels supplies
-matching/Hall propagation and explanations, and equality reasons carry bound
-deductions back to source variables. Channels use interval domains: interior holes
-in source domains do not transfer through linear equalities. This limits filtering
-strength without enlarging the enforced source relation. Recovery cancellation
-skips optional work while retaining the ordinary parsed constraints.
+Each admitted signed-word-safe affine view has an exact channel and a functional
+linear definition hint. A constant `Element` channel preserves live holes in both
+directions when the source index window fits signed 32-bit values and spans at most
+4096 values. At most 65,536 channel values are materialized per compilation; other
+views retain exact linear equality channels with bound propagation. Native
+`AllDifferent` over these views supplies matching/Hall deductions and explanations;
+channel reasons carry them back to source variables. Recovery cancellation skips
+optional work while retaining the ordinary parsed constraints.
 
 `pow(base, exponent)` retains `Power` with a fixed nonnegative integer exponent;
 variable, negative and fractional exponents are unsupported. `div` and `mod`
