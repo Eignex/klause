@@ -136,13 +136,17 @@ class LeafRealCompletionTest {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 1)),
             arrayOf(RealProduct(0, 0, 1, 1.0, 1.0)), numRealVars = 2,
             realLower = doubleArrayOf(1.0, 0.0), realUpper = doubleArrayOf(1.0, 1.0))
-        val completion = LeafRealCompletion(source, objective = null)
+        for (retained in listOf(false, true)) {
+            LeafRealCompletion(source, null, null, retained = retained).use { completion ->
+                for (pin in listOf(0L, 1L, 0L)) {
+                    val sample = Sample(booleanArrayOf(), longArrayOf(pin), doubleArrayOf(1.0, 0.5))
+                    val result = completion.complete(sample, Cancellation.Never)
 
-        for (pin in listOf(0L, 1L, 0L)) {
-            val sample = Sample(booleanArrayOf(), longArrayOf(pin), doubleArrayOf(1.0, 0.5))
-            val result = completion.complete(sample, Cancellation.Never)
-
-            assertEquals(BigFraction.ofLong(pin), assertIs<Completion.Witness>(result).sample.exactReals?.get(1))
+                    assertEquals(
+                        BigFraction.ofLong(pin), assertIs<Completion.Witness>(result).sample.exactReals?.get(1),
+                    )
+                }
+            }
         }
     }
 
@@ -206,11 +210,14 @@ class LeafRealCompletionTest {
         val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
         val checks = listOf<((Sample) -> Boolean)?>(null, { false })
 
-        for (check in checks) {
-            val completion = LeafRealCompletion(problem, objective, check, context)
-                .complete(candidate(2, 0.4), Cancellation.Never)
+        for (retained in listOf(false, true)) {
+            for (check in checks) {
+                LeafRealCompletion(problem, objective, check, context, retained).use { completion ->
+                    val result = completion.complete(candidate(2, 0.4), Cancellation.Never)
 
-            assertTrue(assertIs<Completion.Undecided>(completion).work > 0L)
+                    assertTrue(assertIs<Completion.Undecided>(result).work > 0L)
+                }
+            }
         }
     }
 
@@ -254,27 +261,31 @@ class LeafRealCompletionTest {
         val objective = source.objective!!.toLinearObjective().negated()
         val check: (Sample) -> Boolean = { source.withinTolerance(it.ints, it.reals) }
 
-        for (tolerance in listOf(false, true)) {
-            for (pin in listOf(0L, 1L, 0L)) {
-                val sample = Sample(booleanArrayOf(), longArrayOf(pin), doubleArrayOf(0.5))
-                val completion = LeafRealCompletion(source.model, objective, check.takeIf { tolerance })
-                    .complete(sample, Cancellation.Never)
+        for (retained in listOf(false, true)) {
+            for (tolerance in listOf(false, true)) {
+                LeafRealCompletion(source.model, objective, check.takeIf { tolerance }, retained = retained)
+                    .use { completion ->
+                        for (pin in listOf(0L, 1L, 0L)) {
+                            val sample = Sample(booleanArrayOf(), longArrayOf(pin), doubleArrayOf(0.5))
+                            val result = completion.complete(sample, Cancellation.Never)
 
-                val witness = assertIs<Completion.Witness>(completion).sample
-                assertEquals(pin, witness.ints.single())
-                assertEquals(
-                    if (pin == 0L) 1.0 else 0.2,
-                    witness.approximateRealValue(source.columns.single { it.real }.id),
-                )
-                assertTrue(check(witness))
-                if (tolerance) {
-                    assertNull(witness.exactReals)
-                } else {
-                    assertEquals(
-                        if (pin == 0L) BigFraction.ONE else BigFraction.ofLong(5L).reciprocal(),
-                        source.sourceWitness(witness.ints, witness.exactReals).objective,
-                    )
-                }
+                            val witness = assertIs<Completion.Witness>(result).sample
+                            assertEquals(pin, witness.ints.single())
+                            assertEquals(
+                                if (pin == 0L) 1.0 else 0.2,
+                                witness.approximateRealValue(source.columns.single { it.real }.id),
+                            )
+                            assertTrue(check(witness))
+                            if (tolerance) {
+                                assertNull(witness.exactReals)
+                            } else {
+                                assertEquals(
+                                    if (pin == 0L) BigFraction.ONE else BigFraction.ofLong(5L).reciprocal(),
+                                    source.sourceWitness(witness.ints, witness.exactReals).objective,
+                                )
+                            }
+                        }
+                    }
             }
         }
     }
