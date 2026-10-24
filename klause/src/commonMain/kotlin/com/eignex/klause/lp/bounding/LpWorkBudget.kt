@@ -18,7 +18,7 @@ internal class LpWorkBudget(private val minOps: Long, private val maxOps: Long, 
 
     /**
      * Fold in one solve: whether it [reachedOptimum], its [degenerateColumns] out of [columns], and the
-     * [sizeBudget] the model's own size implies. Calls without a point use explicit work-stop feedback.
+     * [sizeBudget] the model's own size implies. A caller can report a work stop separately without a point.
      */
     fun observe(reachedOptimum: Boolean, degenerateColumns: Int, columns: Int, sizeBudget: Long) {
         if (columns <= 0) return

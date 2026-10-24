@@ -28,6 +28,7 @@ internal object MpsLpQuery {
             for (mode in listOf(
                 "full-cold", "full-retained", "cone-cold", "prepared-cold", "prepared-retained", "prepared-session",
                 "feedback-cold", "feedback-session",
+                "query-session",
             )) {
                 queryMode(problem, objective, mode, bean) { report ->
                     output.appendLine(report.toString())
@@ -56,8 +57,9 @@ internal object MpsLpQuery {
         }
         var owner: Pair<AutoCloseable, Any>? = null
         val sameRoot = mode.endsWith("-session")
+        val nodeOnly = mode == "query-session"
         val rootPolicy = when {
-            mode.startsWith("feedback-") -> "INTERRUPTED_WORK"
+            mode.startsWith("feedback-") || nodeOnly -> "INTERRUPTED_WORK"
             mode.startsWith("prepared-") -> "SEPARATE_PREPARATION"
             else -> "SHARED_WORK"
         }
@@ -80,9 +82,9 @@ internal object MpsLpQuery {
                 val before = stats(active.first, active.second)
                 val boundNs = System.nanoTime()
                 val boundBytes = bean.getThreadAllocatedBytes(thread)
-                val lower = checkedRootBound(active.first, token)
-                val boundElapsed = System.nanoTime() - boundNs
-                val boundAllocated = bean.getThreadAllocatedBytes(thread) - boundBytes
+                var lower = if (nodeOnly) Double.NaN else checkedRootBound(active.first, token)
+                val boundElapsed = if (nodeOnly) 0L else System.nanoTime() - boundNs
+                val boundAllocated = if (nodeOnly) 0L else bean.getThreadAllocatedBytes(thread) - boundBytes
                 val afterBound = stats(active.first, active.second)
                 val pruneNs = System.nanoTime()
                 val pruneBytes = bean.getThreadAllocatedBytes(thread)
@@ -99,6 +101,10 @@ internal object MpsLpQuery {
                 val pruneElapsed = System.nanoTime() - pruneNs
                 val pruneAllocated = bean.getThreadAllocatedBytes(thread) - pruneBytes
                 val afterPrune = stats(active.first, active.second)
+                if (nodeOnly) {
+                    lower = active.first.javaClass.methods.single { it.name.startsWith("getMeasuredRootLowerBound") }
+                        .invoke(active.first) as Double? ?: Double.NaN
+                }
                 val rootUnchanged = !sameRoot || (
                     rootDomains.indices.all { session.intDomain(it) === rootDomains[it] } &&
                         rootBooleans.indices.all { session.boolValue(it) == rootBooleans[it] })
@@ -131,6 +137,8 @@ internal object MpsLpQuery {
                     put("rootUnchanged", rootUnchanged)
                     put("stopReason", stopReason)
                     put("rootQueryPolicy", rootPolicy)
+                    put("checkedBoundOrigin", if (nodeOnly) "node-query" else "fresh-root")
+                    put("checkedRootBoundExecuted", !nodeOnly)
                     put("plan", plan.toString())
                     put("containingSeconds", 30)
                     put("querySeconds", 10)

@@ -548,6 +548,16 @@ internal class LpEngine(
         }
     }
 
+    internal val measuresRootQueries: Boolean get() = rootQueryPolicy == LpRootQueryPolicy.INTERRUPTED_WORK
+    internal var measuredRootLowerBound: Double? = null
+        private set
+
+    internal fun recordRootLowerBound(lower: Double) {
+        if (measuresRootQueries && lower.isFinite()) {
+            measuredRootLowerBound = maxOf(measuredRootLowerBound ?: Double.NEGATIVE_INFINITY, lower)
+        }
+    }
+
     /**
      * The work a solve of this model ought to cost, from its shape alone: roughly one dense pass per
      * column-derived iteration, with `columns / SIZE_BUDGET_DIVISOR` iterations.

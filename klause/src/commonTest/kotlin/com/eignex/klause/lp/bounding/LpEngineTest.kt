@@ -307,6 +307,26 @@ class LpEngineTest {
     }
 
     @Test
+    fun `measured root query bounds should honor certificate acceptance`() {
+        for (accept in listOf(true, false)) {
+            val problem = boundedProblem()
+            val factory = RecordingLpEngineFactory()
+            LpEngine(
+                problem,
+                LinearObjective(intCoefficients = longArrayOf(1L, 1L, 1L)),
+                LpParams(lpPlan = LpPlan(bounding = true, boundMaxDepth = 0), solveBudgetMillis = 30_000L),
+                SolveStatsSink(backend = "measured-root-bound"),
+                if (accept) LpSolveContext(factory) else LpSolveContext(factory, decline),
+                rootQueryPolicy = LpRootQueryPolicy.INTERRUPTED_WORK,
+            ).use { engine ->
+                engine.pruneNode(PropagationSession(problem), Double.POSITIVE_INFINITY, -1, true)
+
+                assertEquals(if (accept) 2.0 else null, engine.measuredRootLowerBound)
+            }
+        }
+    }
+
+    @Test
     fun `sliced LP queries should receive a native slice cap only behind a finite external cutoff`() {
         for (cutoff in listOf(Double.POSITIVE_INFINITY, 100.0)) {
             val problem = boundedProblem()

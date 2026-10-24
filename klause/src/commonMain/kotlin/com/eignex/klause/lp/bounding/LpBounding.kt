@@ -518,6 +518,7 @@ internal fun LpEngine.sparseSafePrune(
         }
         return LpNodeOutcome(false, null)
     }
+    if (session.decisionLevel == 0) recordRootQueryBound(relaxation, result)
     sink.lp.observeLuFill(result.luMaxFill, result.luMaxDensity, result.luMaxDim)
     // LP-guided branching: record the fractional primal + reduced costs so the descent can order
     // branch values toward the LP point and pick reduced-cost-impactful fractional variables. Purely
@@ -1316,20 +1317,35 @@ internal fun LpEngine.rootLpRelaxationBound(
                 solveContext.certificationPolicy,
             )
         }
-        val full = lower?.let { BigFraction.ofDouble(it) }?.plus(BigFraction.ofLong(relaxation.objectiveConstant))
-        val projected = full?.lowerBoundDouble()
-        val integral = relaxation.model.hasIntegralObjective()
-        when {
-            projected == null -> Double.NaN
-            integral && sourceObjectiveRange(relaxation) == null -> Double.NaN
-            integral && abs(projected) >= EXACT_INTEGER_DOUBLE_LIMIT -> projected.nextDown()
-            else -> projected
-        }
+        relaxation.projectCertifiedLowerBound(lower)
     }
 } catch (_: CheckedLongOverflowException) {
     Double.NaN
 } catch (_: LpAssemblyCancelled) {
     Double.NaN
+}
+
+private fun LpEngine.recordRootQueryBound(relaxation: LpRelaxation, result: FloatLpResult) {
+    if (!measuresRootQueries) return
+    val lower = certifiedTightObjectiveLowerBound(
+        relaxation.model.alsoCharged(this),
+        result.duals,
+        sink.lp.certificationObserver(LpRoute.NODE),
+        solveContext.certificationPolicy,
+    )
+    if (!params.cancellation()) recordRootLowerBound(relaxation.projectCertifiedLowerBound(lower))
+}
+
+private fun LpRelaxation.projectCertifiedLowerBound(lower: Double?): Double {
+    val full = lower?.let { BigFraction.ofDouble(it) }?.plus(BigFraction.ofLong(objectiveConstant))
+    val projected = full?.lowerBoundDouble()
+    val integral = model.hasIntegralObjective()
+    return when {
+        projected == null -> Double.NaN
+        integral && sourceObjectiveRange(this) == null -> Double.NaN
+        integral && abs(projected) >= EXACT_INTEGER_DOUBLE_LIMIT -> projected.nextDown()
+        else -> projected
+    }
 }
 
 /**
