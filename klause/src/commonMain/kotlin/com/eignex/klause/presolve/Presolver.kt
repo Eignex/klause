@@ -219,8 +219,13 @@ object Presolver {
             host,
             config.abortFraction,
         )
-        return SourcePresolved(host.current, rounds.fired, rounds.infeasible, SourceRebuilds.compose(host.rebuilds),
-            ctx.linearObjective)
+        return SourcePresolved(
+            host.current,
+            rounds.fired,
+            rounds.infeasible,
+            SourceRebuilds.compose(host.rebuilds),
+            ctx.linearObjective,
+        )
     }
 
     private fun problemPasses(

@@ -82,8 +82,12 @@ object PresolvePipeline {
             !problem.semantics.isApproximate
         if (problem is BakedProblem) return PreparedSource.unchanged(problem, presolveBudget, rewriteObjective)
         val mark = TimeSource.Monotonic.markNow()
-        val context = PresolveContext.of(linearObjective, solutionSetSensitive, problem.hasSymmetryBreaking,
-            transformObjective = rewriteObjective)
+        val context = PresolveContext.of(
+            linearObjective,
+            solutionSetSensitive,
+            problem.hasSymmetryBreaking,
+            transformObjective = rewriteObjective,
+        )
             .withPresolveBudget(presolveBudget)
             .withKeepBinaryComparisons(config.keepsBinaryComparisons(finiteLane))
         val presolved = Presolver.runSource(problem, config, context, phaseCancellation(cancellation, presolveBudget))
@@ -152,8 +156,12 @@ object PresolvePipeline {
         // from the config once and thread it through the context so every rebuild re-derives it.
         val bakeConfig = BakeConfig.from(config)
         var currentObjective = prepared.objective ?: linearObjective
-        var context = PresolveContext.of(currentObjective, solutionSetSensitive, sourceProblem.hasSymmetryBreaking,
-            transformObjective = prepared.transformObjective)
+        var context = PresolveContext.of(
+            currentObjective,
+            solutionSetSensitive,
+            sourceProblem.hasSymmetryBreaking,
+            transformObjective = prepared.transformObjective,
+        )
             .withBakeConfig(bakeConfig)
             .withPresolveBudget(presolveBudget)
             .withKeepBinaryComparisons(config.keepsBinaryComparisons(finiteLane = true))
@@ -311,8 +319,13 @@ object PresolvePipeline {
                     },
                 ) {
                     lpHarvestReporting(
-                        pre.problem, currentObjective ?: LinearObjective(), it, bakeConfig, cancellation,
-                        zeroObjectivePricing, randomSeed,
+                        pre.problem,
+                        currentObjective ?: LinearObjective(),
+                        it,
+                        bakeConfig,
+                        cancellation,
+                        zeroObjectivePricing,
+                        randomSeed,
                     ).also { result ->
                         presolveBudget?.activeInvocation?.let { invocation ->
                             invocation.narrowedColumns = result.report.boundsShaved
@@ -389,8 +402,13 @@ object PresolvePipeline {
         )
         if (posted !== current) mappings.add(SourceMapping(current, posted, TransformationGuarantees.IDENTITY))
         val mapping = mappings.reduce { acc, next -> acc.then(next) }
-        return PresolveOutcome(posted, { mapping.reconstructFrom(posted, it) }, stats,
-            changed = true, objective = refit(currentObjective, posted)).also { it.mapping = mapping }
+        return PresolveOutcome(
+            posted,
+            { mapping.reconstructFrom(posted, it) },
+            stats,
+            changed = true,
+            objective = refit(currentObjective, posted),
+        ).also { it.mapping = mapping }
     }
 }
 

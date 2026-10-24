@@ -22,6 +22,7 @@ import com.eignex.klause.solver.pipeline.SourceExecutionRequest
 import com.eignex.klause.solver.pipeline.SourceExecutionResult
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
+import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -33,7 +34,9 @@ import kotlin.test.assertTrue
 
 class AffineObjectiveTest {
     private val source = Problem(
-        0, 3, Array(3) { IntDomain(0, 4) },
+        0,
+        3,
+        Array(3) { IntDomain(0, 4) },
         listOf(
             Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1),
             Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 1),
@@ -43,8 +46,12 @@ class AffineObjectiveTest {
 
     @Test
     fun `source and finite preparation should compose translated objectives in original units`() {
-        val prepared = PresolvePipeline.prepareSource(source, PresolveConfig.parse("affine"), objective,
-            finiteLane = true)
+        val prepared = PresolvePipeline.prepareSource(
+            source,
+            PresolveConfig.parse("affine"),
+            objective,
+            finiteLane = true,
+        )
         val outcome = PresolvePipeline.run(prepared, objective, PresolveConfig.parse("affine"), false)
         val transformed = assertNotNull(outcome.objective)
 
@@ -62,9 +69,14 @@ class AffineObjectiveTest {
     fun `finite preparation should hand transformed coefficients to minimization and maximization`() {
         for (maximize in listOf(false, true)) {
             val normalized = if (maximize) objective.negated() else objective
-            val preparation = FinitePipeline.prepare(FinitePipelineRequest(
-                source, FiniteEngine.BACKTRACK, normalized, PresolveConfig.parse("affine"),
-            ))
+            val preparation = FinitePipeline.prepare(
+                FinitePipelineRequest(
+                source,
+                FiniteEngine.BACKTRACK,
+                normalized,
+                PresolveConfig.parse("affine"),
+            )
+            )
             val result = BacktrackSolver(preparation.problem.bake()).minimize(assertNotNull(preparation.objective))
             val reduced = assertIs<MinimizeResult.Optimal>(result).sample
             val original = preparation.reconstruct(reduced)
@@ -77,14 +89,24 @@ class AffineObjectiveTest {
     @Test
     fun `source execution should publish reconstructed optima in the original direction`() {
         for (maximize in listOf(false, true)) {
-            val invocation = SourceSetup.prepare(SourceSetupRequest(
-                SourceAttachment(source), ExecutionOperation.OPTIMIZE, FiniteEngine.BACKTRACK,
-                objective, maximize,
-            ))
+            val invocation = SourceSetup.prepare(
+                SourceSetupRequest(
+                SourceAttachment(source),
+                ExecutionOperation.OPTIMIZE,
+                FiniteEngine.BACKTRACK,
+                objective,
+                maximize,
+            )
+            )
 
-            val result = assertIs<SourceExecutionResult.Finite>(SourceSetup.execute(SourceExecutionRequest(
-                invocation, presolveConfig = PresolveConfig.parse("affine"),
-            )))
+            val result = assertIs<SourceExecutionResult.Finite>(
+                SourceSetup.execute(
+                    SourceExecutionRequest(
+                invocation,
+                presolveConfig = PresolveConfig.parse("affine"),
+            )
+                )
+            )
 
             val optimum = assertIs<FiniteSolveOutcome.Completed>(result.result.outcome)
             val sample = assertNotNull(optimum.bestSample)
@@ -100,10 +122,15 @@ class AffineObjectiveTest {
 
     @Test
     fun `supplemental objective consumers should keep their original coordinates`() {
-        val preparation = FinitePipeline.prepare(FinitePipelineRequest(
-            source, FiniteEngine.BACKTRACK, objective, PresolveConfig.parse("affine"),
+        val preparation = FinitePipeline.prepare(
+            FinitePipelineRequest(
+            source,
+            FiniteEngine.BACKTRACK,
+            objective,
+            PresolveConfig.parse("affine"),
             transformObjective = false,
-        ))
+        )
+        )
 
         assertEquals(objective, preparation.objective)
         assertTrue(assertNotNull(preparation.sourceMapping).rebuild.isEmpty)
@@ -111,10 +138,14 @@ class AffineObjectiveTest {
 
     @Test
     fun `translation should carry finite domain holes into the retained coordinate`() {
-        val model = Problem(0, 2, arrayOf(
+        val model = Problem(
+            0, 2,
+            arrayOf(
             IntDomain(1, 4).excludeValues(longArrayOf(2))!!,
             IntDomain(0, 3).excludeValues(longArrayOf(2))!!,
-        ), listOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1))).bake()
+        ),
+            listOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1))
+        ).bake()
         val cost = LinearObjective(intCoefficients = longArrayOf(2, 3))
         val outcome = PresolvePipeline.run(model, cost, PresolveConfig.parse("affine"), false)
 
@@ -129,8 +160,12 @@ class AffineObjectiveTest {
 
     @Test
     fun `coefficient overflow should leave both objective columns protected`() {
-        val model = Problem(0, 2, Array(2) { IntDomain(0, 2) },
-            listOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0)))
+        val model = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, 2) },
+            listOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0)),
+        )
         val cost = LinearObjective(intCoefficients = longArrayOf(Long.MAX_VALUE, 1))
 
         val outcome = PresolvePipeline.run(model, cost, PresolveConfig.parse("affine"), false)
@@ -141,8 +176,12 @@ class AffineObjectiveTest {
 
     @Test
     fun `constant overflow should retain the defining equality`() {
-        val model = Problem(0, 2, Array(2) { IntDomain(0, 2) },
-            listOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1)))
+        val model = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, 2) },
+            listOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1)),
+        )
         val cost = LinearObjective(intCoefficients = longArrayOf(1, -1), constant = Long.MAX_VALUE)
 
         val outcome = PresolvePipeline.run(model, cost, PresolveConfig.parse("affine"), false)
@@ -153,8 +192,12 @@ class AffineObjectiveTest {
 
     @Test
     fun `translation should extend a partial objective to its retained partner`() {
-        val model = Problem(0, 2, Array(2) { IntDomain(0, 2) },
-            listOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1)))
+        val model = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, 2) },
+            listOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1)),
+        )
         val cost = LinearObjective(intCoefficients = longArrayOf(1))
 
         val outcome = PresolvePipeline.run(model, cost, PresolveConfig.parse("affine"), false)
@@ -169,8 +212,12 @@ class AffineObjectiveTest {
 
     @Test
     fun `wider affine expressions should retain objective column protection`() {
-        val model = Problem(0, 3, Array(3) { IntDomain(0, 2) },
-            listOf(Linear(intArrayOf(1, -1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0)))
+        val model = Problem(
+            0,
+            3,
+            Array(3) { IntDomain(0, 2) },
+            listOf(Linear(intArrayOf(1, -1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0)),
+        )
 
         val outcome = PresolvePipeline.run(model, objective, PresolveConfig.parse("affine"), false)
 
@@ -179,8 +226,10 @@ class AffineObjectiveTest {
 
     @Test
     fun `approximate source semantics should retain objective column protection`() {
-        val semantics = SourceSemantics(SourceFormat.IR,
-            feasibilityTolerance = SourceTolerance(absolute = SemanticRational.ofLong(1))).resolve()
+        val semantics = SourceSemantics(
+            SourceFormat.IR,
+            feasibilityTolerance = SourceTolerance(absolute = SemanticRational.ofLong(1)),
+        ).resolve()
         val model = source.withSourceSemantics(semantics)
 
         val outcome = PresolvePipeline.run(model, objective, PresolveConfig.parse("affine"), false)
@@ -200,8 +249,13 @@ class AffineObjectiveTest {
     fun `cancellation should retain objective equality for every committed translation`() {
         for (limit in listOf(0, 5, 20, 100)) {
             var polls = 0
-            val outcome = PresolvePipeline.run(source, objective, PresolveConfig.parse("affine"), false,
-                Cancellation { polls++ >= limit })
+            val outcome = PresolvePipeline.run(
+                source,
+                objective,
+                PresolveConfig.parse("affine"),
+                false,
+                Cancellation { polls++ >= limit },
+            )
 
             val values = BacktrackSolver(outcome.problem.bake()).enumerate().map { reduced ->
                 outcome.mapping.requireObjectivePreserved(objective, outcome.objective ?: objective, reduced)

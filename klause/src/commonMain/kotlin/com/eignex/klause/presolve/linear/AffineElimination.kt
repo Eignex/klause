@@ -134,9 +134,7 @@ internal object AffineSingletons {
     }
 
     /** What one run of the elimination produced: the surviving factors and the substitutions it recorded. */
-    private class Eliminated(
-        val factors: List<Factor>, val subs: List<AffineSub>, val objective: LinearObjective?,
-    )
+    private class Eliminated(val factors: List<Factor>, val subs: List<AffineSub>, val objective: LinearObjective?)
 
     @Suppress("LongParameterList") // one body serves both lanes; the parameters are the lane's differences
     private fun run(
