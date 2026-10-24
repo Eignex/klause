@@ -8,6 +8,11 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 
+internal sealed interface ExtensionalIntersection {
+    data object Refuted : ExtensionalIntersection
+    class Restricted(val factor: Factor) : ExtensionalIntersection
+}
+
 internal object ExtensionalComposition {
     internal class Limits(
         val work: Int = 8_388_608,
@@ -68,12 +73,15 @@ internal object ExtensionalComposition {
                 if (shared < 2) continue
                 meter.pairRemaining = limits.pairWork
                 if (!meter.visit()) break
-                val next = when (current) {
+                val intersection = when (current) {
                     is Table -> if (eligible(current, limits)) intersectTables(current, table, meter) else null
                     is Mdd -> MddTableComposition.intersect(current, table, meter::visit, limits)
                     else -> break
                 } ?: continue
-                if (next === REFUTED) return PassDelta(infeasible = true)
+                val next = when (intersection) {
+                    ExtensionalIntersection.Refuted -> return PassDelta(infeasible = true)
+                    is ExtensionalIntersection.Restricted -> intersection.factor
+                }
                 val cells = when (next) {
                     is Table -> next.tuples.size
                     is Mdd -> next.transitions.size + next.numStatesPerLayer.sum()
@@ -113,7 +121,7 @@ internal object ExtensionalComposition {
         table.hi == null && table.arity <= MAX_SCOPE && table.tuples.size <= limits.tableCells &&
             table.xs.toSet().size == table.arity
 
-    private fun intersectTables(left: Table, right: Table, meter: Meter): Factor? {
+    private fun intersectTables(left: Table, right: Table, meter: Meter): ExtensionalIntersection? {
         val leftColumns = IntArrayList()
         val rightColumns = IntArrayList()
         for (column in left.xs.indices) {
@@ -148,9 +156,9 @@ internal object ExtensionalComposition {
             }
         }
         if (kept.size == left.tuples.size) return null
-        return if (kept.isEmpty()) REFUTED else Table(left.xs, kept.toLongArray())
+        return if (kept.isEmpty()) ExtensionalIntersection.Refuted
+        else ExtensionalIntersection.Restricted(Table(left.xs, kept.toLongArray()))
     }
 
-    internal val REFUTED: Factor = com.eignex.klause.factor.bool.Clause(intArrayOf())
     internal const val MAX_SCOPE = 64
 }

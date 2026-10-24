@@ -34,7 +34,7 @@ class MddTableCompositionTest {
 
         val result = MddTableComposition.intersect(mdd, table, { true }, ExtensionalComposition.Limits())
 
-        assertSame(ExtensionalComposition.REFUTED, result)
+        assertSame(ExtensionalIntersection.Refuted, result)
     }
 
     @Test
@@ -45,9 +45,10 @@ class MddTableCompositionTest {
         )
         val table = Table(intArrayOf(2, 3, 0), longArrayOf(0, 8, 0, 1, 9, 1))
 
-        val composed = assertIs<Mdd>(
+        val result = assertIs<ExtensionalIntersection.Restricted>(
             MddTableComposition.intersect(mdd, table, { true }, ExtensionalComposition.Limits()),
         )
+        val composed = assertIs<Mdd>(result.factor)
         val problem = Problem(0, 3, arrayOf(IntDomain(0, 0), IntDomain(7, 7), IntDomain(0, 1)), arrayOf(composed))
         val state = PropagationState(problem, Assumptions.None)
         assertNull(state.runToFixpoint(allFactors = true))
@@ -65,9 +66,10 @@ class MddTableCompositionTest {
         )
         val table = Table(intArrayOf(0, 1), longArrayOf(0, 0))
 
-        val composed = assertIs<Mdd>(
+        val result = assertIs<ExtensionalIntersection.Restricted>(
             MddTableComposition.intersect(mdd, table, { true }, ExtensionalComposition.Limits()),
         )
+        val composed = assertIs<Mdd>(result.factor)
 
         assertEquals(4, composed.recordStride)
         assertEquals(2, composed.cost)
@@ -87,9 +89,10 @@ class MddTableCompositionTest {
             longArrayOf(0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0), 0, intArrayOf(0), 3,
         )
         val table = Table(intArrayOf(2, 0), longArrayOf(0, 0, 1, 1))
-        val composed = assertIs<Mdd>(
+        val result = assertIs<ExtensionalIntersection.Restricted>(
             MddTableComposition.intersect(mdd, table, { true }, ExtensionalComposition.Limits()),
         )
+        val composed = assertIs<Mdd>(result.factor)
 
         for (first in 0L..1L) for (middle in 0L..1L) for (last in 0L..1L) {
             val domains = arrayOf(IntDomain(first, first), IntDomain(middle, middle), IntDomain(last, last))
@@ -118,9 +121,10 @@ class MddTableCompositionTest {
     @Test
     fun `composed hole explanations should restore sibling supports`() {
         val table = Table(intArrayOf(0, 1), longArrayOf(0, 0, 1, 1, 2, 2))
-        val composed = assertIs<Mdd>(
+        val result = assertIs<ExtensionalIntersection.Restricted>(
             MddTableComposition.intersect(independent(), table, { true }, ExtensionalComposition.Limits()),
         )
+        val composed = assertIs<Mdd>(result.factor)
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 2) }, arrayOf<Factor>(composed))
         val state = PropagationState(problem, Assumptions.None)
         assertNull(state.runToFixpoint(allFactors = true))

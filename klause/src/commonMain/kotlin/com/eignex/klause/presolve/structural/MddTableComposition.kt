@@ -3,7 +3,6 @@ package com.eignex.klause.presolve.structural
 import com.eignex.klause.factor.table.Mdd
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.factor.table.internals.MddTransitionIndex
-import com.eignex.klause.ir.Factor
 import com.eignex.klause.util.LongArrayList
 
 internal object MddTableComposition {
@@ -12,7 +11,7 @@ internal object MddTableComposition {
         table: Table,
         visit: () -> Boolean,
         limits: ExtensionalComposition.Limits,
-    ): Factor? {
+    ): ExtensionalIntersection? {
         if (mdd.seq.size > ExtensionalComposition.MAX_SCOPE || mdd.seq.toSet().size != mdd.seq.size ||
             mdd.transitions.size / mdd.recordStride > limits.records
         ) return null
@@ -53,7 +52,7 @@ internal object MddTableComposition {
                 }
             }
         }
-        if (!suffix[0][mdd.initial]) return ExtensionalComposition.REFUTED
+        if (!suffix[0][mdd.initial]) return ExtensionalIntersection.Refuted
         val trie = buildTrie(table, columns, visit, limits.states) ?: return null
         return product(mdd, index, suffix, columns, trie, visit, limits)
     }
@@ -95,7 +94,7 @@ internal object MddTableComposition {
         trie: List<Map<Long, Int>>,
         visit: () -> Boolean,
         limits: ExtensionalComposition.Limits,
-    ): Factor? {
+    ): ExtensionalIntersection? {
         val counts = IntArray(mdd.seq.size + 1)
         counts[0] = 1
         val starts = IntArray(mdd.seq.size + 1)
@@ -135,13 +134,13 @@ internal object MddTableComposition {
                     if (mdd.recordStride == 4) records.add(mdd.transitions[pointer + 3])
                 }
             }
-            if (next.isEmpty()) return ExtensionalComposition.REFUTED
+            if (next.isEmpty()) return ExtensionalIntersection.Refuted
             counts[layer + 1] = next.size
             current = next
         }
         if (!restricted) return null
         starts[mdd.seq.size] = records.size
-        return trim(mdd, counts, starts, records, visit)
+        return trim(mdd, counts, starts, records, visit)?.let { ExtensionalIntersection.Restricted(it) }
     }
 
     private fun trim(
