@@ -22,7 +22,6 @@ import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.validation.LinearSourceWitness
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.parseBigInt
-import com.eignex.klause.util.unaryMinus
 import com.sun.management.ThreadMXBean
 import java.io.File
 import java.lang.management.ManagementFactory
@@ -198,7 +197,7 @@ internal object ContinuousCompletionReplay {
                 }
                 val checkNs = System.nanoTime() - checkStart
                 val checkBytes = allocated() - checkBefore
-                val value = checked?.objective?.let { if (prepared.compiled.maximize) -it else it }
+                val value = checked?.objective?.let { if (prepared.compiled.maximize) it.negated() else it }
                 val improves = value != null && (best == null || value < checkNotNull(best))
                 if (improves) best = value
                 queries += Query(index, result, lastStats, elapsed, bytes, checked,
@@ -219,7 +218,7 @@ internal object ContinuousCompletionReplay {
             put("completedCandidates", queries.count { it.result !is Completion.Undecided })
             put("checkedWitnesses", queries.count { it.check != null })
             put("checkedImprovements", queries.count { it.checkedImprovement })
-            put("bestCheckedObjective", best?.let { if (prepared.compiled.maximize) -it else it }?.toString())
+            put("bestCheckedObjective", best?.let { if (prepared.compiled.maximize) it.negated() else it }?.toString())
             put("cancelled", stop())
             put("candidateResults", JsonArray(queries.map(::query)))
         }
