@@ -1,6 +1,9 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.lp.SourceLpBudget
+import com.eignex.klause.lp.SparseSourceLpPolicy
+import com.eignex.klause.lp.optimization.LinearAuthority
 import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
@@ -22,6 +25,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class LinearAuthorityInvocationTest {
     private val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
@@ -31,6 +35,31 @@ class LinearAuthorityInvocationTest {
         SourceRevision("conditioned-linear", "exact-affine"),
         objective = SourceObjective("x", ObjectiveSense.MINIMIZE),
     )
+
+    @Test
+    fun `unsliced numerical execution should resume sparse guidance pauses`() {
+        val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val source = SourceProofContext(scope, setOf(real, other), mapOf(
+            "sum" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE,
+                other to BigFraction.MINUS_ONE), BigFraction.ofLong(-3))),
+            "x" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "y" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ), mapOf(real to BigFraction.ONE, other to BigFraction.ofLong(2)))
+        val budget = SourceLpBudget(maxOperations = 1)
+
+        val result = LinearAuthority(budget, retainLp = true,
+            guidancePolicy = SparseSourceLpPolicy(quantum = 1L)).use { authority ->
+            LinearAuthorityInvocation(source, TheoryParams(), borrowedAuthority = authority,
+                boundOrdered = true).use { it.run { _, _ -> } }
+        }
+
+        val terminal = assertNotNull(result.terminal)
+        assertEquals(SourceValue.Rational(BigFraction.ofLong(3)), assertIs<SourceClaim.Optimal>(terminal.claim).value)
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
+        assertTrue(assertNotNull(result.stats.smt.completeSearchStages).getValue("numericalLpPauses") > 0L)
+        assertEquals(1, budget.operations)
+    }
 
     @Test
     fun `frontier should close inherited bounds after an incumbent improves without new LP checks`() {

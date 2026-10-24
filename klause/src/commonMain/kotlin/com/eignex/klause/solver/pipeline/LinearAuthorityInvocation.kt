@@ -103,6 +103,12 @@ internal class LinearAuthorityInvocation(
         }, ::paused, { incumbentRevision },
     )
 
+    fun run(onIncumbent: (Sample, BigFraction) -> Unit): LinearInvocationResult {
+        while (true) {
+            runSlice(Cancellation.Never, Long.MAX_VALUE, -1, onIncumbent)?.let { return it }
+        }
+    }
+
     @Suppress("TooGenericExceptionCaught") // Callback failure retires the invocation and preserves cleanup failures.
     fun runSlice(
         cancellation: Cancellation,

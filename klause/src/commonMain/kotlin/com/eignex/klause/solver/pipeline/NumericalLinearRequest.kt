@@ -107,7 +107,7 @@ class NumericalLinearRequest internal constructor(
         val context = authorityContext(objective ?: LinearObjective(), stop) ?: return unavailable(params, stop)
         return LinearAuthorityInvocation(context, params.copy(cancellation = stop),
             boundOrdered = boundOrdered).use { invocation ->
-            val result = requireNotNull(invocation.runSlice(Cancellation.Never, Long.MAX_VALUE, -1, onIncumbent))
+            val result = invocation.run(onIncumbent)
             LinearOptimizationResult(
                 context.scope,
                 result.terminal.takeIf { complete },
