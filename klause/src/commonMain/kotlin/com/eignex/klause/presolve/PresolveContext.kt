@@ -40,10 +40,13 @@ data class PresolveContext(
     val linearObjective: LinearObjective? = null,
 ) {
     internal fun withObjective(objective: LinearObjective?): PresolveContext {
-        if (objective == null) return this
-        val coefficients = objective.intCoefficientValues.withIndex().filter { it.value != 0L }
-            .associate { it.index to it.value }
-        return copy(objectiveIntCoeffs = coefficients, linearObjective = objective.takeIf { linearObjective != null })
+        if (objective == null || linearObjective == null || objective === linearObjective) return this
+        val coefficients = HashMap<Int, Long>()
+        for (variable in objective.intCoefficientValues.indices) {
+            val coefficient = objective.intCoefficientValues[variable]
+            if (coefficient != 0L) coefficients[variable] = coefficient
+        }
+        return copy(objectiveIntCoeffs = coefficients, linearObjective = objective)
     }
 
     /** Integer variables read by the objective. */
