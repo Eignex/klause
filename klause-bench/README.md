@@ -2226,6 +2226,32 @@ with explicit polling, cursor and relation-index costs. Mac
 including reversible scoring probes; its instrumented timings are not throughput
 evidence.
 
+### MDD changed-state frontier admission
+
+Retain changed-layer sweeps rather than the shared-index, worker-local state-frontier
+prototype. [8167](https://lab.eignex.com/jobs/8167) compares bounded `253e3e30ec`
+with frontier `a73c361a66` under a 32 MiB adjacency admission estimate and a separate
+32 MiB symbol-posting budget. All 216 cases run on one Linux/amd64 spot node;
+all 102 returned witnesses pass independent checking. Across six sources, default
+LS/mixed and fixed-work controls, there are two paired feasibility gains and four
+losses. Small-MDD fixed-work median elapsed rises from 4.433 to 4.929 seconds,
+with nearly unchanged peak RSS (904,000/903,600 KiB); mixed feasibility falls from
+6/6 to 3/6. Large-MDD frontier fixed-work cases reach only 90–118 moves at the
+60-second safety deadline; controls finish 128 moves at a 56.357-second median.
+
+[8172](https://lab.eignex.com/jobs/8172) isolates a corrected prototype `035b54312d`
+that preserves direct primitive probe loops outside index admission. Two MDD
+sources run on two spot nodes, with matched source/runtime/host pairs and a
+90-second fixed-work safety deadline. All 72 cases complete and all 36 returned
+witnesses pass independent checking. All fixed-work pairs retain move counts and
+witnesses, and paired feasibility is unchanged. Large-MDD 128-move medians are
+56.05/55.31 seconds on one node (two repeats) and 59.31/60.33 on the other (four).
+Small-MDD fixed-work medians are 2.779/2.873 and 6.348/6.490 seconds (three repeats
+per node); fixed-work peak-RSS medians differ by under 0.2% within each source/host
+group. Restoring the direct fallback removes the introduced probe overhead
+without a consistent additional gain. These controls do not justify retaining
+the extra index and frontier policy under the measured admission budget.
+
 ### Local-search definition propagation
 
 Retain state-owned evaluation caches and pending-node intersections with the full
