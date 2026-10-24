@@ -1054,6 +1054,21 @@ the recorded witnesses against the original MiniZinc source.
 
 ## Design evidence
 
+### XCSP3 count channel and output reuse
+
+[Lab 7972](https://lab.eignex.com/jobs/7972) compares `085ffb24a1` with `370fd2fd30`:
+mixed/P1, 15 seconds, seeds 1/3, three repeats, debug enabled, no JFR, Mac/aarch64.
+All 24 feasible witnesses pass original-source checking. Source hashes, runtime,
+options and non-solver dependencies match; repeats are not independent seed samples.
+
+ItemsetMining integers fall from 36252 to 2272, Booleans from 34785 to 1283 and
+factors from 70919 to 3899. Preparation takes 1727–1950 ms versus 492–535 ms.
+Objective pairs have three wins and three losses. ProgressiveParty ties at seven
+in all six pairs. BlockedQueens retains its source shape and remains UNKNOWN;
+its preparation takes 143–151 ms versus 163–179 ms. Retain shared indicators and
+functional count outputs for their representation and preparation benefits, with
+mixed search quality and no universal solve-speedup claim.
+
 ### XCSP3 constant-distance disequalities
 
 [Lab 7970](https://lab.eignex.com/jobs/7970) compares `2a9718f55f` with `c99c067c23`
