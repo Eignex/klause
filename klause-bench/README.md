@@ -663,6 +663,9 @@ optional `recording` selects `cli.jfr` or `profile.jfr`, optionally beneath a
 single output index from 0 through 7. The summary includes runtime event durations
 and native-method samples alongside the execution samples and allocations. Use a
 local profile job with an explicit `profile.runTimeoutSec` for either form.
+For a `profileCli` capture, add its zero-based `case` and use
+`recording=profile-<capture UUID>/cli.jfr`; the same byte-hash check applies and the
+summary records the source case. Capture analysis runs in the lab.
 
 `CoefficientLiftingProfile` records Java thread allocations for the coefficient
 strengthening pass on unchanged and productive 64-, 512- and 4096-term inequalities,
