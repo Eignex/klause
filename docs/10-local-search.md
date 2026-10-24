@@ -36,6 +36,13 @@ cause; committed moves reconcile cost and violated membership from the exact
 post-move degrees. The immutable invariant projection is shared; mutable payloads,
 the assignment, weights and random state belong to each `LocalSearchState`.
 
+Unguarded unit-integer `Distinct` maintains multiplicities of exact offset values.
+A source move updates every operand reading that coordinate, including aliases;
+probes restore the counts and discard zero-count keys. Its excess grade matches
+full exact collision grading. Bounded repair proposals choose unused affine values
+through source-domain moves and the ordinary move sink's ownership filters.
+Other affine and reified operands retain complete exact scoring.
+
 Optimization uses two phases. While the hard cost is positive, the walk fights for
 feasibility. At zero cost it descends on the objective, either through the
 strategy's own feasibility-preserving moves or, for violation-native strategies, by

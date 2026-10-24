@@ -36,7 +36,9 @@ internal fun Distinct.propagationView(): Propagator {
     }
 }
 
-internal fun Distinct.scoringView(): Invariant = DistinctInvariant(this)
+internal fun Distinct.scoringView(): Invariant = affineIntegerOperands()?.let {
+    AffineDistinctInvariant(it.vars, it.offsets)
+} ?: DistinctInvariant(this)
 
 private class DistinctInvariant(private val factor: Distinct) : Invariant {
     private fun score(
