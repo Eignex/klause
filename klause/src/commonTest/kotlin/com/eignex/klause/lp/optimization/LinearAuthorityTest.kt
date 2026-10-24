@@ -50,7 +50,7 @@ class LinearAuthorityTest {
         LinearAuthority(budget, retainLp = true, guidancePolicy = SparseSourceLpPolicy(quantum = 1L)).use { authority ->
             var result = authority.advance(source, Cancellation.Never)
             assertTrue(result.paused)
-            assertNull(result.evidence)
+            assertTrue(result.evidence == null)
             repeat(64) {
                 if (result.paused) result = authority.advance(source, Cancellation.Never)
             }
@@ -89,7 +89,8 @@ class LinearAuthorityTest {
             assertEquals(SourceClaim.Refutation, evidence.claim)
             assertEquals(SourceEvidenceCheck.Checked,
                 SourceEvidenceVerifier(restricted.withLinearAuthority()).verify(evidence))
-            assertTrue(SourceEvidenceVerifier(source.withLinearAuthority()).verify(evidence) != SourceEvidenceCheck.Checked)
+            val globalCheck = SourceEvidenceVerifier(source.withLinearAuthority()).verify(evidence)
+            assertTrue(globalCheck != SourceEvidenceCheck.Checked)
 
             val retracted = authority.advance(source, Cancellation.Never)
             assertIs<SourceClaim.Optimal>(assertNotNull(retracted.evidence).claim)
@@ -102,7 +103,8 @@ class LinearAuthorityTest {
         val coordinates = (0 until 129).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
         val source = SourceProofContext(scope, coordinates.toSet(), mapOf(
             "left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-            "right" to SourcePremise(SourceInequality(mapOf(coordinates[1] to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "right" to SourcePremise(SourceInequality(mapOf(coordinates[1] to BigFraction.MINUS_ONE),
+                BigFraction.ZERO)),
             "sum" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE,
                 coordinates[1] to BigFraction.ONE), BigFraction.MINUS_ONE)),
         ), mapOf(real to BigFraction.ONE))
@@ -114,6 +116,32 @@ class LinearAuthorityTest {
             assertNull(result.evidence)
             assertNull(result.bound)
             assertTrue(result.relaxedPoint.isEmpty())
+        }
+    }
+
+    @Test
+    fun `sparse conflicts should retire when a contributing guarded row is disabled`() {
+        val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
+        val coordinates = (0 until 129).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val source = SourceProofContext(scope, (coordinates + bool).toSet(), mapOf(
+            "left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "right" to SourcePremise(SourceInequality(mapOf(coordinates[1] to BigFraction.MINUS_ONE),
+                BigFraction.ZERO)),
+            "sum" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE,
+                coordinates[1] to BigFraction.ONE), BigFraction.MINUS_ONE), guards = mapOf(0 to true)),
+        ), mapOf(real to BigFraction.ONE))
+        val enabled = source.atScope(scope.copy(condition = SourceCondition(bools = mapOf(0 to true))))
+        val disabled = source.atScope(scope.copy(condition = SourceCondition(bools = mapOf(0 to false))))
+
+        LinearAuthority(SourceLpBudget(maxOperations = 2), retainLp = true).use { authority ->
+            val conflict = assertNotNull(authority.advance(enabled, Cancellation.Never).evidence)
+            assertEquals(SourceClaim.Refutation, conflict.claim)
+            val result = authority.advance(disabled, Cancellation.Never)
+
+            val evidence = assertNotNull(result.evidence)
+            assertIs<SourceClaim.Optimal>(evidence.claim)
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(disabled.withLinearAuthority()).verify(evidence))
         }
     }
 
