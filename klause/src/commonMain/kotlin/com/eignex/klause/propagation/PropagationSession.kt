@@ -40,7 +40,7 @@ enum class VarKind {
 class PropagationSession private constructor(
     /** The problem being propagated. */
     val problem: Problem,
-    private val cancellation: Cancellation,
+    private var cancellation: Cancellation,
     propagationCancelFloor: Int,
     nativeSat: Boolean,
     pbLearning: Boolean,
@@ -208,6 +208,19 @@ class PropagationSession private constructor(
     internal val rootPropagationNanos: Long
     internal val work: Long get() = state.work
     internal val propagationNanos: Long get() = state.propagationNanos
+
+    internal fun <T> withCancellation(token: Cancellation, operation: () -> T): T {
+        val previous = cancellation
+        val finite = state.finiteWork.cancellation
+        cancellation = if (token === previous || token === Cancellation.Never) previous else previous or token
+        state.finiteWork.cancellation = cancellation
+        return try {
+            operation()
+        } finally {
+            cancellation = previous
+            state.finiteWork.cancellation = finite
+        }
+    }
 
     init {
         val conflict = if (preparedState == null) {

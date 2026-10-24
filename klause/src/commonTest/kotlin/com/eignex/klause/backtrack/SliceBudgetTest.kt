@@ -9,6 +9,17 @@ import kotlin.test.assertTrue
 class SliceBudgetTest {
 
     @Test
+    fun `expiry polls should account for native propagation completed inside a decision`() {
+        var work = 0L
+        val slice = SliceBudget({ 0L }, { 0L }, { work })
+        slice.begin(Long.MAX_VALUE, 1L)
+
+        work = PROPAGATION_WORK_PER_NODE
+
+        assertTrue(slice.expired())
+    }
+
+    @Test
     fun `remaining native LP allowance should account for fractional work and decisions`() {
         var nodes = 0L
         var work = 0L

@@ -226,6 +226,14 @@ in an ordinary search fixpoint latches incompleteness and withholds model and fa
 publication. Bulk allocations and domain mutations, including atom maintenance,
 remain atomic.
 
+Shared CP assertions also poll the search context's containing allowance. A cancelled
+assertion retracts to its completed parent and retains the same alternative for a
+pausing traversal to retry. Retraction clears native incompleteness only after it
+has removed the interrupted native level. Publication stops before visiting another
+deduction or constructing its premise; a partial publication cannot certify a leaf.
+Slice polls charge completed native propagation visits before deciding whether the
+slice has expired.
+
 A completed fixpoint can share Boolean- and root-grounded native subproofs with search
 peers through a bounded memo of at most 4,096 entries. No memo survives a callback,
 suspension or retraction.
