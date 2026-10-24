@@ -989,6 +989,8 @@ checkpoint. Per-advance timing/allocation excludes report formatting and source
 projection. Pauses retain the artificial-phase continuation without publishing a
 result. The same cumulative limit can overshoot by one atomic numerical operation;
 compare actual work and final headings, rather than aggregate repeated pivots.
+Node-only same-root modes stop when a completed floating solve supplies a checked
+bound; this is neither a source optimum claim nor an exact attainment check.
 
 The frozen `cap6000`, `rentacar` and `misc04inf` comparison rejects an automatic
 admission bypass based on sparsity or successful preparation alone
@@ -1036,6 +1038,32 @@ these are JFR diagnostic phase allocations on Mac/aarch64, Java 25.0.4.1 with
 a 6 GiB maximum heap, excluding physical RSS and any end-to-end speed claim.
 Restored support establishes projection fidelity; dominant-component size and
 missing large-source deductions still withhold an automatic admission bypass.
+
+[Numerical checkpoint control 7991](https://lab.eignex.com/jobs/7991) matches
+checkpointed and uninterrupted final headings, work and numerical outcomes on all
+three frozen sources. Cap6000 completes its floating solve in 81.86M work units,
+349 pivots and seven refactorizations; repeated stops spend 150.11M, aggregating
+717 pivots and eighteen refactorizations while retaining a weaker checked bound.
+The two large controls reach the same uninterrupted headings with two/five
+refactorizations, versus eight/eleven for repeated stops. Their numerical progress
+still supplies no checked bound, and repeated pivot totals include restarted work.
+
+[Integrated root consultations 8002](https://lab.eignex.com/jobs/8002), at
+`7308e70b4b`, retain the same hashes and existing adaptive/cumulative governors.
+Cap6000 supplies a checked native lower bound of -2451537 after seven consultations,
+82.49M node work units and seven refactorizations; the stopped control spends
+144.17M and seventeen refactorizations for -2555534. Node overhead is separate.
+The large roots retain one cursor with three/six refactorizations versus eight/ten,
+but still supply no checked bound, fixing or prune. Their thread allocations fall
+from 670/314 MB to 587/290 MB while diagnostic query times rise from 226/108 ms to
+255/157 ms; fewer rebuilds do not establish an end-to-end speedup.
+
+That capture continues cap6000's completed root until governor demotion, producing
+64 consultations and 1.84 GB of thread allocation. The comparison's terminal rule
+stops at the completed solve with its checked bound. These are Mac/aarch64,
+Java 25.0.4.1, 6 GiB-heap JFR diagnostics, with no source witness/proof or physical
+RSS claim. The checkpoint policy remains internal; ordinary admission and the
+frozen 144-source baseline denominator stay unchanged.
 
 ### CLI profile tables
 
