@@ -2276,6 +2276,14 @@ binds. These pairs support retained useful work at higher cost, with unresolved
 coverage still present; they establish no general speedup or independently checked
 proof. The wider corpus and standalone/companion controls remain separate evidence.
 
+`bench.profile.AffineObjectiveProfile` takes `batch64=` containing a base64-encoded
+JSON list of `suite=ID`, `problem=NAME`, `sha256=HEX` argument lists. It retains the
+original MPS bytes, original translation rows and complete prepared factor keys,
+rows, domains and objectives. Default and exact source policies each compare
+objective substitution enabled and disabled through the full finite preparation.
+Preparation work, elapsed time and interruption are diagnostic observations;
+source-matched ordinary lab solves and witness checks qualify search outcomes.
+
 The scalar session [qualification 8040](https://lab.eignex.com/jobs/8040) compares
 cold `3e8ac384` with retained `6aef3fdd` and an automatic finite control over
 opt1217, p0201, gr4x6, flugpl, p0033, enigma, enlight4 and flugplinf. Each has
