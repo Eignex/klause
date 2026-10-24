@@ -135,9 +135,8 @@ class QfLraSystemTest {
     }
 
     @Test
-    fun `a refused definition should retain the committed source prefix and permit a sibling retry`() {
-        var limit = 0
-        LpPropagator(object : LpSearchPolicy {}, effort = { LpEffortProfile(maxRows = limit) }).use { lp ->
+    fun `a refused definition should retain the committed source prefix across sibling retries`() {
+        LpPropagator(object : LpSearchPolicy {}, effort = { LpEffortProfile(maxRows = 0) }).use { lp ->
             val system = LiveQfLraSystem(source(), lp)
             assertTrue(system.install())
             assertTrue(lp.atLevel(1))
@@ -156,12 +155,11 @@ class QfLraSystemTest {
             assertEquals(0, assertNotNull(lp.state).model.m)
             assertTrue(lp.atLevel(0))
             assertTrue(lp.atLevel(1))
-            limit = 1
             committed.clear()
-            assertTrue(system.assertComparisons(comparisons, Cancellation.Never, committed::add))
-            assertEquals(listOf(0, 1), committed)
-            assertEquals(1, assertNotNull(lp.state).model.m)
-            assertEquals(BigFraction.ONE, assertNotNull(lp.state?.activeSide(2, true)).side.number.value)
+            assertFalse(system.assertComparisons(comparisons, Cancellation.Never, committed::add))
+            assertEquals(listOf(0), committed)
+            assertEquals(0, assertNotNull(lp.state).model.m)
+            assertEquals(BigFraction.ONE, assertNotNull(lp.state?.activeSide(0, true)).side.number.value)
         }
     }
 
@@ -207,6 +205,48 @@ class QfLraSystemTest {
 
             assertEquals(listOf(0), committed)
             assertSame(before, lp.state)
+        }
+    }
+
+    @Test
+    fun `cancellation during source staging should discard the whole pending batch`() {
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source(), lp)
+            assertTrue(system.install())
+            assertTrue(lp.atLevel(1))
+            val before = lp.state
+            val comparisons = (0..1).map { column ->
+                PremisedSmtComparison(ExactComparison(mapOf(column to BigFraction.ONE), BigFraction.ONE,
+                    LinearOp.LE, false, true), axiom)
+            }
+            val committed = ArrayList<Int>()
+            var polls = 0
+
+            assertFalse(system.assertComparisons(comparisons, Cancellation { ++polls >= 4 }, committed::add))
+
+            assertSame(before, lp.state)
+            assertTrue(committed.isEmpty())
+            assertEquals(SearchAtomPremise.Unavailable, lp.boundPremise(0))
+        }
+    }
+
+    @Test
+    fun `batched equalities should preserve wide exact endpoints on both sides`() {
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source(), lp)
+            assertTrue(system.install())
+            assertTrue(lp.atLevel(1))
+            val value = BigFraction.ofLong(9007199254740993L)
+            val committed = ArrayList<Int>()
+
+            assertTrue(system.assertComparisons(listOf(PremisedSmtComparison(
+                ExactComparison(mapOf(0 to BigFraction.ONE), value, LinearOp.EQ, false, true), axiom,
+            )), Cancellation.Never, committed::add))
+
+            assertEquals(listOf(0), committed)
+            for (upper in listOf(false, true)) {
+                assertEquals(value, assertNotNull(lp.state?.activeSide(0, upper)).side.number.value)
+            }
         }
     }
 

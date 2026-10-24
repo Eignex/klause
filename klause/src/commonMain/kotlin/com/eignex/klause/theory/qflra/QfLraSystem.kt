@@ -10,8 +10,8 @@ import com.eignex.klause.ir.linearRows
 import com.eignex.klause.lp.ExactComparison
 import com.eignex.klause.lp.ExactRowForm
 import com.eignex.klause.lp.asFraction
-import com.eignex.klause.lp.bounding.LpPropagator
 import com.eignex.klause.lp.bounding.LpPremisedBound
+import com.eignex.klause.lp.bounding.LpPropagator
 import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.ExactLpColumn
 import com.eignex.klause.lp.engine.ExactLpEntry
@@ -20,8 +20,8 @@ import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpObjective
 import com.eignex.klause.lp.engine.ExactLpRow
 import com.eignex.klause.lp.engine.ExactLpSide
-import com.eignex.klause.lp.engine.LpScopedRow
 import com.eignex.klause.lp.engine.LpBoundBatchResult
+import com.eignex.klause.lp.engine.LpScopedRow
 import com.eignex.klause.lp.engine.strongerThan
 import com.eignex.klause.lp.exactColumnLower
 import com.eignex.klause.lp.exactColumnUpper
