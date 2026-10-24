@@ -35,11 +35,14 @@ internal class CompactMddState(
     fun propagate(): Boolean {
         if (seq.isEmpty()) return initial in accepting
         val domains = Array(seq.size) { state.intDomains[seq[it]] }
-        if (valid.value == 0) reset(domains) else removeDomainDeltas(domains)
-        if (!propagateDown() || !propagateUp()) return false
+        val changed = if (valid.value == 0) {
+            reset(domains)
+            BooleanArray(seq.size) { true }
+        } else removeDomainDeltas(domains)
+        if (!propagateDown(changed) || !propagateUp(changed)) return false
         for (pos in seq.indices) {
             state.checkFiniteWork()
-            if (!prune(pos, domains[pos])) return false
+            if (changed[pos] && !prune(pos, domains[pos])) return false
         }
         for (pos in seq.indices) {
             state.checkFiniteWork()
@@ -66,7 +69,8 @@ internal class CompactMddState(
         }
     }
 
-    private fun removeDomainDeltas(domains: Array<IntDomain>) {
+    private fun removeDomainDeltas(domains: Array<IntDomain>): BooleanArray {
+        val changed = BooleanArray(seq.size)
         for (pos in seq.indices) {
             state.checkFiniteWork()
             val prior = baseline[pos].value
@@ -77,12 +81,14 @@ internal class CompactMddState(
                 state.checkFiniteWork()
                 if (value in prior && value !in current) addMask(index[pos].symbols, bucket, removed)
             }
-            arcs[pos].remove(removed)
+            changed[pos] = arcs[pos].remove(removed)
         }
+        return changed
     }
 
-    private fun propagateDown(): Boolean {
+    private fun propagateDown(changed: BooleanArray): Boolean {
         for (pos in 0 until seq.lastIndex) {
+            if (!changed[pos]) continue
             if (arcs[pos].isEmpty) return false
             val removed = LongArray(arcs[pos + 1].wordCount)
             index[pos + 1].tails.forEachValue(0, sizes[pos + 1].toLong() - 1) { node, bucket ->
@@ -98,13 +104,14 @@ internal class CompactMddState(
                     if (incoming < 0) addMask(index[pos + 1].tails, bucket, removed)
                 }
             }
-            arcs[pos + 1].remove(removed)
+            if (arcs[pos + 1].remove(removed)) changed[pos + 1] = true
         }
         return !arcs.last().isEmpty
     }
 
-    private fun propagateUp(): Boolean {
+    private fun propagateUp(changed: BooleanArray): Boolean {
         for (pos in seq.lastIndex downTo 1) {
+            if (!changed[pos]) continue
             if (arcs[pos].isEmpty) return false
             val removed = LongArray(arcs[pos - 1].wordCount)
             index[pos - 1].heads.forEachValue(0, sizes[pos].toLong() - 1) { node, bucket ->
@@ -120,7 +127,7 @@ internal class CompactMddState(
                     if (outgoing < 0) addMask(index[pos - 1].heads, bucket, removed)
                 }
             }
-            arcs[pos - 1].remove(removed)
+            if (arcs[pos - 1].remove(removed)) changed[pos - 1] = true
         }
         return !arcs.first().isEmpty
     }
@@ -172,13 +179,15 @@ internal class CompactMddState(
             remove(LongArray(wordCount))
         }
 
-        fun remove(mask: LongArray) {
+        fun remove(mask: LongArray): Boolean {
             var i = 0
             var end = length.value
+            var changed = false
             while (i < end) {
                 state.checkFiniteWork()
                 val slot = order[i]
                 val kept = words[slot] and mask[slot].inv()
+                if (kept != words[slot]) changed = true
                 words[slot] = kept
                 if (kept == 0L) {
                     order[i] = order[--end]
@@ -188,6 +197,7 @@ internal class CompactMddState(
                 }
             }
             length.set(end)
+            return changed
         }
 
         fun count(visit: () -> Boolean): Int? {
