@@ -42,6 +42,7 @@ import kotlinx.serialization.json.put
 internal object MpsSparseRoot {
     private const val LP = "com.eignex.klause.lp."
     private const val ENGINE = LP + "engine."
+    private const val REFACTOR_UPDATES = 50
     private val defaultPolicy = Class.forName(LP + "SparseSourceLpPolicy").getConstructor().newInstance()
     private data class Variant(val layout: String, val phaseOne: String, val values: String, val start: String)
 
@@ -80,9 +81,13 @@ internal object MpsSparseRoot {
             "compare" -> listOf("LOGICAL", "FREE_SINGLETON")
             else -> error("unsupported numerical opening")
         }
-        val variants = layouts.flatMap { layout -> phaseOnePolicies.flatMap { phaseOne ->
-            valuePolicies.flatMap { values -> startPolicies.map { start -> Variant(layout, phaseOne, values, start) } }
-        } }
+        val variants = layouts.flatMap { layout ->
+            phaseOnePolicies.flatMap { phaseOne ->
+                valuePolicies.flatMap { values ->
+                    startPolicies.map { start -> Variant(layout, phaseOne, values, start) }
+                }
+            }
+        }
         val requests = Json.decodeFromString<List<List<String>>>(
             Base64.getDecoder().decode(args[0].substringAfter('=')).decodeToString())
         require(requests.size in 1..16)
@@ -193,6 +198,8 @@ internal object MpsSparseRoot {
             put("prepareNs", prepareNs)
             put("prepareThreadBytes", prepareBytes)
             put("policy", NumericalResidualProfile.json(policy))
+            put("refactorUpdates", REFACTOR_UPDATES)
+            put("pricingSeed", 3)
             put("sourceVerdictClaim", false)
             put("independentWitnessCheck", false)
             put("javaVersion", System.getProperty("java.version"))
@@ -266,7 +273,7 @@ internal object MpsSparseRoot {
             .newInstance(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, 3L)
         val allowance = checkNotNull(call(policy, "getFloating"))
         val owner = Class.forName(ENGINE + "LpScopedSolver").constructors.single { it.parameterCount == 9 }
-            .newInstance(call(trail, "getState"), stop, context, 50, call(allowance, "getIterations"),
+            .newInstance(call(trail, "getState"), stop, context, REFACTOR_UPDATES, call(allowance, "getIterations"),
                 call(allowance, "getWork"), false, Int.MAX_VALUE, pricing)
         val limits = checkNotNull(call(policy, "getCertificate"))
         val advance = Class.forName(ENGINE + "LpRootGuidanceKt").methods.single {

@@ -1096,6 +1096,7 @@ Preparation has 2M work units and 64 MiB modeled allocation; floating work retai
 the 150M cumulative limit, 1024 pivots and a ten-second deadline. Consultations
 advance at 20M work units and stop at the completed numerical operation. Dual-only
 certification has its own 2M/64 MiB allowance, with no exact-primal recovery.
+The retained owner uses the 50-update refactor setting.
 
 Each source retains original bytes and build identity. Preparation and guidance
 reports separate work, measured thread allocation, active time, paused versus
@@ -1214,6 +1215,19 @@ repair: the combined arm takes 1532 pivots against 1246, but its last sampled
 infeasibility is worse, 150129.16 against 130734.68, with fewer violated basics,
 1240 against 1399. The original-limit gain is not uniform under larger funding.
 These observations motivate the separately controlled singleton opening.
+
+[Opening comparison 8163](https://lab.eignex.com/jobs/8163), at `34c662be`,
+charges its singleton pivot to the original limits. In the equality layout,
+misc04inf's last sampled infeasibility falls from 172.94 to 114.19 at 120518497
+work and 1022 recorded pivots. Rentacar retains its sampled infeasibility and
+386 pivots, with 72991 additional work. Identity layouts remain unchanged, and
+both completed control bounds pass the same native source check.
+[Funded opening comparison 8166](https://lab.eignex.com/jobs/8166) keeps the
+600M/4096 setting separate: misc04inf reaches floating candidates at
+272080437/267223843 work without/with the opening, and both certificates decline
+as `CANDIDATE`; rentacar's sampled infeasibility is unchanged. The supported
+result is stronger bounded numerical progress with sparse factors. Source
+witnesses, root proof completion and general speedups are not established.
 
 ### CLI profile tables
 
