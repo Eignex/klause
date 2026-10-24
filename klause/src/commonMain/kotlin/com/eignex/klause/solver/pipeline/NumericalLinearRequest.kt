@@ -173,7 +173,8 @@ class NumericalLinearRequest internal constructor(
         val context = authorityContext(objective ?: LinearObjective(), stop) ?: return unavailable(params, stop)
         if (model.numBoolVars != 0) return unavailable(params, stop)
         val executionObjective = if (maximize) objective?.negated() else objective
-        return JointLinearRepair(model, context, executionObjective, params.copy(cancellation = stop)).use { repair ->
+        return JointLinearRepair(model, context, executionObjective, params.copy(cancellation = stop),
+            boundOrdered = boundOrdered).use { repair ->
             repair.search(adaptive).use { search ->
                 var incumbent: Sample? = null
                 var value: BigFraction? = null

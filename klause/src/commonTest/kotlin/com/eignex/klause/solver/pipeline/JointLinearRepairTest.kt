@@ -56,23 +56,26 @@ class JointLinearRepairTest {
             ), numRealVars = 1, realLower = doubleArrayOf(0.75), realUpper = doubleArrayOf(2.0))
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
-        val repair = JointLinearRepair(model, source, objective,
-            TheoryParams(maxFlips = 1, maxLeaves = 2, openWorkLimit = 2), SparseSourceLpPolicy(quantum = 1L))
+        for (boundOrdered in listOf(false, true)) {
+            val repair = JointLinearRepair(model, source, objective,
+                TheoryParams(maxFlips = 1, maxLeaves = 2, openWorkLimit = 2), SparseSourceLpPolicy(quantum = 1L),
+                boundOrdered = boundOrdered)
 
-        val result = repair.use {
-            it.search(adaptive = false).use { search ->
-                assertFalse(search.advance(Cancellation.Never, 1))
-                assertEquals(0.0, search.stats.ls.completions.sum)
-                var done = false
-                repeat(64) { if (!done) done = search.advance(Cancellation.Never, 1) }
-                assertTrue(done)
-                search.minimizeResult(TerminationReason.BudgetExhausted)
+            val result = repair.use {
+                it.search(adaptive = false).use { search ->
+                    assertFalse(search.advance(Cancellation.Never, 1))
+                    assertEquals(0.0, search.stats.ls.completions.sum)
+                    var done = false
+                    repeat(64) { if (!done) done = search.advance(Cancellation.Never, 1) }
+                    assertTrue(done)
+                    search.minimizeResult(TerminationReason.BudgetExhausted)
+                }
             }
-        }
 
-        assertEquals(1L, assertNotNull(result.assignment).intValue(0))
-        assertEquals(2L, result.stats.openTheory.openTheoryChecks)
-        assertTrue((result.stats.smt.completeSearchStages?.get("jointRepairRootPauses") ?: 0) > 0)
+            assertEquals(1L, assertNotNull(result.assignment).intValue(0))
+            assertEquals(2L, result.stats.openTheory.openTheoryChecks)
+            assertTrue((result.stats.smt.completeSearchStages?.get("jointRepairRootPauses") ?: 0) > 0)
+        }
     }
 
     @Test
