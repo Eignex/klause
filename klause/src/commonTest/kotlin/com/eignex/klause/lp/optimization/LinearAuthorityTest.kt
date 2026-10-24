@@ -50,7 +50,7 @@ class LinearAuthorityTest {
         LinearAuthority(budget, retainLp = true, guidancePolicy = SparseSourceLpPolicy(quantum = 1L)).use { authority ->
             var result = authority.advance(source, Cancellation.Never)
             assertTrue(result.paused)
-            assertTrue(result.evidence == null)
+            assertEquals(null, result.evidence)
             repeat(64) {
                 if (result.paused) result = authority.advance(source, Cancellation.Never)
             }
