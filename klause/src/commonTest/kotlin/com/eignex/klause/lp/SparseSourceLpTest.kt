@@ -4,6 +4,10 @@ import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.ExactLpColumn
 import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpSide
+import com.eignex.klause.lp.engine.LpExactState
+import com.eignex.klause.lp.engine.ReconstructionLimits
+import com.eignex.klause.lp.engine.certifyLpBoundOnly
+import com.eignex.klause.lp.engine.checkedLpWitness
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.util.Cancellation
@@ -17,6 +21,78 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class SparseSourceLpTest {
+    @Test
+    fun `unconditional equality compaction should retain both sides of the source equality`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1), listOf(BigFraction.ONE, BigFraction.ONE), BigFraction.ONE),
+            ExactRationalInequality(intArrayOf(0, 1), listOf(BigFraction.MINUS_ONE, BigFraction.MINUS_ONE),
+                BigFraction.MINUS_ONE),
+        )
+        val prepared = assertNotNull(SparseSourceLp.prepare(rows,
+            List(2) { ExactLpColumn(ExactLpBounds()) }, List(2) { BigFraction.ZERO }, BigFraction.ZERO, limits,
+            rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES).prepared)
+        val model = assertNotNull(LpExactState(prepared.model).toWorkingModel())
+        val points = listOf(
+            listOf(BigFraction.ZERO, BigFraction.ONE),
+            listOf(BigFraction.ZERO, BigFraction.ZERO),
+            listOf(BigFraction.ONE, BigFraction.ONE),
+        )
+
+        assertEquals(1, prepared.emittedRowCount)
+        assertEquals(2, prepared.sourceRowCount)
+        assertContentEquals(intArrayOf(0, 1), prepared.rowSources(0))
+        for (point in points) {
+            assertEquals(point.satisfiesSourceRows(rows), checkedLpWitness(model, point) != null)
+        }
+    }
+
+    @Test
+    fun `compacted equality bounds should lift either multiplier sign to original source rows`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1), listOf(BigFraction.ONE, BigFraction.ONE), BigFraction.ONE),
+            ExactRationalInequality(intArrayOf(0, 1), listOf(BigFraction.MINUS_ONE, BigFraction.MINUS_ONE),
+                BigFraction.MINUS_ONE),
+        )
+        for (sign in listOf(BigFraction.ONE, BigFraction.MINUS_ONE)) {
+            val prepared = assertNotNull(SparseSourceLp.prepare(rows,
+                List(2) { ExactLpColumn(ExactLpBounds()) }, List(2) { sign }, BigFraction.ZERO, limits,
+                rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES).prepared)
+            val model = assertNotNull(LpExactState(prepared.model).toWorkingModel())
+
+            val bound = assertNotNull(certifyLpBoundOnly(model, doubleArrayOf(sign.toDouble()),
+                ReconstructionLimits()).bound)
+            val weights = assertNotNull(prepared.sourceRowWeights(
+                assertNotNull(bound.dualMultipliers).map { it.negated() }))
+
+            assertEquals(sign, bound.value)
+            val selected = if (sign == BigFraction.ONE) 1 else 0
+            assertEquals(BigFraction.ONE, weights[selected])
+            assertEquals(BigFraction.ZERO, weights[1 - selected])
+            assertEquals(bound.value.negated(), rows[selected].rhs)
+            assertEquals(sign.negated(), rows[selected].coefficients.first())
+        }
+    }
+
+    @Test
+    fun `equality compaction should require an explicit policy and closed opposing rows`() {
+        val upper = ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.ONE)
+        val lower = ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.MINUS_ONE)
+        val cases = listOf(
+            listOf(upper, lower) to SparseSourceLpRowPolicy.IDENTITY,
+            listOf(upper, ExactRationalInequality(lower.columns, lower.coefficients, lower.rhs, true)) to
+                SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES,
+            listOf(upper, ExactRationalInequality(lower.columns, lower.coefficients, BigFraction.ZERO)) to
+                SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES,
+        )
+        for ((rows, policy) in cases) {
+            val prepared = assertNotNull(SparseSourceLp.prepare(rows, listOf(ExactLpColumn(ExactLpBounds())),
+                listOf(BigFraction.ZERO), BigFraction.ZERO, limits, rowPolicy = policy).prepared)
+
+            assertEquals(2, prepared.emittedRowCount)
+            assertNull(prepared.sourceRowWeights(listOf(BigFraction.MINUS_ONE, BigFraction.ZERO)))
+        }
+    }
+
     @Test
     fun `sparse preparation should preserve exact rows columns objective and adjacency`() {
         val third = BigFraction.ofLong(3L).reciprocal()

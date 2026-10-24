@@ -14,6 +14,7 @@ internal data class SparseSourceLpPolicy(
         maxAllocation = 64L * 1024L * 1024L,
         maxAttempts = 1,
     ),
+    val rowPolicy: SparseSourceLpRowPolicy = SparseSourceLpRowPolicy.IDENTITY,
 ) {
     init {
         require(floating.work > 0L && floating.iterations > 0 && quantum > 0L)
