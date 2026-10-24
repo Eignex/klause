@@ -60,11 +60,11 @@ class LinearAuthorityTest {
             assertEquals(SourceEvidenceCheck.Checked,
                 SourceEvidenceVerifier(source.withLinearAuthority()).verify(evidence))
             assertTrue(result.relaxedPoint.isEmpty())
-            val certificateWork = budget.measuredBoundCertificationWork
+            val certificateWork = budget.measuredConflictCertificationWork
             val floatWork = budget.measuredFloatWork
             assertTrue(certificateWork > 0L)
             assertEquals(SourceClaim.Refutation, authority.advance(source, Cancellation.Never).evidence?.claim)
-            assertEquals(certificateWork, budget.measuredBoundCertificationWork)
+            assertEquals(certificateWork, budget.measuredConflictCertificationWork)
             assertEquals(floatWork, budget.measuredFloatWork)
             assertEquals(1, budget.operations)
         }

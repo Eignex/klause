@@ -59,7 +59,8 @@ internal class JointLinearRepair(
         (!rootPreparationPending && pending == null && (!state.work.hasAllowance() ||
             state.work.acceptedChecks >= params.maxLeaves))
     val work: Long get() = state.work.spent + budget.measuredPreparationWork + budget.measuredFloatWork +
-        budget.measuredContinuationWork + budget.measuredBoundCertificationWork + preparationWork +
+        budget.measuredContinuationWork + budget.measuredBoundCertificationWork +
+        budget.measuredConflictCertificationWork + preparationWork +
         (selection?.visitedEntries ?: 0)
     val stats: SolveStats get() = SolveStats(openTheory = state.work.snapshot(), smt = state.smt.snapshot().copy(
         completeSearchStages = observations() + mapOf(

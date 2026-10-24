@@ -79,6 +79,8 @@ internal class SourceLpBudget(
         private set
     var measuredBoundCertificationWork: Long = 0L
         private set
+    var measuredConflictCertificationWork: Long = 0L
+        private set
 
     private var reported = SourceLpWorkStats()
 
@@ -88,12 +90,14 @@ internal class SourceLpBudget(
         continuation: Long = 0L,
         refinement: Long = 0L,
         boundCertification: Long = 0L,
+        conflictCertification: Long = 0L,
     ) {
         measuredPreparationWork += minOf(preparation, Long.MAX_VALUE - measuredPreparationWork)
         measuredFloatWork += minOf(floatWork, Long.MAX_VALUE - measuredFloatWork)
         measuredContinuationWork += minOf(continuation, Long.MAX_VALUE - measuredContinuationWork)
         measuredRefinementWork += minOf(refinement, Long.MAX_VALUE - measuredRefinementWork)
         measuredBoundCertificationWork += minOf(boundCertification, Long.MAX_VALUE - measuredBoundCertificationWork)
+        measuredConflictCertificationWork += minOf(conflictCertification, Long.MAX_VALUE - measuredConflictCertificationWork)
         if (activeStart == null) publish()
     }
 
@@ -108,6 +112,7 @@ internal class SourceLpBudget(
             measuredContinuationWork,
             measuredRefinementWork,
             measuredBoundCertificationWork,
+            measuredConflictCertificationWork,
         )
         val previous = reported
         reported = current
@@ -121,6 +126,7 @@ internal class SourceLpBudget(
             current.continuationWork - previous.continuationWork,
             current.refinementWork - previous.refinementWork,
             current.boundCertificationWork - previous.boundCertificationWork,
+            current.conflictCertificationWork - previous.conflictCertificationWork,
         )
         onWork(delta)
     }
