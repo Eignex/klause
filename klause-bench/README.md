@@ -893,6 +893,13 @@ adaptive request; its ceiling, cumulative governor and deadlines still apply.
 The report names the internal root policy explicitly. A missing point is neither
 an infeasibility proof nor evidence of a numerical failure.
 
+`query-session` uses only the retained node-query sequence, with no repeated
+standalone checked-root probes spending its containing allowance. Returned guides
+use the existing bound certifier and objective projection; the report marks the
+bound origin and the skipped standalone phase. Compare this sequence when judging
+the query policy's cost and deductions, keeping the paired modes' diagnostic work
+separate.
+
 ### CLI profile tables
 
 A lab `profileCli` case sets `KLAUSE_LAB_PROFILE_DIR`; after the subprocess timing

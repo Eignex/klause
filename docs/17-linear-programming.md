@@ -128,6 +128,9 @@ Its interruption policy can grow the adaptive request when a query makes pivots
 and stops on work before producing a point. Growth stays under the existing
 adaptive ceiling and remaining cumulative allowance; missing reasons, zero-pivot
 stops and numerical or infeasibility candidates supply no such feedback.
+Returned root guides can supply a recorded lower bound only through the existing
+certificate policy and the same objective projection used by the standalone root
+operation. Recording this bound supplies no additional pruning authority.
 Ordinary admission and node preparation use the shared adaptive allowance.
 
 ### Leaf completion
