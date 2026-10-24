@@ -1097,11 +1097,13 @@ Ordinary finite and source admission remain independent of this diagnostic polic
 
 Add `layout=compare` for identity and unconditional-equality layouts on the same
 hash-pinned requests and resource policy. `layout=equalities` selects the latter
-alone. Pairing changes emitted rows and support, not source inequalities or their
+alone. Comparison round zero warms up; round one reverses layout order. Pairing
+changes emitted rows and support, not source inequalities or their
 scope; guarded and pinned templates are excluded. Reports retain emitted shape,
 floating progress, factor fill, certificate work and the separate cost/outcome of
 lifting the bound through the existing native source-evidence verifier. This native
 source check remains separate from an independent MPS witness or proof check.
+Owner close time/allocation and final owner counts are recorded separately.
 
 ### CLI profile tables
 

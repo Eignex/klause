@@ -57,14 +57,17 @@ internal object MpsSparseRoot {
         require(requests.size in 1..16)
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         Reports.writeJson(out.resolve("build-provenance.json").path, InstalledBuild.reference)
-        requests.forEachIndexed { index, request ->
-            layouts.forEach { layout ->
-                inspect(request, out.resolve("$index/$layout").apply { mkdirs() }, layout)
+        val rounds = if (layouts.size == 1) listOf(1) else listOf(0, 1)
+        for (round in rounds) {
+            requests.forEachIndexed { index, request ->
+                for (layout in if (round == 0) layouts else layouts.reversed()) {
+                    inspect(request, out.resolve("$index/$round/$layout").apply { mkdirs() }, layout, round)
+                }
             }
         }
     }
 
-    private fun inspect(request: List<String>, out: File, layout: String) {
+    private fun inspect(request: List<String>, out: File, layout: String, round: Int) {
         val options = request.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.keys == setOf("suite", "problem", "sha256"))
         val selected = Catalog.uncapped(options.getValue("suite")).problems
@@ -132,6 +135,8 @@ internal object MpsSparseRoot {
         val report = buildJsonObject {
             put("revision", Reports.readGitSha())
             put("problem", options.getValue("problem"))
+            put("round", round)
+            put("warmup", round == 0)
             put("sourceSha256", sha256(bytes))
             put("sourceSemantics", source.semantics.declared.toString())
             put("sourceTolerance", source.semantics.effective.feasibilityTolerance.toString())
@@ -266,7 +271,14 @@ internal object MpsSparseRoot {
                 } while (call(guide, "getPaused") == true && !stop())
             }
         } finally {
+            val started = System.nanoTime()
+            val allocated = bean.getThreadAllocatedBytes(thread)
             (owner as AutoCloseable).close()
+            out.resolve("close.json").writeText(buildJsonObject {
+                put("elapsedNs", System.nanoTime() - started)
+                put("threadBytes", bean.getThreadAllocatedBytes(thread) - allocated)
+                put("ownerMetrics", NumericalResidualProfile.json(call(owner, "getMetrics")))
+            }.toString() + "\n")
         }
     }
 
