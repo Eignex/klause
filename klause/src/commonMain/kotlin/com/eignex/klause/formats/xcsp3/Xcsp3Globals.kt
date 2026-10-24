@@ -1188,7 +1188,6 @@ internal fun Compiler.Builder.allDifferent(e: XmlElement) {
     postAllDifferent(vars)
 }
 
-/** Post native distinctness; fewer than two positions impose no constraint. */
 internal fun Compiler.Builder.postAllDifferent(vars: IntArray) {
     if (vars.size >= 2) factors.add(AllDifferent(vars))
 }

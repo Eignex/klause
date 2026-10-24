@@ -1054,6 +1054,20 @@ the recorded witnesses against the original MiniZinc source.
 
 ## Design evidence
 
+### XCSP3 declared intension extrema
+
+[Lab 7973](https://lab.eignex.com/jobs/7973) compares `370fd2fd30` with `51a86c6f10`
+on Fischer and BlockedQueens: mixed/P1, 10 seconds, seeds 1/3, three repeats,
+debug enabled, no JFR, Mac/aarch64. All 24 cases remain UNKNOWN, without a witness
+claim to check. Source hashes, runtime, options and non-solver dependencies match.
+
+Fischer pre-bake integers fall from 41351 to 23584. Preparation takes
+1267–1353 ms versus 836–875 ms; CP node counts rise from 6825–18773 to
+13981–24993, and peak depth from 238–820 to 1024–1061. BlockedQueens retains
+its source shape and outcome. These diagnostics support declared output retention,
+reduced preparation cost and deeper search; they establish neither source recovery
+nor a universal solve speedup.
+
 ### XCSP3 count channel and output reuse
 
 [Lab 7972](https://lab.eignex.com/jobs/7972) compares `085ffb24a1` with `370fd2fd30`:
