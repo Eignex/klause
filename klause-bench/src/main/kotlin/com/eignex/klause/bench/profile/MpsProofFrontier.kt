@@ -118,6 +118,7 @@ internal object MpsProofFrontier {
             val snapshot = NumericalFrontierSnapshot(context, captureStop, scale)
             val frontier = snapshot.capture(invocation)
             val terminal = field(result, "terminal") as SourceEvidence?
+            val work = stats(invocation).smt.sourceLp
             Reports.writeJson(out.resolve("frontier.json").path, buildJsonObject {
                 put("revision", Reports.readGitSha())
                 put("suite", options.getValue("suite"))
@@ -148,6 +149,14 @@ internal object MpsProofFrontier {
                 put("frontier", frontier)
                 put("stages", buildJsonObject {
                     stats(invocation).smt.completeSearchStages.orEmpty().forEach { (key, value) -> put(key, value) }
+                })
+                put("sourceLp", buildJsonObject {
+                    put("operations", work.operations)
+                    put("activeNs", work.activeNs)
+                    put("preparationWork", work.preparationWork)
+                    put("floatWork", work.floatWork)
+                    put("continuationWork", work.continuationWork)
+                    put("refinementWork", work.refinementWork)
                 })
                 terminal?.let {
                     put("nativeTerminal", it.claim::class.simpleName)

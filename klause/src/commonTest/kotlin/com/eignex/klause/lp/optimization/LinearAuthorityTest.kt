@@ -33,6 +33,22 @@ class LinearAuthorityTest {
     )
 
     @Test
+    fun `fractional proposals should retain every eligible coordinate and floor negative values`() {
+        val other = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
+        val half = BigFraction.of(bigIntOf(1), bigIntOf(2))
+        val source = SourceProofContext(scope, setOf(integer, other), mapOf(
+            "first" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.MINUS_ONE), half)),
+            "second" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE), half.negated())),
+        ), mapOf(integer to BigFraction.ONE, other to BigFraction.ONE))
+
+        val result = LinearAuthority(SourceLpBudget()).check(source, Cancellation.Never)
+
+        assertEquals(listOf(integer to half.negated(), other to half), result.fractional)
+        assertEquals(integer to BigFraction.MINUS_ONE, result.split)
+        assertNull(result.evidence)
+    }
+
+    @Test
     fun `free real objective should have a checked improving ray`() {
         val source = SourceProofContext(scope, setOf(real), emptyMap(), mapOf(real to BigFraction.ONE))
 

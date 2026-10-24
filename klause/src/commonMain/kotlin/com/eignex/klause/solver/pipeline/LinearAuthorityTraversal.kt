@@ -6,6 +6,7 @@ import com.eignex.klause.lp.optimization.LinearApproach
 import com.eignex.klause.lp.optimization.LinearAuthority
 import com.eignex.klause.lp.optimization.LinearAuthorityResult
 import com.eignex.klause.lp.optimization.atScope
+import com.eignex.klause.lp.optimization.floorSplit
 import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
@@ -51,6 +52,7 @@ internal class LinearAuthorityTraversal(
         if (!shape.admitted) observe("numericalLpShapesOutsideDimensionGuard")
     }
     private val root = CoverageNode(source.scope.condition)
+    private val branchHistory = LinearBranchHistory()
     private val path = arrayListOf(0 to root)
     private val current: CoverageNode get() = path.last().second
     private val observations = linkedMapOf(
@@ -152,6 +154,12 @@ internal class LinearAuthorityTraversal(
             if (parent != null) {
                 val before = (parent.value as SourceValue.Rational).value
                 if (if (minimizes) after > before else after < before) observe("numericalChildBoundGains")
+                val parentNode = path.getOrNull(path.lastIndex - 1)?.second
+                val split = parentNode?.split as? CoverageSplit.Integer
+                split?.fractional?.let { candidate ->
+                    branchHistory.observe(candidate, current === split.below,
+                        if (minimizes) after - before else before - after)
+                }
             }
         }
         if (result.evidence != null || current.coveredBound != null) {
@@ -168,7 +176,10 @@ internal class LinearAuthorityTraversal(
         }
         if (current.coveredBound != null) return SearchNodeDisposition.Prune
         result.split?.let { (coordinate, threshold) ->
-            current.split = CoverageSplit.Integer(coordinate, threshold, current.condition)
+            val candidate = branchHistory.select(result.fractional, cancellation)
+            val selected = candidate?.floorSplit() ?: (coordinate to threshold)
+            if (selected != result.split) observe("numericalHistorySelections")
+            current.split = CoverageSplit.Integer(selected.first, selected.second, current.condition, candidate)
             splitCreated()
             observe("numericalFractionalSplits")
             return SearchNodeDisposition.Expand
@@ -290,7 +301,8 @@ private sealed class CoverageSplit(below: SourceCondition, above: SourceConditio
     val above = CoverageNode(above)
     class Boolean(val id: Int, condition: SourceCondition) : CoverageSplit(
         condition.pin(id, false), condition.pin(id, true))
-    class Integer(val coordinate: SourceCoordinate, val threshold: BigFraction, condition: SourceCondition) :
+    class Integer(val coordinate: SourceCoordinate, val threshold: BigFraction, condition: SourceCondition,
+        val fractional: Pair<SourceCoordinate, BigFraction>? = null) :
         CoverageSplit(condition.bound(coordinate, threshold, true),
             condition.bound(coordinate, threshold + BigFraction.ONE, false))
 }
