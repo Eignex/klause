@@ -46,7 +46,7 @@ internal object MpsLpAdmission {
     @JvmStatic
     fun main(args: Array<String>) {
         require(args.size in 1..2 && args[0].startsWith("batch64="))
-        require(args.size == 1 || args[1] == "queries=true")
+        require(args.size == 1 || args[1] in setOf("queries=true", "queries=checkpoint"))
         val requests = Json.decodeFromString<List<List<String>>>(
             Base64.getDecoder().decode(args[0].substringAfter('=')).decodeToString(),
         )
@@ -54,11 +54,11 @@ internal object MpsLpAdmission {
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         Reports.writeJson(out.resolve("build-provenance.json").path, InstalledBuild.reference)
         requests.forEachIndexed { index, request ->
-            inspect(request, out.resolve("$index").apply { mkdirs() }, args.size == 2)
+            inspect(request, out.resolve("$index").apply { mkdirs() }, args.getOrNull(1))
         }
     }
 
-    private fun inspect(request: List<String>, out: File, queries: Boolean) {
+    private fun inspect(request: List<String>, out: File, queries: String?) {
         val options = request.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.keys == setOf("suite", "problem", "sha256"))
         val source = Catalog.uncapped(options.getValue("suite")).problems
@@ -128,7 +128,10 @@ internal object MpsLpAdmission {
         }
         out.resolve("admission.json").writeText("$report\n")
         println(report)
-        if (queries) MpsLpQuery.measure(problem, checkNotNull(objective), out)
+        when (queries) {
+            "queries=true" -> MpsLpQuery.measure(problem, checkNotNull(objective), out)
+            "queries=checkpoint" -> MpsLpCheckpoint.measure(problem, checkNotNull(objective), out)
+        }
     }
 
     internal fun preparedObjective(plan: PreparedSourcePlan): LinearObjective? {
@@ -196,7 +199,7 @@ internal object MpsLpAdmission {
     }
 
     @Suppress("SpreadOperator") // Java reflection requires varargs at the constructor boundary.
-    private fun shape(problem: Problem, objective: LinearObjective?, cone: Boolean, stop: Cancellation): JsonObject {
+    internal fun rootRelaxation(problem: Problem, objective: LinearObjective?, cone: Boolean, stop: Cancellation): Any {
         check(!stop())
         // Reflection keeps diagnostic access to internal assembly out of the published API.
         val type = Class.forName("com.eignex.klause.lp.relaxation.CpToLpRelaxation")
@@ -215,7 +218,11 @@ internal object MpsLpAdmission {
         val domains = domainType.constructors.single().newInstance(problem)
         val build = type.methods.single { it.name == "build" && it.parameterCount == 3 &&
             it.parameterTypes[0].simpleName == "RelaxationDomains" }
-        val relaxation = build.invoke(relaxer, domains, emptyList<Any>(), stop)
+        return build.invoke(relaxer, domains, emptyList<Any>(), stop)
+    }
+
+    private fun shape(problem: Problem, objective: LinearObjective?, cone: Boolean, stop: Cancellation): JsonObject {
+        val relaxation = rootRelaxation(problem, objective, cone, stop)
         val model = get(relaxation, "Model")
         val rows = get(model, "M") as Int
         val columns = get(model, "N") as Int
