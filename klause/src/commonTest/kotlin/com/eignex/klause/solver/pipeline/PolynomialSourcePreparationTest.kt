@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.RealProduct
+import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
@@ -19,7 +19,7 @@ class PolynomialSourcePreparationTest {
             Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 1.0), LinearOp.EQ, 1.0),
             Linear(intArrayOf(), doubleArrayOf(), intArrayOf(1, 2), doubleArrayOf(1.0, 1.0), LinearOp.EQ, 2.0),
             Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 2), doubleArrayOf(1.0, -1.0), LinearOp.EQ, -1.0),
-            RealProduct(0, 0, 1, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY),
+            ContinuousProduct(0, 0, 1),
         ), numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
             realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
         val request = source.pipelineRequest()

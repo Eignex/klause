@@ -51,7 +51,9 @@ class DependentEqualitiesTest {
     @Test
     fun `pure real blocks should drop dependent equalities at exact fractional and wide scales`() {
         val refs = IntArray(3, Term::ofRealVar)
-        for (scale in listOf(BigFraction.ONE, BigFraction.of(bigIntOf(1), bigIntOf(3)), BigFraction.of(bigIntOf(1) shl 90, BIG_ONE))) {
+        val scales = listOf(BigFraction.ONE, BigFraction.of(bigIntOf(1), bigIntOf(3)),
+            BigFraction.of(bigIntOf(1) shl 90, BIG_ONE))
+        for (scale in scales) {
             val rows = listOf(
                 exact(refs.copyOfRange(0, 2), listOf(scale, scale), scale),
                 exact(refs.copyOfRange(1, 3), listOf(scale, scale), scale * BigFraction.ofLong(2)),
