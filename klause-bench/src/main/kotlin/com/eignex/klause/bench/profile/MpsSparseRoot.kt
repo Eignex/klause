@@ -227,13 +227,23 @@ internal object MpsSparseRoot {
         val owner = Class.forName(ENGINE + "LpScopedSolver").constructors.single { it.parameterCount == 9 }
             .newInstance(call(trail, "getState"), stop, context, 50, call(allowance, "getIterations"),
                 call(allowance, "getWork"), false, Int.MAX_VALUE, pricing)
-        val numericalOwner = checkNotNull(NumericalFrontierSnapshot.field(owner, "solver"))
-        call(numericalOwner, "enableProgressTrace")
         val limits = checkNotNull(call(policy, "getCertificate"))
         val advance = Class.forName(ENGINE + "LpRootGuidanceKt").methods.single {
             it.name == "advanceRootGuidance" && it.parameterCount == 7
         }
         try {
+            val preparationStarted = System.nanoTime()
+            val preparationBytes = bean.getThreadAllocatedBytes(thread)
+            val admitted = call(owner, "prepare", stop) == true
+            out.resolve("owner-preparation.json").writeText(buildJsonObject {
+                put("admitted", admitted)
+                put("elapsedNs", System.nanoTime() - preparationStarted)
+                put("threadBytes", bean.getThreadAllocatedBytes(thread) - preparationBytes)
+                put("ownerMetrics", NumericalResidualProfile.json(call(owner, "getMetrics")))
+            }.toString() + "\n")
+            if (!admitted) return
+            val numericalOwner = checkNotNull(NumericalFrontierSnapshot.field(owner, "solver"))
+            call(numericalOwner, "enableProgressTrace")
             out.resolve("guidance.jsonl").bufferedWriter().use { output ->
                 var iteration = 0
                 do {
