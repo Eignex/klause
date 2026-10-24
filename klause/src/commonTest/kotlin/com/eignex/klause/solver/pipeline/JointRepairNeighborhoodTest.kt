@@ -15,6 +15,23 @@ import kotlin.test.assertNull
 
 class JointRepairNeighborhoodTest {
     @Test
+    fun `an integer indicator should connect its trigger with the guarded residual`() {
+        val trigger = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val x = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
+        val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val source = SourceProofContext(SourceScope(SourceRevision("indicator", "exact")), setOf(trigger, x, real),
+            mapOf("guarded" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE, real to BigFraction.ONE),
+                BigFraction.ONE), emptyMap(), mapOf(trigger to BigFraction.ZERO))))
+        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 2, 1, Cancellation.Never))
+
+        val condition = repair.propose(List(3) { BigFraction.ZERO }, booleanArrayOf(), 2, 1,
+            BigFraction.ONE, null)
+
+        assertEquals(emptyMap(), condition.lower)
+        assertEquals(emptyMap(), condition.upper)
+    }
+
+    @Test
     fun `oversized coordinate indexes should decline before allocation`() {
         val source = SourceProofContext(SourceScope(SourceRevision("large", "exact")), emptySet(), emptyMap())
 

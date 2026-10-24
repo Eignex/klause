@@ -2097,6 +2097,16 @@ The finite control proves p0033 at 3089 but leaves gr4x6 at 229.05 after its
 allowance. This comparison supports preparation reuse with complete source
 coverage, alongside higher retained memory and no observed wall-time improvement;
 it does not measure the sparse bound-ordered consumer.
+Numerical `engine=ls|alns` selects joint integer/real repair. Compare
+`param.max-flips=1` for its initial fixed-discrete rounding with the ordinary
+candidate allowance, and retain automatic finite LS and LP/pumping controls at the
+same source hashes, revision and settings. `smtCompleteSearchStage_jointRepair*`
+counts root guidance, candidate queries, selected integer coordinates, connectivity
+and preparation work, compatible owner reuse, paused consultations and checked
+improvements. Incumbent trajectories measure accepted source objectives; independent
+witness validation still checks each retained final point separately. Neighborhood
+exhaustion supplies no global bound or refutation, and a guidance miss supplies no
+performance comparison with an admitted repair.
 
 The complete-worker [comparison 8067](https://lab.eignex.com/jobs/8067) freezes
 `6b3e0df4` after the work-accounting correction. It compares automatic finite,
