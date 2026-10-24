@@ -164,17 +164,24 @@ class TablePropagatorTest {
     @Test
     fun `interrupted delayed table reasons should withhold partial premises`() {
         val problem = Problem(
-            0, 2, Array(2) { IntDomain(0, 127) },
-            arrayOf<Factor>(Table(intArrayOf(0, 1), LongArray(256) { (it / 2).toLong() })),
+            0, 2, arrayOf(IntDomain(0, 127), IntDomain(0, 2)),
+            arrayOf<Factor>(Table(intArrayOf(0, 1), LongArray(256) { cell ->
+                val row = cell / 2
+                if (cell % 2 == 0) row.toLong() else when (row) {
+                    0 -> 0L
+                    127 -> 2L
+                    else -> 1L
+                }
+            })),
         )
         val state = PropagationState(problem, Assumptions.None)
         assertNull(state.runToFixpoint(allFactors = true))
         state.undoLogging = true
         state.levelToDecisionVar.add(0)
         state.currentLevel = 1
-        check(state.excludeIntValue(0, 1))
+        check(state.setInt(0, 0))
         assertNull(state.runToFixpoint(allFactors = false))
-        val reason = assertNotNull(state.holeReasonFor(1, 1))
+        val reason = assertNotNull(state.intMaxAntecedents[1])
         var polls = 0
         state.finiteWork.cancellation = Cancellation { ++polls >= 2 }
 

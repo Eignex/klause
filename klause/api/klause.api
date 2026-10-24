@@ -12986,6 +12986,7 @@ public final class com/eignex/klause/solver/pipeline/UnplaceableColumn {
 public final class com/eignex/klause/solver/pipeline/ValSelectorKind : java/lang/Enum {
 	public static final field Companion Lcom/eignex/klause/solver/pipeline/ValSelectorKind$Companion;
 	public static final field MAX Lcom/eignex/klause/solver/pipeline/ValSelectorKind;
+	public static final field MAX_SD Lcom/eignex/klause/solver/pipeline/ValSelectorKind;
 	public static final field MEDIAN Lcom/eignex/klause/solver/pipeline/ValSelectorKind;
 	public static final field MIDDLE Lcom/eignex/klause/solver/pipeline/ValSelectorKind;
 	public static final field MIN Lcom/eignex/klause/solver/pipeline/ValSelectorKind;
