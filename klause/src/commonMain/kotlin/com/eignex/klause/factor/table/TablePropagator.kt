@@ -78,7 +78,13 @@ internal class TablePropagator(
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         if (state.undoLogging) supportLoss(state, -1, state.undo.size) else collectHoleAndBoundAntecedents(state, xs)
 
-    override fun explain(state: PropagationState, factorId: Int, payload: IntArray, atTrail: Int, atLevel: Int): IntArray {
+    override fun explain(
+        state: PropagationState,
+        factorId: Int,
+        payload: IntArray,
+        atTrail: Int,
+        atLevel: Int,
+    ): IntArray {
         if (payload.size == 1) return supportLoss(state, payload[0], atTrail)
         val value = (payload[2].toLong() shl 32) or (payload[3].toLong() and 0xFFFFFFFFL)
         return groundSupportLoss(state, payload[0], payload[1], value, atTrail)
@@ -508,10 +514,14 @@ internal class TablePropagator(
             val maxSup = domLo[col] + lastSet
             if (minSup > state.intDomains[xs[col]].min &&
                 !state.tightenIntMin(xs[col], minSup, deductionReason(state, col, LOWER, minSup, ant) { coarse })
-            ) return false
+            ) {
+                return false
+            }
             if (maxSup < state.intDomains[xs[col]].max &&
                 !state.tightenIntMax(xs[col], maxSup, deductionReason(state, col, UPPER, maxSup, ant) { coarse })
-            ) return false
+            ) {
+                return false
+            }
             val d = state.intDomains[xs[col]]
             val colLo = domLo[col]
             val colHi = domHi[col]
@@ -595,11 +605,23 @@ internal class TablePropagator(
             // Every surviving tuple contributed to every column, so numValid > 0 leaves each column with
             // at least one supported value (minSup/maxSup are set).
             if (minSup[col] > state.intDomains[xs[col]].min &&
-                !state.tightenIntMin(xs[col], minSup[col], deductionReason(state, col, LOWER, minSup[col], ant) { coarse })
-            ) return false
+                !state.tightenIntMin(
+                    xs[col],
+                    minSup[col],
+                    deductionReason(state, col, LOWER, minSup[col], ant) { coarse },
+                )
+            ) {
+                return false
+            }
             if (maxSup[col] < state.intDomains[xs[col]].max &&
-                !state.tightenIntMax(xs[col], maxSup[col], deductionReason(state, col, UPPER, maxSup[col], ant) { coarse })
-            ) return false
+                !state.tightenIntMax(
+                    xs[col],
+                    maxSup[col],
+                    deductionReason(state, col, UPPER, maxSup[col], ant) { coarse },
+                )
+            ) {
+                return false
+            }
             val sup = supported[col]
             // A column too large to walk keeps its bounds tightening above; skip the per-value support
             // removal rather than walking the span. Sound: such a domain is never a full assignment, and
@@ -611,7 +633,12 @@ internal class TablePropagator(
                 }
                 for (k in 0 until toRemove.size) {
                     val value = toRemove[k]
-                    if (!state.excludeIntValue(xs[col], value, deductionReason(state, col, VALUE, value, ant) { coarse })) {
+                    if (!state.excludeIntValue(
+                            xs[col],
+                            value,
+                            deductionReason(state, col, VALUE, value, ant) { coarse },
+                        )
+                    ) {
                         return false
                     }
                 }
