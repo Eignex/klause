@@ -34,7 +34,7 @@ internal class TheoryCompletion(
         return when (result) {
             is ExactNeighborhoodResult.Witness -> Completion.Witness(result.sample, work)
             ExactNeighborhoodResult.Refuted -> Completion.Refuted(work = work)
-            ExactNeighborhoodResult.Undecided -> Completion.Undecided(work)
+            ExactNeighborhoodResult.Undecided, ExactNeighborhoodResult.Paused -> Completion.Undecided(work)
         }
     }
 
