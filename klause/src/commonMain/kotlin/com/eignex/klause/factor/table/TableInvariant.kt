@@ -284,9 +284,11 @@ internal fun tableBuildTupleMove(
 ): List<Move.IntSet>? {
     val parts = ArrayList<Move.IntSet>(arity)
     for (col in 0 until arity) {
+        state.checkScoringWork()
         val v = xs[col]
         var dup = false
         for (prev in 0 until col) {
+            state.checkScoringWork()
             if (xs[prev] == v) {
                 dup = true
                 break
@@ -299,6 +301,7 @@ internal fun tableBuildTupleMove(
         var lo = domain.min
         var upper = domain.max
         for (other in col until arity) {
+            state.checkScoringWork()
             if (xs[other] != v) continue
             lo = maxOf(lo, tableCellLo(tuples, arity, row, other))
             upper = minOf(upper, tableCellHi(tuples, hi, arity, row, other))
