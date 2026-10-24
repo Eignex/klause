@@ -150,7 +150,25 @@ Top-level `ne(dist(x,y),k)` with a constant integer `k` posts exact linear
 disequalities for the two signed differences, without materializing the distance.
 Zero needs one disequality; a negative distance is impossible, so its disequality
 imposes no constraint. Nested and reified distance expressions keep their arithmetic
-relation.
+relation. The equivalent top-level `ne(abs(sub(x,y)),k)` form uses the same rows.
+
+Complete connected groups of unconditional unit-coefficient affine disequalities
+can additionally retain collective distinctness, even when the source uses no
+global. Recognition checks every pair against exact offsets anchored at one
+variable. Ambiguous triangles and incomplete or inconsistent groups decline.
+It indexes at most 65,536 rows, 512 variables, 32,768 distinct labelled edges and
+eight labels per pair, and spends at most one million adjacency/label probes with
+cooperative cancellation. Exceeding collection limits discards the optional index;
+no source row is removed. Reified and soft constraint attributes are unsupported
+and rejected, including group templates.
+
+Each admitted signed-word-safe affine view has an exact equality channel and a
+functional definition hint. Native `AllDifferent` over these channels supplies
+matching/Hall propagation and explanations, and equality reasons carry bound
+deductions back to source variables. Channels use interval domains: interior holes
+in source domains do not transfer through linear equalities. This limits filtering
+strength without enlarging the enforced source relation. Recovery cancellation
+skips optional work while retaining the ordinary parsed constraints.
 
 `pow(base, exponent)` retains `Power` with a fixed nonnegative integer exponent;
 variable, negative and fractional exponents are unsupported. `div` and `mod`

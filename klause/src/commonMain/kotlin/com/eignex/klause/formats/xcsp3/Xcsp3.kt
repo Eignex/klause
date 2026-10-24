@@ -12,6 +12,7 @@ import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.ir.SourceSemanticsOwner
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.StringCharSource
 
@@ -42,21 +43,23 @@ data class Xcsp3Problem(
 
 /** XCSP3 integer format facade. */
 object Xcsp3 {
-    /** Decode and lower XCSP3 [text]. */
+    /** Decode and lower XCSP3 [text]; [recoveryCancellation] stops optional collective recovery. */
     fun parse(
         text: String,
         settings: ProblemSettings = KlauseConfig.current.problemSettings(),
         semanticOverrides: SemanticOverrides = SemanticOverrides(),
-    ): Xcsp3Problem = parse(StringCharSource(text), settings, semanticOverrides)
+        recoveryCancellation: Cancellation = Cancellation.Never,
+    ): Xcsp3Problem = parse(StringCharSource(text), settings, semanticOverrides, recoveryCancellation)
 
-    /** Decode and lower a streamed XCSP3 [source], retaining only bounded subtrees. */
+    /** Decode and lower a streamed XCSP3 [source]; [recoveryCancellation] stops optional collective recovery. */
     @Suppress("SwallowedException")
     fun parse(
         source: CharSource,
         settings: ProblemSettings = KlauseConfig.current.problemSettings(),
         semanticOverrides: SemanticOverrides = SemanticOverrides(),
+        recoveryCancellation: Cancellation = Cancellation.Never,
     ): Xcsp3Problem = try {
-        Compiler.Builder(settings, xcsp3Semantics.resolve(semanticOverrides)).run {
+        Compiler.Builder(settings, xcsp3Semantics.resolve(semanticOverrides), recoveryCancellation).run {
             val reader = XmlReader(source)
             reader.openRoot()
             // Single forward pass over `<instance>`'s children keeps the container order and tolerates
