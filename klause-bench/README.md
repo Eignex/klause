@@ -745,8 +745,10 @@ performance gain. Field/method incompatibility fails the diagnostic explicitly.
 query through its containing stop. Its `request64=<base64>` argument encodes up to
 18 `{suite, problem, sha256}` catalog identities, with at most 48 KiB of encoded
 request and 1 MiB per original source. It requires the frozen original hash before
-parsing and retains those bytes. Submit it as a `lab profile` without host or
-machine placement overrides.
+parsing and retains those bytes. Submit it as a Lab profile job without host or
+machine placement overrides. The Lab's documented `profile.runTimeoutSec` covers
+active setup, compilation, execution and cleanup; `base.timeout` supplies the
+separate command allowance.
 The measured child uses one active processor, Serial GC and a 3 GiB heap, retaining
 its command, streams, actual exit, installed CLI/harness/runtime hashes and options.
 
@@ -777,7 +779,10 @@ first regional entry. A missing progress field is unavailable. These scalar
 observations retain no uncommitted formula or partial reconstruction.
 
 Partial-state sign checking exposes exact check/conflict counts and numeric
-exclusion uses/reuses through the same progress record. A supported conflict
+exclusion uses/reuses through the same progress record. Retained sign-state
+observations also count system builds, extension checks and predicates submitted
+to checks. These counters accumulate actual attempts across search snapshots.
+A supported conflict
 observer retains the first completed conflict's full premise count and a preview
 of at most 16 predicates, each limited to 512 characters. Coordinate identifiers
 belong to the measured query. Formatting visits at most eight terms and eight
@@ -1157,6 +1162,38 @@ Separate [baseline](https://lab.eignex.com/jobs/7799) and
 expired-poll and return latency across linear and polynomial sources. Their small
 instrumented samples establish neither default CLI latency nor a general speedup.
 Polling frequency, parent predicate order and charge boundaries remain unchanged.
+
+### Polynomial numeric conflicts
+
+At `86bb866`, [raw diagnostics](https://lab.eignex.com/jobs/7906) retain two exact
+three-premise conflicts on late UNSAT controls with one, two or four unrelated
+Boolean pairs. Exclusion reuses grow 4/16/160 while issued regions fall from
+4/8/32 to zero. [Prepared diagnostics](https://lab.eignex.com/jobs/7907) retain
+five-premise conflicts including graph equations; no prefix reuse is observed
+after source preparation.
+
+Retaining feasible sign fixpoints removes repeated reconstruction during numeric
+extensions. Raw LassoRanker reaches its component witness with one build and 365
+extensions, spending 55,368,234 native units. Rebuilding each check stops at
+176,599,649 units without a region; the baseline without partial checks reaches
+the same 29 polynomials/1408 cells in 43,802,244 units. Prepared LassoRanker also
+reaches a region again. Component results establish no default source recovery,
+and arithmetic overhead remains relative to the baseline.
+
+[Run 7914](https://lab.eignex.com/jobs/7914) compares all three policies across
+15 sources and three repeats on Mac/aarch64, P1, seed 3, debug enabled and 10 seconds.
+All 135 native outcomes match; all 54 SAT witnesses pass Dolmen. The retained policy
+saves about 5–17% native work on UNSAT controls and adds about 1% on SAT controls.
+Sorting completes more CAD work than the rebuilding policy; all three originals
+remain UNKNOWN. Counters accumulate actual attempts, including discarded snapshots.
+
+[Regression 7919](https://lab.eignex.com/jobs/7919) preserves all 68 paired outcomes
+across core, heldout, original, mixed and Boolean sources. Each arm has 37 independently
+accepted SAT models, one unchecked DIMACS SAT and one power-syntax SAT the checker
+cannot parse. Native UNSAT has no independent certificate. Heldout Boolean UNSAT
+work falls 73,705→71,744 units; corresponding SAT work rises 76,978→77,278. Boolean
+equivalence refutation rises 76,620→77,539. These charged-work observations and
+single regression samples establish no uniform runtime speedup.
 
 ### State ownership
 
