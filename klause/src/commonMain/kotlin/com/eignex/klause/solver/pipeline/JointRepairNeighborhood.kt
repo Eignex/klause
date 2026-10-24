@@ -11,6 +11,7 @@ internal class JointRepairNeighborhood private constructor(
     private val integers: Int,
     private val rows: List<IntArray>,
     private val occurrences: Array<IntArray>,
+    val preparationEntries: Long,
 ) : ExactNeighborhoodProposal {
     private var seeds = (0 until integers).toList()
     var selectedIntegers: Long = 0
@@ -88,7 +89,8 @@ internal class JointRepairNeighborhood private constructor(
                 rows += columns.toIntArray()
             }
             return if (cancellation()) null else
-                JointRepairNeighborhood(integers, rows, Array(occurrences.size) { occurrences[it].toIntArray() })
+                JointRepairNeighborhood(integers, rows, Array(occurrences.size) { occurrences[it].toIntArray() },
+                    entries.toLong())
         }
     }
 }

@@ -41,11 +41,12 @@ internal class JointLinearRepair(
     val exhausted: Boolean get() = !state.work.hasAllowance() || state.work.acceptedChecks >= params.maxLeaves ||
         budget.operations >= SOURCE_OPERATION_LIMIT
     val work: Long get() = state.work.spent + budget.measuredPreparationWork + budget.measuredFloatWork +
-        budget.measuredContinuationWork
+        budget.measuredContinuationWork + (selection?.preparationEntries ?: 0) + (selection?.visitedEntries ?: 0)
     val stats: SolveStats get() = SolveStats(openTheory = state.work.snapshot(), smt = state.smt.snapshot().copy(
         completeSearchStages = observations() + mapOf(
             "jointRepairSelectedIntegers" to (selection?.selectedIntegers ?: 0),
             "jointRepairConnectivityVisits" to (selection?.visitedEntries ?: 0),
+            "jointRepairPreparationEntries" to (selection?.preparationEntries ?: 0),
             "jointRepairLpPreparations" to authority.preparations,
             "jointRepairLpReuses" to authority.reuses,
         )))
