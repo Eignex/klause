@@ -22,6 +22,30 @@ import kotlin.test.assertTrue
 
 class LocalSearchOperationTest {
     @Test
+    fun `interrupted compound scoring should restore completed primitive edits before returning`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            arrayOf<Factor>(Table(intArrayOf(0, 1), longArrayOf(0, 0, 1, 1))))
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        state.assignment.setInt(0, 0)
+        state.assignment.setInt(1, 0)
+        state.recompute()
+        state.weights.factorWeights[0] = 2.0
+        val before = state.assignment.snapshot()
+        val move = Move.Compound(listOf(Move.IntSet(0, 1), Move.IntSet(1, 1)))
+
+        val interrupted = state.scoringPick(Cancellation { state.assignment.intValue(0) == 1L }) {
+            state.weightedNetDelta(move)
+            move
+        }
+
+        assertNull(interrupted)
+        assertEquals(before, state.assignment.snapshot())
+        assertEquals(0L, state.cost)
+        assertEquals(2.0, state.weightedNetDelta(Move.IntSet(0, 1)))
+        assertEquals(0.0, state.weightedNetDelta(move))
+    }
+
+    @Test
     fun `interrupted relation scoring should preserve the assignment and subsequent exact scores`() {
         val length = 300
         val sequence = IntArray(length)
