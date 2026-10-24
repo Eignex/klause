@@ -651,7 +651,8 @@ internal class RevisedSimplex(
      * Both terms are the model's shape and the pivot path, never the solver's fill, so the meter reads
      * the same on a deployment that found an accelerated backend and one that did not.
      */
-    private fun chargeSolve() {
+    private fun chargeSolve(rhs: IndexedVector) {
+        if (rhs.count == 0) return
         work.add(nnzB.toLong() + (basisLifecycle.current?.updateCount ?: 0).toLong() * m)
     }
 
@@ -733,9 +734,9 @@ internal class RevisedSimplex(
         carrier: IndexedVector,
         boundUpdateFtran: Boolean = false,
     ): DoubleArray {
-        chargeSolve()
         requireFiniteRhs(b)
         carrier.scatter(b)
+        chargeSolve(carrier)
         val solver = solver()
         val before = operationWork(solver)
         solver.ftran(carrier, expectedDensity = 1.0)
@@ -753,9 +754,9 @@ internal class RevisedSimplex(
 
     /** `Bᵀ x = b` for a dense right-hand side, into [out] through [carrier]. */
     private fun btranDense(b: DoubleArray, out: DoubleArray, carrier: IndexedVector): DoubleArray {
-        chargeSolve()
         requireFiniteRhs(b)
         carrier.scatter(b)
+        chargeSolve(carrier)
         val solver = solver()
         val before = operationWork(solver)
         solver.btran(carrier, expectedDensity = 1.0)
@@ -771,8 +772,8 @@ internal class RevisedSimplex(
      * form it kept instead of solving again.
      */
     private fun spike(q: Int) {
-        chargeSolve()
         scatterColumn(q, spikeVec)
+        chargeSolve(spikeVec)
         val solver = solver()
         val before = operationWork(solver)
         solver.ftran(spikeVec, ftranDensity)
@@ -798,8 +799,8 @@ internal class RevisedSimplex(
 
     /** The pivotal row `ρ = eᵣᵀB⁻¹ = B⁻ᵀeᵣ` into [pivotEtaVec], likewise left as the solver filled it. */
     private fun pivotalRow(r: Int) {
-        chargeSolve()
         pivotEtaVec.unit(r)
+        chargeSolve(pivotEtaVec)
         val solver = solver()
         val before = operationWork(solver)
         solver.btran(pivotEtaVec, btranDensity)
