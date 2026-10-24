@@ -591,7 +591,7 @@ enum class PresolvePass(
         else -> true
     }
 
-    /** Independent semantic and multiplicity guarantees under the pass's protected objective. */
+    /** Semantic and multiplicity guarantees under a protected or exactly substituted objective. */
     val guarantees: TransformationGuarantees
         get() = when {
             preservesSolutionSet -> TransformationGuarantees.IDENTITY

@@ -14,6 +14,8 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
 import com.eignex.klause.solver.pipeline.FinitePipelineRequest
+import com.eignex.klause.solver.pipeline.FiniteSolveOutcome
+import com.eignex.klause.solver.pipeline.FiniteSolveVerdict
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.SourceAttachment
 import com.eignex.klause.solver.pipeline.SourceExecutionRequest
@@ -84,10 +86,15 @@ class AffineObjectiveTest {
                 invocation, presolveConfig = PresolveConfig.parse("affine"),
             )))
 
-            val optimum = assertIs<MinimizeResult.Optimal>(result.result.nativeSourceMinimum)
-            assertEquals(if (maximize) 13L else 7L, objective.evaluateLong(optimum.sample))
-            assertEquals(optimum.sample.intValue(1) + 1L, optimum.sample.intValue(0))
-            assertEquals(optimum.sample.intValue(2) + 1L, optimum.sample.intValue(1))
+            val optimum = assertIs<FiniteSolveOutcome.Completed>(result.result.outcome)
+            val sample = assertNotNull(optimum.bestSample)
+            assertEquals(FiniteSolveVerdict.OPTIMAL, optimum.verdict)
+            assertEquals(if (maximize) 13L else 7L, objective.evaluateLong(sample))
+            assertEquals(sample.intValue(1) + 1L, sample.intValue(0))
+            assertEquals(sample.intValue(2) + 1L, sample.intValue(1))
+            val plan = assertNotNull(result.result.preparation.executionPlan)
+            assertEquals(objective, plan.objective)
+            assertEquals(maximize, plan.maximize)
         }
     }
 

@@ -91,7 +91,7 @@ data class PresolveContext(
         /** Context for pure feasibility. */
         val EMPTY = PresolveContext()
 
-        /** Build a context which protects the objective's nonzero coefficients. */
+        /** Capture nonzero coefficients, optionally admitting exact objective substitution. */
         fun of(
             objective: LinearObjective?,
             solutionSetSensitive: Boolean = false,
