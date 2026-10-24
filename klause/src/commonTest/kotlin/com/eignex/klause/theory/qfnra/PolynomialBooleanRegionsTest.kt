@@ -66,6 +66,7 @@ class PolynomialBooleanRegionsTest {
         for ((smaller, larger) in work.zipWithNext()) {
             assertTrue(larger <= 2 * smaller + 32, "first region work: $work")
         }
+        assertTrue(work.last() < 10_000, "first region work: $work")
     }
 
     @Test
