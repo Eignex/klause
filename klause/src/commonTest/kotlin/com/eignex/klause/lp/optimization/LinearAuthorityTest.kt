@@ -379,6 +379,7 @@ class LinearAuthorityTest {
         }
 
         assertEquals(1L, result.primalStages["PrimalRecoveryResidual"])
+        assertEquals(1L, result.primalStages["PrimalRecoverySourceRejected"])
         assertNull(result.incumbent)
         assertNull(result.evidence)
     }
