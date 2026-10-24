@@ -25,8 +25,11 @@ internal object ExtensionalCompositionProfile {
     fun main(args: Array<String>) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.keys == setOf("suite", "problem", "sha256"))
-        val reference = Catalog.uncapped(options.getValue("suite")).problems.single { it.name == options.getValue("problem") }
-        val bytes = CorpusFiles.open(CorpusFetcher.resolve(reference.source)).use { it.readNBytes(64 * 1024 * 1024 + 1) }
+        val reference = Catalog.uncapped(options.getValue("suite")).problems
+            .single { it.name == options.getValue("problem") }
+        val bytes = CorpusFiles.open(CorpusFetcher.resolve(reference.source)).use {
+            it.readNBytes(64 * 1024 * 1024 + 1)
+        }
         require(bytes.size <= 64 * 1024 * 1024 && sha256(bytes) == options.getValue("sha256"))
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
@@ -37,12 +40,13 @@ internal object ExtensionalCompositionProfile {
         val diagrams = problem.factors.filterIsInstance<Mdd>()
         val shapes = buildJsonObject {
             put("tables", buildJsonArray {
-                tables.groupingBy { "${it.arity}/${it.numTuples}/${it.hi != null}" }.eachCount().forEach { (shape, count) ->
-                    add(buildJsonObject { put("arity/rows/intervals", shape); put("count", count) })
-                }
+                tables.groupingBy { "${it.arity}/${it.numTuples}/${it.hi != null}" }.eachCount()
+                    .forEach { (shape, count) ->
+                        add(buildJsonObject { put("arity/rows/intervals", shape); put("count", count) })
+                    }
             })
             put("diagrams", buildJsonArray {
-                diagrams.groupingBy { "${it.seq.size}/${it.numStatesPerLayer.sum()}/${it.transitions.size / it.recordStride}" }
+                diagrams.groupingBy { diagramShape(it) }
                     .eachCount().forEach { (shape, count) ->
                         add(buildJsonObject { put("arity/states/records", shape); put("count", count) })
                     }
@@ -64,7 +68,7 @@ internal object ExtensionalCompositionProfile {
         diagrams.firstOrNull()?.let { diagram ->
             val overlaps = tables.filter { table -> diagram.seq.count { it in table.xs } >= 2 }
             for ((index, table) in overlaps.withIndex()) samples["overlap-$index"] = arrayOf<Factor>(diagram, table)
-            samples["one-diagram"] = arrayOf<Factor>(diagram, *overlaps.toTypedArray())
+            samples["one-diagram"] = (listOf<Factor>(diagram) + overlaps).toTypedArray()
         }
         out.resolve("composition.jsonl").bufferedWriter().use { writer ->
             for ((name, factors) in samples) repeat(3) { iteration ->
@@ -92,7 +96,8 @@ internal object ExtensionalCompositionProfile {
                     put("allocatedBytes", allocated)
                     put("replaced", delta.droppedIndices.size)
                     put("infeasible", delta.infeasible)
-                    put("mddRecords", delta.addedFactors.filterIsInstance<Mdd>().sumOf { it.transitions.size / it.recordStride })
+                    put("mddRecords", delta.addedFactors.filterIsInstance<Mdd>()
+                        .sumOf { it.transitions.size / it.recordStride })
                     put("sourceVerdictClaim", false)
                 }
                 writer.appendLine(row.toString())
@@ -101,4 +106,7 @@ internal object ExtensionalCompositionProfile {
             }
         }
     }
+
+    private fun diagramShape(mdd: Mdd): String =
+        "${mdd.seq.size}/${mdd.numStatesPerLayer.sum()}/${mdd.transitions.size / mdd.recordStride}"
 }

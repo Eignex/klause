@@ -9024,6 +9024,8 @@ public final class com/eignex/klause/presolve/Presolve {
 	public static synthetic fun breakSymmetries$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/propagation/BakedProblem;Ljava/util/Set;Ljava/util/Set;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PassDelta;
 	public final fun breakValuePrecedence (Lcom/eignex/klause/propagation/BakedProblem;Ljava/util/Set;)Lcom/eignex/klause/presolve/PassDelta;
 	public static synthetic fun breakValuePrecedence$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/propagation/BakedProblem;Ljava/util/Set;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PassDelta;
+	public final fun composeExtensional (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/presolve/PassDelta;
+	public static synthetic fun composeExtensional$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PassDelta;
 	public final fun deriveXorUnits (Lcom/eignex/klause/propagation/BakedProblem;)Lcom/eignex/klause/presolve/PassDelta;
 	public final fun eliminateAffineSingletons (Lcom/eignex/klause/propagation/BakedProblem;Ljava/util/Set;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/SharedIntOccurrence;Z[ILcom/eignex/klause/presolve/AffinePivotOrder;Lcom/eignex/klause/solver/objective/LinearObjective;)Lcom/eignex/klause/presolve/PassDelta;
 	public static synthetic fun eliminateAffineSingletons$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/propagation/BakedProblem;Ljava/util/Set;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/SharedIntOccurrence;Z[ILcom/eignex/klause/presolve/AffinePivotOrder;Lcom/eignex/klause/solver/objective/LinearObjective;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PassDelta;
@@ -9199,6 +9201,7 @@ public final class com/eignex/klause/presolve/PresolveOutcome {
 public class com/eignex/klause/presolve/PresolvePass : java/lang/Enum {
 	public static final field AGGREGATE_SUB_SUMS Lcom/eignex/klause/presolve/PresolvePass;
 	public static final field BREAK_SYMMETRIES Lcom/eignex/klause/presolve/PresolvePass;
+	public static final field COMPOSE_EXTENSIONAL Lcom/eignex/klause/presolve/PresolvePass;
 	public static final field Companion Lcom/eignex/klause/presolve/PresolvePass$Companion;
 	public static final field DERIVE_XOR_UNITS Lcom/eignex/klause/presolve/PresolvePass;
 	public static final field DROP_DEPENDENT_EQUALITIES Lcom/eignex/klause/presolve/PresolvePass;

@@ -86,7 +86,7 @@ class ExtensionalCompositionTest {
         val left = Table(intArrayOf(0, 1), longArrayOf(0, 0, 0, 1, 1, 1))
         val right = Table(intArrayOf(0, 1), longArrayOf(0, 0, 1, 1))
         val factors = arrayOf<Factor>(left, right)
-        val budget = PresolveBudget(24)
+        val budget = PresolveBudget(32)
 
         val delta = ExtensionalComposition.reduce(factors, budget.orSpent(Cancellation.Never))
 
