@@ -288,6 +288,15 @@ projection uses the general CP lane. AllDifferent tries its cached incremental p
 before full matching. Assignment-dependent payloads such as live tuples and diagram
 reachability stay state-owned.
 
+Unguarded affine integer Distinct projects unit operands onto a shared value graph
+without adding finite coordinates. Exact offsets identify values; a compact
+translated universe uses signed words when its width fits, otherwise value keys
+remain arbitrary precision. Matching and SCC filtering remove source values directly.
+Large domains use translated Hall bounds when representable, with exact fixed-value
+filtering otherwise. Reasons retain source positions and reconstruct bounds and
+holes at the deduction trail position. Domain snapshots and matching seeds belong
+to each propagation state; changed or restored domains invalidate the snapshot.
+
 Ground Tables with at least 128 rows and an admitted support index keep a reversible
 tuple bitmap beside the STR2 prefix. Immutable domain baselines identify changed
 columns; sparse postings and dense masks union the newly excluded values' rows

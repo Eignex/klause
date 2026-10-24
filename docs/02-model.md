@@ -214,7 +214,9 @@ objective normalization.
 `factor.global.Distinct` retains exact affine operands over integer, Boolean and
 real coordinates with arbitrary-width rational coefficients. An optional activator
 is equivalent to the whole relation, so a false activator requires a collision.
-Finite propagation checks pinned operands; local search grades collisions exactly
+Unguarded unit integer operands `x + c` use original-coordinate matching/Hall
+filtering with exact integer offsets and historical source bound/hole reasons.
+Other finite operands and reified relations retain pinned checking. Local search grades collisions exactly
 over finite points, while real-coordinate scores are binary64 heuristics.
 Distinctness supplies no numerical relaxation. Linear encoders expand it into exact
 pairwise comparisons, and polynomial encoders defer the expansion to query
