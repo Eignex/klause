@@ -524,6 +524,10 @@ internal object Compiler {
         internal fun intension(expr: String) = intension(FExpr.parse(expr))
 
         internal fun intension(node: FExpr) {
+            if (node is FExpr.Call && node.fn == "ne" && node.args.size == 2 &&
+                (postDistanceDisequality(node.args[0], node.args[1]) ||
+                    postDistanceDisequality(node.args[1], node.args[0]))
+            ) return
             if (node is FExpr.Call && node.fn == "eq" && node.args.size == 2) {
                 // A direct Product keeps its declared output in the maintained definition cone.
                 (directProduct(node.args[0], node.args[1]) ?: directProduct(node.args[1], node.args[0]))
@@ -554,6 +558,21 @@ internal object Compiler {
                 val cc = tryComparisonClause(node)
                 if (cc != null) factors.add(cc) else factors.add(Clause(intArrayOf(compileBool(node))))
             }
+        }
+
+        private fun postDistanceDisequality(distance: FExpr, constant: FExpr): Boolean {
+            if (distance !is FExpr.Call || distance.fn != "dist" || distance.args.size != 2 ||
+                constant !is FExpr.Num
+            ) return false
+            val arguments = distance.args.map { linear(it) }
+            if (constant.value < 0) return true
+            val difference = sumIntCombs(arguments, negateTail = true)
+            val bound = IntComb.Narrow(LinComb(emptyMap(), constant.value.toLong()))
+            postRel(RelParts(intCombDiff(difference, bound, 0L), LinearOp.NE))
+            if (constant.value > 0) {
+                postRel(RelParts(intCombDiff(scaleIntComb(difference, -1L), bound, 0L), LinearOp.NE))
+            }
+            return true
         }
 
         /** Post a lowered relation as a top-level factor: a [Linear] when it carries variable terms, else a

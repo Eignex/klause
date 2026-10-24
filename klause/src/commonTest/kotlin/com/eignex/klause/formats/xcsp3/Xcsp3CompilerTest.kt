@@ -16,6 +16,73 @@ import kotlin.test.assertTrue
 
 class Xcsp3CompilerTest {
     @Test
+    fun `constant distance disequalities should preserve every source pair`() {
+        for (constant in listOf(-1, 0, 1, 2)) {
+            for (expression in listOf("ne(dist(x,y),$constant)", "ne($constant,dist(y,x))")) {
+                val parsed = Xcsp3.parse(
+                    """<instance><variables><var id="x">-1..1</var><var id="y">-1..1</var>
+                        </variables><constraints><intension>$expression</intension></constraints></instance>""",
+                )
+
+                val actual = BruteForceSolver(parsed.problem.bake()).enumerate(BruteForceParams(randomSeed = 0L))
+                    .map { it.ints.toList() }.toSet()
+                val expected = (-1L..1L).flatMap { x ->
+                    (-1L..1L).filter { y -> kotlin.math.abs(x - y) != constant.toLong() }.map { y -> listOf(x, y) }
+                }.toSet()
+
+                assertEquals(expected, actual, expression)
+            }
+        }
+    }
+
+    @Test
+    fun `top level distance disequalities should retain only exact linear rows`() {
+        for ((constant, rows) in listOf(-1 to 0, 0 to 1, 1 to 2)) {
+            val parsed = Xcsp3.parse(
+                """<instance><variables><var id="x">0..56</var><var id="y">0..56</var>
+                    </variables><constraints><intension>ne(dist(x,y),$constant)</intension>
+                    </constraints></instance>""",
+            )
+
+            assertEquals(2, parsed.problem.numIntVars)
+            assertEquals(0, parsed.problem.numBoolVars)
+            assertEquals(rows, parsed.problem.factors.size)
+            assertTrue(parsed.problem.factors.all { it is Linear && it.op == LinearOp.NE })
+        }
+    }
+
+    @Test
+    fun `negative distance disequalities should still validate arithmetic operands`() {
+        assertFailsWith<UnsupportedXcsp3Exception> {
+            Xcsp3.parse(
+                """<instance><variables><var id="x">0..1</var><var id="y">0..1</var>
+                    </variables><constraints><intension>ne(dist(div(x,0),y),-1)</intension>
+                    </constraints></instance>""",
+            )
+        }
+    }
+
+    @Test
+    fun `distance disequalities should preserve exact signed word boundary comparisons`() {
+        for ((x, y, constant, feasible) in listOf(
+            listOf(Long.MIN_VALUE, Long.MAX_VALUE, 1L, 1L),
+            listOf(Long.MIN_VALUE, Long.MIN_VALUE + 1, 1L, 0L),
+            listOf(Long.MAX_VALUE, Long.MAX_VALUE, 0L, 0L),
+            listOf(Long.MAX_VALUE, Long.MIN_VALUE, Int.MAX_VALUE.toLong(), 1L),
+        )) {
+            val parsed = Xcsp3.parse(
+                """<instance><variables><var id="x">$x</var><var id="y">$y</var>
+                    </variables><constraints><intension>ne(dist(x,y),$constant)</intension>
+                    </constraints></instance>""",
+            )
+
+            val actual = BruteForceSolver(parsed.problem.bake()).enumerate(BruteForceParams(randomSeed = 0L)).toList()
+
+            assertEquals(feasible.toInt(), actual.size)
+        }
+    }
+
+    @Test
     fun `n-ary equality implications should preserve every source truth value`() {
         for ((constraint, roles) in listOf(
             "<intension>imp(eq(x[0],x[1],x[2]),ne(x[0],x[3]))</intension>" to listOf(0, 1, 2, 3),

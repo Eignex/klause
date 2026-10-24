@@ -148,6 +148,12 @@ references need. Source factors remain the authority for every constraint.
 
 ### Arithmetic relations
 
+Top-level `ne(dist(x,y),k)` with a constant integer `k` posts exact linear
+disequalities for the two signed differences, without materializing the distance.
+Zero needs one disequality; a negative distance is impossible, so its disequality
+imposes no constraint. Nested and reified distance expressions keep their arithmetic
+relation.
+
 `pow(base, exponent)` retains `Power` with a fixed nonnegative integer exponent;
 variable, negative and fractional exponents are unsupported. `div` and `mod`
 retain a shared truncating `DivMod`: nonzero signed-word constants are admitted,
