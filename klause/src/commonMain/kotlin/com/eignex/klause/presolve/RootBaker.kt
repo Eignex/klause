@@ -15,6 +15,7 @@ import com.eignex.klause.solver.result.PresolveLane
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongHashSet
+import com.eignex.klause.util.binarySearchInt
 import kotlin.random.Random
 
 /**
@@ -168,7 +169,7 @@ object RootBaker {
         }
         for (i in result.intSetKeys.indices) {
             val v = result.intSetKeys[i]
-            val previous = base.intSetKeys.binarySearch(v)
+            val previous = base.intSetKeys.binarySearchInt(v)
             val size = result.intSetOffsets[i + 1] - result.intSetOffsets[i]
             if (previous < 0 || size < base.intSetOffsets[previous + 1] - base.intSetOffsets[previous]) narrowed.add(v)
         }
