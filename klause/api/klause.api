@@ -14129,6 +14129,9 @@ public final class com/eignex/klause/solver/result/PresolvePreparationStage : ja
 	public static final field REAL_DIFFERENCE Lcom/eignex/klause/solver/result/PresolvePreparationStage;
 	public static final field ROOT_BAKE Lcom/eignex/klause/solver/result/PresolvePreparationStage;
 	public static final field SOURCE_ENCODER Lcom/eignex/klause/solver/result/PresolvePreparationStage;
+	public static final field SOURCE_OWNERSHIP Lcom/eignex/klause/solver/result/PresolvePreparationStage;
+	public static final field SOURCE_ROWS Lcom/eignex/klause/solver/result/PresolvePreparationStage;
+	public static final field SOURCE_SELECTION Lcom/eignex/klause/solver/result/PresolvePreparationStage;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/solver/result/PresolvePreparationStage;
 	public static fun values ()[Lcom/eignex/klause/solver/result/PresolvePreparationStage;

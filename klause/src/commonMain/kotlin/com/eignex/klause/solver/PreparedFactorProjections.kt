@@ -32,7 +32,8 @@ import com.eignex.klause.util.Cancellation
 
 /**
  * Immutable source-associated mechanism selection. Factories are retained, never mutable workspaces;
- * each engine opens its own projections. A source rewrite requires a fresh selection.
+ * each engine opens its own projections. Rewrites require a new binding; checked source deletions
+ * can retain descriptors through their explicit factor mapping.
  */
 class PreparedFactorProjections internal constructor(
     /** Canonical model whose factor indices these selections describe. */

@@ -319,7 +319,10 @@ class ComponentPlan internal constructor(
         source === spec && factorProjections === projections && hasTheoryComponent &&
             encodingDecline != EncoderDecline.RESOURCE
 
-    internal fun retainedEncoding(mapping: RetainedFactors, projections: PreparedFactorProjections?): RetainedLinearEncoding? =
+    internal fun retainedEncoding(
+        mapping: RetainedFactors,
+        projections: PreparedFactorProjections?,
+    ): RetainedLinearEncoding? =
         if (source === mapping.source && factorProjections === projections &&
             projections?.providers === FactorProjectionProviders.Default && encodingDecline == null &&
             hasTheoryComponent && installedFragment != null
@@ -405,8 +408,9 @@ internal fun Problem.buildComponentPlan(
     fun install(target: EncodingTarget, indices: List<Int>, onDecline: (EncoderDecline) -> Unit): Problem? =
         preparationBudget.observePreparation(PresolvePreparationStage.SOURCE_ROWS, PresolveLane.SOURCE, this, stop) {
                 token, _ ->
-            retained?.model(target, indices, token) ?: projections.requestEncoders(target, indices, cancellation = token,
-                completeFiniteConditions = true, onDecline = onDecline)?.let {
+            retained?.model(target, indices, token) ?: projections.requestEncoders(
+                target, indices, cancellation = token, completeFiniteConditions = true, onDecline = onDecline,
+            )?.let {
                 projections.linearTheoryModel(it, onDecline)
             }
         }

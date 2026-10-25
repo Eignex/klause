@@ -2045,6 +2045,13 @@ retain bounded metered probe polling with exact visit charges and transactional
 retraction; see [source preparation](../docs/07-presolve.md#source-routing-and-encoder-selection)
 and [probing](../docs/07-presolve.md#symmetry-and-probing).
 
+Certified source deletions can retain immutable built-in encoder rows while
+rebuilding ownership. `SOURCE_SELECTION`, `SOURCE_ROWS` and `SOURCE_OWNERSHIP`
+separate descriptor/mapping, row preparation and ownership/admission costs. These
+observations are exclusive children of `SOURCE_ENCODER`: sum all four for a
+complete replan, and compare whole preparation and CLI time too. Unchanged-plan
+reuse stays in `SOURCE_ENCODER`; frontend routing captures initial planning.
+
 [Lab 7712](https://lab.eignex.com/jobs/7712) compares the merged plan-reuse baseline
 `9f40a0678c` with probe polling at `3008350cf1`: six original SMT sources, seed 3,
 three repeats, one core and 10 s. All 36 cases finished. Every same-host pair matches
