@@ -813,11 +813,13 @@ private fun reconstructBoundVector(
         meter.step()
         val floating = value.toDouble()
         val part = reconstructRational(floating, maxDenominator = limit,
-            tolerance = 1e-9 * maxOf(1.0, kotlin.math.abs(floating)), onStep = { meter.step() }) ?: run {
+            tolerance = 1e-9 * maxOf(1.0, kotlin.math.abs(floating)), onStep = { meter.step() })
+        if (part == null) {
             meter.entryRejection = ReconstructionEntryRejection(row, value)
-            return null
+            reconstructExactVector(listOf(value), denominator, meter)?.single() ?: return null
+        } else {
+            meter.fraction(BigFraction.of(bigIntOf(part.numerator), bigIntOf(part.denominator)))
         }
-        meter.fraction(BigFraction.of(bigIntOf(part.numerator), bigIntOf(part.denominator)))
     }
 }
 
