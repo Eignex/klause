@@ -313,8 +313,15 @@ internal class LinearAuthority(
                     point = recovered
                     observePrimal("PrimalRecoverySourceChecked")
                     val attempt = checkNotNull(primalAttempt)
-                    if (!attempt.refinementFinished) {
-                        attempt.refined = lp.refine(coordinates, checkNotNull(recovered), rows, prepared.inactive,
+                    val accepted = checkNotNull(recovered)
+                    val attained = (bound?.claim as? SourceClaim.Bound)?.value?.let { limit ->
+                        val value = (accepted.indices.fold(constant) { total, id ->
+                            total + costs[id] * accepted[id]
+                        }) * sign
+                        limit == SourceValue.Rational(value)
+                    } == true
+                    if (!attained && !attempt.refinementFinished) {
+                        attempt.refined = lp.refine(coordinates, accepted, rows, prepared.inactive,
                             costs, cancellation, ::observePrimal)
                         attempt.refinementFinished = budget.funding?.paused != true && !cancellation()
                     }
