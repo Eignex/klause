@@ -12,6 +12,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 
@@ -45,8 +46,8 @@ import com.eignex.klause.util.LongArrayList
  * Other factor kinds read their integer variables value-wise (a global, a general reified
  * row, a product), so a column they mention stays an integer column.
  *
- * A column the objective reads is never substituted: the objective names integer variable ids directly
- * and the engine optimises over the presolved problem, so substituting one would silently rewrite it.
+ * An exact binary objective can use [BinaryObjectiveView] before substitution. Other objective columns
+ * remain protected, since their costs still address integer coordinates.
  *
  * The substituted column is left mentioned by no factor and **pinned** to 0, rather than left free over
  * `{0, 1}`: search would otherwise branch over a column that constrains nothing, one extra decision per
@@ -60,7 +61,12 @@ internal object BinaryColumnSubstitution {
 
     /** The transformed [problem], its typed [rebuild] into the input's variable space, and the number of
      *  [columns] substituted. [reconstruct] adapts the rebuild to finite samples. */
-    class Substitution(val problem: BakedProblem, val rebuild: SourceRebuilds, val columns: Int) {
+    class Substitution(
+        val problem: BakedProblem,
+        val rebuild: SourceRebuilds,
+        val columns: Int,
+        val objective: LinearObjective? = null,
+    ) {
         val reconstruct: (Sample) -> Sample = checkNotNull(rebuild.asSampleLift())
     }
 
@@ -70,7 +76,23 @@ internal object BinaryColumnSubstitution {
      * [objectiveIntVars] are held back. [bakeConfig] is threaded into the rebuild so the root-bake probing
      * policy is re-derived over the rewritten factor set.
      */
-    fun substitute(problem: BakedProblem, objectiveIntVars: Set<Int>, bakeConfig: BakeConfig): Substitution? {
+    fun substitute(
+        problem: BakedProblem,
+        objectiveIntVars: Set<Int>,
+        bakeConfig: BakeConfig,
+        objective: LinearObjective? = null,
+    ): Substitution? {
+        val view = objective?.let { BinaryObjectiveView.create(problem, it) }
+        if (view == null) return substituteColumns(problem, objectiveIntVars, bakeConfig)
+        val viewed = PresolveShared.rebuildProblem(
+            problem, view.factors, bakeConfig = bakeConfig, numBoolVars = view.numBoolVars,
+        )
+        val substituted = substituteColumns(viewed, emptySet(), bakeConfig)
+        val rebuild = SourceRebuilds(substituted?.rebuild?.steps.orEmpty(), sourceBoolVars = problem.numBoolVars)
+        return Substitution(substituted?.problem ?: viewed, rebuild, substituted?.columns ?: 0, view.objective)
+    }
+
+    private fun substituteColumns(problem: BakedProblem, objectiveIntVars: Set<Int>, bakeConfig: BakeConfig): Substitution? {
         val numInts = problem.numIntVars
         val factors = problem.factors
         val ranges = ColumnRanges.of(problem.rootIntDomainsInPlace)
@@ -172,21 +194,6 @@ internal object BinaryColumnSubstitution {
         val occurrence = intOccurrence(factors, numIntVars)
         disqualifyToFixpoint(factors, substitutable, normalizedBound, occurrence)
         return Eligibility(substitutable, rows, channels, normalizedBound, occurrence)
-    }
-
-    private fun Factor.binaryChannelLiteral(): Int {
-        val channel = this as? ReifiedLinear ?: return Lit.NONE
-        val row = channel.integerConstants ?: return Lit.NONE
-        if (channel.vars.size != 1) return Lit.NONE
-        fun holds(value: Long): Boolean = when (channel.op) {
-            LinearOp.LE -> value <= row.bound
-            LinearOp.GE -> value >= row.bound
-            LinearOp.EQ -> value == row.bound
-            LinearOp.NE -> value != row.bound
-        }
-        val atZero = holds(0L)
-        val atOne = holds(row.coeff(0))
-        return if (atZero == atOne) Lit.NONE else Lit.make(channel.auxBoolVar, atOne)
     }
 
     /** Clear [substitutable] for every column a factor this cannot rewrite mentions, and — to a fixpoint —

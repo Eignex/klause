@@ -75,7 +75,15 @@ import com.eignex.klause.solver.search.completedSearchSample
 import com.eignex.klause.solver.validation.composedFixpoint
 import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.solver.withSourceSemantics
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.fitsLong
+import com.eignex.klause.util.minus
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.toLongExact
 import com.eignex.klause.util.cancelledWhen
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.ComparableTimeMark
@@ -218,7 +226,7 @@ internal class ResumableMinimize(
     private val externalShared = params.objectiveBoundSupplier != null
     private var lastExternalCutoff = Double.POSITIVE_INFINITY
     private var lastObjBoundAsserted: Long? = null
-    private var lastBoolCutoffRhs: Long? = null
+    private var lastBoolCutoffRhs: BigInt? = null
     private var lastOpenCutoff: Long? = null
 
     private fun externalCutoff(): Double {
@@ -835,27 +843,32 @@ internal class ResumableMinimize(
      * closes it). Fired at the root on each restart, re-posting only when the incumbent improved. The
      * cutoff normalizes to `Σ |w_b|·ℓ_b ≥ degree` with `ℓ_b = x_b` when `w_b < 0` else `¬x_b`,
      * `degree = Σ_{w_b>0} w_b − (bestObj − constant − 1)`. Returns true iff it empties the root
-     * (optimum proven). Integer/mixed objectives keep the objective-variable path above.
+     * (optimum proven). Integer constraints are independent of this Boolean cost view.
      */
     private fun postBoolObjectiveCutoffAtRoot(): Boolean {
-        if (!params.pbObjectiveCutoff || problem.numIntVars > 0 || !bestObj.isFinite()) return false
-        val bestLong = bestObj.toLong()
-        if (bestLong.toDouble() != bestObj) return false // non-integral incumbent: no exact integer cutoff
-        val cutoffRhs = bestLong - objective.constant - 1 // Σ w_b·x_b must be ≤ this to beat the incumbent
+        if (!params.pbObjectiveCutoff || problem.numRealVars > 0 ||
+            objective.intCoefficientValues.any { it != 0L } || objective.realCoefficientValues.any { it != 0.0 }
+        ) return false
+        val best = incumbents.current()?.objective?.exact ?: return false
+        if (best.den != BIG_ONE) return false
+        val cutoffRhs = best.num - bigIntOf(objective.constant) - BIG_ONE
         if (cutoffRhs == lastBoolCutoffRhs) return false
         lastBoolCutoffRhs = cutoffRhs
         val weights = objective.boolWeightValues
         val nb = minOf(problem.numBoolVars, weights.size)
-        var posSum = 0L
+        var posSum = bigIntOf(0)
         var nnz = 0
         for (b in 0 until nb) {
             val w = weights[b]
             if (w == 0L) continue
             nnz++
-            if (w > 0L) posSum += w
+            if (w == Long.MIN_VALUE) return false
+            if (w > 0L) posSum += bigIntOf(w)
         }
         if (nnz == 0) return false
-        val degree = posSum - cutoffRhs
+        val exactDegree = posSum - cutoffRhs
+        if (!exactDegree.fitsLong()) return false
+        val degree = exactDegree.toLongExact()
         if (degree <= 0L) return false // every assignment already beats the cutoff — nothing to enforce
         val pbWeights = LongArray(nnz)
         val pbLits = IntArray(nnz)

@@ -438,8 +438,13 @@ first, and every accepted tightening requires the LP bound certificate.
 Binary-column substitution turns single-variable reified relations over a 0/1
 integer into Boolean equivalences when every reader supports the replacement,
 reusing an existing channel literal where one exists. General reified rows,
-value-reading globals and objective columns keep their integers. Substituted values
-are reconstructed from their literals, preserving source values and counts.
+value-reading globals keep their integers. Exact finite optimization first exposes
+0/1 integer costs as a Boolean objective, reusing signed comparison literals or
+adding exact equality channels. Fixed costs enter the constant; signed coefficients
+coalesce exactly and a view outside the objective's storage width declines. Mixed
+integer readers retain their columns and channels. Substituted values are
+reconstructed from their literals, preserving original costs and source coordinates.
+Approximate and solution-set-sensitive invocations retain their objective form.
 
 ## Source routing and encoder selection
 
