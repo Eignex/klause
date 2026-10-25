@@ -1,6 +1,8 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.portfolio.EngineMix
@@ -55,6 +57,20 @@ class FiniteNumericalCompanionsTest {
         val completed = finiteNumericalCompletion(result, context, Cancellation.Never)
 
         assertEquals(0.0, assertIs<MinimizeResult.Optimal>(completed).objective)
+    }
+
+    @Test
+    fun `a checked numerical refutation should complete the same finite working model`() {
+        val model = Problem(0, 1, arrayOf(IntDomain(0, 1)),
+            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2)))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val context = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            Cancellation.Never))
+        val result = OpenTheoryPipeline.optimizeLinear(context)
+
+        val completed = finiteNumericalCompletion(result, context, Cancellation.Never)
+
+        assertIs<MinimizeResult.Infeasible>(completed)
     }
 
     @Test
