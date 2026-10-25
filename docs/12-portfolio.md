@@ -312,10 +312,6 @@ branching, without adding allowance:
 
 The latter two require at least six configured slots and preserve pool size.
 
-The primary scheduling worker uses reconciled random poses at initialization and
-restarts, leaving cost reduction to its native move sources. Its companion uses
-generic greedy initialization, supplying a separate starting trajectory.
-
 #### LP arm admission
 
 Curated sequential mixed finite optimization pools add LP-bounded backtrack workers

@@ -159,8 +159,14 @@ reorder or translation moves, alongside equal-footprint swaps. Relocations sampl
 most eight rectangles and check at most 24 targets, reading aliased positions and
 sizes at their final values and declining moves that affect more than eight
 rectangles. Admitted relocations reconcile scalar envelopes as Cumulative moves do.
-Geometry checks establish only the Diffn's own satisfaction; complete scoring covers
-the rest.
+Geometry probes screen the Diffn layout; complete scoring includes definition
+effects and the other factors.
+
+With at most four overlapping pairs, primary repair also considers domain boundaries
+and other rectangles' edges for both endpoints of the first collision. At most 128
+rectangles and 128 placement probes admit four candidates. Each relocated
+rectangle must become disjoint from every rectangle it reaches; other collisions
+remain for later repairs. Ordinary pair separation remains available.
 
 ## Completion, restarts and ownership
 

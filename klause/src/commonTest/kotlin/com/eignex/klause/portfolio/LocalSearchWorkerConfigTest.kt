@@ -1,19 +1,9 @@
 package com.eignex.klause.portfolio
 
-import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.ir.Factor
-import com.eignex.klause.ir.IntDomain
-import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.localsearch.LocalSearchState
-import com.eignex.klause.localsearch.MoveSink
-import com.eignex.klause.localsearch.movesource.ConfiguredSource
-import com.eignex.klause.localsearch.movesource.MoveSource
-import com.eignex.klause.localsearch.movesource.MoveSourceId
-import com.eignex.klause.localsearch.movesource.Phase
-import com.eignex.klause.localsearch.movesource.Pool
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
@@ -58,43 +48,6 @@ class LocalSearchWorkerConfigTest {
         pools = SharedPools(clauses = SharedClausePool(), cuts = null, solutions = exchange),
     ).use { worker ->
         worker.improvements({ Double.POSITIVE_INFINITY }, Cancellation.Never, maxInstructions = budget).last()
-    }
-
-    @Test
-    fun `native initialization should leave the first repair to move sources`() {
-        val problem = Problem(
-            0, 32, Array(32) { IntDomain(0, if (it < 2) 1 else 0) },
-            listOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0)),
-        ).bake()
-        val objective = LinearObjective(intCoefficients = LongArray(32))
-        for (native in listOf(false, true)) {
-            val costs = mutableListOf<Long>()
-            for (seed in 0L until 16L) {
-                var firstCost: Long? = null
-                val source = object : MoveSource {
-                    override val id = MoveSourceId("initial-repair")
-                    override val phase = Phase.Any
-                    override val pool = Pool.ScoreOnly
-                    override fun generate(state: LocalSearchState, sink: MoveSink) {
-                        if (firstCost == null) firstCost = state.cost
-                        sink.addIntSet(0, state.assignment.intValue(1))
-                    }
-                }
-                val recipe = LocalSearchCatalog.byLabel("cbls/fixed").withSources {
-                    listOf(ConfiguredSource(source))
-                }
-                val ordinary = LocalSearchWorkerConfig(recipe)
-                val config = if (native) ordinary.withoutGreedyRepair() else ordinary
-                config.materialize(problem, 0, 0, seed, 1.0, objective, null, null, null, null).use { worker ->
-                    checkNotNull(worker.newResumableSearch { Double.POSITIVE_INFINITY }).use { run ->
-                        run.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L) {}
-                    }
-                }
-                costs += checkNotNull(firstCost)
-            }
-
-            assertTrue(if (native) costs.any { it > 0L } else costs.all { it == 0L }, "native=$native")
-        }
     }
 
     @Test

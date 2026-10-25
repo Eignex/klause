@@ -266,8 +266,6 @@ and an integer tries every value of a domain of at most 16 values or 16 sampled
 ones. It is one forward pass that never raises the cost; the aim is a low-violation
 start, not feasibility. Tabu and configuration marking are suppressed during it, and
 pinned, defined and implicitly owned coordinates are skipped.
-Initialization policy can omit the pass; source definitions and implicit seeding
-still reconcile before search.
 
 Implicit seeding gives elected structural globals a satisfying start. Implicit table
 moves select values from a support row intersected with root domains; frozen
