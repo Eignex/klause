@@ -370,7 +370,9 @@ local-search slots lead with fixed-break probSAT.
 #### Boolean objective core search
 
 Curated mixed finite optimization pools append a retained core-guided complete worker
-when every objective term is Boolean and the model has no continuous columns. The
+when every objective term is Boolean, including exact views of 0/1 integer costs,
+and the model has no continuous columns. Other finite integer constraints remain
+admissible. Boolean cutoff consumers also accept this cost view. The
 worker assumes all positive residual objective terms false and asks for a satisfying
 assignment. A refutation returns a core: a set of terms at least one of which must be
 violated. The worker adds the core's minimum residual weight to an exact lower bound

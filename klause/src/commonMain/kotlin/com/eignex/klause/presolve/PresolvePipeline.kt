@@ -297,17 +297,19 @@ object PresolvePipeline {
         } else {
             presolveBudget.observeTransform(
                 PresolvePass.SUBSTITUTE_BINARY_COLUMNS, packed, cancellation,
-                eligible = { hasBinaryCandidate(packed, context.objectiveIntVars, cancellation) },
+                eligible = { hasBinaryCandidate(packed, emptySet(), cancellation) },
                 unchanged = { null },
                 output = { it?.problem ?: packed },
             ) {
-                BinaryColumnSubstitution.substitute(packed, context.objectiveIntVars, bakeConfig).also { result ->
+                BinaryColumnSubstitution.substitute(
+                    packed, context.objectiveIntVars, bakeConfig, context.linearObjective,
+                ).also { result ->
                     presolveBudget?.activeInvocation?.fixedColumns = result?.columns ?: 0
                 }
             }
         }
         var current = substitution?.problem ?: packed
-        currentObjective = refit(currentObjective, current)
+        currentObjective = refit(substitution?.objective ?: currentObjective, current)
         context = context.withObjective(currentObjective)
         substitution?.let {
             mappings.add(SourceMapping(packed, it.problem, TransformationGuarantees.IDENTITY, it.rebuild))
