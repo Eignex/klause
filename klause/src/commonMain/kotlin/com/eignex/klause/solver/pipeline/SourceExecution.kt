@@ -431,14 +431,14 @@ private fun executeCapturedSource(
                 ?: throw PipelineConfigException("finite source execution requires its typed finite controls")
             require(finite.shape === shape) { "finite execution belongs to a different source invocation" }
             invocation.requireFiniteExecution(finite.shape, finite.engine, finite.operation)
-            if (invocation.request.linearTraversal == LinearTraversal.FINITE_COMPANIONS) {
-                finite.numericalCompanionParams = request.theory.boundTo(invocation)
-            }
             bindScope?.invoke(
                 finite.cancellation or Cancellation { finite.deadlineExceeded() },
                 finite.toleranceCheck == null,
             )
-            SourceExecutionResult.Finite(invocation, FinitePipeline.solve(finite, callbacks.finite))
+            val result = if (invocation.request.linearTraversal == LinearTraversal.FINITE_COMPANIONS) {
+                FinitePipeline.solve(finite, callbacks.finite, request.theory.boundTo(invocation))
+            } else FinitePipeline.solve(finite, callbacks.finite)
+            SourceExecutionResult.Finite(invocation, result)
         }
 
         is SourceProblemRoute.OpenTheory -> {
