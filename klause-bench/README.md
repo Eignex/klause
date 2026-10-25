@@ -1329,6 +1329,8 @@ including its portfolio index.
 Optional `sliceMillis=N sliceWork=N` repeatedly resumes the same handle under
 those cooperative allowances; omitted allowances are unbounded. Timed slices
 depend on capture overhead and host speed and do not reproduce portfolio allocation.
+Optional `greedy=false` omits the walk's generic greedy initializer; the separate
+initialization capture and coordinate trace still retain that pass as a control.
 A move source that emits no candidates records source-coordinate assignments,
 ordered violated factors and exact degrees before the first 256 candidate collections
 and every 512 thereafter. A separate initialization capture omits greedy repair,
@@ -1508,6 +1510,15 @@ but six candidate objectives worsen and three improve. The broad repair is
 rejected for default recovery. Each experiment retains matching sources, runtime,
 non-solver dependencies and invoked launcher bytes within its arms; timings are
 not pooled across hosts or with the Mac captures.
+
+[Structural fallback 8307](https://lab.eignex.com/jobs/8307) compares `dc3560c3ac`,
+broad boundary repair and boundary placement restricted to blocked axis separation:
+189 cases over the same seven sources, seeds and allowances on Linux/amd64. All
+67 reported witnesses pass independent checking, with no worker failures. The
+fallback finds one of three original Cargo seed-3 witnesses versus none in either
+control, but loses two seed-17 witnesses and worsens all three seed-41 objectives.
+CarpetCutting quality improves in four pairs, worsens in three and ties in two.
+This recovery is insufficient for default admission.
 
 ### XCSP3 declared intension extrema
 

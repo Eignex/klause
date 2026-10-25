@@ -50,7 +50,7 @@ internal object LocalSearchTrajectory {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val required = setOf("suite", "problem", "sha256", "recipe", "seed", "moves")
         require(options.keys.containsAll(required) && options.keys.all {
-            it in required || it == "sliceMillis" || it == "sliceWork"
+            it in required || it == "sliceMillis" || it == "sliceWork" || it == "greedy"
         })
         val reference = Catalog.uncapped(options.getValue("suite")).problems
             .single { it.name == options.getValue("problem") }
@@ -71,6 +71,7 @@ internal object LocalSearchTrajectory {
         val moves = options.getValue("moves").toLong().also { require(it in 1..1_000_000) }
         val sliceMillis = options["sliceMillis"]?.toLong()?.also { require(it > 0L) } ?: Long.MAX_VALUE
         val sliceWork = options["sliceWork"]?.toLong()?.also { require(it > 0L) } ?: Long.MAX_VALUE
+        val repairGreedy = options["greedy"]?.toBooleanStrict() ?: true
         for (rewrite in listOf(false, true)) {
             val stop = Cancellation.after(60.seconds)
             val invocation = SourceSetup.prepare(SourceSetupRequest(
@@ -101,8 +102,8 @@ internal object LocalSearchTrajectory {
                 put("domains", JsonArray(problem.rootIntDomains().map { JsonPrimitive(it.toString()) }))
                 put("sourceVerdictClaim", false)
             }.toString())
-            for (greedy in listOf(false, true)) {
-                val label = if (greedy) rewrite.toString() else "initial-$rewrite"
+            for (walk in listOf(false, true)) {
+                val label = if (walk) rewrite.toString() else "initial-$rewrite"
                 out.resolve("walk-$label.jsonl").bufferedWriter().use { writer ->
                     var picks = 0L
                     var captured: LocalSearchState? = null
@@ -152,7 +153,7 @@ internal object LocalSearchTrajectory {
                                 put("violated", JsonArray(state.violated.toIntArray().map(::JsonPrimitive)))
                             }.toString())
                             writer.flush()
-                            if (!greedy) {
+                            if (!walk) {
                                 captured = state
                                 throw Captured
                             }
@@ -163,12 +164,12 @@ internal object LocalSearchTrajectory {
                     }
                     val solver = LocalSearchSolver(
                         problem, strategy = recipe.strategy, optimizeStrategy = recipe.optimizeStrategy,
-                        greedyRepairOnRestart = greedy,
+                        greedyRepairOnRestart = walk && repairGreedy,
                         definitionalSweep = sweep, perMoveInvariants = sweep != null && recipe.perMoveInvariants,
                         seedImplicitOnRestart = recipe.seedImplicitOnRestart,
                     )
                     val params = LocalSearchParams(
-                        randomSeed = seed, maxFlips = if (greedy) moves else 1L, cancellation = stop,
+                        randomSeed = seed, maxFlips = if (walk) moves else 1L, cancellation = stop,
                         costShaping = CostShaping.Linear(lambda = 1.0), lsObjective = gradient,
                         normalizeWeightsByClass = true, reportResiduals = true,
                     )
@@ -186,7 +187,7 @@ internal object LocalSearchTrajectory {
                             "picks=$picks\ncancelled=${stop()}\nresult=$result\nstats=${run.stats}\n",
                         )
                     }
-                    if (!greedy) traceGreedy(checkNotNull(captured), out.resolve("greedy-$rewrite.jsonl"))
+                    if (!walk) traceGreedy(checkNotNull(captured), out.resolve("greedy-$rewrite.jsonl"))
                 }
             }
         }

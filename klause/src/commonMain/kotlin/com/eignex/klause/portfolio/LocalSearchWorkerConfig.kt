@@ -33,6 +33,7 @@ internal class LocalSearchWorkerConfig private constructor(
     private val seedOffset: Int,
     private val numericalCompletion: Boolean,
     private val toleranceCheck: ((Sample) -> Boolean)?,
+    private val greedyRepairOnRestart: Boolean = true,
 ) :
     WorkerConfig {
 
@@ -47,24 +48,29 @@ internal class LocalSearchWorkerConfig private constructor(
 
     fun withToleranceCheck(check: (Sample) -> Boolean): LocalSearchWorkerConfig =
         LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, reportPhaseTimes, seedOffset,
-            numericalCompletion, check)
+            numericalCompletion, check, greedyRepairOnRestart)
 
     override fun withNodeBudget(budget: NodeBudget): WorkerConfig =
         LocalSearchWorkerConfig(recipe, budget, reportResiduals, reportPhaseTimes, seedOffset,
-            numericalCompletion, toleranceCheck)
+            numericalCompletion, toleranceCheck, greedyRepairOnRestart)
 
     fun withNumericalCompletion(): LocalSearchWorkerConfig =
-        LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, reportPhaseTimes, seedOffset, true, toleranceCheck)
+        LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, reportPhaseTimes, seedOffset, true,
+            toleranceCheck, greedyRepairOnRestart)
+
+    fun withoutGreedyRepair(): LocalSearchWorkerConfig =
+        LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, reportPhaseTimes, seedOffset,
+            numericalCompletion, toleranceCheck, false)
 
     override val label: String get() = recipe.label
 
     override fun withLsResiduals(): LocalSearchWorkerConfig =
         LocalSearchWorkerConfig(recipe, nodeBudget, true, reportPhaseTimes, seedOffset,
-            numericalCompletion, toleranceCheck)
+            numericalCompletion, toleranceCheck, greedyRepairOnRestart)
 
     override fun withLsPhaseTimes(): LocalSearchWorkerConfig =
         LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, true, seedOffset,
-            numericalCompletion, toleranceCheck)
+            numericalCompletion, toleranceCheck, greedyRepairOnRestart)
 
     /** Build an LS worker: its [LocalSearchSolver] session (with the per-move invariant network when
      *  a [definitionalSweep] is present and the recipe enables it) + λ-shaped params, exposing the
@@ -104,6 +110,7 @@ internal class LocalSearchWorkerConfig private constructor(
             effectiveProblem,
             strategy = recipe.strategy,
             optimizeStrategy = recipe.optimizeStrategy,
+            greedyRepairOnRestart = greedyRepairOnRestart,
             definitionalSweep = definitionalSweep,
             perMoveInvariants = definitionalSweep != null && recipe.perMoveInvariants,
             seedImplicitOnRestart = recipe.seedImplicitOnRestart,

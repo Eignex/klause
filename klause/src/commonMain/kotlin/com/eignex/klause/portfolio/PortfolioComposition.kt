@@ -369,7 +369,7 @@ internal object PortfolioComposition {
                     LocalSearchCatalog.byLabel("cbls-primary-plateau/ils-basin"),
                     scenario.nodeBudget,
                     seedOffset = 1,
-                )
+                ).withoutGreedyRepair()
                 listOf(primary) + selected.drop(1)
             } else {
                 selected
