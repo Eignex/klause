@@ -11,6 +11,7 @@ import com.eignex.klause.presolve.PreparedSource
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolvePass
+import com.eignex.klause.presolve.SourceRebuilds
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.theory.BuiltInEncoderProvider
 import com.eignex.klause.theory.EncodedTheoryFactor
@@ -105,6 +106,22 @@ class OpenSourcePreparationTest {
 
         assertEquals(1, planned.model.numFactors)
         assertSame(original, requireNotNull(planned.plan.encodedTheoryFragment(planned.model)).factors.single())
+    }
+
+    @Test
+    fun `uncertified deletion should prepare fresh rows`() {
+        val row = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 1.0)
+        val model = Problem(0, 0, emptyArray(), arrayOf<Factor>(row, row), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
+        val reduced = model.withFactors(arrayOf(row))
+        val projections = FactorProjectionProviders.Default.prepare(model)
+        val captured = model.componentPlan(projections)
+        val original = requireNotNull(captured.encodedTheoryFragment(model)).factors.first()
+        val preparation = PreparedSource(model, reduced, false, null, emptyList(), SourceRebuilds.NONE, null)
+
+        val planned = preparation.planned(reduced, projections, capturedPlan = captured)
+
+        assertNotSame(original, requireNotNull(planned.plan.encodedTheoryFragment(reduced)).factors.single())
     }
 
     @Test
