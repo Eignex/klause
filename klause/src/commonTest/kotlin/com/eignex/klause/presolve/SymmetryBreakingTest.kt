@@ -155,6 +155,26 @@ class SymmetryBreakingTest {
     }
 
     @Test
+    fun `newly exposed value orbits should retain an optimal objective assignment`() {
+        val problem = Problem(
+            0,
+            4,
+            arrayOf(IntDomain(1, 1), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
+            listOf(AllDifferent(intArrayOf(1, 2, 3))),
+        ).bake()
+        val optimal = longArrayOf(1, 0, 1, 2)
+
+        for (delta in listOf(
+            Presolve.breakSymmetries(problem, objectiveIntVars = setOf(1)),
+            Presolve.breakValuePrecedence(problem, objectiveIntVars = setOf(1)),
+        )) {
+            val reduced = problem.withPassDelta(delta, BakeConfig.NONE)
+
+            assertTrue(isFeasible(reduced, BooleanArray(0), optimal))
+        }
+    }
+
+    @Test
     fun `unread domains should neither split value orbits nor enter precedence chains`() {
         val problem = Problem(
             0,
