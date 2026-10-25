@@ -1268,6 +1268,14 @@ takes 37 ms and 81.4 MB of measured thread allocation outside the engine allowan
 These instrumented captures establish a checked bound, not a source witness,
 integer optimality, independent MPS proof or general speedup.
 
+[Retained consumer 8288](https://lab.eignex.com/jobs/8288), at `50a242e6e9`,
+consumes the same exact bound, approximately 2656.424000168177, and passes the native
+source recheck with one operation and preparation. Its floating work remains
+267,223,843; the caller ledger separately records 1,074,843 certificate work.
+Cap6000 and p0033 retain their source-checked bounds. This reuses the funding
+qualification in [8258](https://lab.eignex.com/jobs/8258); it establishes certificate
+consumption from the completed numerical basis.
+
 ### CLI profile tables
 
 A lab `profileCli` case sets `KLAUSE_LAB_PROFILE_DIR`; after the subprocess timing
