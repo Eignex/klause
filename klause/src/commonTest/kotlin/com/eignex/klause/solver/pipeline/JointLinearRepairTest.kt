@@ -26,6 +26,33 @@ import kotlin.test.assertTrue
 
 class JointLinearRepairTest {
     @Test
+    fun `joint repair should consume a sparse residual rejected by small scalar admission`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(), doubleArrayOf(), IntArray(65) { it }, DoubleArray(65) { 3.141592653589793 },
+                    LinearOp.EQ, 0.1),
+            ), numRealVars = 129, realLower = DoubleArray(129), realUpper = DoubleArray(129) { 1.0 })
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val condition = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ZERO),
+            mapOf(0 to BigFraction.ZERO))
+
+        JointLinearRepair(model, source, objective, TheoryParams(maxFlips = 1)).use { repair ->
+            var result = repair.check(condition, Cancellation.Never)
+            repeat(64) {
+                if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, Cancellation.Never)
+            }
+
+            val sample = assertIs<ExactNeighborhoodResult.Witness>(result).sample
+            val stages = assertNotNull(repair.stats.smt.completeSearchStages)
+            assertEquals(1L, stages["jointRepairPrimalRecoveryExactAdmissionInputBits"])
+            assertEquals(1L, stages["jointRepairPrimalRecoverySparseCompleted"])
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+                SourceEvidence(source.scope, SourceClaim.Witness(sample), SourceDerivation.SourceWitness)))
+        }
+    }
+
+    @Test
     fun `wide repair refutations should discharge only their pinned candidate and account certificate work`() {
         val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(1, 1), null, null),
             factors = arrayOf(

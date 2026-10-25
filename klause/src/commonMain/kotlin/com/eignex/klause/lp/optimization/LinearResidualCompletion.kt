@@ -155,6 +155,7 @@ internal class LinearResidualCompletion(
         }
         paused = !finished && !cancellation() && budget.funding?.paused == true
         if (finished) {
+            floating = null
             admission?.close()
             admission = null
             budget.closeOwner(owner)
