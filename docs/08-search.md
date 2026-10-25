@@ -309,7 +309,9 @@ construction branch. Interval Tables and storage declines keep the full STR2 sca
 fractions, with at most 65,536 factor, position, row and word visits for one ordering.
 Provider discovery and diagram admission share that allowance and cancellation
 polling. Tables count live
-tuples through the bitmap or the small STR2 prefix. Deterministic, unweighted MDDs
+tuples through the bitmap or the small STR2 prefix. A shared no-pruning table result
+can count domain-compatible rows within the same visit allowance without constructing
+a private live set. Deterministic, unweighted MDDs
 with distinct sequence variables cache prefix and suffix path counts, multiplying
 them at each live edge to count accepted assignments for a value. Admission allows
 at most 8,192 states and edges per diagram and 1,048,576 retained cells per state.

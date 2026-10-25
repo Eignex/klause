@@ -13,9 +13,41 @@ import com.eignex.klause.util.WorkMeter
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class MaxSdTest {
+    @Test
+    fun `a grouped table should retain support guidance without a private live set`() {
+        val tuples = longArrayOf(0, 0, 1, 0, 1, 1)
+        val problem = Problem(
+            0, 4, Array(4) { IntDomain(0, 1) },
+            arrayOf<Factor>(Table(intArrayOf(0, 1), tuples), Table(intArrayOf(2, 3), tuples)),
+        )
+        val session = PropagationSession(problem)
+        val before = session.propagationCount
+
+        val scores = assertNotNull(session.extensionalDensities(2, longArrayOf(0, 1)))
+
+        assertTrue(scores[1] > scores[0])
+        assertEquals(before, session.propagationCount)
+        assertEquals(0, session.decisionLevel)
+    }
+
+    @Test
+    fun `grouped support guidance should screen rows outside live domains`() {
+        val tuples = longArrayOf(0, 0, 0, 1, 1, 2)
+        val problem = Problem(
+            0, 4, arrayOf(IntDomain(0, 1), IntDomain(1, 2), IntDomain(0, 1), IntDomain(1, 2)),
+            arrayOf<Factor>(Table(intArrayOf(0, 1), tuples), Table(intArrayOf(2, 3), tuples)),
+        )
+        val session = PropagationSession(problem)
+
+        val scores = assertNotNull(session.extensionalDensities(2, longArrayOf(0, 1)))
+
+        assertEquals(scores[0], scores[1])
+    }
+
     @Test
     fun `support discovery should observe cancellation before an unsupported fallback`() {
         var cancelled = false

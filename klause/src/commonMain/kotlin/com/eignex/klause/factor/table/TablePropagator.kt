@@ -58,7 +58,9 @@ internal class TablePropagator(
         values: LongArray,
         visit: () -> Boolean,
     ): ExtensionalSupportCounts? {
-        val support = state.refPayload[factorId] as? TableStr2State ?: return null
+        val payload = state.refPayload[factorId]
+        if (payload === NoopStarted) return unfilteredSupportCounts(state, variable, values, visit)
+        val support = payload as? TableStr2State ?: return null
         if (hi != null || !support.started || support.numValid == 0) return null
         var col = -1
         for (i in xs.indices) {
@@ -85,6 +87,43 @@ internal class TablePropagator(
             }
         }
         return ExtensionalSupportCounts(counts, support.numValid)
+    }
+
+    private fun unfilteredSupportCounts(
+        state: PropagationState,
+        variable: Int,
+        values: LongArray,
+        visit: () -> Boolean,
+    ): ExtensionalSupportCounts? {
+        if (hi != null) return null
+        var column = -1
+        val seen = IntHashSet()
+        for (i in xs.indices) {
+            if (!visit()) return null
+            if (!seen.add(xs[i])) return null
+            if (xs[i] == variable) {
+                column = i
+            }
+        }
+        if (column < 0) return null
+        val counts = IntArray(values.size)
+        var total = 0
+        for (row in 0 until numTuples) {
+            if (!visit()) return null
+            var live = true
+            for (col in xs.indices) {
+                if (!visit()) return null
+                if (cellLo(row, col) !in state.intDomains[xs[col]]) {
+                    live = false
+                    break
+                }
+            }
+            if (!live) continue
+            total++
+            val candidate = values.binarySearchLong(cellLo(row, column))
+            if (candidate >= 0) counts[candidate]++
+        }
+        return if (total == 0) null else ExtensionalSupportCounts(counts, total)
     }
 
     /** Lower/upper bound the cell at (row, col) accepts; equal for a point, `[MIN, MAX]` for a `*`. */
