@@ -198,7 +198,8 @@ class SymmetryBreakingTest {
 
         val symmetry = Presolve.breakSymmetries(residual)
 
-        assertEquals(setOf(0, 1), affine.rebuild.steps.filterIsInstance<RebuildStep.AffineValue>().map { it.variable }.toSet())
+        val rebuilt = affine.rebuild.steps.filterIsInstance<RebuildStep.AffineValue>().map { it.variable }.toSet()
+        assertEquals(setOf(0, 1), rebuilt)
         assertTrue(residual.factors.all { factor -> factor.intVars.all { it == 2 } })
         assertTrue(symmetry.addedFactors.all { factor -> factor.intVars.all { it == 2 } })
     }
