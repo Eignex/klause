@@ -229,7 +229,7 @@ class BinaryColumnSubstitutionTest {
     }
 
     @Test
-    fun `composed preparation should preserve the source objective after Boolean zero extension`() {
+    fun `composed preparation should preserve the source objective through a Boolean view`() {
         val model = problem(
             5,
             listOf(
@@ -250,6 +250,7 @@ class BinaryColumnSubstitutionTest {
 
         assertEquals(setOf(11L, 13L), values)
         assertEquals(first.problem.numBoolVars, adjusted.boolWeights.size)
-        assertTrue(adjusted.boolWeights.all { it == 0L })
+        assertTrue(adjusted.boolWeights.any { it == 2L })
+        assertTrue(adjusted.intCoefficients.all { it == 0L })
     }
 }

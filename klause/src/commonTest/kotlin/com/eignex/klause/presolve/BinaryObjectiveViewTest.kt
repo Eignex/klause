@@ -186,7 +186,9 @@ class BinaryObjectiveViewTest {
             listOf(Linear(longArrayOf(2, 2, 1), intArrayOf(0, 1, 2), LinearOp.GE, 3)),
         ).bake()
         val original = LinearObjective(intCoefficients = longArrayOf(-3, 5), constant = 7)
-        val transformed = checkNotNull(BinaryColumnSubstitution.substitute(source, setOf(0, 1), BakeConfig.NONE, original))
+        val transformed = checkNotNull(BinaryColumnSubstitution.substitute(
+            source, setOf(0, 1), BakeConfig.NONE, original,
+        ))
         val objective = checkNotNull(transformed.objective)
 
         val result = assertIs<MinimizeResult.Optimal>(BacktrackSolver(transformed.problem).minimize(
@@ -263,10 +265,14 @@ class BinaryObjectiveViewTest {
             val source = BakedProblem(
                 numBoolVars = 1, numIntVars = 2,
                 intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 2)), factors = factors,
-                seedDeductions = PropagationResult.Implied(intArrayOf(0), booleanArrayOf(true), intArrayOf(), longArrayOf()),
+                seedDeductions = PropagationResult.Implied(
+                    intArrayOf(0), booleanArrayOf(true), intArrayOf(), longArrayOf(),
+                ),
             )
             val original = LinearObjective(longArrayOf(5), longArrayOf(3))
-            val transformed = checkNotNull(BinaryColumnSubstitution.substitute(source, setOf(0), BakeConfig.NONE, original))
+            val transformed = checkNotNull(BinaryColumnSubstitution.substitute(
+                source, setOf(0), BakeConfig.NONE, original,
+            ))
 
             val result = assertIs<MinimizeResult.Optimal>(BacktrackSolver(transformed.problem).minimize(
                 checkNotNull(transformed.objective),
@@ -286,7 +292,9 @@ class BinaryObjectiveViewTest {
         ).bake()
         val original = LinearObjective(intCoefficients = longArrayOf(-3, 5), constant = 7)
 
-        val transformed = checkNotNull(BinaryColumnSubstitution.substitute(source, setOf(0, 1), BakeConfig.NONE, original))
+        val transformed = checkNotNull(BinaryColumnSubstitution.substitute(
+            source, setOf(0, 1), BakeConfig.NONE, original,
+        ))
         val objective = checkNotNull(transformed.objective)
         val samples = BacktrackSolver(transformed.problem).enumerate().toList()
 

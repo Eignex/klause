@@ -74,7 +74,8 @@ internal object BinaryColumnSubstitution {
     /**
      * Substitute every eligible `{0, 1}` column of [problem] for a Boolean literal, or return `null`
      * when no column qualifies (the common case, and always for a model with no integer columns).
-     * [objectiveIntVars] are held back unless [objective] admits an exact Boolean view. [bakeConfig] is threaded into the rebuild so the root-bake probing
+     * [objectiveIntVars] are held back unless [objective] admits an exact Boolean view.
+     * [bakeConfig] is threaded into the rebuild so the root-bake probing
      * policy is re-derived over the rewritten factor set.
      */
     fun substitute(

@@ -1,10 +1,12 @@
 package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.fitsLong
@@ -40,6 +42,9 @@ internal class BinaryObjectiveView(
             }
             val weights = MutableList(problem.numBoolVars) { bigIntOf(objective.boolWeightValues.getOrElse(it) { 0L }) }
             val factors = problem.factors.toMutableList()
+            (problem.rootDeductions as? PropagationResult.Implied)?.forEachBool { id, value ->
+                factors.add(Clause(intArrayOf(Lit.make(id, value))))
+            }
             var constant = bigIntOf(objective.constant)
             for (v in objective.intCoefficientValues.indices) {
                 val coefficient = bigIntOf(objective.intCoefficientValues[v])
@@ -74,7 +79,7 @@ internal class BinaryObjectiveView(
                     boolWeights = LongArray(weights.size) { weights[it].toLongExact() },
                     intCoefficients = LongArray(objective.intCoefficientValues.size),
                     constant = constant.toLongExact(),
-                ),
+                ).captureBinaryIntegerView(problem, objective),
                 weights.size,
             )
         }

@@ -51,7 +51,9 @@ data class PresolveContext(
             val weight = objective.boolWeightValues[variable]
             if (weight != 0L) boolCoefficients[variable] = weight
         }
-        return copy(objectiveIntCoeffs = coefficients, objectiveBoolCoeffs = boolCoefficients, linearObjective = objective)
+        return copy(
+            objectiveIntCoeffs = coefficients, objectiveBoolCoeffs = boolCoefficients, linearObjective = objective,
+        )
     }
 
     /** Integer variables read by the objective. */

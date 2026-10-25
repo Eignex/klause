@@ -327,7 +327,10 @@ annotated, or execution is parallel or single-engine. See
   under a cuts-off ceiling. Eligibility reads complete unconditional row conjunctions
   with 64-bit integer constants, including normalized exact source rows. A
   propagator-only symmetry factor preserves this eligibility; at least one row
-  conjunction is required, and every other factor must qualify.
+  conjunction is required, and every other factor must qualify. An exact binary
+  integer objective view retains this admission through its Boolean rows and value
+  channels. Its captured source rows and costs also preserve binary packing and
+  equality recipes; changed objective coefficients discard that capture.
 - **Continuous columns.** The default LP arm ranks after the SAT guard and
   conflict-driven core and joins first-solution search under the ordinary bounded
   slices for both finite and continuous objectives. Single-core pools reserve half the
