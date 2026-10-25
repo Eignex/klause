@@ -19,6 +19,8 @@ import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.TableauCutSolver
+import com.eignex.klause.lp.relaxation.CpToLpRelaxation
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
@@ -35,6 +37,29 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpPrimalHeuristicsTest {
+    @Test
+    fun `LP pinning should stop before another mutation after an interrupted equality`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 255) }, emptyArray())
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1))
+        var armed = false
+        lateinit var session: PropagationSession
+        session = PropagationSession(problem, Cancellation {
+            armed && session.litTruth(session.boundGeLit(0, 16, true)) == true
+        })
+        repeat(128) { session.boundGeLit(0, it.toLong() + 1, true) }
+        val relaxation = CpToLpRelaxation(problem, objective).build(session)
+        armed = true
+
+        val proposal = LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)),
+            SolveStatsSink(backend = "interrupted-pinning")).use { engine ->
+            engine.pinToward(session, relaxation) { 129.0 }
+        }
+
+        assertNull(proposal)
+        assertTrue(session.fixpointCancelled)
+        assertEquals(IntDomain(0, 255), session.intDomain(1))
+    }
+
     @Test
     fun `interrupted rounding should resume only its original LP objective`() {
         for (sameObjective in listOf(true, false)) {

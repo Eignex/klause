@@ -203,6 +203,7 @@ class PropagationSession private constructor(
 
     // Initial point pins can refute this root while the underlying model remains feasible.
     private var bakedUnsat: PropagationResult.Unsat? = null
+    private var interruptedReseed = false
 
     internal val rootWork: Long
     internal val rootPropagationNanos: Long
@@ -494,9 +495,15 @@ class PropagationSession private constructor(
      * [desired], one decision level per pin. Any leftover search decisions sit above the seed prefix and,
      * differing from [desired], are popped like any other mismatch. Returns the cumulative implied set
      * beyond the pins, or the first [PropagationResult.Unsat] a push hits.
+     * An interrupted push retracts to the completed prefix and sets [fixpointCancelled]; a later
+     * call retries the missing pins under its current cancellation token.
      */
     fun reseedFrom(desired: Assumptions): PropagationResult {
         bakedUnsat?.let { return it }
+        if (interruptedReseed) {
+            state.runCancelled = false
+            interruptedReseed = false
+        }
         var keep = 0
         while (keep < trail.size) {
             val e = trail[keep]
@@ -517,17 +524,36 @@ class PropagationSession private constructor(
         val bv = desired.boolValues
         for (i in bk.indices) {
             if (boolPinned[bk[i]] != -1) continue
+            if (stopReseeding()) return PropagationResult.Implied.EMPTY
             val r = pushBool(bk[i], bv[i])
             if (r is PropagationResult.Unsat) return r
+            if (state.runCancelled) return retractInterruptedSeed()
         }
         val ik = desired.intKeys
         val iv = desired.intValues
         for (i in ik.indices) {
             if (intPinnedSet[ik[i]]) continue
+            if (stopReseeding()) return PropagationResult.Implied.EMPTY
             val r = pushInt(ik[i], iv[i])
             if (r is PropagationResult.Unsat) return r
+            if (state.runCancelled) return retractInterruptedSeed()
         }
         return computeImplied()
+    }
+
+    private fun stopReseeding(): Boolean {
+        if (state.runCancelled) return true
+        if (!cancellation()) return false
+        interruptedReseed = true
+        state.runCancelled = true
+        return true
+    }
+
+    private fun retractInterruptedSeed(): PropagationResult {
+        // An equality can stop between its two bounds; only completed pins may survive a reseed diff.
+        popLast()
+        interruptedReseed = true
+        return PropagationResult.Implied.EMPTY
     }
 
     /** Drop every decision pin, restoring the primitive pin arrays to "free". Iterates the

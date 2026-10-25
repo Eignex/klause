@@ -203,6 +203,13 @@ replays saved domains and interior carves. Unconditional root carves are kept in
 state-owned interval runs, so late equality atoms and historical queries still see
 them.
 
+Integer domain maintenance retains an interrupted history/atom-wakeup cursor. No
+subsequent mutation may start until that cursor completes or retraction discards it.
+LP primal pinning stops at an interrupted fixpoint. Incremental assumption reseeding
+retracts an interrupted pin, including an equality stopped between its two bounds,
+and retries from the completed prefix on the next reseed. An interrupted prefix
+cannot certify the requested assumption set.
+
 Search-time holes keep their reason, level and undo position in trail order, with
 a per-variable value index for lookup. Retraction removes index entries with the
 discarded witness tail. Unconditional root runs remain separate from that index.
