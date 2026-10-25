@@ -738,7 +738,8 @@ private fun reconstructCandidates(
                     reconstructExactVector(x, denominator, meter)?.let { current.point(it, basis) }
                     current.reconstructedSeated(x, basis, denominator)?.let { current.point(it, basis) }
                 }
-                if (y != null) reconstructExactVector(y, denominator, meter)?.let {
+                if (y != null) (reconstructExactVector(y, denominator, meter)
+                    ?: if (goal == ReconstructionGoal.BOUND) reconstructBoundVector(y, denominator, meter) else null)?.let {
                     val candidate = if (goal == ReconstructionGoal.BOUND) {
                         repairBoundMultipliers(authority, it, meter)
                     } else it
@@ -791,6 +792,22 @@ private fun reconstructCandidates(
         meter.snapshot(decline),
         run?.pointRejection.takeIf { decline == ReconstructionDecline.CANDIDATE },
     )
+}
+
+private fun reconstructBoundVector(
+    values: List<BigFraction>,
+    denominator: BigInt,
+    meter: ReconstructionMeter,
+): List<BigFraction>? {
+    meter.phase = ReconstructionPhase.VECTOR
+    meter.storage(values.size.toLong() * 32L)
+    val limit = if (denominator.magnitudeBitLength() > 63) Long.MAX_VALUE else denominator.toLongExact()
+    return values.map { value ->
+        meter.step()
+        val part = reconstructRational(value.toDouble(), maxDenominator = limit, onStep = { meter.step() })
+            ?: return null
+        meter.fraction(BigFraction.of(bigIntOf(part.numerator), bigIntOf(part.denominator)))
+    }
 }
 
 private fun reconstructionViolation(
