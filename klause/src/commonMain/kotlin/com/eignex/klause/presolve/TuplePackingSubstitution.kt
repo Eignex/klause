@@ -1,7 +1,6 @@
 package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.bool.Cardinality
-import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Factor
@@ -84,6 +83,9 @@ internal object TuplePackingSubstitution {
                 choices += kept.size
                 cells += kept.size * table.arity
             }
+            if (rows.any { it.isEmpty() }) {
+                return Substitution(RootBaker.provenInfeasible(problem, BakeConfig.NONE), SourceRebuilds.NONE, 0)
+            }
             if (cells > limits.cells - retainedCells || choices > limits.choices - (nextBool - problem.numBoolVars)) {
                 continue
             }
@@ -96,7 +98,7 @@ internal object TuplePackingSubstitution {
                 val table = entry.second
                 val tuples = rows[group]
                 val literals = IntArray(tuples.size) { Lit.make(localBool++, true) }
-                local.add(if (literals.isEmpty()) Clause(intArrayOf()) else Cardinality.exactlyOne(literals))
+                local.add(Cardinality.exactlyOne(literals))
                 val counts = HashMap<Long, Int>()
                 for ((row, tuple) in tuples.withIndex()) {
                     for (value in tuple.values) {
@@ -121,7 +123,9 @@ internal object TuplePackingSubstitution {
             }
             // Every group chooses a placement. Two groups requiring one value exceed its capacity
             // even when no scalar coordinate has a singleton domain.
-            if (mandatory.values.any { it > 1 }) local.add(Clause(intArrayOf()))
+            if (mandatory.values.any { it > 1 }) {
+                return Substitution(RootBaker.provenInfeasible(problem, BakeConfig.NONE), SourceRebuilds.NONE, 0)
+            }
             val exactCover = capacity.size == packing.scope.size
             for (literals in capacity.values) {
                 if (!meter.visit()) return null
@@ -167,7 +171,7 @@ internal object TuplePackingSubstitution {
             if (!problem.intBounds.hasLower(variable) || !problem.intBounds.hasUpper(variable)) return null
             val users = occurrences[variable] ?: return null
             if (users.size != 2 || id !in users) return null
-            val tableId = users.first { it != id }
+            val tableId = users.firstOrNull { it != id } ?: return null
             val table = problem.factors[tableId] as? Table ?: return null
             if (table.hi != null || table.tuples.size > limits.cells) return null
             tables[tableId] = table

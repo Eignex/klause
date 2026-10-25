@@ -63,6 +63,19 @@ class TuplePackingSubstitutionTest {
     }
 
     @Test
+    fun `a table with no internally distinct placement should refute the packing`() {
+        val source = Problem(0, 4, Array(4) { IntDomain(0, 3) }, listOf(
+            Table(intArrayOf(0, 1), longArrayOf(0, 0, 1, 1)),
+            Table(intArrayOf(2, 3), longArrayOf(2, 3, 3, 2)), AllDifferent(intArrayOf(0, 1, 2, 3)),
+        )).bake()
+        assertFalse(source.baked is PropagationResult.Unsat)
+
+        val result = assertNotNull(TuplePackingSubstitution.substitute(source, emptySet()))
+
+        assertIs<PropagationResult.Unsat>(result.problem.baked)
+    }
+
+    @Test
     fun `placement branching should preserve each distinct source assignment once`() {
         val rows = longArrayOf(0, 1, 1, 0, 2, 3, 3, 2, 0, 1, 2, 2)
         val source = Problem(1, 4, Array(4) { IntDomain(0, 3) }, listOf(
@@ -135,6 +148,18 @@ class TuplePackingSubstitutionTest {
 
             assertNull(TuplePackingSubstitution.substitute(source, emptySet()))
         }
+    }
+
+    @Test
+    fun `repeated coordinates and interval tables should decline substitution`() {
+        val repeated = Problem(0, 1, arrayOf(IntDomain(0, 3)), listOf(AllDifferent(intArrayOf(0, 0)))).bake()
+        val interval = Problem(0, 4, Array(4) { IntDomain(0, 3) }, listOf(
+            Table(intArrayOf(0, 1), longArrayOf(0, 1), longArrayOf(2, 3)),
+            Table(intArrayOf(2, 3), longArrayOf(0, 1, 2, 3)), AllDifferent(intArrayOf(0, 1, 2, 3)),
+        )).bake()
+
+        assertNull(TuplePackingSubstitution.substitute(repeated, emptySet()))
+        assertNull(TuplePackingSubstitution.substitute(interval, emptySet()))
     }
 
     @Test
