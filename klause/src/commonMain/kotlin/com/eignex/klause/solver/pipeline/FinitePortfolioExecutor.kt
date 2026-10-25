@@ -75,6 +75,9 @@ internal fun FinitePipeline.portfolioExecutor(
     val profile = ProblemProfile.of(problem, scenario.kind == Kind.COP)
     val identity = ModelIdentity.of(problem, objective)
     val binding = EngineInvocation(preparedPlan, identity, objective)
+    val companions = if (numericalCompanions != null && objective != null &&
+        finiteNumericalCompanionsAdmitted(problem, scenario)
+    ) FiniteNumericalCompanions.prepare(problem, objective, numericalCompanions, cancellation) else null
     val finiteFactories = PortfolioBuilder.factories(
         problem, scenario, objective, lsObjective, definitionalSweep, onEvent,
         profile, numericalCompletion, sourceHints,
@@ -90,12 +93,13 @@ internal fun FinitePipeline.portfolioExecutor(
                 sharingInvocation = binding,
                 provesResults = worker.permitsSourceProofs,
             )
-        }) { slot -> factory.materialize(slot.index, slot.baseSeed, slot.nodeBudget) }
+        }) { slot ->
+            // The leading numerical probe does not renumber the finite workers' seed positions.
+            factory.materialize(slot.index - if (companions == null) 0 else 1, slot.baseSeed, slot.nodeBudget)
+        }
     }
-    val companions = if (numericalCompanions != null && objective != null &&
-        finiteNumericalCompanionsAdmitted(problem, scenario)
-    ) FiniteNumericalCompanions.prepare(problem, objective, numericalCompanions, cancellation) else null
-    val factories = finiteFactories + companions?.factories(preparedPlan, finiteFactories.size).orEmpty()
+    val additional = companions?.factories(preparedPlan, finiteFactories.size).orEmpty()
+    val factories = additional.take(1) + finiteFactories + additional.drop(1)
     return PortfolioInvocation(
         preparedPlan,
         factories,
