@@ -46,6 +46,57 @@ class AffineObjectiveTest {
     private val objective = LinearObjective(intCoefficients = longArrayOf(2, -2, 3), constant = 5)
 
     @Test
+    fun `an unsupported reflection should leave a later objective translation available`() {
+        val model = Problem(
+            0,
+            3,
+            Array(3) { IntDomain(0, 4) },
+            listOf(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 4),
+                Linear(intArrayOf(1, -1), intArrayOf(0, 2), LinearOp.EQ, 1),
+            ),
+        )
+        val cost = LinearObjective(intCoefficients = longArrayOf(1, 2, 3))
+
+        for (order in AffinePivotOrder.entries) {
+            val outcome = PresolvePipeline.run(
+                model, cost, PresolveConfig.parse("affine").withAffinePivotOrder(order), false,
+            )
+            val assignments = BacktrackSolver(outcome.problem.bake()).enumerate().map { reduced ->
+                outcome.mapping.requireObjectivePreserved(cost, assertNotNull(outcome.objective), reduced)
+                outcome.reconstruct(reduced).ints.toList()
+            }.toSet()
+
+            assertTrue(outcome.mapping.rebuild.steps.filterIsInstance<RebuildStep.AffineValue>().any { it.variable == 0 })
+            assertEquals(setOf(listOf(1L, 3L, 0L), listOf(2L, 2L, 1L), listOf(3L, 1L, 2L), listOf(4L, 0L, 3L)), assignments)
+        }
+    }
+
+    @Test
+    fun `an overflowing translation should leave a later objective alias available`() {
+        val model = Problem(
+            0,
+            3,
+            Array(3) { IntDomain(0, 4) },
+            listOf(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1),
+                Linear(intArrayOf(1, -1), intArrayOf(0, 2), LinearOp.EQ, 0),
+            ),
+        )
+        val cost = LinearObjective(intCoefficients = longArrayOf(1, -1, 2), constant = Long.MAX_VALUE)
+
+        for (order in AffinePivotOrder.entries) {
+            val outcome = PresolvePipeline.run(
+                model, cost, PresolveConfig.parse("affine").withAffinePivotOrder(order), false,
+            )
+
+            assertTrue(outcome.mapping.rebuild.steps.filterIsInstance<RebuildStep.AffineValue>().any { it.variable == 0 })
+            assertEquals(listOf(0L, -1L, 3L), assertNotNull(outcome.objective).intCoefficients.toList())
+            assertEquals(Long.MAX_VALUE, outcome.objective.constant)
+        }
+    }
+
+    @Test
     fun `source and finite preparation should compose translated objectives in original units`() {
         val prepared = PresolvePipeline.prepareSource(
             source,
