@@ -235,7 +235,8 @@ internal fun refineLinearPrimal(
         if (refined.size != members.size || !meter.satisfies(refined, residual)) return null
         var difference = BigFraction.ZERO
         for (id in members.indices) {
-            difference = meter.subtractProduct(difference, objective[id], refined[id] - point[members[id]])
+            difference = meter.subtractProduct(difference, objective[id], refined[id])
+            difference = meter.subtractProduct(difference, objective[id].negated(), point[members[id]])
         }
         if (difference <= BigFraction.ZERO) {
             observe("PrimalRefinementNeutral", 1L)

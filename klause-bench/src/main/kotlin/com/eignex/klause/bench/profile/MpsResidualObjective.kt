@@ -14,7 +14,11 @@ import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.Term
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceCoordinate
+import com.eignex.klause.solver.evidence.SourceClaim
+import com.eignex.klause.solver.evidence.SourceCondition
+import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceProofContext
+import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.LinearTraversal
@@ -115,6 +119,18 @@ internal object MpsResidualObjective {
             next[coordinates.indexOf(mapped.keys.elementAt(id))]
         } }
         val checked = newValues?.let { source.checkMpsWitness(it, stop) }
+        val pins = coordinates.indices.filter { coordinates[it].kind != SourceCoordinate.Kind.Real }
+            .associate { coordinates[it] to point[it] }
+        val fixed = context.atScope(context.scope.copy(condition = SourceCondition(lower = pins, upper = pins)))
+        val authorityType = Class.forName("com.eignex.klause.lp.optimization.LinearAuthority")
+        val authority = authorityType.constructors.single { it.parameterCount == 4 }
+            .newInstance(budget, { _: Any -> }, true, policy)
+        val bound = try {
+            val result = call(authority, "advance", fixed, stop, false)
+            result?.let { call(it, "getBound") as SourceEvidence? }
+        } finally {
+            (authority as AutoCloseable).close()
+        }
         val result = buildJsonObject {
             put("revision", Reports.readGitSha())
             put("sourceSha256", sha256(bytes))
@@ -124,6 +140,9 @@ internal object MpsResidualObjective {
             put("nativeProposal", refined != null)
             put("originalSourceChecked", checked != null)
             put("independentWitnessCheck", false)
+            put("fixedPinNominalBound", bound?.let {
+                (((it.claim as SourceClaim.Bound).value as SourceValue.Rational).value * scale.reciprocal()).toString()
+            })
             put("elapsedNs", elapsed)
             put("threadBytes", allocation)
             put("stages", NumericalResidualProfile.json(stages))
