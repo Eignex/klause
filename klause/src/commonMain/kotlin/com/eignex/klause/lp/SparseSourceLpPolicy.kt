@@ -19,4 +19,12 @@ internal data class SparseSourceLpPolicy(
     init {
         require(floating.work > 0L && floating.iterations > 0 && quantum > 0L)
     }
+
+    fun funded(work: Long): LpFloatAllowance {
+        require(work > 0L)
+        val blocks = work / floating.work + if (work % floating.work == 0L) 0L else 1L
+        val iterations = if (blocks > Int.MAX_VALUE / floating.iterations) Int.MAX_VALUE
+            else (blocks * floating.iterations).toInt()
+        return LpFloatAllowance(work, iterations)
+    }
 }

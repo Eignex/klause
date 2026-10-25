@@ -242,7 +242,12 @@ hold bound trails, active-row identity and verification caches.
 Numerical source traversal retains a `LinearAuthoritySession` per invocation.
 Its fixed matrix has free structural columns; extracted source sides are asserted
 in a replaceable scope. Child and sibling queries retract that scope and retain
-compatible factors. Source row templates and numeric coordinate addresses are
+compatible factors. Source sides bind as one checked batch in column and side
+order, retaining witness IDs and assertion depth. Unprojectable batches use the
+trail's scalar path; a declined batch retires the owner without publishing guidance.
+A conflicting prefix retains its witnesses before the remaining sides are asserted.
+Cancellation withholds the new scope identity.
+Source row templates and numeric coordinate addresses are
 prepared once per Boolean substitution. Conditional rows remain in the matrix;
 their logical sides are suspended while their pins are unestablished and restored
 on retraction. Objective edits invalidate dependent certificates; changed
@@ -257,7 +262,11 @@ Floating source coordinates are guidance and supply no witness or proof authorit
 bound-certificate policy through that same scoped owner. One admitted operation
 survives unchanged consultations; changed source scope, sides or active rows revoke
 its admission and numerical cursor before another query. A pause publishes no
-coordinates or certificate. Completed coordinates propose exhaustive integer splits
+coordinates or certificate. Compatible work and pivot allowance promotions retain
+paid preparation, phase-local values and the numerical cursor. A funding stop at an
+iteration boundary keeps that cursor and reports its limiting resource; unchanged
+stops and completed declines are cached. A promoted allowance can resume a funding
+stop. Authority edits and cancellation retire it. Completed coordinates propose exhaustive integer splits
 that add new scoped restrictions, including fractional source-bound endpoints.
 Opposed coordinate sides refute a branch through checked source combinations
 without another numerical query. Integral-looking

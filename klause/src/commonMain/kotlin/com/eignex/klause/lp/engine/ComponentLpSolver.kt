@@ -100,7 +100,7 @@ internal class ComponentLpSolver(
     }
 
     @Suppress("TooGenericExceptionCaught")
-    override fun openSolve(allowance: LpFloatAllowance?): LpSolveCursor<FloatLpResult?> {
+    override fun openSolve(allowance: LpFloatAllowance?, retainFundingStop: Boolean): LpSolveCursor<FloatLpResult?> {
         check(!closed && activeSolve == null) { "LP solve is closed or suspended" }
         return LpSolveCursor<FloatLpResult?>(completed = { activeSolve = null }) {
             val reuse = solveStarted

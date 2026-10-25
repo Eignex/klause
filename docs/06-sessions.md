@@ -277,6 +277,11 @@ for both children and their captured condition maps. Resuming cannot renew eithe
 operation ceiling for controlled comparisons. Other source LP clients retain their
 operation-based admission policy.
 
+Each retained sparse query takes its finite numerical lifetime from the caller's
+remaining cumulative work, with a proportional pivot allowance. Slice grants limit
+individual advances and do not renew that lifetime. Unfunded clients keep the fixed
+query policy. Preparation, certification and atomic overspend debit the same caller.
+
 Optional guidance reuses completed checks. Its index construction spends the check's
 token under a 65,536-entry boundary; a private stop discards only the hint. Native
 setup prepays source capture, and new controls cannot revive stopped preparation.

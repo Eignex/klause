@@ -18,6 +18,31 @@ import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
     @Test
+    fun `promoting a pivot stopped query should preserve its paid numerical path`() {
+        val expected = LpScopedSolver(LpExactState(lowerBoundModel())).use { owner ->
+            assertNotNull(owner.solveFloat()).second to owner.lastMetrics
+        }
+        LpScopedSolver(LpExactState(lowerBoundModel())).use { owner ->
+            val first = owner.advanceRootGuidance(100_000L, LpFloatAllowance(100_000L, 1), ReconstructionLimits())
+            val paid = owner.lastMetrics
+
+            assertFalse(first.paused)
+            assertTrue(owner.floatFundingStopped)
+            assertEquals(LpFloatTermination.PIVOTS, first.termination)
+            assertNull(first.primal)
+            assertNull(first.bound)
+            val resumed = assertNotNull(owner.advanceFloat(100_000L, LpFloatAllowance(200_000L, 100))).second
+            val total = paid + owner.lastMetrics
+
+            assertEquals(assertNotNull(expected.first).objective, assertNotNull(resumed).objective)
+            assertEquals(expected.second.workOps, total.workOps)
+            assertEquals(expected.second.pivots, total.pivots)
+            assertEquals(1L, owner.metrics.createdOwners)
+            assertEquals(0L, owner.metrics.closedOwners)
+        }
+    }
+
+    @Test
     fun `owner cancellation during root certification should discard guidance`() {
         var cancelled = false
         val observer = object : LpCertificationObserver {
