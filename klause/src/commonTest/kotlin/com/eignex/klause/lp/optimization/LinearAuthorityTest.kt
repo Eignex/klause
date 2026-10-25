@@ -424,6 +424,24 @@ class LinearAuthorityTest {
     }
 
     @Test
+    fun `an attained recovered bound should not request objective refinement`() {
+        val coordinates = (0 until 129).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val other = coordinates[1]
+        val coefficients = mapOf(real to BigFraction.ofLong(3), other to BigFraction.ofLong(3))
+        val source = SourceProofContext(scope, coordinates.toSet(), mapOf(
+            "upper" to SourcePremise(SourceInequality(coefficients, BigFraction.ONE)),
+            "lower" to SourcePremise(SourceInequality(coefficients.mapValues { it.value.negated() },
+                BigFraction.MINUS_ONE)),
+        ), coefficients)
+        val budget = SourceLpBudget()
+
+        val result = LinearAuthority(budget, retainLp = true).use { it.advance(source, Cancellation.Never) }
+
+        assertIs<SourceClaim.Optimal>(assertNotNull(result.evidence).claim)
+        assertEquals(1, budget.operations)
+    }
+
+    @Test
     fun `wide strict recovery should preserve the gap between a feasible point and its bound`() {
         val coordinates = (0 until 129).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
         val source = SourceProofContext(scope, coordinates.toSet(), mapOf(
