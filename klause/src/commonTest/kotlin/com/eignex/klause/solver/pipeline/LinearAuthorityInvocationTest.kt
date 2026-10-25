@@ -60,6 +60,28 @@ class LinearAuthorityInvocationTest {
     }
 
     @Test
+    fun `frontier should consume a sparse residual rejected by small scalar admission`() {
+        val reals = (0 until 129).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val coefficients = reals.take(65).associateWith { checkNotNull(BigFraction.ofDouble(3.141592653589793)) }
+        val value = checkNotNull(BigFraction.ofDouble(0.1))
+        val source = SourceProofContext(scope, reals.toSet(), mapOf(
+            "upper" to SourcePremise(SourceInequality(coefficients, value)),
+            "lower" to SourcePremise(SourceInequality(coefficients.mapValues { it.value.negated() }, value.negated())),
+        ), emptyMap())
+
+        val result = LinearAuthorityInvocation(source, TheoryParams(), boundOrdered = true).use {
+            it.run { _, _ -> }
+        }
+
+        val stages = assertNotNull(result.stats.smt.completeSearchStages)
+        assertEquals(1L, stages["numericalPrimalRecoveryExactAdmissionInputBits"])
+        assertEquals(1L, stages["numericalPrimalRecoverySparseCompleted"])
+        assertNotNull(result.incumbent)
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.terminal)))
+    }
+
+    @Test
     fun `borrowing an authority should preserve its exhausted cumulative funding`() {
         val source = SourceProofContext(scope, setOf(real), emptyMap(), mapOf(real to BigFraction.ONE))
         val budget = SourceLpBudget(funding = SourceLpFunding(0, 1000))

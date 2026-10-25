@@ -201,6 +201,7 @@ internal fun verifyExactBasis(
     observer: LpCertificationObserver? = null,
     primalOnly: Boolean = false,
 ): ExactBasisVerification {
+    require(!primalOnly || rayRow == null)
     val meter = ExactBasisMeter(limits, cancellation)
     if (!limits.admitsDimensions(model)) {
         val declined = try {
