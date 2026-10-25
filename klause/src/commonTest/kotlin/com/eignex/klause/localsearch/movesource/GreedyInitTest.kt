@@ -96,6 +96,29 @@ class GreedyInitTest {
         assertEquals(seeded, state.assignment.snapshot())
     }
 
+    @Test
+    fun `unused wide coordinates should not change the repair trajectory`() {
+        for (seed in longArrayOf(1L, 3L, 7L)) {
+            fun state(unused: IntDomain) = freshState(Problem(
+                numBoolVars = 0,
+                numIntVars = 3,
+                intDomains = arrayOf(IntDomain(0, 100_000), IntDomain(0, 100_000), unused),
+                factors = arrayOf<Factor>(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0)),
+            ), seed).also {
+                it.assignment.setInt(0, 70_000L)
+                it.assignment.setInt(1, 10_000L)
+                it.recompute()
+            }
+            val fixed = state(IntDomain(0, 0))
+            val wide = state(IntDomain(0, 100_000))
+
+            GreedyInit().run(fixed)
+            GreedyInit().run(wide)
+
+            assertEquals(fixed.assignment.snapshot(), wide.assignment.snapshot(), "seed=$seed")
+        }
+    }
+
     private fun problem(): Problem = Problem(
         numBoolVars = 0,
         numIntVars = 2,

@@ -72,12 +72,18 @@ class GreedyInit {
         if (v < numBoolVars) {
             val boolId = v
             if (!eligibility.allowsBool(boolId)) return
+            if (state.projection.boolOccurrences[boolId].isEmpty() &&
+                state.invariants?.readsBool(boolId) != true
+            ) return
             val baselineCost = state.cost
             state.apply(Move.BoolFlip(boolId))
             if (state.cost > baselineCost) state.apply(Move.BoolFlip(boolId))
         } else {
             val intId = v - numBoolVars
             if (!eligibility.allowsInt(intId)) return
+            if (state.projection.intOccurrences[intId].isEmpty() &&
+                state.invariants?.readsInt(intId) != true
+            ) return
             val d = state.rootDomains[intId]
             val cur = state.assignment.intValue(intId)
             if (d.isFixed) return
