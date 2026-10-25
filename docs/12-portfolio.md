@@ -174,8 +174,12 @@ parallel pools and purely integer models retain their finite composition.
 The numerical frontier receives the first bounded probe, preserving early completion
 without opening the finite handles; finite probes retain their order and seed positions.
 
-Each appended worker keeps at most four seconds of active search, 250 milliseconds
-and 5,000 work units per segment. Atomic preparation and certification can overrun;
+Each appended worker keeps at most four seconds of active search. Numerical segments
+take at most one second and joint-repair segments 250 milliseconds, further limited
+by the containing offer. Each segment caps native work or counted instructions at
+5,000. Before the first incumbent, joint repair is owed 30% of scheduled search time
+in addition to the finite policy's reservations: root preparation earns no incumbent
+reward until a proposal completes. Atomic preparation and certification can overrun;
 overspend retires that worker at its next turn without claiming exhaustion. Workers
 cannot reseed to renew these limits. The two owners divide the containing numerical
 work and allocation ceilings equally and retain their query funding across slices.

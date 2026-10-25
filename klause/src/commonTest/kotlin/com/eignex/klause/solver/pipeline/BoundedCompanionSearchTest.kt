@@ -19,31 +19,33 @@ import kotlin.time.TestTimeSource
 class BoundedCompanionSearchTest {
     @Test
     fun `an overrun should retire a companion without claiming exhaustion`() {
-        val clock = TestTimeSource()
-        var calls = 0
-        val native = object : ResumableSearch {
-            override val isDone: Boolean get() = false
-            override val stats: SolveStats get() = SolveStats.EMPTY
-            override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
-                onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
-                assertEquals(250L, sliceMillis)
-                assertEquals(5_000L, sliceNodes)
-                calls++
-                clock += 5.seconds
-                return null
+        for (ceiling in listOf(250L, 1_000L)) {
+            val clock = TestTimeSource()
+            var calls = 0
+            val native = object : ResumableSearch {
+                override val isDone: Boolean get() = false
+                override val stats: SolveStats get() = SolveStats.EMPTY
+                override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+                    onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
+                    assertEquals(ceiling, sliceMillis)
+                    assertEquals(5_000L, sliceNodes)
+                    calls++
+                    clock += 5.seconds
+                    return null
+                }
             }
+
+            val search = BoundedCompanionSearch(native, "trial", sliceLimit = ceiling.milliseconds, clock = clock)
+            assertNull(search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {})
+            assertFalse(search.canReseed)
+            val result = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {}
+
+            assertEquals(TerminationReason.BudgetExhausted, assertIs<MinimizeResult.Unknown>(result).reason)
+            assertEquals(1, calls)
+            assertTrue(search.isDone)
+            assertEquals(1L, search.stats.smt.completeSearchStages?.get("trialRetired"))
+            assertEquals(5_000L, search.stats.smt.completeSearchStages?.get("trialActiveMs"))
         }
-
-        val search = BoundedCompanionSearch(native, "trial", clock = clock)
-        assertNull(search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {})
-        assertFalse(search.canReseed)
-        val result = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {}
-
-        assertEquals(TerminationReason.BudgetExhausted, assertIs<MinimizeResult.Unknown>(result).reason)
-        assertEquals(1, calls)
-        assertTrue(search.isDone)
-        assertEquals(1L, search.stats.smt.completeSearchStages?.get("trialRetired"))
-        assertEquals(5_000L, search.stats.smt.completeSearchStages?.get("trialActiveMs"))
     }
 
     @Test

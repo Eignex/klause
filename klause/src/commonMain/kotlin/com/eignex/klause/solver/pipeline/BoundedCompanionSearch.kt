@@ -14,6 +14,7 @@ internal class BoundedCompanionSearch(
     private val search: ResumableSearch,
     private val prefix: String,
     private val activeLimit: Duration = 4_000.milliseconds,
+    private val sliceLimit: Duration = 250.milliseconds,
     private val clock: TimeSource = TimeSource.Monotonic,
 ) : InstructionSlicedSearch, ReseedGuard, ResumableSearch by search {
     private var active = Duration.ZERO
@@ -53,7 +54,8 @@ internal class BoundedCompanionSearch(
         }
         val mark = clock.markNow()
         try {
-            terminal = run(minOf(sliceMillis, 250L, (activeLimit - active).inWholeMilliseconds.coerceAtLeast(1)))
+            terminal = run(minOf(sliceMillis, sliceLimit.inWholeMilliseconds,
+                (activeLimit - active).inWholeMilliseconds.coerceAtLeast(1)))
         } finally {
             active += mark.elapsedNow()
         }
