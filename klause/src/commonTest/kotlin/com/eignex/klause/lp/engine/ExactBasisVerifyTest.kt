@@ -14,6 +14,23 @@ import kotlin.time.Duration
 
 class ExactBasisVerifyTest {
     @Test
+    fun `primal only verification should withhold objective and conflict authority`() {
+        val model = LpBuilder().apply {
+            addVar(0L, 10L, cost = 3L)
+            addRow(intArrayOf(0), longArrayOf(3L), Relation.EQ, 1L)
+        }.build(Sense.MINIMIZE)
+        val basis = Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.FIXED))
+
+        val result = verifyExactBasis(model, basis, primalOnly = true)
+
+        assertEquals(listOf(BigFraction.ofLong(3).reciprocal()), assertNotNull(result.witness).primal)
+        assertEquals(1, result.metrics.solves)
+        assertNull(result.bound)
+        assertNull(result.conflict)
+        assertFalse(result.complementary)
+    }
+
+    @Test
     fun `transient entry stops should take precedence over structural rejection and permit retry`() {
         val model = LpBuilder().apply {
             addVar(0L, 1L)

@@ -56,6 +56,7 @@ internal class LinearAuthorityLp(
     private var guidanceRows: List<ExactRationalInequality>? = null
     private var guidanceInactive: Set<Int> = emptySet()
     private var guidancePacked: LinearAuthorityModel? = null
+    private val residual = LinearResidualCompletion(budget, guidancePolicy)
     val preparations: Long get() = session?.preparations ?: 0L
     val reuses: Long get() = session?.reuses ?: 0L
     fun invalidateGuidance() = session?.invalidateGuidance() ?: Unit
@@ -73,13 +74,14 @@ internal class LinearAuthorityLp(
         constant: BigFraction,
         cancellation: Cancellation,
         inactive: Set<Int> = emptySet(),
+        onDecline: (String) -> Unit = {},
     ): LinearAuthorityLpResult? {
         val retained = session
         var prepared: LinearAuthorityModel? = null
         return budget.runPrepared(cancellation, prepare = { token ->
             LinearAuthorityModel.prepare(rows, costs.size, token, inactive)?.also { prepared = it }
                 ?.input(costs, constant)
-        }) { token ->
+        }, onDecline = onDecline) { token ->
             val packed = checkNotNull(prepared)
             val workingRows = packed.rows
             val zero = ExactLpNumber.of(0L)
@@ -209,6 +211,7 @@ internal class LinearAuthorityLp(
         guidanceRows = null
         guidanceInactive = emptySet()
         guidancePacked = null
+        residual.close()
         session?.close()
     }
 
@@ -218,17 +221,20 @@ internal class LinearAuthorityLp(
         progress: LinearPrimalRecoveryProgress,
     ): List<BigFraction>? = session?.withGuidance(cancellation) { token ->
         recoverLinearPrimal(coordinates, point, rows, inactive, token, complete = { residual, columns, active ->
-            LinearAuthorityLp(budget, { shape ->
-                onShape(shape)
-                if (shape.prepared) {
-                    observe("PrimalRecoveryComponentMaxColumns", shape.columns.toLong())
-                    observe("PrimalRecoveryComponentMaxRows", shape.rows.toLong())
-                    if (!shape.admitted) observe("PrimalRecoveryComponentDimension", 1L)
+            this.residual.complete(residual, columns, active, observe) {
+                LinearAuthorityLp(budget, { shape ->
+                    onShape(shape)
+                    if (shape.prepared) {
+                        observe("PrimalRecoveryComponentMaxColumns", shape.columns.toLong())
+                        observe("PrimalRecoveryComponentMaxRows", shape.rows.toLong())
+                        if (!shape.admitted) observe("PrimalRecoveryComponentDimension", 1L)
+                    }
+                }).use { completion ->
+                    completion.solve(residual, List(columns) { BigFraction.ZERO }, BigFraction.ZERO, active,
+                        onDecline = { observe("PrimalRecoveryExactAdmission$it", 1L) })
+                        ?.result?.exactPrimal?.take(columns)
                 }
-            }).use { completion ->
-                completion.solve(residual, List(columns) { BigFraction.ZERO }, BigFraction.ZERO, active)
-                    ?.result?.exactPrimal?.take(columns)
-            }
+            }.also { progress.pending = this.residual.paused }
         }, observe = { stage, count ->
             if (stage == "PrimalRecoveryWork") budget.observe(refinement = count)
             if (stage == "PrimalRecoveryAllocation") budget.funding?.charge(0L, count)

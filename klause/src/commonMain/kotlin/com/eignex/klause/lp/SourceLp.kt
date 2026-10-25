@@ -175,8 +175,10 @@ internal class SourceLpBudget(
     fun <T> runPrepared(
         cancellation: Cancellation,
         prepare: (Cancellation) -> SourceLpInput?,
+        onDecline: (String) -> Unit = {},
         block: (Cancellation) -> T?,
-    ): T? = runAdmitted(emptyList(), 0, cancellation, emptyList(), emptyList(), false, block, prepare)
+    ): T? = runAdmitted(emptyList(), 0, cancellation, emptyList(), emptyList(), false, block, prepare,
+        onDecline = onDecline)
 
     fun <T> runSparse(
         cancellation: Cancellation,
@@ -228,6 +230,7 @@ internal class SourceLpBudget(
         prepare: ((Cancellation) -> SourceLpInput?)? = null,
         sparse: ((Cancellation) -> SparseSourceLpPreparation)? = null,
         resumed: SourceLpSparseAdmission? = null,
+        onDecline: (String) -> Unit = {},
     ): T? {
         val activeCap = maxActiveNanos
         if (cancellation() || funding?.paused == true || (resumed == null && operations >= maxOperations)) return null
@@ -263,22 +266,32 @@ internal class SourceLpBudget(
             val admittedRhs = prepared?.rhs ?: rhs
             val groups = listOf(prepared?.rows ?: rows) + additional
             val rowCount = groups.sumOf { it.size.toLong() }
-            if (!admitsDimensions(admittedVariables, rowCount) || admittedRhs.size > 128) return null
+            if (!admitsDimensions(admittedVariables, rowCount) || admittedRhs.size > 128) {
+                onDecline("Dimension")
+                return null
+            }
             var entries = 0L
             var bits = 0L
             fun admit(number: BigFraction): Boolean {
                 if (token()) return false
                 val numerator = number.num.magnitudeBitLength()
                 val denominator = number.den.magnitudeBitLength()
-                if (numerator > 4096 || denominator > 4096) return false
+                if (numerator > 4096 || denominator > 4096) {
+                    onDecline("ScalarWidth")
+                    return false
+                }
                 bits += numerator.toLong() + denominator
-                return bits <= 8192L
+                return (bits <= 8192L).also { if (!it) onDecline("InputBits") }
             }
             for (group in groups) {
                 for (row in group) {
                     if (token()) return null
                     entries += row.columns.size
-                    if (entries > 512L || row.columns.any { it !in 0 until admittedVariables }) return null
+                    if (entries > 512L) {
+                        onDecline("Entries")
+                        return null
+                    }
+                    if (row.columns.any { it !in 0 until admittedVariables }) return null
                     if (!admit(row.rhs) || row.coefficients.any { !admit(it) }) return null
                 }
             }

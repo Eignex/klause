@@ -199,6 +199,7 @@ internal fun verifyExactBasis(
     cancellation: Cancellation = Cancellation.Never,
     limits: ExactBasisLimits = ExactBasisLimits(),
     observer: LpCertificationObserver? = null,
+    primalOnly: Boolean = false,
 ): ExactBasisVerification {
     val meter = ExactBasisMeter(limits, cancellation)
     if (!limits.admitsDimensions(model)) {
@@ -256,13 +257,15 @@ internal fun verifyExactBasis(
             val point = verifyBasisCandidates(model, authority, primal, null, null, meter)
             witness = point.witness
             point.metrics.decline?.takeUnless { it == ReconstructionDecline.CANDIDATE }?.let { meter.stop(it) }
-            meter.phase = ExactBasisPhase.DUAL
-            val dual = solveExactBasis(factors, authority.costs, true, meter)
-            val checked = verifyBasisCandidates(model, authority, primal, dual, null, meter)
-            witness = checked.witness ?: witness
-            bound = checked.bound
-            complementary = checked.complementary
-            checked.metrics.decline?.let { meter.stop(it) }
+            if (!primalOnly) {
+                meter.phase = ExactBasisPhase.DUAL
+                val dual = solveExactBasis(factors, authority.costs, true, meter)
+                val checked = verifyBasisCandidates(model, authority, primal, dual, null, meter)
+                witness = checked.witness ?: witness
+                bound = checked.bound
+                complementary = checked.complementary
+                checked.metrics.decline?.let { meter.stop(it) }
+            }
         } else {
             meter.phase = ExactBasisPhase.RAY
             meter.charge(model.m.toLong(), model.m * 32L)
