@@ -1,5 +1,7 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.simplex.basis.RationalBasisLimits
+import com.eignex.klause.simplex.basis.RationalBasisStats
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.BigRationalConflict
 import com.eignex.klause.simplex.exact.ExactSimplexBound
@@ -49,11 +51,22 @@ internal enum class LpPointRejection {
     LOGICAL_BOUND,
 }
 
-internal enum class ReconstructionPhase { INPUT, POINT, DUAL, RAY, SUPPORT, VIOLATION, VECTOR, SCHEDULE }
+internal enum class ReconstructionPhase { INPUT, POINT, DUAL, RAY, SUPPORT, VIOLATION, VECTOR, BASIS, SCHEDULE }
 
 internal data class ReconstructionDualRejection(val column: Int, val upper: Boolean, val reduced: BigFraction)
 internal data class ReconstructionVectorRejection(val commonDenominator: BigInt, val limit: BigInt)
 internal data class ReconstructionEntryRejection(val row: Int, val value: BigFraction)
+internal data class ReconstructionBasisMetrics(
+    val peeledRows: Int = 0,
+    val peeledColumns: Int = 0,
+    val coreRows: Int = 0,
+    val components: Int = 0,
+    val largestComponent: Int = 0,
+    val solvedComponents: Int = 0,
+    val work: Long = 0L,
+    val allocation: Long = 0L,
+    val decline: String? = null,
+)
 
 internal data class ReconstructionMetrics(
     val attempts: Int,
@@ -73,6 +86,7 @@ internal data class ReconstructionMetrics(
     val dualRejection: ReconstructionDualRejection? = null,
     val vectorRejection: ReconstructionVectorRejection? = null,
     val entryRejection: ReconstructionEntryRejection? = null,
+    val basisRepair: ReconstructionBasisMetrics? = null,
 )
 
 internal class ReconstructedCertificate(
@@ -88,6 +102,7 @@ internal class ReconstructedCertificate(
 
 internal class ReconstructionOverflow : RuntimeException()
 private class ReconstructionStop(val reason: ReconstructionDecline) : RuntimeException()
+private class ReconstructionLayoutStop(val reason: LogicalBasisLayoutDecline) : RuntimeException()
 
 internal class ReconstructionMeter(
     val limits: ReconstructionLimits = ReconstructionLimits(),
@@ -106,6 +121,7 @@ internal class ReconstructionMeter(
     var dualRejection: ReconstructionDualRejection? = null
     var vectorRejection: ReconstructionVectorRejection? = null
     var entryRejection: ReconstructionEntryRejection? = null
+    var basisRepair: ReconstructionBasisMetrics? = null
     private var work = 0L
     private var allocation = 0L
     private var maxBits = 0
@@ -170,11 +186,24 @@ internal class ReconstructionMeter(
     fun snapshot(decline: ReconstructionDecline?) = ReconstructionMetrics(
         attempts, pointChecks, dualChecks, rayChecks, pointSuccesses, dualSuccesses, raySuccesses,
         vectorRestarts, verificationRestarts, work, allocation, maxBits, decline, phase, dualRejection, vectorRejection,
-        entryRejection,
+        entryRejection, basisRepair,
     )
+
+    fun basisLimits(): RationalBasisLimits = RationalBasisLimits(
+        work = (limits.maxWork - work) / 2L,
+        allocationBytes = (limits.maxAllocation - allocation) / 2L,
+        fill = minOf(limits.maxEntries, 16384),
+        bits = limits.maxBits,
+    )
+
+    fun recordBasis(stats: RationalBasisStats) {
+        step(stats.work)
+        storage(stats.allocationBytes)
+        maxBits = maxOf(maxBits, stats.maxBits)
+    }
 }
 
-private class ReconstructionAuthority(val model: LpModel, val meter: ReconstructionMeter) {
+internal class ReconstructionAuthority(val model: LpModel, val meter: ReconstructionMeter) {
     val n = model.n
     val m = model.m
     val size = model.numVars
@@ -575,6 +604,20 @@ private class ReconstructionRun(private val a: ReconstructionAuthority, private 
         return result.toList()
     }
 
+    fun basisDual(candidate: List<BigFraction>, basis: Basis): List<BigFraction>? {
+        if (!validHeadings(basis)) return null
+        meter.phase = ReconstructionPhase.BASIS
+        val layout = try {
+            LogicalBasisLayout.prepare(a.n, a.m, basis.basicVars, { a.matrix[it] },
+                { work, bytes -> meter.step(work); if (bytes > 0L) meter.storage(bytes) },
+                { reason -> throw ReconstructionLayoutStop(reason) })
+        } catch (stop: ReconstructionLayoutStop) {
+            meter.basisRepair = ReconstructionBasisMetrics(decline = stop.reason.name)
+            return null
+        }
+        return reconstructBasisDual(a, basis, layout, candidate, meter)
+    }
+
     private fun validHeadings(basis: Basis?): Boolean {
         meter.step(a.size.toLong())
         if (basis == null || basis.status.size != a.size || basis.basicVars.size != a.m) return false
@@ -746,13 +789,20 @@ private fun reconstructCandidates(
                     current.reconstructedSeated(x, basis, denominator)?.let { current.point(it, basis) }
                 }
                 if (y != null) {
-                    val vector = reconstructExactVector(y, denominator, meter)
-                        ?: if (goal == ReconstructionGoal.BOUND) reconstructBoundVector(y, denominator, meter) else null
-                    vector?.let {
-                        val candidate = if (goal == ReconstructionGoal.BOUND) {
-                            repairBoundMultipliers(authority, it, meter)
-                        } else it
-                        current.dual(candidate, ray = false)
+                    if (goal == ReconstructionGoal.BOUND && basis != null) {
+                        current.basisDual(y, basis)?.let { current.dual(it, ray = false) }
+                    }
+                    if (goal != ReconstructionGoal.BOUND || current.bound == null) {
+                        val vector = reconstructExactVector(y, denominator, meter)
+                            ?: if (goal == ReconstructionGoal.BOUND) {
+                                reconstructBoundVector(y, denominator, meter)
+                            } else null
+                        vector?.let {
+                            val candidate = if (goal == ReconstructionGoal.BOUND) {
+                                repairBoundMultipliers(authority, it, meter)
+                            } else it
+                            current.dual(candidate, ray = false)
+                        }
                     }
                 }
                 if (rho != null && current.point == null) {
@@ -967,11 +1017,12 @@ internal fun certifyLpBoundOnly(
     cancellation: Cancellation = Cancellation.Never,
     observer: LpCertificationObserver? = null,
     policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
+    basis: Basis? = null,
 ): ReconstructedCertificate {
     val timer = LpPhaseTimer(observer, LpSolvePhase.BOUND_CERTIFICATE)
     val checked = reconstructCandidates(
         model, 0, duals.size, 0, null,
-        { meter -> reconstructIeee(duals, meter) }, null, null, cancellation, limits,
+        { meter -> reconstructIeee(duals, meter) }, null, basis, cancellation, limits,
         goal = ReconstructionGoal.BOUND,
         validate = { meter ->
             meter.poll()

@@ -56,6 +56,7 @@ internal fun LpScopedSolver.advanceRootGuidance(
     val point = result.primal.takeIf { it.size == state.model.n && it.all(Double::isFinite) }
     val checked = certifyLpBoundOnly(
         requireNotNull(state.ownerWorkingModel()), result.duals, certificateLimits, token, observer, policy,
+        basis = result.basis,
     )
     if (token()) return LpRootGuidance(null, null, LpRootGuidancePhase.CERTIFICATE, false,
         lastFloatTermination, checked.metrics)
