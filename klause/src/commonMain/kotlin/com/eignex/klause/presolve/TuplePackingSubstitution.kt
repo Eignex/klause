@@ -160,6 +160,7 @@ internal object TuplePackingSubstitution {
         val tables = LinkedHashMap<Int, Table>()
         for (variable in distinct.vars) {
             if (!meter.visit() || variable in objectiveIntVars || !scope.add(variable)) return null
+            if (!problem.intBounds.hasLower(variable) || !problem.intBounds.hasUpper(variable)) return null
             val users = occurrences[variable] ?: return null
             if (users.size != 2 || id !in users) return null
             val tableId = users.first { it != id }

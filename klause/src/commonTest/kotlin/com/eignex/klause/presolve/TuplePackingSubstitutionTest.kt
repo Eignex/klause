@@ -151,6 +151,19 @@ class TuplePackingSubstitutionTest {
     }
 
     @Test
+    fun `invented finite endpoints should retain the original source relations`() {
+        val factors = listOf(Table(intArrayOf(0, 1), longArrayOf(0, 1, 2, 3)),
+            Table(intArrayOf(2, 3), longArrayOf(0, 1, 2, 3)), AllDifferent(intArrayOf(0, 1, 2, 3)))
+        for (upper in listOf(false, true)) {
+            val source = Problem(0, 4, Array(4) { IntDomain(0, 3) }, factors,
+                openIntLo = BooleanArray(4) { it == 0 && !upper },
+                openIntHi = BooleanArray(4) { it == 0 && upper }).bake()
+
+            assertNull(TuplePackingSubstitution.substitute(source, emptySet()))
+        }
+    }
+
+    @Test
     fun `incomplete admission should retain the source model`() {
         val tables = listOf(Table(intArrayOf(0, 1), longArrayOf(0, 1, 2, 3)),
             Table(intArrayOf(2, 3), longArrayOf(0, 1, 2, 3)))
