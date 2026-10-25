@@ -108,6 +108,21 @@ class MaxSdTest {
     }
 
     @Test
+    fun `interrupted residual scoring should restore its pin and retain the candidate`() {
+        val session = PropagationSession(Problem(0, 2, Array(2) { IntDomain(0, 2) }, emptyArray<Factor>()))
+        var visits = 0
+
+        val values = probeAndOrder(
+            session, VarRef.IntVar(0), Random(0L), maxProbes = 32, ascending = false,
+            scoreVisit = { ++visits < 2 },
+        ).toSet()
+
+        assertEquals(setOf(0L, 1L, 2L), values)
+        assertEquals(0, session.decisionLevel)
+        assertEquals(IntDomain(0, 2), session.intDomain(0))
+    }
+
+    @Test
     fun `support discovery should observe cancellation before an unsupported fallback`() {
         var cancelled = false
         val cancellation = object : Cancellation {
