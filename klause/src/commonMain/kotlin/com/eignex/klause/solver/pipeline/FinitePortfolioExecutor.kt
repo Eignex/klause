@@ -145,7 +145,11 @@ internal fun FinitePipeline.portfolioExecutor(
         } else {
             emptySet()
         }
-        PortfolioInvocationPolicy(profile, reserved, reserveBeforeIncumbentOnly = true, probes = probes)
+        val probeWeights = if (companions == null) intArrayOf() else IntArray(workers.size) { arm ->
+            if (workers[arm].label == "numerical/finite-companion") 3 else 1
+        }
+        PortfolioInvocationPolicy(profile, reserved, reserveBeforeIncumbentOnly = true, probes = probes,
+            probeWeights = probeWeights)
     }
 }
 

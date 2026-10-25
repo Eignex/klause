@@ -67,26 +67,31 @@ class LinearSourceExecutionTest {
 
     @Test
     fun `automatic and explicit finite companions should consume checked numerical completion`() {
-        val source = LinearSourceProblem(
-            listOf(LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE),
-                LinearSourceVariable("r", false, SemanticRational.ZERO, SemanticRational.ONE)),
-            listOf(LinearSourceRow(listOf(LinearSourceTerm(0, SemanticRational.ONE),
-                LinearSourceTerm(1, SemanticRational.ONE)),
-                lower = SemanticRational.of(BIG_ONE, bigIntOf(2)))),
-            LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE),
-                LinearSourceTerm(1, SemanticRational.ONE))),
-        )
-        for (traversal in listOf(LinearTraversal.AUTOMATIC, LinearTraversal.FINITE_COMPANIONS)) {
-            val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
-                ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED, linearTraversal = traversal))
+        for (sense in ObjectiveSense.entries) {
+            val source = LinearSourceProblem(
+                listOf(LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE),
+                    LinearSourceVariable("r", false, SemanticRational.ZERO, SemanticRational.ONE)),
+                listOf(LinearSourceRow(listOf(LinearSourceTerm(0, SemanticRational.ONE),
+                    LinearSourceTerm(1, SemanticRational.ONE)),
+                    lower = SemanticRational.of(BIG_ONE, bigIntOf(2)))),
+                LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE),
+                    LinearSourceTerm(1, SemanticRational.ONE)), sense = sense),
+            )
+            for (traversal in listOf(LinearTraversal.AUTOMATIC, LinearTraversal.FINITE_COMPANIONS)) {
+                val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
+                    ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED,
+                    maximize = sense == ObjectiveSense.MAXIMIZE, linearTraversal = traversal))
 
-            val result = assertIs<SourceExecutionResult.Finite>(SourceSetup.execute(SourceExecutionRequest(invocation,
-                ExecutionOptions(), presolveConfig = PresolveConfig.NONE)))
+                val result = assertIs<SourceExecutionResult.Finite>(SourceSetup.execute(SourceExecutionRequest(
+                    invocation, ExecutionOptions(), presolveConfig = PresolveConfig.NONE)))
 
-            assertEquals(LinearSourceConclusion.OPTIMAL, result.linearSource?.conclusion)
-            assertEquals(BigFraction.of(BIG_ONE, bigIntOf(2)), result.linearSource?.incumbent?.objective)
-            val completed = assertIs<FiniteSolveOutcome.Completed>(result.result.outcome)
-            assertEquals(1L, completed.stats.smt.completeSearchStages?.get("finiteNumericalCompanionOptimal"))
+                assertEquals(LinearSourceConclusion.OPTIMAL, result.linearSource?.conclusion)
+                val expected = if (sense == ObjectiveSense.MAXIMIZE) BigFraction.ofLong(2)
+                    else BigFraction.of(BIG_ONE, bigIntOf(2))
+                assertEquals(expected, result.linearSource?.incumbent?.objective)
+                val completed = assertIs<FiniteSolveOutcome.Completed>(result.result.outcome)
+                assertEquals(1L, completed.stats.smt.completeSearchStages?.get("finiteNumericalCompanionOptimal"))
+            }
         }
     }
 

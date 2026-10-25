@@ -26,6 +26,19 @@ import kotlin.test.assertTrue
 
 class PortfolioTest {
     @Test
+    fun `probe weights should redistribute the fixed initial pool budget`() {
+        val eligible = listOf(0, 1, 2)
+        val uniform = eligible.map { initialProbeFraction(it, eligible, intArrayOf()) }
+
+        val weighted = eligible.map { initialProbeFraction(it, eligible, intArrayOf(3, 1, 1)) }
+
+        assertEquals(1.0, uniform.sum(), 1e-12)
+        assertEquals(1.0, weighted.sum(), 1e-12)
+        assertTrue(weighted[0] > uniform[0])
+        assertTrue(weighted.drop(1).all { it < uniform[0] })
+    }
+
+    @Test
     fun `sequential solve should return sat on a satisfiable problem`() {
         val r = Portfolio.thompson(btArms(exactlyOneOver(4), 3)).use { it.solve() }
         val sat = assertIs<SolveResult.Sat>(r)
