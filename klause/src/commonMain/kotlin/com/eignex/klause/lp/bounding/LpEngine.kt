@@ -16,6 +16,7 @@ import com.eignex.klause.factor.global.GlobalCardinality
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.LpHullGroupKey
 import com.eignex.klause.lp.cut.AggregationMirSeparator
 import com.eignex.klause.lp.cut.AllDifferentSeparator
@@ -44,6 +45,7 @@ import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.newPersistentLpSolver
 import com.eignex.klause.lp.engine.solveAndCertify
+import com.eignex.klause.lp.lpHullFamily
 import com.eignex.klause.lp.lpHullGroupKey
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LeafRealResult
@@ -1024,14 +1026,18 @@ internal class LpEngine(
             return
         }
         val groups = LinkedHashMap<LpHullGroupKey, MutableSet<Int>>()
-        for ((factorId, factor) in problem.factors.withIndex()) {
-            if (factorId % CONSTRUCTION_BATCH_SIZE == 0 && cancellation()) return
-            groups.getOrPut(factor.lpHullGroupKey(factorId)) { LinkedHashSet() }.add(factorId)
+        for ((index, factorId) in hullIds.withIndex()) {
+            if (index % CONSTRUCTION_BATCH_SIZE == 0 && cancellation()) return
+            groups.getOrPut(problem.factors[factorId].lpHullGroupKey(factorId)) { LinkedHashSet() }.add(factorId)
         }
-        val candidates = hullIds.map { problem.factors[it].lpHullGroupKey(it) }.distinct()
-        for (key in candidates) {
+        if (groups.keys.any { it.family == HullFamily.ELEMENT }) {
+            for ((factorId, factor) in problem.factors.withIndex()) {
+                if (factorId % CONSTRUCTION_BATCH_SIZE == 0 && cancellation()) return
+                if (factor.lpHullFamily() == HullFamily.ELEMENT) groups[factor.lpHullGroupKey(factorId)]?.add(factorId)
+            }
+        }
+        for (group in groups.values) {
             if (cancellation()) return
-            val group = groups.getValue(key)
             val probe = buildRelaxer(params.lpPlan, suppressed + group) ?: continue
             val bound = rootLpObjective(probe, cancellation)
             if (!bound.isNaN() && bound >= full - HULL_PRUNE_TOL) suppressed.addAll(group)
