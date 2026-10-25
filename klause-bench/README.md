@@ -1437,8 +1437,17 @@ controls establish no general speedup.
 
 [8321](https://lab.eignex.com/jobs/8321) compares the rebased implementation
 `4bcf201d7e` with `02e78c79dc` after finite presolve and search-catalog integration,
-using the same ten sources and options, with one repeat per seed. This integration
-control is separate from the three-repeat work-stop comparison.
+using the same ten sources and options, with one repeat per seed on Mac/aarch64.
+All 40 records return and all 22 witnesses pass independent source checking;
+original hashes, runtime, options and non-solver dependencies match. Both native
+ChainReaction refutations remain, in 1.10/1.50 seconds versus default UNKNOWN.
+Nonogram takes 1.08/1.26 seconds versus 4.06/6.11. Satisfiable ChainReaction still
+costs 5.73/9.09 seconds versus 0.78/1.40. Both CarSequencing-75 seeds are feasible
+under both arms. Single paired witness gains on Eternity and CarSequencing-80
+establish no stable recovery; Eternity reports 133 narrowed columns, while
+CarSequencing-80 reports none. This integration
+run has no paired feasibility loss; it does not remove the losses in the separate
+three-repeat work-stop comparison.
 
 ### Exact source equality blocks
 
