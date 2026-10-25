@@ -7,10 +7,11 @@ import com.eignex.klause.util.Cancellation
 
 internal class RetainedLinearEncoding(
     private val mapping: RetainedFactors,
-    private val models: Map<EncodingTarget, Problem>,
+    private val target: EncodingTarget,
+    private val encoded: Problem,
 ) {
     fun model(target: EncodingTarget, indices: List<Int>, cancellation: Cancellation): Problem? {
-        val encoded = models[target] ?: return null
+        if (target != this.target) return null
         if (encoded.numRealVars != mapping.source.numRealVars) return null
         val targetIds = IntArray(mapping.source.numFactors) { -1 }
         for (index in indices) targetIds[mapping.sourceIndex(index)] = index

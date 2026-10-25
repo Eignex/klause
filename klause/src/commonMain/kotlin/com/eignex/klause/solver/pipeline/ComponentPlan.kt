@@ -67,7 +67,6 @@ class ComponentPlan internal constructor(
     },
     private val installedFragment: Problem? = null,
     internal val encodingDecline: EncoderDecline? = null,
-    private val completeEncodings: Map<EncodingTarget, Problem> = emptyMap(),
 ) {
     init {
         factorProjections.requireSource(source)
@@ -323,8 +322,8 @@ class ComponentPlan internal constructor(
     internal fun retainedEncoding(mapping: RetainedFactors, projections: PreparedFactorProjections?): RetainedLinearEncoding? =
         if (source === mapping.source && factorProjections === projections &&
             projections?.providers === FactorProjectionProviders.Default && encodingDecline == null &&
-            completeEncodings.isNotEmpty()
-        ) RetainedLinearEncoding(mapping, completeEncodings) else null
+            hasTheoryComponent && installedFragment != null
+        ) RetainedLinearEncoding(mapping, encodingTarget(), installedFragment) else null
 
     private fun requireBelongsTo(spec: Problem) {
         require(spec === source) {
@@ -536,15 +535,7 @@ internal fun Problem.buildComponentPlan(
         if (route != ProblemPipeline.UNSUPPORTED_OPEN) null
         else if (preparationStopped || stop() || linearDecline == EncoderDecline.RESOURCE ||
             differenceDecline == EncoderDecline.RESOURCE) EncoderDecline.RESOURCE
-        else linearDecline ?: differenceDecline ?: fullLinearDecline ?: fullDifferenceDecline,
-        when {
-            initialResourceDecline || preparationStopped || stop() -> emptyMap()
-            route == ProblemPipeline.DIFFERENCE_THEORY && difference != null ->
-                mapOf(EncodingTarget.DIFFERENCE to difference)
-            (route == ProblemPipeline.EXACT_LRA || route == ProblemPipeline.EXACT_LIRA) && linear != null ->
-                mapOf(EncodingTarget.LINEAR to linear)
-            else -> emptyMap()
-        })
+        else linearDecline ?: differenceDecline ?: fullLinearDecline ?: fullDifferenceDecline)
 }
 
 /**
