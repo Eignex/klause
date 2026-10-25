@@ -11,6 +11,8 @@ internal class SourceLpFunding(
     var allocated: Long = 0
         private set
     private var granted = 0L
+    val remainingWork: Long get() = (workLimit - spent).coerceAtLeast(0L)
+    val availableWork: Long get() = minOf(remainingWork, (granted - spent).coerceAtLeast(0L))
     val exhausted: Boolean get() = spent >= workLimit || allocated >= allocationLimit
     val paused: Boolean get() = exhausted || spent >= granted
 

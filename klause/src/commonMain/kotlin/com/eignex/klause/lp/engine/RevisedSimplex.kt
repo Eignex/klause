@@ -195,6 +195,7 @@ internal class RevisedSimplex(
         get() = if (effectiveIterationLimit > 0) effectiveIterationLimit else 50 * (m + numVars) + 200
 
     private var floatAllowance: LpFloatAllowance? = null
+    private var retainFundingStop = false
     private val effectiveWorkLimit: Long get() = floatAllowance?.work ?: workLimit
     private val effectiveIterationLimit: Int get() = floatAllowance?.iterations ?: iterationLimit
     private val m = model.m
@@ -941,11 +942,12 @@ internal class RevisedSimplex(
         }
     }
 
-    override fun openSolve(allowance: LpFloatAllowance?): LpSolveCursor<FloatLpResult?> {
+    override fun openSolve(allowance: LpFloatAllowance?, retainFundingStop: Boolean): LpSolveCursor<FloatLpResult?> {
         check(activeSolve == null) { "LP solve is suspended" }
         return LpSolveCursor<FloatLpResult?>(completed = { activeSolve = null }) {
             val previous = floatAllowance
             floatAllowance = allowance
+            this@RevisedSimplex.retainFundingStop = retainFundingStop
             val reuse = solveStarted
             val progress = SolveProgress()
             try {
@@ -954,14 +956,31 @@ internal class RevisedSimplex(
                 }
             } finally {
                 floatAllowance = previous
+                this@RevisedSimplex.retainFundingStop = false
             }
         }.also { activeSolve = it }
     }
 
-    private suspend fun pauseAtIteration() {
+    override fun promoteSolve(allowance: LpFloatAllowance): Boolean {
+        val previous = floatAllowance ?: return false
+        if (activeSolve == null || allowance.work < previous.work || allowance.iterations < previous.iterations) {
+            return false
+        }
+        floatAllowance = allowance
+        return true
+    }
+
+    private suspend fun pauseAtIteration(progress: SolveProgress) {
         val cursor = activeSolve ?: return
         chargeWork()
         cursor.checkpoint(work.ops)
+        while (retainFundingStop && !cancellation()) {
+            val stop = remainingStop(progress) ?: break
+            if (stop != LpFloatTermination.WORK && stop != LpFloatTermination.PIVOTS) break
+            observations.termination = stop
+            cursor.pauseAt(work.ops)
+            observations.termination = null
+        }
     }
 
     /**
@@ -1471,7 +1490,6 @@ internal class RevisedSimplex(
             }
         }
         resetGamma() // fresh Devex reference frame for this solve
-        val maxIter = maxIterations
         // Bounds stay fixed for this solve; the leaving scan otherwise reads every basic column from the
         // exact model on every iteration. Artificial sides count as finite until they are dropped.
         val finiteLower = if (m > 0 && model.exactState != null) {
@@ -1498,8 +1516,8 @@ internal class RevisedSimplex(
         // Whether an iterate's basic values are in [beta], so a solve that stops short can still hand
         // back its bound. The buffer is reused, and holds the last iterate the loop completed.
         var haveBeta = false
-        iterations@ while (progress.iterations < maxIter) {
-            if (activeSolve != null) pauseAtIteration()
+        iterations@ while (retainFundingStop || progress.iterations < maxIterations) {
+            if (activeSolve != null) pauseAtIteration(progress)
             val iteration = progress.dualIterations++
             // Cooperative deadline, phased off the first iteration so a spent budget never starts.
             if (iteration % CANCEL_POLL == 0 && cancellation()) {
@@ -2782,10 +2800,9 @@ internal class RevisedSimplex(
         val gamma = phaseOneGradient
         val pi = phaseOneDuals
         val alphaBuf = alphaValues
-        val maxIter = maxIterations
         var valueUpdates = 0
-        while (progress.iterations < maxIter) {
-            if (activeSolve != null) pauseAtIteration()
+        while (retainFundingStop || progress.iterations < maxIterations) {
+            if (activeSolve != null) pauseAtIteration(progress)
             val iteration = progress.primalIterations++
             if (iteration % CANCEL_POLL == 0 && cancellation()) {
                 observations.termination = LpFloatTermination.CANCELLED
@@ -3068,11 +3085,10 @@ internal class RevisedSimplex(
             basicValues(beta)
             if (!primalFeasible(beta)) return null // phase-1 could not reach feasibility
         }
-        val maxIter = maxIterations
         val blandStall = 2 * (m + numVars) + BLAND_STALL_BASE
         val alphaBuf = alphaValues
-        while (progress.iterations < maxIter) {
-            if (activeSolve != null) pauseAtIteration()
+        while (retainFundingStop || progress.iterations < maxIterations) {
+            if (activeSolve != null) pauseAtIteration(progress)
             val iteration = progress.primalIterations++
             if (iteration % CANCEL_POLL == 0 && cancellation()) return stopped(LpFloatTermination.CANCELLED)
             if (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit) return stopped(LpFloatTermination.WORK)

@@ -35,8 +35,8 @@ internal class LpScopedSolver(
     private val cancellation: Cancellation = Cancellation.Never,
     private val context: LpSolveContext = LpSolveContext.Production,
     private val refactorUpdateLimit: Int = DEFAULT_REFACTOR_UPDATE_LIMIT,
-    private val iterationLimit: Int = 0,
-    private val workLimit: Long = 0L,
+    private var iterationLimit: Int = 0,
+    private var workLimit: Long = 0L,
     private val trackDegeneracy: Boolean = false,
     private val maxRetainedRows: Int = Int.MAX_VALUE,
     private val pricing: LpPricingOptions = LpPricingOptions(),
@@ -46,11 +46,13 @@ internal class LpScopedSolver(
     internal val pointRecoveryCache = LpRefinementCache()
     private var trail = LpBoundTrail(initial)
     private var solver: PersistentLpSolver? = null
-    private class PendingFloat(val cursor: LpSolveCursor<FloatLpResult?>) {
+    private class PendingFloat(val cursor: LpSolveCursor<FloatLpResult?>, var allowance: LpFloatAllowance) {
         var reported = LpSolveMetrics()
     }
     private var pendingFloat: PendingFloat? = null
     val floatPaused: Boolean get() = pendingFloat != null
+    val floatFundingStopped: Boolean get() = floatPaused &&
+        (lastFloatTermination == LpFloatTermination.WORK || lastFloatTermination == LpFloatTermination.PIVOTS)
     private var closed = false
     private var workingActive = false
     var lastWorkingMetrics: LpWorkingMetrics? = null
@@ -301,6 +303,8 @@ internal class LpScopedSolver(
             discardFloatProgress()
             return null
         }
+        if (workLimit > 0L) workLimit = maxOf(workLimit, allowance.work)
+        if (iterationLimit > 0) iterationLimit = maxOf(iterationLimit, allowance.iterations)
         if (!prepare(token)) {
             discardFloatProgress()
             return null
@@ -310,13 +314,20 @@ internal class LpScopedSolver(
             return solveFloat(token = token, allowance = allowance.copy(work = minOf(quantum, allowance.work)))
         }
         var pending = pendingFloat
+        if (pending != null && pending.allowance != allowance) {
+            if (!current.promoteSolve(allowance)) {
+                discardFloatProgress()
+                return advanceFloat(quantum, allowance, token)
+            }
+            pending.allowance = allowance
+        }
         if (pending == null) {
             if (!current.adopt(state, token)) {
                 solver = null
                 closeOwner(current)
                 return null
             }
-            pending = PendingFloat(current.openSolve(allowance))
+            pending = PendingFloat(current.openSolve(allowance, retainFundingStop = true), allowance)
             pendingFloat = pending
         }
         try {
@@ -325,6 +336,7 @@ internal class LpScopedSolver(
             lastMetrics = actual - pending.reported
             pending.reported = actual
             if (step is LpSolveStep.Paused) {
+                lastFloatTermination = current.lastTermination
                 if (token() || cancellation()) discardFloatProgress()
                 return null
             }

@@ -51,7 +51,7 @@ internal fun LpScopedSolver.advanceRootGuidance(
     if (result == null || token()) {
         return LpRootGuidance(null, null,
             if (lastFloatTermination == null && !floatPaused) LpRootGuidancePhase.PREPARATION
-            else LpRootGuidancePhase.FLOAT, floatPaused, lastFloatTermination)
+            else LpRootGuidancePhase.FLOAT, floatPaused && !floatFundingStopped, lastFloatTermination)
     }
     val point = result.primal.takeIf { it.size == state.model.n && it.all(Double::isFinite) }
     val checked = certifyLpBoundOnly(
