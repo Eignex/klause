@@ -72,17 +72,20 @@ internal fun bindSourceExecutionControls(
     }
     if (kind == SourceExecutionKind.FINITE || kind == SourceExecutionKind.REFUTED) {
         options.validateKnown()
+        val defaults = TheoryParams(nodeBudget = budget, randomSeed = seed, timeout = timeout,
+            cancellation = cancellation)
+        val theory = if (companions) defaults.copy(
+            maxDecisions = reader[ExecutionOption.maxDecisions] ?: defaults.maxDecisions,
+            maxFlips = reader[ExecutionOption.maxFlips] ?: defaults.maxFlips,
+            maxInstructions = reader[ExecutionOption.maxInstructions],
+            sourceLpWorkLimit = reader.defaulted(ExecutionOption.sourceLpWorkLimit,
+                defaults.sourceLpWorkLimit) ?: Long.MAX_VALUE,
+            sourceLpAllocationLimit = reader.defaulted(ExecutionOption.sourceLpAllocationLimit,
+                defaults.sourceLpAllocationLimit) ?: Long.MAX_VALUE,
+            sourceLpOperations = reader[ExecutionOption.sourceLpOperations] ?: defaults.sourceLpOperations,
+        ) else defaults
         return SourceExecutionControls(
-            TheoryParams(nodeBudget = budget, randomSeed = seed, timeout = timeout, cancellation = cancellation,
-                maxDecisions = reader[ExecutionOption.maxDecisions] ?: Long.MAX_VALUE,
-                maxFlips = reader[ExecutionOption.maxFlips] ?: Long.MAX_VALUE,
-                maxInstructions = reader[ExecutionOption.maxInstructions],
-                sourceLpWorkLimit = if (companions) reader.defaulted(ExecutionOption.sourceLpWorkLimit,
-                    TheoryParams().sourceLpWorkLimit) ?: Long.MAX_VALUE else TheoryParams().sourceLpWorkLimit,
-                sourceLpAllocationLimit = if (companions) reader.defaulted(ExecutionOption.sourceLpAllocationLimit,
-                    TheoryParams().sourceLpAllocationLimit) ?: Long.MAX_VALUE else TheoryParams().sourceLpAllocationLimit,
-                sourceLpOperations = if (companions) reader[ExecutionOption.sourceLpOperations]
-                    ?: Int.MAX_VALUE else Int.MAX_VALUE),
+            theory,
             PolynomialTheoryParams(),
             null,
             null,

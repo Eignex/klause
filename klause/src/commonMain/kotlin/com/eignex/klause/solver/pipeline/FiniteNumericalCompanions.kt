@@ -28,7 +28,8 @@ import com.eignex.klause.util.Cancellation
 
 internal fun finiteNumericalCompanionsAdmitted(problem: BakedProblem, scenario: PortfolioScenario): Boolean =
     scenario.cores == 1 && scenario.kind == Kind.COP && scenario.engine == EngineMix.MIXED &&
-        scenario.btPool == null && scenario.lsPool == null && scenario.btEdit == null && scenario.annotationArm == null &&
+        scenario.btPool == null && scenario.lsPool == null && scenario.btEdit == null &&
+        scenario.annotationArm == null &&
         problem.numIntVars > 0 && problem.numRealVars > 0 && problem.binaryIntegers &&
         problem.numBoolVars == 0 && problem.numIntVars.toLong() + problem.numRealVars <= 4_096L &&
         problem.factors.size <= 16_384 && scenario.lpCeiling.resolved(LpTechnique.BOUNDING)
@@ -90,7 +91,8 @@ internal class FiniteNumericalCompanions private constructor(
             onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
             result?.let { return it }
             val finished = search.runSlice(global, sliceMillis, sliceNodes) { sample, value ->
-                onIncumbent(MinimizeResult.BestFound(sample, value.toDouble(), TerminationReason.BudgetExhausted, stats))
+                onIncumbent(MinimizeResult.BestFound(sample, value.toDouble(),
+                    TerminationReason.BudgetExhausted, stats))
             } ?: return null
             val original = LinearOptimizationResult(context.scope, finished.terminal, finished.bound,
                 finished.incumbent, finished.value, finished.reason, finished.stats, context.semantics)
@@ -127,7 +129,9 @@ internal fun finiteNumericalCompletion(result: LinearOptimizationResult, context
     }
     val point = result.incumbent
     val value: BigFraction? = result.value
-    val reason = if (result.reason == TerminationReason.SearchExhausted) TerminationReason.Unsupported else result.reason
+    val reason = if (result.reason == TerminationReason.SearchExhausted) {
+        TerminationReason.Unsupported
+    } else result.reason
     return if (point == null || value == null) MinimizeResult.Unknown(reason, result.stats)
     else MinimizeResult.BestFound(point, value.toDouble(), reason, result.stats)
 }
