@@ -7,16 +7,16 @@ import com.eignex.klause.lowering.LinRelation
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 
-internal class AffineDistinctGroup(val vars: IntArray, val offsets: LongArray)
+internal class AffineDistinctGroup(val vars: IntArray, val offsets: LongArray, val sourceRows: IntArray)
 
 internal class Xcsp3AffineDistinctness(private val workLimit: Int = 1_000_000) {
-    private val edges = linkedMapOf<Int, MutableMap<Int, MutableSet<Long>>>()
+    private val edges = linkedMapOf<Int, MutableMap<Int, MutableMap<Long, MutableList<Int>>>>()
     private var rows = 0
     private var edgeCount = 0
     private var stopped = false
     private var work = 0
 
-    fun record(relation: LinRelation, op: LinearOp) {
+    fun record(relation: LinRelation, op: LinearOp, factorIndex: Int) {
         if (stopped) return
         if (++rows > MAX_ROWS) {
             stop()
@@ -34,9 +34,15 @@ internal class Xcsp3AffineDistinctness(private val workLimit: Int = 1_000_000) {
             stop()
             return
         }
-        val forward = edges.getOrPut(first) { linkedMapOf() }.getOrPut(second) { linkedSetOf() }
-        if (!forward.add(row.bound)) return
-        edges.getOrPut(second) { linkedMapOf() }.getOrPut(first) { linkedSetOf() }.add(-row.bound)
+        val forward = edges.getOrPut(first) { linkedMapOf() }.getOrPut(second) { linkedMapOf() }
+        val existing = forward[row.bound]
+        if (existing != null) {
+            existing.add(factorIndex)
+            return
+        }
+        val sources = arrayListOf(factorIndex)
+        forward[row.bound] = sources
+        edges.getOrPut(second) { linkedMapOf() }.getOrPut(first) { linkedMapOf() }[-row.bound] = sources
         if (++edgeCount > MAX_EDGES || forward.size > MAX_ALTERNATIVES) stop()
     }
 
@@ -60,13 +66,13 @@ internal class Xcsp3AffineDistinctness(private val workLimit: Int = 1_000_000) {
             val vars = component.toIntArray()
             val anchor = edges.getValue(vars[0])
             val pivot = edges.getValue(vars[1])
-            for (seed in anchor.getValue(vars[1])) {
+            for (seed in anchor.getValue(vars[1]).keys) {
                 val offsets = LongArray(vars.size)
                 offsets[1] = seed
                 var consistent = true
                 for (i in 2 until vars.size) {
                     var selected: Long? = null
-                    for (offset in anchor.getValue(vars[i])) {
+                    for (offset in anchor.getValue(vars[i]).keys) {
                         if (!spend(cancellation)) return result
                         val difference = subtractExact(offset, seed) ?: continue
                         if (difference !in pivot.getValue(vars[i])) continue
@@ -84,6 +90,7 @@ internal class Xcsp3AffineDistinctness(private val workLimit: Int = 1_000_000) {
                     offsets[i] = selected
                 }
                 if (!consistent) continue
+                val sourceRows = ArrayList<Int>()
                 for (i in vars.indices) {
                     for (j in i + 1 until vars.size) {
                         if (!spend(cancellation)) return result
@@ -92,10 +99,11 @@ internal class Xcsp3AffineDistinctness(private val workLimit: Int = 1_000_000) {
                             consistent = false
                             break
                         }
+                        sourceRows.addAll(edges.getValue(vars[i]).getValue(vars[j]).getValue(difference))
                     }
                     if (!consistent) break
                 }
-                if (consistent) result.add(AffineDistinctGroup(vars, offsets))
+                if (consistent) result.add(AffineDistinctGroup(vars, offsets, sourceRows.toIntArray()))
             }
         }
         return result
@@ -125,8 +133,9 @@ private fun subtractExact(left: Long, right: Long): Long? {
 }
 
 internal fun Compiler.Builder.recoverAffineDistinctness(index: Xcsp3AffineDistinctness, cancellation: Cancellation) {
+    val removed = HashSet<Int>()
     for (group in index.groups(cancellation)) {
-        if (cancellation()) return
+        if (cancellation()) break
         val operands = group.vars.indices.map { i ->
             Distinct.Operand(
                 intArrayOf(Term.ofIntVar(group.vars[i])),
@@ -134,6 +143,11 @@ internal fun Compiler.Builder.recoverAffineDistinctness(index: Xcsp3AffineDistin
                 BigFraction.ofLong(group.offsets[i]),
             )
         }
+        if (cancellation()) break
         factors.add(Distinct(operands))
+        group.sourceRows.forEach { removed.add(it) }
     }
+    if (removed.isEmpty()) return
+    var factorIndex = 0
+    factors.removeAll { factorIndex++ in removed }
 }
