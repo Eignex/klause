@@ -103,7 +103,6 @@ class FiniteSolveRequest(
     val toleranceCheck: ((Sample) -> Boolean)? = null,
 ) {
     private var capturedSourceControls: SourceFiniteControls? = null
-    internal var numericalCompanionParams: TheoryParams? = null
     internal val sourceControls: SourceFiniteControls? get() = capturedSourceControls
 
     internal constructor(shape: FiniteSolveShape, controls: SourceFiniteControls) : this(
@@ -485,11 +484,16 @@ private fun FiniteExecutionResult.withCompleteSearch(value: Boolean): FiniteExec
 fun FinitePipeline.solve(request: FiniteSolveRequest, callbacks: FiniteSolveCallbacks): FiniteSolveResult =
     solve(request, callbacks, LpSolveContext.Production)
 
+internal fun FinitePipeline.solve(request: FiniteSolveRequest, callbacks: FiniteSolveCallbacks,
+    numericalCompanions: TheoryParams): FiniteSolveResult =
+    solve(request, callbacks, LpSolveContext.Production, numericalCompanions)
+
 /** Execute the fixed finite route with per-invocation LP dependencies. */
 internal fun FinitePipeline.solve(
     request: FiniteSolveRequest,
     callbacks: FiniteSolveCallbacks,
     lpSolveContext: LpSolveContext,
+    numericalCompanions: TheoryParams? = null,
 ): FiniteSolveResult {
     require(request.engine == FiniteEngine.FIXED || lpSolveContext == LpSolveContext.Production) {
         "custom LP dependencies require the fixed finite route"
@@ -629,7 +633,7 @@ internal fun FinitePipeline.solve(
             sourceInvocation = request.shape.sourceInvocation,
             sourceMapping = preparation.sourceMapping,
             sourceControls = request.sourceControls,
-            numericalCompanionParams = request.numericalCompanionParams,
+            numericalCompanionParams = numericalCompanions,
         ),
         FiniteExecutionCallbacks(
             onSample = { sample ->
