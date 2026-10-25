@@ -866,6 +866,9 @@ final enum class com.eignex.klause.solver.result/PresolvePreparationStage : kotl
     enum entry REAL_DIFFERENCE // com.eignex.klause.solver.result/PresolvePreparationStage.REAL_DIFFERENCE|null[0]
     enum entry ROOT_BAKE // com.eignex.klause.solver.result/PresolvePreparationStage.ROOT_BAKE|null[0]
     enum entry SOURCE_ENCODER // com.eignex.klause.solver.result/PresolvePreparationStage.SOURCE_ENCODER|null[0]
+    enum entry SOURCE_OWNERSHIP // com.eignex.klause.solver.result/PresolvePreparationStage.SOURCE_OWNERSHIP|null[0]
+    enum entry SOURCE_ROWS // com.eignex.klause.solver.result/PresolvePreparationStage.SOURCE_ROWS|null[0]
+    enum entry SOURCE_SELECTION // com.eignex.klause.solver.result/PresolvePreparationStage.SOURCE_SELECTION|null[0]
 
     final val entries // com.eignex.klause.solver.result/PresolvePreparationStage.entries|#static{}entries[0]
         final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.solver.result/PresolvePreparationStage> // com.eignex.klause.solver.result/PresolvePreparationStage.entries.<get-entries>|<get-entries>#static(){}[0]

@@ -39,8 +39,7 @@ class PreparedSourceTest {
 
         problem.prepareOpenSource(config = PresolveConfig.NONE, budget = budget)
 
-        val stage = budget.preparationStages.single()
-        assertEquals(PresolvePreparationStage.SOURCE_ENCODER, stage.stage)
+        val stage = budget.preparationStages.single { it.stage == PresolvePreparationStage.SOURCE_ROWS }
         assertEquals(PresolveInvocationOutcome.COMPLETE, stage.outcome)
         assertTrue(stage.nativeWork > 0L)
         assertEquals(0L, budget.spent())
