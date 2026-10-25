@@ -6,11 +6,14 @@ import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpAutoConfig
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.meta.coreguided.CoreGuidedSearch
+import com.eignex.klause.presolve.binaryChannelLiteral
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.solver.ProblemProfile
@@ -78,16 +81,30 @@ internal class ProblemFacts(
             objective: LinearObjective? = null,
         ): ProblemFacts {
             val binary = problem.binaryIntegers
+            val binarySource = objective?.binaryIntegerSource
+            val binaryView = binarySource != null
             return ProblemFacts(
                 profile,
                 binaryIntegers = binary,
-                binaryPackingObjective = binary && problem.hasPackingObjective(objective),
-                binaryEqualityObjective = binary && problem.hasBinaryEqualityObjective(objective),
+                binaryPackingObjective = binary && problem.hasPackingObjective(objective) ||
+                    binarySource?.let {
+                        it.problem.binaryIntegers && it.problem.hasPackingObjective(it.objective)
+                    } == true,
+                binaryEqualityObjective = binary && problem.hasBinaryEqualityObjective(objective) ||
+                    binarySource?.let {
+                        it.problem.binaryIntegers && it.problem.hasBinaryEqualityObjective(it.objective)
+                    } == true,
                 continuousObjective = objective?.realCoefficientValues?.any { it != 0.0 } == true,
                 integerLinear = problem.factors.any { it !is SymmetryHandling } && problem.factors.all {
                     if (it is SymmetryHandling) return@all true
+                    if (binaryView && it.binaryChannelLiteral() != Lit.NONE) {
+                        val domain = problem.rootIntDomain(it.intVars.single())
+                        if (domain.min >= 0L && domain.max <= 1L) return@all true
+                    }
                     val form = it.linearForm as? LinearForm.Conjunction ?: return@all false
-                    form.rows.isNotEmpty() && form.rows.all { row -> row.isLongUnconditional && row.isIntegerOnly }
+                    form.rows.isNotEmpty() && form.rows.all { row ->
+                        row.isLongUnconditional && (row.isIntegerOnly || binaryView)
+                    }
                 },
                 booleanObjective = objective?.let {
                     CoreGuidedSearch.eligible(problem, it) &&
@@ -118,13 +135,13 @@ internal val ProblemProfile.kind: Kind get() = if (optimizing) Kind.COP else Kin
 internal val BakedProblem.continuousMajority: Boolean
     get() = numRealVars.toLong() > numBoolVars.toLong() + numIntVars
 
-internal val BakedProblem.binaryIntegers: Boolean
+internal val Problem.binaryIntegers: Boolean
     get() = (0 until numIntVars).all {
         intBounds.hasLower(it) && intBounds.hasUpper(it) &&
             intBounds.lower(it) >= 0L && intBounds.upper(it) <= 1L
     }
 
-private fun BakedProblem.hasPackingObjective(objective: LinearObjective?): Boolean {
+private fun Problem.hasPackingObjective(objective: LinearObjective?): Boolean {
     if (numBoolVars != 0 || numRealVars != 0 || numIntVars == 0 || objective == null) return false
     if (objective.boolWeightValues.any { it != 0L } || objective.realCoefficientValues.any { it != 0.0 } ||
         objective.intCoefficientValues.size > numIntVars ||
@@ -151,7 +168,7 @@ private fun Factor.isBinaryPackingCapacity(): Boolean {
     return coupled
 }
 
-private fun BakedProblem.hasBinaryEqualityObjective(objective: LinearObjective?): Boolean {
+private fun Problem.hasBinaryEqualityObjective(objective: LinearObjective?): Boolean {
     if (numBoolVars != 0 || numRealVars != 0 || numIntVars == 0 || objective == null) return false
     if (objective.boolWeightValues.any { it != 0L } || objective.realCoefficientValues.any { it != 0.0 } ||
         objective.intCoefficientValues.size > numIntVars ||

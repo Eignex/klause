@@ -2,15 +2,19 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.symmetry.SymmetryHandling
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
+import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.presolve.PresolvePass
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ProblemProfile
@@ -84,6 +88,79 @@ class ArmNeedsTest {
         val arms = PortfolioComposition.compose(PortfolioScenario.sequential(Kind.COP), facts)
 
         assertTrue(arms.any { it.label == "lp-aggressive" })
+    }
+
+    @Test
+    fun `binary cost channels should retain the mixed integer linear companion`() {
+        val source = Problem(
+            0, 3, arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 2)),
+            listOf(Linear(longArrayOf(2, 3, 1), intArrayOf(0, 1, 2), LinearOp.GE, 4)),
+        )
+        val objective = LinearObjective(intCoefficients = longArrayOf(3, 5))
+        val config = PresolveConfig(overrides = PresolvePass.entries.associateWith {
+            it == PresolvePass.SUBSTITUTE_BINARY_COLUMNS
+        })
+        val prepared = FinitePipeline.prepare(FinitePipelineRequest(source, FiniteEngine.MIXED, objective, config))
+        val model = prepared.executableProblem()
+        val facts = ProblemFacts.of(model, ProblemProfile.of(model, true), LpConfig.AGGRESSIVE, prepared.objective)
+
+        val arms = PortfolioComposition.compose(PortfolioScenario.sequential(Kind.COP), facts)
+
+        assertTrue(arms.any { it.label == "lp-aggressive" })
+        assertTrue(arms.any { it.label == "core-guided" })
+    }
+
+    @Test
+    fun `Boolean source costs should not change integer linear recipe admission`() {
+        val model = Problem(
+            2, 1, arrayOf(IntDomain(0, 1)),
+            listOf(Cardinality(intArrayOf(Lit.make(0, true), Lit.make(1, true)), 1, 2)),
+        ).bake()
+        val objective = LinearObjective(longArrayOf(1, 2))
+
+        val facts = ProblemFacts.of(model, ProblemProfile.of(model, true), LpConfig.AGGRESSIVE, objective)
+
+        assertFalse(facts.integerLinear)
+    }
+
+    @Test
+    fun `binary objective views should retain the packing LP recipe`() {
+        val source = Problem(
+            0, 3, Array(3) { IntDomain(0, 1) },
+            listOf(Linear(longArrayOf(2, 3, 4), intArrayOf(0, 1, 2), LinearOp.LE, 5)),
+        )
+        val objective = LinearObjective(intCoefficients = longArrayOf(-4, -5, -6))
+        val config = PresolveConfig(overrides = PresolvePass.entries.associateWith {
+            it == PresolvePass.SUBSTITUTE_BINARY_COLUMNS
+        })
+        val prepared = FinitePipeline.prepare(FinitePipelineRequest(source, FiniteEngine.MIXED, objective, config))
+        val model = prepared.executableProblem()
+        val facts = ProblemFacts.of(model, ProblemProfile.of(model, true), LpConfig.AGGRESSIVE, prepared.objective)
+
+        val arms = PortfolioComposition.compose(PortfolioScenario.sequential(Kind.COP), facts)
+
+        assertTrue(facts.binaryPackingObjective)
+        assertTrue(arms.any { it.label == "lp-default" })
+    }
+
+    @Test
+    fun `changed Boolean view costs should discard the source packing recipe`() {
+        val source = Problem(
+            0, 3, Array(3) { IntDomain(0, 1) },
+            listOf(Linear(longArrayOf(2, 3, 4), intArrayOf(0, 1, 2), LinearOp.LE, 5)),
+        )
+        val objective = LinearObjective(intCoefficients = longArrayOf(-4, -5, -6))
+        val config = PresolveConfig(overrides = PresolvePass.entries.associateWith {
+            it == PresolvePass.SUBSTITUTE_BINARY_COLUMNS
+        })
+        val prepared = FinitePipeline.prepare(FinitePipelineRequest(source, FiniteEngine.MIXED, objective, config))
+        val model = prepared.executableProblem()
+        val originalView = checkNotNull(prepared.objective)
+        val changed = originalView.copy(boolWeights = LongArray(model.numBoolVars) { 1L })
+
+        val facts = ProblemFacts.of(model, ProblemProfile.of(model, true), LpConfig.AGGRESSIVE, changed)
+
+        assertFalse(facts.binaryPackingObjective)
     }
 
     private fun linearModel(upper: Long = 5L) = Problem(

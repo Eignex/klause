@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.objective
 import com.eignex.klause.ir.LinearObjectiveSpec
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Assignment
@@ -86,6 +87,13 @@ class LinearObjective(
     realCoefficients: DoubleArray = EmptyDoubleArray,
 ) : Objective {
     private var capturedSourcePairing: SourceObjectivePairing? = null
+    private var capturedBinaryIntegerSource: BinaryIntegerObjectiveSource? = null
+
+    internal val binaryIntegerSource: BinaryIntegerObjectiveSource? get() = capturedBinaryIntegerSource
+
+    internal fun captureBinaryIntegerView(problem: Problem, objective: LinearObjective): LinearObjective = apply {
+        capturedBinaryIntegerSource = BinaryIntegerObjectiveSource(problem, objective)
+    }
 
     internal val sourcePairing: SourceObjectivePairing? get() = capturedSourcePairing
 
@@ -112,11 +120,17 @@ class LinearObjective(
         realCoefficients: DoubleArray = realCoefficientValues,
     ): LinearObjective = LinearObjective(boolWeights, intCoefficients, constant, realCoefficients).also {
         it.capturedSourcePairing = capturedSourcePairing?.copied(this, it)
+        it.capturedBinaryIntegerSource = capturedBinaryIntegerSource?.takeIf {
+            constant == this.constant && sameObjectiveTerms(boolWeights, boolWeightValues) &&
+                sameObjectiveTerms(intCoefficients, intCoefficientValues) &&
+                realCoefficients.contentEquals(realCoefficientValues)
+        }
     }
 
     internal fun paired(pairing: SourceObjectivePairing): LinearObjective =
         LinearObjective(boolWeightValues, intCoefficientValues, constant, realCoefficientValues).also {
             it.capturedSourcePairing = pairing
+            it.capturedBinaryIntegerSource = capturedBinaryIntegerSource
         }
 
     /** Independent Boolean coefficients for destructuring. */
@@ -141,7 +155,12 @@ class LinearObjective(
         intCoefficients = LongArray(intCoefficientValues.size) { -intCoefficientValues[it] },
         constant = -constant,
         realCoefficients = DoubleArray(realCoefficientValues.size) { -realCoefficientValues[it] },
-    ).also { it.capturedSourcePairing = capturedSourcePairing?.negated() }
+    ).also {
+        it.capturedSourcePairing = capturedSourcePairing?.negated()
+        it.capturedBinaryIntegerSource = capturedBinaryIntegerSource?.let { source ->
+            BinaryIntegerObjectiveSource(source.problem, source.objective.negated())
+        }
+    }
 
     /** Exact integer objective value of [sample]; lower is better. */
     fun evaluateLong(sample: Sample): Long {
@@ -310,3 +329,10 @@ private fun addOrNull(a: Long, b: Long): Long? {
 }
 
 private const val HALF_RANGE: Long = (1L shl 31) - 1
+
+private fun sameObjectiveTerms(left: LongArray, right: LongArray): Boolean {
+    for (index in 0 until maxOf(left.size, right.size)) {
+        if (left.getOrElse(index) { 0L } != right.getOrElse(index) { 0L }) return false
+    }
+    return true
+}

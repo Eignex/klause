@@ -23,7 +23,9 @@ class BooleanObjectiveCutoffTest {
                 var activity = 0L
                 for (index in cutoff.literals.indices) {
                     val literal = cutoff.literals[index]
-                    if (Lit.evaluate(literal, sample.boolValue(Lit.variable(literal)))) activity += cutoff.weights[index]
+                    if (Lit.evaluate(literal, sample.boolValue(Lit.variable(literal)))) {
+                        activity += cutoff.weights[index]
+                    }
                 }
                 assertEquals(objective.evaluateLong(sample) < incumbent, activity >= cutoff.degree)
             }
