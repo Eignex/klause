@@ -19,6 +19,27 @@ import kotlin.test.assertTrue
 
 class PropagationSessionTest {
     @Test
+    fun `a factor conflict after external fixing should retain a valid asserting clause`() {
+        val session = PropagationSession(Problem(1, 2, Array(2) { IntDomain(0, 10) }, emptyArray()))
+        assertIs<PropagationResult.Implied>(session.pinIntAtLeast(0, 1))
+        val excluded = session.boundLeLit(1, 5, false)
+        for (positive in listOf(false, true)) {
+            assertIs<PropagationResult.Implied>(session.addLearnedClause(
+                Clause(intArrayOf(excluded, Lit.make(0, positive))), 2,
+            ))
+        }
+
+        val conflict = assertIs<PropagationResult.Unsat>(session.implyIntAtMost(1, 5))
+
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(conflict.learnedClause)
+        assertEquals(listOf(excluded), learned.literals.toList())
+        assertTrue(learned.asserting)
+        session.popToLevel(learned.backjumpLevel)
+        assertIs<PropagationResult.Implied>(session.addLearnedClause(Clause(learned.literals), learned.lbd))
+        assertEquals(6L, session.intDomain(1).min)
+    }
+
+    @Test
     fun `a conflicting external bound should not analyze an unrelated atom clause`() {
         for (lower in listOf(false, true)) {
             for (padding in listOf(0, 7)) {
