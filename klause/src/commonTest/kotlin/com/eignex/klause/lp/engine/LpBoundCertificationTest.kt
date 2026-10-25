@@ -110,31 +110,42 @@ class LpBoundCertificationTest {
     }
 
     @Test
-    fun `basis derived bounds should require both acceptance gates and charge work once`() {
+    fun `basis derived bounds should require both acceptance gates`() {
         val basis = Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.AT_LOWER))
         for (denied in listOf(LpCertifier.RATIONAL, LpCertifier.EXACT_BASIS)) {
-            val certifiers = ArrayList<LpCertifier>()
-            var work = 0L
-            val observer = object : LpCertificationObserver {
-                override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
-                    certifiers += certifier
-                    assertTrue(success)
-                    work += (cost as LpCertifierCost.Metered).work
-                }
-                override fun observeExactInput(accepted: Boolean) = Unit
-                override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
-            }
-
             val result = certifyLpBoundOnly(model(upper = null, coefficient = 3L, rhs = 1L),
-                doubleArrayOf(-1.0 / 3.0), ReconstructionLimits(maxAttempts = 1), observer = observer,
+                doubleArrayOf(-1.0 / 3.0), ReconstructionLimits(maxAttempts = 1),
                 policy = LpCertificationPolicy { certifier, successful -> successful && certifier != denied },
                 basis = basis)
 
             assertNull(result.bound)
-            assertEquals(listOf(LpCertifier.RATIONAL, LpCertifier.EXACT_BASIS), certifiers)
-            assertEquals(result.metrics.work, work)
+            assertEquals(1, result.metrics.dualSuccesses)
             assertTrue(result.metrics.basisWork > 0L)
         }
+    }
+
+    @Test
+    fun `basis repair observers should charge certificate work once`() {
+        val basis = Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.AT_LOWER))
+        val certifiers = ArrayList<LpCertifier>()
+        var work = 0L
+        val observer = object : LpCertificationObserver {
+            override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
+                certifiers += certifier
+                assertTrue(success)
+                work += (cost as LpCertifierCost.Metered).work
+            }
+            override fun observeExactInput(accepted: Boolean) = Unit
+            override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
+        }
+
+        val result = certifyLpBoundOnly(model(upper = null, coefficient = 3L, rhs = 1L),
+            doubleArrayOf(-1.0 / 3.0), ReconstructionLimits(maxAttempts = 1), observer = observer, basis = basis)
+
+        assertNotNull(result.bound)
+        assertEquals(listOf(LpCertifier.RATIONAL, LpCertifier.EXACT_BASIS), certifiers)
+        assertEquals(result.metrics.work, work)
+        assertTrue(result.metrics.basisWork > 0L)
     }
 
     @Test
