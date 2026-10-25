@@ -3138,3 +3138,17 @@ controls on a second Linux spot host. Source-order numerical gr4x6 retains its
 107-check proof, while automatic finite p0033 retains its 3089 proof. All 24
 reported witnesses pass solchecker. These controls preserve routing and outcomes;
 the native proof claims remain separate from independent witness checks.
+
+`bench.profile.LocalSearchTrajectory` takes `suite=ID problem=NAME sha256=HEX
+recipe=LABEL seed=N moves=N` for a hash-pinned minimizing XCSP3 source. It compares
+protected and substituted objective coordinates through mixed-route preparation,
+then runs the selected local-search recipe alone with a fixed move allowance and
+no shared incumbents. The seed is the worker seed, including its portfolio index.
+A move source that emits no candidates records source-coordinate assignments,
+ordered violated factors and exact degrees before the first 256 candidate draws
+and every 512 draws thereafter. Model keys, domains, objectives, source bytes and
+build identity remain alongside the walk. Hint construction uses the production
+mapping through reflection and fails on an internal shape mismatch. Each arm has
+a sixty-second outer deadline; cancellation is recorded. These instrumented walks
+isolate local trajectories; they establish neither default portfolio equivalence,
+throughput, native proof nor independently checked source feasibility.
