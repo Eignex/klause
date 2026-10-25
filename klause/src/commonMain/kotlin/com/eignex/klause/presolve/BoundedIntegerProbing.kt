@@ -34,8 +34,16 @@ internal object BoundedIntegerProbing {
         val accounting = RootWorkAccounting(token, state)
         return try {
             if (!state.seeded) return PropagationResult.Unsat()
-            val conflict = state.runToFixpoint(allFactors = true, cancellation = accounting)
-            if (conflict != null) return PropagationResult.Unsat()
+            val queue = state.beginRootFixpoint()
+            while (queue.hasNext()) {
+                queue.next()
+                if (accounting()) return base
+            }
+            while (state.rootFixpointPending) {
+                if (accounting()) return base
+                val conflict = state.advanceRootFixpoint(accounting)
+                if (conflict != null) return PropagationResult.Unsat()
+            }
             if (state.runCancelled || accounting()) return base
             val session = PropagationSession.prepared(state, accounting, null)
             ProbeRun(problem, base, config, session, accounting).run()
