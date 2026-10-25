@@ -21,6 +21,24 @@ construction; explicit `arms`, `ls` or `bt` settings take precedence. Native
 arithmetic routes reject finite-only explicit policy instead of ignoring it. Recipe
 defaults carry no witness or proof authority.
 
+For default single-core mixed placement optimization, an eliminated affine objective
+coordinate can supply a private protected-coordinate view to the curated full
+local-search slot. This applies to `Diffn` models without `Element` alternatives,
+where primary and full neighborhoods offer the same repairs. The slot runs the full
+plateau recipe with its configured seed offset; the primary retains the rewritten
+model. Protected aliases guide infeasible repairs; the canonical objective orders
+feasible incumbents. The view retires at the next scheduling boundary after the first
+global witness, so canonical workers handle incumbent improvement. No arms or
+allowances are added. Custom local-search recipes, named backtrack pools, explicit
+arm counts and explicit presolve keep the selected representation.
+
+The private view shares no pools, warm starts or scalar cutoffs. Its source mapping
+must retain the same original model and a compatible discrete column namespace.
+Each proposal is reconstructed, stripped of private certificates, checked against
+the canonical prepared model and evaluated with its objective before publication.
+Private terminal proofs have no source authority. Resumable preparation, instruction
+accounting, cancellation and closure follow the private handle.
+
 ## Prepared strategy admission
 
 Source adapters consume the [prepared plan](02-model.md#engine-projections-and-factor-capabilities)

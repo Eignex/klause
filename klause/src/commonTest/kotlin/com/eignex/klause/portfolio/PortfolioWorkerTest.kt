@@ -8,6 +8,10 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.InstructionSlicedSearch
+import com.eignex.klause.solver.ReseedGuard
+import com.eignex.klause.solver.ResumableSearch
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.evidence.quadraticEngineInvocation
 import com.eignex.klause.solver.incumbent.CompletedEnginePublication
@@ -16,15 +20,113 @@ import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.pipeline.preparePolynomialExecutionPlan
+import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class PortfolioWorkerTest {
+    @Test
+    fun `objective coordinate search should preserve instruction slices and preparation continuation`() {
+        val point = MinimizeResult.Optimal(Sample(booleanArrayOf(), longArrayOf(3)), 3.0)
+        val tracking = TrackingResumableSearch(point)
+        val allowances = mutableListOf<Long>()
+        val child = object : ResumableSearch by tracking, InstructionSlicedSearch, ReseedGuard {
+            override val canReseed = false
+            override val canContinuePreparation = true
+            override fun runInstructionSlice(
+                global: Cancellation,
+                sliceMillis: Long,
+                sliceInstructions: Long,
+                onIncumbent: (MinimizeResult.WithSample) -> Unit,
+            ): MinimizeResult {
+                allowances += sliceInstructions
+                onIncumbent(point)
+                return point
+            }
+        }
+        val worker = PortfolioWorker.ofMinimize("private", 0, true, resumable = { child }) { _, _, _, _ ->
+            sequenceOf(point)
+        }.objectiveCoordinateProposals(ModelIdentity.of(Any())) {
+            MinimizeResult.BestFound(it, 6.0, TerminationReason.SearchExhausted)
+        }
+        val handle = assertNotNull(worker.newResumableSearch { 0.0 })
+        val points = mutableListOf<MinimizeResult.WithSample>()
+
+        val terminal = assertIs<InstructionSlicedSearch>(handle).runInstructionSlice(
+            Cancellation.Never, 1L, 17L, points::add,
+        )
+
+        assertEquals(listOf(17L), allowances)
+        assertEquals(listOf(6.0), points.map { it.objective })
+        assertIs<MinimizeResult.BestFound>(terminal)
+        val guard = assertIs<ReseedGuard>(handle)
+        assertFalse(guard.canReseed)
+        assertTrue(guard.canContinuePreparation)
+        handle.close()
+        assertEquals(1, tracking.closes)
+    }
+
+    @Test
+    fun `objective coordinate proposals should not promote private terminal proofs`() {
+        val sample = Sample(booleanArrayOf(), longArrayOf(3))
+        val results = listOf(
+            MinimizeResult.Optimal(sample, 3.0),
+            MinimizeResult.Unbounded(sample, 3.0, emptyList()),
+            MinimizeResult.Infeasible(),
+        )
+        for (result in results) {
+            val child = TrackingResumableSearch(result, result as? MinimizeResult.WithSample)
+            val native = PortfolioWorker.ofMinimize("private", 0, resumable = { child }) { _, _, _, _ ->
+                sequenceOf(result)
+            }
+            val worker = native.objectiveCoordinateProposals(ModelIdentity.of(Any())) {
+                MinimizeResult.BestFound(it, 6.0, TerminationReason.SearchExhausted)
+            }
+            val points = mutableListOf<MinimizeResult.WithSample>()
+
+            val terminal = assertNotNull(worker.newResumableSearch { 0.0 }).use {
+                it.runSlice(Cancellation.Never, 1L, points::add)
+            }
+
+            if (result.assignment == null) {
+                assertIs<MinimizeResult.Unknown>(terminal)
+                assertTrue(points.isEmpty())
+            } else {
+                assertEquals(6.0, assertIs<MinimizeResult.BestFound>(terminal).objective)
+                assertEquals(listOf(6.0), points.map { it.objective })
+            }
+            assertFalse(worker.permitsSourceProofs)
+            assertEquals(1, child.closes)
+        }
+    }
+
+    @Test
+    fun `rejected objective coordinate proposals should not stream incumbents`() {
+        val point = MinimizeResult.Optimal(Sample(booleanArrayOf(), longArrayOf(0)), 0.0)
+        val child = TrackingResumableSearch(point, point)
+        val worker = PortfolioWorker.ofMinimize("private", 0, resumable = { child }) { _, _, _, _ ->
+            sequenceOf(point)
+        }.objectiveCoordinateProposals(ModelIdentity.of(Any())) { null }
+        val points = mutableListOf<MinimizeResult.WithSample>()
+
+        val terminal = assertNotNull(worker.newResumableSearch { 0.0 }).use {
+            it.runSlice(Cancellation.Never, 1L, 1L, points::add)
+        }
+
+        assertIs<MinimizeResult.Unknown>(terminal)
+        assertTrue(points.isEmpty())
+        assertEquals(1, child.closes)
+    }
+
     @Test
     fun `sharing should keep the containing invocation separate from a stronger worker`() {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 5)), emptyArray())

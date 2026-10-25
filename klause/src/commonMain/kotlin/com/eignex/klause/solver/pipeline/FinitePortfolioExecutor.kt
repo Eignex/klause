@@ -71,6 +71,7 @@ internal fun FinitePipeline.portfolioExecutor(
     numericalCompletion: Boolean,
     sourceHints: ((Set<ExecutionStrategy>) -> PreparedSourceHints?)? = null,
     numericalCompanions: TheoryParams? = null,
+    objectiveCoordinates: ObjectiveCoordinateView? = null,
 ): PortfolioInvocation {
     val profile = ProblemProfile.of(problem, scenario.kind == Kind.COP)
     val identity = ModelIdentity.of(problem, objective)
@@ -80,7 +81,7 @@ internal fun FinitePipeline.portfolioExecutor(
     ) FiniteNumericalCompanions.prepare(problem, objective, numericalCompanions, cancellation) else null
     val finiteFactories = PortfolioBuilder.factories(
         problem, scenario, objective, lsObjective, definitionalSweep, onEvent,
-        profile, numericalCompletion, sourceHints,
+        profile, numericalCompletion, sourceHints, objectiveCoordinates,
     ).map { factory ->
         PortfolioArmFactory(preparedPlan, factory.armId, factory.family, binding = { worker ->
             SourceWorkerBinding(
