@@ -61,4 +61,17 @@ class ElementLpProjectionTest {
         assertNull(estimate)
         assertEquals(0, relaxation.colReq.count { it != null })
     }
+
+    @Test
+    fun `array ranges inside an index hole decline without selector allocation`() {
+        val factor = Element(0, 1, longArrayOf(1, 2, 3), false, 10)
+        val domain = IntDomain(0, 100).excludeValues(LongArray(99) { it + 1L })!!
+        val problem = Problem(0, 2, arrayOf(domain, IntDomain(0, 3)), arrayOf(factor))
+
+        val estimate = factor.estimateLpHull(RootBoxes(problem))
+        val relaxation = CpToLpRelaxation(problem, null, elementHull = true).build(RootDomains(problem))
+
+        assertNull(estimate)
+        assertEquals(0, relaxation.colReq.count { it != null })
+    }
 }

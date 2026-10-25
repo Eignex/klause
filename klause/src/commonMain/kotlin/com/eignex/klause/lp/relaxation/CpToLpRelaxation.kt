@@ -587,8 +587,8 @@ internal class LeafRealResult(
 internal class CpToLpRelaxation(
     private val problem: Problem,
     private val objective: LinearObjective?,
-    /** When true, linearize each constant-array Element with a one-hot selector model (its exact
-     *  convex hull). Adds O(len) columns, so it is gated; variable arrays are skipped. */
+    /** Share bounded index-value choices across Element properties; constant arrays use their joint
+     *  convex hull and variable arrays use bounded big-M result links. */
     private val elementHull: Boolean = false,
     /** When true, linearize each Table with one selector column per allowed tuple — its exact convex
      *  hull. Adds O(numTuples) columns, so it is gated. */
