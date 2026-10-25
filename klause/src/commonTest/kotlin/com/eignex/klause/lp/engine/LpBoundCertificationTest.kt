@@ -110,6 +110,34 @@ class LpBoundCertificationTest {
     }
 
     @Test
+    fun `basis derived bounds should require both acceptance gates and charge work once`() {
+        val basis = Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.AT_LOWER))
+        for (denied in listOf(LpCertifier.RATIONAL, LpCertifier.EXACT_BASIS)) {
+            val certifiers = ArrayList<LpCertifier>()
+            var work = 0L
+            val observer = object : LpCertificationObserver {
+                override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
+                    certifiers += certifier
+                    assertTrue(success)
+                    work += (cost as LpCertifierCost.Metered).work
+                }
+                override fun observeExactInput(accepted: Boolean) = Unit
+                override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
+            }
+
+            val result = certifyLpBoundOnly(model(upper = null, coefficient = 3L, rhs = 1L),
+                doubleArrayOf(-1.0 / 3.0), ReconstructionLimits(maxAttempts = 1), observer = observer,
+                policy = LpCertificationPolicy { certifier, successful -> successful && certifier != denied },
+                basis = basis)
+
+            assertNull(result.bound)
+            assertEquals(listOf(LpCertifier.RATIONAL, LpCertifier.EXACT_BASIS), certifiers)
+            assertEquals(result.metrics.work, work)
+            assertTrue(result.metrics.basisWork > 0L)
+        }
+    }
+
+    @Test
     fun `independent dual denominators should certify a bound on free columns`() {
         val coefficients = listOf(101L, 103L, 107L, 109L, 1L)
         val zero = ExactLpNumber.of(0L)

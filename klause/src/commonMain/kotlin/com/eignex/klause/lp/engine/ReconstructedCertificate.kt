@@ -88,6 +88,7 @@ internal data class ReconstructionMetrics(
     val vectorRejection: ReconstructionVectorRejection? = null,
     val entryRejection: ReconstructionEntryRejection? = null,
     val basisRepair: ReconstructionBasisMetrics? = null,
+    val basisWork: Long = 0L,
 )
 
 internal class ReconstructedCertificate(
@@ -99,6 +100,7 @@ internal class ReconstructedCertificate(
     val complementary: Boolean,
     val metrics: ReconstructionMetrics,
     val pointRejection: LpPointRejection? = null,
+    val boundUsesBasis: Boolean = false,
 )
 
 internal class ReconstructionOverflow : RuntimeException()
@@ -123,6 +125,8 @@ internal class ReconstructionMeter(
     var vectorRejection: ReconstructionVectorRejection? = null
     var entryRejection: ReconstructionEntryRejection? = null
     var basisRepair: ReconstructionBasisMetrics? = null
+    var basisWork = 0L
+    val spentWork: Long get() = work
     private var work = 0L
     private var allocation = 0L
     private var maxBits = 0
@@ -187,7 +191,7 @@ internal class ReconstructionMeter(
     fun snapshot(decline: ReconstructionDecline?) = ReconstructionMetrics(
         attempts, pointChecks, dualChecks, rayChecks, pointSuccesses, dualSuccesses, raySuccesses,
         vectorRestarts, verificationRestarts, work, allocation, maxBits, decline, phase, dualRejection, vectorRejection,
-        entryRejection, basisRepair,
+        entryRejection, basisRepair, basisWork,
     )
 
     fun basisLimits(): RationalBasisLimits = RationalBasisLimits(
@@ -516,6 +520,8 @@ private class ReconstructionRun(private val a: ReconstructionAuthority, private 
     var conflictSupport: LpExactSupport? = null
     var statusesMatch = false
     var complementary = false
+    var boundUsesBasis = false
+        private set
 
     fun point(candidate: List<BigFraction>, basis: Basis?) {
         meter.phase = ReconstructionPhase.POINT
@@ -537,7 +543,7 @@ private class ReconstructionRun(private val a: ReconstructionAuthority, private 
         }
     }
 
-    fun dual(candidate: List<BigFraction>, ray: Boolean) {
+    fun dual(candidate: List<BigFraction>, ray: Boolean, usesBasis: Boolean = false) {
         meter.phase = if (ray) ReconstructionPhase.RAY else ReconstructionPhase.DUAL
         if (ray) meter.rayChecks++ else meter.dualChecks++
         val checked = try {
@@ -569,6 +575,7 @@ private class ReconstructionRun(private val a: ReconstructionAuthority, private 
             if (bound == null || proof.value > requireNotNull(bound).value) {
                 bound = proof
                 dual = checked
+                boundUsesBasis = usesBasis
             }
         }
     }
@@ -606,17 +613,22 @@ private class ReconstructionRun(private val a: ReconstructionAuthority, private 
     }
 
     fun basisDual(candidate: List<BigFraction>, basis: Basis): List<BigFraction>? {
-        if (!validHeadings(basis)) return null
-        meter.phase = ReconstructionPhase.BASIS
-        val layout = try {
-            LogicalBasisLayout.prepare(a.n, a.m, basis.basicVars, { a.matrix[it] },
-                { work, bytes -> meter.step(work); if (bytes > 0L) meter.storage(bytes) },
-                { reason -> throw ReconstructionLayoutStop(reason) })
-        } catch (stop: ReconstructionLayoutStop) {
-            meter.basisRepair = ReconstructionBasisMetrics(decline = stop.reason.name)
-            return null
+        val before = meter.spentWork
+        try {
+            if (!validHeadings(basis)) return null
+            meter.phase = ReconstructionPhase.BASIS
+            val layout = try {
+                LogicalBasisLayout.prepare(a.n, a.m, basis.basicVars, { a.matrix[it] },
+                    { work, bytes -> meter.step(work); if (bytes > 0L) meter.storage(bytes) },
+                    { reason -> throw ReconstructionLayoutStop(reason) })
+            } catch (stop: ReconstructionLayoutStop) {
+                meter.basisRepair = ReconstructionBasisMetrics(decline = stop.reason.name)
+                return null
+            }
+            return reconstructBasisDual(a, basis, layout, candidate, meter)
+        } finally {
+            meter.basisWork += meter.spentWork - before
         }
-        return reconstructBasisDual(a, basis, layout, candidate, meter)
     }
 
     private fun validHeadings(basis: Basis?): Boolean {
@@ -793,7 +805,7 @@ private fun reconstructCandidates(
                 if (y != null) {
                     if (goal == ReconstructionGoal.BOUND && basis != null && !basisAttempted) {
                         basisAttempted = true
-                        current.basisDual(y, basis)?.let { current.dual(it, ray = false) }
+                        current.basisDual(y, basis)?.let { current.dual(it, ray = false, usesBasis = true) }
                     }
                     if (goal != ReconstructionGoal.BOUND || current.bound == null) {
                         val vector = reconstructExactVector(y, denominator, meter)
@@ -854,6 +866,7 @@ private fun reconstructCandidates(
         run?.complementary ?: false,
         meter.snapshot(decline),
         run?.pointRejection.takeIf { decline == ReconstructionDecline.CANDIDATE },
+        boundUsesBasis = run?.boundUsesBasis == true,
     )
 }
 
@@ -1035,8 +1048,14 @@ internal fun certifyLpBoundOnly(
     )
     val metrics = checked.metrics
     val bound = checked.bound
-    val accepted = policy.acceptNullable(LpCertifier.RATIONAL, bound)
-    observer?.observe(LpCertifier.RATIONAL, bound != null, LpCertifierCost.Metered(metrics.work))
+    val rational = policy.acceptNullable(LpCertifier.RATIONAL, bound)
+    val accepted = if (checked.boundUsesBasis) policy.acceptNullable(LpCertifier.EXACT_BASIS, rational) else rational
+    observer?.observe(LpCertifier.RATIONAL, bound != null, LpCertifierCost.Metered(metrics.work - metrics.basisWork))
+    if (metrics.basisWork > 0L) {
+        observer?.observe(LpCertifier.EXACT_BASIS, bound != null && checked.boundUsesBasis,
+            LpCertifierCost.Metered(metrics.basisWork))
+    }
     timer.finish(metrics.decline?.name ?: if (accepted != null) "BOUND" else "REFUSED", metrics.work)
-    return ReconstructedCertificate(null, accepted, null, null, false, false, metrics)
+    return ReconstructedCertificate(null, accepted, null, null, false, false, metrics,
+        boundUsesBasis = accepted != null && checked.boundUsesBasis)
 }
