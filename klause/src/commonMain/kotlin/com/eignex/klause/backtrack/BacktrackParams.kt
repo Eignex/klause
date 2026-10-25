@@ -94,8 +94,8 @@ data class BacktrackParams(
      * fresh from level 0. Phase-saving (see [phaseSaving]) and the B&B bound (in
      * [com.eignex.klause.solver.Optimizer.minimize]) survive the restart, so each
      * restart resumes with strictly more information than the previous run. Disabled
-     * by default (`null`); set a strictly positive unit (for example `256`) to enable Luby restarts (M. Luby, A. Sinclair,
-     * D. Zuckerman, "Optimal speedup of Las Vegas algorithms", Inf. Process. Lett. 47(4), 1993,
+     * by default (`null`); set a strictly positive unit (for example `256`) to enable Luby restarts
+     * (M. Luby, A. Sinclair, D. Zuckerman, "Optimal speedup of Las Vegas algorithms", Inf. Process. Lett. 47(4), 1993,
      * https://doi.org/10.1016/0020-0190(93)90029-9).
      */
     val lubyRestartBase: Long? = null,
