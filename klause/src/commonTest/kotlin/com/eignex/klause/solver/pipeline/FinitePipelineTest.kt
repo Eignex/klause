@@ -87,19 +87,21 @@ class FinitePipelineTest {
                 Table(intArrayOf(2, 0), longArrayOf(0, 1, 1, 0)),
             ),
         )
-        val budget = PresolveBudget(Long.MAX_VALUE)
+        for (spec in listOf("default", "off,+probe-int-holes")) {
+            val budget = PresolveBudget(Long.MAX_VALUE)
 
-        val preparation = FinitePipeline.prepare(
-            FinitePipelineRequest(
-                source, FiniteEngine.BACKTRACK, presolveConfig = PresolveConfig.parse("off,+probe-int-holes"),
-                cancellation = Cancellation { budget.probeCalls > 0L }, solveCancellation = Cancellation.Never,
-                presolveBudget = budget,
-            ),
-        )
+            val preparation = FinitePipeline.prepare(
+                FinitePipelineRequest(
+                    source, FiniteEngine.BACKTRACK, presolveConfig = PresolveConfig.parse(spec),
+                    cancellation = Cancellation { budget.probeCalls > 0L }, solveCancellation = Cancellation.Never,
+                    presolveBudget = budget,
+                ),
+            )
 
-        assertFalse(assertNotNull(preparation.presolve).infeasible)
-        assertIs<PropagationResult.Implied>(preparation.executableProblem().baked)
-        assertTrue(budget.invocations.any { it.outcome == PresolveInvocationOutcome.INTERRUPTED })
+            assertFalse(assertNotNull(preparation.presolve).infeasible)
+            assertIs<PropagationResult.Implied>(preparation.executableProblem().baked)
+            assertTrue(budget.invocations.any { it.outcome == PresolveInvocationOutcome.INTERRUPTED })
+        }
     }
 
     @Test
