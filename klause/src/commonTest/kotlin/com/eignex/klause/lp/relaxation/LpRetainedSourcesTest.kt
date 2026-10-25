@@ -69,7 +69,9 @@ class LpRetainedSourcesTest {
             live = problem.finiteIntDomain(0)
             val restored = assertNotNull(sources.prepare(owner.state, domains))
             assertTrue(
-                owner.replaceRows(restored.retired, restored.columns, restored.rows, false, objective = restored.objective),
+                owner.replaceRows(
+                    restored.retired, restored.columns, restored.rows, false, objective = restored.objective,
+                ),
             )
             restored.commit()
             assertEquals(BigFraction.ONE, assertNotNull(sources.liveBounds(domains)[column].upper).number.value)
