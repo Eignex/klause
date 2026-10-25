@@ -24,6 +24,7 @@ import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -88,6 +89,30 @@ class SymmetryBreakingTest {
 
         assertTrue(Presolve.breakSymmetries(problem).isEmpty)
         assertTrue(Presolve.breakValuePrecedence(problem).isEmpty)
+    }
+
+    @Test
+    fun `an interrupted active column scan should post no symmetry break`() {
+        val problem = Problem(0, 4, Array(4) { IntDomain(0, 2) }, listOf(AllDifferent(intArrayOf(1, 3)))).bake()
+
+        for (pass in listOf(PresolvePass.BREAK_SYMMETRIES, PresolvePass.VALUE_PRECEDENCE)) {
+            val budget = PresolveBudget(6)
+            val context = PresolveContext(cancellation = budget.orSpent(Cancellation.Never))
+
+            assertTrue(pass.applyFinite(problem, context).isEmpty)
+        }
+    }
+
+    @Test
+    fun `solution set sensitive preparation should retain live symmetry assignments`() {
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 2) }, listOf(AllDifferent(intArrayOf(0, 2)))).bake()
+
+        val result = Presolver.run(
+            problem, PresolveConfig.parse("off,+symmetry,+value-precede"), PresolveContext(solutionSetSensitive = true),
+        )
+
+        assertTrue(result.passesFired.isEmpty())
+        assertEquals(countFeasible(problem), countFeasible(result.problem))
     }
 
     @Test
