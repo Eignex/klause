@@ -1708,6 +1708,47 @@ unconfirmed. Native work includes discovery visits in the candidate, so raw work
 totals are different currencies. Adoption is for bounded complementary coverage,
 with observed search and cost tradeoffs and no general speedup or recovery claim.
 
+Reject standalone `NoopStarted` counter filling in `66c224e6fc`.
+[8198](https://lab.eignex.com/jobs/8198) pairs it with `0b9f22b574` on
+Linux/amd64: the parent's explicit maxSD retains six checked Car80 witnesses at
+the same 3,917-node prefix, while the prototype loses all six at 15 seconds.
+Its Nonogram node reduction does not justify that loss. Relation-count availability
+does not replace global propagation guidance; the provider remains a research variant.
+
+Retain bounded `propagation-guided` CSP search beside cheap `support-aware` ordering;
+[portfolios](../docs/12-portfolio.md#satisfaction-pools) owns admission and
+[search](../docs/08-search.md) owns restoration and the local work allowance.
+[8248](https://lab.eignex.com/jobs/8248) compares `373afe5346` with core
+`bda32446e3` on Mac/aarch64: seven original sources, P1, 15 seconds, seeds 3/17
+and three repetitions. All 252 cases return without arm failures, all 96 witnesses
+pass independent source checks, and no accepted witness is lost across 84 paired
+CP/mixed default controls. Source hashes, runtime/options and non-solver dependency
+bytes match; compiler identity is unavailable. Later commits add tests, API snapshots
+and merged propagation fixes without changing the selector or recipe implementations.
+
+| Single recipe | Explicit maxSD | Bounded propagation guidance |
+| --- | --- | --- |
+| Car75 | 13,568 nodes, 11.599–14.433 s | 5,037 nodes, 4.372–5.626 s |
+| Car80 | 3,917 nodes, 5.599–7.517 s | 4,991 nodes, 5.737–7.171 s |
+| Nonogram 039 | 915 nodes, 3.971–4.300 s | 799 nodes, 5.678–6.223 s |
+
+Each cell retains six checked witnesses at one identical prefix across both seeds;
+these are not independent seed trajectories. Car75 spends 483 completed probes and
+seven local cap hits; Car80 spends 457 probes and 32 hits. Default Car runs remain
+unresolved. Car80 CP depth rises from 403 to 405–425 and mixed depth from 402–403
+to 405, without establishing a portfolio verdict gain. Nonogram mixed defaults
+cost 6.153–10.475 seconds instead of 4.455–6.627 despite retaining every witness.
+
+WordDesign's bounded single recipe reaches 15–20 nodes instead of six, and WordSquare
+24–35 instead of three; both remain unknown. WordDesign records 12–14 locally capped
+orderings and no completed probes, explicitly declining its expensive fallback.
+Default WordDesign/WordSquare remain unknown. Eternity's maxSD controls retain depth
+37 without fallback probes. Nonadmitted QuasiGroup preserves default feasibility and the single-recipe
+373-node witness prefix. Bounded native work includes residual-score visits, so raw
+work totals have different currencies. RSS and allocations were not collected.
+Adoption preserves bounded complementary guidance with measured costs, without a
+general speedup or hard-family recovery claim.
+
 Retain adaptive live tuple masks and bounded support-count ordering as consumers of
 the shared index. [8055](https://lab.eignex.com/jobs/8055) compares `e5028472dd`
 (the retained algorithms on parent `e467739f4e`, with maxSD exposed) and `e36eb235ac`
