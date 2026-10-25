@@ -98,20 +98,25 @@ internal object BoundedIntegerProbing {
             return acc
         }
 
-        private fun probe(variable: Int, value: Long): PropagationResult.Unsat? {
+        private fun takeCall(variable: Int): Boolean {
             if (perVar[variable] >= config.probeBudgetPerVar) {
                 cancellation.interruptPresolveInvocation()
-                return null
+                return false
             }
             if (calls >= config.probeTotalBudget || credit == 0 || cancellation()) {
                 cancellation.interruptPresolveInvocation()
                 stopped = true
-                return null
+                return false
             }
             perVar[variable]++
             calls++
             credit--
             cancellation.recordPresolveProbe()
+            return true
+        }
+
+        private fun probe(variable: Int, value: Long): PropagationResult.Unsat? {
+            if (!takeCall(variable)) return null
             val result = session.probeInt(variable, value)
             if (result == null) {
                 cancellation.interruptPresolveInvocation()
@@ -120,7 +125,7 @@ internal object BoundedIntegerProbing {
                 for (factor in result.conflictFactors) if (factor in weights.indices) weights[factor] += 1.0
                 credit = minOf(config.probeTotalBudget.toLong() - calls, credit.toLong() + PROBES_PER_REFUTATION).toInt()
                 acc = acc.withHole(variable, value)
-                if (cancellation()) {
+                if (!takeCall(variable)) {
                     stopped = true
                     return null
                 }
