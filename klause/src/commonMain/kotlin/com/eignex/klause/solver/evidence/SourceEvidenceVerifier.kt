@@ -123,6 +123,8 @@ class SourceEvidenceVerifier(
         SourceEvidenceCheck.Unavailable("original-source arithmetic check cancelled")
     } catch (_: PolynomialResourceLimit) {
         SourceEvidenceCheck.Unavailable("original-source arithmetic allowance exhausted")
+    } catch (_: SourceRoundingLimit) {
+        SourceEvidenceCheck.Unavailable("mixed integer rounding scalar width exhausted")
     }
 
     private inner class Run(
