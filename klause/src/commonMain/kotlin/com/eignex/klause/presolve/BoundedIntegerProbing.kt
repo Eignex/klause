@@ -2,8 +2,10 @@ package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.RootWorkAccounting
 import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
@@ -23,14 +25,16 @@ internal object BoundedIntegerProbing {
         val budget = cancellation.presolveBudget()
         val token = budget?.let { it.slice(minOf(MAX_PROBE_WORK, it.remaining() / 8)) or cancellation } ?: cancellation
         if (token()) return base
-        val session = PropagationSession(problem, token, propagationCancelFloor = 0, nativeSat = true)
-        val accounting = RootWorkAccounting(token, session.explanationState)
+        val state = PropagationState(PropagationProblem(problem), base.toAssumptions(), nativeSat = true)
+        state.cancelFloor = 0
+        val accounting = RootWorkAccounting(token, state)
         return try {
-            session.withCancellation(accounting) {
-                if (session.isUnsatAtRoot) return@withCancellation PropagationResult.Unsat()
-                if (session.fixpointCancelled || accounting()) return@withCancellation base
-                ProbeRun(problem, base, config, session, accounting).run()
-            }
+            if (!state.seeded) return PropagationResult.Unsat()
+            val conflict = state.runToFixpoint(allFactors = true, cancellation = accounting)
+            if (conflict != null) return PropagationResult.Unsat()
+            if (state.runCancelled || accounting()) return base
+            val session = PropagationSession.prepared(state, accounting, null)
+            ProbeRun(problem, base, config, session, accounting).run()
         } finally {
             accounting.flush()
         }
@@ -109,7 +113,7 @@ internal object BoundedIntegerProbing {
                 stopped = true
             } else if (result is PropagationResult.Unsat) {
                 for (factor in result.conflictFactors) if (factor in weights.indices) weights[factor] += 1.0
-                credit = minOf(config.probeTotalBudget - calls, credit + PROBES_PER_REFUTATION)
+                credit = minOf(config.probeTotalBudget.toLong() - calls, credit.toLong() + PROBES_PER_REFUTATION).toInt()
                 acc = acc.withHole(variable, value)
                 if (cancellation()) {
                     stopped = true
