@@ -15,6 +15,8 @@ import com.eignex.klause.meta.coreguided.CoreGuidedSearch
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioBuilder
 import com.eignex.klause.portfolio.PortfolioScenario
+import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
@@ -235,6 +237,32 @@ class BinaryObjectiveViewTest {
             val plan = checkNotNull(result.result.preparation.executionPlan)
             assertEquals(objective, plan.objective)
             assertEquals(maximize, plan.maximize)
+        }
+    }
+
+    @Test
+    fun `objective views should retain scoped Boolean root pins across either rebuild`() {
+        for (mixed in listOf(false, true)) {
+            val factors = if (mixed) {
+                listOf(Linear(longArrayOf(2, 1), intArrayOf(0, 1), LinearOp.GE, 1))
+            } else {
+                emptyList()
+            }
+            val source = BakedProblem(
+                numBoolVars = 1, numIntVars = 2,
+                intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 2)), factors = factors,
+                seedDeductions = PropagationResult.Implied(intArrayOf(0), booleanArrayOf(true), intArrayOf(), longArrayOf()),
+            )
+            val original = LinearObjective(longArrayOf(5), longArrayOf(3))
+            val transformed = checkNotNull(BinaryColumnSubstitution.substitute(source, setOf(0), BakeConfig.NONE, original))
+
+            val result = assertIs<MinimizeResult.Optimal>(BacktrackSolver(transformed.problem).minimize(
+                checkNotNull(transformed.objective),
+            ))
+            val restored = transformed.reconstruct(result.sample)
+
+            assertTrue(restored.boolValue(0))
+            assertEquals(5L, original.evaluateLong(restored))
         }
     }
 

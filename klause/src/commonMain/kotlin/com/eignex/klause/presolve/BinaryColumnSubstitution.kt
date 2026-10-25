@@ -11,6 +11,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.IntArrayList
@@ -95,10 +96,11 @@ internal object BinaryColumnSubstitution {
         val numInts = problem.numIntVars
         val factors = view?.factors?.toTypedArray() ?: problem.factors
         val numBools = view?.numBoolVars ?: problem.numBoolVars
+        val seeds = if (view == null) PropagationResult.Implied.EMPTY else problem.rootDeductions
         fun viewOnly(): Substitution? {
             if (view == null) return null
             val rebuilt = PresolveShared.rebuildProblem(
-                problem, view.factors, bakeConfig = bakeConfig, numBoolVars = numBools,
+                problem, view.factors, bakeConfig = bakeConfig, numBoolVars = numBools, seedDeductions = seeds,
             )
             return Substitution(
                 rebuilt, SourceRebuilds(emptyList(), sourceBoolVars = problem.numBoolVars), 0, view.objective,
@@ -153,7 +155,9 @@ internal object BinaryColumnSubstitution {
         }
         val domains = problem.rootIntDomains()
         for (k in 0 until columns.size) domains[columns[k]] = IntDomain(0, 0)
-        val rebuilt = PresolveShared.rebuildProblem(problem, out, domains, bakeConfig, numBoolVars = nextBool)
+        val rebuilt = PresolveShared.rebuildProblem(
+            problem, out, domains, bakeConfig, numBoolVars = nextBool, seedDeductions = seeds,
+        )
         val substituted = columns.toIntArray()
         val rebuild = SourceRebuilds(
             substituted.map { RebuildStep.IntegerFromLiteral(it, valueLiterals[it]) },
