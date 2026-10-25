@@ -10,6 +10,58 @@ import kotlin.test.assertTrue
 
 class LpBoundCertificationTest {
     @Test
+    fun `retained basis should recover coupled dual equations without a primal`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = assertNotNull(LpExactState(ExactLpModel(
+            listOf(
+                listOf(ExactLpEntry(0, ExactLpNumber.of(3L)), ExactLpEntry(1, ExactLpNumber.of(1L))),
+                listOf(ExactLpEntry(0, ExactLpNumber.of(2L)), ExactLpEntry(1, ExactLpNumber.of(4L))),
+            ),
+            listOf(ExactLpNumber.of(5L), ExactLpNumber.of(5L)),
+            List(2) { ExactLpColumn(ExactLpBounds()) } +
+                List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
+            List(2) { ExactLpRow() },
+            ExactLpObjective(listOf(ExactLpNumber.of(-1L), ExactLpNumber.of(-1L), zero, zero)),
+        )).toWorkingModel())
+        val basis = Basis(intArrayOf(0, 1), arrayOf(VarStatus.BASIC, VarStatus.BASIC,
+            VarStatus.AT_LOWER, VarStatus.AT_LOWER))
+
+        val result = certifyLpBoundOnly(source, doubleArrayOf(-0.3 + 1e-10, -0.1 - 1e-10),
+            ReconstructionLimits(maxAttempts = 1), basis = basis)
+
+        assertEquals(BigFraction.ofLong(-2L), assertNotNull(result.bound).value)
+        val repair = assertNotNull(result.metrics.basisRepair)
+        assertEquals(2, repair.largestComponent)
+        assertEquals(1, repair.solvedComponents)
+        assertEquals(0, result.metrics.pointChecks)
+        assertEquals(2, result.metrics.dualChecks)
+        assertTrue(repair.work > 0L)
+    }
+
+    @Test
+    fun `singleton basis equations should recover fractional multipliers`() {
+        val basis = Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.AT_LOWER))
+
+        val result = certifyLpBoundOnly(model(upper = null, coefficient = 3L, rhs = 1L),
+            doubleArrayOf(-1.0 / 3.0), ReconstructionLimits(maxAttempts = 1), basis = basis)
+
+        assertEquals(BigFraction.ofLong(-3L).reciprocal(), assertNotNull(result.bound).value)
+        assertEquals(1, assertNotNull(result.metrics.basisRepair).peeledRows)
+        assertEquals(0, result.metrics.pointChecks)
+    }
+
+    @Test
+    fun `singular retained basis should supply no bound on an open objective`() {
+        val basis = Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.AT_LOWER))
+
+        val result = certifyLpBoundOnly(model(upper = null, coefficient = 0L), doubleArrayOf(-1.0),
+            ReconstructionLimits(maxAttempts = 1), basis = basis)
+
+        assertNull(result.bound)
+        assertEquals("SINGULAR", assertNotNull(result.metrics.basisRepair).decline)
+    }
+
+    @Test
     fun `independent dual denominators should certify a bound on free columns`() {
         val coefficients = listOf(101L, 103L, 107L, 109L, 1L)
         val zero = ExactLpNumber.of(0L)
