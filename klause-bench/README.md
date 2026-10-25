@@ -52,6 +52,13 @@ controls and establish no solver throughput or verdict claim.
 
 ## Klause-lab
 
+`bench.profile.ElementHullProfile` takes `suite=ID problem=NAME sha256=HEX` for a
+hash-pinned XCSP3 source. It prepares the ordinary mixed finite model, then measures
+forced Element hull assembly, retained selectors by index, allocation and default /
+aggressive admission under the existing size guards. It makes no search query or
+source verdict claim. Use ordinary matched CLI experiments for solve costs and
+independent source-witness validation.
+
 [Klause-lab](https://github.com/Eignex/klause-lab) owns everything that runs more than
 one case: experiments and A/B comparisons, regression schedules, reference solving and
 reference results, witness checking and profiling. It builds the Klause revisions an

@@ -199,7 +199,13 @@ internal object MpsLpAdmission {
     }
 
     @Suppress("SpreadOperator") // Java reflection requires varargs at the constructor boundary.
-    internal fun rootRelaxation(problem: Problem, objective: LinearObjective?, cone: Boolean, stop: Cancellation): Any {
+    internal fun rootRelaxation(
+        problem: Problem,
+        objective: LinearObjective?,
+        cone: Boolean,
+        stop: Cancellation,
+        element: Boolean = false,
+    ): Any {
         check(!stop())
         // Reflection keeps diagnostic access to internal assembly out of the published API.
         val type = Class.forName("com.eignex.klause.lp.relaxation.CpToLpRelaxation")
@@ -211,8 +217,9 @@ internal object MpsLpAdmission {
         }
         values[0] = problem
         values[1] = objective
+        values[2] = element
         values[11] = cone
-        values[21] = (1 or (1 shl 1) or (1 shl 11)).inv()
+        values[21] = (1 or (1 shl 1) or (1 shl 2) or (1 shl 11)).inv()
         val relaxer = constructor.newInstance(*values)
         val domainType = Class.forName("com.eignex.klause.lp.relaxation.RootDomains")
         val domains = domainType.constructors.single().newInstance(problem)
