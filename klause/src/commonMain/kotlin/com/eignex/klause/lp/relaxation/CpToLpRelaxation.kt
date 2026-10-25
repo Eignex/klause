@@ -31,6 +31,7 @@ import com.eignex.klause.lp.LinearLpProjection
 import com.eignex.klause.lp.LpAuxiliaryColumn
 import com.eignex.klause.lp.NumericalLinearRow
 import com.eignex.klause.lp.RelaxationBuilder
+import com.eignex.klause.lp.SharedIndexChoices
 import com.eignex.klause.lp.cut.CircuitArcModel
 import com.eignex.klause.lp.cut.CircuitSeparator
 import com.eignex.klause.lp.cut.SourceCut
@@ -830,7 +831,7 @@ internal class CpToLpRelaxation(
         private val cancellation: Cancellation = Cancellation.Never,
         private val region: LpEmissionRegion? = null,
         private val columnDomains: RelaxationDomains = domains,
-    ) : ExactRelaxationBuilder {
+    ) : ExactRelaxationBuilder, SharedIndexChoices {
         private val builder = LpBuilder()
         private val exactRows = ExactRelaxationRows()
         private val intCol = IntArray(if (region == null) problem.numIntVars else 0) { -1 }
@@ -860,6 +861,21 @@ internal class CpToLpRelaxation(
         private val colReq = ArrayList<LongArray?>()
         private val colPresence = ArrayList<CutAuxiliaryDefinition?>()
         private val colPresentUpper = LongArrayList()
+        private val indexChoices = HashMap<Pair<Int, Long>, Int>()
+        private val indexChoiceBlocks = HashSet<Pair<Int, List<Long>>>()
+
+        override fun indexChoiceBlock(index: Int, values: LongArray): Boolean =
+            indexChoiceBlocks.add(index to values.toList())
+
+        override fun indexChoiceColumn(index: Int, value: Long): Int = indexChoices.getOrPut(index to value) {
+            // Negative producer keys reserve source-level choices outside factor-local namespaces.
+            addAuxColumn(
+                0L, if (value in liveDomain(index)) 1L else 0L,
+                presence = longArrayOf(index.toLong(), value),
+                definition = LpAuxiliaryColumn(listOf(value), 1L, true),
+                sourceRole = listOf(-1L, index.toLong(), value),
+            )
+        }
 
         /** Arc-indicator models recorded by `buildArcModel` for the subtour-elimination separator. */
         private val circuitModels = ArrayList<CircuitArcModel>()
@@ -902,7 +918,16 @@ internal class CpToLpRelaxation(
         /** Auxiliary LP column with no backing CP variable (tag/colVarId = -1) — e.g. a circuit arc.
          *  [presence] names the `(intVar, value)` memberships that must all hold for the column to be
          *  present (upper [hi]); when given, the column can be re-bound on the persistent path. */
-        override fun auxColumn(lo: Long, hi: Long, presence: LongArray?, definition: LpAuxiliaryColumn?): Int {
+        override fun auxColumn(lo: Long, hi: Long, presence: LongArray?, definition: LpAuxiliaryColumn?): Int =
+            addAuxColumn(lo, hi, presence, definition)
+
+        private fun addAuxColumn(
+            lo: Long,
+            hi: Long,
+            presence: LongArray?,
+            definition: LpAuxiliaryColumn?,
+            sourceRole: List<Long>? = null,
+        ): Int {
             checkCancellation()
             if (definition != null) {
                 require(
@@ -922,7 +947,7 @@ internal class CpToLpRelaxation(
             colPresence.add(
                 definition?.let {
                     CutAuxiliaryDefinition(
-                        listOf(currentFactorId.toLong(), currentEmissionRoute) + it.role,
+                        sourceRole ?: (listOf(currentFactorId.toLong(), currentEmissionRoute) + it.role),
                         requireNotNull(presence).toList(),
                         it.presentUpper,
                         it.integralExtension,

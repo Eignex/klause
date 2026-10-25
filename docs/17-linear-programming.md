@@ -6,6 +6,16 @@ assemble source-aware rows; the engine solves and certifies them; consumers inte
 the result in source coordinates. Shared search owns integer and Boolean alternatives.
 LP feasibility alone establishes no integrality.
 
+Element hulls share an index-value selector across properties of the same integer
+index. Constant properties use one joint distribution, preserving their choice
+correlations; variable entries keep their bounded big-M links. Admission enumerates
+at most 1024 root choices within each array's index range, excluding root holes,
+and charges shared columns once against the aggregate LP size guard. Open source
+index bounds decline the hull. Selector presence follows live index membership;
+source definitions identify the index and value independently of the emitting
+factor or its array offset. Retained factor emissions reuse those definitions and
+may retain duplicate channel rows. Their row estimate remains conservative.
+
 ## Boundaries
 
 ```text

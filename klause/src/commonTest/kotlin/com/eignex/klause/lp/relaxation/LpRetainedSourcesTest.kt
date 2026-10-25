@@ -26,6 +26,54 @@ import kotlin.test.assertTrue
 
 class LpRetainedSourcesTest {
     @Test
+    fun `shared element choices retain exact joint bounds across holes and pop`() {
+        val problem = Problem(
+            0, 3, arrayOf(IntDomain(0, 2), IntDomain(0, 1), IntDomain(0, 1)),
+            arrayOf(
+                Element(0, 1, longArrayOf(0, 1, 0), false, 0),
+                Element(0, 2, longArrayOf(7, 1, 0, 1), false, -1),
+            ),
+        )
+        var live = problem.finiteIntDomain(0)
+        val domains = object : RelaxationDomains {
+            override fun intDomain(varId: Int): IntDomain = if (varId == 0) live else problem.finiteIntDomain(varId)
+            override fun boolValue(varId: Int): Boolean? = null
+        }
+        val sources = LpRetainedSources(
+            problem,
+            CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(0, 1, 1)), elementHull = true),
+        )
+        LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
+            val root = assertNotNull(sources.prepare(owner.state, domains))
+            assertTrue(owner.replaceRows(root.retired, root.columns, root.rows, false, objective = root.objective))
+            root.commit()
+            val relaxation = sources.relaxation(owner.state, domains)
+            val column = relaxation.colReq.indices.single { relaxation.colReq[it].contentEquals(longArrayOf(0, 1)) }
+            assertEquals(3, relaxation.colReq.count { it != null })
+            assertEquals(BigFraction.ONE, assertNotNull(owner.solve()).lowerBound)
+            assertTrue(owner.push())
+            live = live.excludeValue(1L)
+
+            val child = assertNotNull(sources.prepare(owner.state, domains))
+
+            assertTrue(child.columns.isEmpty())
+            assertTrue(owner.replaceRows(child.retired, child.columns, child.rows, true, objective = child.objective))
+            child.commit()
+            assertEquals(BigFraction.ZERO, assertNotNull(sources.liveBounds(domains)[column].upper).number.value)
+            assertEquals(BigFraction.ONE, assertNotNull(owner.solve()).lowerBound)
+            assertTrue(owner.pop(0))
+            sources.retract(0)
+            live = problem.finiteIntDomain(0)
+            val restored = assertNotNull(sources.prepare(owner.state, domains))
+            assertTrue(owner.replaceRows(restored.retired, restored.columns, restored.rows, false, objective = restored.objective))
+            restored.commit()
+            assertEquals(BigFraction.ONE, assertNotNull(sources.liveBounds(domains)[column].upper).number.value)
+            assertEquals(BigFraction.ONE, assertNotNull(owner.solve()).lowerBound)
+            assertEquals(6, owner.state.model.n)
+        }
+    }
+
+    @Test
     fun `unrepresentable emission should decline without publishing a partial layout`() {
         val problem = Problem(
             0,
