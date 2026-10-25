@@ -68,6 +68,11 @@ until it completes; see
 
 ## Traversal and branching
 
+An exact Boolean objective can install a permanent pseudo-Boolean strict-improvement
+cutoff at a root even when other integer coordinates remain. Signed normalization
+uses exact arithmetic; a cutoff outside the learned word-sized kernel declines
+without changing ordinary objective bounds.
+
 Branch proposals determine the next exhaustive split. Component hints order its
 alternatives; source-bound atoms give arithmetic decisions stable Boolean names.
 

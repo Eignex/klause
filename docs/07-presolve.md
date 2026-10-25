@@ -445,7 +445,8 @@ exactly. A fresh positive channel retains the source coefficient when signed reu
 or a constant shift exceeds the objective's storage width. Mixed
 integer readers retain their columns and channels. Substituted values are
 reconstructed from their literals, preserving original costs and source coordinates.
-Approximate and solution-set-sensitive invocations retain their objective form.
+Continuous models, approximate semantics and solution-set-sensitive invocations
+retain their objective form.
 
 ## Source routing and encoder selection
 

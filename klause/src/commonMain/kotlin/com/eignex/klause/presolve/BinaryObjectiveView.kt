@@ -19,7 +19,8 @@ internal class BinaryObjectiveView(
 ) {
     companion object {
         fun create(problem: BakedProblem, objective: LinearObjective): BinaryObjectiveView? {
-            if (problem.semantics.isApproximate || objective.realCoefficientValues.any { it != 0.0 } ||
+            if (problem.numRealVars > 0 || problem.semantics.isApproximate ||
+                objective.realCoefficientValues.any { it != 0.0 } ||
                 objective.boolWeightValues.size > problem.numBoolVars ||
                 objective.intCoefficientValues.none { it != 0L }
             ) return null

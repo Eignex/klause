@@ -107,6 +107,18 @@ class BinaryObjectiveViewTest {
     }
 
     @Test
+    fun `continuous models without a Boolean consumer should retain their objective form`() {
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0, 1)), emptyList(),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+        ).bake()
+
+        val view = BinaryObjectiveView.create(problem, LinearObjective(intCoefficients = longArrayOf(1)))
+
+        assertNull(view)
+    }
+
+    @Test
     fun `a nonbinary cost should retain the integer objective`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyList()).bake()
 
