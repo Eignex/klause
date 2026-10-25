@@ -76,7 +76,7 @@ private class BasisDualRun(
                 meter.step()
                 if (coefficient.isZero) continue
                 if (activeRow[row]) {
-                    meter.storage(48L)
+                    meter.storage(96L)
                     support += row to coefficient
                     byRow[row] += equation to coefficient
                 } else {
@@ -156,7 +156,7 @@ private class BasisDualRun(
     }
 
     private fun solveComponents() {
-        meter.storage(a.m * 28L + equations.size * 24L)
+        meter.storage(a.m * 128L + equations.size * 64L)
         val parent = IntArray(a.m) { it }
         val size = IntArray(a.m) { 1 }
         fun root(row: Int): Int {
@@ -231,8 +231,8 @@ private class BasisDualRun(
                 if (activeRow[row]) matrix[id][local[row]] = value
             }
         }
-        val allowance = allowance()
-        val build = RationalBasisFactors.factor(matrix, limits = allowance, cancellation = token)
+        val factorAllowance = allowance()
+        val build = RationalBasisFactors.factor(matrix, limits = factorAllowance, cancellation = token)
         record(build.stats)
         val factors = when (build) {
             is RationalBasisBuild.Ready -> build.factors
