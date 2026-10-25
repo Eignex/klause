@@ -937,7 +937,9 @@ contradiction spends 826→23,469 units and quartic no-real-root 1462→16,929.
 hash-pinned XCSP3 source. It uses mixed finite preparation with seed 3, a
 1.65-billion work allowance and a thirty-second containing deadline. The report
 records forced Element root assembly, selectors by index, current-thread allocation
-and default / aggressive admission under the existing size guards. Preparation can
+and default / aggressive complete-group selections under the existing size guards.
+Selected Element-only projections report their emitted shape and assembly cost
+separately from the base admission estimate. Preparation can
 query numerical bounds; the capture makes no search or source verdict claim. Use
 ordinary matched CLI experiments for solve costs and independent source-witness
 validation.
@@ -954,6 +956,29 @@ root bounds; their incumbent results were mixed, including one gain and one loss
 on Wordpress-08-20-500_c24. These two-seed observations establish no general timing
 or default-quality improvement. Complete-group admission remains separately bounded
 by the aggregate LP size guard.
+
+Complete-group capture [8313](https://lab.eignex.com/jobs/8313), on d245cbcfac and
+Linux/amd64 with Java 25.0.5, admits six of the ten index groups at aggressive
+emphasis: 2,994 selectors, 219 rows and 3,122 columns. Its emitted size proxy is
+731,898 cells under the unchanged 1,048,576-cell cap. Ordinary admission keeps the
+large groups disabled. Selected assembly records 24 ms and 13.3 MB of current-thread
+allocation; forced full assembly records 115 ms and 28.7 MB. The full projection
+runs first, so these instrumented timings are descriptive rather than a paired
+timing comparison. The capture assembles Element hulls without a search or source
+verdict claim.
+
+Complete-group comparison [8314](https://lab.eignex.com/jobs/8314) uses four sources,
+seeds 3/17, P1/30s and debug enabled on one Linux/amd64 host. All 32 source
+witnesses pass independent checking, with no worker failures. Aggressive LP
+incumbents on Wordpress-08-20-500_c24 improve from 3689/3643 to 3398; other
+aggressive incumbents and native proof coverage stay unchanged. Recorded root
+bounds remain zero. On the original 04-10 source, node LP work falls from
+1.26/1.34 billion to 2.09 million units alongside existing effort demotion and
+fewer LP deductions: 2162/1994 LP prunes become zero. Mixed-default witness quality
+does not regress in this cohort, but the large groups remain outside its ordinary
+small-hull threshold. These two-seed observations establish no general timing,
+default-quality or root-bound improvement. The paired revisions are 7500a0e1ff
+and 51d8bb6a49, before the pruner's unrelated-factor allocation cleanup.
 
 ### MPS LP admission capture
 
