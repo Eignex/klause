@@ -90,63 +90,67 @@ internal object LocalSearchTrajectory {
                 put("domains", JsonArray(problem.rootIntDomains().map { JsonPrimitive(it.toString()) }))
                 put("sourceVerdictClaim", false)
             }.toString())
-            out.resolve("walk-$rewrite.jsonl").bufferedWriter().use { writer ->
-                var picks = 0L
-                val recorder = object : MoveSource {
-                    override val id = MoveSourceId("trajectory-observation")
-                    override val phase = Phase.Any
-                    override val pool = Pool.NoiseEligible
-                    override fun generate(state: LocalSearchState, sink: MoveSink) {
-                        val pick = picks++
-                        if (pick >= 256 && pick % 512 != 0L) return
-                        val sample = prepared.reconstruct(state.assignment.snapshot())
-                        writer.appendLine(buildJsonObject {
-                            put("pick", pick)
-                            put("step", state.step)
-                            put("cost", state.cost)
-                            put("workingIntegers", JsonArray((0 until problem.numIntVars).map {
-                                JsonPrimitive(state.assignment.intValue(it))
-                            }))
-                            put("weights", JsonArray(state.weights.factorWeights.map(::JsonPrimitive)))
-                            if (pick == 0L) {
-                                put("unreadIntegers", buildJsonArray {
-                                    for (variable in 0 until problem.numIntVars) {
-                                        if (state.projection.intOccurrences[variable].isEmpty()) add(JsonPrimitive(variable))
-                                    }
+            for (greedy in listOf(false, true)) {
+                val label = if (greedy) rewrite.toString() else "initial-$rewrite"
+                out.resolve("walk-$label.jsonl").bufferedWriter().use { writer ->
+                    var picks = 0L
+                    val recorder = object : MoveSource {
+                        override val id = MoveSourceId("trajectory-observation")
+                        override val phase = Phase.Any
+                        override val pool = Pool.NoiseEligible
+                        override fun generate(state: LocalSearchState, sink: MoveSink) {
+                            val pick = picks++
+                            if (pick >= 256 && pick % 512 != 0L) return
+                            val sample = prepared.reconstruct(state.assignment.snapshot())
+                            writer.appendLine(buildJsonObject {
+                                put("pick", pick)
+                                put("step", state.step)
+                                put("cost", state.cost)
+                                put("workingIntegers", JsonArray((0 until problem.numIntVars).map {
+                                    JsonPrimitive(state.assignment.intValue(it))
+                                }))
+                                put("weights", JsonArray(state.weights.factorWeights.map(::JsonPrimitive)))
+                                if (pick == 0L) {
+                                    put("unreadIntegers", buildJsonArray {
+                                        for (variable in 0 until problem.numIntVars) {
+                                            if (state.projection.intOccurrences[variable].isEmpty()) add(JsonPrimitive(variable))
+                                        }
+                                    })
+                                    put("definedIntegers", buildJsonArray {
+                                        for (variable in 0 until problem.numIntVars) {
+                                            if (state.invariants?.isDefinedInt(variable) == true) add(JsonPrimitive(variable))
+                                        }
+                                    })
+                                }
+                                put("sourceIntegers", buildJsonObject {
+                                    for ((name, variable) in parsed.intVarNames) put(name, sample.intValue(variable))
                                 })
-                                put("definedIntegers", buildJsonArray {
-                                    for (variable in 0 until problem.numIntVars) {
-                                        if (state.invariants?.isDefinedInt(variable) == true) add(JsonPrimitive(variable))
-                                    }
-                                })
-                            }
-                            put("sourceIntegers", buildJsonObject {
-                                for ((name, variable) in parsed.intVarNames) put(name, sample.intValue(variable))
-                            })
-                            put("degrees", JsonArray(state.factorDegree.map(::JsonPrimitive)))
-                            put("violated", JsonArray(state.violated.toIntArray().map(::JsonPrimitive)))
-                        }.toString())
-                        writer.flush()
+                                put("degrees", JsonArray(state.factorDegree.map(::JsonPrimitive)))
+                                put("violated", JsonArray(state.violated.toIntArray().map(::JsonPrimitive)))
+                            }.toString())
+                            writer.flush()
+                        }
                     }
-                }
-                val recipe = LocalSearchCatalog.byLabel(options.getValue("recipe")).withSources {
-                    listOf(ConfiguredSource(recorder)) + it
-                }
-                val solver = LocalSearchSolver(
-                    problem, strategy = recipe.strategy, optimizeStrategy = recipe.optimizeStrategy,
-                    definitionalSweep = sweep, perMoveInvariants = sweep != null && recipe.perMoveInvariants,
-                    seedImplicitOnRestart = recipe.seedImplicitOnRestart,
-                )
-                val params = LocalSearchParams(
-                    randomSeed = seed, maxFlips = moves, cancellation = stop,
-                    costShaping = CostShaping.Linear(lambda = 1.0), lsObjective = gradient,
-                    normalizeWeightsByClass = true, reportResiduals = true,
-                )
-                solver.resumable(workingObjective, params).use { run ->
-                    val result = run.runSlice(stop, Long.MAX_VALUE) {}
-                    out.resolve("result-$rewrite.txt").writeText(
-                        "picks=$picks\ncancelled=${stop()}\nresult=$result\nstats=${run.stats}\n",
+                    val recipe = LocalSearchCatalog.byLabel(options.getValue("recipe")).withSources {
+                        listOf(ConfiguredSource(recorder)) + it
+                    }
+                    val solver = LocalSearchSolver(
+                        problem, strategy = recipe.strategy, optimizeStrategy = recipe.optimizeStrategy,
+                        greedyRepairOnRestart = greedy,
+                        definitionalSweep = sweep, perMoveInvariants = sweep != null && recipe.perMoveInvariants,
+                        seedImplicitOnRestart = recipe.seedImplicitOnRestart,
                     )
+                    val params = LocalSearchParams(
+                        randomSeed = seed, maxFlips = if (greedy) moves else 1L, cancellation = stop,
+                        costShaping = CostShaping.Linear(lambda = 1.0), lsObjective = gradient,
+                        normalizeWeightsByClass = true, reportResiduals = true,
+                    )
+                    solver.resumable(workingObjective, params).use { run ->
+                        val result = run.runSlice(stop, Long.MAX_VALUE) {}
+                        out.resolve("result-$label.txt").writeText(
+                            "picks=$picks\ncancelled=${stop()}\nresult=$result\nstats=${run.stats}\n",
+                        )
+                    }
                 }
             }
         }
