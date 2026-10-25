@@ -710,6 +710,7 @@ class Portfolio(
         private val liveStats = arrayOfNulls<SolveStats>(workers.size)
         private val busy = BooleanArray(workers.size)
         private val retired = BooleanArray(workers.size)
+        private val firstWitnessArms = workers.indices.filter { workers[it].firstWitnessOnly }
         private var remaining = workers.size
         private val probed = BooleanArray(workers.size)
         private val productive = BooleanArray(workers.size)
@@ -759,6 +760,7 @@ class Portfolio(
         }
 
         fun reseedAllowed(arm: Int): Boolean = !retired[arm] &&
+            !(improving && workers[arm].firstWitnessOnly) &&
             !(improving && arm in incumbentProbeArms && !productive[arm])
 
         fun revisitPreparation(arm: Int) {
@@ -816,6 +818,9 @@ class Portfolio(
          * incumbent, or when the initial pool retires.
          */
         private fun claim(lane: Int): Claim? = locked {
+            if (improving) {
+                for (arm in firstWitnessArms) if (!busy[arm]) retire(arm)
+            }
             if (remaining == 0) return@locked null
             val dedicated = lanes == workers.size
             val eligible = eligibleArms()

@@ -26,8 +26,9 @@ coordinate can supply a private protected-coordinate view to the curated full
 local-search slot. This applies to `Diffn` models without `Element` alternatives,
 where primary and full neighborhoods offer the same repairs. The slot runs the full
 plateau recipe with its configured seed offset; the primary retains the rewritten
-model. Pool size and scheduling allowances are unchanged. Explicit presolve or arm
-selection keeps the selected representation.
+model. The protected view retires at the next scheduling boundary after the first
+global witness, so canonical workers handle incumbent improvement. No arms or
+allowances are added. Explicit presolve or arm selection keeps the selected representation.
 
 The private view shares no pools, warm starts or scalar cutoffs. Its source mapping
 must retain the same original model and a compatible discrete column namespace.

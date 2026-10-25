@@ -28,6 +28,33 @@ import kotlin.time.TimeSource
 
 class PortfolioSchedulingTest {
     @Test
+    fun `first witness workers should retire after either sibling supplies an incumbent`() {
+        for (helperFindsFirst in listOf(false, true)) {
+            var helperSlices = 0
+            var siblingSlices = 0
+            val point = MinimizeResult.BestFound(Sample(BooleanArray(0), LongArray(0)), 0.0,
+                TerminationReason.BudgetExhausted)
+            val helper = TrackingResumableSearch(null, point.takeIf { helperFindsFirst },
+                onRun = { helperSlices++ })
+            val sibling = TrackingResumableSearch(null, point, onRun = { siblingSlices++ })
+            val workers = listOf(
+                trackingWorker("helper", 0, helper).also { it.firstWitnessOnly = true },
+                trackingWorker("sibling", 1, sibling),
+            )
+
+            val result = Portfolio.thompson(workers).use {
+                it.minimize(Cancellation { siblingSlices >= 3 })
+            }
+
+            assertIs<MinimizeResult.BestFound>(result)
+            assertEquals(1, helperSlices)
+            assertEquals(3, siblingSlices)
+            assertEquals(1, helper.closes)
+            assertEquals(1, sibling.closes)
+        }
+    }
+
+    @Test
     fun `preparation revisits should follow every initial sibling admission`() {
         for (instructions in listOf(false, true)) {
             val order = mutableListOf<Int>()

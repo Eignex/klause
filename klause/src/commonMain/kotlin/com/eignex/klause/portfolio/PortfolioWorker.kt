@@ -71,6 +71,8 @@ class PortfolioWorker private constructor(
 
     internal var improvementOnly: Boolean = false
 
+    internal var firstWitnessOnly: Boolean = false
+
     internal var auxiliaryProof: Boolean = false
 
     internal var controlsObjectiveCutoff: Boolean = false
@@ -240,6 +242,7 @@ class PortfolioWorker private constructor(
         ).bindEvidence(model, provesResults = false).also {
             it.family = family
             it.restartingSearch = restartingSearch
+            it.firstWitnessOnly = true
         }
     }
 
