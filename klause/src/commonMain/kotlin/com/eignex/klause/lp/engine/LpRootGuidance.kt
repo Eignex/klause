@@ -32,7 +32,7 @@ internal fun LpScopedSolver.advanceRootGuidance(
     policy: LpCertificationPolicy = proofPolicy,
 ): LpRootGuidance {
     val token = cancellation or cancellationToken
-    val attempt = advanceFloat(quantum, allowance, token)
+    val attempt = advanceFloat(quantum, allowance, token, retainFundingStop = true)
     val result = attempt?.second
     if (attempt != null && result == null && !token() &&
         lastFloatTermination == LpFloatTermination.INFEASIBLE_CANDIDATE

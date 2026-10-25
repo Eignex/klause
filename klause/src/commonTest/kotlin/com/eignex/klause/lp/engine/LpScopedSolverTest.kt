@@ -31,7 +31,8 @@ class LpScopedSolverTest {
             assertEquals(LpFloatTermination.PIVOTS, first.termination)
             assertNull(first.primal)
             assertNull(first.bound)
-            val resumed = assertNotNull(owner.advanceFloat(100_000L, LpFloatAllowance(200_000L, 100))).second
+            val resumed = assertNotNull(owner.advanceFloat(100_000L, LpFloatAllowance(200_000L, 100),
+                retainFundingStop = true)).second
             val total = paid + owner.lastMetrics
 
             assertEquals(assertNotNull(expected.first).objective, assertNotNull(resumed).objective)
@@ -128,6 +129,20 @@ class LpScopedSolverTest {
             assertEquals(expected.second.pivots, work.pivots)
             assertFalse(owner.floatPaused)
             assertEquals(1L, owner.metrics.createdOwners)
+        }
+    }
+
+    @Test
+    fun `fixed lifetime consultations should retain their cursor as remaining work shrinks`() {
+        LpScopedSolver(LpExactState(lowerBoundModel())).use { owner ->
+            assertNull(owner.advanceFloat(1L, LpFloatAllowance(100_000L, 100)))
+            val preparation = owner.metrics.preparationWork
+
+            owner.advanceFloat(1L, LpFloatAllowance(50_000L, 100))
+
+            assertEquals(preparation, owner.metrics.preparationWork)
+            assertEquals(1L, owner.metrics.createdOwners)
+            assertEquals(0L, owner.metrics.closedOwners)
         }
     }
 

@@ -293,6 +293,7 @@ internal class LpScopedSolver(
         quantum: Long,
         allowance: LpFloatAllowance,
         token: Cancellation = cancellation,
+        retainFundingStop: Boolean = false,
     ): Pair<LpSolver, FloatLpResult?>? {
         requireAvailable()
         require(quantum > 0L && allowance.work > 0L)
@@ -303,8 +304,10 @@ internal class LpScopedSolver(
             discardFloatProgress()
             return null
         }
-        if (workLimit > 0L) workLimit = maxOf(workLimit, allowance.work)
-        if (iterationLimit > 0) iterationLimit = maxOf(iterationLimit, allowance.iterations)
+        if (retainFundingStop) {
+            if (workLimit > 0L) workLimit = maxOf(workLimit, allowance.work)
+            if (iterationLimit > 0) iterationLimit = maxOf(iterationLimit, allowance.iterations)
+        }
         if (!prepare(token)) {
             discardFloatProgress()
             return null
@@ -314,10 +317,10 @@ internal class LpScopedSolver(
             return solveFloat(token = token, allowance = allowance.copy(work = minOf(quantum, allowance.work)))
         }
         var pending = pendingFloat
-        if (pending != null && pending.allowance != allowance) {
+        if (retainFundingStop && pending != null && pending.allowance != allowance) {
             if (!current.promoteSolve(allowance)) {
                 discardFloatProgress()
-                return advanceFloat(quantum, allowance, token)
+                return advanceFloat(quantum, allowance, token, retainFundingStop)
             }
             pending.allowance = allowance
         }
@@ -327,7 +330,7 @@ internal class LpScopedSolver(
                 closeOwner(current)
                 return null
             }
-            pending = PendingFloat(current.openSolve(allowance, retainFundingStop = true), allowance)
+            pending = PendingFloat(current.openSolve(allowance, retainFundingStop), allowance)
             pendingFloat = pending
         }
         try {
