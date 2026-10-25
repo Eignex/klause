@@ -25,13 +25,15 @@ internal class BinaryObjectiveView(
             ) return null
             val ranges = ColumnRanges.of(problem.rootIntDomainsInPlace)
             for (v in objective.intCoefficientValues.indices) {
+                if (v % 256 == 0 && problem.cancellation()) return null
                 if (objective.intCoefficientValues[v] == 0L) continue
                 if (v >= problem.numIntVars || !ranges.isClosed(v) || ranges.min(v) < 0L || ranges.max(v) > 1L) {
                     return null
                 }
             }
             val literals = IntArray(problem.numIntVars) { Lit.NONE }
-            for (factor in problem.factors) {
+            for ((index, factor) in problem.factors.withIndex()) {
+                if (index % 256 == 0 && problem.cancellation()) return null
                 val literal = factor.binaryChannelLiteral()
                 if (literal != Lit.NONE) literals[factor.intVars.single()] = literal
             }
@@ -40,6 +42,7 @@ internal class BinaryObjectiveView(
             var constant = bigIntOf(objective.constant)
             for (v in objective.intCoefficientValues.indices) {
                 val coefficient = bigIntOf(objective.intCoefficientValues[v])
+                if (v % 256 == 0 && problem.cancellation()) return null
                 if (objective.intCoefficientValues[v] == 0L) continue
                 if (ranges.min(v) == ranges.max(v)) {
                     if (ranges.min(v) == 1L) constant += coefficient

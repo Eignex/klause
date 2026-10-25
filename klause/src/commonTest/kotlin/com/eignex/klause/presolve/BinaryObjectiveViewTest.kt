@@ -7,6 +7,10 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SemanticRational
+import com.eignex.klause.ir.SourceFormat
+import com.eignex.klause.ir.SourceSemantics
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.meta.coreguided.CoreGuidedSearch
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioBuilder
@@ -110,6 +114,43 @@ class BinaryObjectiveViewTest {
         assertEquals(1L, original.evaluateLong(sample))
         assertEquals(original.evaluateExact(sample), objective.evaluateExact(result.sample))
         assertTrue(result.stats.coreGuided.cores > 0)
+        assertTrue(2 * sample.intValue(0) + 2 * sample.intValue(1) + sample.intValue(2) >= 3)
+    }
+
+    @Test
+    fun `approximate and solution sensitive invocations should retain integer costs`() {
+        val original = LinearObjective(intCoefficients = longArrayOf(3, 5))
+        val source = Problem(0, 2, Array(2) { IntDomain(0, 1) }, emptyList())
+        val approximate = source.withSourceSemantics(SourceSemantics(
+            SourceFormat.IR,
+            feasibilityTolerance = SourceTolerance(absolute = SemanticRational.ofLong(1)),
+        ).resolve())
+        val config = PresolveConfig(overrides = PresolvePass.entries.associateWith {
+            it == PresolvePass.SUBSTITUTE_BINARY_COLUMNS
+        })
+        for ((problem, sensitive) in listOf(approximate to false, source to true)) {
+            val outcome = PresolvePipeline.run(problem, original, config, sensitive)
+            assertEquals(original, outcome.objective ?: original)
+            assertEquals(0, outcome.problem.numBoolVars)
+        }
+    }
+
+    @Test
+    fun `Boolean cutoffs should preserve mixed integer feasibility and signed costs`() {
+        val source = Problem(
+            0, 3, arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 2)),
+            listOf(Linear(longArrayOf(2, 2, 1), intArrayOf(0, 1, 2), LinearOp.GE, 3)),
+        ).bake()
+        val original = LinearObjective(intCoefficients = longArrayOf(-3, 5), constant = 7)
+        val transformed = checkNotNull(BinaryColumnSubstitution.substitute(source, setOf(0, 1), BakeConfig.NONE, original))
+        val objective = checkNotNull(transformed.objective)
+
+        val result = assertIs<MinimizeResult.Optimal>(BacktrackSolver(transformed.problem).minimize(
+            objective, BacktrackParams(nativeSat = false, pbObjectiveCutoff = true),
+        ))
+        val sample = transformed.reconstruct(result.sample)
+
+        assertEquals(4L, original.evaluateLong(sample))
         assertTrue(2 * sample.intValue(0) + 2 * sample.intValue(1) + sample.intValue(2) >= 3)
     }
 
