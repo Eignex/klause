@@ -125,8 +125,8 @@ internal object PresolveShared {
         factors: List<Factor>,
         intDomains: Array<IntDomain> = problem.rootIntDomains(),
         bakeConfig: BakeConfig = BakeConfig.NONE,
-        // Substitutions and objective views append Boolean coordinates, so
-        // every existing factor still addresses the same variable.
+        // Substitutions and objective views append Boolean coordinates, so every existing
+        // factor still addresses the same variable.
         numBoolVars: Int = problem.numBoolVars,
         // Root deductions the [factors] alone do not imply, carried into the rebuild's own bake.
         seedDeductions: PropagationResult = PropagationResult.Implied.EMPTY,

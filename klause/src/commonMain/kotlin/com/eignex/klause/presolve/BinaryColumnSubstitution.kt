@@ -83,20 +83,29 @@ internal object BinaryColumnSubstitution {
         objective: LinearObjective? = null,
     ): Substitution? {
         val view = objective?.let { BinaryObjectiveView.create(problem, it) }
-        if (view == null) return substituteColumns(problem, objectiveIntVars, bakeConfig)
-        val viewed = PresolveShared.rebuildProblem(
-            problem, view.factors, bakeConfig = bakeConfig, numBoolVars = view.numBoolVars,
-        )
-        val substituted = substituteColumns(viewed, emptySet(), bakeConfig)
-        val rebuild = SourceRebuilds(substituted?.rebuild?.steps.orEmpty(), sourceBoolVars = problem.numBoolVars)
-        return Substitution(substituted?.problem ?: viewed, rebuild, substituted?.columns ?: 0, view.objective)
+        return substituteColumns(problem, if (view == null) objectiveIntVars else emptySet(), bakeConfig, view)
     }
 
-    private fun substituteColumns(problem: BakedProblem, objectiveIntVars: Set<Int>, bakeConfig: BakeConfig): Substitution? {
+    private fun substituteColumns(
+        problem: BakedProblem,
+        objectiveIntVars: Set<Int>,
+        bakeConfig: BakeConfig,
+        view: BinaryObjectiveView?,
+    ): Substitution? {
         val numInts = problem.numIntVars
-        val factors = problem.factors
+        val factors = view?.factors?.toTypedArray() ?: problem.factors
+        val numBools = view?.numBoolVars ?: problem.numBoolVars
+        fun viewOnly(): Substitution? {
+            if (view == null) return null
+            val rebuilt = PresolveShared.rebuildProblem(
+                problem, view.factors, bakeConfig = bakeConfig, numBoolVars = numBools,
+            )
+            return Substitution(
+                rebuilt, SourceRebuilds(emptyList(), sourceBoolVars = problem.numBoolVars), 0, view.objective,
+            )
+        }
         val ranges = ColumnRanges.of(problem.rootIntDomainsInPlace)
-        val eligibility = eligibility(factors, numInts, ranges, objectiveIntVars) ?: return null
+        val eligibility = eligibility(factors, numInts, ranges, objectiveIntVars) ?: return viewOnly()
         val substitutable = eligibility.substitutable
         val rows = eligibility.rows
         val channels = eligibility.channels
@@ -112,13 +121,13 @@ internal object BinaryColumnSubstitution {
             if (substitutable[v] && valueLiterals[v] == Lit.NONE) valueLiterals[v] = channels[i]
         }
         val columns = IntArrayList()
-        var nextBool = problem.numBoolVars
+        var nextBool = numBools
         for (v in 0 until numInts) {
             if (!substitutable[v] || occurrence.count(v) == 0) continue
             if (valueLiterals[v] == Lit.NONE) valueLiterals[v] = Lit.make(nextBool++, true)
             columns.add(v)
         }
-        if (columns.isEmpty()) return null
+        if (columns.isEmpty()) return viewOnly()
 
         val out = ArrayList<Factor>(factors.size)
         for (i in factors.indices) {
@@ -150,7 +159,7 @@ internal object BinaryColumnSubstitution {
             substituted.map { RebuildStep.IntegerFromLiteral(it, valueLiterals[it]) },
             sourceBoolVars = problem.numBoolVars,
         )
-        return Substitution(rebuilt, rebuild, substituted.size)
+        return Substitution(rebuilt, rebuild, substituted.size, view?.objective)
     }
 
     /**
