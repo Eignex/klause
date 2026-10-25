@@ -3318,3 +3318,40 @@ controls on a second Linux spot host. Source-order numerical gr4x6 retains its
 107-check proof, while automatic finite p0033 retains its 3089 proof. All 24
 reported witnesses pass solchecker. These controls preserve routing and outcomes;
 the native proof claims remain separate from independent witness checks.
+
+#### Checked mixed source rows
+
+[8265](https://lab.eignex.com/jobs/8265) compares `3c9a421ec7` mixed residual
+rounding, separation disabled, the `0b9f22b574` pure-rounding frontier and its
+automatic defaults. Thirteen original MPS identities, seeds 1/3, P1 and ten-second
+default-tolerance budgets produce 104 cases on Mac/aarch64. All 36 reported
+witnesses pass solchecker. Source hashes, runtime/options, non-solver dependencies
+and compiler identity match across arms; solver/CLI identities remain revision-bound.
+
+Each seed retains and activates 40 mixed cuts on `rgn` and 16 on `pp08aCUTS`.
+Both complete the bounded row scan. Small-source declines distinguish integral
+shifted right sides from missing continuous bounds; `fiber`, `gesa2-o` and
+`cap6000` exhaust row preparation, so their zero counts establish no complete
+eligibility result. The four pure cuts on `p0033` preserve its 3089 proof at
+1995 checks, versus 2081 with separation disabled. All numerical `gr4x6` controls
+retain the 202.35 proof at 45 checks.
+
+The new family establishes capability without a cost improvement. On `rgn`,
+mixed cuts leave native bounds near 73.6, versus 75.0/73.6 with separation disabled.
+They close 185/171 leaves versus 276/252 and spend 164.9M/150.7M floating work
+versus 101.6M/97.0M, plus 3.60M/3.26M cut-proof steps. Working rows grow from 46
+to 86; reported modeled LP allocation grows from 262,364 to 421,164 bytes.
+These are modeled costs, not physical memory or throughput measurements.
+Neither numerical arm finds an incumbent on `rgn`; automatic defaults retain
+checked witnesses near 82.2. Eligibility and retained consumption justify the
+bounded mechanism; these results supply no numerical-default admission or speedup
+claim. Cut efficacy and selection need separate evidence.
+
+[8299](https://lab.eignex.com/jobs/8299) captures `rgn` at `b1e32dd019`, seed 3,
+with the same source hash and default-tolerance policy. All 40 retained cuts pass
+fresh native checks under the last query's recorded scope, across 637 retained
+nodes and 357 LP reuses. The first mixed derivation scales its original row by
+`1/230000001` and cites four continuous bounds; rounding changes residual magnitude
+from `50000000/230000001` to `25000000/107499989`. Original bytes, exact rows,
+weights, bound citations and scopes remain in the capture. This instrumented
+inspection supplies neither an independent proof check nor a whole-CLI timing claim.
