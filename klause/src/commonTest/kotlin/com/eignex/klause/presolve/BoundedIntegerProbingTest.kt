@@ -17,6 +17,24 @@ import kotlin.test.assertSame
 
 class BoundedIntegerProbingTest {
     @Test
+    fun `interior probes should preserve both endpoints and exclude unsupported shared values`() {
+        val budget = PresolveBudget(Long.MAX_VALUE)
+        val source = Problem(
+            0, 2, Array(2) { IntDomain(0, 2) },
+            listOf(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                Table(intArrayOf(0, 1), longArrayOf(0, 0, 0, 1, 0, 2, 1, 0, 1, 2, 2, 0, 2, 1, 2, 2)),
+            ),
+        ).bake(budget.orSpent(Cancellation.Never))
+
+        val result = RootBaker.reseedBounded(source, BakeConfig())
+
+        assertEquals(List(2) { listOf(0L, 2L) }, (0..1).map { v ->
+            (0L..2L).filter { it in result.rootIntDomain(v) }
+        })
+    }
+
+    @Test
     fun `unmetered preparation should leave the optional pilot unfunded`() {
         val source = Problem(
             0, 3, Array(3) { IntDomain(0, 1) },

@@ -61,6 +61,11 @@ private fun collectRootPropagation(
         )
     }
 
+    return state.rootDeductions(assumptions)
+}
+
+internal fun PropagationState.rootDeductions(assumptions: Assumptions): PropagationResult.Implied {
+    val state = this
     val boolKeys = IntArrayList(initialCapacity = 8)
     val boolValues = ArrayList<Boolean>()
     for (variable in 0 until problem.numBoolVars) {
