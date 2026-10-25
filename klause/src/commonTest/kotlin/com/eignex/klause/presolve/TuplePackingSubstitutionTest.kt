@@ -6,7 +6,6 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.table.Table
-import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
@@ -18,6 +17,7 @@ import com.eignex.klause.lp.engine.solveLp
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.RootDomains
 import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.baked
 import com.eignex.klause.util.Cancellation
@@ -25,6 +25,7 @@ import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -34,7 +35,9 @@ class TuplePackingSubstitutionTest {
     @Test
     fun `mandatory occupied values should refute disjoint tables with scalar support`() {
         val rows = longArrayOf(0, 1, 1, 0, 0, 2, 2, 0, 0, 3, 3, 0)
-        val source = problem(listOf(Table(intArrayOf(0, 1), rows), Table(intArrayOf(2, 3), rows)), 4).bake()
+        val source = Problem(0, 4, Array(4) { IntDomain(0, 3) }, listOf(
+            Table(intArrayOf(0, 1), rows), Table(intArrayOf(2, 3), rows), AllDifferent(intArrayOf(0, 1, 2, 3)),
+        )).bake()
         assertFalse(source.baked is PropagationResult.Unsat)
 
         val result = assertNotNull(TuplePackingSubstitution.substitute(source, emptySet()))
@@ -48,7 +51,8 @@ class TuplePackingSubstitutionTest {
             val low = 2L + group * 2
             Table(intArrayOf(group * 2, group * 2 + 1), longArrayOf(0, low, low, 0, 1, low + 1, low + 1, 1))
         }
-        val source = problem(tables, 8).bake()
+        val source = Problem(0, 6, Array(6) { IntDomain(0, 7) },
+            tables + AllDifferent(IntArray(6) { it })).bake()
         val scalar = CpToLpRelaxation(source, null, tableHull = true).build(RootDomains(source))
         assertEquals(FloatLpStatus.OPTIMAL, solveLp(scalar.model).status)
 
@@ -61,7 +65,10 @@ class TuplePackingSubstitutionTest {
     @Test
     fun `placement branching should preserve each distinct source assignment once`() {
         val rows = longArrayOf(0, 1, 1, 0, 2, 3, 3, 2, 0, 1, 2, 2)
-        val source = problem(listOf(Table(intArrayOf(0, 1), rows), Table(intArrayOf(2, 3), rows)), 4, bools = 1)
+        val source = Problem(1, 4, Array(4) { IntDomain(0, 3) }, listOf(
+            Table(intArrayOf(0, 1), rows), Table(intArrayOf(2, 3), rows), AllDifferent(intArrayOf(0, 1, 2, 3)),
+            Clause(intArrayOf(Lit.make(0, true))),
+        ))
         val expected = BacktrackSolver(source.bake()).enumerate(BacktrackParams(randomSeed = 0L))
             .map { it.ints.toList() }.toList()
         val result = assertNotNull(TuplePackingSubstitution.substitute(source.bake(), emptySet()))
@@ -79,10 +86,11 @@ class TuplePackingSubstitutionTest {
 
     @Test
     fun `packing in a larger universe should retain unused values`() {
-        val source = problem(listOf(
+        val source = Problem(0, 4, Array(4) { IntDomain(0, 5) }, listOf(
             Table(intArrayOf(0, 1), longArrayOf(0, 1, 1, 0)),
             Table(intArrayOf(2, 3), longArrayOf(2, 3, 4, 5)),
-        ), 6).bake()
+            AllDifferent(intArrayOf(0, 1, 2, 3)),
+        )).bake()
         val result = assertNotNull(TuplePackingSubstitution.substitute(source, emptySet()))
         val reconstruct = assertNotNull(result.rebuild.asSampleLift())
 
@@ -94,10 +102,47 @@ class TuplePackingSubstitutionTest {
     }
 
     @Test
+    fun `placement capacity deductions should retract between sibling choices`() {
+        val source = Problem(0, 4, Array(4) { IntDomain(0, 3) }, listOf(
+            Table(intArrayOf(0, 1), longArrayOf(0, 1, 2, 3)),
+            Table(intArrayOf(2, 3), longArrayOf(0, 1, 2, 3)), AllDifferent(intArrayOf(0, 1, 2, 3)),
+        )).bake()
+        val result = assertNotNull(TuplePackingSubstitution.substitute(source, emptySet()))
+        val selections = result.rebuild.steps.filterIsInstance<RebuildStep.TupleValue>()
+        val first = selections.first { it.variable == 0 }.literals.map(Lit::variable)
+        val second = selections.first { it.variable == 2 }.literals.map(Lit::variable)
+        val session = PropagationSession(result.problem)
+
+        session.pinBool(first[0], true)
+        assertEquals(false, session.boolValue(second[0]))
+        assertEquals(true, session.boolValue(second[1]))
+        session.popLast()
+        session.pinBool(first[1], true)
+
+        assertEquals(true, session.boolValue(second[0]))
+        assertEquals(false, session.boolValue(second[1]))
+    }
+
+    @Test
+    fun `optional and excepted distinctness should retain original relations`() {
+        val tables = listOf(Table(intArrayOf(0, 1), longArrayOf(0, 1, 2, 3)),
+            Table(intArrayOf(2, 3), longArrayOf(0, 1, 2, 3)))
+        for (distinct in listOf(
+            AllDifferent(intArrayOf(0, 1, 2, 3), presents = IntArray(4) { Lit.make(0, true) }),
+            AllDifferent(intArrayOf(0, 1, 2, 3), exceptSet = longArrayOf(0)),
+        )) {
+            val source = Problem(1, 4, Array(4) { IntDomain(0, 3) }, tables + distinct).bake()
+
+            assertNull(TuplePackingSubstitution.substitute(source, emptySet()))
+        }
+    }
+
+    @Test
     fun `outside readers and protected objectives should decline substitution`() {
         val tables = listOf(Table(intArrayOf(0, 1), longArrayOf(0, 1, 2, 3)),
             Table(intArrayOf(2, 3), longArrayOf(0, 1, 2, 3)))
-        val source = problem(tables, 4)
+        val source = Problem(0, 4, Array(4) { IntDomain(0, 3) },
+            tables + AllDifferent(intArrayOf(0, 1, 2, 3)))
         val external = Problem(0, 4, Array(4) { IntDomain(0, 3) }, source.factors.toList() +
             Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.LE, 4))
 
@@ -109,7 +154,8 @@ class TuplePackingSubstitutionTest {
     fun `incomplete admission should retain the source model`() {
         val tables = listOf(Table(intArrayOf(0, 1), longArrayOf(0, 1, 2, 3)),
             Table(intArrayOf(2, 3), longArrayOf(0, 1, 2, 3)))
-        val source = problem(tables, 4).bake()
+        val source = Problem(0, 4, Array(4) { IntDomain(0, 3) },
+            tables + AllDifferent(intArrayOf(0, 1, 2, 3))).bake()
         for (limits in listOf(TuplePackingSubstitution.Limits(work = 20),
             TuplePackingSubstitution.Limits(cells = 7), TuplePackingSubstitution.Limits(choices = 3),
             TuplePackingSubstitution.Limits(scope = 3))) {
@@ -130,10 +176,21 @@ class TuplePackingSubstitutionTest {
     }
 
     @Test
+    fun `tuple reconstruction should require exactly one selected choice`() {
+        val rebuild = SourceRebuilds(listOf(RebuildStep.TupleValue(0,
+            intArrayOf(Lit.make(0, true), Lit.make(1, true)), longArrayOf(1, 2))))
+
+        for (bools in listOf(booleanArrayOf(false, false), booleanArrayOf(true, true))) {
+            assertFailsWith<IllegalArgumentException> { rebuild.rebuildInto(bools, longArrayOf(0)) }
+        }
+    }
+
+    @Test
     fun `pipeline should retain packing reconstruction with solution sensitive admission`() {
         val tables = listOf(Table(intArrayOf(0, 1), longArrayOf(0, 1, 2, 3)),
             Table(intArrayOf(2, 3), longArrayOf(0, 1, 2, 3)))
-        val source = problem(tables, 4)
+        val source = Problem(0, 4, Array(4) { IntDomain(0, 3) },
+            tables + AllDifferent(intArrayOf(0, 1, 2, 3)))
 
         val result = PresolvePipeline.run(source, null, PresolveConfig.parse("off,+tuple-packing"), true)
         val assignments = BacktrackSolver(result.problem.bake()).enumerate(BacktrackParams(randomSeed = 0L))
@@ -144,11 +201,4 @@ class TuplePackingSubstitutionTest {
         assertEquals(2, assignments.size)
     }
 
-    private fun problem(tables: List<Table>, values: Int, bools: Int = 0): Problem {
-        val scope = tables.flatMap { it.xs.toList() }.distinct().toIntArray()
-        val factors = ArrayList<Factor>(tables)
-        factors.add(AllDifferent(scope))
-        if (bools > 0) factors.add(Clause(intArrayOf(Lit.make(0, true))))
-        return Problem(bools, scope.size, Array(scope.size) { IntDomain(0, (values - 1).toLong()) }, factors)
-    }
 }

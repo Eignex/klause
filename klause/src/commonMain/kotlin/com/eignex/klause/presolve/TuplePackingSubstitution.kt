@@ -110,9 +110,12 @@ internal object TuplePackingSubstitution {
                 }
                 for (column in table.xs.indices) {
                     if (!meter.visit()) return null
-                    steps.add(RebuildStep.TupleValue(table.xs[column], literals, LongArray(tuples.size) {
-                        tuples[it].values[column]
-                    }))
+                    val values = LongArray(tuples.size)
+                    for (row in tuples.indices) {
+                        if (!meter.visit()) return null
+                        values[row] = tuples[row].values[column]
+                    }
+                    steps.add(RebuildStep.TupleValue(table.xs[column], literals, values))
                 }
             }
             // Every group chooses a placement. Two groups requiring one value exceed its capacity
@@ -140,6 +143,7 @@ internal object TuplePackingSubstitution {
         return Substitution(rebuilt, SourceRebuilds(rebuilds, problem.numBoolVars), nextBool - problem.numBoolVars)
     }
 
+    @Suppress("LongParameterList")
     private fun partition(
         problem: BakedProblem,
         id: Int,
