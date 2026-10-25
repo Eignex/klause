@@ -1,10 +1,12 @@
 package com.eignex.klause.backtrack.selector
 
 import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.factor.table.Mdd
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.search.VarRef
@@ -13,9 +15,80 @@ import com.eignex.klause.util.WorkMeter
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class MaxSdTest {
+    @Test
+    fun `bounded probing should rank by global propagation when counters decline`() {
+        val problem = Problem(
+            0, 2, Array(2) { IntDomain(0, 2) },
+            arrayOf<Factor>(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 2)),
+        )
+        val session = PropagationSession(problem)
+
+        val values = MaxSd(probeWorkLimit = 10_000L).fresh()
+            .values(session, VarRef.IntVar(0), Random(0L)).toList()
+
+        assertEquals(listOf(0L, 1L, 2L), values)
+        assertEquals(3L, session.valueOrdering.probes)
+        assertEquals(0L, session.valueOrdering.supportOrders)
+    }
+
+    @Test
+    fun `a local probe cap should restore domains and retain every interrupted alternative`() {
+        for (limit in listOf(0L, 1L, 3L)) {
+            val problem = Problem(
+                0, 3, Array(3) { IntDomain(0, 2) },
+                arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 3)),
+            )
+            val session = PropagationSession(problem)
+            val before = (0..2).map { session.intDomain(it) }
+
+            val values = MaxSd(probeWorkLimit = limit).values(session, VarRef.IntVar(0), Random(0L)).toSet()
+
+            assertEquals(setOf(0L, 1L, 2L), values)
+            assertEquals(before, (0..2).map { session.intDomain(it) })
+            assertEquals(0, session.decisionLevel)
+            assertFalse(session.fixpointCancelled)
+            assertFalse(session.probeCancelled)
+            assertEquals(1L, session.valueOrdering.cappedOrders)
+        }
+    }
+
+    @Test
+    fun `bounded completed refutations should remove only their infeasible alternatives`() {
+        val problem = Problem(
+            0, 3, Array(3) { IntDomain(0, 1) },
+            arrayOf<Factor>(
+                AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 2),
+                AllDifferent(intArrayOf(1, 2), domainMin = 0, domainSize = 2),
+                AllDifferent(intArrayOf(0, 2), domainMin = 0, domainSize = 2),
+            ),
+        )
+        val session = PropagationSession(problem)
+
+        val values = MaxSd(probeWorkLimit = 10_000L).values(session, VarRef.IntVar(0), Random(0L)).toList()
+
+        assertTrue(values.isEmpty())
+        assertEquals(2L, session.valueOrdering.refutations)
+        assertEquals(0, session.decisionLevel)
+    }
+
+    @Test
+    fun `a local probe cap should preserve an external cancellation`() {
+        var cancelled = false
+        val session = PropagationSession(
+            Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyArray<Factor>()),
+            cancellation = Cancellation { cancelled },
+        )
+        cancelled = true
+
+        MaxSd(probeWorkLimit = 0L).values(session, VarRef.IntVar(0), Random(0L)).toList()
+
+        assertTrue(session.probeCancelled)
+    }
+
     @Test
     fun `support discovery should observe cancellation before an unsupported fallback`() {
         var cancelled = false

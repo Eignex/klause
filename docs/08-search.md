@@ -328,6 +328,15 @@ counts describe relation structure and have no deduction authority. Unavailable
 or incomplete counters and larger domains retain residual-domain probing. The
 ordering keeps every candidate, including zero-count alternatives.
 
+The `propagation-guided` recipe bounds a residual-domain ordering to 32 candidate
+probes and 262,144 native work units. Work cancellation is cooperative inside
+propagation; restoration and indivisible propagator operations can exceed the
+allowance. A cut probe restores the completed parent and retains its candidate.
+Completed probes retain their order or refutation, and every untested alternative
+remains available. Exhausting this local allowance does not cancel the search.
+Completed support orderings, probe orderings, completed probes, hypothetical
+refutations, native probe work and local cap hits have separate counters.
+
 DivMod retains complete signed tuples for at most 4096 live operand pairs in each
 state's factor payload. Each fire recomputes live supports in reusable primitive
 sets against all operand and output domains, including holes and aliased roles.

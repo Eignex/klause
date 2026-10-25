@@ -17,6 +17,8 @@ class BacktrackCatalogTest {
 
         assertEquals(listOf("satOptimized", "conflictDriven", "support-aware"), recipes.take(3).map { it.label })
         assertIs<MaxSd>(recipes[2].build(3L, null).valueSelector)
+        assertEquals("propagation-guided", recipes[3].label)
+        assertIs<MaxSd>(recipes[3].build(3L, null).valueSelector)
     }
 
     @Test
@@ -34,6 +36,7 @@ class BacktrackCatalogTest {
             val recipes = BacktrackCatalog.ranked(kind, facts)
 
             assertFalse(recipes.any { it.label == "support-aware" })
+            assertFalse(recipes.any { it.label == "propagation-guided" })
         }
     }
 

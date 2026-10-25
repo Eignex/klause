@@ -348,6 +348,14 @@ and family coverage; other recipes retain their value orders. Explicit pools kee
 their requested recipes, and optimization and other model classes decline automatic
 admission. MDD-only models retain their ordinary default palette.
 
+The same finite-Table gate admits `propagation-guided` immediately after
+`support-aware`. It keeps completed support ordering and uses bounded residual-domain
+probing when counters decline. The cheap and ordinary conflict-driven recipes keep
+their earlier slots. Its local work allowance belongs to one value ordering, while
+all work also consumes the ordinary containing worker slice. Explicit maxSD keeps
+its deadline-bounded probing policy. [Search](08-search.md) owns probe restoration,
+coverage and accounting.
+
 Curated sequential mixed finite-CP satisfaction pools of at least six slots keep
 dom/wdeg and first-fail in the free and selector-switch slots when the selected
 complete workers contain no LP recipe. Wider pools swap an existing matching

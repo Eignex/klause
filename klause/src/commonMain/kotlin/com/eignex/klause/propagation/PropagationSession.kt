@@ -7,6 +7,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.search.ComponentCheck
+import com.eignex.klause.solver.result.ValueOrderingStatsSink
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
@@ -208,6 +209,7 @@ class PropagationSession private constructor(
     internal val rootWork: Long
     internal val rootPropagationNanos: Long
     internal val work: Long get() = state.work
+    internal val valueOrdering = ValueOrderingStatsSink()
     internal val propagationNanos: Long get() = state.propagationNanos
 
     internal fun <T> withCancellation(token: Cancellation, operation: () -> T): T {
