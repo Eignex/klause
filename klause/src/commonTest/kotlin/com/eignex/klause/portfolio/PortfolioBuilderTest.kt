@@ -5,6 +5,7 @@ import com.eignex.klause.backtrack.toBacktrackParams
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.circuit.Circuit
+import com.eignex.klause.factor.scheduling.Diffn
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -16,6 +17,7 @@ import com.eignex.klause.ir.VariableSelection
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpTechnique
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
+import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.ProblemProfile
@@ -24,6 +26,8 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.ExecutionStrategy
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
+import com.eignex.klause.solver.pipeline.FinitePipelineRequest
+import com.eignex.klause.solver.pipeline.ObjectiveCoordinateView
 import com.eignex.klause.solver.pipeline.PortfolioPlan
 import com.eignex.klause.solver.pipeline.PortfolioPlanRequest
 import com.eignex.klause.solver.pipeline.planPortfolio
@@ -38,6 +42,43 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class PortfolioBuilderTest {
+
+    @Test
+    fun `private objective coordinates should use the full slot beside the canonical primary`() {
+        val source = Problem(0, 5, arrayOf(
+            IntDomain(0, 5), IntDomain(1, 6), IntDomain(0, 5), IntDomain(0, 0), IntDomain(0, 0),
+        ), listOf(
+            Linear(longArrayOf(1, -1), intArrayOf(1, 0), LinearOp.EQ, 1),
+            Diffn(intArrayOf(0, 2), intArrayOf(3, 4), longArrayOf(1, 1), longArrayOf(1, 1)),
+        ))
+        val sourceObjective = LinearObjective(intCoefficients = longArrayOf(0, 1, 0, 0, 0))
+        val preparations = listOf(true, false).map { rewrite ->
+            FinitePipeline.prepare(FinitePipelineRequest(
+                source, FiniteEngine.MIXED, sourceObjective, PresolveConfig.parse("off,+affine"),
+                transformObjective = rewrite,
+            ))
+        }
+        val canonical = preparations[0]
+        val view = assertNotNull(ObjectiveCoordinateView.create(canonical, preparations[1], null, Cancellation.Never))
+        val problem = canonical.executableProblem()
+        val scenario = PortfolioScenario.sequential(Kind.COP)
+        val profile = ProblemProfile.of(problem, true)
+        val baseline = PortfolioBuilder.factories(problem, scenario, canonical.objective, null, null, null, profile)
+        val factories = PortfolioBuilder.factories(problem, scenario, canonical.objective, null, null, null,
+            profile, false, objectiveCoordinates = view)
+
+        val workers = factories.mapIndexed { index, factory -> factory.materialize(index, 3L, null) }
+
+        try {
+            assertEquals(baseline.size, workers.size)
+            assertEquals("ls/cbls-primary-plateau/ils-basin", workers[2].label)
+            assertEquals("ls/cbls-plateau/ils-basin/objective-coordinates", workers[3].label)
+            assertTrue(workers[3].firstWitnessOnly)
+            assertTrue(workers.all { it.evidenceModel?.matches(view.canonicalModel) == true })
+        } finally {
+            workers.forEach { it.close() }
+        }
+    }
 
     @Test
     fun `complete only selected pools should not request native heuristic views`() {

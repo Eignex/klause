@@ -98,6 +98,12 @@ overflow scans and pivot cost selection. A rejected definition leaves other pivo
 of that equality and translations through other definitions available.
 Wider affine expressions, approximate semantics, open-theory
 preparation and protection-only objectives retain objective-column protection.
+Default single-core mixed placement optimization can prepare a second finite view
+with objective columns protected when affine substitution removed an objective
+coordinate. This elective preparation spends the remaining preparation allowance;
+its effort joins the invocation totals. The rewritten model retains complete-search
+ownership. The [portfolio](12-portfolio.md) uses the protected view only for checked
+local-search proposals over a compatible discrete namespace.
 Finite holes and projected hints follow the same reconstruction as factor substitution.
 Independent source evaluation checks the composed adjustment against reconstructed
 witnesses. A mapping never issues a proof certificate. Optional
