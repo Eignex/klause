@@ -11,7 +11,9 @@ import com.eignex.klause.presolve.TransformationGuarantees
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -35,17 +37,19 @@ class ObjectiveCoordinateViewTest {
             { mapping.reconstructFrom(privateProblem, it) }, null).also { it.sourceMapping = mapping }
         val view = assertNotNull(ObjectiveCoordinateView.create(preparation, coordinates, null, Cancellation.Never))
         val cases = listOf(
-            Triple(3L, listOf(3L, 4L), 8.0),
-            Triple(Long.MAX_VALUE, null, null),
+            Triple(Sample(booleanArrayOf(), longArrayOf(3, 0)), listOf(3L, 4L), 8.0),
+            Triple(Sample(booleanArrayOf(), longArrayOf(Long.MAX_VALUE, 0)), null, null),
+            Triple(Sample(booleanArrayOf(), longArrayOf(Long.MAX_VALUE, 0),
+                exactInts = listOf(bigIntOf(Long.MAX_VALUE), BIG_ZERO)), null, null),
         )
-        for ((value, expected, score) in cases) {
-            val sample = Sample(booleanArrayOf(), longArrayOf(value, 0))
+        for ((sample, expected, score) in cases) {
+            val before = sample.ints.toList()
 
             val result = view.proposal(sample)
 
             assertEquals(expected, result?.sample?.ints?.toList())
             assertEquals(score, result?.objective)
-            assertEquals(listOf(value, 0L), sample.ints.toList())
+            assertEquals(before, sample.ints.toList())
         }
     }
 

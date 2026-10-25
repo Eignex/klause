@@ -49,7 +49,11 @@ internal class ObjectiveCoordinateView private constructor(
                 if (cancellation() || point.numBoolVars != privateProblem.numBoolVars ||
                     point.numIntVars != privateProblem.numIntVars || point.numRealVars != 0
                 ) return@ObjectiveCoordinateView null
-                val lifted = coordinates.reconstruct(point)
+                val lifted = try {
+                    coordinates.reconstruct(point)
+                } catch (_: ArithmeticException) {
+                    return@ObjectiveCoordinateView null
+                }
                 if (lifted.exactInts?.any { !it.fitsLong() } == true) return@ObjectiveCoordinateView null
                 // Drop private certificates and frames; the canonical verifier establishes fresh witness authority.
                 val sample = Sample(lifted.bools, lifted.ints)
