@@ -185,6 +185,31 @@ class LinearAuthorityCutsTest {
     }
 
     @Test
+    fun `mixed cuts should require their source integer pin after retained template reuse`() {
+        val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val source = SourceProofContext(scope, setOf(x, y, real), mapOf(
+            "mixed" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                real to BigFraction.MINUS_ONE), BigFraction.ofLong(3)), emptyMap(), mapOf(y to BigFraction.ONE)),
+            "real" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ), mapOf(x to BigFraction.MINUS_ONE))
+        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, Cancellation.Never, cuts = true))
+        val enabled = source.atScope(scope.copy(condition = SourceCondition(
+            lower = mapOf(y to BigFraction.ONE), upper = mapOf(y to BigFraction.ONE))))
+
+        val first = assertNotNull(LinearAuthorityQuery.prepare(enabled, template, Cancellation.Never))
+        val sibling = assertNotNull(LinearAuthorityQuery.prepare(source, template, Cancellation.Never))
+        val restored = assertNotNull(LinearAuthorityQuery.prepare(enabled, template, Cancellation.Never))
+
+        assertEquals(1, first.activeMixedCuts)
+        assertEquals(0, sibling.activeMixedCuts)
+        assertEquals(1, restored.activeMixedCuts)
+        assertTrue(source.premises.size in sibling.inactive)
+        val cut = assertNotNull(template.cuts).rows.single()
+        assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(source).verify(SourceEvidence(scope,
+            SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
     fun `cancelled separation should publish no retained rows`() {
         val source = SourceProofContext(scope, setOf(x), emptyMap(), emptyMap())
 
