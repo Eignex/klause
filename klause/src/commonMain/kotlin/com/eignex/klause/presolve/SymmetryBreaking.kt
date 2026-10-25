@@ -267,6 +267,7 @@ internal object SymmetryBreaking {
         val orbits = verifiedValueOrbits(problem, columns, cancellation) ?: return emptyList()
         val extra = ArrayList<Factor>()
         for (orbit in orbits) {
+            if (objectiveIntVars.any { columns.contains(it, orbit.first()) }) continue
             val orbitSet = LongHashSet()
             orbit.forEach { orbitSet.add(it) }
             val internal = (0 until problem.numIntVars)
@@ -387,6 +388,7 @@ internal object SymmetryBreaking {
         val extra = ArrayList<Factor>()
         for (orbit in orbits) {
             if (cancellation()) break
+            if (heldInts.any { columns.contains(it, orbit.first()) }) continue
             val orbitSet = LongHashSet()
             orbit.forEach { orbitSet.add(it) }
             val seq = IntArrayList()
