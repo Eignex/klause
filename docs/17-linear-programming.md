@@ -266,7 +266,9 @@ coordinates or certificate. Compatible work and pivot allowance promotions retai
 paid preparation, phase-local values and the numerical cursor. A funding stop at an
 iteration boundary keeps that cursor and reports its limiting resource; unchanged
 stops and completed declines are cached. A promoted allowance can resume a funding
-stop. Authority edits and cancellation retire it. Completed coordinates propose exhaustive integer splits
+stop. Fixed-lifetime CP consultations keep their initial allowance when later calls
+report decreasing remaining work. Authority edits and cancellation retire the cursor.
+Completed coordinates propose exhaustive integer splits
 that add new scoped restrictions, including fractional source-bound endpoints.
 Opposed coordinate sides refute a branch through checked source combinations
 without another numerical query. Integral-looking

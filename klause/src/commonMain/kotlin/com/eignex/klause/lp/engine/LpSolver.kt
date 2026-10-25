@@ -338,7 +338,10 @@ internal interface RetainedLpSolver : LpSolver {
 
 internal interface ResumableLpSolver : RetainedLpSolver {
     val currentWork: Long
-    fun openSolve(allowance: LpFloatAllowance? = null, retainFundingStop: Boolean = false): LpSolveCursor<FloatLpResult?>
+    fun openSolve(
+        allowance: LpFloatAllowance? = null,
+        retainFundingStop: Boolean = false,
+    ): LpSolveCursor<FloatLpResult?>
     fun promoteSolve(allowance: LpFloatAllowance): Boolean = false
 }
 

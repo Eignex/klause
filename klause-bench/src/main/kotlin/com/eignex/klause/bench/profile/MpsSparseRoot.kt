@@ -258,10 +258,12 @@ internal object MpsSparseRoot {
     ) {
         val stop = Cancellation.after(30.seconds)
         val budget = Class.forName(LP + "SourceLpBudget").getConstructor().newInstance()
-        val funding = totalFunding?.let {
+        val funding = totalFunding?.let { work ->
             Class.forName(LP + "SourceLpFunding").constructors.single { it.parameterCount == 2 }
-                .newInstance(it, 512L * 1024L * 1024L).also { ledger ->
-                    budget.javaClass.getDeclaredField("funding").apply { isAccessible = true }.set(budget, ledger)
+                .newInstance(work, 512L * 1024L * 1024L).also { ledger ->
+                    val field = budget.javaClass.getDeclaredField("funding")
+                    field.isAccessible = true
+                    field.set(budget, ledger)
                 }
         }
         val session = Class.forName(LP + "optimization.LinearAuthoritySession").constructors
@@ -341,7 +343,7 @@ internal object MpsSparseRoot {
                         }
                         check(assertions?.size == expected.size)
                         expected.forEachIndexed { witness, (column, upper, side) ->
-                            val actual = checkNotNull(assertions?.get(witness))
+                            val actual = checkNotNull(assertions[witness])
                             check(call(actual, "getColumn") == column && call(actual, "getUpper") == upper &&
                                 call(actual, "getSide") == side && call(actual, "getWitness") == witness.toLong() &&
                                 call(actual, "getDepth") == 1)
@@ -355,7 +357,9 @@ internal object MpsSparseRoot {
                         put("termination", guide?.let { call(it, "getTermination") }?.toString())
                         put("phase", guide?.let { call(it, "getPhase") }?.toString())
                         put("heuristicCoordinates", (guide?.let { call(it, "getPrimal") } as DoubleArray?)?.size ?: 0)
-                        put("certificate", NumericalResidualProfile.json(guide?.let { call(it, "getCertificateMetrics") }))
+                        put("certificate", NumericalResidualProfile.json(guide?.let {
+                            call(it, "getCertificateMetrics")
+                        }))
                         put("budget", NumericalResidualProfile.json(budget))
                         put("funding", NumericalResidualProfile.json(funding))
                         put("preparations", call(session, "getPreparations") as Long)
