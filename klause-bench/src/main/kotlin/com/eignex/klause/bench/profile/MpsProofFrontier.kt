@@ -54,8 +54,9 @@ internal object MpsProofFrontier {
         }
         require(Runtime.getRuntime().availableProcessors() == 1)
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
+        val supported = setOf("suite", "problem", "sha256", "exact", "probe", "history", "frontier", "cuts")
         require(options.keys.containsAll(setOf("suite", "problem", "sha256", "exact")) &&
-            (options.keys - setOf("suite", "problem", "sha256", "exact", "probe", "history", "frontier", "cuts")).isEmpty())
+            (options.keys - supported).isEmpty())
         val probe = options["probe"]?.toBooleanStrict() ?: false
         val historyEnabled = options["history"]?.toBooleanStrict() ?: false
         val frontierEnabled = options["frontier"]?.toBooleanStrict() ?: false
