@@ -2955,6 +2955,33 @@ other factors, domains and objective; the residual matches symmetry disabled.
 All 24 exact/declared preparation controls complete without cancellation. These
 captures inspect preparation and make no search, source-witness or proof claim.
 
+[Current-default integration 8270](https://lab.eignex.com/jobs/8270) compares
+pre-admission `dccd34fe6d`, admission `b751b6c55e` and active-mask `51e0324eba`,
+with affine/symmetry-disabled controls, P1, ten seconds, seed 3 and three repeats.
+Fiber has two Mac/aarch64 repeats and one Linux/amd64 repeat; cap6000, gr4x6 and
+CoinsGrid run on Linux. Comparisons stay within actual hosts, with matching source
+hashes, runtime, non-solver dependencies and JVM options. Completed witnesses pass
+independent source checks. Gr4x6 and CoinsGrid retain native optima 202.35 and 200;
+witness acceptance does not independently certify those proofs.
+
+Admission retains cap6000's -2,442,801 incumbent while exact preparation falls
+from 913–942 to 668–688 ms in completed Linux comparisons. Exact fiber improves
+from 1,292,011.56 to 1,107,576.76 on Mac, but regresses from 1,029,093.08 to
+1,109,204.76 on Linux. The active mask retains those exact-policy incumbents.
+Declared fiber improves from 1,175,639.51 to 1,147,376.57 on Mac and from
+1,458,797.07 to 1,205,594.73 on Linux, matching the symmetry-disabled controls.
+Its preparation falls from 331–337 to 126–131 ms on Mac and 707 to 245 ms on
+Linux; visited nodes rise from about 40,900 to 161,000 and 19,781 to 95,630.
+CoinsGrid's removed generators also move only unread columns, so it is an
+objective/proof control rather than evidence of retained live symmetry.
+
+The bounded preparation benefit coexists with search and resource costs. Linux
+exact fiber visits fewer nodes after admission (28,258 to 18,845) but performs
+more LP solves (843 to 1,042) and retains the worse incumbent. Adding the active
+mask raises that repeat's peak RSS from 318,672 to 334,700 KiB; whole-CLI wall
+time stays 10.17–10.18 seconds. These results establish neither a uniform objective
+gain nor a general runtime or memory improvement.
+
 The integrated companion [qualification 8173](https://lab.eignex.com/jobs/8173)
 pins `6fb51fd8fd`: 450 runs over the fifteen frozen 8087 sources, three seeds,
 exact and declared `1e-7` absolute/relative tolerance policies, P1, ten seconds,
