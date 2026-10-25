@@ -15,6 +15,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.pipeline.ObjectiveCoordinateView
 import com.eignex.klause.solver.pipeline.finiteExactNeighborhoodWorker
 import com.eignex.klause.solver.pipeline.fixedDiscreteSample
 import com.eignex.klause.solver.result.SearchEvent
@@ -65,6 +66,28 @@ internal class LocalSearchWorkerConfig private constructor(
     override fun withLsPhaseTimes(): LocalSearchWorkerConfig =
         LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, true, seedOffset,
             numericalCompletion, toleranceCheck)
+
+    internal fun materializeObjectiveCoordinates(
+        view: ObjectiveCoordinateView,
+        index: Int,
+        armId: Int,
+        seed: Long,
+        lsLambda: Double,
+        onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
+    ): PortfolioWorker = LocalSearchWorkerConfig(
+        LocalSearchCatalog.byLabel(LocalSearchArm.CblsPlateauIlsBasin.label),
+        nodeBudget, reportResiduals, reportPhaseTimes, seedOffset, numericalCompletion, toleranceCheck,
+    ).materialize(
+        view.problem, index, armId, seed, lsLambda, view.objective, view.hints?.objective,
+        view.hints?.sweep,
+        onEvent = null,
+        pools = null,
+    ).objectiveCoordinateProposals(view.canonicalModel) { sample ->
+        view.proposal(sample)?.also { point ->
+            onEvent?.invoke("ls/${LocalSearchArm.CblsPlateauIlsBasin.label}/objective-coordinates",
+                SearchEvent.Incumbent(point.objective))
+        }
+    }
 
     /** Build an LS worker: its [LocalSearchSolver] session (with the per-move invariant network when
      *  a [definitionalSweep] is present and the recipe enables it) + λ-shaped params, exposing the

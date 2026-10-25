@@ -6,6 +6,8 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.backtrack.SearchOutcome
 import com.eignex.klause.backtrack.toBacktrackParams
+import com.eignex.klause.factor.scheduling.Diffn
+import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SearchHints
 import com.eignex.klause.localsearch.DefinitionalSweep
@@ -25,7 +27,9 @@ import com.eignex.klause.portfolio.LocalSearchCatalog
 import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.presolve.RebuildStep
 import com.eignex.klause.presolve.SourceMapping
+import com.eignex.klause.presolve.effortStats
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ProblemClass
@@ -387,6 +391,7 @@ internal class FiniteExecutionRequest(
     val sourceInvocation: PreparedSourceInvocation? = null,
     val sourceMapping: SourceMapping? = null,
     val sourceControls: SourceFiniteControls? = null,
+    val objectiveCoordinates: ObjectiveCoordinateView? = null,
 )
 
 /** Streaming hooks owned by a rendering frontend. */
@@ -518,30 +523,8 @@ internal fun FinitePipeline.solve(
         )
     }
     val preparationStart = TimeSource.Monotonic.markNow()
-    val preparation = prepare(
-        FinitePipelineRequest(
-            problem = request.shape.finiteProblem,
-            componentPlan = request.shape.componentPlan,
-            preparedPlan = request.shape.preparedPlan,
-            engine = request.engine,
-            objective = request.shape.linearObjective,
-            transformObjective = request.shape.localSearchObjective == null,
-            presolveConfig = request.presolveConfig,
-            explicitPresolveConfig = request.explicitPresolveConfig,
-            solutionSetSensitive = request.solutionSetSensitive ||
-                (request.shape.sourceInvocation != null && request.operation == ExecutionOperation.ENUMERATE),
-            cancellation = if (request.shape.sourceInvocation == null) {
-                request.presolveCancellation
-            } else {
-                request.presolveCancellation or stop
-            },
-            solveCancellation = stop,
-            presolveBudget = request.presolveBudget,
-            zeroObjectivePricing = request.zeroObjectivePricing,
-            randomSeed = request.randomSeed,
-        ),
-    )
-    val preparationElapsed = preparationStart.elapsedNow()
+    var preparation = prepare(request.preparationRequest(stop))
+    var preparationElapsed = preparationStart.elapsedNow()
     if (request.prepareOnly) return result(preparation, preparationElapsed, FiniteSolveOutcome.PreparedOnly)
     if (preparation.presolve?.infeasible == true) {
         return result(
@@ -571,6 +554,41 @@ internal fun FinitePipeline.solve(
             FiniteSolveOutcome.Completed(FiniteSolveVerdict.UNKNOWN, SolveStats.EMPTY, 0L, null, 0L),
         )
     }
+    val objectiveCoordinates = if (request.admitsObjectiveCoordinates(preparation) && !stop() &&
+        !request.presolveCancellation() && request.presolveBudget?.remaining() != 0L
+    ) {
+        val coordinateRequest = request.preparationRequest(stop, protectObjective = true)
+        val coordinateStop = coordinateRequest.solveCancellation
+        val coordinates = prepare(coordinateRequest)
+        val hints = if (coordinates.presolve?.infeasible == true ||
+            coordinates.executionPlan?.decline == PreparedPlanDecline.RESOURCE || coordinateStop()
+        ) null else {
+            request.shape.sourceInvocation?.heuristicHints(
+                coordinates.problem, coordinates.objective, coordinates.sourceMapping, coordinateStop,
+                setOf(ExecutionStrategy.LOCAL_SEARCH),
+                (coordinates.executionPlan ?: request.shape.preparedPlan).capabilities,
+            ) ?: PreparedSourceHints(request.shape.definitionalSweep, request.shape.localSearchObjective)
+        }
+        val view = if (hints == null) null else
+            ObjectiveCoordinateView.create(preparation, coordinates, hints, stop)
+        preparationElapsed = preparationStart.elapsedNow()
+        val previous = preparation
+        preparation = FinitePipelinePreparation(
+            previous.problem, previous.objective, previous.reconstruct,
+            previous.presolve?.let { stats ->
+                stats.copy(
+                    bakeElapsed = stats.bakeElapsed + (coordinates.presolve?.bakeElapsed ?: Duration.ZERO),
+                    lpStats = stats.lpStats.mergedWith(coordinates.presolve?.lpStats ?: SolveStats.EMPTY.lp),
+                    effort = request.presolveConfig.effortStats(request.presolveBudget, preparationElapsed),
+                )
+            },
+            previous.constructionBakeElapsed,
+        ).also {
+            it.sourceMapping = previous.sourceMapping
+            it.executionPlan = previous.executionPlan
+        }
+        view
+    } else null
     val invocation = request.shape.sourceInvocation
     val linearSource = invocation?.linearSource
     val permitsToleranceOptimum = invocation?.let {
@@ -627,6 +645,7 @@ internal fun FinitePipeline.solve(
             sourceInvocation = request.shape.sourceInvocation,
             sourceMapping = preparation.sourceMapping,
             sourceControls = request.sourceControls,
+            objectiveCoordinates = objectiveCoordinates,
         ),
         FiniteExecutionCallbacks(
             onSample = { sample ->
@@ -657,6 +676,47 @@ internal fun FinitePipeline.solve(
         (execution as? FiniteExecutionResult.Completed)?.nativeSourceMinimum,
         (execution as? FiniteExecutionResult.Completed)?.completeSearchAdmitted,
     )
+}
+
+private fun FiniteSolveRequest.preparationRequest(
+    stop: Cancellation,
+    protectObjective: Boolean = false,
+): FinitePipelineRequest {
+    val preparationStop = if (shape.sourceInvocation == null) presolveCancellation else presolveCancellation or stop
+    val electiveStop = presolveBudget?.orSpent(preparationStop or stop) ?: (preparationStop or stop)
+    return FinitePipelineRequest(
+        problem = shape.finiteProblem, componentPlan = shape.componentPlan, preparedPlan = shape.preparedPlan,
+        engine = engine, objective = shape.linearObjective,
+        transformObjective = !protectObjective && shape.localSearchObjective == null,
+        presolveConfig = presolveConfig, explicitPresolveConfig = explicitPresolveConfig,
+        solutionSetSensitive = solutionSetSensitive ||
+            (shape.sourceInvocation != null && operation == ExecutionOperation.ENUMERATE),
+        cancellation = preparationStop,
+        solveCancellation = if (protectObjective) electiveStop else stop,
+        presolveBudget = presolveBudget, zeroObjectivePricing = zeroObjectivePricing, randomSeed = randomSeed,
+    )
+}
+
+private fun FiniteSolveRequest.admitsObjectiveCoordinates(preparation: FinitePipelinePreparation): Boolean {
+    if (!shape.optimize || engine != FiniteEngine.MIXED || cores != 1 || explicitPresolveConfig ||
+        shape.localSearchObjective != null || executionOptions.explicitArms || preparation.problem.numRealVars != 0
+    ) return false
+    val options = executionOptions.reader()
+    if (options[ExecutionOption.localSearchArm] != null || options[ExecutionOption.backtrackArmsByLabel] != null) {
+        return false
+    }
+    // Without Element alternatives the primary and full neighborhoods offer the same repairs.
+    if (preparation.problem.factors.none { it is Diffn } || preparation.problem.factors.any { it is Element }) {
+        return false
+    }
+    val sourceWeights = shape.linearObjective?.intCoefficientValues ?: return false
+    val weights = preparation.objective?.intCoefficientValues ?: return false
+    return preparation.sourceMapping?.stages?.any { stage ->
+        stage.rebuild.steps.any { step ->
+            step is RebuildStep.AffineValue && sourceWeights.getOrElse(step.variable) { 0L } != 0L &&
+                weights.getOrElse(step.variable) { 0L } == 0L
+        }
+    } == true
 }
 
 private fun FiniteExecutionResult.toSolveOutcome(): FiniteSolveOutcome = when (this) {
@@ -1034,6 +1094,7 @@ private fun executePortfolio(
                 )
             }
         },
+        objectiveCoordinates = request.objectiveCoordinates,
     )
     val start = TimeSource.Monotonic.markNow()
     executor.use {

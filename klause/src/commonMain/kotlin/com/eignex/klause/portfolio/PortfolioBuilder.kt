@@ -18,6 +18,7 @@ import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.ExecutionStrategy
+import com.eignex.klause.solver.pipeline.ObjectiveCoordinateView
 import com.eignex.klause.solver.pipeline.PreparedSourceHints
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.result.SearchEvent
@@ -97,6 +98,7 @@ object PortfolioBuilder {
         profile: ProblemProfile,
         numericalCompletion: Boolean,
         sourceHints: ((Set<ExecutionStrategy>) -> PreparedSourceHints?)? = null,
+        objectiveCoordinates: ObjectiveCoordinateView? = null,
     ): List<FinitePortfolioFactory> {
         val plan = PortfolioComposition.plan(scenario, ProblemFacts.of(problem, profile, scenario.lpCeiling, objective))
         val residuals = if (scenario.reportLsResiduals) plan.arms.map { it.withLsResiduals() } else plan.arms
@@ -143,10 +145,19 @@ object PortfolioBuilder {
                     admitted
                 }
                 val bounded = budget?.let(completion::withNodeBudget) ?: completion
-                bounded.materialize(
+                val worker = if (objectiveCoordinates != null && bounded is LocalSearchWorkerConfig &&
+                    config.label == LocalSearchArm.CblsPrimaryPlateauIlsBasin.label &&
+                    scenario.cores == 1 && scenario.engine == EngineMix.MIXED &&
+                    scenario.lsPool == null && scenario.btPool == null
+                ) {
+                    bounded.materializeObjectiveCoordinates(
+                        objectiveCoordinates, index, armId, seed, scenario.lsLambda, onEvent,
+                    )
+                } else bounded.materialize(
                     problem, index, armId, seed, scenario.lsLambda, objective, selectedObjective,
                     selectedSweep, onEvent, pools,
-                ).bindEvidence(ModelIdentity.of(problem, objective)).also {
+                )
+                worker.bindEvidence(ModelIdentity.of(problem, objective)).also {
                     it.improvementOnly = armId >= plan.firstSolutionCount ||
                         (config is CoreGuidedWorkerConfig && deferCore)
                 }

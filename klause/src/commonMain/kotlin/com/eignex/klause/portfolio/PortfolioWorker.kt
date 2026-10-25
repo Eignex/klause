@@ -1,6 +1,8 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.solver.InstructionSlicedSearch
+import com.eignex.klause.solver.ReseedGuard
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.Sample
@@ -15,6 +17,7 @@ import com.eignex.klause.solver.incumbent.EvidenceKind
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 
 /**
@@ -163,6 +166,81 @@ class PortfolioWorker private constructor(
 
     override fun close() {
         closeFn()
+    }
+
+    internal fun objectiveCoordinateProposals(
+        model: ModelIdentity,
+        proposal: (Sample) -> MinimizeResult.BestFound?,
+    ): PortfolioWorker {
+        fun checked(result: MinimizeResult): MinimizeResult {
+            val reason = when (result) {
+                is MinimizeResult.BestFound -> result.reason
+                is MinimizeResult.Unknown -> result.reason
+                else -> TerminationReason.SearchExhausted
+            }
+            return result.assignment?.let(proposal)?.copy(reason = reason, stats = result.stats)
+                ?: MinimizeResult.Unknown(reason, result.stats)
+        }
+
+        return PortfolioWorker(
+            label = "$label/objective-coordinates",
+            armId = armId,
+            solveFn = { _, _ -> error("objective coordinate worker only minimizes") },
+            // Private coordinates and objective offsets cannot consume canonical warm starts or cutoffs.
+            improvementsFn = { _, _, cancel, limit ->
+                improvements({ Double.POSITIVE_INFINITY }, cancel, maxInstructions = limit).map(::checked)
+            },
+            samplesFn = { emptySequence() },
+            resumableFn = { _, cancel, _ ->
+                val search = resumableFn?.invoke({ Double.POSITIVE_INFINITY }, cancel, null)
+                search?.let { child ->
+                    object : ResumableSearch by child, InstructionSlicedSearch, ReseedGuard {
+                        override val chargedInstructions: Long
+                            get() = (child as? InstructionSlicedSearch)?.chargedInstructions
+                                ?: child.stats.ls.moves.sum.toLong()
+                        override val canReseed: Boolean get() = (child as? ReseedGuard)?.canReseed ?: true
+                        override val canContinuePreparation: Boolean
+                            get() = (child as? ReseedGuard)?.canContinuePreparation ?: false
+
+                        override fun runSlice(
+                            global: Cancellation,
+                            sliceMillis: Long,
+                            onIncumbent: (MinimizeResult.WithSample) -> Unit,
+                        ): MinimizeResult? = runSlice(global, sliceMillis, -1L, onIncumbent)
+
+                        override fun runSlice(
+                            global: Cancellation,
+                            sliceMillis: Long,
+                            sliceNodes: Long,
+                            onIncumbent: (MinimizeResult.WithSample) -> Unit,
+                        ): MinimizeResult? = child.runSlice(global, sliceMillis, sliceNodes) { point ->
+                            proposal(point.sample)?.let(onIncumbent)
+                        }?.let(::checked)
+
+                        override fun runInstructionSlice(
+                            global: Cancellation,
+                            sliceMillis: Long,
+                            sliceInstructions: Long,
+                            onIncumbent: (MinimizeResult.WithSample) -> Unit,
+                        ): MinimizeResult? {
+                            val accept: (MinimizeResult.WithSample) -> Unit = { point ->
+                                proposal(point.sample)?.let(onIncumbent)
+                            }
+                            val terminal = if (child is InstructionSlicedSearch) {
+                                child.runInstructionSlice(global, sliceMillis, sliceInstructions, accept)
+                            } else child.runSlice(global, sliceMillis, sliceInstructions, accept)
+                            return terminal?.let(::checked)
+                        }
+                    }
+                }
+            },
+            resumableSolveFn = null,
+            withInstructions = withInstructions,
+            closeFn = ::close,
+        ).bindEvidence(model, provesResults = false).also {
+            it.family = family
+            it.restartingSearch = restartingSearch
+        }
     }
 
     /** Factory for type-erased workers over a concrete typed session. */
