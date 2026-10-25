@@ -262,8 +262,9 @@ internal class NumericalFrontierSnapshot(
             val type = Class.forName("com.eignex.klause.solver.pipeline.LinearAuthorityInvocation")
             val authorityType = Class.forName("com.eignex.klause.lp.optimization.LinearAuthority")
             val fundingType = Class.forName("com.eignex.klause.lp.SourceLpFunding")
-            val funding = fundingType.getDeclaredConstructor(Long::class.javaPrimitiveType, Long::class.javaPrimitiveType)
-                .newInstance(params.sourceLpWorkLimit, params.sourceLpAllocationLimit)
+            val funding = fundingType.getDeclaredConstructor(
+                Long::class.javaPrimitiveType, Long::class.javaPrimitiveType,
+            ).newInstance(params.sourceLpWorkLimit, params.sourceLpAllocationLimit)
             return type.getDeclaredConstructor(SourceProofContext::class.java, TheoryParams::class.java,
                 Function0::class.java, stateType, Boolean::class.javaPrimitiveType, authorityType,
                 Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType, fundingType,
