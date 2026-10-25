@@ -3,6 +3,7 @@ package com.eignex.klause.formats.xcsp3
 import com.eignex.klause.brute.BruteForceParams
 import com.eignex.klause.brute.BruteForceSolver
 import com.eignex.klause.factor.PropagationReasonOracle
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.global.Distinct
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.LinearOp
@@ -31,6 +32,7 @@ class Xcsp3AffineDistinctnessTest {
             )
 
             assertEquals(2, parsed.problem.factors.count { it is Distinct }, expression)
+            assertTrue(parsed.problem.factors.none { it is Linear }, expression)
             assertEquals(4, parsed.problem.numIntVars, expression)
             assertTrue(parsed.definitionHints.isEmpty(), expression)
         }
@@ -309,7 +311,7 @@ class Xcsp3AffineDistinctnessTest {
     fun `recognition should stop at its work allowance without emitting a partial group`() {
         val index = Xcsp3AffineDistinctness(workLimit = 1)
         for ((a, b, bound) in listOf(Triple(0, 1, 1L), Triple(0, 2, 2L), Triple(1, 2, 1L))) {
-            index.record(LinRelation.LongRel(intArrayOf(a, b), longArrayOf(1, -1), bound), LinearOp.NE)
+            index.record(LinRelation.LongRel(intArrayOf(a, b), longArrayOf(1, -1), bound), LinearOp.NE, a)
         }
 
         assertTrue(index.groups(Cancellation.Never).isEmpty())
@@ -335,7 +337,7 @@ class Xcsp3AffineDistinctnessTest {
         val index = Xcsp3AffineDistinctness()
         repeat(2) {
             for ((a, b, bound) in listOf(Triple(0, 1, 1L), Triple(0, 2, 2L), Triple(1, 2, 1L))) {
-                index.record(LinRelation.LongRel(intArrayOf(b, a), longArrayOf(-1, 1), bound), LinearOp.NE)
+                index.record(LinRelation.LongRel(intArrayOf(b, a), longArrayOf(-1, 1), bound), LinearOp.NE, b)
             }
         }
 
@@ -343,5 +345,60 @@ class Xcsp3AffineDistinctnessTest {
 
         assertEquals(1, groups.size)
         assertContentEquals(longArrayOf(0, 1, 2), groups.single().offsets)
+    }
+
+    @Test
+    fun `committed recovery should remove duplicate reversed rows and preserve unmatched labels`() {
+        val source = """<instance><variables><array id="x" size="[3]">-1..1</array></variables>
+            <constraints><intension>ne(sub(x[0],x[1]),1)</intension>
+            <intension>ne(sub(x[1],x[0]),-1)</intension>
+            <intension>ne(sub(x[0],x[2]),2)</intension>
+            <intension>ne(sub(x[1],x[2]),1)</intension>
+            <intension>ne(sub(x[1],x[2]),0)</intension></constraints></instance>"""
+        val parsed = Xcsp3.parse(source).problem
+        val pairwise = Xcsp3.parse(source, recoveryCancellation = Cancellation { true }).problem
+        val actual = BruteForceSolver(parsed.bake()).enumerate(BruteForceParams(randomSeed = 0L))
+            .map { it.ints.toList() }.toSet()
+        val expected = BruteForceSolver(pairwise.bake()).enumerate(BruteForceParams(randomSeed = 0L))
+            .map { it.ints.toList() }.toSet()
+
+        assertEquals(1, parsed.factors.count { it is Distinct })
+        assertEquals(1, parsed.factors.count { it is Linear })
+        assertEquals(expected, actual)
+    }
+
+    @Test
+    fun `cancellation after a committed group should retain uncommitted source rows`() {
+        val builder = Compiler.Builder()
+        val index = Xcsp3AffineDistinctness()
+        for (base in listOf(0, 3)) {
+            for ((a, b, bound) in listOf(Triple(0, 1, 1L), Triple(0, 2, 2L), Triple(1, 2, 1L))) {
+                val vars = intArrayOf(base + a, base + b)
+                index.record(LinRelation.LongRel(vars, longArrayOf(1, -1), bound), LinearOp.NE, builder.factors.size)
+                builder.factors.add(Linear(longArrayOf(1, -1), vars, LinearOp.NE, bound))
+            }
+        }
+        val uncommitted = builder.factors.takeLast(3)
+
+        builder.recoverAffineDistinctness(index, Cancellation { builder.factors.size > 6 })
+
+        assertEquals(1, builder.factors.count { it is Distinct })
+        assertEquals(uncommitted, builder.factors.filterIsInstance<Linear>())
+    }
+
+    @Test
+    fun `cancellation before commit should preserve every source row`() {
+        val builder = Compiler.Builder()
+        val index = Xcsp3AffineDistinctness()
+        for ((a, b, bound) in listOf(Triple(0, 1, 1L), Triple(0, 2, 2L), Triple(1, 2, 1L))) {
+            val vars = intArrayOf(a, b)
+            index.record(LinRelation.LongRel(vars, longArrayOf(1, -1), bound), LinearOp.NE, builder.factors.size)
+            builder.factors.add(Linear(longArrayOf(1, -1), vars, LinearOp.NE, bound))
+        }
+        val original = builder.factors.toList()
+
+        builder.recoverAffineDistinctness(index, Cancellation { true })
+
+        assertEquals(original, builder.factors)
     }
 }

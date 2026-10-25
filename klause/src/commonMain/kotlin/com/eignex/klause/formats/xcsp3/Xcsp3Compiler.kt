@@ -592,7 +592,7 @@ internal object Compiler {
         /** Post a lowered relation as a top-level factor: a [Linear] when it carries variable terms, else a
          *  contradiction clause when the constant relation `0 op bound` is false (a true one is dropped). */
         private fun postRel(r: RelParts) {
-            affineDistinctness.record(r.rel, r.op)
+            affineDistinctness.record(r.rel, r.op, factors.size)
             when (val rel = r.rel) {
                 is LinRelation.LongRel ->
                     if (rel.vars.isNotEmpty()) {

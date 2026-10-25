@@ -163,11 +163,15 @@ no source row is removed. Reified and soft constraint attributes are unsupported
 and rejected, including group templates and streamed group/block containers.
 
 Each admitted group retains one exact affine `Distinct` over the original integer
-coordinates. No auxiliary domains, equality channels or definition hints are
+coordinates and replaces every indexed source row with its verified pair label,
+including duplicate and reversed rows. Other labels and uncommitted groups retain
+their source rows. The global and its covered-row removals commit together;
+cancellation can leave completed groups committed without changing other rows.
+No auxiliary domains, equality channels or definition hints are
 materialized. Finite matching/Hall propagation applies bounds and hole deductions
 directly to source domains; lazy reasons read those domains at the deduction's
 trail position. Offset arithmetic remains exact beyond signed-word endpoints.
-Recovery cancellation skips optional work while retaining the ordinary parsed constraints.
+Recovery cancellation skips uncommitted optional work.
 
 `pow(base, exponent)` retains `Power` with a fixed nonnegative integer exponent;
 variable, negative and fractional exponents are unsupported. `div` and `mod`
