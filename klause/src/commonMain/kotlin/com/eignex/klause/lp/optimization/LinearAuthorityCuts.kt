@@ -5,6 +5,7 @@ import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourceProofContext
+import com.eignex.klause.solver.evidence.SourceRoundingLimit
 import com.eignex.klause.solver.evidence.mixedIntegerRounding
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
@@ -36,7 +37,11 @@ internal class LinearAuthorityCuts private constructor(
             try {
                 if (cancellation()) return null
                 val cuts = ArrayList<LinearAuthorityCut>()
-                val observations = linkedMapOf<String, Long>()
+                val observations = linkedMapOf(
+                    "MixedRowsVisited" to 0L, "MixedEligibleRows" to 0L, "MixedMissingBounds" to 0L,
+                    "MixedIntegralShiftedRhs" to 0L, "MixedRetentionLimited" to 0L, "MixedWidthLimited" to 0L,
+                    "BoundScanLimited" to 0L, "RowScanLimited" to 0L,
+                )
                 fun observe(name: String) {
                     observations[name] = (observations[name] ?: 0L) + 1L
                 }
@@ -72,7 +77,6 @@ internal class LinearAuthorityCuts private constructor(
                     }
                     work += cost
                     val mixed = coefficients.keys.any { it.kind == SourceCoordinate.Kind.Real }
-                    if (mixed) observe("MixedRowsVisited")
                     if (coefficients.isEmpty() || coefficients.keys.any { it.kind == SourceCoordinate.Kind.Boolean }) {
                         continue
                     }
@@ -81,6 +85,7 @@ internal class LinearAuthorityCuts private constructor(
                             it.den.magnitudeBitLength() > 4096 }) continue
                     val integerValues = coefficients.filterKeys { it.kind == SourceCoordinate.Kind.Integer }.values
                     if (integerValues.isEmpty()) continue
+                    if (mixed) observe("MixedRowsVisited")
                     var scale = BIG_ONE
                     for (value in integerValues) {
                         if (cancellation()) return null
@@ -108,7 +113,12 @@ internal class LinearAuthorityCuts private constructor(
                             continue
                         }
                         val selected = sides.filterNotNull()
-                        val conclusion = mixedIntegerRounding(normalized, selected.map { it.first }, cancellation)
+                        val conclusion = try {
+                            mixedIntegerRounding(normalized, selected.map { it.first }, cancellation)
+                        } catch (_: SourceRoundingLimit) {
+                            observe("MixedWidthLimited")
+                            continue
+                        }
                         if (cancellation()) return null
                         if (conclusion == null) {
                             observe("MixedIntegralShiftedRhs")
