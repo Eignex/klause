@@ -48,7 +48,8 @@ internal class PreparedSource(
     val changed: Boolean get() = problem !== source
 
     internal fun retainedFactors(cancellation: Cancellation): RetainedFactors? =
-        if (infeasible || !rebuild.isEmpty) null else RetainedFactors.between(source, problem, cancellation)
+        if (infeasible || !rebuild.isEmpty || passesFired.isEmpty()) null
+        else RetainedFactors.between(source, problem, cancellation)
 
     /** Terse summary of this phase alone, in the shape every route reports. */
     val stats: PresolveStats get() = PresolveStats(

@@ -2053,7 +2053,8 @@ complete replan, and compare whole preparation and CLI time too. Unchanged-plan
 reuse stays in `SOURCE_ENCODER`; frontend routing captures initial planning.
 
 `bench.profile.SourceEncoderReuseProfile` compares built-in and delegating custom
-providers with presolve off or `off,+dependent-rows` on one hash-pinned SMT source.
+providers with presolve off or `off,+dependent-rows` on one hash-pinned linear SMT
+satisfiability source.
 Pass `suite=ID problem=NAME sha256=HEX repeats=3 warmups=1` through `lab profile`
 with a 180-second job limit. It records initial setup, complete execution and
 preparation costs, plus custom encoder selection/installation counts. Retained

@@ -25,6 +25,7 @@ internal class RetainedLinearEncoding(
             val attribution = row.attribution
             val index = targetIds.getOrNull(attribution.sourceFactorIndex) ?: return null
             if (index < 0) continue
+            if (row.source !== mapping.source.factors[attribution.sourceFactorIndex]) return null
             if (attribution.integerConditions.isNotEmpty() || attribution.booleanConditions.isNotEmpty() ||
                 attribution.auxiliaries.isNotEmpty() || attribution.integerEmbeddings.isNotEmpty() ||
                 attribution.realEmbeddings.isNotEmpty()
