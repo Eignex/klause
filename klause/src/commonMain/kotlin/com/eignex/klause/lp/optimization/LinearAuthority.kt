@@ -288,11 +288,10 @@ internal class LinearAuthority(
                 (lower == null || threshold + BigFraction.ONE > lower) &&
                     (upper == null || threshold < upper)
             }
-            fun witness(values: List<BigFraction>, recovered: Boolean): Sample? {
+            fun witness(values: List<BigFraction>, stage: String): Sample? {
                 val proposed = sample(source, coordinates, values)
                 val evidence = SourceEvidence(source.scope, SourceClaim.Witness(proposed),
                     SourceDerivation.SourceWitness)
-                val stage = if (recovered) "PrimalRecoverySource" else "PrimalSource"
                 return when (SourceEvidenceVerifier(context).verify(evidence, cancellation)) {
                     SourceEvidenceCheck.Checked -> proposed
                     is SourceEvidenceCheck.Rejected -> {
@@ -305,11 +304,11 @@ internal class LinearAuthority(
                     }
                 }
             }
-            var candidate = point?.takeIf { fractionalCoordinates.isEmpty() }?.let { witness(it, false) }
+            var candidate = point?.takeIf { fractionalCoordinates.isEmpty() }?.let { witness(it, "PrimalSource") }
             if (candidate != null) observePrimal("PrimalSourceChecked")
             if (candidate == null && point != null && fractionalCoordinates.isEmpty()) {
                 val recovered = recover(prepared, point, cancellation)
-                candidate = recovered?.let { witness(it, true) }
+                candidate = recovered?.let { witness(it, "PrimalRecoverySource") }
                 if (candidate != null) {
                     point = recovered
                     observePrimal("PrimalRecoverySourceChecked")
@@ -320,7 +319,7 @@ internal class LinearAuthority(
                         attempt.refinementFinished = budget.funding?.paused != true && !cancellation()
                     }
                     attempt.refined?.let { refined ->
-                        val improved = witness(refined, true)
+                        val improved = witness(refined, "PrimalRefinementSource")
                         if (improved != null) {
                             candidate = improved
                             point = refined

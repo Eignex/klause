@@ -13,9 +13,9 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.Term
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCondition
+import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceValue
@@ -121,7 +121,9 @@ internal object MpsResidualObjective {
         val checked = newValues?.let { source.checkMpsWitness(it, stop) }
         val pins = coordinates.indices.filter { coordinates[it].kind != SourceCoordinate.Kind.Real }
             .associate { coordinates[it] to point[it] }
-        val fixed = context.atScope(context.scope.copy(condition = SourceCondition(lower = pins, upper = pins)))
+        val fixed = SourceProofContext(context.scope.copy(condition = SourceCondition(lower = pins, upper = pins)),
+            context.coordinates, context.premises, context.objective, context.objectiveConstant,
+            semantics = context.semantics)
         val authorityType = Class.forName("com.eignex.klause.lp.optimization.LinearAuthority")
         val authority = authorityType.constructors.single { it.parameterCount == 4 }
             .newInstance(budget, { _: Any -> }, true, policy)
