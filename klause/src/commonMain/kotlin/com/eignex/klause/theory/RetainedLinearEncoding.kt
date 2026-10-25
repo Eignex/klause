@@ -28,7 +28,8 @@ internal class RetainedLinearEncoding(
                 attribution.auxiliaries.isNotEmpty() || attribution.integerEmbeddings.isNotEmpty() ||
                 attribution.realEmbeddings.isNotEmpty()
             ) return null
-            factors += EncodedTheoryFactor(mapping.target.factors[index], row.linearForm,
+            factors += if (index == attribution.sourceFactorIndex && row.source === mapping.target.factors[index]) row
+            else EncodedTheoryFactor(mapping.target.factors[index], row.linearForm,
                 EncodingAttribution(index, attribution.booleans, attribution.integers, attribution.reals,
                     affineAuxiliaries = attribution.affineAuxiliaries, linearGuards = attribution.linearGuards))
             origins += index

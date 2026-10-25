@@ -7,8 +7,8 @@ import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolvePipeline
 import com.eignex.klause.presolve.observePreparation
 import com.eignex.klause.presolve.preparationInterrupted
-import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.FactorProjectionProviders
+import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.PresolveLane
 import com.eignex.klause.solver.result.PresolvePreparationStage

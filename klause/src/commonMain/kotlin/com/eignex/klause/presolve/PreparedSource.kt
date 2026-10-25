@@ -2,9 +2,9 @@ package com.eignex.klause.presolve
 
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.RetainedFactors
-import com.eignex.klause.util.Cancellation
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.PresolveStats
+import com.eignex.klause.util.Cancellation
 import kotlin.time.Duration
 
 /**

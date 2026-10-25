@@ -8,17 +8,17 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.RetainedFactors
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.VarRemap
-import com.eignex.klause.propagation.BakedProblem
-import com.eignex.klause.propagation.CpIntId
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.observePreparation
+import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.CpIntId
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.solver.encodingPreparationScope
-import com.eignex.klause.solver.supportsCompleteDifferenceTheory
 import com.eignex.klause.solver.result.PresolveLane
 import com.eignex.klause.solver.result.PresolvePreparationStage
+import com.eignex.klause.solver.supportsCompleteDifferenceTheory
 import com.eignex.klause.theory.EncodedTheoryFactor
 import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.theory.EncodingTarget
@@ -322,7 +322,8 @@ class ComponentPlan internal constructor(
 
     internal fun retainedEncoding(mapping: RetainedFactors, projections: PreparedFactorProjections?): RetainedLinearEncoding? =
         if (source === mapping.source && factorProjections === projections &&
-            projections?.providers === FactorProjectionProviders.Default && encodingDecline == null
+            projections?.providers === FactorProjectionProviders.Default && encodingDecline == null &&
+            completeEncodings.isNotEmpty()
         ) RetainedLinearEncoding(mapping, completeEncodings) else null
 
     private fun requireBelongsTo(spec: Problem) {
@@ -536,9 +537,13 @@ internal fun Problem.buildComponentPlan(
         else if (preparationStopped || stop() || linearDecline == EncoderDecline.RESOURCE ||
             differenceDecline == EncoderDecline.RESOURCE) EncoderDecline.RESOURCE
         else linearDecline ?: differenceDecline ?: fullLinearDecline ?: fullDifferenceDecline,
-        if (initialResourceDecline || preparationStopped || stop()) emptyMap() else buildMap {
-            if (linear != null) put(EncodingTarget.LINEAR, linear)
-            if (difference != null) put(EncodingTarget.DIFFERENCE, difference)
+        when {
+            initialResourceDecline || preparationStopped || stop() -> emptyMap()
+            route == ProblemPipeline.DIFFERENCE_THEORY && difference != null ->
+                mapOf(EncodingTarget.DIFFERENCE to difference)
+            (route == ProblemPipeline.EXACT_LRA || route == ProblemPipeline.EXACT_LIRA) && linear != null ->
+                mapOf(EncodingTarget.LINEAR to linear)
+            else -> emptyMap()
         })
 }
 
