@@ -771,6 +771,7 @@ private fun reconstructCandidates(
             var correction = BigFraction.ofLong(2L)
             var previous: BigInt? = null
             var round = 0
+            var basisAttempted = false
             for (attempt in 0 until limits.maxAttempts) {
                 meter.phase = ReconstructionPhase.SCHEDULE
                 val denominator = if (violation.isZero) {
@@ -790,7 +791,8 @@ private fun reconstructCandidates(
                     current.reconstructedSeated(x, basis, denominator)?.let { current.point(it, basis) }
                 }
                 if (y != null) {
-                    if (goal == ReconstructionGoal.BOUND && basis != null) {
+                    if (goal == ReconstructionGoal.BOUND && basis != null && !basisAttempted) {
+                        basisAttempted = true
                         current.basisDual(y, basis)?.let { current.dual(it, ray = false) }
                     }
                     if (goal != ReconstructionGoal.BOUND || current.bound == null) {

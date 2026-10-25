@@ -1113,6 +1113,8 @@ retained rebinding. These instrumented streams measure mechanism cost separately
 from source-checked cold CLI comparisons.
 Session and binding entries use production numerical settings; `phase1`, `values`
 and `start` controls apply only to the engine entry.
+The session entry records accepted exact bounds and the native source lift/recheck
+after its timed advance, with the lift's own elapsed time and thread allocation.
 
 Each source retains original bytes and build identity. Preparation and guidance
 reports separate work, measured thread allocation, active time, paused versus
@@ -1244,6 +1246,27 @@ both completed control bounds pass the same native source check.
 as `CANDIDATE`; rentacar's sampled infeasibility is unchanged. The supported
 result is stronger bounded numerical progress with sparse factors. Source
 witnesses, root proof completion and general speedups are not established.
+
+[Certificate capture 8207](https://lab.eignex.com/jobs/8207), at `b397fc8f38`,
+reproduces the completed misc04inf candidate after 2222 pivots. Its first refused
+side is structural column 186's missing upper bound, at exact reduced cost
+`-37/36893488147419103232`. [8256](https://lab.eignex.com/jobs/8256), at
+`884965884e`, records common denominator 115362244805515 above the schedule's
+44079937 limit. Independent entry reconstruction supplies a complete vector but
+still fails exact reduced costs; a floating optimum supplies no bound.
+
+[Basis repair 8283](https://lab.eignex.com/jobs/8283), at `bc4b93dc3c`, uses the
+same four source hashes, Mac/aarch64, Java 25.0.4.1, 6 GiB heap, 600M/4096 floating
+policy and 2M/64 MiB certificate allowance. After logical elimination, peeling
+recovers 955 singleton equations and defers 105 variables, leaving 45 rows in three cores;
+the largest is 41. All three exact solves cost 75,591 factor work and 5,199,992
+modeled bytes. Complete certification costs 1,074,843 work and 24,633,954 modeled
+bytes at 164 scalar bits, and its exact bound passes the original native source
+lift/recheck. Cap6000 and p0033 retain identical checked bounds and certificate
+work; rentacar remains a numerical feasibility stop. The misc04inf source check
+takes 37 ms and 81.4 MB of measured thread allocation outside the engine allowance.
+These instrumented captures establish a checked bound, not a source witness,
+integer optimality, independent MPS proof or general speedup.
 
 ### CLI profile tables
 

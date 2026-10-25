@@ -319,17 +319,36 @@ internal object MpsSparseRoot {
                     funding?.let { call(it, "grant", 20_000_000L) }
                     val started = System.nanoTime()
                     val allocated = bean.getThreadAllocatedBytes(thread)
+                    var sourcePrepared: Any? = null
                     val guide = if (entry == "bind") {
                         checkNotNull(call(session, "bind", packed, call(checkNotNull(model), "getObjective"), stop,
                             { model }, if (index % 2 == 0) context.scope else alternate, call(policy, "getFloating")))
                         null
                     } else {
-                        val consume: (Any, Any, Cancellation) -> Any = { guidance, _, _ -> guidance }
+                        val consume: (Any, Any, Cancellation) -> Any = { guidance, prepared, _ ->
+                            sourcePrepared = prepared
+                            guidance
+                        }
                         call(session, "advance", packed, costs, context.objectiveConstant * sign, context.scope,
                             stop, policy, observer, consume)
                     }
                     val elapsed = System.nanoTime() - started
                     val allocation = bean.getThreadAllocatedBytes(thread) - allocated
+                    val bound = guide?.let { call(it, "getBound") }
+                    val sourceBound = buildJsonObject {
+                        put("available", bound != null)
+                        if (bound != null) {
+                            val liftStarted = System.nanoTime()
+                            val liftBytes = bean.getThreadAllocatedBytes(thread)
+                            put("check", checkBound(bound, checkNotNull(sourcePrepared), packed, context, costs, sign))
+                            val value = call(bound, "getValue") as BigFraction
+                            put("originalDirectionNativeBound", (value * sign).toString())
+                            put("approximateOriginalDirectionNativeBound",
+                                (value * sign).toDouble().takeIf(Double::isFinite))
+                            put("elapsedNs", System.nanoTime() - liftStarted)
+                            put("threadBytes", bean.getThreadAllocatedBytes(thread) - liftBytes)
+                        }
+                    }
                     paused = guide?.let { call(it, "getPaused") == true } ?:
                         (funding?.let { call(it, "getPaused") == true && call(it, "getExhausted") != true } ?: false)
                     val owner = NumericalFrontierSnapshot.field(session, "owner")
@@ -358,6 +377,8 @@ internal object MpsSparseRoot {
                         put("termination", guide?.let { call(it, "getTermination") }?.toString())
                         put("phase", guide?.let { call(it, "getPhase") }?.toString())
                         put("heuristicCoordinates", (guide?.let { call(it, "getPrimal") } as DoubleArray?)?.size ?: 0)
+                        put("checkedNativeBound", bound?.let { call(it, "getValue").toString() })
+                        put("nativeSourceBound", sourceBound)
                         put("certificate", NumericalResidualProfile.json(guide?.let {
                             call(it, "getCertificateMetrics")
                         }))
