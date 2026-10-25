@@ -18,7 +18,9 @@ import kotlin.test.assertTrue
 class SourceExecutionControlsTest {
     @Test
     fun `source cut control should bind to numerical execution`() {
-        val source = SmtLib.parse("(declare-const x Real) (assert (> x 0))").source
+        val source = SourceAttachment(
+            LinearSourceProblem(listOf(LinearSourceVariable("x", false)), emptyList()), ProblemSettings(),
+        )
         val invocation = SourceSetup.prepare(SourceSetupRequest(
             source, ExecutionOperation.SATISFY, FiniteEngine.FIXED,
             linearTraversal = LinearTraversal.NUMERICAL_FRONTIER,
