@@ -1,5 +1,6 @@
 package com.eignex.klause.presolve.linear
 
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.presolve.AffinePivotOrder
 import com.eignex.klause.presolve.equivalentLinear
 import com.eignex.klause.util.Cancellation
@@ -15,7 +16,7 @@ internal object AffinePivotOrders {
         eliminated: BooleanArray,
         objectiveIntVars: IntHashSet,
         capWide: Boolean,
-        pivotable: ((Int, Int) -> Boolean)?,
+        pivotable: ((Linear, Int) -> Boolean)?,
         cancellation: Cancellation,
     ): AffineSingletons.PivotOrder = when (policy) {
         AffinePivotOrder.STABLE_ID ->
@@ -30,7 +31,7 @@ internal object AffinePivotOrders {
         private val eliminated: BooleanArray,
         private val objectiveIntVars: IntHashSet,
         private val capWide: Boolean,
-        private val pivotable: ((Int, Int) -> Boolean)?,
+        private val pivotable: ((Linear, Int) -> Boolean)?,
         private val cancellation: Cancellation,
     ) : AffineSingletons.PivotOrder {
         private var scanFrom = 0
@@ -65,7 +66,7 @@ internal object AffinePivotOrders {
         private val eliminated: BooleanArray,
         private val objectiveIntVars: IntHashSet,
         private val capWide: Boolean,
-        private val pivotable: ((Int, Int) -> Boolean)?,
+        private val pivotable: ((Linear, Int) -> Boolean)?,
         private val cancellation: Cancellation,
     ) : AffineSingletons.PivotOrder {
         private val heap = PivotHeap()
@@ -145,20 +146,20 @@ internal object AffinePivotOrders {
             val vars = f.intVars
             if (vars.size < 2) return 0L
             val row = f.integerConstants
+            var minDegree = Int.MAX_VALUE
             if (row != null) {
                 for (xi in f.vars.indices) {
                     val x = f.vars[xi]
                     if (eliminated[x] || x in objectiveIntVars) continue
+                    if (pivotable != null && !pivotable(f, xi)) continue
+                    val degree = ws.degreeOf(x)
+                    if (degree < minDegree) minDegree = degree
                     val cx = row.coeff(xi)
                     if (cx != 1L && cx != -1L) continue
-                    return (ws.degreeOf(x) - 1).toLong() * (f.vars.size - 1)
+                    return (degree - 1).toLong() * (f.vars.size - 1)
                 }
             }
-            var minDegree = Int.MAX_VALUE
-            for (v in vars) {
-                val d = ws.degreeOf(v)
-                if (d < minDegree) minDegree = d
-            }
+            if (minDegree == Int.MAX_VALUE) return 0L
             return (minDegree - 1).toLong() * (vars.size - 1)
         }
     }

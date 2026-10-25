@@ -1,5 +1,6 @@
 package com.eignex.klause.presolve.linear
 
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.CheckedLongOverflowException
@@ -28,18 +29,31 @@ internal class AffineObjective(private val source: LinearObjective, private val 
         }
     }
 
-    fun permits(variable: Int, partners: Int): Boolean = partners == 1 || variable !in coefficients
+    fun permits(definition: Linear, pivot: Int): Boolean {
+        val variable = definition.vars[pivot]
+        if (variable !in coefficients) return true
+        if (definition.vars.size != 2) return false
+        val row = definition.integerConstants ?: return false
+        val coefficient = row.coeff(pivot)
+        if (coefficient == 0L || coefficient == Long.MIN_VALUE || row.coeff(1 - pivot) != -coefficient) return false
+        if (row.bound % coefficient != 0L || (row.bound == Long.MIN_VALUE && coefficient == -1L)) return false
+        return substitution(variable, definition.vars[1 - pivot], row.bound / coefficient) != null
+    }
 
     fun substitute(candidate: AffineSingletons.AffineCandidate): (() -> Unit)? {
-        val coefficient = coefficients[candidate.x] ?: return {}
+        if (candidate.x !in coefficients) return {}
         if (candidate.termVars.size != 1 || candidate.termCoeffs[0] != 1L) return null
-        val partner = candidate.termVars[0]
+        return substitution(candidate.x, candidate.termVars[0], candidate.constTerm)
+    }
+
+    private fun substitution(variable: Int, partner: Int, offset: Long): (() -> Unit)? {
+        val coefficient = coefficients[variable] ?: return {}
         return try {
             val nextCoefficient = addExact(coefficients[partner] ?: 0L, coefficient)
-            val nextConstant = addExact(constant, mulExact(coefficient, candidate.constTerm))
+            val nextConstant = addExact(constant, mulExact(coefficient, offset))
             if (nextCoefficient == Long.MIN_VALUE || nextConstant == Long.MIN_VALUE) return null
             val commit: () -> Unit = {
-                coefficients.remove(candidate.x)
+                coefficients.remove(variable)
                 if (nextCoefficient == 0L) coefficients.remove(partner) else coefficients[partner] = nextCoefficient
                 constant = nextConstant
                 changed = true
