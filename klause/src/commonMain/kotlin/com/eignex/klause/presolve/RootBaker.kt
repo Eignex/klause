@@ -166,6 +166,12 @@ object RootBaker {
         result.forEachIntHole { v, value ->
             if (result.intValueOrNull(v) == null && previousHoles[v]?.contains(value) != true) narrowed.add(v)
         }
+        for (i in result.intSetKeys.indices) {
+            val v = result.intSetKeys[i]
+            val previous = base.intSetKeys.binarySearch(v)
+            val size = result.intSetOffsets[i + 1] - result.intSetOffsets[i]
+            if (previous < 0 || size < base.intSetOffsets[previous + 1] - base.intSetOffsets[previous]) narrowed.add(v)
+        }
         narrowedColumns = result.numInts - base.numInts + narrowed.size
     }
 
