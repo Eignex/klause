@@ -122,7 +122,7 @@ internal object LocalSearchTrajectory {
                 )
                 val params = LocalSearchParams(
                     randomSeed = seed, maxFlips = moves, cancellation = stop,
-                    costShaping = CostShaping.Linear(lambda = 0.0), lsObjective = gradient,
+                    costShaping = CostShaping.Linear(lambda = 1.0), lsObjective = gradient,
                     normalizeWeightsByClass = true, reportResiduals = true,
                 )
                 solver.resumable(workingObjective, params).use { run ->
