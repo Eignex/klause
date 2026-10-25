@@ -67,6 +67,8 @@ internal class LinearAuthority(
         val progress = LinearPrimalRecoveryProgress()
         var recovered: List<BigFraction>? = null
         var finished = false
+        var refined: List<BigFraction>? = null
+        var refinementFinished = false
     }
     private var primalAttempt: PrimalAttempt? = null
 
@@ -107,7 +109,7 @@ internal class LinearAuthority(
         val result = checkSource(source, cancellation, guidance = true, cuts = cuts)
         if (cancellation()) {
             lp.close()
-            return LinearAuthorityResult()
+            return LinearAuthorityResult(incumbent = result.incumbent, primalStages = primalStages.toMap())
         }
         return result.copy(relaxedPoint = relaxedPoint, primalStages = primalStages.toMap(),
             paused = result.paused || (result.evidence == null && result.split == null &&
@@ -311,6 +313,20 @@ internal class LinearAuthority(
                 if (candidate != null) {
                     point = recovered
                     observePrimal("PrimalRecoverySourceChecked")
+                    val attempt = checkNotNull(primalAttempt)
+                    if (!attempt.refinementFinished) {
+                        attempt.refined = lp.refine(coordinates, checkNotNull(recovered), rows, prepared.inactive, costs,
+                            cancellation, ::observePrimal)
+                        attempt.refinementFinished = budget.funding?.paused != true && !cancellation()
+                    }
+                    attempt.refined?.let { refined ->
+                        val improved = witness(refined, true)
+                        if (improved != null) {
+                            candidate = improved
+                            point = refined
+                            observePrimal("PrimalRefinementSourceChecked")
+                        }
+                    }
                 }
             }
             if (candidate != null && bound != null) {

@@ -18,6 +18,24 @@ import kotlin.test.assertTrue
 
 class LinearResidualCompletionTest {
     @Test
+    fun `changed objective costs should discard a completed residual point`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.ofLong(3)),
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.MINUS_ONE),
+        )
+
+        LinearResidualCompletion(SourceLpBudget(), SparseSourceLpPolicy()).use { completion ->
+            val minimum = completion.complete(rows, 1, Cancellation.Never, { _, _ -> },
+                listOf(BigFraction.ONE), small = { null })
+            val maximum = completion.complete(rows, 1, Cancellation.Never, { _, _ -> },
+                listOf(BigFraction.MINUS_ONE), small = { null })
+
+            assertEquals(listOf(BigFraction.ONE), minimum)
+            assertEquals(listOf(BigFraction.ofLong(3)), maximum)
+        }
+    }
+
+    @Test
     fun `a residual lifetime should use cumulative caller funding beyond the baseline floating allowance`() {
         val funding = SourceLpFunding(1_000_000L, 64L * 1024L * 1024L)
         val budget = SourceLpBudget(funding = funding)

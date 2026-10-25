@@ -91,7 +91,7 @@ internal object MpsResidualObjective {
         val budget = Class.forName("com.eignex.klause.lp.SourceLpBudget").getConstructor().newInstance()
         val policy = Class.forName("com.eignex.klause.lp.SparseSourceLpPolicy").getConstructor().newInstance()
         val completionType = Class.forName("com.eignex.klause.lp.optimization.LinearResidualCompletion")
-        val completion = completionType.constructors.single { it.parameterCount == 2 }.newInstance(budget, policy)
+        val completion = completionType.constructors.single { it.parameterCount == 3 }.newInstance(budget, policy, null)
         val stages = linkedMapOf<String, Long>()
         val observe: (String, Long) -> Unit = { key, count -> stages[key] = (stages[key] ?: 0L) + count }
         val bean = ManagementFactory.getThreadMXBean() as ThreadMXBean

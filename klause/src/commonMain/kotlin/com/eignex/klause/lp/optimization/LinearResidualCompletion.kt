@@ -23,6 +23,7 @@ import com.eignex.klause.util.Cancellation
 internal class LinearResidualCompletion(
     private val budget: SourceLpBudget,
     private val policy: SparseSourceLpPolicy,
+    private val lifetimeLimit: LpFloatAllowance? = null,
 ) : AutoCloseable {
     private var rows: List<ExactRationalInequality>? = null
     private var columns = 0
@@ -104,7 +105,8 @@ internal class LinearResidualCompletion(
                 currentToken = active
                 val funding = budget.funding
                 if (funding?.paused == true) return@resumeSparse null
-                val profile = lifetime ?: (funding?.let { policy.funded(it.remainingWork) } ?: policy.floating)
+                val profile = lifetime ?: (lifetimeLimit ?: funding?.let { policy.funded(it.remainingWork) }
+                    ?: policy.floating)
                     .also { lifetime = it }
                 val quantum = minOf(policy.quantum, funding?.availableWork ?: policy.quantum)
                 if (quantum <= 0L) return@resumeSparse null

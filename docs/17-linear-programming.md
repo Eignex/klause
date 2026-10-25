@@ -322,7 +322,15 @@ allocation, debits their cumulative source funding, and retains completed compon
 across funding pauses for an unchanged query and guide. Every
 recovered point requires a fresh complete original-source witness check. Frontier
 leaves and joint repair consume those checked incumbents through the same authority.
-Residual completion seeks feasibility; attainment still requires checked objective agreement.
+After feasibility recovery passes the source check, the authority can refine the
+continuous objective with the exact discrete coordinates substituted into the
+active rows. Refinement uses the original working objective direction and scale,
+shares cumulative source funding, and caps its numerical lifetime at the ordinary
+sparse floating allowance. It retains its cursor across funding pauses and accepts
+only an exact strict objective improvement that passes a fresh original-source
+witness check. A decline, strict endpoint or rejected refinement keeps the accepted
+feasible point. Attainment still requires checked objective agreement with a bound;
+a fixed-pin objective solve supplies no global bound or refutation.
 Residuals rejected by small exact input admission can prepare a sparse feasibility
 query with the shared source budget. Its floating cursor survives funding pauses;
 the lifetime uses the caller's remaining cumulative funding and consultation work
