@@ -60,8 +60,9 @@ may retain duplicate channel rows. Their row estimate remains conservative.
 Automatic admission treats all properties sharing an index as one candidate,
 declines incomplete groups and admits the smallest complete groups within the
 existing aggregate size budget. The ordinary small-hull threshold applies per
-group. The selected indexes remain fixed across objective-specific engines and
-retained rebuilds; root pruning removes a complete index group together.
+group. Each engine applies its selected indexes to retained rebuilds; changing the
+objective resolves the caller's admission intent again. Root pruning removes a
+complete index group together.
 
 The objective-cone relaxation follows integer, Boolean and real objective support
 through supported linear and Boolean factors. Ordinary, exact and continuous rows
