@@ -6,12 +6,25 @@ import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class LinearPrimalRecoveryTest {
     private val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
     private val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+
+    @Test
+    fun `an exhausted recovery allowance should retire a preceding component pause`() {
+        val progress = LinearPrimalRecoveryProgress().apply { pending = true }
+
+        val point = recoverLinearPrimal(listOf(real), listOf(BigFraction.ZERO), emptyList(), emptySet(),
+            Cancellation.Never, complete = { _, _, _ -> error("exhausted recovery") }, observe = { _, _ -> },
+            limits = LinearPrimalRecoveryLimits(work = 0L), progress = progress)
+
+        assertNull(point)
+        assertFalse(progress.pending)
+    }
 
     @Test
     fun `reconstruction should preserve the exact integer assignment`() {

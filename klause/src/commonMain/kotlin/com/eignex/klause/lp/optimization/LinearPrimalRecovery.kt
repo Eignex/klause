@@ -34,6 +34,7 @@ internal fun recoverLinearPrimal(
     limits: LinearPrimalRecoveryLimits = LinearPrimalRecoveryLimits(),
     progress: LinearPrimalRecoveryProgress = LinearPrimalRecoveryProgress(),
 ): List<BigFraction>? {
+    progress.pending = false
     val initialWork = progress.work
     val initialAllocation = progress.allocation
     val meter = LinearPrimalMeter(limits, cancellation, progress)
@@ -172,6 +173,7 @@ internal fun recoverLinearPrimal(
             recovered
         } else null
     } catch (stop: LinearPrimalStop) {
+        progress.pending = false
         observe("PrimalRecovery${stop.reason}", 1L)
         null
     } finally {
