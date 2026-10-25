@@ -103,6 +103,39 @@ class LinearAuthoritySessionTest {
     }
 
     @Test
+    fun `funding spent during preparation should preserve its admission before binding`() {
+        val packed = assertNotNull(LinearAuthorityModel.prepare(listOf(
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.MINUS_ONE),
+        ), 1, Cancellation.Never))
+        val funding = SourceLpFunding(1_000_000L, 1_000_000L)
+        var interrupt = true
+        val budget = SourceLpBudget(maxOperations = 1, funding = funding, onWork = {
+            if (interrupt) {
+                interrupt = false
+                funding.charge(funding.availableWork)
+            }
+        })
+        val policy = SparseSourceLpPolicy()
+        LinearAuthoritySession(budget).use { session ->
+            funding.grant(100_000L)
+            val stopped = session.advance(packed, listOf(BigFraction.ONE), BigFraction.ZERO, scope,
+                Cancellation.Never, policy, observer) { guidance, _, _ -> guidance }
+            val preparation = budget.measuredPreparationWork
+
+            assertNull(stopped)
+            assertTrue(funding.paused)
+            funding.grant(100_000L)
+            val resumed = session.advance(packed, listOf(BigFraction.ONE), BigFraction.ZERO, scope,
+                Cancellation.Never, policy, observer) { guidance, _, _ -> guidance }
+
+            assertNotNull(assertNotNull(resumed).primal)
+            assertTrue(preparation > 0L)
+            assertEquals(1, budget.operations)
+            assertEquals(1L, session.preparations)
+        }
+    }
+
+    @Test
     fun `a caller funded query should pass the unfunded pivot ceiling without another preparation`() {
         val rows = listOf(
             ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.ZERO),
