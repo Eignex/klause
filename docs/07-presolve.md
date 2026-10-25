@@ -384,11 +384,12 @@ no deductions, and established pins are not emitted again.
 
 ### Symmetry and probing
 
-Default finite satisfaction preparation runs one bounded integer-probing pilot
-before the finite rounds. Its private incremental root retains completed exclusions
+Metered default finite satisfaction preparation runs one bounded integer-probing
+pilot before the finite rounds. Unmetered callers leave it unfunded. Its private
+incremental root retains completed exclusions
 across probes. The first 128 probes are funded; each failed probe funds another 32,
-within the configured per-column and total caps and at most one eighth of remaining
-phase work or 50 million units. Bounds precede interior values. A completed
+within the configured per-column and total caps, with a work stop at one eighth of
+remaining phase work or 50 million units, whichever is smaller. Bounds precede interior values. A completed
 refutation remains terminal; incomplete coverage records interruption. Explicit
 integer-probe overrides select the exhaustive tiers or disable the pilot.
 
