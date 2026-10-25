@@ -50,7 +50,7 @@ internal object LocalSearchTrajectory {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val required = setOf("suite", "problem", "sha256", "recipe", "seed", "moves")
         require(options.keys.containsAll(required) && options.keys.all {
-            it in required || it == "sliceMillis" || it == "sliceMoves"
+            it in required || it == "sliceMillis" || it == "sliceWork"
         })
         val reference = Catalog.uncapped(options.getValue("suite")).problems
             .single { it.name == options.getValue("problem") }
@@ -70,7 +70,7 @@ internal object LocalSearchTrajectory {
         val seed = options.getValue("seed").toLong()
         val moves = options.getValue("moves").toLong().also { require(it in 1..1_000_000) }
         val sliceMillis = options["sliceMillis"]?.toLong()?.also { require(it > 0L) } ?: Long.MAX_VALUE
-        val sliceMoves = options["sliceMoves"]?.toLong()?.also { require(it > 0L) } ?: Long.MAX_VALUE
+        val sliceWork = options["sliceWork"]?.toLong()?.also { require(it > 0L) } ?: Long.MAX_VALUE
         for (rewrite in listOf(false, true)) {
             val stop = Cancellation.after(60.seconds)
             val invocation = SourceSetup.prepare(SourceSetupRequest(
@@ -173,9 +173,9 @@ internal object LocalSearchTrajectory {
                     )
                     solver.resumable(workingObjective, params).use { run ->
                         val result = try {
-                            var observed = run.runSlice(stop, sliceMillis, sliceMoves) {}
+                            var observed = run.runSlice(stop, sliceMillis, sliceWork) {}
                             while (observed == null && !stop()) {
-                                observed = run.runSlice(stop, sliceMillis, sliceMoves) {}
+                                observed = run.runSlice(stop, sliceMillis, sliceWork) {}
                             }
                             observed
                         } catch (_: Captured) {

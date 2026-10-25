@@ -1326,7 +1326,7 @@ protected and substituted objective coordinates through mixed-route preparation,
 then runs the selected local-search recipe alone with a fixed allowance counting
 moves and restarts, and no shared incumbents. The seed is the worker seed,
 including its portfolio index.
-Optional `sliceMillis=N sliceMoves=N` repeatedly resumes the same handle under
+Optional `sliceMillis=N sliceWork=N` repeatedly resumes the same handle under
 those cooperative allowances; omitted allowances are unbounded. Timed slices
 depend on capture overhead and host speed and do not reproduce portfolio allocation.
 A move source that emits no candidates records source-coordinate assignments,
