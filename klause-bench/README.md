@@ -1544,6 +1544,59 @@ unknown at seed 70. These data establish neither identical walks nor a uniform
 ordinary-route speedup. The CP projection is unchanged by the repair additions;
 the cost control above does not isolate local-search operator throughput.
 
+#### Covered affine source rows
+
+[8209](https://lab.eignex.com/jobs/8209) compares retained rows at `32cc4dfff6`
+with exact covered-row replacement `d8fb41ca71` on the same twelve originals:
+CP/LP-off, one conflictDriven arm, P1, 2000 nodes, 20 seconds, seeds 1/2/3 and
+three repeats. All 216 cases return and all 54 SAT witnesses pass independent
+original-source checks. Every pair matches source hashes, runtime/options,
+non-solver dependencies and Mac/aarch64 platform; compiler identity is unreported.
+External CLI time/RSS uses no JFR and collects no allocation estimate.
+
+On `56-1860436781`, source integers stay at 56 and factors fall from 5817 to 2737.
+Median frontend load changes from 103 to 96 ms and finite engine bake from
+9.9 to 6.6 ms; bake work falls from 123323 to 51603 units.
+Propagation work falls from 101,831,608 to 48,255,150, failures from 4151 to 4068,
+and peak depth rises from 21 to 24 at 2000 decisions. Median physical CLI wall
+time changes from 2.97 to 2.35 seconds and peak RSS from 240336 to 236096 KiB.
+All eight queen wall-time medians decrease, but changed failures and depths
+prevent a pure per-node throughput claim. On `56-1860437025`, depth falls from
+31 to 28 and failures rise from 4280 to 4290; both arms remain unknown.
+
+The small SAT source uses 856 versus 747 decisions; all four holdouts retain
+their CP work and verdicts. Counters repeat across seeds and repetitions within
+each arm, so these are timing repeats rather than independent search paths.
+This comparison predates numerical-companion integration and establishes no
+ordinary mixed-route feasibility or proof recovery.
+
+[8278](https://lab.eignex.com/jobs/8278) compares integrated main `0b9f22b574`
+with rebased replacement `763470d49b` on all twelve originals: ordinary mixed/P1
+defaults, ten seconds and consecutive seeds 1–10 once each. All 240 cases return
+and all 62 SAT witnesses pass independent source checks. Small-source native
+refutations increase from 6/10 to 10/10; those proofs are not independently
+certificate-checked. The small SAT source and four holdouts retain verdict
+coverage. On scarce SAT source `56-1860437025`, retained rows find seed 10 and
+replacement finds seed 3, each missing the other's witness. Other queen sources
+remain unknown. All 120 pairs match original hashes, runtime/options, non-solver
+dependencies and Mac/aarch64 platform; compiler identity is unreported.
+
+[8242](https://lab.eignex.com/jobs/8242) compares integrated main `0b9f22b574`
+with rebased replacement `763470d49b` on scarce SAT source `56-1860437025`:
+ordinary mixed/P1 defaults, ten seconds, consecutive seeds 1–100 once each.
+All 200 cases return. Both arms find one independently source-checked witness:
+retained rows at seed 70 and replacement at seed 3. Each arm misses the other's
+successful seed; the materialized parent's four successful seeds remain unknown
+in both arms. Equal observed witness counts establish neither equal walks nor
+equal feasibility probability. Median aggregate CP decisions change from 3180
+to 4714 and LS moves from 31618 to 71641, with changed portfolio trajectories.
+All 100 pairs match original hashes, runtime/options, non-solver dependencies
+and Mac/aarch64 platform; compiler identity is unreported.
+Overlapping seeds in the ordinary family run are repetitions, not extra trials.
+These results support lower preparation and propagation cost with observed
+ordinary source feasibility and stronger bounded refutation coverage; they do
+not establish uniform feasibility or identical search trajectories.
+
 ### Table and MDD historical domains
 
 Retain bounded exact prefix/suffix path weights for deterministic MDD guidance
