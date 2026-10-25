@@ -1391,6 +1391,55 @@ the recorded witnesses against the original MiniZinc source.
 
 ## Design evidence
 
+### Bounded retained integer probing
+
+Default metered finite satisfaction preparation funds one retained root, 128 probe
+or repair calls, another 32 calls per completed refutation, and at most 50 million
+work units or one eighth of remaining phase work. Explicit probing remains
+exhaustive; unmetered calls do not fund the pilot.
+
+[8243](https://lab.eignex.com/jobs/8243) compares the initial pilot with `0b9f22b574`
+on ten original, satisfiable negative and held-out XCSP3 sources, CP/LP-off and
+ordinary mixed/default-LP, P1, seeds 3/17 and 20 seconds on Linux/amd64. All 80
+records return; all 27 feasible witnesses pass independent source checking.
+ChainReaction-20-020 gains native refutations in both routes and seeds, while
+Pentominoes remains UNKNOWN. Mixed satisfiable ChainReaction-20-025 at seed 3
+slows from 1.47 to 18.76 seconds.
+
+[8311](https://lab.eignex.com/jobs/8311) compares the complete retained-root pilot
+`7400de1ad8`, its otherwise identical 8-million stop `86850d2f8d`, and integrated
+default `1bd3cb70b6`. It uses the same ten sources, ordinary mixed/P1/default LP,
+20 seconds, seeds 3/17 and three repeats on Mac/aarch64. Original hashes, runtime,
+options and non-solver dependencies match. The lab returns 179 records and accepts
+all 75 witnesses against their original sources. One Nonogram control is
+interrupted by the lab; the completed job refuses retry, and its unmatched pair
+is excluded. Repeats of two seeds are not independent samples. Native UNSAT claims
+have no independently checked proof certificate.
+
+The 50-million stop refutes ChainReaction-20-020 in all six runs, in 1.10–1.43
+seconds; default and 8 million remain UNKNOWN. Its 515 calls narrow 51 columns.
+Nonogram's checked witnesses take 1.07–1.22 seconds versus default's 2.79–7.33;
+8 million starts no probes and takes 2.90–7.39 seconds. The retained root doubles
+ChainReaction root-construction entries from 728 to 1456 across 515 calls. One
+matched whole-CLI resource receipt changes peak RSS from 552288 to 359104 KiB
+and wall time from 20.11 to 1.16 seconds; this includes the shorter search and
+does not measure probe allocations.
+
+Costs remain visible. Satisfiable ChainReaction takes 5.69–8.85 seconds at 50
+million versus default's 0.77–1.62; 8 million takes 0.84–2.03. CarSequencing-75
+returns two checked witnesses under default and one under each pilot: 50 million
+has one paired gain and two losses, despite no narrowed columns. Pentominoes,
+Eternity, NurseRostering and CarSequencing-80 remain UNKNOWN; Nurse preparation
+rises from 125–126 to 238–240 ms. Keep the 50-million stop for bounded deduction
+and refutation coverage, with these latency and feasibility costs; the cheaper
+stop loses both ChainReaction refutations and Nonogram's search benefit. These
+controls establish no general speedup.
+
+[8321](https://lab.eignex.com/jobs/8321) compares the rebased implementation
+`4bcf201d7e` with `02e78c79dc` after finite presolve and search-catalog integration,
+using the same ten sources and options, with one repeat per seed. This integration
+control is separate from the three-repeat work-stop comparison.
+
 ### Exact source equality blocks
 
 [Capture 8115](https://lab.eignex.com/jobs/8115) retains the tagged exact rows of
