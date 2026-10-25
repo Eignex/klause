@@ -83,7 +83,8 @@ class SourceMixedIntegerRoundingTest {
             listOf(SourceDerivation.Premise("bound")))
         val conclusion = SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ofLong(-2)), endpoint)
 
-        val check = SourceEvidenceVerifier(source).verify(SourceEvidence(scope, SourceClaim.Consequence(conclusion), proof))
+        val check = SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(conclusion), proof))
 
         assertIs<SourceEvidenceCheck.Unavailable>(check)
     }

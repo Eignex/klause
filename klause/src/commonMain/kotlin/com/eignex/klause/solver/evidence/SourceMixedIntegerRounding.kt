@@ -5,8 +5,6 @@ import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.magnitudeBitLength
 
-internal class SourceRoundingLimit : RuntimeException()
-
 private fun bounded(value: BigFraction): BigFraction {
     if (value.num.magnitudeBitLength() > 4096 || value.den.magnitudeBitLength() > 4096) throw SourceRoundingLimit()
     return value

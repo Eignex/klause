@@ -1,7 +1,6 @@
 package com.eignex.klause.bench.profile
 
 import com.eignex.klause.ir.ObjectiveSense
-import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.optimization.LinearAuthoritySemantics
 import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.simplex.exact.BigFraction
@@ -262,12 +261,15 @@ internal class NumericalFrontierSnapshot(
             val state = stateType.getDeclaredConstructor(TheoryParams::class.java).newInstance(params)
             val type = Class.forName("com.eignex.klause.solver.pipeline.LinearAuthorityInvocation")
             val authorityType = Class.forName("com.eignex.klause.lp.optimization.LinearAuthority")
+            val fundingType = Class.forName("com.eignex.klause.lp.SourceLpFunding")
+            val funding = fundingType.getDeclaredConstructor(Long::class.javaPrimitiveType, Long::class.javaPrimitiveType)
+                .newInstance(params.sourceLpWorkLimit, params.sourceLpAllocationLimit)
             return type.getDeclaredConstructor(SourceProofContext::class.java, TheoryParams::class.java,
                 Function0::class.java, stateType, Boolean::class.javaPrimitiveType, authorityType,
-                Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType, SourceLpFunding::class.java,
+                Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType, fundingType,
                 Boolean::class.javaPrimitiveType)
                 .newInstance(context, params, { null }, state, history, null, frontier, false,
-                    SourceLpFunding(params.sourceLpWorkLimit, params.sourceLpAllocationLimit), frontier && params.sourceCuts)
+                    funding, frontier && params.sourceCuts)
         }
 
         fun run(

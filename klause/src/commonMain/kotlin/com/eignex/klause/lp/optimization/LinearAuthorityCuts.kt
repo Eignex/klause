@@ -105,9 +105,10 @@ internal class LinearAuthorityCuts private constructor(
                     val combination = SourceDerivation.Combination(listOf(
                         SourceDerivation.Combination.Term(multiplier, SourceDerivation.Premise(entry.key))))
                     if (mixed) {
-                        val sides = coefficients.filterKeys { it.kind == SourceCoordinate.Kind.Real }.map { (id, value) ->
-                            bounds[id to (value > BigFraction.ZERO)] ?: bounds[id to (value < BigFraction.ZERO)]
-                        }
+                        val sides = coefficients.filterKeys { it.kind == SourceCoordinate.Kind.Real }
+                            .map { (id, value) ->
+                                bounds[id to (value > BigFraction.ZERO)] ?: bounds[id to (value < BigFraction.ZERO)]
+                            }
                         if (sides.any { it == null }) {
                             observe("MixedMissingBounds")
                             continue
