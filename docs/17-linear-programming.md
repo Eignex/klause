@@ -307,6 +307,14 @@ across funding pauses for an unchanged query and guide. Every
 recovered point requires a fresh complete original-source witness check. Frontier
 leaves and joint repair consume those checked incumbents through the same authority.
 Residual completion seeks feasibility; attainment still requires checked objective agreement.
+Residuals rejected by small exact input admission can prepare a sparse feasibility
+query with the shared source budget. Its floating cursor survives funding pauses;
+completed coordinates undergo bounded rational reconstruction and primal-only exact
+basis verification. These checks publish no dual bound or conflict. The most recent
+unchanged residual retains its completed point or hard decline across proposals;
+changed exact rows, endpoints, strictness or column count retire that result.
+Small-input admission, sparse preparation, floating termination and primal
+verification report separate decline reasons and costs.
 Small unresolved queries can use bounded exact completion; recovery declines supply
 neither a conflict nor exhaustion authority.
 Source reconstruction restores exact fixed coordinates and matching projected
