@@ -374,6 +374,8 @@ class SourceEvidenceVerifier(
     }
 }
 
+internal class SourceRoundingLimit : RuntimeException()
+
 private class ProofStop(val verdict: SourceEvidenceCheck) : RuntimeException()
 
 private fun reject(reason: String): SourceEvidenceCheck.Rejected = SourceEvidenceCheck.Rejected(reason)
