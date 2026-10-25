@@ -27,6 +27,61 @@ import kotlin.test.assertTrue
 
 class JointLinearRepairTest {
     @Test
+    fun `a publication lifetime should retain a checked point after its query slice expires`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(2), null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.GE, 0.0),
+            ), numRealVars = 1, realLower = doubleArrayOf(0.75), realUpper = doubleArrayOf(2.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val condition = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ONE),
+            mapOf(0 to BigFraction.ONE))
+        for (atomic in listOf(false, true)) {
+            JointLinearRepair(model, source, objective, TheoryParams(),
+                publicationLifetime = if (atomic) Cancellation.Never else null).use { repair ->
+                val slice = Cancellation {
+                    (repair.stats.smt.completeSearchStages?.get("jointRepairClosedLeaves") ?: 0L) > 0
+                }
+
+                var result = repair.check(condition, slice)
+                repeat(64) { if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, slice) }
+
+                assertTrue(slice())
+                if (atomic) assertEquals(1L, assertIs<ExactNeighborhoodResult.Witness>(result).sample.intValue(0))
+                else assertEquals(ExactNeighborhoodResult.Paused, result)
+            }
+        }
+    }
+
+    @Test
+    fun `a cancelled publication lifetime should withhold the completed point`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(2), null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.GE, 0.0),
+            ), numRealVars = 1, realLower = doubleArrayOf(0.75), realUpper = doubleArrayOf(2.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val condition = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ONE),
+            mapOf(0 to BigFraction.ONE))
+        lateinit var repair: JointLinearRepair
+        val lifetime = Cancellation {
+            (repair.stats.smt.completeSearchStages?.get("jointRepairClosedLeaves") ?: 0L) > 0
+        }
+        repair = JointLinearRepair(model, source, objective, TheoryParams(), publicationLifetime = lifetime)
+
+        val result = repair.use { current ->
+            var result = current.check(condition, Cancellation.Never)
+            repeat(64) {
+                if (result == ExactNeighborhoodResult.Paused) result = current.check(condition, Cancellation.Never)
+            }
+            result
+        }
+
+        assertTrue(lifetime())
+        assertEquals(ExactNeighborhoodResult.Undecided, result)
+    }
+
+    @Test
     fun `joint repair should find a checked point within a priced LP node allowance`() {
         val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(2), null, null),
             factors = arrayOf(
