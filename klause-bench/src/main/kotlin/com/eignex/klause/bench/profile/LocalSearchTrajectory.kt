@@ -74,7 +74,8 @@ internal object LocalSearchTrajectory {
         for (rewrite in listOf(false, true)) {
             val stop = Cancellation.after(60.seconds)
             val invocation = SourceSetup.prepare(SourceSetupRequest(
-                SourceAttachment(parsed.problem, parsed.definedVars, emptyList(), parsed.definitionHints),
+                if (parsed.definedVars.isEmpty()) SourceAttachment(parsed.problem, parsed.definitionHints)
+                else SourceAttachment(parsed.problem, parsed.definedVars, emptyList(), parsed.definitionHints),
                 ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED, objective = objective, cancellation = stop,
             ))
             val plan = requireNotNull(invocation.preparedPlan)
