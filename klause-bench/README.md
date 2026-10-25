@@ -2037,6 +2037,14 @@ preparation costs, plus custom encoder selection/installation counts. Retained
 source bytes and build provenance bind the observations; JFR timings are
 instrumented, and native verdicts have no independent witness or proof check.
 
+[8280](https://lab.eignex.com/jobs/8280), at `f6e9e0fb30` on Mac/aarch64, retains
+all sixteen native SAT outcomes on `real-dependent`. After one warmup, three
+measured custom-provider runs select six descriptors and install both retained
+factors after deletion; unchanged executions select and install none. Built-in/custom
+median preparation is 0.22/0.30 ms after deletion and 0.043/0.048 ms unchanged.
+Whole setup plus execution is 1.79/1.66 ms and 1.69/1.68 ms respectively. These
+instrumented small-source costs establish the fallback behavior, not a speedup.
+
 [8254](https://lab.eignex.com/jobs/8254) compares `32cc4dfff6` with `1f33dff5c3`
 on 24 original and control sources: seed 3, three repeats, P1, 10 s, debug enabled,
 Linux/amd64, Serial GC and a 3 GiB heap. All 288 pairs match final feasibility,
@@ -2052,6 +2060,26 @@ plan reuse stays below 1 ms. All original runs remain UNKNOWN at 10.16 s CLI wal
 time. Default/isolated peak RSS changes from 315/314 to 317/309 MiB, and theory
 checks from 880/889 to 863/907. These single-seed timings establish preparation
 savings without a general solve-throughput or memory improvement.
+
+[8305](https://lab.eignex.com/jobs/8305) compares baseline `cc39379df6`, retained
+rows `76bfc96b96` and shared immutable metadata `f6e9e0fb30`: 648 cases on the
+same 24 sources, seed 3, three repeats, P1, 10 s and debug enabled, on Mac/aarch64
+with four concurrent cases, Serial GC and a 3 GiB heap. All 216 triples match final
+feasibility, objectives, native proof flags and checker states. Source, runtime and
+non-solver dependency identities match. Dolmen accepts 162 witnesses; 54 checks
+are unknown and 324 unsupported, with the same checker limitations as above.
+
+On fixnet-5000, baseline/rows/shared median exact preparation is 260/263/232 ms,
+and complete replanning is 60/38/31 ms. Sharing metadata reduces retained row
+preparation from 23 to 14 ms. With `exact=false`, complete replanning falls from
+62 to 39 to 30 ms, but whole preparation rises from 278 to 284 to 304 ms as other
+source-stage timings increase. Unchanged-plan reuse remains below 1 ms. All original
+runs stay UNKNOWN at about 10.2 s CLI wall time; exact theory checks change from
+1522 to 1531 to 1465. Small-source process medians change by -57 to +85 ms against
+baseline, including unchanged controls, and preparation by -19 to +24 ms. These
+parallel, single-seed observations support cheaper replanning, without uniform
+preparation, startup, search-throughput or memory improvements; this run has no
+external memory capture.
 
 [Lab 7712](https://lab.eignex.com/jobs/7712) compares the merged plan-reuse baseline
 `9f40a0678c` with probe polling at `3008350cf1`: six original SMT sources, seed 3,
