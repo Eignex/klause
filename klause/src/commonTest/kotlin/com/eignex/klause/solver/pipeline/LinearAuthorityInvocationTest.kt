@@ -38,6 +38,28 @@ class LinearAuthorityInvocationTest {
     )
 
     @Test
+    fun `retained frontier should consume checked mixed source cuts`() {
+        val source = SourceProofContext(scope, setOf(integer, real), mapOf(
+            "mixed" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ofLong(-2),
+                real to BigFraction.MINUS_ONE), BigFraction.ofLong(-3))),
+            "integer" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "real" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ), mapOf(integer to BigFraction.ONE, real to BigFraction.ONE))
+
+        val result = LinearAuthorityInvocation(source, TheoryParams(), boundOrdered = true).use {
+            it.run { _, _ -> }
+        }
+
+        val terminal = assertNotNull(result.terminal)
+        assertEquals(SourceValue.Rational(BigFraction.ofLong(2)), assertIs<SourceClaim.Optimal>(terminal.claim).value)
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
+        val stages = assertNotNull(result.stats.smt.completeSearchStages)
+        assertEquals(1L, stages["numericalMaxActiveMixedCuts"])
+        assertEquals(1L, stages["numericalCutMixedEligibleRows"])
+    }
+
+    @Test
     fun `borrowing an authority should preserve its exhausted cumulative funding`() {
         val source = SourceProofContext(scope, setOf(real), emptyMap(), mapOf(real to BigFraction.ONE))
         val budget = SourceLpBudget(funding = SourceLpFunding(0, 1000))

@@ -1,6 +1,7 @@
 package com.eignex.klause.bench.profile
 
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.optimization.LinearAuthoritySemantics
 import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.simplex.exact.BigFraction
@@ -8,9 +9,11 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceCoordinate
+import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
+import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
@@ -34,6 +37,67 @@ internal class NumericalFrontierSnapshot(
 ) {
     private val checked = IdentityHashMap<SourceEvidence, JsonObject>()
     private var remaining = 4096
+
+    fun cuts(invocation: Any): JsonObject {
+        val authority = checkNotNull(field(checkNotNull(field(invocation, "component")), "authority"))
+        val template = field(authority, "template")
+        val retained = template?.let { field(it, "cuts") }
+        val query = field(authority, "query")
+        val queryContext = query?.let { field(it, "context") as SourceProofContext }
+        val numeric = template?.let { field(it, "numeric") as SourceProofContext }
+        val verifierContext = if (numeric == null || queryContext == null) null else SourceProofContext(
+            queryContext.scope, numeric.coordinates, numeric.premises, numeric.objective, numeric.objectiveConstant)
+        @Suppress("UNCHECKED_CAST")
+        val rows = retained?.let { field(it, "rows") as List<Any> }.orEmpty()
+        @Suppress("UNCHECKED_CAST")
+        val inactive = query?.let { field(it, "inactive") as Set<Int> }.orEmpty()
+        @Suppress("UNCHECKED_CAST")
+        val originals = template?.let { field(it, "rows") as List<Any> }.orEmpty()
+        fun proof(value: SourceDerivation, depth: Int = 0): JsonObject {
+            require(depth < 32 && !stop())
+            return buildJsonObject {
+                put("kind", value::class.simpleName)
+                when (value) {
+                    is SourceDerivation.Premise -> put("id", value.id)
+                    is SourceDerivation.Combination -> put("terms", buildJsonArray {
+                        value.terms.forEach { term -> add(buildJsonObject {
+                            put("weight", term.weight.toString())
+                            put("derivation", proof(term.derivation, depth + 1))
+                        }) }
+                    })
+                    is SourceDerivation.IntegerRounding -> put("row", proof(value.inequality, depth + 1))
+                    is SourceDerivation.MixedIntegerRounding -> {
+                        put("row", proof(value.inequality, depth + 1))
+                        put("bounds", JsonArray(value.bounds.map { proof(it, depth + 1) }))
+                    }
+                    else -> error("unsupported retained source cut derivation")
+                }
+            }
+        }
+        return buildJsonObject {
+            put("independentProofCheck", false)
+            put("scope", queryContext?.let { scope(it.scope) })
+            put("rows", buildJsonArray {
+                rows.forEachIndexed { index, cut ->
+                    require(!stop())
+                    val row = field(cut, "inequality") as SourceInequality
+                    val derivation = field(cut, "derivation") as SourceDerivation
+                    add(buildJsonObject {
+                        put("owner", field(cut, "owner") as Int)
+                        put("mixed", field(cut, "mixed") as Boolean)
+                        put("active", query != null && originals.size + index !in inactive)
+                        put("coefficients", coefficients(row.coefficients))
+                        put("rhs", row.rhs.toString())
+                        put("derivation", proof(derivation))
+                        put("sourceCheck", verifierContext?.let {
+                            SourceEvidenceVerifier(it).verify(SourceEvidence(it.scope,
+                                SourceClaim.Consequence(row), derivation), stop).toString()
+                        })
+                    })
+                }
+            })
+        }
+    }
 
     fun probeRoot(invocation: Any, emit: (JsonObject) -> Unit) {
         val root = checkNotNull(field(checkNotNull(field(invocation, "component")), "root"))
@@ -200,8 +264,10 @@ internal class NumericalFrontierSnapshot(
             val authorityType = Class.forName("com.eignex.klause.lp.optimization.LinearAuthority")
             return type.getDeclaredConstructor(SourceProofContext::class.java, TheoryParams::class.java,
                 Function0::class.java, stateType, Boolean::class.javaPrimitiveType, authorityType,
-                Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType)
-                .newInstance(context, params, { null }, state, history, null, frontier, false)
+                Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType, SourceLpFunding::class.java,
+                Boolean::class.javaPrimitiveType)
+                .newInstance(context, params, { null }, state, history, null, frontier, false,
+                    SourceLpFunding(params.sourceLpWorkLimit, params.sourceLpAllocationLimit), frontier && params.sourceCuts)
         }
 
         fun run(

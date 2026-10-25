@@ -125,6 +125,63 @@ class LinearAuthorityCutsTest {
         val cuts = assertNotNull(LinearAuthorityCuts.prepare(source, Cancellation.Never))
 
         assertTrue(cuts.rows.isEmpty())
+        assertEquals(1L, cuts.observations["MixedMissingBounds"])
+    }
+
+    @Test
+    fun `mixed source rounding should strengthen a checked objective bound`() {
+        val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val source = SourceProofContext(scope, setOf(x, real), mapOf(
+            "mixed" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(-2),
+                real to BigFraction.MINUS_ONE), BigFraction.ofLong(-3))),
+            "x" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "real" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ), mapOf(x to BigFraction.ONE, real to BigFraction.ONE))
+        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, Cancellation.Never, cuts = true))
+        val cut = assertNotNull(template.cuts).rows.single()
+        assertEquals(SourceInequality(mapOf(x to BigFraction.MINUS_ONE, real to BigFraction.MINUS_ONE),
+            BigFraction.ofLong(-2)), cut.inequality)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(SourceEvidence(scope,
+            SourceClaim.Consequence(cut.inequality), cut.derivation)))
+
+        LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
+            val baseline = authority.advance(source, Cancellation.Never)
+            val result = authority.advance(source, Cancellation.Never, cuts = true)
+
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(3) * BigFraction.ofLong(2).reciprocal()),
+                assertIs<SourceClaim.Bound>(assertNotNull(baseline.bound).claim).value)
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(2)),
+                assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)))
+            assertEquals(1L, authority.cutObservations()["numericalMaxActiveMixedCuts"])
+        }
+    }
+
+    @Test
+    fun `mixed cuts should retract and reactivate with their Boolean source owner`() {
+        val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
+        val source = SourceProofContext(scope, setOf(x, real, bool), mapOf(
+            "mixed" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(-2),
+                real to BigFraction.MINUS_ONE), BigFraction.ofLong(-3)), mapOf(0 to true)),
+            "real" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ), mapOf(x to BigFraction.ONE, real to BigFraction.ONE))
+        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, Cancellation.Never, cuts = true))
+        val enabled = source.atScope(scope.copy(condition = SourceCondition(bools = mapOf(0 to true))))
+        val disabled = source.atScope(scope.copy(condition = SourceCondition(bools = mapOf(0 to false))))
+
+        val first = assertNotNull(LinearAuthorityQuery.prepare(enabled, template, Cancellation.Never))
+        val sibling = assertNotNull(LinearAuthorityQuery.prepare(disabled, template, Cancellation.Never))
+        val restored = assertNotNull(LinearAuthorityQuery.prepare(enabled, template, Cancellation.Never))
+
+        assertEquals(1, first.activeMixedCuts)
+        assertEquals(0, sibling.activeMixedCuts)
+        assertEquals(1, restored.activeMixedCuts)
+        assertEquals(first.cited, restored.cited)
+        val cut = assertNotNull(template.cuts).rows.single()
+        assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(disabled).verify(SourceEvidence(disabled.scope,
+            SourceClaim.Consequence(cut.inequality), cut.derivation)))
     }
 
     @Test

@@ -115,18 +115,25 @@ count, and root and node separation keep their round, depth, pool and work
 allowances. The [portfolio](12-portfolio.md#lp-arm-admission) decides when
 an aggressive LP companion runs.
 
-Explicit bound-ordered sparse frontiers consume single-row Chvatal–Gomory rounding.
+Explicit bound-ordered sparse frontiers consume single-row Chvatal–Gomory rounding
+and bounded mixed-integer residual rounding.
 Other guidance calls can opt in through the adapter. The adapter
 normalizes an integer-only source activity by its exact rational coefficient gcd
-and retains a cut only when rounding tightens its right side. Continuous activity
-declines. Preparation visits at most 65,536 modeled row/support operations with
+and retains a cut only when rounding tightens its right side. Mixed rows normalize
+their integer activity and cite unconditional source bounds for every continuous
+term, preferring the side that retains a negative residual. Exact shifting and
+complementing precede mixed rounding; missing sides and integral shifted right
+sides decline. At most 64 mixed cuts are retained per template. Eligibility and
+decline observations describe only rows visited within the preparation allowance.
+Preparation visits at most 65,536 modeled row/support operations with
 4,096-bit input and denominator limits. Cut definitions and source-row ownership
 stay in the retained template, ahead of changing invocation-bound rows. Every
 query rechecks active cuts against the exact numeric source context under one
 shared 100,000-step proof allowance and premise view; inactive
 Boolean guards or integer pins disable the owner and its cuts together. Retraction
 restores those activation masks. Unverified cuts remain inactive and require an
-identity row layout. LP certificates cite the nested source rounding
+identity row layout. `source-cuts=false` disables this separation in numerical
+frontier traversal. LP certificates cite the nested source rounding
 derivation, and final source checking repeats Boolean substitution independently.
 Preparation and proof traversal report separate work observations, including
 interrupted queries. Separation and

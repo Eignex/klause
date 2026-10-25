@@ -138,6 +138,9 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** Source LP operation ceiling for controlled comparisons. */
         val sourceLpOperations: ExecutionOption<Int> = ExecutionOption("source-lp-operations", ValueKind.INT)
 
+        /** Checked numerical source-row separation control. */
+        val sourceCuts: ExecutionOption<Boolean> = ExecutionOption("source-cuts", ValueKind.BOOLEAN)
+
         /** Native polynomial or function arithmetic work; null means unlimited. */
         val nraWorkLimit: ExecutionOption<Long?> = ExecutionOption("nra-work-limit", ValueKind.ALLOWANCE)
 
@@ -375,7 +378,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
             listOf(
                 dryRunPresolve, affinePivotOrder, presolveAbortFraction, presolveMaxRounds,
                 presolveProbePerVar, presolveProbeTotal,
-                nodeLimit, openWorkLimit, sourceLpWorkLimit, sourceLpAllocationLimit, sourceLpOperations,
+                nodeLimit, openWorkLimit, sourceLpWorkLimit, sourceLpAllocationLimit, sourceLpOperations, sourceCuts,
                 nraWorkLimit, nraDenseCoefficients, nraMatrixCells, niaCandidates, niaMoves,
                 maxFlips, maxInstructions, alnsIterations, sharedRestart, openBranching,
                 openHintFlips, openHintMinSplits,

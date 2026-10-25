@@ -50,12 +50,17 @@ internal class LinearAuthority(
     private var cutVerificationWork = 0L
     private var retainedCutPeak = 0L
     private var activeCutPeak = 0L
+    private val cutEligibility = linkedMapOf<String, Long>()
+    private var retainedMixedCutPeak = 0L
+    private var activeMixedCutPeak = 0L
     fun cutObservations(): Map<String, Long> = mapOf(
         "numericalCutPreparationWork" to cutPreparationWork,
         "numericalCutVerificationWork" to cutVerificationWork,
         "numericalMaxRetainedCuts" to retainedCutPeak,
         "numericalMaxActiveCuts" to activeCutPeak,
-    )
+        "numericalMaxRetainedMixedCuts" to retainedMixedCutPeak,
+        "numericalMaxActiveMixedCuts" to activeMixedCutPeak,
+    ) + cutEligibility
     private class PrimalAttempt(
         val query: LinearAuthorityQuery, val point: List<BigFraction>,
     ) {
@@ -170,12 +175,20 @@ internal class LinearAuthority(
                 }?.also {
                     template = it
                     retainedCutPeak = maxOf(retainedCutPeak, it.cuts?.rows?.size?.toLong() ?: 0L)
+                    retainedMixedCutPeak = maxOf(retainedMixedCutPeak,
+                        it.cuts?.rows?.count { cut -> cut.mixed }?.toLong() ?: 0L)
+                    it.cuts?.observations?.forEach { (key, value) ->
+                        cutEligibility["numericalCut$key"] = maxOf(cutEligibility["numericalCut$key"] ?: 0L, value)
+                    }
                 } ?: return null
         } else null
         return LinearAuthorityQuery.prepare(source, prepared, cancellation) { work ->
             cutVerificationWork += work
             budget.observe(boundCertification = work)
-        }?.also { activeCutPeak = maxOf(activeCutPeak, it.activeCuts.toLong()) }
+        }?.also {
+            activeCutPeak = maxOf(activeCutPeak, it.activeCuts.toLong())
+            activeMixedCutPeak = maxOf(activeMixedCutPeak, it.activeMixedCuts.toLong())
+        }
     }
 
     private fun checkSource(

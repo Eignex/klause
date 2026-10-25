@@ -44,6 +44,13 @@ coefficients over declared integer coordinates. It rounds a closed right side
 down, or a strict right side to `ceil(rhs) - 1`. Source guards and integer pins
 remain premises of the nested derivation; rounding cannot establish them.
 
+`MixedIntegerRounding` checks integral integer activity and one cited coordinate
+bound for each continuous term. After exact shifts or upper-bound complements,
+positive continuous terms drop and negative terms scale by `1 / (1 - frac(rhs))`;
+the right side rounds down. The closed row is valid for strict input rows too.
+Every bound and row keeps its source guards and invocation scope. Affine mappings
+decline transfer without an integrality-preserving coordinate justification.
+
 `SourceSemanticsChecker` owns complete exact witness and recession checks for the
 declared source language and declines unsupported semantics.
 `LinearSourceSemanticsChecker` handles a source made entirely of affine premises and

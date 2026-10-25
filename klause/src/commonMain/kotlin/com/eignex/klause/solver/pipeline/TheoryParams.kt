@@ -101,6 +101,8 @@ data class TheoryParams(
     val sourceLpAllocationLimit: Long = 512L * 1024L * 1024L,
     /** Optional source LP operation ceiling, independent of cumulative numerical work. */
     val sourceLpOperations: Int = Int.MAX_VALUE,
+    /** Enable checked source-row separation for numerical frontier traversal. */
+    val sourceCuts: Boolean = true,
 ) {
     init {
         require(sourceLpWorkLimit >= 0 && sourceLpAllocationLimit >= 0 && sourceLpOperations >= 0)
