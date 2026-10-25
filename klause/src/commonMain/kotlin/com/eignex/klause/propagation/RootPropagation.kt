@@ -22,18 +22,17 @@ internal fun runRootPropagation(
 ): PropagationResult {
     val state = PropagationState(PropagationProblem(problem), assumptions, nativeSat = true)
     if (cancellation.workMeter() !is RootWorkMeter) {
-        return collectRootPropagation(problem, assumptions, state, cancellation, skipExpensiveBake)
+        return collectRootPropagation(assumptions, state, cancellation, skipExpensiveBake)
     }
     val accounting = RootWorkAccounting(cancellation, state)
     try {
-        return collectRootPropagation(problem, assumptions, state, accounting, skipExpensiveBake)
+        return collectRootPropagation(assumptions, state, accounting, skipExpensiveBake)
     } finally {
         accounting.flush()
     }
 }
 
 private fun collectRootPropagation(
-    problem: Problem,
     assumptions: Assumptions,
     state: PropagationState,
     cancellation: Cancellation,
