@@ -51,13 +51,17 @@ internal object LocalSearchTrajectory {
         require(options.keys == setOf("suite", "problem", "sha256", "recipe", "seed", "moves"))
         val reference = Catalog.uncapped(options.getValue("suite")).problems
             .single { it.name == options.getValue("problem") }
-        val bytes = CorpusFiles.open(CorpusFetcher.resolve(reference.source)).use { it.readBytes() }
-        require(sha256(bytes) == options.getValue("sha256"))
+        val bytes = CorpusFiles.open(CorpusFetcher.resolve(reference.source)).use {
+            it.readNBytes(64 * 1024 * 1024 + 1)
+        }
+        require(bytes.size <= 64 * 1024 * 1024 && sha256(bytes) == options.getValue("sha256"))
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
         out.resolve("source.xml").writeBytes(bytes)
         out.resolve("request.txt").writeText(args.joinToString("\n"))
         val parsed = Xcsp3.parse(bytes.decodeToString())
+        require(parsed.problem.numBoolVars.toLong() + parsed.problem.numIntVars <= 1024)
+        require(parsed.problem.numFactors <= 4096)
         val objective = requireNotNull(parsed.objective).toLinearObjective()
         require(parsed.sense == ObjectiveSense.MINIMIZE)
         val seed = options.getValue("seed").toLong()

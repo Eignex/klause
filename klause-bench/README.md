@@ -1272,7 +1272,8 @@ That run stops at the observer before candidate generation; its retained state t
 traces the production greedy pass one coordinate at a time through reflection.
 The diagnostic stop supplies no solver verdict or worker-failure evidence.
 Model keys, domains, objectives, source bytes and
-build identity remain alongside the walk. Hint construction uses the production
+build identity remain alongside the walk. Inputs admit at most 64 MiB,
+1,024 Boolean/integer coordinates and 4,096 factors. Hint construction uses the production
 mapping through reflection and fails on an internal shape mismatch. Each arm has
 a sixty-second outer deadline; cancellation is recorded. These instrumented walks
 isolate local trajectories; they establish neither default portfolio equivalence,
@@ -1397,6 +1398,31 @@ before relation admission. The self-metered pass charges its own visits and uses
 unit-weight scheduling normalization. The scheduling failures in
 [8164](https://lab.eignex.com/jobs/8164) are errors and supply no UNKNOWN verdict
 or search evidence.
+
+### Cargo objective-coordinate trajectories
+
+[Revision brackets 8212](https://lab.eignex.com/jobs/8212) retain the original
+Cargo-09-1s-18_c24 bytes and default mixed/P1/30-second seed-3 settings on
+Mac/aarch64. The three pre-objective revisions find checked witnesses; objective
+substitution and every later bracket retain 133 factors instead of 146 and find
+none. [Refinement 8279](https://lab.eignex.com/jobs/8279) pins the semantic change
+to `9a38fd5417`. Intermediate builds delete only its broken, unused benchmark
+profile; solver and CLI production sources remain historical-identical. The
+preceding `81d4dca3e2` witness passes independent XCSP3 checking.
+
+[Capture 8277](https://lab.eignex.com/jobs/8277) compares protected and substituted
+objectives at fixed worker seed 6. Before greedy repair, integer slots 0–314 and
+all six RNG fields match. [Coordinate capture 8284](https://lab.eignex.com/jobs/8284)
+retains the same 328-coordinate order: zero-based entry 49, source `rt[19]`, stays
+at 43439 with the protected alias but moves to 46194 after substitution, while
+the RNG still matches. The first RNG divergence follows entry 68, an eliminated
+objective slot. Inactive-coordinate probes are a secondary change; altered
+infeasible grading drives the first changed repair decision.
+
+These direct fixed-move captures establish a trajectory change, not a solver
+correctness defect or general throughput result. Removing exact objective aliases
+preserves source semantics. Independent checking applies to ordinary lab
+witnesses; the instrumented local-search observations carry no source proof claim.
 
 ### XCSP3 declared intension extrema
 
