@@ -55,7 +55,8 @@ internal object TuplePackingSubstitution {
         val dropped = HashSet<Int>()
         val additions = ArrayList<Factor>()
         val rebuilds = ArrayList<RebuildStep>()
-        val domains = problem.rootIntDomains()
+        val sourceDomains = problem.rootIntDomainsInPlace
+        val pinned = HashSet<Int>()
         var nextBool = problem.numBoolVars
         var retainedCells = 0
         for ((id, factor) in problem.factors.withIndex()) {
@@ -75,7 +76,7 @@ internal object TuplePackingSubstitution {
                         if (!meter.visit()) return null
                         val value = table.tuples[row * table.arity + column]
                         tuple[column] = value
-                        if (value !in domains[table.xs[column]] || !occupied.add(value)) feasible = false
+                        if (value !in sourceDomains[table.xs[column]] || !occupied.add(value)) feasible = false
                     }
                     if (feasible) kept.add(Tuple(tuple))
                 }
@@ -130,13 +131,16 @@ internal object TuplePackingSubstitution {
             if (cancellation()) return null
             dropped.add(packing.distinctId)
             packing.tables.forEach { dropped.add(it.first) }
-            for (variable in packing.scope) domains[variable] = IntDomain(domains[variable].min, domains[variable].min)
+            for (variable in packing.scope) pinned.add(variable)
             additions.addAll(local)
             rebuilds.addAll(steps)
             nextBool = localBool
             retainedCells += cells
         }
         if (dropped.isEmpty() || cancellation()) return null
+        repeat(problem.numIntVars) { if (!meter.visit()) return null }
+        val domains = sourceDomains.copyOf()
+        for (variable in pinned) domains[variable] = IntDomain(domains[variable].min, domains[variable].min)
         val factors = problem.factors.filterIndexed { id, _ -> id !in dropped } + additions
         val rebuilt = PresolveShared.rebuildProblem(problem, factors, domains, numBoolVars = nextBool,
             cancellation = cancellation)

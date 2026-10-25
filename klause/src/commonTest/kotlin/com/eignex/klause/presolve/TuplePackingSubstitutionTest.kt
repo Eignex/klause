@@ -24,8 +24,8 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -213,5 +213,4 @@ class TuplePackingSubstitutionTest {
         assertEquals(setOf(listOf(0L, 1L, 2L, 3L), listOf(2L, 3L, 0L, 1L)), assignments.toSet())
         assertEquals(2, assignments.size)
     }
-
 }
