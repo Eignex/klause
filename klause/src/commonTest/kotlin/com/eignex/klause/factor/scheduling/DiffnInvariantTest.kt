@@ -4,42 +4,12 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
-import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class DiffnInvariantTest {
-
-    @Test
-    fun `primary repair should relocate past a rectangle outside the colliding pair`() {
-        val variants = listOf(false, true).flatMap { vertical ->
-            listOf(false, true).map { primary -> vertical to primary }
-        }
-        for ((vertical, primary) in variants) {
-            val positions = intArrayOf(0, 1, 2)
-            val fixed = intArrayOf(3, 4, 5)
-            val factor = Diffn(
-                xs = if (vertical) fixed else positions,
-                ys = if (vertical) positions else fixed,
-                widths = LongArray(3) { if (vertical) 1L else 2L },
-                heights = LongArray(3) { if (vertical) 2L else 1L },
-            )
-            val problem = Problem(0, 6, Array(6) { IntDomain(0, if (it < 3) 5 else 0) }, listOf(factor))
-            val state = LocalSearchState(problem.bake(), Random(7L))
-            state.assignment.setInt(1, 1L)
-            state.assignment.setInt(2, 3L)
-            state.recompute()
-            val sink = MoveSink()
-            if (primary) sink.alternativeRepairs = MoveSink()
-
-            state.factors[0].proposeRepairMoves(state, 0, sink)
-
-            assertEquals(primary, sink.list.any { state.netDelta(it) == -state.cost },
-                "vertical=$vertical primary=$primary")
-        }
-    }
 
     // Probing and apply share the affected-pair formula, so only a full recount can catch a shared error.
     private fun assertDeltaMatchesRecompute(

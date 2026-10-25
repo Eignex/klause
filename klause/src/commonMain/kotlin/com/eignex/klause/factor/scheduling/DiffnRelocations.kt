@@ -18,34 +18,7 @@ internal class DiffnRelocations(
 ) {
     private var emitted = 0
     private var probes = 0
-    private var probeLimit = PROBE_CAP
     private val boundCompletion = EnvelopeCompletion(state, sink, factorId)
-
-    fun repair(first: Int, second: Int) {
-        if (xs.size > REPAIR_RECTANGLE_CAP) return
-        probeLimit = REPAIR_PROBE_CAP
-        for (i in intArrayOf(first, second)) {
-            for (axis in 0..1) {
-                val positions = if (axis == 0) xs else ys
-                val sizes = if (axis == 0) widths else heights
-                val variables = if (axis == 0) widthVars else heightVars
-                val variable = positions[i]
-                if (!sink.allowsInt(variable)) continue
-                offer(listOf(Move.IntSet(variable, state.rootDomains[variable].min)))
-                offer(listOf(Move.IntSet(variable, state.rootDomains[variable].max)))
-                val ownSize = size(i, sizes, variables, emptyList())
-                for (j in positions.indices) {
-                    if (emitted >= MOVE_CAP || probes >= probeLimit) return
-                    if (i == j) continue
-                    val origin = state.assignment.intValue(positions[j])
-                    endpoint(origin, size(j, sizes, variables, emptyList()))?.let {
-                        offer(listOf(Move.IntSet(variable, it)))
-                    }
-                    before(origin, ownSize)?.let { offer(listOf(Move.IntSet(variable, it))) }
-                }
-            }
-        }
-    }
 
     fun propose() {
         val start = state.rng.nextInt(xs.size)
@@ -102,7 +75,7 @@ internal class DiffnRelocations(
     }
 
     private fun offer(requested: List<Move.IntSet>) {
-        if (emitted >= MOVE_CAP || probes >= probeLimit) return
+        if (emitted >= MOVE_CAP || probes >= PROBE_CAP) return
         val parts = ArrayList<Move.IntSet>(requested.size)
         for (part in requested) {
             val previous = parts.firstOrNull { it.varId == part.varId }
@@ -150,7 +123,6 @@ internal class DiffnRelocations(
             val wi = size(i, widths, widthVars, parts)
             val hi = size(i, heights, heightVars, parts)
             for (j in xs.indices) {
-                if (probeLimit == REPAIR_PROBE_CAP) state.checkScoringWork()
                 if (j == i) continue
                 val wj = size(j, widths, widthVars, parts)
                 val hj = size(j, heights, heightVars, parts)
@@ -185,7 +157,5 @@ internal class DiffnRelocations(
         const val PROBE_CAP = 24
         const val MOVE_CAP = 4
         const val AFFECTED_CAP = 8
-        const val REPAIR_RECTANGLE_CAP = 128
-        const val REPAIR_PROBE_CAP = 128
     }
 }

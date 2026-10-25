@@ -306,7 +306,8 @@ branching, without adding allowance:
 
 | Structure | Additional diversity |
 |---|---|
-| Scheduling | A primary-repair CBLS variant beside the full neighborhood, both using iterated local-search restarts |
+| Scheduling with Element | A primary-repair CBLS variant beside the full neighborhood, both using iterated local-search restarts |
+| Scheduling without Element | Fixed-cadence CBLS beside the full plateau neighborhood |
 | Annotated circuit/subcircuit with first-fail/min values | Unrestricted first-fail beside the annotation's tiered scope |
 | Finite objective without an initial LP recipe | A restart-level bandit over variable/value selectors (`selector-switch`) beside the SAT guard |
 

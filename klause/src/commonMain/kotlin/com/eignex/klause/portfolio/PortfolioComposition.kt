@@ -362,7 +362,8 @@ internal object PortfolioComposition {
         val local = if (lsCount > 0) {
             val selected = lsArms(scenario.kind, lsCount, scenario.lsPool, scenario.nodeBudget, facts)
             if (scenario.kind == Kind.COP && scenario.cores == 1 && scenario.lsPool == null &&
-                facts.profile.scheduling && selected.getOrNull(1)?.label == "cbls-plateau/ils-basin" &&
+                facts.profile.scheduling && facts.elementAlternatives &&
+                selected.getOrNull(1)?.label == "cbls-plateau/ils-basin" &&
                 selected.first().label == "cbls/fixed"
             ) {
                 val primary = LocalSearchWorkerConfig(

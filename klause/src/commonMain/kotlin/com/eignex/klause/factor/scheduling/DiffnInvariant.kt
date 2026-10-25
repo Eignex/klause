@@ -165,7 +165,6 @@ internal class DiffnInvariant(
      *  of the overlap, diagonal compound shifts, and a position swap. */
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (!isViolated(state, factorId)) return
-        var relocated = false
         for (i in 0 until n) {
             val xi = rx(state, i, -1, 0L)
             val yi = ry(state, i, -1, 0L)
@@ -177,13 +176,6 @@ internal class DiffnInvariant(
                 val wj = rw(state, j, -1, 0L)
                 val hj = rh(state, j, -1, 0L)
                 if (!overlaps(xi, yi, wi, hi, xj, yj, wj, hj)) continue
-                if (!relocated && sink.alternativeRepairs != null &&
-                    (state.refPayload[factorId] as DiffnLsState).overlappingPairs <= 4
-                ) {
-                    DiffnRelocations(xs, ys, widths, heights, widthVars, heightVars, nonStrict, factorId, state, sink)
-                        .repair(i, j)
-                    relocated = true
-                }
                 val dxsI = state.rootDomains[xs[i]]
                 val dysI = state.rootDomains[ys[i]]
                 val dxsJ = state.rootDomains[xs[j]]
