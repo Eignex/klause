@@ -120,12 +120,16 @@ internal object LocalSearchTrajectory {
                                 if (pick == 0L) {
                                     put("unreadIntegers", buildJsonArray {
                                         for (variable in 0 until problem.numIntVars) {
-                                            if (state.projection.intOccurrences[variable].isEmpty()) add(JsonPrimitive(variable))
+                                        if (state.projection.intOccurrences[variable].isEmpty()) {
+                                            add(JsonPrimitive(variable))
+                                        }
                                         }
                                     })
                                     put("definedIntegers", buildJsonArray {
                                         for (variable in 0 until problem.numIntVars) {
-                                            if (state.invariants?.isDefinedInt(variable) == true) add(JsonPrimitive(variable))
+                                        if (state.invariants?.isDefinedInt(variable) == true) {
+                                            add(JsonPrimitive(variable))
+                                        }
                                         }
                                     })
                                 }
