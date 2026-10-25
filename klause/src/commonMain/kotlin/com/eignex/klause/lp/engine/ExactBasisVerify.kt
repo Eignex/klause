@@ -328,42 +328,16 @@ private fun solveLogicalReducedPrimal(
     meter: ExactBasisMeter,
 ): List<BigFraction> {
     val dimension = authority.model.m
-    meter.charge(dimension.toLong() * 4L, dimension * 64L)
-    val logical = IntArray(dimension) { -1 }
-    val structural = ArrayList<Int>()
-    for (slot in authority.headings.indices) {
-        meter.charge()
-        val column = authority.headings[slot]
-        if (column < authority.model.n) {
-            structural += slot
-        } else {
-            val support = authority.matrix[column]
-            if (support.size != 1 || support.single().second != BigFraction.ONE) {
-                meter.stop(ExactBasisDecline.INVALID_BASIS)
-            }
-            val row = support.single().first
-            if (logical[row] >= 0) meter.stop(ExactBasisDecline.SINGULAR)
-            logical[row] = slot
-        }
-    }
-    val retained = logical.indices.filter { logical[it] < 0 }
-    val local = IntArray(dimension) { -1 }
-    for (id in retained.indices) local[retained[id]] = id
+    val core = LogicalBasisCore.prepare(authority, meter)
+    val logical = core.logicalSlots
+    val structural = core.structuralSlots
+    val retained = core.retainedRows
     val size = retained.size
-    if (size != structural.size) meter.stop(ExactBasisDecline.INVALID_BASIS)
-    meter.charge(size.toLong() * size, size.toLong() * size * 8L + size * 64L)
-    val matrix = List(size) { MutableList(size) { BigFraction.ZERO } }
-    for (id in structural.indices) {
-        for ((row, value) in authority.matrix[authority.headings[structural[id]]]) {
-            meter.charge()
-            if (local[row] >= 0) matrix[local[row]][id] = value
-        }
-    }
     val basics = MutableList(dimension) { BigFraction.ZERO }
     if (size > 0) {
         meter.phase = ExactBasisPhase.FACTOR
         meter.factoryCalls++
-        val build = RationalBasisFactors.factor(matrix, null, meter.factorLimits(), meter.token)
+        val build = RationalBasisFactors.factor(core.matrix, null, meter.factorLimits(), meter.token)
         meter.record(build.stats)
         val factors = when (build) {
             is RationalBasisBuild.Ready -> build.factors
