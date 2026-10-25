@@ -177,7 +177,9 @@ internal class DiffnInvariant(
                 val wj = rw(state, j, -1, 0L)
                 val hj = rh(state, j, -1, 0L)
                 if (!overlaps(xi, yi, wi, hi, xj, yj, wj, hj)) continue
-                if (!relocated && (state.refPayload[factorId] as DiffnLsState).overlappingPairs <= 4) {
+                if (!relocated && state.violated.size == 1 &&
+                    (state.refPayload[factorId] as DiffnLsState).overlappingPairs <= 4
+                ) {
                     DiffnRelocations(xs, ys, widths, heights, widthVars, heightVars, nonStrict, factorId, state, sink)
                         .repair(i, j)
                     relocated = true
