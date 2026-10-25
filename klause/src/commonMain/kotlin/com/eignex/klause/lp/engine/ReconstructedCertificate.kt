@@ -52,6 +52,7 @@ internal enum class LpPointRejection {
 internal enum class ReconstructionPhase { INPUT, POINT, DUAL, RAY, SUPPORT, VIOLATION, VECTOR, SCHEDULE }
 
 internal data class ReconstructionDualRejection(val column: Int, val upper: Boolean, val reduced: BigFraction)
+internal data class ReconstructionVectorRejection(val commonDenominator: BigInt, val limit: BigInt)
 
 internal data class ReconstructionMetrics(
     val attempts: Int,
@@ -69,6 +70,7 @@ internal data class ReconstructionMetrics(
     val decline: ReconstructionDecline?,
     val phase: ReconstructionPhase,
     val dualRejection: ReconstructionDualRejection? = null,
+    val vectorRejection: ReconstructionVectorRejection? = null,
 )
 
 internal class ReconstructedCertificate(
@@ -100,6 +102,7 @@ internal class ReconstructionMeter(
     var vectorRestarts = 0
     var verificationRestarts = 0
     var dualRejection: ReconstructionDualRejection? = null
+    var vectorRejection: ReconstructionVectorRejection? = null
     private var work = 0L
     private var allocation = 0L
     private var maxBits = 0
@@ -163,7 +166,7 @@ internal class ReconstructionMeter(
 
     fun snapshot(decline: ReconstructionDecline?) = ReconstructionMetrics(
         attempts, pointChecks, dualChecks, rayChecks, pointSuccesses, dualSuccesses, raySuccesses,
-        vectorRestarts, verificationRestarts, work, allocation, maxBits, decline, phase, dualRejection,
+        vectorRestarts, verificationRestarts, work, allocation, maxBits, decline, phase, dualRejection, vectorRejection,
     )
 }
 

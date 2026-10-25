@@ -218,7 +218,10 @@ private fun reconstructLongVector(
             d = rest
         }
         common = lcm(common, q1) ?: throw ReconstructionOverflow()
-        if (common > limit) return null
+        if (common > limit) {
+            meter.vectorRejection = ReconstructionVectorRejection(meter.integer(bigIntOf(common)), denominator)
+            return null
+        }
         parts += meter.fraction(
             BigFraction.of(bigIntOf(if (value.signum() < 0) -p1 else p1), bigIntOf(q1)),
         )
@@ -257,7 +260,10 @@ private fun reconstructBigVector(
             d = rest
         }
         common = meter.integer(common / common.gcd(q1) * q1)
-        if (common > denominator) return null
+        if (common > denominator) {
+            meter.vectorRejection = ReconstructionVectorRejection(common, denominator)
+            return null
+        }
         parts += meter.fraction(BigFraction.of(if (value.signum() < 0) -p1 else p1, q1))
     }
     return parts.toList()
