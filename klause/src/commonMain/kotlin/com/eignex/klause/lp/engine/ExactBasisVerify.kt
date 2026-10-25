@@ -224,9 +224,9 @@ internal fun verifyExactBasis(
     try {
         val authority = ExactBasisAuthority(model, basis, meter)
         if (rayRow != null && rayRow !in 0 until model.m) meter.stop(ExactBasisDecline.INVALID_BASIS)
-        val cached = cache.find(authority)
+        val cached = if (primalOnly) null else cache.find(authority)
         if (cached != null) meter.reuse++
-        val factors = cached ?: run {
+        val factors = if (primalOnly) null else cached ?: run {
             val matrix = authority.basisMatrix()
             meter.phase = ExactBasisPhase.FACTOR
             val proposed = cache.proposedOrder(authority)
@@ -252,7 +252,8 @@ internal fun verifyExactBasis(
             meter.phase = ExactBasisPhase.ASSEMBLY
             val rhs = authority.primalRhs()
             meter.phase = ExactBasisPhase.PRIMAL
-            val basics = solveExactBasis(factors, rhs, false, meter)
+            val basics = if (primalOnly) solveLogicalReducedPrimal(authority, rhs, meter)
+                else solveExactBasis(checkNotNull(factors), rhs, false, meter)
             val primal = authority.sourcePrimal(basics)
             // Publish this complete independent witness before BTRAN can exhaust the remaining budget.
             val point = verifyBasisCandidates(model, authority, primal, null, null, meter)
@@ -260,7 +261,7 @@ internal fun verifyExactBasis(
             point.metrics.decline?.takeUnless { it == ReconstructionDecline.CANDIDATE }?.let { meter.stop(it) }
             if (!primalOnly) {
                 meter.phase = ExactBasisPhase.DUAL
-                val dual = solveExactBasis(factors, authority.costs, true, meter)
+                val dual = solveExactBasis(checkNotNull(factors), authority.costs, true, meter)
                 val checked = verifyBasisCandidates(model, authority, primal, dual, null, meter)
                 witness = checked.witness ?: witness
                 bound = checked.bound
@@ -271,7 +272,7 @@ internal fun verifyExactBasis(
             meter.phase = ExactBasisPhase.RAY
             meter.charge(model.m.toLong(), model.m * 32L)
             val rhs = List(model.m) { if (it == rayRow) BigFraction.ONE else BigFraction.ZERO }
-            val ray = solveExactBasis(factors, rhs, true, meter)
+            val ray = solveExactBasis(checkNotNull(factors), rhs, true, meter)
             val checked = verifyBasisCandidates(model, authority, null, null, ray, meter)
             conflict = checked.conflict
             support = checked.conflictSupport
@@ -317,6 +318,77 @@ private fun orderPermutation(order: IntArray): Boolean {
         seen[value] = true
     }
     return true
+}
+
+// Logical basic columns are unit columns. Their rows recover after the structural core without fill.
+private fun solveLogicalReducedPrimal(
+    authority: ExactBasisAuthority,
+    rhs: List<BigFraction>,
+    meter: ExactBasisMeter,
+): List<BigFraction> {
+    val dimension = authority.model.m
+    meter.charge(dimension.toLong() * 4L, dimension * 64L)
+    val logical = IntArray(dimension) { -1 }
+    val structural = ArrayList<Int>()
+    for (slot in authority.headings.indices) {
+        meter.charge()
+        val column = authority.headings[slot]
+        if (column < authority.model.n) {
+            structural += slot
+        } else {
+            val support = authority.matrix[column]
+            if (support.size != 1 || support.single().second != BigFraction.ONE) {
+                meter.stop(ExactBasisDecline.INVALID_BASIS)
+            }
+            val row = support.single().first
+            if (logical[row] >= 0) meter.stop(ExactBasisDecline.SINGULAR)
+            logical[row] = slot
+        }
+    }
+    val retained = logical.indices.filter { logical[it] < 0 }
+    val local = IntArray(dimension) { -1 }
+    for (id in retained.indices) local[retained[id]] = id
+    val size = retained.size
+    if (size != structural.size) meter.stop(ExactBasisDecline.INVALID_BASIS)
+    meter.charge(size.toLong() * size, size.toLong() * size * 8L + size * 64L)
+    val matrix = List(size) { MutableList(size) { BigFraction.ZERO } }
+    for (id in structural.indices) {
+        for ((row, value) in authority.matrix[authority.headings[structural[id]]]) {
+            meter.charge()
+            if (local[row] >= 0) matrix[local[row]][id] = value
+        }
+    }
+    val basics = MutableList(dimension) { BigFraction.ZERO }
+    if (size > 0) {
+        meter.phase = ExactBasisPhase.FACTOR
+        meter.factoryCalls++
+        val build = RationalBasisFactors.factor(matrix, null, meter.factorLimits(), meter.token)
+        meter.record(build.stats)
+        val factors = when (build) {
+            is RationalBasisBuild.Ready -> build.factors
+            is RationalBasisBuild.Singular -> meter.stop(ExactBasisDecline.SINGULAR)
+            is RationalBasisBuild.Declined -> {
+                if (build.reason.name == "CANCELLED") meter.poll()
+                meter.stop(ExactBasisDecline.valueOf(build.reason.name))
+            }
+        }
+        meter.phase = ExactBasisPhase.PRIMAL
+        val values = solveExactBasis(factors, retained.map { rhs[it] }, false, meter)
+        for (id in structural.indices) basics[structural[id]] = values[id]
+    }
+    meter.phase = ExactBasisPhase.PRIMAL
+    val residual = rhs.toMutableList()
+    for (slot in structural) {
+        for ((row, value) in authority.matrix[authority.headings[slot]]) {
+            meter.charge()
+            if (logical[row] >= 0) residual[row] = meter.subtractProduct(residual[row], value, basics[slot])
+        }
+    }
+    for (row in logical.indices) {
+        meter.charge()
+        if (logical[row] >= 0) basics[logical[row]] = residual[row]
+    }
+    return basics
 }
 
 private fun solveExactBasis(
