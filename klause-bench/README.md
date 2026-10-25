@@ -1257,6 +1257,36 @@ markers. They are sampled views of visible stacks, not wall-time attribution or
 causal explanations, and their totals must not be added together. Summarization
 does not change the CLI recording configuration.
 
+### Tuple packing capacities
+
+Retain finite `+tuple-packing` as an opt-in representation for exclusively owned
+Table partitions of plain AllDifferent; [presolve](../docs/07-presolve.md#structural-reductions)
+owns its admission and reconstruction. Small controls cover the disjoint mandatory-value
+counterexample, a certified shared-capacity LP refutation with no mandatory individual
+value, sibling retraction and exact source multiplicity.
+
+[8235](https://lab.eignex.com/jobs/8235), at `4c79a3697b`, compares default CP,
+packing CP, explicit hole-probing CP and default mixed search on all fourteen
+Pentominoes sources: P1, 20 seconds, seeds 3/17. All 112 cases finish and all 38
+reported witnesses pass independent original-XCSP3 checking. Sixty-four cases run
+on Mac/aarch64 and 48 on Linux/amd64; each problem's arms share a host. Sources,
+runtime options and installed bytes are retained per case; timings are not pooled
+across platforms. The four arms find 13/11/11/3 witnesses out of 28 respectively.
+
+Packing admits 03-20, 04-15, 05-12 and 06-10, with 1,236/1,696/1,936/2,056
+choices and 72 rows each. The ten other sources retain outside symmetry-order
+readers and decline. Grouped source arguments repeat piece Tables on larger
+boards; counting distinct relation payloads does not count those placements.
+On the eight admitted cases, packing finds six witnesses versus default CP's eight:
+06-10 loses feasibility in both seeds. On Mac, 03-20 first feasibility changes from
+16.51/16.91 to 7.35/13.22 seconds, while 04-15 changes from 1.10/1.13 to
+2.72/3.41. Packing preparation costs 176–435 ms versus 42–91 ms in these admitted
+controls. On 03-20 seed 3, propagation work changes from 853.1M to 62.3M visits
+and whole-CLI peak RSS from 323 to 237 MiB. These observations establish no
+uniform speedup or allocation improvement. Bounded row-aware placement branching
+is the consuming next step before reconsidering default admission; preserving
+outside source readers requires a separate coordinate channel.
+
 ### Table profiling
 
 `bench.profile.ExtensionalCompositionProfile` accepts `suite=ID problem=NAME

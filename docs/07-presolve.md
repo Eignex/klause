@@ -286,8 +286,9 @@ and the ordinary core LP projection consume the shared incidence rows.
 
 The substitution requires exclusive coordinate ownership by the partition's Tables
 and AllDifferent, with stated bounds and no objective use, optional positions,
-exceptions or repeated roles. Other uses retain the original factors. Original integer slots are pinned;
-typed reconstruction reads their selected tuple before truncating fresh Boolean
+exceptions or repeated roles. Other uses retain the original factors. Original
+integer slots are pinned; typed reconstruction reads their selected tuple before
+truncating fresh Boolean
 coordinates. Deduplicated rows give one Boolean extension per source assignment,
 preserving solution multiplicity. Admission caps a scope at 4,096 coordinates,
 retained choices at 65,536, tuple cells at 262,144 and construction at 1,048,576

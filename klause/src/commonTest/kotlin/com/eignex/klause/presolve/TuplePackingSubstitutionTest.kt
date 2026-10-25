@@ -238,4 +238,23 @@ class TuplePackingSubstitutionTest {
         assertEquals(setOf(listOf(0L, 1L, 2L, 3L), listOf(2L, 3L, 0L, 1L)), assignments.toSet())
         assertEquals(2, assignments.size)
     }
+
+    @Test
+    fun `packing and binary substitution should compose their Boolean namespaces`() {
+        val source = Problem(0, 6, Array(6) { IntDomain(0, if (it < 4) 3L else 1L) }, listOf(
+            Table(intArrayOf(0, 1), longArrayOf(0, 1, 2, 3)),
+            Table(intArrayOf(2, 3), longArrayOf(0, 1, 2, 3)), AllDifferent(intArrayOf(0, 1, 2, 3)),
+            Linear(intArrayOf(1, 1), intArrayOf(4, 5), LinearOp.GE, 1),
+        ))
+        val result = PresolvePipeline.run(source, null,
+            PresolveConfig.parse("off,+tuple-packing,+binary-columns"), true)
+
+        val assignments = BacktrackSolver(result.problem.bake()).enumerate(BacktrackParams(randomSeed = 0L))
+            .map(result.reconstruct).onEach { assertTrue(it.bools.isEmpty()) }.map { it.ints.toList() }.toList()
+
+        assertTrue("tuple-packing" in result.stats.passes && "binary-columns" in result.stats.passes)
+        assertEquals(6, assignments.size)
+        assertEquals(assignments.size, assignments.toSet().size)
+        assertTrue(assignments.all { it.take(4).toSet().size == 4 && it[4] + it[5] >= 1L })
+    }
 }
