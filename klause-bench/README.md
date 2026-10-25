@@ -2852,6 +2852,25 @@ retain their objective and verdict; completed searches retain their node counts.
 This qualifies exact finite objective substitution with a fiber quality gain and
 a cap6000 preparation cost, without a general speedup claim.
 
+Definition-specific objective admission in [8213](https://lab.eignex.com/jobs/8213)
+compares `32cc4dfff6` with `14584471e9` on Mac/aarch64, P1, ten seconds and seed 3
+repeated three times. All 54 witnesses pass original-source checking. Exact
+cap6000 retains its incumbent while median preparation falls 596 to 420 ms and
+finite affine analysis 280 to 95 ms; charged analysis falls 133,902 to 130,312
+units with unchanged rebuild work. Exact fiber improves 1,292,011.56 to
+1,107,576.76. Declared outcomes and gr4x6 native proofs agree. Costs remain:
+median exact cap6000 peak RSS rises 480,592 to 520,480 KiB and fiber CPU time
+17.94 to 18.83 seconds. These isolated-base observations establish no general speedup.
+
+Current-main residual captures [8271](https://lab.eignex.com/jobs/8271) and
+[8272](https://lab.eignex.com/jobs/8272) compare `51e0324eba` with `b751b6c55e`
+on the same original cap6000/fiber hashes. Both declared-fiber generators move
+only columns 1264/1266/1267, whose only row readers are the two symmetry orders.
+The active mask removes that generator factor and both orders, retaining all
+other factors, domains and objective; the residual matches symmetry disabled.
+All 24 exact/declared preparation controls complete without cancellation. These
+captures inspect preparation and make no search, source-witness or proof claim.
+
 The integrated companion [qualification 8173](https://lab.eignex.com/jobs/8173)
 pins `6fb51fd8fd`: 450 runs over the fifteen frozen 8087 sources, three seeds,
 exact and declared `1e-7` absolute/relative tolerance policies, P1, ten seconds,
