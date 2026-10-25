@@ -19,6 +19,50 @@ import kotlin.test.assertTrue
 
 class PropagationSessionTest {
     @Test
+    fun `a conflicting external bound should not analyze an unrelated atom clause`() {
+        for (lower in listOf(false, true)) {
+            for (padding in listOf(0, 7)) {
+                val session = PropagationSession(Problem(0, 3, Array(3) { IntDomain(0, 10) }, emptyArray()))
+                val pin = if (lower) session.pinIntAtMost(0, 4) else session.pinIntAtLeast(0, 6)
+                assertIs<PropagationResult.Implied>(pin)
+                repeat(padding) { session.boundGeLit(1, it.toLong() + 1, true) }
+                val left = session.boundGeLit(1, 8, true)
+                val right = session.boundLeLit(2, 2, true)
+                assertIs<PropagationResult.Implied>(session.addLearnedClause(Clause(intArrayOf(left, right)), 2))
+
+                val result = if (lower) session.implyIntAtLeast(0, 5) else session.implyIntAtMost(0, 5)
+
+                assertNull(assertIs<PropagationResult.Unsat>(result).learnedClause)
+                assertNull(session.litTruth(left))
+                assertNull(session.litTruth(right))
+                assertEquals(if (lower) IntDomain(0, 4) else IntDomain(6, 10), session.intDomain(0))
+            }
+        }
+    }
+
+    @Test
+    fun `an external fixing should belong to the active decision level after a root factor fires`() {
+        for (lower in listOf(false, true)) {
+            val session = PropagationSession(Problem(0, 3, Array(3) { IntDomain(0, 10) }, emptyArray()))
+            assertIs<PropagationResult.Implied>(session.pinIntAtLeast(0, 1))
+            val root = session.boundLeLit(2, 10, true)
+            assertIs<PropagationResult.Implied>(session.addLearnedClause(Clause(intArrayOf(root)), 1))
+
+            val result = if (lower) session.implyIntAtLeast(1, 5) else session.implyIntAtMost(1, 5)
+
+            assertIs<PropagationResult.Implied>(result)
+            val negated = if (lower) session.boundGeLit(1, 5, false) else session.boundLeLit(1, 5, false)
+            val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(
+                session.analyzeConflictClause(intArrayOf(negated)),
+            )
+            assertEquals(listOf(1), learned.decisionLevels.toList())
+            assertTrue(learned.asserting)
+            session.popToLevel(0)
+            assertNull(session.litTruth(negated))
+        }
+    }
+
+    @Test
     fun `interrupted reseeding should retract an incomplete equality before retrying`() {
         var armed = false
         lateinit var session: PropagationSession

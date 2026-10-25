@@ -75,6 +75,12 @@ survives undo and propagates in sibling branches. These clauses assume no incumb
 cutoff. See
 [LP consumer contracts](17-linear-programming.md#consumers-explanations-and-cuts).
 
+An external fixing enters CP at the active decision depth without a CP factor owner.
+Its explicit premises, when supplied, remain its reason. An immediate contradiction
+has no factor conflict clause to analyze; conflicts reached by the ensuing fixpoint
+use the factor that actually failed. An unrelated preceding factor's context cannot
+provide a fixing's level or conflict reason.
+
 ## Conflict analysis
 
 `ConflictAnalyzer` walks the implication graph backwards from a conflict, resolving

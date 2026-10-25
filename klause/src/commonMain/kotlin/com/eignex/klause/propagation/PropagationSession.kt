@@ -755,7 +755,13 @@ class PropagationSession private constructor(
     private fun implyAtCurrentLevel(apply: () -> Boolean): PropagationResult {
         bakedUnsat?.let { return it }
         val base = state.undoTop
-        if (!apply()) return revertAndUnsat(state.conflictLevels ?: EmptyIntArray)
+        state.currentFactor = -1
+        state.currentLevel = decisionLevel
+        if (!apply()) {
+            // No CP factor ran, so its last fire cannot supply this external deduction's conflict clause.
+            state.lastDecisionConflictVar = -1
+            return revertAndUnsat(state.conflictLevels ?: EmptyIntArray)
+        }
         val conflict = state.runToFixpoint(allFactors = false, cancellation = cancellation)
         if (conflict != null) return revertAndUnsat(conflict)
         // Fold into the current level's baseline so a later same-level revert keeps it, and so
