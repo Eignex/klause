@@ -134,6 +134,11 @@ and neighborhood exhaustion supplies no global claim.
 
 ### Statistics
 
+Complete-search value guidance reports `valueSupportOrders`, `valueProbeOrders`,
+`valueProbes`, `valueProbeRefutations`, `valueProbeWork` and `valueProbeCappedOrders`
+when used. Hypothetical probe refutations are separate from search failures;
+probe work is included in total native propagation work.
+
 `--debug` adds `runtimeDebug=true` and `jvmCompilationSupported` to the statistics.
 On a JVM with compilation-time monitoring, `jvmCompilationStartupMs` is the
 accumulated compilation time at the first snapshot, before input loading, and

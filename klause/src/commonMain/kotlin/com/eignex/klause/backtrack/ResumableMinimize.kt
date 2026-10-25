@@ -380,6 +380,7 @@ internal class ResumableMinimize(
         ).also {
             it.conflictStats = sink.ca
             sink.search.propagationWork = { it.session.work }
+            sink.search.valueOrdering = { it.session.valueOrdering.snapshot() }
             sink.search.rootPropagationWork = { it.session.rootWork }
             sink.search.propagationNanos = { it.session.propagationNanos }
             sink.search.rootPropagationNanos = { it.session.rootPropagationNanos }

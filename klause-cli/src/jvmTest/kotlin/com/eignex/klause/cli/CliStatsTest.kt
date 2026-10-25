@@ -27,6 +27,7 @@ import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.RunStats
 import com.eignex.klause.solver.result.SchedulingStats
 import com.eignex.klause.solver.result.SearchStats
+import com.eignex.klause.solver.result.ValueOrderingStats
 import com.eignex.klause.solver.result.SmtStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SourceLpWorkStats
@@ -39,6 +40,20 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration
 
 class CliStatsTest {
+    @Test
+    fun `value ordering should report support and probe costs separately`() {
+        val stats = SolveStats(search = SearchStats(valueOrdering = ValueOrderingStats(1, 2, 3, 4, 5, 6)))
+
+        val pairs = searchStatPairs(stats).toMap()
+
+        assertEquals("1", pairs["valueSupportOrders"])
+        assertEquals("2", pairs["valueProbeOrders"])
+        assertEquals("3", pairs["valueProbes"])
+        assertEquals("4", pairs["valueProbeRefutations"])
+        assertEquals("5", pairs["valueProbeWork"])
+        assertEquals("6", pairs["valueProbeCappedOrders"])
+    }
+
 
     @Test
     fun `board restart outcomes should be emitted only after a completed observation`() {
