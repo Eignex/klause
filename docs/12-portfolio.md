@@ -22,10 +22,10 @@ arithmetic routes reject finite-only explicit policy instead of ignoring it. Rec
 defaults carry no witness or proof authority.
 
 For default single-core mixed placement optimization, an eliminated affine objective
-coordinate can supply a private protected-coordinate view to the curated primary
+coordinate can supply a private protected-coordinate view to the curated full
 local-search slot. This applies to `Diffn` models without `Element` alternatives,
 where primary and full neighborhoods offer the same repairs. The slot runs the full
-plateau recipe with its configured seed offset; the companion retains the rewritten
+plateau recipe with its configured seed offset; the primary retains the rewritten
 model. Pool size and scheduling allowances are unchanged. Explicit presolve or arm
 selection keeps the selected representation.
 

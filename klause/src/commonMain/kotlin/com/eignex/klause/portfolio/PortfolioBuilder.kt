@@ -146,7 +146,7 @@ object PortfolioBuilder {
                 }
                 val bounded = budget?.let(completion::withNodeBudget) ?: completion
                 val worker = if (objectiveCoordinates != null && bounded is LocalSearchWorkerConfig &&
-                    config.label == LocalSearchArm.CblsPrimaryPlateauIlsBasin.label &&
+                    config.label == LocalSearchArm.CblsPlateauIlsBasin.label &&
                     scenario.cores == 1 && scenario.engine == EngineMix.MIXED &&
                     scenario.lsPool == null && scenario.btPool == null
                 ) {
