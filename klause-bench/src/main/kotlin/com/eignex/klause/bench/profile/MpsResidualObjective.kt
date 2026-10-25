@@ -67,6 +67,12 @@ internal object MpsResidualObjective {
             .associate { it.substringBefore('=') to rational(it.substringAfter('=')) }
         val values = source.variables.map { witness.getValue(it.name) }
         val original = checkNotNull(source.checkMpsWitness(values, stop))
+        val sourceObjective = checkNotNull(source.objective)
+        val constant = BigFraction.of(sourceObjective.constant.numerator, sourceObjective.constant.denominator)
+        val discreteCost = sourceObjective.terms.filter { source.variables[it.column].integer }
+            .fold(BigFraction.ZERO) { cost, term ->
+                cost + BigFraction.of(term.coefficient.numerator, term.coefficient.denominator) * values[term.column]
+            }
         val plan = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
             ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED,
             maximize = source.objective?.sense == ObjectiveSense.MAXIMIZE, cancellation = stop,
@@ -137,8 +143,12 @@ internal object MpsResidualObjective {
             put("revision", Reports.readGitSha())
             put("sourceSha256", sha256(bytes))
             put("originalSourceObjective", original.objective.toString())
+            put("sourceObjectiveConstant", constant.toString())
+            put("fixedDiscreteCost", discreteCost.toString())
+            put("originalContinuousCost", (checkNotNull(original.objective) - constant - discreteCost).toString())
             put("objectiveScale", scale.toString())
             put("refinedSourceObjective", checked?.objective?.toString())
+            put("refinedContinuousCost", checked?.objective?.let { (it - constant - discreteCost).toString() })
             put("nativeProposal", refined != null)
             put("originalSourceChecked", checked != null)
             put("independentWitnessCheck", false)
@@ -162,7 +172,7 @@ internal object MpsResidualObjective {
         val parts = text.split('/')
         if (parts.size == 2) return BigFraction.of(parts[0].toBigInteger(), parts[1].toBigInteger())
         val value = BigDecimal(text)
-        return if (value.scale() < 0) BigFraction.of(value.toBigIntegerExact()) else
+        return if (value.scale() < 0) BigFraction.of(value.toBigIntegerExact(), java.math.BigInteger.ONE) else
             BigFraction.of(value.unscaledValue(), java.math.BigInteger.TEN.pow(value.scale()))
     }
 
