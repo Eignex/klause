@@ -27,8 +27,13 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import kotlin.time.Duration.Companion.milliseconds
 
+internal val PreparedSourceInvocation.requestsFiniteNumericalCompanions: Boolean get() =
+    request.linearTraversal == LinearTraversal.FINITE_COMPANIONS ||
+        (request.linearTraversal == LinearTraversal.AUTOMATIC && linearSource != null)
+
 internal fun finiteNumericalCompanionsAdmitted(problem: BakedProblem, scenario: PortfolioScenario): Boolean =
     scenario.cores == 1 && scenario.kind == Kind.COP && scenario.engine == EngineMix.MIXED &&
+        scenario.arms == PortfolioScenario.DEFAULT_ARMS &&
         scenario.btPool == null && scenario.lsPool == null && scenario.btEdit == null &&
         scenario.annotationArm == null &&
         problem.numIntVars > 0 && problem.numRealVars > 0 && problem.binaryIntegers &&

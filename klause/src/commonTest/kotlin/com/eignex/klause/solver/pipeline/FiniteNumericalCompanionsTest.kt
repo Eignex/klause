@@ -35,6 +35,8 @@ class FiniteNumericalCompanionsTest {
             Triple(binary, ordinary, true),
             Triple(integers, ordinary, false),
             Triple(general, ordinary, false),
+            Triple(binary, ordinary.copy(arms = 1), false),
+            Triple(binary, ordinary.copy(arms = PortfolioScenario.DEFAULT_ARMS + 1), false),
             Triple(binary, ordinary.copy(cores = 2), false),
             Triple(binary, ordinary.copy(kind = Kind.CSP), false),
             Triple(binary, ordinary.copy(engine = EngineMix.BACKTRACK), false),

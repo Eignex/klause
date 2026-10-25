@@ -2873,10 +2873,12 @@ infrastructure without changing default worker admission.
 
 ### Linear traversal comparison
 
-`param.linear-traversal=finite-companions` keeps the ordinary automatic finite
-portfolio and appends bounded numerical workers to eligible binary/continuous
-models. Compare it with an unmodified default, retaining presolve and full finite
-recipes. `finiteNumericalCompanionActiveMs`/`finiteJointCompanionActiveMs`,
+Automatic MPS routing keeps the ordinary finite portfolio and appends bounded
+numerical workers to eligible binary/continuous models.
+`param.linear-traversal=finite-companions` explicitly selects that policy.
+Use a pinned unmodified control revision for admission comparisons, retaining
+presolve and full finite recipes.
+`finiteNumericalCompanionActiveMs`/`finiteJointCompanionActiveMs`,
 `Retired`, `Optimal` and `Refuted` suffixes expose each trial's active cost and
 completion. The numerical-first `numerical-companions` control records
 `finiteCompanionNativeOptimal`, `finiteCompanionNativeRefuted` and

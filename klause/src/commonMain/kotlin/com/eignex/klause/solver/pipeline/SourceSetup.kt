@@ -125,7 +125,10 @@ class SourceSetupRequest private constructor(
 
 /** Traversal policy over an unchanged linear source, independent of worker recipes and declarations. */
 enum class LinearTraversal {
-    /** Prefer admitted finite execution, retaining numerical execution for open sources. */
+    /**
+     * Prefer finite execution with selectively bounded numerical workers;
+     * retain numerical execution for open sources.
+     */
     AUTOMATIC,
 
     /** Use numerical LP/MIP traversal without finite bound closure or finite search. */

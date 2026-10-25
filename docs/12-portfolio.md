@@ -164,12 +164,12 @@ pending proposals keep their scope until completion. Global proofs remain numeri
 derivations with complete sibling coverage. The independent companion recipe keeps
 the same workers and quotas while withholding incumbent and bound imports.
 
-The opt-in finite companion policy keeps the ordinary finite recipes, arm identities,
+The automatic linear-source finite companion policy keeps the ordinary finite recipes, arm identities,
 seeds, sharing channels and completion authority. It appends numerical frontier and
 joint-repair workers to sequential mixed optimization over binary integers and
 continuous columns, with at most 4,096 numeric columns and 16,384 factors. Complete
 affine capture and LP bounding must be available; the redundant propagated difference
-graph is omitted from that relaxation. Explicit recipes, annotations,
+graph is omitted from that relaxation. Explicit recipes, nondefault pool sizes, annotations,
 parallel pools and purely integer models retain their finite composition.
 The numerical frontier receives the first bounded probe, preserving early completion
 without opening the finite handles; finite probes retain their order and seed positions.

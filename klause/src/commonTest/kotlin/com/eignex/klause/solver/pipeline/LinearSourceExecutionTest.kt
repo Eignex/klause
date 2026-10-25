@@ -45,18 +45,49 @@ class LinearSourceExecutionTest {
         val source = LinearSourceProblem(
             listOf(LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE),
                 LinearSourceVariable("r", false, SemanticRational.ZERO, SemanticRational.ONE)),
-            emptyList(), LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
+            listOf(LinearSourceRow(listOf(LinearSourceTerm(0, SemanticRational.ONE),
+                LinearSourceTerm(1, SemanticRational.ONE)),
+                lower = SemanticRational.of(BIG_ONE, bigIntOf(2)))),
+            LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
         )
-        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
-            ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED, linearTraversal = LinearTraversal.FINITE_COMPANIONS))
-        assertIs<SourceProblemRoute.Finite>(invocation.route)
+        for (traversal in listOf(LinearTraversal.AUTOMATIC, LinearTraversal.FINITE_COMPANIONS)) {
+            val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
+                ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED, linearTraversal = traversal))
+            assertIs<SourceProblemRoute.Finite>(invocation.route)
 
-        val result = SourceSetup.execute(SourceExecutionRequest(invocation,
-            ExecutionOptions(ExecutionOption.sourceLpWorkLimit(0))))
+            val result = assertIs<SourceExecutionResult.Finite>(SourceSetup.execute(SourceExecutionRequest(invocation,
+                ExecutionOptions(ExecutionOption.sourceLpWorkLimit(0)), presolveConfig = PresolveConfig.NONE)))
 
-        assertIs<SourceExecutionResult.Finite>(result)
-        assertEquals(LinearSourceConclusion.OPTIMAL, result.linearSource?.conclusion)
-        assertEquals(BigFraction.ZERO, result.linearSource?.incumbent?.objective)
+            assertEquals(LinearSourceConclusion.OPTIMAL, result.linearSource?.conclusion)
+            assertEquals(BigFraction.ZERO, result.linearSource?.incumbent?.objective)
+            val completed = assertIs<FiniteSolveOutcome.Completed>(result.result.outcome)
+            assertEquals(0L, completed.stats.smt.completeSearchStages?.get("finiteNumericalCompanionOptimal"))
+        }
+    }
+
+    @Test
+    fun `automatic and explicit finite companions should consume checked numerical completion`() {
+        val source = LinearSourceProblem(
+            listOf(LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE),
+                LinearSourceVariable("r", false, SemanticRational.ZERO, SemanticRational.ONE)),
+            listOf(LinearSourceRow(listOf(LinearSourceTerm(0, SemanticRational.ONE),
+                LinearSourceTerm(1, SemanticRational.ONE)),
+                lower = SemanticRational.of(BIG_ONE, bigIntOf(2)))),
+            LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE),
+                LinearSourceTerm(1, SemanticRational.ONE))),
+        )
+        for (traversal in listOf(LinearTraversal.AUTOMATIC, LinearTraversal.FINITE_COMPANIONS)) {
+            val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
+                ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED, linearTraversal = traversal))
+
+            val result = assertIs<SourceExecutionResult.Finite>(SourceSetup.execute(SourceExecutionRequest(invocation,
+                ExecutionOptions(), presolveConfig = PresolveConfig.NONE)))
+
+            assertEquals(LinearSourceConclusion.OPTIMAL, result.linearSource?.conclusion)
+            assertEquals(BigFraction.of(BIG_ONE, bigIntOf(2)), result.linearSource?.incumbent?.objective)
+            val completed = assertIs<FiniteSolveOutcome.Completed>(result.result.outcome)
+            assertEquals(1L, completed.stats.smt.completeSearchStages?.get("finiteNumericalCompanionOptimal"))
+        }
     }
 
     @Test
