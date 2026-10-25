@@ -32,6 +32,7 @@ class LpBoundCertificationTest {
         assertEquals(0, result.metrics.pointChecks)
         assertEquals(1, result.metrics.attempts)
         assertEquals(2, result.metrics.dualChecks)
+        assertNotNull(result.metrics.vectorRejection)
         assertNotNull(bound.support)
     }
 
