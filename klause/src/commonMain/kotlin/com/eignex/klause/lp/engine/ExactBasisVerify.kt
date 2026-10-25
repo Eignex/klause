@@ -258,7 +258,8 @@ internal fun verifyExactBasis(
             // Publish this complete independent witness before BTRAN can exhaust the remaining budget.
             val point = verifyBasisCandidates(model, authority, primal, null, null, meter)
             witness = point.witness
-            point.metrics.decline?.takeUnless { it == ReconstructionDecline.CANDIDATE }?.let { meter.stop(it) }
+            point.metrics.decline?.takeUnless { !primalOnly && it == ReconstructionDecline.CANDIDATE }
+                ?.let { meter.stop(it) }
             if (!primalOnly) {
                 meter.phase = ExactBasisPhase.DUAL
                 val dual = solveExactBasis(checkNotNull(factors), authority.costs, true, meter)

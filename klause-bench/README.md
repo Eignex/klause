@@ -3177,6 +3177,18 @@ dimension guard but still decline completion. The probe makes no paired timing
 claim. [#3568](https://github.com/Eignex/klause/issues/3568) tracks larger residual
 completion and deeper diagnosis of the within-dimension decline.
 
+[Diagnosis 8217](https://lab.eignex.com/jobs/8217), at `117f3e0d2e`, retains
+8170's original hashes, exact/P1/10 s, seed 1, numerical joint repair and presolve
+off on Mac/aarch64. Rgn exceeds small exact scalar-bit admission. Seven sparse
+residuals complete through exact primal basis verification and supply 254 retained
+component reuses; its final 104.39999928 witness passes independent solchecker.
+This is a feasible-point claim, without a native optimality proof. Modglob reaches
+nine floating feasible candidates but each exhausts the 2M exact-primal work
+allowance; 115 unchanged declines reuse their result. Those failed basis attempts
+spend 17,074,248 work and 358,453,908 modeled allocation bytes in total, separately
+from residual assembly and floating work. The allocation is not measured RSS, and
+this diagnostic establishes no paired speedup or default-route quality advantage.
+
 `bench.profile.MpsProofFrontier` takes `suite=ID problem=NAME sha256=HEX exact=true|false`
 for one hash-matched original source. It uses the same numerical source setup and
 invocation, seed 3 and a ten-second solve deadline under the existing LP allowances.
