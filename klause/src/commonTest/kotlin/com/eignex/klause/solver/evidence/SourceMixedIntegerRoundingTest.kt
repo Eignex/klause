@@ -1,7 +1,9 @@
 package com.eignex.klause.solver.evidence
 
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.shl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -68,5 +70,21 @@ class SourceMixedIntegerRoundingTest {
         val check = SourceEvidenceVerifier(source).verify(SourceEvidence(scope, SourceClaim.Consequence(forged), proof))
 
         assertIs<SourceEvidenceCheck.Rejected>(check)
+    }
+
+    @Test
+    fun `mixed rounding should withhold a proof when an intermediate exceeds the scalar allowance`() {
+        val endpoint = BigFraction.of(BIG_ONE shl 4095, BIG_ONE)
+        val source = SourceProofContext(scope, setOf(x, y), mapOf(
+            "mixed" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.MINUS_ONE), half)),
+            "bound" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), endpoint)),
+        ))
+        val proof = SourceDerivation.MixedIntegerRounding(SourceDerivation.Premise("mixed"),
+            listOf(SourceDerivation.Premise("bound")))
+        val conclusion = SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ofLong(-2)), endpoint)
+
+        val check = SourceEvidenceVerifier(source).verify(SourceEvidence(scope, SourceClaim.Consequence(conclusion), proof))
+
+        assertIs<SourceEvidenceCheck.Unavailable>(check)
     }
 }
