@@ -3,6 +3,7 @@ package com.eignex.klause.lp.bounding
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -31,6 +32,26 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LpEngineTest {
+    @Test
+    fun `root pruning retains complete useful element property groups`() {
+        val problem = Problem(
+            0, 3, arrayOf(IntDomain(0, 1), IntDomain(0, 2), IntDomain(0, 9)),
+            arrayOf(
+                Element(0, 1, longArrayOf(1, 2), false, 0),
+                Element(0, 2, longArrayOf(8, 9), false, 0),
+            ),
+        )
+        LpEngine(
+            problem, LinearObjective(intCoefficients = longArrayOf(0, 1, 0)),
+            LpParams(lpConfig = LpConfig.AUTO), SolveStatsSink("groups"),
+        ).use { engine ->
+            engine.pruneIneffectiveHulls(Cancellation.Never)
+
+            val relaxation = assertNotNull(engine.lpRelaxer).build(PropagationSession(problem))
+            assertEquals(setOf(0, 1), relaxation.hullFactorIds.toSet())
+        }
+    }
+
     @Test
     fun `fixed fractional real leaf should retain its exact contradiction`() {
         val problem = Problem(

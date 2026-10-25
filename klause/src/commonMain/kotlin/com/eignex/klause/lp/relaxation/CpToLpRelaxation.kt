@@ -666,7 +666,9 @@ internal class CpToLpRelaxation(
     internal val auxiliarySources: LpAuxiliarySources = LpAuxiliarySources(),
     deferred: Boolean = false,
     private val projections: PreparedFactorProjections? = (problem as? BakedProblem)?.factorProjections,
+    elementIndexes: Set<Int>? = null,
 ) {
+    private val elementIndexes = elementIndexes?.toSet()
     private val linearProjection = LinearLpProjection()
 
     /** Verified makespan plans for the scheduling globals; null when disabled or none applicable. */
@@ -1265,7 +1267,7 @@ internal class CpToLpRelaxation(
                 // cut-only or scheduling-view factors) have no LP projection and
                 // contribute nothing here — they are handled by the separators and the blocks above.
                 currentHullEnabled = factorId !in suppressedHullFactors && !objectiveCone &&
-                    factor.lpHullEnabled(hullFlags)
+                    factor.lpHullEnabled(hullFlags, elementIndexes)
                 if (projections == null) {
                     factor.emitLpRelaxation(this, linearProjection)
                 } else {

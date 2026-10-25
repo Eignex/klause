@@ -52,6 +52,7 @@ internal data class LpAdmission(
     val withinCeiling: Boolean,
     val explicitBounding: Boolean,
     val plan: LpPlan,
+    val elementIndexes: Set<Int>? = null,
 )
 
 /**
@@ -332,7 +333,7 @@ object LpAutoConfig {
                 // the build); the driver-emitted circuit arcs and time-indexed model keep their own.
                 if (circuit) admit(circuitEstimate(problem))
                 if (constArrayElement) {
-                    admit(hullEstimate(problem, rootBoxes(), LpTechnique.ELEMENT, HullFamily.ELEMENT))
+                    for (estimate in elementEstimates(problem, rootBoxes())) admit(estimate)
                 }
                 if (table) admit(hullEstimate(problem, rootBoxes(), LpTechnique.TABLE, HullFamily.TABLE))
                 if (nValue) admit(hullEstimate(problem, rootBoxes(), LpTechnique.NVALUE, HullFamily.NVALUE))
@@ -342,7 +343,8 @@ object LpAutoConfig {
                 if (scheduling) admit(timeIndexedEstimate(problem))
             }
         }
-        val acceptedHulls = acceptUnderBudget(rows, baseCols, candidates, hullCap)
+        val selection = acceptUnderBudget(rows, baseCols, candidates, hullCap)
+        val acceptedHulls = selection.techniques
 
         // Tableau eligibility belongs to the assembled model's exact columns and row data;
         // source mapping discharges rounding bounds and inherited guards before sharing a cut.
@@ -391,7 +393,8 @@ object LpAutoConfig {
             },
         )
         observe?.invoke(LpAdmission(rows, baseCols, cells, structApplicable,
-            config.resolved(LpTechnique.BOUNDING), coneRequested || cells <= ceilingCap, base.bounding, plan))
+            config.resolved(LpTechnique.BOUNDING), coneRequested || cells <= ceilingCap, base.bounding, plan,
+            if (base.element) null else selection.elementIndexes.toSet()))
         return plan
     }
 
@@ -400,7 +403,14 @@ object LpAutoConfig {
     private fun tableauCells(rows: Long, cols: Long): Long = rows * (cols + rows + 1L)
 
     /** A gated hull's estimated added columns and rows, summed over its factors of one kind. */
-    private class HullEstimate(val key: LpTechnique, val cols: Long, val rows: Long)
+    private class HullEstimate(
+        val key: LpTechnique,
+        val cols: Long,
+        val rows: Long,
+        val elementIndex: Int? = null,
+    )
+
+    private class HullSelection(val techniques: Set<LpTechnique>, val elementIndexes: Set<Int>)
 
     /** Whether [h]'s hull may compete for the size budget under [config]: an explicit override wins;
      *  else the technique's cost tier must be permitted by the emphasis (`AGGRESSIVE`), or — the middle
@@ -420,18 +430,48 @@ object LpAutoConfig {
         baseCols: Long,
         candidates: List<HullEstimate>,
         maxCells: Long,
-    ): Set<LpTechnique> {
+    ): HullSelection {
         var r = baseRows
         var c = baseCols
         val accepted = HashSet<LpTechnique>()
-        for (h in candidates.sortedBy { it.cols + it.rows }) {
+        val elementIndexes = LinkedHashSet<Int>()
+        for (h in candidates.sortedWith(compareBy<HullEstimate> { it.cols + it.rows }.thenBy { it.elementIndex })) {
             if (tableauCells(r + h.rows, c + h.cols) <= maxCells) {
                 r += h.rows
                 c += h.cols
                 accepted.add(h.key)
+                h.elementIndex?.let(elementIndexes::add)
             }
         }
-        return accepted
+        return HullSelection(accepted, elementIndexes)
+    }
+
+    private suspend fun SequenceScope<Unit>.elementEstimates(problem: Problem, boxes: RootBoxes): List<HullEstimate> {
+        var visits = 0
+        val groups = LinkedHashMap<Int, MutableList<Element>>()
+        for (factor in problem.factors) {
+            if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+            if (factor is Element) groups.getOrPut(factor.idx) { ArrayList() }.add(factor)
+        }
+        val estimates = ArrayList<HullEstimate>()
+        for ((index, factors) in groups) {
+            val choices = ElementLpChoices()
+            var cols = 0L
+            var rows = 0L
+            var complete = true
+            for (factor in factors) {
+                if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+                val estimate = prepareLpHull(factor, boxes, choices)
+                if (estimate == null) {
+                    complete = false
+                    break
+                }
+                cols += estimate.cols
+                rows += estimate.rows
+            }
+            if (complete) estimates.add(HullEstimate(LpTechnique.ELEMENT, cols, rows, index))
+        }
+        return estimates
     }
 
     /** Arc-model columns (`Σ` candidate arcs) + degree/channel rows over the under-cap [Circuit]
@@ -475,11 +515,10 @@ object LpAutoConfig {
         var cols = 0L
         var rows = 0L
         var any = false
-        val elementChoices = ElementLpChoices()
         for (f in problem.factors) {
             if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
             if (f.lpHullFamily() != family) continue
-            val e = (if (f is Element) prepareLpHull(f, boxes, elementChoices) else prepareLpHull(f, boxes)) ?: continue
+            val e = prepareLpHull(f, boxes) ?: continue
             cols += e.cols
             rows += e.rows
             any = true

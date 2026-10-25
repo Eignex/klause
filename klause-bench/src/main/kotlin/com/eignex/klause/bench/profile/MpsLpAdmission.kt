@@ -205,13 +205,14 @@ internal object MpsLpAdmission {
         cone: Boolean,
         stop: Cancellation,
         element: Boolean = false,
+        elementIndexes: Set<Int>? = null,
     ): Any {
         check(!stop())
         // Reflection keeps diagnostic access to internal assembly out of the published API.
         val type = Class.forName("com.eignex.klause.lp.relaxation.CpToLpRelaxation")
         val constructor = type.constructors.single { it.parameterTypes.last().simpleName == "DefaultConstructorMarker" }
-        check(constructor.parameterCount == 23)
-        val values = arrayOfNulls<Any>(23)
+        check(constructor.parameterCount == 24)
+        val values = arrayOfNulls<Any>(24)
         constructor.parameterTypes.forEachIndexed { index, parameter ->
             if (parameter == Boolean::class.javaPrimitiveType) values[index] = false
         }
@@ -219,7 +220,8 @@ internal object MpsLpAdmission {
         values[1] = objective
         values[2] = element
         values[11] = cone
-        values[21] = (1 or (1 shl 1) or (1 shl 2) or (1 shl 11)).inv()
+        values[21] = elementIndexes
+        values[22] = (1 or (1 shl 1) or (1 shl 2) or (1 shl 11) or (1 shl 21)).inv()
         val relaxer = constructor.newInstance(*values)
         val domainType = Class.forName("com.eignex.klause.lp.relaxation.RootDomains")
         val domains = domainType.constructors.single().newInstance(problem)

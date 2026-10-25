@@ -26,12 +26,13 @@ import kotlin.test.assertTrue
 
 class LpRetainedSourcesTest {
     @Test
-    fun `shared element choices retain exact joint bounds across holes and pop`() {
+    fun `selected element groups retain exact joint bounds across holes and pop`() {
         val problem = Problem(
-            0, 3, arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 1)),
+            0, 5, arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 1), IntDomain(0, 2), IntDomain(0, 2)),
             arrayOf(
                 Element(0, 1, longArrayOf(2, 0, 2), false, 0),
                 Element(0, 2, longArrayOf(7, 0, 1, 0), false, -1),
+                Element(3, 4, longArrayOf(2, 1, 2), false, 0),
             ),
         )
         var live = problem.finiteIntDomain(0)
@@ -41,7 +42,10 @@ class LpRetainedSourcesTest {
         }
         val sources = LpRetainedSources(
             problem,
-            CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(0, 1, 1)), elementHull = true),
+            CpToLpRelaxation(
+                problem, LinearObjective(intCoefficients = longArrayOf(0, 1, 1, 0, 1)),
+                elementHull = true, elementIndexes = setOf(0),
+            ),
         )
         LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
             val root = assertNotNull(sources.prepare(owner.state, domains))
@@ -76,7 +80,7 @@ class LpRetainedSourcesTest {
             restored.commit()
             assertEquals(BigFraction.ONE, assertNotNull(sources.liveBounds(domains)[column].upper).number.value)
             assertEquals(BigFraction.ONE, assertNotNull(owner.solve()).lowerBound)
-            assertEquals(6, owner.state.model.n)
+            assertEquals(8, owner.state.model.n)
         }
     }
 

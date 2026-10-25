@@ -16,6 +16,7 @@ import com.eignex.klause.factor.global.GlobalCardinality
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.LpHullGroupKey
 import com.eignex.klause.lp.cut.AggregationMirSeparator
 import com.eignex.klause.lp.cut.AllDifferentSeparator
 import com.eignex.klause.lp.cut.AssignmentObjectiveCut
@@ -43,6 +44,7 @@ import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.newPersistentLpSolver
 import com.eignex.klause.lp.engine.solveAndCertify
+import com.eignex.klause.lp.lpHullGroupKey
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LeafRealResult
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
@@ -133,6 +135,7 @@ internal class LpEngine(
     }
 
     private var closed = false
+    private val requestedPlan = params0.lpPlan
     internal var primalPropagationWork: Long = 0L
     internal var primalSearchWork: Long = 0L
     internal var rootRoundingWarmStart: RootRoundingWarmStart? = null
@@ -194,7 +197,7 @@ internal class LpEngine(
             problem,
             next,
             LpParams(
-                params.lpPlan,
+                requestedPlan,
                 params.lpConfig,
                 token,
                 params.solveBudgetMillis,
@@ -277,9 +280,11 @@ internal class LpEngine(
         return supported
     }
 
+    private var elementIndexes: Set<Int>? = null
+
     /** Construct the relaxer for [plan]'s hull flags, or null when bounding is off. Factored so the
-     *  ineffective-hull probe can build variants with whole families ([plan]) or individual factor
-     *  hulls ([suppressedHullFactors]) turned off. */
+     *  ineffective-hull probe can build variants with whole families ([plan]) or factor groups
+     *  ([suppressedHullFactors]) turned off. */
     private fun buildRelaxer(
         plan: LpPlan,
         suppressedHullFactors: Set<Int> = emptySet(),
@@ -308,6 +313,7 @@ internal class LpEngine(
                 auxiliarySources = auxiliarySources,
                 deferred = deferred,
                 projections = projections,
+                elementIndexes = elementIndexes,
             )
         } else {
             null
@@ -988,9 +994,9 @@ internal class LpEngine(
     /**
      * Drop each convex hull that adds no strength to the root LP optimum, rebuilding the relaxer once
      * over the survivors. Per-factor hulls (every factor whose LP projection
-     * emits a [com.eignex.klause.lp.Contribution.HULL] row) are pruned individually: each is solved
-     * out in turn and kept only if its removal loosens the optimum, so two factors of the same family
-     * are judged separately. The non-per-factor hulls (cumulative time-indexed, diffn, Boolean RLT) are
+     * emits a [com.eignex.klause.lp.Contribution.HULL] row) are pruned separately, except Element
+     * properties sharing an index, which are removed as a complete group. Each group is kept only
+     * if its removal loosens the optimum. The driver hulls (cumulative time-indexed, diffn, Boolean RLT) are
      * emitted by the driver, not a factor, so they carry no per-factor tag and are pruned by whole
      * family. A hull whose removal leaves the optimum unchanged (often because root propagation already
      * achieves the same bound) is pure per-node build cost and is dropped. This is the per-technique
@@ -1007,7 +1013,7 @@ internal class LpEngine(
         val relaxer = lpRelaxer ?: return
         val full = rootLpObjective(relaxer, cancellation)
         if (full.isNaN()) return
-        // Per-factor: greedily solve out each tagged hull contribution; removing a hull can only loosen a
+        // Greedily solve out each tagged hull group; removing a hull can only loosen a
         // minimisation optimum, so an unchanged optimum (within tol) means it added no root strength. A
         // NaN probe (the hull is the only structure) keeps it. Candidates are the factors that emitted a
         // HULL row in the full build.
@@ -1017,10 +1023,18 @@ internal class LpEngine(
         } catch (_: LpAssemblyCancelled) {
             return
         }
-        for (factorId in hullIds) {
-            val probe = buildRelaxer(params.lpPlan, suppressed + factorId) ?: continue
+        val groups = LinkedHashMap<LpHullGroupKey, MutableSet<Int>>()
+        for ((factorId, factor) in problem.factors.withIndex()) {
+            if (factorId % CONSTRUCTION_BATCH_SIZE == 0 && cancellation()) return
+            groups.getOrPut(factor.lpHullGroupKey(factorId)) { LinkedHashSet() }.add(factorId)
+        }
+        val candidates = hullIds.map { problem.factors[it].lpHullGroupKey(it) }.distinct()
+        for (key in candidates) {
+            if (cancellation()) return
+            val group = groups.getValue(key)
+            val probe = buildRelaxer(params.lpPlan, suppressed + group) ?: continue
             val bound = rootLpObjective(probe, cancellation)
-            if (!bound.isNaN() && bound >= full - HULL_PRUNE_TOL) suppressed.add(factorId)
+            if (!bound.isNaN() && bound >= full - HULL_PRUNE_TOL) suppressed.addAll(group)
         }
         // Per-family: the driver-emitted hulls with no per-factor tag.
         var plan = params.lpPlan
@@ -1040,7 +1054,7 @@ internal class LpEngine(
         /** One disabler per prunable hull that is **not** per-factor (emitted by the driver, not a
          *  factor projection, so it carries no [com.eignex.klause.lp.Contribution] tag): returns the plan
          *  with that family off, or null when it is already off. The per-factor convex hulls are pruned
-         *  individually by [pruneIneffectiveHulls]; the base relaxation, objective cone and circuit arcs
+         *  in factor groups by [pruneIneffectiveHulls]; the base relaxation, objective cone and circuit arcs
          *  are not hulls and are excluded. */
         val HULL_DISABLERS: List<(LpPlan) -> LpPlan?> = listOf(
             { p -> if (p.cumulativeTimeIndexed) p.copy(cumulativeTimeIndexed = false) else null },
@@ -1055,7 +1069,9 @@ internal class LpEngine(
 
     internal fun preparation(): Iterator<Unit> = sequence {
         params.lpConfig?.let { config ->
-            val plan = with(LpAutoConfig) { prepare(problem, config, params.lpPlan, objective) }
+            val plan = with(LpAutoConfig) {
+                prepare(problem, config, requestedPlan, objective) { elementIndexes = it.elementIndexes }
+            }
             params = params.copy(lpPlan = plan)
         }
         structuralCutSupport = structuralCutSupport || params.lpPlan.circuit

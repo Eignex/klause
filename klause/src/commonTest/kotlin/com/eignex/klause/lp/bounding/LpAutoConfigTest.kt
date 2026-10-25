@@ -21,9 +21,73 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpAutoConfigTest {
+    @Test
+    fun `element admission selects complete index groups alongside competing hulls`() {
+        val problem = Problem(
+            0, 6, Array(6) { IntDomain(0, 2) },
+            arrayOf(
+                Element(0, 2, longArrayOf(0, 1, 0), false, 0),
+                Element(0, 3, longArrayOf(1, 0, 1), false, 0),
+                Element(1, 4, longArrayOf(0, 1, 0), false, 0),
+                Element(1, 5, longArrayOf(1, 0, 1), false, 0),
+                Table(intArrayOf(0, 1), longArrayOf(0, 0, 1, 1)),
+            ),
+            settings = ProblemSettings(lpMaxTableauCells = 200L),
+        )
+
+        val admission = LpAutoConfig.admission(problem, LpConfig.AUTO, LpPlan())
+        val objective = LinearObjective(intCoefficients = longArrayOf(0, 0, 1, 1, 1, 1))
+
+        assertEquals(setOf(0), admission.elementIndexes)
+        assertTrue(admission.plan.table)
+        LpEngine(problem, objective, LpParams(lpConfig = LpConfig.AUTO), SolveStatsSink("groups")).use { engine ->
+            val relaxation = assertNotNull(engine.lpRelaxer).build(PropagationSession(problem))
+            assertEquals(setOf(0, 1, 4), relaxation.hullFactorIds.toSet())
+            assertEquals(3, relaxation.colReq.count { it?.size == 2 })
+            engine.forObjective(objective.negated(), Cancellation.Never).use { alternate ->
+                val rebuilt = assertNotNull(alternate.lpRelaxer).build(PropagationSession(problem))
+                assertEquals(relaxation.hullFactorIds.toSet(), rebuilt.hullFactorIds.toSet())
+            }
+        }
+    }
+
+    @Test
+    fun `element admission declines a group when one property cannot be built`() {
+        val problem = Problem(
+            0, 3, Array(3) { IntDomain(0, 2) },
+            arrayOf(
+                Element(0, 1, longArrayOf(0, 1, 2), false, 0),
+                Element(0, 2, longArrayOf(0, 1, 2), false, 10),
+            ),
+        )
+
+        val admission = LpAutoConfig.admission(problem, LpConfig.AGGRESSIVE, LpPlan())
+
+        assertFalse(admission.plan.element)
+        assertEquals(emptySet(), admission.elementIndexes)
+    }
+
+    @Test
+    fun `explicit element plans retain all groups above the automatic budget`() {
+        val problem = Problem(
+            0, 2, Array(2) { IntDomain(0, 2) },
+            arrayOf(Element(0, 1, longArrayOf(0, 1, 2), false, 0)),
+            settings = ProblemSettings(lpMaxTableauCells = 1L),
+        )
+
+        val automatic = LpAutoConfig.admission(problem, LpConfig.AUTO, LpPlan())
+        val explicit = LpAutoConfig.admission(problem, LpConfig.AUTO, LpPlan(element = true))
+
+        assertFalse(automatic.plan.element)
+        assertEquals(emptySet(), automatic.elementIndexes)
+        assertTrue(explicit.plan.element)
+        assertNull(explicit.elementIndexes)
+    }
+
     @Test
     fun `element admission charges shared index choices once`() {
         val problem = Problem(

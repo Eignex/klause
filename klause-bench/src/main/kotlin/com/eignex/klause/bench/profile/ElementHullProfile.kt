@@ -9,9 +9,12 @@ import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.formats.xcsp3.Xcsp3
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpAutoConfig
 import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.presolve.PresolveBudget
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
@@ -21,6 +24,7 @@ import com.sun.management.ThreadMXBean
 import java.io.File
 import java.lang.management.ManagementFactory
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -71,6 +75,8 @@ internal object ElementHullProfile {
             put("forcedElementHull", true)
             put("defaultElementAdmission", LpAutoConfig.resolve(problem, LpConfig.AUTO).element)
             put("aggressiveElementAdmission", LpAutoConfig.resolve(problem, LpConfig.AGGRESSIVE).element)
+            put("defaultSelection", selection(problem, prepared.objective, LpConfig.AUTO, stop))
+            put("aggressiveSelection", selection(problem, prepared.objective, LpConfig.AGGRESSIVE, stop))
             put("preparationWork", budget.spent())
             put("preparationWorkAllowance", budget.allowance)
             put("elementFactors", elements.size)
@@ -91,6 +97,39 @@ internal object ElementHullProfile {
         }
         out.resolve("element-hull.json").writeText("$report\n")
         println(report)
+    }
+
+    private fun selection(
+        problem: Problem,
+        objective: LinearObjective?,
+        config: LpConfig,
+        stop: Cancellation,
+    ) = buildJsonObject {
+        val method = LpAutoConfig.javaClass.methods.single { it.name.startsWith("admission$") }
+        val admission = method.invoke(LpAutoConfig, problem, config, LpPlan())
+        @Suppress("UNCHECKED_CAST")
+        val indexes = get(admission, "ElementIndexes") as Set<Int>
+        val plan = get(admission, "Plan") as LpPlan
+        put("indexes", buildJsonArray { indexes.sorted().forEach { add(JsonPrimitive(it)) } })
+        for (name in listOf("EstimatedRows", "EstimatedColumns", "EstimatedCells")) {
+            put(name.replaceFirstChar { it.lowercase() }, get(admission, name) as Long)
+        }
+        put("elementEnabled", plan.element)
+        put("elementOnlyProjection", true)
+        val bean = ManagementFactory.getThreadMXBean() as ThreadMXBean
+        val thread = Thread.currentThread().threadId()
+        val before = bean.getThreadAllocatedBytes(thread)
+        val started = System.nanoTime()
+        val relaxation = MpsLpAdmission.rootRelaxation(problem, objective, false, stop, plan.element, indexes)
+        put("assemblyNs", System.nanoTime() - started)
+        put("assemblyThreadAllocatedBytes", bean.getThreadAllocatedBytes(thread) - before)
+        val model = get(relaxation, "Model")
+        val rows = get(model, "M") as Int
+        val columns = get(model, "N") as Int
+        put("rows", rows)
+        put("columns", columns)
+        put("emittedCells", rows.toLong() * (columns.toLong() + rows + 1))
+        put("selectorColumns", (get(relaxation, "ColReq") as Array<*>).count { it != null })
     }
 
     private fun get(receiver: Any, name: String): Any =
