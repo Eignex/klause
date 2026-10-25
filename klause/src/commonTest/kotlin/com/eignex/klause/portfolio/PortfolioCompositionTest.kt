@@ -5,13 +5,21 @@ import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.SmallestDomain
 import com.eignex.klause.backtrack.toBacktrackParams
+import com.eignex.klause.factor.scheduling.Diffn
+import com.eignex.klause.factor.table.Element
+import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SearchGroup
 import com.eignex.klause.ir.SearchHints
 import com.eignex.klause.ir.ValueSelection
 import com.eignex.klause.ir.VariableSelection
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.ProblemClass
+import com.eignex.klause.solver.ProblemProfile
+import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -450,10 +458,27 @@ class PortfolioCompositionTest {
     }
 
     @Test
+    fun `scheduling specialization should require element alternatives`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP).copy(lpCeiling = LpConfig.OFF)
+        for (element in listOf(false, true)) {
+            val factors = mutableListOf<Factor>(Diffn(intArrayOf(0), intArrayOf(1), longArrayOf(1), longArrayOf(1)))
+            if (element) factors += Element(0, 3, longArrayOf(0, 1), arrIsVars = false, indexOffset = 0)
+            val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) }, factors).bake()
+            val objective = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1))
+            val facts = ProblemFacts.of(problem, ProblemProfile.of(problem, true), LpConfig.OFF, objective)
+
+            val selected = PortfolioComposition.compose(scenario, facts).filterIsInstance<LocalSearchWorkerConfig>()
+
+            assertEquals(if (element) "cbls-primary-plateau/ils-basin" else "cbls/fixed", selected.first().label)
+            assertEquals("cbls-plateau/ils-basin", selected[1].label)
+        }
+    }
+
+    @Test
     fun `scheduled mixed optimization should pair primary and full plateau neighborhoods`() {
         val scenario = PortfolioScenario.sequential(Kind.COP)
         val ordinary = ProblemFacts.assumed(Kind.COP)
-        val scheduling = ProblemFacts(ordinary.profile.copy(scheduling = true)) { true }
+        val scheduling = ProblemFacts(ordinary.profile.copy(scheduling = true), elementAlternatives = true) { true }
         val baseline = PortfolioComposition.compose(scenario, ordinary).filterIsInstance<LocalSearchWorkerConfig>()
 
         val paired = PortfolioComposition.compose(scenario, scheduling).filterIsInstance<LocalSearchWorkerConfig>()
@@ -474,7 +499,7 @@ class PortfolioCompositionTest {
         )
         for (scenario in scenarios) {
             val ordinary = ProblemFacts.assumed(scenario.kind)
-            val scheduling = ProblemFacts(ordinary.profile.copy(scheduling = true)) { true }
+            val scheduling = ProblemFacts(ordinary.profile.copy(scheduling = true), elementAlternatives = true) { true }
 
             val selected = PortfolioComposition.compose(scenario, scheduling)
 

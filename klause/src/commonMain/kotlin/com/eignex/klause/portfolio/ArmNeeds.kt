@@ -2,6 +2,7 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.factor.circuit.Circuit
 import com.eignex.klause.factor.symmetry.SymmetryHandling
+import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearForm
@@ -55,6 +56,7 @@ internal class ProblemFacts(
     val binaryPackingObjective: Boolean = false,
     val binaryEqualityObjective: Boolean = false,
     val extensionalSupports: Boolean = false,
+    val elementAlternatives: Boolean = false,
     private val relaxation: (LpEmphasis) -> Boolean,
 ) {
     private val relaxations = HashMap<LpEmphasis, Boolean>()
@@ -112,6 +114,7 @@ internal class ProblemFacts(
                         it.boolWeightValues.any { weight -> weight != 0L }
                 } == true,
                 circuit = problem.factors.any { it is Circuit },
+                elementAlternatives = problem.factors.any { it is Element },
                 extensionalSupports = profile.problemClass == ProblemClass.FiniteCp && !profile.optimizing &&
                     problem.factors.any { factor ->
                         factor is Table && factor.hi == null && factor.arity in 2..32 && factor.numTuples <= 65_536 &&
