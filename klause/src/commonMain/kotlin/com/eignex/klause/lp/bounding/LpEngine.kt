@@ -1055,7 +1055,7 @@ internal class LpEngine(
 
     internal fun preparation(): Iterator<Unit> = sequence {
         params.lpConfig?.let { config ->
-            val plan = with(LpAutoConfig) { prepare(problem, config, params.lpPlan) }
+            val plan = with(LpAutoConfig) { prepare(problem, config, params.lpPlan, objective) }
             params = params.copy(lpPlan = plan)
         }
         structuralCutSupport = structuralCutSupport || params.lpPlan.circuit

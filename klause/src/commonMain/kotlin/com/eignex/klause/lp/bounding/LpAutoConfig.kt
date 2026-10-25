@@ -39,6 +39,7 @@ import com.eignex.klause.lp.relaxation.prepareSchedulingViews
 import com.eignex.klause.lp.relaxation.schedulingViews
 import com.eignex.klause.lp.rootDomainOf
 import com.eignex.klause.lp.statesBothBounds
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
 
 internal data class LpAdmission(
@@ -130,6 +131,17 @@ object LpAutoConfig {
         return checkNotNull(result)
     }
 
+    internal fun resolve(
+        problem: Problem,
+        config: LpConfig,
+        base: LpPlan,
+        objective: LinearObjective?,
+    ): LpPlan {
+        var result: LpPlan? = null
+        sequence<Unit> { result = prepare(problem, config, base, objective) }.forEach { }
+        return checkNotNull(result)
+    }
+
     internal fun admission(problem: Problem, config: LpConfig, base: LpPlan): LpAdmission {
         var result: LpAdmission? = null
         sequence { prepare(problem, config, base) { result = it } }.forEach { }
@@ -140,10 +152,12 @@ object LpAutoConfig {
         problem: Problem,
         config: LpConfig,
         base: LpPlan,
+        objective: LinearObjective? = null,
         observe: ((LpAdmission) -> Unit)? = null,
     ): LpPlan {
         var visits = 0
         var lpEmittable = false
+        val binaryIntegerView = objective?.binaryIntegerSource != null
         var allDifferent = false
         var globalCardinality = false
         var cumulative = false
@@ -191,9 +205,15 @@ object LpAutoConfig {
                     rows += 2
                 }
 
-                is Cardinality -> rows += 2
+                is Cardinality -> {
+                    if (binaryIntegerView) lpEmittable = true
+                    rows += 2
+                }
 
-                is Clause -> rows += 1
+                is Clause -> {
+                    if (binaryIntegerView) lpEmittable = true
+                    rows += 1
+                }
 
                 is AllDifferent -> allDifferent = true
 

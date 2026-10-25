@@ -15,6 +15,7 @@ import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.meta.coreguided.CoreGuidedSearch
 import com.eignex.klause.presolve.binaryChannelLiteral
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.difference.DifferenceSystem
 import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.objective.LinearObjective
@@ -86,17 +87,17 @@ internal class ProblemFacts(
             return ProblemFacts(
                 profile,
                 binaryIntegers = binary,
-                binaryPackingObjective = binary && problem.hasPackingObjective(objective) ||
+                binaryPackingObjective = (binary && problem.hasPackingObjective(objective)) ||
                     binarySource?.let {
                         it.problem.binaryIntegers && it.problem.hasPackingObjective(it.objective)
                     } == true,
-                binaryEqualityObjective = binary && problem.hasBinaryEqualityObjective(objective) ||
+                binaryEqualityObjective = (binary && problem.hasBinaryEqualityObjective(objective)) ||
                     binarySource?.let {
                         it.problem.binaryIntegers && it.problem.hasBinaryEqualityObjective(it.objective)
                     } == true,
                 continuousObjective = objective?.realCoefficientValues?.any { it != 0.0 } == true,
                 integerLinear = problem.factors.any { it !is SymmetryHandling } && problem.factors.all {
-                    if (it is SymmetryHandling) return@all true
+                    if (it is SymmetryHandling || (binaryView && it is DifferenceSystem)) return@all true
                     if (binaryView && it.binaryChannelLiteral() != Lit.NONE) {
                         val domain = problem.rootIntDomain(it.intVars.single())
                         if (domain.min >= 0L && domain.max <= 1L) return@all true
@@ -117,7 +118,9 @@ internal class ProblemFacts(
                             factor.xs.all { problem.rootIntDomain(it).spanOrNull(32L) != null }
                     },
                 relaxation = { emphasis ->
-                    LpAutoConfig.resolve(problem, LpConfig(emphasis).cappedUnder(lpCeiling)) != LpPlan()
+                    LpAutoConfig.resolve(
+                        problem, LpConfig(emphasis).cappedUnder(lpCeiling), LpPlan(), objective,
+                    ) != LpPlan()
                 },
             )
         }
