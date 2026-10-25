@@ -77,6 +77,10 @@ internal class LinearResidualCompletion(
             admission = budget.admitSparse(cancellation) { active ->
                 SparseSourceLp.prepare(packed.rows, packed.columns, List(variables) { BigFraction.ZERO },
                     BigFraction.ZERO, policy, active).also {
+                    observe("PrimalRecoverySparseInputEntries", it.metrics.inputEntries)
+                    observe("PrimalRecoverySparseInputBits", it.metrics.scalarBits)
+                    observe("PrimalRecoverySparsePreparationWork", it.metrics.work)
+                    observe("PrimalRecoverySparsePreparationAllocation", it.metrics.allocation)
                     it.decline?.let { reason -> observe("PrimalRecoverySparsePreparation${reason.name}", 1L) }
                 }
             }
@@ -140,6 +144,9 @@ internal class LinearResidualCompletion(
                     budget.funding?.charge(0L, checked.metrics.allocation)
                     observe("PrimalRecoverySparseBasisWork", checked.metrics.work)
                     observe("PrimalRecoverySparseBasisAllocation", checked.metrics.allocation)
+                    observe("PrimalRecoverySparseBasisMaxFill", checked.metrics.peakFill.toLong())
+                    observe("PrimalRecoverySparseBasisMaxBits", checked.metrics.maxBits.toLong())
+                    observe("PrimalRecoverySparseBasisPhase_${checked.metrics.phase.name}", 1L)
                     checked.metrics.decline?.let { observe("PrimalRecoverySparseBasis${it.name}", 1L) }
                     point = budget.context.certificationPolicy.acceptNullable(LpCertifier.EXACT_BASIS,
                         checked.witness)?.primal
