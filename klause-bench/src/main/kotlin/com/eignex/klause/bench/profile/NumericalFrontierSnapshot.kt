@@ -76,7 +76,7 @@ internal class NumericalFrontierSnapshot(
         }
         return buildJsonObject {
             put("independentProofCheck", false)
-            put("scope", queryContext?.let { scope(it.scope) })
+            queryContext?.let { put("scope", scope(it.scope)) }
             put("rows", buildJsonArray {
                 rows.forEachIndexed { index, cut ->
                     require(!stop())
