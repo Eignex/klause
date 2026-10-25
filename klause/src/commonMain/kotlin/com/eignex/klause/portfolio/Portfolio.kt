@@ -39,6 +39,12 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
+internal fun initialProbeFraction(arm: Int, eligible: List<Int>, weights: IntArray): Double {
+    val weight = weights.getOrElse(arm) { 1 }.toLong()
+    val total = eligible.sumOf { weights.getOrElse(it) { 1 }.toLong() }.coerceAtLeast(weight)
+    return weight.toDouble() / total
+}
+
 /**
  * Bandit-scheduled portfolio of [PortfolioWorker] arms built by [PortfolioBuilder], mixing local
  * search, backtrack and ALNS. Each lane claims an arm selected by [UnivariateBandit], runs one
@@ -137,6 +143,12 @@ class Portfolio(
     internal var runTimeSource: TimeSource = TimeSource.Monotonic
     internal var reserveBeforeIncumbentOnly: Boolean = false
     internal var incumbentProbeArms: Set<Int> = emptySet()
+    internal var initialProbeWeights: IntArray = intArrayOf()
+        set(value) {
+            require(value.isEmpty() || value.size == workers.size)
+            require(value.all { it > 0 })
+            field = value.copyOf()
+        }
 
     internal var evidenceVerification: PortfolioEvidence? = workers.firstNotNullOfOrNull { it.evidenceModel }?.let {
         val verifier = PortfolioEvidence(it, CandidateVerifier.trusting())
@@ -641,7 +653,7 @@ class Portfolio(
         val sliceMillis: Long,
         val sliceWork: Long,
         val whole: Boolean = false,
-        val probeCount: Int = 1,
+        val probeFraction: Double = 1.0,
         val preparationRevisit: Boolean = false,
     ) {
         /** The work a resumable handle's slice may spend; a negative allowance leaves it to the run's token. */
@@ -861,7 +873,8 @@ class Portfolio(
                 if (auxiliary) minOf(time, remainingTime.inWholeMilliseconds.coerceAtLeast(1L)) else time,
                 if (auxiliary) minOf(allowance, trialWorkLimit - trialSearchWork[arm]) else allowance,
                 whole = dedicated,
-                probeCount = eligible.count { !workers[it].auxiliaryProof }.coerceAtLeast(1),
+                probeFraction = if (probing) initialProbeFraction(arm,
+                    eligible.filter { !workers[it].auxiliaryProof }, initialProbeWeights) else 1.0,
                 preparationRevisit = revisiting,
             )
         }
@@ -1197,10 +1210,10 @@ class Portfolio(
      * policy chooses among, since the policy shares time by family and an arm's segments add up to its family's.
      * A segment cut to a share per arm would chop a proof into pieces too short to finish however much of the run
      * its family won. Probes run before the policy chooses among newly admitted arms, so each takes a share per
-     * admitted arm, and the probes together never take more than half the run.
+     * admitted arm by its probe weight, and the probes together never take more than half the run.
      */
     private fun remainingShare(claim: Claim): Double =
-        REMAINING_SHARE / (if (claim.probing) claim.probeCount else familyCount)
+        if (claim.probing) REMAINING_SHARE * claim.probeFraction else REMAINING_SHARE / familyCount
 
     private fun until(millis: Long): Cancellation =
         Cancellation.until(TimeSource.Monotonic.markNow() + millis.milliseconds)

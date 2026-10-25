@@ -171,8 +171,10 @@ continuous columns, with at most 4,096 numeric columns and 16,384 factors. Compl
 affine capture and LP bounding must be available; the redundant propagated difference
 graph is omitted from that relaxation. Explicit recipes, nondefault pool sizes, annotations,
 parallel pools and purely integer models retain their finite composition.
-The numerical frontier receives the first bounded probe, preserving early completion
-without opening the finite handles; finite probes retain their order and seed positions.
+The numerical frontier receives the first bounded probe with weight three; other
+probes have weight one. The shared half-run probe allowance is split by these weights,
+so a small numerical proof can complete before opening finite handles. Finite probes
+retain their order and seed positions.
 
 Each appended worker keeps at most four seconds of active search. Numerical segments
 take at most one second and joint-repair segments 250 milliseconds, further limited
