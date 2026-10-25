@@ -72,4 +72,9 @@ class EncodingAttribution internal constructor(
     val integerConditions: Map<SourceIntId, BigInt> get() = conditions.integers()
     /** Source Boolean pins supporting a conditioned relation. */
     val booleanConditions: Map<SourceBoolId, Boolean> get() = conditions.booleans()
+
+    internal fun atFactorIndex(index: Int): EncodingAttribution = EncodingAttribution(
+        index, boolIds, intIds, realIds, intMap, realMap, auxiliaryIds,
+        affineAuxiliaries = affineDefinitions, linearGuards = guardDefinitions, conditions = conditions,
+    )
 }

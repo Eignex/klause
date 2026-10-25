@@ -468,8 +468,9 @@ can retain built-in descriptors and completed immutable linear or difference row
 through an ordered retained-factor mapping. Declarations, source coordinates,
 semantics, settings and implied flags must agree, and reconstruction must be empty.
 Ownership and complete-fragment admission are rebuilt against the reduced source;
-retained rows receive its factor attribution. Private real auxiliaries, conditioned
-rows, custom providers, changed dependencies, different bindings and resource
+retained rows receive its factor attribution while sharing immutable variable
+metadata and condition snapshots. Private real auxiliaries, conditioned rows,
+custom providers, changed dependencies, different bindings and resource
 declines require fresh preparation. Selection, row preparation and ownership have
 separate preparation observations. Each execution opens private search state.
 

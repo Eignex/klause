@@ -2061,6 +2061,22 @@ preparation costs, plus custom encoder selection/installation counts. Retained
 source bytes and build provenance bind the observations; JFR timings are
 instrumented, and native verdicts have no independent witness or proof check.
 
+[8254](https://lab.eignex.com/jobs/8254) compares `32cc4dfff6` with `1f33dff5c3`
+on 24 original and control sources: seed 3, three repeats, P1, 10 s, debug enabled,
+Linux/amd64, Serial GC and a 3 GiB heap. All 288 pairs match final feasibility,
+objective and native proof flags, with identical source, runtime and non-solver
+dependency identities. Dolmen accepts 144 witnesses; 48 checks are unknown and
+288 unsupported because of type, objective, MPS syntax or decimal limitations.
+Native optimality and UNSAT claims have no independent proof check.
+
+On original fixnet-5000, median default preparation is 291 to 251 ms; isolated
+equality preparation is 111 to 73 ms. Complete default replanning is 78 to 39 ms,
+including about 8 ms selection, 25 ms row retargeting and 5 ms ownership. Unchanged
+plan reuse stays below 1 ms. All original runs remain UNKNOWN at 10.16 s CLI wall
+time. Default/isolated peak RSS changes from 315/314 to 317/309 MiB, and theory
+checks from 880/889 to 863/907. These single-seed timings establish preparation
+savings without a general solve-throughput or memory improvement.
+
 [Lab 7712](https://lab.eignex.com/jobs/7712) compares the merged plan-reuse baseline
 `9f40a0678c` with probe polling at `3008350cf1`: six original SMT sources, seed 3,
 three repeats, one core and 10 s. All 36 cases finished. Every same-host pair matches
