@@ -104,6 +104,22 @@ internal object LocalSearchTrajectory {
                             put("pick", pick)
                             put("step", state.step)
                             put("cost", state.cost)
+                            put("workingIntegers", JsonArray((0 until problem.numIntVars).map {
+                                JsonPrimitive(state.assignment.intValue(it))
+                            }))
+                            put("weights", JsonArray(state.weights.factorWeights.map(::JsonPrimitive)))
+                            if (pick == 0L) {
+                                put("unreadIntegers", buildJsonArray {
+                                    for (variable in 0 until problem.numIntVars) {
+                                        if (state.projection.intOccurrences[variable].isEmpty()) add(JsonPrimitive(variable))
+                                    }
+                                })
+                                put("definedIntegers", buildJsonArray {
+                                    for (variable in 0 until problem.numIntVars) {
+                                        if (state.invariants?.isDefinedInt(variable) == true) add(JsonPrimitive(variable))
+                                    }
+                                })
+                            }
                             put("sourceIntegers", buildJsonObject {
                                 for ((name, variable) in parsed.intVarNames) put(name, sample.intValue(variable))
                             })
