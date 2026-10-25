@@ -314,8 +314,8 @@ internal class LinearAuthority(
                     observePrimal("PrimalRecoverySourceChecked")
                     val attempt = checkNotNull(primalAttempt)
                     if (!attempt.refinementFinished) {
-                        attempt.refined = lp.refine(coordinates, checkNotNull(recovered), rows, prepared.inactive, costs,
-                            cancellation, ::observePrimal)
+                        attempt.refined = lp.refine(coordinates, checkNotNull(recovered), rows, prepared.inactive,
+                            costs, cancellation, ::observePrimal)
                         attempt.refinementFinished = budget.funding?.paused != true && !cancellation()
                     }
                     attempt.refined?.let { refined ->
