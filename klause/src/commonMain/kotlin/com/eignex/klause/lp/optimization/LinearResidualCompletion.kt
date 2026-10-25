@@ -8,6 +8,7 @@ import com.eignex.klause.lp.engine.ExactBasisLimits
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpExactState
+import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpScopedSolver
 import com.eignex.klause.lp.engine.ReconstructionLimits
 import com.eignex.klause.lp.engine.acceptNullable
@@ -30,6 +31,7 @@ internal class LinearResidualCompletion(
     private var finished = false
     private var point: List<BigFraction>? = null
     private var floating: FloatLpResult? = null
+    private var lifetime: LpFloatAllowance? = null
     private var currentToken = Cancellation.Never
     private val token = object : Cancellation {
         override fun isCancelled() = currentToken()
@@ -96,19 +98,30 @@ internal class LinearResidualCompletion(
             budget.resumeSparse(reservation, cancellation) { prepared, active ->
                 consulted = true
                 currentToken = active
+                val funding = budget.funding
+                if (funding?.paused == true) return@resumeSparse null
+                val profile = lifetime ?: (funding?.let { policy.funded(it.remainingWork) } ?: policy.floating)
+                    .also { lifetime = it }
+                val quantum = minOf(policy.quantum, funding?.availableWork ?: policy.quantum)
+                if (quantum <= 0L) return@resumeSparse null
                 val current = owner ?: LpScopedSolver(LpExactState(prepared.model), token,
-                    context = budget.context, iterationLimit = policy.floating.iterations,
-                    workLimit = policy.floating.work).also { owner = it }
+                    context = budget.context, iterationLimit = profile.iterations,
+                    workLimit = profile.work).also { owner = it }
                 val result = floating ?: run {
                     val preparation = current.metrics.preparationWork
                     try {
-                        current.advanceFloat(policy.quantum, policy.floating, token)?.second
+                        current.advanceFloat(quantum, profile, token, retainFundingStop = true)?.second
                     } finally {
                         budget.observe(preparation = current.metrics.preparationWork - preparation,
                             floatWork = current.lastMetrics.workOps)
                         observe("PrimalRecoverySparseFloatWork", current.lastMetrics.workOps)
                         observe("PrimalRecoverySparsePivots", current.lastMetrics.pivots.toLong())
                     }
+                }
+                if (current.floatFundingStopped) {
+                    current.lastFloatTermination?.let { observe("PrimalRecoverySparseFloat${it.name}", 1L) }
+                    finished = !token()
+                    return@resumeSparse null
                 }
                 if (current.floatPaused) return@resumeSparse null
                 if (floating == null) {
@@ -179,6 +192,7 @@ internal class LinearResidualCompletion(
         rows = null
         point = null
         floating = null
+        lifetime = null
         finished = false
         paused = false
     }

@@ -302,7 +302,9 @@ leaves and joint repair consume those checked incumbents through the same author
 Residual completion seeks feasibility; attainment still requires checked objective agreement.
 Residuals rejected by small exact input admission can prepare a sparse feasibility
 query with the shared source budget. Its floating cursor survives funding pauses;
-completed coordinates undergo bounded rational reconstruction and primal-only exact
+the lifetime uses the caller's remaining cumulative funding and consultation work
+requests follow its current grant, without renewing paid preparation or numerical work.
+Completed coordinates undergo bounded rational reconstruction and primal-only exact
 basis verification. These checks publish no dual bound or conflict.
 Primal-only verification removes basic logical unit columns before factoring the
 remaining structural core, then recovers their values and checks all original
