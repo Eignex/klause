@@ -18,14 +18,14 @@ enum class PresolvePreparationStage {
     ENGINE_BAKE,
     /** Reconstruction of source encoders and component ownership. */
     SOURCE_ENCODER,
+    /** Assembly of exact-real difference guidance for a finite projection. */
+    REAL_DIFFERENCE,
     /** Descriptor selection and retained-factor validation for source planning. */
     SOURCE_SELECTION,
     /** Immutable arithmetic row installation or retained-row attribution. */
     SOURCE_ROWS,
     /** Authoritative component ownership and complete-fragment admission. */
     SOURCE_OWNERSHIP,
-    /** Assembly of exact-real difference guidance for a finite projection. */
-    REAL_DIFFERENCE,
 }
 
 /** One preparation operation, separate from elective pass analysis. */
