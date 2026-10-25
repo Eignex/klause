@@ -20,6 +20,18 @@ import kotlin.test.fail
 class RootPropagationTest {
 
     @Test
+    fun `unchanged sparse sets should not repeat input assumptions`() {
+        for (values in listOf(longArrayOf(0, 100_000), longArrayOf(Long.MIN_VALUE, 0, Long.MAX_VALUE))) {
+            val problem = Problem(0, 1, arrayOf(intDomainFromSurvivors(values)), emptyArray())
+            val assumptions = implied(problem.propagate()).toAssumptions()
+
+            val result = implied(problem.propagate(assumptions))
+
+            assertEquals(emptyList(), result.intSetKeys.toList())
+        }
+    }
+
+    @Test
     fun `sparse signed word domains should capture survivors without walking gaps`() {
         val cases = listOf(
             longArrayOf(Long.MIN_VALUE, 0, Long.MAX_VALUE),
