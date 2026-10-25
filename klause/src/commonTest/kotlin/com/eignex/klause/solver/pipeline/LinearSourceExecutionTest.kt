@@ -52,7 +52,7 @@ class LinearSourceExecutionTest {
         assertIs<SourceProblemRoute.Finite>(invocation.route)
 
         val result = SourceSetup.execute(SourceExecutionRequest(invocation,
-            ExecutionOptions(ExecutionOption.sourceLpWorkLimit(0), ExecutionOption.maxFlips(0))))
+            ExecutionOptions(ExecutionOption.sourceLpWorkLimit(0))))
 
         assertIs<SourceExecutionResult.Finite>(result)
         assertEquals(LinearSourceConclusion.OPTIMAL, result.linearSource?.conclusion)
