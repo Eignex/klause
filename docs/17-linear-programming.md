@@ -193,7 +193,9 @@ or exact feasibility continuation. A retained basis supplies a dual proposal by
 reusing logical-column layout, peeling singleton equations and variables without
 fill, and solving admitted residual components with the rational basis factors.
 Factorization and complete verification share the certificate budget; an unresolved
-component retains its proposed entries. A refused common denominator can propose
+component retains its proposed entries. Basis-derived bounds require both rational
+and exact-basis policy acceptance; their observer work is charged once across the
+two mechanisms. A refused common denominator can propose
 independent continued-fraction entries under the same denominator and spending
 limits; approximation tolerances select proposals only. Every proposal must pass
 the complete exact reduced-cost and bound-side check. Diagnostics retain the
