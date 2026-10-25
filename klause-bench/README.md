@@ -2871,6 +2871,91 @@ numerical sources decline before retained LP preparation and supply no batching
 or sparse-lifetime cost evidence. These results support the checked binding
 infrastructure without changing default worker admission.
 
+### Bounded numerical companions in finite MPS portfolios
+
+[Qualification 8332](https://lab.eignex.com/jobs/8332) compares automatic admission
+at `c19fef3db2` with unmodified main `02fd784969`, including retained integer
+probing and complete element LP groups. It retains all 20 source identities,
+seeds 1/2/3, 10/30-second budgets, P1, default presolve and declared source
+semantics. All 360 commands complete on Mac/aarch64 with debug off, a 3 GiB heap
+and Serial GC. Source hashes, runtime/dependency hashes and runtime options match
+across arms; records retain revision and installed-build fingerprints.
+Explicit compiler identity is unavailable in these records.
+
+Each budget has 60 cases per mode. All 274 reported feasible witnesses pass
+independent solchecker, with no worker failures or faults. Native completion
+includes refutations; native proof claims are not independently proof-checked.
+
+| Mode | Feasible 10s / 30s | Native complete 10s / 30s |
+|---|---|---|
+| Unmodified finite default | 45 / 48 | 19 / 19 |
+| Automatic finite companions | 48 / 48 | 24 / 24 |
+| Numerical-first companions | 41 / 44 | 21 / 21 |
+
+Nine sources admit numerical workers. All six cap91 candidate runs return checked
+points at 796648.4375 with native optimality. The finite control has no short-budget
+point and worse unproved long-budget objectives. Short-budget repair consumes
+1.17/1.28/1.29 seconds of active time; completed-point publication takes
+253/290/286 ms under the containing lifetime. Enigma retains all six ordinary
+finite proofs, while numerical-first returns four checked points without proofs.
+
+Objective quality remains mixed: pp08aCUTS has five losses and one win, dcmulti
+three losses, two wins and one tie, and modglob four wins and two losses over the
+six paired runs. Deadline variation also occurs in models outside companion
+admission. Rgn seed 1 at 30 seconds records 174 certified scoped numerical bounds,
+140 child-bound gains, 19 LP conflicts and 10 coordinate conflicts in 4.20 seconds
+of active work, including atomic overspend, without numerical completion.
+These counters describe bounded progress separately from source outcomes.
+
+[Serial qualification 8333](https://lab.eignex.com/jobs/8333) compares the same
+revisions on gr4x6, cap91, p0033 and enigma, with three repeats per seed at
+10 seconds. Whole-CLI external-time measurements use the same Mac/aarch64 host,
+heap, GC and runtime options, without JFR; allocation is not collected.
+Measurement manifests bind raw solve records by SHA-256, source/build identity,
+seed, budget, processors, witness, proof flag and case index.
+All 216 commands complete without worker failures or faults: 196 witnesses are
+independently valid, nine checks are unsupported and eleven runs return no point.
+The candidate modes report native optima in all 72 trials, each with an
+independently valid witness. CPU below sums user and system time.
+
+All 54 gr4x6 witnesses are independently valid. The exact/presolve-off comparison
+has nine native proofs at 4047/20 per mode; these are descriptive medians over
+three seeds and three repeats.
+
+| gr4x6 exact, presolve off | Wall s | CPU s | Peak RSS KiB |
+|---|---|---|---|
+| Finite CP, one LP worker | 1.15 | 2.67 | 243936 |
+| Automatic finite companions | 0.59 | 1.18 | 207120 |
+| Numerical-first companions | 0.58 | 1.16 | 207008 |
+
+Declared automatic mode also proves all nine trials, with median wall/CPU/RSS
+0.59s/1.21s/209136KiB. The unmodified finite default proves eight of nine; its
+unproved trial remains in the outcome record.
+
+All 18 cap91 candidate trials, declared and exact/presolve-off, return independently
+valid points at 796648.4375 with native optimality. Keeping the finite portfolio
+has a cost: declared candidate wall/CPU/RSS medians are
+6.01s/12.07s/476928KiB versus numerical-first 3.00s/6.02s/310176KiB, with nine
+equivalent native optima each. The finite default returns nine worse unproved
+points. All nine finite-LP exact-control witnesses remain checker-unsupported:
+289/1092 has no exact decimal representation for solchecker's decimal input.
+They are retained without approximation and excluded from independently checked
+outcome claims.
+
+P0033 and enigma retain all nine declared-mode native optima per revision, at
+3089 and 0 respectively. Their finite-default/candidate costs remain close;
+medians are wall seconds / CPU seconds / peak RSS KiB.
+
+| Source | Finite default | Automatic finite companions |
+|---|---|---|
+| p0033 | 0.41 / 0.77 / 157856 | 0.41 / 0.79 / 161712 |
+| enigma | 1.37 / 3.04 / 242896 | 1.36 / 3.00 / 243120 |
+
+Numerical-first proves all nine declared p0033 trials at a 3.86-second wall
+median. Its declared/exact enigma modes return four/three checked points and
+no proofs, reaching the 10-second limit. These outcome and cost differences
+bound the admission claim to the retained finite recipes and measured sources.
+
 ### Linear traversal comparison
 
 Automatic MPS routing keeps the ordinary finite portfolio and appends bounded
@@ -2884,7 +2969,7 @@ completion. The numerical-first `numerical-companions` control records
 `finiteCompanionNativeOptimal`, `finiteCompanionNativeRefuted` and
 `finiteCompanionNativeExhausted` before withholding finite proof authority.
 These stage fields distinguish worker completion from transport; inspect
-`armFailure.*` and per-arm failures alongside source outcomes.
+`armFailure.*` and per-arm failures and faults alongside source outcomes.
 
 For bounded MPS traversal diagnostics, compare `param.linear-traversal=automatic`
 with `param.linear-traversal=numerical` through the same source pipeline and pinned
