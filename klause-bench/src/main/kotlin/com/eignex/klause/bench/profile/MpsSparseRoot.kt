@@ -15,6 +15,7 @@ import com.eignex.klause.lp.optimization.LinearPinnedObjective
 import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceClaim
+import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceEvidence
@@ -30,6 +31,7 @@ import com.eignex.klause.util.Cancellation
 import com.sun.management.ThreadMXBean
 import java.io.File
 import java.lang.management.ManagementFactory
+import java.lang.reflect.Proxy
 import java.util.Base64
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.Json
@@ -48,9 +50,15 @@ internal object MpsSparseRoot {
 
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.size in 1..7 && args[0].startsWith("batch64="))
+        require(args.size in 1..9 && args[0].startsWith("batch64="))
         val options = args.drop(1).associate { it.substringBefore('=') to it.substringAfter('=') }
-        require(options.keys.all { it in setOf("layout", "phase1", "values", "start", "work", "iterations") })
+        require(options.keys.all {
+            it in setOf("layout", "phase1", "values", "start", "work", "iterations", "entry", "funding")
+        })
+        val entry = options["entry"] ?: "engine"
+        require(entry in setOf("engine", "session", "bind"))
+        val funding = options["funding"]?.toLong()
+        require(funding == null || (entry == "session" && funding > 0L))
         require(("work" in options) == ("iterations" in options))
         val work = options["work"]?.toLong() ?: 150_000_000L
         val iterations = options["iterations"]?.toInt() ?: 1024
@@ -98,7 +106,7 @@ internal object MpsSparseRoot {
             requests.forEachIndexed { index, request ->
                 for (variant in if (round == 0) variants else variants.reversed()) {
                     val path = "$index/$round/${variant.layout}/${variant.phaseOne}/${variant.values}/${variant.start}"
-                    inspect(request, out.resolve(path).apply { mkdirs() }, round, variant, floating)
+                    inspect(request, out.resolve(path).apply { mkdirs() }, round, variant, floating, entry, funding)
                 }
             }
         }
@@ -110,6 +118,8 @@ internal object MpsSparseRoot {
         round: Int,
         variant: Variant,
         floating: Any,
+        entry: String,
+        funding: Long?,
     ) {
         val options = request.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.keys == setOf("suite", "problem", "sha256"))
@@ -168,6 +178,10 @@ internal object MpsSparseRoot {
         val bean = ManagementFactory.getThreadMXBean() as ThreadMXBean
         bean.isThreadAllocatedMemoryEnabled = true
         val thread = Thread.currentThread().threadId()
+        if (entry != "engine") {
+            retained(packed, context, costs, sign, policy, out, bean, thread, entry, funding, bytes)
+            return
+        }
         val started = System.nanoTime()
         val allocated = bean.getThreadAllocatedBytes(thread)
         val preparation = checkNotNull(call(sparseType.getField("Companion").get(null), "prepare",
@@ -226,6 +240,138 @@ internal object MpsSparseRoot {
                     put("threadBytes", bean.getThreadAllocatedBytes(thread) - beforeLift)
                 }
             }
+        }
+    }
+
+    private fun retained(
+        packed: Any,
+        context: SourceProofContext,
+        costs: List<BigFraction>,
+        sign: BigFraction,
+        policy: Any,
+        out: File,
+        bean: ThreadMXBean,
+        thread: Long,
+        entry: String,
+        totalFunding: Long?,
+        source: ByteArray,
+    ) {
+        val stop = Cancellation.after(30.seconds)
+        val budget = Class.forName(LP + "SourceLpBudget").getConstructor().newInstance()
+        val funding = totalFunding?.let {
+            Class.forName(LP + "SourceLpFunding").constructors.single { it.parameterCount == 2 }
+                .newInstance(it, 512L * 1024L * 1024L).also { ledger ->
+                    budget.javaClass.getDeclaredField("funding").apply { isAccessible = true }.set(budget, ledger)
+                }
+        }
+        val session = Class.forName(LP + "optimization.LinearAuthoritySession").constructors
+            .single { it.parameterCount == 1 }.newInstance(budget)
+        val observerType = Class.forName(ENGINE + "LpCertificationObserver")
+        val observer = Proxy.newProxyInstance(observerType.classLoader, arrayOf(observerType)) { _, _, _ -> null }
+        val columns = call(packed, "getColumns") as List<*>
+        val rows = call(packed, "getRows") as List<*>
+        val free = columns.map { column ->
+            val value = checkNotNull(column)
+            call(value, "copy", Class.forName(ENGINE + "ExactLpBounds").getConstructor().newInstance(),
+                call(value, "getOrigin"), call(value, "getIntegral"), call(value, "getTag"))
+        }
+        val sparseType = Class.forName(LP + "SparseSourceLp")
+        val model = if (entry == "bind") {
+            val preparation = checkNotNull(call(sparseType.getField("Companion").get(null), "prepare", rows, free,
+                costs, context.objectiveConstant * sign, policy, stop))
+            call(checkNotNull(call(preparation, "getPrepared")), "getModel")
+        } else null
+        val coordinates = context.coordinates.sortedWith(compareBy({ it.kind.ordinal }, { it.id }))
+        val restricted = columns.indices.firstOrNull {
+            call(checkNotNull(call(checkNotNull(columns[it]), "getBounds")), "getLower") != null
+        }
+        val alternate = restricted?.let { index ->
+            val bounds = checkNotNull(call(checkNotNull(columns[index]), "getBounds"))
+            val side = checkNotNull(call(bounds, "getLower"))
+            val number = checkNotNull(call(side, "getNumber"))
+            context.scope.copy(condition = SourceCondition(lower = mapOf(coordinates[index] to
+                (call(number, "getValue") as BigFraction))))
+        }
+        require(entry != "bind" || alternate != null)
+        out.resolve("request.json").writeText(buildJsonObject {
+            put("revision", Reports.readGitSha())
+            put("sourceSha256", sha256(source))
+            put("scope", NumericalFrontierSnapshot.scope(context.scope))
+            put("entry", entry)
+            put("funding", totalFunding)
+            put("policy", NumericalResidualProfile.json(policy))
+            put("columns", columns.size)
+            put("rows", rows.size)
+            put("sourceVerdictClaim", false)
+            put("independentWitnessCheck", false)
+            put("javaVersion", System.getProperty("java.version"))
+            put("os", System.getProperty("os.name"))
+            put("arch", System.getProperty("os.arch"))
+        }.toString() + "\n")
+        try {
+            out.resolve("retained.jsonl").bufferedWriter().use { output ->
+                var index = 0
+                var paused: Boolean
+                do {
+                    funding?.let { call(it, "grant", 20_000_000L) }
+                    val started = System.nanoTime()
+                    val allocated = bean.getThreadAllocatedBytes(thread)
+                    val guide = if (entry == "bind") {
+                        checkNotNull(call(session, "bind", packed, call(checkNotNull(model), "getObjective"), stop,
+                            { model }, if (index % 2 == 0) context.scope else alternate, call(policy, "getFloating")))
+                        null
+                    } else {
+                        val consume: (Any, Any, Cancellation) -> Any = { guidance, _, _ -> guidance }
+                        call(session, "advance", packed, costs, context.objectiveConstant * sign, context.scope,
+                            stop, policy, observer, consume)
+                    }
+                    val elapsed = System.nanoTime() - started
+                    val allocation = bean.getThreadAllocatedBytes(thread) - allocated
+                    paused = guide?.let { call(it, "getPaused") == true } ?:
+                        (funding?.let { call(it, "getPaused") == true && call(it, "getExhausted") != true } ?: false)
+                    val owner = NumericalFrontierSnapshot.field(session, "owner")
+                    val state = owner?.let { call(it, "getState") }
+                    val assertions = state?.let { call(it, "getAssertions") } as List<*>?
+                    if (entry == "bind") {
+                        val expected = columns.flatMapIndexed { column, description ->
+                            val bounds = checkNotNull(call(checkNotNull(description), "getBounds"))
+                            listOf(false to "getLower", true to "getUpper").mapNotNull { (upper, getter) ->
+                                call(bounds, getter)?.let { Triple(column, upper, it) }
+                            }
+                        }
+                        check(assertions?.size == expected.size)
+                        expected.forEachIndexed { witness, (column, upper, side) ->
+                            val actual = checkNotNull(assertions?.get(witness))
+                            check(call(actual, "getColumn") == column && call(actual, "getUpper") == upper &&
+                                call(actual, "getSide") == side && call(actual, "getWitness") == witness.toLong() &&
+                                call(actual, "getDepth") == 1)
+                        }
+                    }
+                    val report = buildJsonObject {
+                        put("index", index++)
+                        put("elapsedNs", elapsed)
+                        put("threadBytes", allocation)
+                        put("paused", paused)
+                        put("termination", guide?.let { call(it, "getTermination") }?.toString())
+                        put("phase", guide?.let { call(it, "getPhase") }?.toString())
+                        put("heuristicCoordinates", (guide?.let { call(it, "getPrimal") } as DoubleArray?)?.size ?: 0)
+                        put("certificate", NumericalResidualProfile.json(guide?.let { call(it, "getCertificateMetrics") }))
+                        put("budget", NumericalResidualProfile.json(budget))
+                        put("funding", NumericalResidualProfile.json(funding))
+                        put("preparations", call(session, "getPreparations") as Long)
+                        put("assertionSha256", assertions?.let {
+                            sha256(NumericalResidualProfile.json(it).toString().encodeToByteArray())
+                        })
+                        put("floatMetrics", NumericalResidualProfile.json(owner?.let { call(it, "getLastMetrics") }))
+                        put("ownerMetrics", NumericalResidualProfile.json(owner?.let { call(it, "getMetrics") }))
+                    }
+                    output.appendLine(report.toString())
+                    output.flush()
+                    println(report)
+                } while (!stop() && index < 256 && (paused || (entry == "bind" && index < 32)))
+            }
+        } finally {
+            (session as AutoCloseable).close()
         }
     }
 

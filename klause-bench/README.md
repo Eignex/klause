@@ -1101,6 +1101,17 @@ advance at 20M work units and stop at the completed numerical operation. Dual-on
 certification has its own 2M/64 MiB allowance, with no exact-primal recovery.
 The retained owner uses the 50-update refactor setting.
 
+`entry=session` exercises `LinearAuthoritySession` through the same prepared source.
+Optional `funding=600000000` supplies a finite caller work ledger, a 512 MiB
+preparation ledger and renewed 20M slice grants; the unfunded control keeps the
+fixed policy. Compare the same request and profile source on both solver revisions.
+`entry=bind` replays 32 alternating original/redundantly restricted source scopes
+without solving. Each transition checks every bound witness, side and depth and
+records an assertion digest outside its timed bind, plus thread allocation and
+owner metrics. The first transitions include preparation; later transitions isolate
+retained rebinding. These instrumented streams measure mechanism cost separately
+from source-checked cold CLI comparisons.
+
 Each source retains original bytes and build identity. Preparation and guidance
 reports separate work, measured thread allocation, active time, paused versus
 completed floating outcomes, heuristic coordinates, native checked bounds and
