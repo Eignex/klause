@@ -52,13 +52,6 @@ controls and establish no solver throughput or verdict claim.
 
 ## Klause-lab
 
-`bench.profile.ElementHullProfile` takes `suite=ID problem=NAME sha256=HEX` for a
-hash-pinned XCSP3 source. It prepares the ordinary mixed finite model, then measures
-forced Element hull assembly, retained selectors by index, allocation and default /
-aggressive admission under the existing size guards. It makes no search query or
-source verdict claim. Use ordinary matched CLI experiments for solve costs and
-independent source-witness validation.
-
 [Klause-lab](https://github.com/Eignex/klause-lab) owns everything that runs more than
 one case: experiments and A/B comparisons, regression schedules, reference solving and
 reference results, witness checking and profiling. It builds the Klause revisions an
@@ -937,6 +930,30 @@ DIMACS SAT and one SAT whose power syntax the checker cannot parse. Native UNSAT
 claims have no independent certificates. Single regression samples establish no
 timing comparison. Small-case costs can rise substantially: strict-root
 contradiction spends 826→23,469 units and quartic no-real-root 1462→16,929.
+
+### Element hull admission capture
+
+`bench.profile.ElementHullProfile` takes `suite=ID problem=NAME sha256=HEX` for a
+hash-pinned XCSP3 source. It uses mixed finite preparation with seed 3, a
+1.65-billion work allowance and a thirty-second containing deadline. The report
+records forced Element root assembly, selectors by index, current-thread allocation
+and default / aggressive admission under the existing size guards. Preparation can
+query numerical bounds; the capture makes no search or source verdict claim. Use
+ordinary matched CLI experiments for solve costs and independent source-witness
+validation.
+
+The shared-selector capture on Wordpress-04-10-500_c24 measured 4,990 selectors
+across ten indexes, 243 rows and 5,122 columns after finite preparation. Forced
+assembly used 56 ms and 28.2 MB of current-thread allocation on Mac/aarch64;
+automatic admission still declined the full hull. In lab job 8293, all 32 witnesses
+passed independent source checking and no worker failure was reported. On
+Wordpress-04-06-500_c24, both shared-hull aggressive runs proved objective 1866;
+the matched controls timed out with the same incumbent. Mixed defaults proved both
+seeds with or without sharing. The other three sources retained zero recorded
+root bounds; their incumbent results were mixed, including one gain and one loss
+on Wordpress-08-20-500_c24. These two-seed observations establish no general timing
+or default-quality improvement. Complete-group admission remains separately bounded
+by the aggregate LP size guard.
 
 ### MPS LP admission capture
 
