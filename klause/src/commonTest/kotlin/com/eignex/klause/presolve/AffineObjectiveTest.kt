@@ -67,8 +67,12 @@ class AffineObjectiveTest {
                 outcome.reconstruct(reduced).ints.toList()
             }.toSet()
 
-            assertTrue(outcome.mapping.rebuild.steps.filterIsInstance<RebuildStep.AffineValue>().any { it.variable == 0 })
-            assertEquals(setOf(listOf(1L, 3L, 0L), listOf(2L, 2L, 1L), listOf(3L, 1L, 2L), listOf(4L, 0L, 3L)), assignments)
+            val rebuilt = outcome.mapping.rebuild.steps.filterIsInstance<RebuildStep.AffineValue>()
+            assertTrue(rebuilt.any { it.variable == 0 })
+            assertEquals(
+                setOf(listOf(1L, 3L, 0L), listOf(2L, 2L, 1L), listOf(3L, 1L, 2L), listOf(4L, 0L, 3L)),
+                assignments,
+            )
         }
     }
 
@@ -90,7 +94,8 @@ class AffineObjectiveTest {
                 model, cost, PresolveConfig.parse("affine").withAffinePivotOrder(order), false,
             )
 
-            assertTrue(outcome.mapping.rebuild.steps.filterIsInstance<RebuildStep.AffineValue>().any { it.variable == 0 })
+            val rebuilt = outcome.mapping.rebuild.steps.filterIsInstance<RebuildStep.AffineValue>()
+            assertTrue(rebuilt.any { it.variable == 0 })
             assertEquals(listOf(0L, -1L, 3L), assertNotNull(outcome.objective).intCoefficients.toList())
             assertEquals(Long.MAX_VALUE, outcome.objective.constant)
         }
