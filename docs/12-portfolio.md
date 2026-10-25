@@ -239,6 +239,10 @@ feasibility. Shared clauses, root fixings and objective floors stay credited but
 no extra turns, because deduction throughput does not predict the first witness;
 violation reductions can, and a working heuristic segment without progress supplies
 plateau feedback. Preparation and zero-work pauses supply no failure signal.
+Within the selected family, the least-funded sibling receives the next work
+allowance until the first accepted witness. After that witness, per-arm reward
+selection directs improvement. Family feedback and complete elapsed coverage
+retain their separate policies.
 
 Complete workers keep an elapsed coverage floor until the first witness or
 refutation: together they are owed one family share of active time, with one base

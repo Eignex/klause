@@ -907,9 +907,8 @@ class Portfolio(
             val eligible = if (improving) present else present.filter { it != ArmFamily.Lns }.ifEmpty { present }
             val family = families.choose(eligible)
             val candidates = free.filter { policyFamily(it) == family }
-            // Complete-search progress can remain invisible until a leaf; shared deductions do not
-            // establish which search will reach the first witness.
-            if (!improving && !family.observable) return candidates.minBy { armWork[it] }
+            // Infeasible gradients can favor a plateau over a sibling that can reach a witness.
+            if (!improving) return candidates.minBy { armWork[it] }
             return armAmong(candidates)
         }
 
