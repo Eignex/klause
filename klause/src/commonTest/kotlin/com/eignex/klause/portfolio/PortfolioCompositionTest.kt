@@ -31,6 +31,7 @@ class PortfolioCompositionTest {
 
             assertEquals(scenario.arms, plan.arms.size)
             assertEquals(listOf("satOptimized", "conflictDriven", "support-aware"), complete.take(3).map { it.label })
+            assertEquals("propagation-guided", complete[3].label)
             val support = complete.single { it.label == "support-aware" }
             assertSame(budget, support.recipe.build(3L, null).nodeBudget)
             assertEquals(plan.arms.size, plan.firstSolutionCount)

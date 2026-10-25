@@ -2,6 +2,8 @@ package com.eignex.klause.backtrack.selector
 
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.search.VarRef
+import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.random.Random
 
 /**
@@ -19,9 +21,10 @@ internal class MaxSd(
     private val maxProbes: Int = 32,
     private val fallback: ValueSelector? = null,
     private val maxSupportVisits: Int = 65_536,
+    private val probeWorkLimit: Long? = null,
 ) : ValueSelector {
 
-    override fun fresh() = MaxSd(maxProbes, fallback?.fresh(), maxSupportVisits)
+    override fun fresh() = MaxSd(maxProbes, fallback?.fresh(), maxSupportVisits, probeWorkLimit)
     override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Long> {
         if (varRef is VarRef.IntVar) {
             val domain = session.intDomain(varRef.varId).spanOrNull(maxProbes.toLong())
@@ -29,11 +32,41 @@ internal class MaxSd(
                 val values = LongArray(domain.size) { domain.valueAt(it) }
                 val densities = session.extensionalDensities(varRef.varId, values, maxSupportVisits)
                 if (densities != null) {
+                    session.valueOrdering.supportOrders++
                     return values.indices.sortedByDescending { densities[it] }.asSequence().map { values[it] }
                 }
             }
         }
         return fallback?.values(session, varRef, rng)
-            ?: probeAndOrder(session, varRef, rng, maxProbes, ascending = false)
+            ?: probe(session, varRef, rng)
+    }
+
+    private fun probe(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Long> {
+        val observations = session.valueOrdering
+        observations.probeOrders++
+        val start = session.work
+        val priorCancelled = session.probeCancelled
+        var capped = false
+        val token = probeWorkLimit?.let { limit ->
+            object : Cancellation {
+                private val meter = WorkMeter { }
+                override fun workMeter(): WorkMeter = meter
+                override fun isCancelled(): Boolean {
+                    if (session.work - start >= limit) capped = true
+                    return capped
+                }
+            }
+        } ?: Cancellation.Never
+        return try {
+            session.withCancellation(token) {
+                probeAndOrder(session, varRef, rng, maxProbes, ascending = false, observations = observations)
+            }
+        } finally {
+            observations.probeWork += session.work - start
+            if (capped) {
+                observations.cappedOrders++
+                if (!session.cancelRequested) session.probeCancelled = priorCancelled
+            }
+        }
     }
 }

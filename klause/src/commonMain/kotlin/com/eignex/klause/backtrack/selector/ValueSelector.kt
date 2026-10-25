@@ -6,6 +6,7 @@ import com.eignex.klause.ir.values
 import com.eignex.klause.propagation.PropagationResult.Unsat
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.result.ValueOrderingStatsSink
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.LongHashSet
@@ -98,6 +99,7 @@ internal fun probeAndOrder(
     rng: Random,
     maxProbes: Int,
     ascending: Boolean,
+    observations: ValueOrderingStatsSink? = null,
 ): Sequence<Long> {
     val candidates: LongArray = when (varRef) {
         is VarRef.Bool -> longArrayOf(0L, 1L)
@@ -146,6 +148,10 @@ internal fun probeAndOrder(
             is VarRef.IntVar -> session.probeInt(varRef.varId, v)
         } ?: break
         probed++
+        observations?.let {
+            it.probes++
+            if (r is Unsat) it.refutations++
+        }
         settled.add(v)
         if (r is Unsat) continue
         val post = logRemainingDomainProduct(session)

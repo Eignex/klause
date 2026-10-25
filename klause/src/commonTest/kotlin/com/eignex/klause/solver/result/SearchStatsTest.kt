@@ -4,6 +4,15 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class SearchStatsTest {
+    @Test
+    fun `value guidance observations should add across worker lifetimes`() {
+        val first = SearchStats(valueOrdering = ValueOrderingStats(1, 2, 3, 4, 5, 6))
+        val second = SearchStats(valueOrdering = ValueOrderingStats(6, 5, 4, 3, 2, 1))
+
+        val combined = first.mergedWith(second)
+
+        assertEquals(ValueOrderingStats(7, 7, 7, 7, 7, 7), combined.valueOrdering)
+    }
 
     @Test
     fun `relearned clause in any literal order should count as relearned`() {

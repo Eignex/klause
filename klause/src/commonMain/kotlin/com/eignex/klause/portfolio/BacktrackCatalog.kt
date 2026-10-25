@@ -66,6 +66,12 @@ object BacktrackCatalog {
         )
     }
 
+    private fun propagationGuided() = BacktrackRecipe("propagation-guided") { seed, onEvent ->
+        BacktrackPresets.conflictDriven(randomSeed = seed, onEvent = onEvent).copy(
+            valueSelector = MaxSd(probeWorkLimit = 262_144L),
+        )
+    }
+
     /** The learned LinUCB variable heuristic ([RegressionVariableSelector]) on solution-guided
      *  values — the COP routing / feasibility-reach diversity arm. */
     private fun linUcb() = BacktrackRecipe("linucb") { seed, onEvent ->
@@ -171,6 +177,7 @@ object BacktrackCatalog {
         BacktrackArm.ClausalStable -> clausal(arm, 0.99)
         BacktrackArm.ConflictDriven -> conflictDriven()
         BacktrackArm.SupportAware -> supportAware()
+        BacktrackArm.PropagationGuided -> propagationGuided()
         BacktrackArm.CoreGuided -> BacktrackRecipe(BacktrackArm.CoreGuided.label) { seed, event ->
             BacktrackPresets.satOptimized(randomSeed = seed, inprocess = false, onEvent = event)
         }
@@ -205,11 +212,13 @@ object BacktrackCatalog {
         BacktrackArm.ClausalStable,
         BacktrackArm.CoreGuided,
         BacktrackArm.SupportAware,
+        BacktrackArm.PropagationGuided,
     )
     private val cspOrder = listOf(
         BacktrackArm.SatOptimized,
         BacktrackArm.ConflictDriven,
         BacktrackArm.SupportAware,
+        BacktrackArm.PropagationGuided,
         // The relaxation refutes a satisfaction node by infeasibility, which needs no objective — the
         // emphasis is the axis here exactly as it is for the optimize palette.
         BacktrackArm.LpDefault,
@@ -293,6 +302,7 @@ internal enum class BacktrackArm(val label: String, val needs: Set<ArmNeed> = em
     ClausalStable("clausal-stable", setOf(ArmNeed.Clausal)),
     ConflictDriven("conflictDriven"),
     SupportAware("support-aware", setOf(ArmNeed.ExtensionalSupports)),
+    PropagationGuided("propagation-guided", setOf(ArmNeed.ExtensionalSupports)),
     CoreGuided("core-guided", setOf(ArmNeed.BooleanObjective)),
     LpAggressive("lp-aggressive", setOf(ArmNeed.Relaxation(LpEmphasis.AGGRESSIVE))),
     LpDefault("lp-default", setOf(ArmNeed.Relaxation(LpEmphasis.DEFAULT))),

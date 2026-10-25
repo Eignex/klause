@@ -308,6 +308,15 @@ internal fun searchStatPairs(stats: SolveStats): List<Pair<String, String>> {
     out += "rootPropagationWork" to "${stats.search.rootPropagationWork.sum.toLong()}"
     out += "propagationMs" to "${stats.search.propagationNanos.sum.toLong() / 1_000_000L}"
     out += "rootPropagationMs" to "${stats.search.rootPropagationNanos.sum.toLong() / 1_000_000L}"
+    val ordering = stats.search.valueOrdering
+    if (ordering.supportOrders > 0L || ordering.probeOrders > 0L) {
+        out += "valueSupportOrders" to "${ordering.supportOrders}"
+        out += "valueProbeOrders" to "${ordering.probeOrders}"
+        out += "valueProbes" to "${ordering.probes}"
+        out += "valueProbeRefutations" to "${ordering.refutations}"
+        out += "valueProbeWork" to "${ordering.probeWork}"
+        out += "valueProbeCappedOrders" to "${ordering.cappedOrders}"
+    }
     val learned = stats.search.learnedClauses.sum
     out += "learned" to "${learned.toLong()}"
     if (learned > 0.0) {

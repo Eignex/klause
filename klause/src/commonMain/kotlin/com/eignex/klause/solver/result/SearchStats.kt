@@ -66,10 +66,13 @@ data class SearchStats(
     val clausalPrimalInfeasible: SumResult = ZERO_COUNT,
     /** Private clausal trials stopped incompletely without a feasible model. */
     val clausalPrimalIncomplete: SumResult = ZERO_COUNT,
+    /** Relation-count and residual-domain value guidance, separate from real search conflicts. */
+    val valueOrdering: ValueOrderingStats = ValueOrderingStats(),
 
 ) {
     /** Combine two workers' search stats: counters add, peak depth maxes, depth means weight-combine. */
     fun mergedWith(o: SearchStats): SearchStats = SearchStats(
+        valueOrdering = valueOrdering.mergedWith(o.valueOrdering),
         nodes = SumResult(nodes.sum + o.nodes.sum),
         fails = SumResult(fails.sum + o.fails.sum),
         restarts = SumResult(restarts.sum + o.restarts.sum),
@@ -103,6 +106,7 @@ data class SearchStats(
 
 /** Mutable [SearchStats] accumulator; snapshots into a [SearchStats]. See [SolveStatsSink]. */
 internal class SearchStatsSink {
+    var valueOrdering: () -> ValueOrderingStats = { ValueOrderingStats() }
     var clausalPrimalStarts: Long = 0L
     var clausalPrimalTrials: Long = 0L
     var clausalPrimalModels: Long = 0L
@@ -180,6 +184,7 @@ internal class SearchStatsSink {
     }
 
     fun snapshot(): SearchStats = SearchStats(
+        valueOrdering = valueOrdering(),
         nodes = nodes.read(),
         fails = fails.read(),
         restarts = restarts.read(),
