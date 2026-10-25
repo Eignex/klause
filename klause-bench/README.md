@@ -2315,6 +2315,64 @@ cannot consume modglob's nonterminating rational output; that is an unsupported
 validation route, not an independent witness check. These captures measure the
 mechanism and do not establish production throughput.
 
+[Qualification 8340](https://lab.eignex.com/jobs/8340) compares `51f1828a66` with
+`b738c5d89a`: five original sources, ordinary defaults and numerical companions,
+default/exact policies, P1, 30 seconds, seeds 1/2/3 and default presolve. All 120
+cases report feasible points, 111 pass independent solchecker and nine refined
+modglob witnesses are unsupported nonterminating rationals. All 48 native
+gr4x6/p0033 optimum labels agree; native proofs are not independently checked.
+Source hashes, runtime/options and non-solver dependency JARs match on Mac/aarch64;
+compiler identity is unreported.
+
+All nine numerical modglob pairs improve from 312.43M to 35.15M, while ordinary
+default-mode finite search retains roughly 20.78M points. Both rgn companion
+policies improve from 98.19999924 to 82.19999924 in all three seeds, matching the
+strong default-mode control. Rgn bound closures increase from four to 55, pending
+leaves fall from 812 to 685 and numerical funded work from 375.12M to 364.06M.
+Bell3a companion objectives agree. Ordinary bell3a has one quality gain and one
+loss without refinement activity. Ordinary exact rgn loses at two seeds and ties
+at the third: 141.8/121/116 become 153.6/156.2/116, approximately.
+
+Whole-CLI external-time measurements collect no physical allocation estimate.
+These are medians across seeds, not independent timing repeats:
+
+| Companion source and policy | Peak RSS KiB, base to refinement | Wall seconds, base to refinement |
+| --- | ---: | ---: |
+| modglob default | 502528 to 490176 | 30.10 to 30.10 |
+| modglob exact | 470016 to 527136 | 30.10 to 30.10 |
+| rgn default | 419408 to 428192 | 18.77 to 16.17 |
+| rgn exact | 417392 to 409504 | 18.47 to 15.95 |
+
+Modglob's modeled joint allocation increases from 10.04 to 29.78 MB and its first
+point arrives about 90 ms later. Neutral bell3a attempts increase modeled joint
+allocation from 34.89 to 111.14 MB under the default policy. P0033 companion wall
+medians change from 3.60/4.36 to 4.50/4.23 seconds despite unchanged LP counters
+and no refinement activity. These results establish no general throughput gain.
+
+[Ordinary exact rgn repeats 8343](https://lab.eignex.com/jobs/8343) compare the same
+base with `36d933a39e` on Linux/amd64: three fresh repetitions of seeds 1/2/3,
+18 cases at 30 seconds. All witnesses pass solchecker. Treatment has two wins,
+three losses and four ties; median objective changes from about 131 to 140.2.
+Both versions vary within a seed. This separate platform does not remove the Mac
+regressions or establish an ordinary exact-mode quality improvement.
+
+Matched neutral-point replays [8344](https://lab.eignex.com/jobs/8344) and
+[8345](https://lab.eignex.com/jobs/8345), on Mac/aarch64, retain both exact source
+points, 203/35 pivots and the same basis fill/width. Comparing objective cost before
+checking a neutral proposal reduces helper work from 33739 to 17872 on modglob
+and 14783 to 11170 on rgn; modeled helper allocation changes from 1256355 to
+744782 bytes and 590938 to 456836 bytes. Residual assembly remains paid. Improving
+proposals still require complete strict-row and original-source checks.
+
+[Attained-bound qualification 8346](https://lab.eignex.com/jobs/8346), on
+Linux/amd64, compares the base with `a3401d7c05` across 12 gr4x6 cases. Skipping
+refinement at a checked attained bound retains all checked 202.35 points and
+native proofs, 45 checks and 65 nodes. It restores the base's 1942663 floating and
+2786191 funded work units, avoiding the nine extra pivots observed in 8340.
+The remaining modglob boundary is [discrete proposal quality](https://github.com/Eignex/klause/issues/3610),
+not larger continuous admission. Ordinary exact-mode trajectory losses remain a
+qualification limit of this bounded point-refinement mechanism.
+
 ### Continuous candidate owner reuse
 
 Continuous local-search candidates use fresh numerical owners. The

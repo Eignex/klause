@@ -326,7 +326,9 @@ After feasibility recovery passes the source check, the authority can refine the
 continuous objective with the exact discrete coordinates substituted into the
 active rows. Refinement uses the original working objective direction and scale,
 shares cumulative source funding, and caps its numerical lifetime at the ordinary
-sparse floating allowance. It retains its cursor across funding pauses and accepts
+sparse floating allowance. A point attaining an already checked bound needs no
+refinement query. Exact objective comparison precedes row verification for an
+improving proposal. Refinement retains its cursor across funding pauses and accepts
 only an exact strict objective improvement that passes a fresh original-source
 witness check. A decline, strict endpoint or rejected refinement keeps the accepted
 feasible point. Attainment still requires checked objective agreement with a bound;
