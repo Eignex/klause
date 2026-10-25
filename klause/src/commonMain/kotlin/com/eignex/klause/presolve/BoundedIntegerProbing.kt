@@ -131,7 +131,10 @@ internal object BoundedIntegerProbing {
                 stopped = true
             } else if (result is PropagationResult.Unsat) {
                 for (factor in result.conflictFactors) if (factor in weights.indices) weights[factor] += 1.0
-                credit = minOf(config.probeTotalBudget.toLong() - calls, credit.toLong() + PROBES_PER_REFUTATION).toInt()
+                credit = minOf(
+                    config.probeTotalBudget.toLong() - calls,
+                    credit.toLong() + PROBES_PER_REFUTATION,
+                ).toInt()
                 acc = acc.withHole(variable, value)
                 if (!takeCall(variable)) {
                     stopped = true
