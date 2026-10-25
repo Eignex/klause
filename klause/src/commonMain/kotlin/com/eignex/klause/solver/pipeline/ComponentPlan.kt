@@ -324,7 +324,7 @@ class ComponentPlan internal constructor(
         projections: PreparedFactorProjections?,
     ): RetainedLinearEncoding? =
         if (source === mapping.source && factorProjections === projections &&
-            projections?.providers === FactorProjectionProviders.Default && encodingDecline == null &&
+            projections.providers === FactorProjectionProviders.Default && encodingDecline == null &&
             hasTheoryComponent && installedFragment != null
         ) RetainedLinearEncoding(mapping, encodingTarget(), installedFragment) else null
 

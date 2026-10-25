@@ -2052,6 +2052,14 @@ observations are exclusive children of `SOURCE_ENCODER`: sum all four for a
 complete replan, and compare whole preparation and CLI time too. Unchanged-plan
 reuse stays in `SOURCE_ENCODER`; frontend routing captures initial planning.
 
+`bench.profile.SourceEncoderReuseProfile` compares built-in and delegating custom
+providers with presolve off or `off,+dependent-rows` on one hash-pinned SMT source.
+Pass `suite=ID problem=NAME sha256=HEX repeats=3 warmups=1` through `lab profile`
+with a 180-second job limit. It records initial setup, complete execution and
+preparation costs, plus custom encoder selection/installation counts. Retained
+source bytes and build provenance bind the observations; JFR timings are
+instrumented, and native verdicts have no independent witness or proof check.
+
 [Lab 7712](https://lab.eignex.com/jobs/7712) compares the merged plan-reuse baseline
 `9f40a0678c` with probe polling at `3008350cf1`: six original SMT sources, seed 3,
 three repeats, one core and 10 s. All 36 cases finished. Every same-host pair matches
