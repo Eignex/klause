@@ -14,6 +14,7 @@ import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.klause.localsearch.movesource.GreedyInit
 import com.eignex.klause.localsearch.movesource.ConfiguredSource
 import com.eignex.klause.localsearch.movesource.MoveSource
 import com.eignex.klause.localsearch.movesource.MoveSourceId
@@ -94,6 +95,7 @@ internal object LocalSearchTrajectory {
                 val label = if (greedy) rewrite.toString() else "initial-$rewrite"
                 out.resolve("walk-$label.jsonl").bufferedWriter().use { writer ->
                     var picks = 0L
+                    var captured: LocalSearchState? = null
                     val recorder = object : MoveSource {
                         override val id = MoveSourceId("trajectory-observation")
                         override val phase = Phase.Any
@@ -140,6 +142,10 @@ internal object LocalSearchTrajectory {
                                 put("violated", JsonArray(state.violated.toIntArray().map(::JsonPrimitive)))
                             }.toString())
                             writer.flush()
+                            if (!greedy) {
+                                captured = state
+                                throw Captured
+                            }
                         }
                     }
                     val recipe = LocalSearchCatalog.byLabel(options.getValue("recipe")).withSources {
@@ -157,13 +163,53 @@ internal object LocalSearchTrajectory {
                         normalizeWeightsByClass = true, reportResiduals = true,
                     )
                     solver.resumable(workingObjective, params).use { run ->
-                        val result = run.runSlice(stop, Long.MAX_VALUE) {}
+                        val result = try {
+                            run.runSlice(stop, Long.MAX_VALUE) {}
+                        } catch (_: Captured) {
+                            null
+                        }
                         out.resolve("result-$label.txt").writeText(
                             "picks=$picks\ncancelled=${stop()}\nresult=$result\nstats=${run.stats}\n",
                         )
                     }
+                    if (!greedy) traceGreedy(checkNotNull(captured), out.resolve("greedy-$rewrite.jsonl"))
                 }
             }
+        }
+    }
+
+    private object Captured : RuntimeException(null, null, false, false)
+
+    private fun traceGreedy(state: LocalSearchState, file: File) {
+        val initializer = GreedyInit()
+        val pass = checkNotNull(initializer.javaClass.methods.single {
+            it.name.substringBefore('$') == "pass" && it.parameterCount == 1
+        }.invoke(initializer, state))
+        val order = pass.javaClass.getDeclaredField("order").apply { isAccessible = true }.get(pass) as IntArray
+        var position = 0
+        file.bufferedWriter().use { writer ->
+            val observe = {
+                val slot = order[position++]
+                writer.appendLine(buildJsonObject {
+                    put("position", position - 1)
+                    put("slot", slot)
+                    put("cost", state.cost)
+                    put("integers", JsonArray((0 until state.problem.numIntVars).map {
+                        JsonPrimitive(state.assignment.intValue(it))
+                    }))
+                    put("randomState", buildJsonObject {
+                        for (field in state.rng.javaClass.declaredFields) {
+                            if (field.type != Int::class.javaPrimitiveType) continue
+                            field.isAccessible = true
+                            put(field.name, field.getInt(state.rng))
+                        }
+                    })
+                }.toString())
+                writer.flush()
+                false
+            }
+            val completed = pass.javaClass.methods.single { it.name == "advance" }.invoke(pass, observe)
+            check(completed == true && position == order.size)
         }
     }
 
