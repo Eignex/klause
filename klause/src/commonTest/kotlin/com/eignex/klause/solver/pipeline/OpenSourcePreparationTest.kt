@@ -58,6 +58,7 @@ class OpenSourcePreparationTest {
         assertTrue(retained.isNotEmpty())
         for (index in retained.indices) {
             assertSame(original[index].linearForm, retained[index].linearForm)
+            assertSame(original[index].variables, retained[index].variables)
             assertSame(planned.model.factors[1], retained[index].source)
         }
         val fresh = planned.model.componentPlan()

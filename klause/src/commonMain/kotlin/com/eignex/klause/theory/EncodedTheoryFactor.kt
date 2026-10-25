@@ -11,6 +11,7 @@ import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.ir.Term
+import com.eignex.klause.ir.VarList
 import com.eignex.klause.lowering.LinearEncodingInterrupted
 import com.eignex.klause.lowering.LinearFormulaLowering
 import com.eignex.klause.simplex.exact.BigFraction
@@ -20,16 +21,23 @@ import com.eignex.klause.solver.pipeline.ExactSearchRow
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
 
-internal class EncodedTheoryFactor(
+internal class EncodedTheoryFactor private constructor(
     val source: Factor,
     override val linearForm: LinearForm,
     val attribution: EncodingAttribution,
+    override val variables: VarList,
 ) : Factor by source {
-    override val variables = MixedVars(
-        boundInts = (source.intVars.toList() + attribution.integers.map { it.index }).distinct().toIntArray(),
-        boolVars = source.boolVars,
-        reals = (source.variables.reals.toList() + attribution.auxiliaries.map { it.index }).distinct().toIntArray(),
+    constructor(source: Factor, linearForm: LinearForm, attribution: EncodingAttribution) : this(
+        source, linearForm, attribution, MixedVars(
+            boundInts = (source.intVars.toList() + attribution.integers.map { it.index }).distinct().toIntArray(),
+            boolVars = source.boolVars,
+            reals = (source.variables.reals.toList() + attribution.auxiliaries.map { it.index })
+                .distinct().toIntArray(),
+        ),
     )
+
+    fun atFactorIndex(index: Int): EncodedTheoryFactor = if (index == attribution.sourceFactorIndex) this
+    else EncodedTheoryFactor(source, linearForm, attribution.atFactorIndex(index), variables)
 }
 
 internal fun PreparedFactorProjections.linearTheoryModel(
