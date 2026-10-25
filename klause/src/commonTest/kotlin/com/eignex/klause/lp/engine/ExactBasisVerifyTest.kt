@@ -14,6 +14,25 @@ import kotlin.time.Duration
 
 class ExactBasisVerifyTest {
     @Test
+    fun `primal verification should recover reordered logical seats under a bounded allowance`() {
+        val model = LpBuilder().apply {
+            addVar(0L, 10L)
+            addRow(intArrayOf(0), longArrayOf(3L), Relation.EQ, 1L)
+            for (row in 1 until 64) addRow(intArrayOf(0), longArrayOf(1L), Relation.LE, row.toLong())
+        }.build(Sense.MINIMIZE)
+        val headings = IntArray(64) { if (it == 63) 0 else it + 2 }
+        val statuses = Array(65) { if (it == 1) VarStatus.FIXED else VarStatus.BASIC }
+        val limits = ExactBasisLimits(RationalBasisLimits(work = 10_000L, allocationBytes = 1024L * 1024L))
+
+        val result = verifyExactBasis(model, Basis(headings, statuses), primalOnly = true, limits = limits)
+
+        assertEquals(listOf(BigFraction.ofLong(3).reciprocal()), assertNotNull(result.witness).primal)
+        assertNull(result.metrics.decline)
+        assertNull(result.bound)
+        assertNull(result.conflict)
+    }
+
+    @Test
     fun `primal only verification should withhold objective and conflict authority`() {
         val model = LpBuilder().apply {
             addVar(0L, 10L, cost = 3L)

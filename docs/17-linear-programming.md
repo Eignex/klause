@@ -310,7 +310,10 @@ Residual completion seeks feasibility; attainment still requires checked objecti
 Residuals rejected by small exact input admission can prepare a sparse feasibility
 query with the shared source budget. Its floating cursor survives funding pauses;
 completed coordinates undergo bounded rational reconstruction and primal-only exact
-basis verification. These checks publish no dual bound or conflict. The most recent
+basis verification. These checks publish no dual bound or conflict.
+Primal-only verification removes basic logical unit columns before factoring the
+remaining structural core, then recovers their values and checks all original
+column and row sides under the same allowance. The most recent
 unchanged residual retains its completed point or hard decline across proposals;
 changed exact rows, endpoints, strictness or column count retire that result.
 Small-input admission, sparse preparation, floating termination and primal

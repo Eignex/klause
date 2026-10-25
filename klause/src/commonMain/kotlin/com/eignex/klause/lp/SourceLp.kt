@@ -312,7 +312,14 @@ internal class SourceLpBudget(
             val words = (width + 63L) / 64L
             val work = (if (pairing) 0L else 400_000_000L) + visits * words * words
             val allocation = (if (pairing) 0L else 1_073_741_824L) + visits * (64L + 16L * width)
-            if (work > 1_000_000_000_000L || allocation > 2_147_483_648L) return null
+            if (work > 1_000_000_000_000L) {
+                onDecline("WorkReservation")
+                return null
+            }
+            if (allocation > 2_147_483_648L) {
+                onDecline("AllocationReservation")
+                return null
+            }
             reservedWork += work
             reservedAllocation += allocation
             return block(token).takeUnless { token() }
