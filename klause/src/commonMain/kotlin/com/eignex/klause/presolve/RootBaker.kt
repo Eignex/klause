@@ -161,6 +161,11 @@ object RootBaker {
             val previous = base.intMaxOrNullCompat(v) ?: problem.rootIntDomain(v).max
             if (result.intMaxValues[i] < previous && result.intValueOrNull(v) == null) narrowed.add(v)
         }
+        val previousHoles = HashMap<Int, LongHashSet>()
+        base.forEachIntHole { v, value -> previousHoles.getOrPut(v) { LongHashSet() }.add(value) }
+        result.forEachIntHole { v, value ->
+            if (result.intValueOrNull(v) == null && previousHoles[v]?.contains(value) != true) narrowed.add(v)
+        }
         narrowedColumns = result.numInts - base.numInts + narrowed.size
     }
 
@@ -248,10 +253,13 @@ object RootBaker {
         acc: PropagationResult.Implied,
         factorWeights: DoubleArray,
         rng: Random,
+        cancellation: Cancellation = Cancellation.Never,
     ): IntArray {
         val numIntVars = problem.numIntVars
         val intOccurrences by lazy { PropagationProblem(problem).intOccurrences }
         val scores = DoubleArray(numIntVars) { v ->
+            cancellation.charge(1)
+            if (cancellation()) return@DoubleArray Double.NEGATIVE_INFINITY
             if (acc.intValueOrNull(v) != null) return@DoubleArray Double.NEGATIVE_INFINITY
             val orig = problem.rootIntDomain(v)
             val lo = acc.intMinOrNullCompat(v) ?: orig.min
@@ -259,9 +267,14 @@ object RootBaker {
             val dom = (hi - lo + 1).coerceAtLeast(1)
             var wdeg = 0.0
             val occ = intOccurrences[v]
-            for (i in occ.indices) wdeg += factorWeights[occ[i]]
+            for (i in occ.indices) {
+                cancellation.charge(1)
+                if (i and 63 == 0 && cancellation()) break
+                wdeg += factorWeights[occ[i]]
+            }
             wdeg / dom
         }
+        if (cancellation()) return IntArray(0)
         val tie = IntArray(numIntVars) { rng.nextInt() }
         val boxed = Array(numIntVars) { it }
         boxed.sortWith(
@@ -271,6 +284,8 @@ object RootBaker {
                 if (sa != sb) sb.compareTo(sa) else tie[a].compareTo(tie[b])
             },
         )
+        cancellation.charge(numIntVars.toLong())
+        if (cancellation()) return IntArray(0)
         return IntArray(numIntVars) { boxed[it] }
     }
 
