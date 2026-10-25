@@ -24,6 +24,7 @@ internal class DiffnRelocations(
     fun repair(first: Int, second: Int) {
         if (xs.size > REPAIR_RECTANGLE_CAP) return
         probeLimit = REPAIR_PROBE_CAP
+        if (hasPairSeparation(first, second)) return
         for (i in intArrayOf(first, second)) {
             for (axis in 0..1) {
                 val positions = if (axis == 0) xs else ys
@@ -45,6 +46,32 @@ internal class DiffnRelocations(
                 }
             }
         }
+    }
+
+    private fun hasPairSeparation(first: Int, second: Int): Boolean {
+        for (i in intArrayOf(first, second)) {
+            val j = if (i == first) second else first
+            for (axis in 0..1) {
+                val positions = if (axis == 0) xs else ys
+                val sizes = if (axis == 0) widths else heights
+                val variables = if (axis == 0) widthVars else heightVars
+                val variable = positions[i]
+                if (!sink.allowsInt(variable)) continue
+                val origin = state.assignment.intValue(positions[j])
+                val targets = listOf(
+                    endpoint(origin, size(j, sizes, variables, emptyList())),
+                    before(origin, size(i, sizes, variables, emptyList())),
+                )
+                for (target in targets) {
+                    if (target == null || target == state.assignment.intValue(variable) ||
+                        target !in state.rootDomains[variable]
+                    ) continue
+                    probes++
+                    if (feasible(listOf(Move.IntSet(variable, target)))) return true
+                }
+            }
+        }
+        return false
     }
 
     fun propose() {
