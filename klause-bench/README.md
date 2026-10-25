@@ -2633,6 +2633,40 @@ retain their objective and verdict; completed searches retain their node counts.
 This qualifies exact finite objective substitution with a fiber quality gain and
 a cap6000 preparation cost, without a general speedup claim.
 
+The integrated companion [qualification 8173](https://lab.eignex.com/jobs/8173)
+pins `6fb51fd8fd`: 450 runs over the fifteen frozen 8087 sources, three seeds,
+exact and declared `1e-7` absolute/relative tolerance policies, P1, ten seconds,
+presolve off and a containing 100-million-unit decision/move allowance. Automatic
+CP/`lp-default`, forced frontier and joint-repair controls accompany sharing and
+independent companions. Numerical work/allocation ceilings are partitioned across
+private owners. Runs span Mac/aarch64 and two Linux/amd64 c7i.2xlarge spot nodes;
+each source/seed comparison has matching host, runtime, dependencies and options.
+All source hashes match 8087, and all 211 reported witnesses pass solchecker.
+
+Sharing improves nine objectives and adds two feasible outcomes in 90 matched
+pairs, with 79 identical feasibility/objective/native-proof outcomes and no paired
+loss. The gains occur on dcmulti, pp08a, bell5 and enigma. There are 77 numerical
+incumbent adoptions and 468 pooled repair-centering events; the independent recipe
+records none. Exact bell3a closes 11–14 alternatives with imported incumbents,
+versus zero, retaining the same 878430.316 point. Its median Mac whole-CLI wall
+time stays 10.10 seconds; median peak RSS is 379,744 versus 393,856 KiB.
+These observations establish working exchange and scoped pruning, not equal actual
+work or a general speedup. The corpus imports no finite objective floor: that
+channel accepts only ascending unit integer objectives without offsets, with
+compatible import and incompatible-unit refusal covered by deterministic tests.
+
+The p0033 [terminal replay comparison 8178](https://lab.eignex.com/jobs/8178)
+compares `6fb51fd8fd` with `8a0d14ff46` on Mac/aarch64, exact/P1/10s/presolve off,
+sharing and independent recipes, seed 2 repeated three times. Source, runtime,
+non-solver dependencies and options match; all twelve witnesses pass solchecker.
+Direct typed-terminal replay publishes all six native optima at 3089, versus none,
+with the same 1,995 numerical checks and 27,593,443 funded work units. The standard
+verifier step/depth limits remain unchanged. Median sharing whole-CLI wall time
+falls from 10.11 to 4.61 seconds and peak RSS from 375,280 to 307,488 KiB by ending
+the portfolio at its checked completion. Repeats are not independent seeds, and
+standalone frontier remains cheaper on this source. Native proof claims remain
+separate from independent witness checks; default admission remains unchanged.
+
 The scalar session [qualification 8040](https://lab.eignex.com/jobs/8040) compares
 cold `3e8ac384` with retained `6aef3fdd` and an automatic finite control over
 opt1217, p0201, gr4x6, flugpl, p0033, enigma, enlight4 and flugplinf. Each has
