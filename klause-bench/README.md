@@ -1627,6 +1627,43 @@ control, but loses two seed-17 witnesses and worsens all three seed-41 objective
 CarpetCutting quality improves in four pairs, worsens in three and ties in two.
 This recovery is insufficient for default admission.
 
+[Initialization comparison 8315](https://lab.eignex.com/jobs/8315) retains main
+`7500a0e1ff` against a primary scheduling worker omitting generic greedy repair:
+126 default mixed/P1/30-second cases with the same seven sources and repeated
+seeds. All 43 reported witnesses pass independent checking. Both arms miss all
+three original Cargo seed-3 witnesses; total Cargo-09 coverage falls from six to
+five. This initializer policy is rejected for the recovery.
+
+[Isolated recipe bridge 8320](https://lab.eignex.com/jobs/8320) compares ordinary
+installed CLI runs at `7500a0e1ff` with primary-only boundary repair: seed 6,
+P1/30 seconds and 37500 work units, which price 30000 LS moves. The control
+finds no point; all three candidate repetitions produce independently accepted
+35682 witnesses. This establishes source publication for the isolated recipe,
+without establishing default recovery.
+
+[Integrated comparison 8326](https://lab.eignex.com/jobs/8326) compares
+`02fd784969`, primary-only boundary repair and a structural admission guard over
+the same seven sources, repeated seeds and default allowances on Mac/aarch64.
+All 69 reported witnesses pass independent checking; runtime, compiler, source
+hashes, options and non-solver dependencies match, with no worker failures.
+Boundary repair raises Cargo-09 coverage from three to seven of nine: one of
+three original seed-3 cases, all three seed-17 cases and all three seed-41 cases.
+Its primary arm supplies the seed-3 witness at 13201 ms, followed by improvement
+to 10485. The control has no seed-3 or seed-17 witness. Seed-41 objectives change
+from 29742/845/11483 to 20610/16465/14888, retaining two quality losses.
+The admission guard misses seed 3 and is rejected for this recovery.
+
+Both candidates retain all nine checked CarSequencing and CarpetCutting witnesses.
+Boundary CarpetCutting objectives improve in seven pairs, worsen in one and tie
+in one; both arms retain one native optimum, in different repetitions. The guard
+has three better, five worse and one tied objective, without the control's native
+optimum. Native proof claims are separate from independent witness checks.
+The other four sources remain unresolved across all arms. The boundary result
+is partial recovery, without restoring the original three seed-3 witnesses.
+[Capture 8330](https://lab.eignex.com/jobs/8330) reproduces the earlier primary
+35682 native point with identical prepared-model hashes and recorded walk at this
+integrated base; nominal work alone does not explain the default misses.
+
 ### XCSP3 declared intension extrema
 
 [Lab 7973](https://lab.eignex.com/jobs/7973) compares `370fd2fd30` with `51a86c6f10`
