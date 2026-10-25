@@ -18,6 +18,7 @@ internal data class LinearPrimalRecoveryLimits(
 internal class LinearPrimalRecoveryProgress {
     var work: Long = 0L
     var allocation: Long = 0L
+    var pending = false
     val completed = mutableMapOf<Int, List<BigFraction>>()
 }
 

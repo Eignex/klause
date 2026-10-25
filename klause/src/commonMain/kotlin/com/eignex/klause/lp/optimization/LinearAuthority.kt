@@ -135,7 +135,7 @@ internal class LinearAuthority(
             cancellation, ::observePrimal, attempt.progress)
         if (!cancellation()) {
             attempt.recovered = recovered
-            attempt.finished = recovered != null || budget.funding?.paused != true
+            attempt.finished = recovered != null || (!attempt.progress.pending && budget.funding?.paused != true)
         }
         return recovered
     }
@@ -319,6 +319,9 @@ internal class LinearAuthority(
                 val proof = checked(SourceClaim.Optimal(candidate, SourceValue.Rational(value)),
                     SourceDerivation.Optimum(SourceDerivation.SourceWitness, bound.derivation))
                 if (proof != null) return LinearAuthorityResult(proof, bound, candidate)
+            }
+            if (candidate == null && primalAttempt?.progress?.pending == true) {
+                return LinearAuthorityResult(bound = bound, paused = true)
             }
             if (fractions.isNotEmpty()) return LinearAuthorityResult(bound = bound, incumbent = candidate,
                 split = fractions.first().floorSplit(), fractional = fractions)
