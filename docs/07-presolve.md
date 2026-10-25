@@ -285,8 +285,8 @@ every scalar coordinate retains support. Cardinality propagation, Boolean branch
 and the ordinary core LP projection consume the shared incidence rows.
 
 The substitution requires exclusive coordinate ownership by the partition's Tables
-and AllDifferent, with no objective use, optional positions, exceptions or repeated
-roles. Other uses retain the original factors. Original integer slots are pinned;
+and AllDifferent, with stated bounds and no objective use, optional positions,
+exceptions or repeated roles. Other uses retain the original factors. Original integer slots are pinned;
 typed reconstruction reads their selected tuple before truncating fresh Boolean
 coordinates. Deduplicated rows give one Boolean extension per source assignment,
 preserving solution multiplicity. Admission caps a scope at 4,096 coordinates,
