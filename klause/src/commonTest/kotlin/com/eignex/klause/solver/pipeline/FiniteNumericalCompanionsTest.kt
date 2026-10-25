@@ -13,6 +13,7 @@ import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.withRealDifferenceSystem
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -59,6 +60,7 @@ class FiniteNumericalCompanionsTest {
     fun `admitting numerical workers should append to the finite composition`() {
         val model = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray(), numRealVars = 1,
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
+            .withRealDifferenceSystem(Cancellation.Never)
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         val plan = model.prepareExecutionPlan(objective, preferFinite = true)
         val scenario = PortfolioScenario.sequential(Kind.COP)

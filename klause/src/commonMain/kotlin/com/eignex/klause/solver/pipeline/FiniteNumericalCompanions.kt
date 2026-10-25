@@ -11,6 +11,7 @@ import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.portfolio.SourceWorkerBinding
 import com.eignex.klause.portfolio.binaryIntegers
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.difference.DifferenceSystem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.evidence.SourceClaim
@@ -103,7 +104,9 @@ internal class FiniteNumericalCompanions private constructor(
     companion object {
         fun prepare(model: BakedProblem, objective: LinearObjective, params: TheoryParams,
             cancellation: Cancellation): FiniteNumericalCompanions? {
-            val context = model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, cancellation,
+            // The propagated difference graph duplicates affine rows and bounds in these coordinates.
+            val affine = model.withFactors(model.factors.filterNot { it is DifferenceSystem }.toTypedArray())
+            val context = affine.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, cancellation,
                 numericalIndicators = true) ?: return null
             return FiniteNumericalCompanions(model, objective, context, params, cancellation)
         }
@@ -112,7 +115,7 @@ internal class FiniteNumericalCompanions private constructor(
 
 internal fun finiteNumericalCompletion(result: LinearOptimizationResult, context: SourceProofContext,
     cancellation: Cancellation): MinimizeResult {
-    // The typed proof is checked in the same working frame before the finite invocation attests completion.
+    // A verified relaxation proof uses the finite working coordinates and objective; finite admission checks the point.
     if (result.verifyTerminal(context, cancellation) is Verification.Accepted) {
         when (val claim = result.terminal?.claim) {
             is SourceClaim.Optimal -> return MinimizeResult.Optimal(claim.sample,
