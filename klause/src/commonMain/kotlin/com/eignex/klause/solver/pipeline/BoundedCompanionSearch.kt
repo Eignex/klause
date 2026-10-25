@@ -30,7 +30,8 @@ internal class BoundedCompanionSearch(
             "${prefix}Optimal" to if (terminal is MinimizeResult.Optimal) 1L else 0L,
             "${prefix}Refuted" to if (terminal is MinimizeResult.Infeasible) 1L else 0L,
         )
-        original.copy(smt = original.smt.copy(completeSearchStages = original.smt.completeSearchStages.orEmpty() + stages))
+        original.copy(smt = original.smt.copy(
+            completeSearchStages = original.smt.completeSearchStages.orEmpty() + stages))
     }
 
     override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
