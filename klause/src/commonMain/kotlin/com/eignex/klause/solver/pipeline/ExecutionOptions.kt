@@ -12,6 +12,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         val captured = if (value is List<*>) value.toList() else value
         val entry = try {
             if (kind == ValueKind.SCALAR_AXIS) scalarTokens(captured as List<AxisToken>, id)
+            if (kind == ValueKind.POSITIVE_LONG) positiveLong(captured as Long)
             if (kind == ValueKind.ALLOWANCE && captured != null && (captured as Long) < 0) {
                 pipelineConfigError("engine param `$id` expects a non-negative allowance")
             }
@@ -25,6 +26,8 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
     @Suppress("UNCHECKED_CAST")
     internal fun decode(params: EngineParams): T? = when (kind) {
         ValueKind.LONG -> params.long(id)
+
+        ValueKind.POSITIVE_LONG -> params.long(id)?.let { positiveLong(it) }
 
         ValueKind.INT -> params.int(id)
 
@@ -71,8 +74,14 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         }
     } as T?
 
+    private fun positiveLong(value: Long): Long {
+        if (value <= 0L) pipelineConfigError("engine param `$id` expects a positive integer, got `$value`")
+        return value
+    }
+
     private enum class ValueKind {
         LONG,
+        POSITIVE_LONG,
         INT,
         DOUBLE,
         BOOLEAN,
@@ -169,8 +178,8 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** The `max-decisions` execution setting. */
         val maxDecisions: ExecutionOption<Long> = ExecutionOption("max-decisions", ValueKind.LONG)
 
-        /** The `luby` execution setting. */
-        val luby: ExecutionOption<Long> = ExecutionOption("luby", ValueKind.LONG)
+        /** Strictly positive Luby restart unit. */
+        val luby: ExecutionOption<Long> = ExecutionOption("luby", ValueKind.POSITIVE_LONG)
 
         /** The `adaptive-restart` execution setting. */
         val adaptiveRestart: ExecutionOption<Boolean> = ExecutionOption("adaptive-restart", ValueKind.BOOLEAN)

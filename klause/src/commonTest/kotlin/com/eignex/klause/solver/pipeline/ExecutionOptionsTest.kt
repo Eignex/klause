@@ -20,6 +20,22 @@ import kotlin.test.assertTrue
 
 class ExecutionOptionsTest {
     @Test
+    fun `parsed and typed luby units should reject non-positive values before recipe construction`() {
+        for (base in listOf(0L, -1L, Long.MIN_VALUE)) {
+            for (options in listOf(
+                ExecutionOptions.parse(listOf("luby=$base", "ema-restart=on")),
+                ExecutionOptions(ExecutionOption.luby(base), ExecutionOption.emaRestart(true)),
+            )) {
+                val failure = assertFailsWith<PipelineConfigException> {
+                    backtrackOverride(options.reader(), allowSelectors = true)
+                }
+                assertTrue("luby" in failure.message.orEmpty())
+                assertTrue("positive integer" in failure.message.orEmpty())
+            }
+        }
+    }
+
+    @Test
     fun `resource settings should retain automatic unlimited and zero as distinct policies`() {
         for ((raw, expected) in listOf("auto" to 13L, "unlimited" to null, "0" to 0L, "7" to 7L)) {
             val options = ExecutionOptions.parse(listOf("nra-work-limit=$raw"))
