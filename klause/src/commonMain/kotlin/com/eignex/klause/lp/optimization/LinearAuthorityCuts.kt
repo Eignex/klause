@@ -5,6 +5,7 @@ import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourceProofContext
+import com.eignex.klause.solver.evidence.mixedIntegerRounding
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.Cancellation
@@ -19,11 +20,13 @@ internal class LinearAuthorityCut(
     val owner: Int,
     val inequality: SourceInequality,
     val derivation: SourceDerivation,
+    val mixed: Boolean = false,
 )
 
 internal class LinearAuthorityCuts private constructor(
     val rows: List<LinearAuthorityCut>,
     val work: Long,
+    val observations: Map<String, Long>,
 ) {
     companion object {
         fun prepare(
@@ -33,43 +36,108 @@ internal class LinearAuthorityCuts private constructor(
             try {
                 if (cancellation()) return null
                 val cuts = ArrayList<LinearAuthorityCut>()
+                val observations = linkedMapOf<String, Long>()
+                fun observe(name: String) {
+                    observations[name] = (observations[name] ?: 0L) + 1L
+                }
+                val bounds = HashMap<Pair<SourceCoordinate, Boolean>, Pair<SourceInequality, SourceDerivation>>()
+                for ((id, premise) in source.premises) {
+                    if (cancellation()) return null
+                    val row = premise.inequality
+                    val cost = if (row.supportSize == 1) 2L else 1L
+                    if (cost > 32_768L - work) {
+                        observe("BoundScanLimited")
+                        break
+                    }
+                    work += cost
+                    if (row.supportSize != 1) continue
+                    val (coordinate, coefficient) = row.coefficients.entries.singleOrNull() ?: continue
+                    if (coordinate.kind != SourceCoordinate.Kind.Real ||
+                        premise.guards.isNotEmpty() || premise.integerPins.isNotEmpty() ||
+                        (listOf(coefficient, row.rhs)).any { it.num.magnitudeBitLength() > 4096 ||
+                            it.den.magnitudeBitLength() > 4096 }) continue
+                    bounds.getOrPut(coordinate to (coefficient > BigFraction.ZERO)) {
+                        row to SourceDerivation.Premise(id)
+                    }
+                }
+                var mixedCount = 0
                 for ((owner, entry) in source.premises.entries.withIndex()) {
                     if (cancellation()) return null
                     val row = entry.value.inequality
                     val coefficients = row.coefficients
-                    val cost = 1L + coefficients.size * 4L
-                    if (cost > 65_536L - work) break
+                    val cost = 1L + coefficients.size * 12L
+                    if (cost > 65_536L - work) {
+                        observe("RowScanLimited")
+                        break
+                    }
                     work += cost
-                    if (coefficients.isEmpty() || coefficients.keys.any { it.kind != SourceCoordinate.Kind.Integer }) {
+                    val mixed = coefficients.keys.any { it.kind == SourceCoordinate.Kind.Real }
+                    if (mixed) observe("MixedRowsVisited")
+                    if (coefficients.isEmpty() || coefficients.keys.any { it.kind == SourceCoordinate.Kind.Boolean }) {
                         continue
                     }
                     val values = coefficients.values
                     if ((values + row.rhs).any { it.num.magnitudeBitLength() > 4096 ||
                             it.den.magnitudeBitLength() > 4096 }) continue
+                    val integerValues = coefficients.filterKeys { it.kind == SourceCoordinate.Kind.Integer }.values
+                    if (integerValues.isEmpty()) continue
                     var scale = BIG_ONE
-                    for (value in values) {
+                    for (value in integerValues) {
                         if (cancellation()) return null
                         scale = scale / scale.gcd(value.den) * value.den
                         if (scale.magnitudeBitLength() > 4096) break
                     }
                     if (scale.magnitudeBitLength() > 4096) continue
                     var divisor = BIG_ZERO
-                    for (value in values) {
+                    for (value in integerValues) {
                         if (cancellation()) return null
                         divisor = divisor.gcd((value.num * (scale / value.den)).abs())
                     }
                     if (divisor.isZero()) continue
                     val multiplier = BigFraction.of(scale, divisor)
+                    val normalized = SourceInequality(coefficients.mapValues { (_, value) -> value * multiplier },
+                        row.rhs * multiplier, row.strict)
+                    val combination = SourceDerivation.Combination(listOf(
+                        SourceDerivation.Combination.Term(multiplier, SourceDerivation.Premise(entry.key))))
+                    if (mixed) {
+                        val sides = coefficients.filterKeys { it.kind == SourceCoordinate.Kind.Real }.map { (id, value) ->
+                            bounds[id to (value > BigFraction.ZERO)] ?: bounds[id to (value < BigFraction.ZERO)]
+                        }
+                        if (sides.any { it == null }) {
+                            observe("MixedMissingBounds")
+                            continue
+                        }
+                        val selected = sides.filterNotNull()
+                        val conclusion = mixedIntegerRounding(normalized, selected.map { it.first }, cancellation)
+                        if (cancellation()) return null
+                        if (conclusion == null) {
+                            observe("MixedIntegralShiftedRhs")
+                            continue
+                        }
+                        observe("MixedEligibleRows")
+                        if (mixedCount >= 64) {
+                            observe("MixedRetentionLimited")
+                            continue
+                        }
+                        if ((conclusion.coefficients.values + conclusion.rhs).any {
+                                it.num.magnitudeBitLength() > 4096 || it.den.magnitudeBitLength() > 4096 }) {
+                            observe("MixedWidthLimited")
+                            continue
+                        }
+                        val proof = SourceDerivation.MixedIntegerRounding(combination, selected.map { it.second })
+                        cuts += LinearAuthorityCut(owner, conclusion, proof, mixed = true)
+                        mixedCount++
+                        continue
+                    }
                     val scaled = row.rhs * multiplier
                     val rhs = if (row.strict) BigFraction.of(scaled.ceilInteger(), BIG_ONE) - BigFraction.ONE
                         else BigFraction.of(scaled.negated().ceilInteger(), BIG_ONE).negated()
                     if (rhs == scaled && !row.strict) continue
                     val conclusion = SourceInequality(coefficients.mapValues { (_, value) -> value * multiplier }, rhs)
-                    val proof = SourceDerivation.IntegerRounding(SourceDerivation.Combination(listOf(
-                        SourceDerivation.Combination.Term(multiplier, SourceDerivation.Premise(entry.key)))))
+                    val proof = SourceDerivation.IntegerRounding(combination)
                     cuts += LinearAuthorityCut(owner, conclusion, proof)
                 }
-                return LinearAuthorityCuts(cuts, work)
+                return LinearAuthorityCuts(cuts, work, observations)
             } finally {
                 onWork(work)
             }

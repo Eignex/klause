@@ -26,6 +26,7 @@ internal class LinearAuthorityQuery private constructor(
     val sign: BigFraction,
     val cuts: Boolean,
     val activeCuts: Int,
+    val activeMixedCuts: Int,
 ) {
     val context: SourceProofContext = source.withLinearAuthority()
     val closureRows: List<ExactRationalInequality> = rows.map {
@@ -68,13 +69,15 @@ internal class LinearAuthorityQuery private constructor(
                 }
             }
             var activeCuts = 0
+            var activeMixedCuts = 0
             var cutVerificationWork = 0L
             val cuts = template?.cuts?.rows.orEmpty()
-            val active = cuts.filter { it.owner !in inactive }
+            val active = cuts.indices.filter { cuts[it].owner !in inactive }
             val checks = if (active.isEmpty()) emptyList() else {
                 SourceEvidenceVerifier(numeric.atScope(source.scope), maximumSteps = maximumCutProofSteps)
-                    .verifyAll(active.map {
-                        SourceEvidence(source.scope, SourceClaim.Consequence(it.inequality), it.derivation)
+                    .verifyAll(active.map { id ->
+                        val cut = cuts[id]
+                        SourceEvidence(source.scope, SourceClaim.Consequence(cut.inequality), cut.derivation)
                     }, Cancellation {
                         cutVerificationWork++
                         cancellation()
@@ -82,10 +85,13 @@ internal class LinearAuthorityQuery private constructor(
             }
             onCutWork(cutVerificationWork)
             val accepted = active.indices.filter { checks[it] == SourceEvidenceCheck.Checked }
-                .mapTo(HashSet()) { active[it].owner }
-            for (cut in cuts) {
+                .mapTo(HashSet()) { active[it] }
+            for ((id, cut) in cuts.withIndex()) {
                 if (cancellation()) return null
-                if (cut.owner in accepted) activeCuts++ else inactive += cited.size
+                if (id in accepted) {
+                    activeCuts++
+                    if (cut.mixed) activeMixedCuts++
+                } else inactive += cited.size
                 cited += cut.inequality to cut.derivation
             }
             val condition = source.scope.condition
@@ -101,7 +107,7 @@ internal class LinearAuthorityQuery private constructor(
                 else BigFraction.MINUS_ONE
             val costs = coordinates.map { sign * (numeric.objective[it] ?: BigFraction.ZERO) }
             return LinearAuthorityQuery(source, coordinates, cited, rows, inactive, unconditional && inactive.isEmpty(),
-                costs, numeric.objectiveConstant * sign, sign, template?.cuts != null, activeCuts)
+                costs, numeric.objectiveConstant * sign, sign, template?.cuts != null, activeCuts, activeMixedCuts)
         }
     }
 }

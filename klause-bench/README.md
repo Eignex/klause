@@ -2983,6 +2983,11 @@ completion and deeper diagnosis of the within-dimension decline.
 `bench.profile.MpsProofFrontier` takes `suite=ID problem=NAME sha256=HEX exact=true|false`
 for one hash-matched original source. It uses the same numerical source setup and
 invocation, seed 3 and a ten-second solve deadline under the existing LP allowances.
+`frontier=true` selects the retained bound-ordered owner; `cuts=false` disables its
+source separation. `cuts.json` retains the last query's cut rows, source premise
+references, exact combination weights, continuous bound derivations and fresh
+native source checks. Eligibility counters cover only visited source rows and
+distinguish missing bounds, integral shifted right sides and retention limits.
 Submit through the lab with `profile.runTimeoutSec: 180` for a bounded local Mac
 capture. A child JVM uses one processor, a 3 GiB heap, Serial GC and JFR. This is an
 instrumented owner-state capture; ordinary matched CLI experiments measure cost.

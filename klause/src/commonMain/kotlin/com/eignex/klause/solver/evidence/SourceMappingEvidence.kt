@@ -186,6 +186,8 @@ private class MappingProofTranslation(
             })
             is SourceDerivation.IntegerRounding -> SourceDerivation.IntegerRounding(
                 translate(proof.inequality, transformation, scope, depth + 1))
+            is SourceDerivation.MixedIntegerRounding -> missing(
+                "mapping mixed integer rounding requires an integrality-preserving coordinate justification")
             is SourceDerivation.Import -> {
                 val imported = proof.evidence
                 if (imported.scope.revision != scope.revision || imported.scope.objective != scope.objective ||

@@ -349,6 +349,15 @@ class SourceEvidenceVerifier(
                         else BigFraction.of(row.rhs.negated().ceilInteger(), BIG_ONE).negated()
                     SourceInequality(coefficients, rhs)
                 }
+                is SourceDerivation.MixedIntegerRounding -> {
+                    val row = inequality(derivation.inequality, scope, depth + 1)
+                    val bounds = derivation.bounds.map { inequality(it, scope, depth + 1) }
+                    if (row.coefficients.keys.any { it !in coordinates }) {
+                        rejectProof("mixed integer rounding references an undeclared coordinate")
+                    }
+                    mixedIntegerRounding(row, bounds, Cancellation { step(depth); cancellation() })
+                        ?: rejectProof("mixed integer rounding requires integral activity and continuous bounds")
+                }
                 is SourceDerivation.Import -> {
                     val consequence = derivation.evidence.claim as? SourceClaim.Consequence
                         ?: rejectProof("inequality import requires a proved consequence")

@@ -50,7 +50,7 @@ internal class LinearAuthorityInvocation(
     guidance: Boolean = false,
     private val funding: SourceLpFunding = borrowedAuthority?.funding
         ?: SourceLpFunding(params.sourceLpWorkLimit, params.sourceLpAllocationLimit),
-    cuts: Boolean = boundOrdered,
+    cuts: Boolean = boundOrdered && params.sourceCuts,
 ) : AutoCloseable {
     init {
         require(borrowedAuthority?.funding == null || borrowedAuthority.funding === funding) {

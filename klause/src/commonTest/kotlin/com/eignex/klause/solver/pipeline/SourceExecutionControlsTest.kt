@@ -17,6 +17,18 @@ import kotlin.test.assertTrue
 
 class SourceExecutionControlsTest {
     @Test
+    fun `source cut control should bind to numerical execution`() {
+        val source = SmtLib.parse("(declare-const x Real) (assert (> x 0))").source
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            source, ExecutionOperation.SATISFY, FiniteEngine.FIXED, linearTraversal = LinearTraversal.NUMERICAL_FRONTIER,
+        ))
+
+        val request = SourceExecutionRequest(invocation, ExecutionOptions.parse(listOf("source-cuts=false")))
+
+        assertEquals(false, request.theory.sourceCuts)
+    }
+
+    @Test
     fun `source option binding should retain the containing ledger across native families`() {
         val sources = listOf(
             "(declare-const x Real) (assert (> x 0))",

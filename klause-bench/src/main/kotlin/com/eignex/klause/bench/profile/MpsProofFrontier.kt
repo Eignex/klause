@@ -55,7 +55,7 @@ internal object MpsProofFrontier {
         require(Runtime.getRuntime().availableProcessors() == 1)
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.keys.containsAll(setOf("suite", "problem", "sha256", "exact")) &&
-            (options.keys - setOf("suite", "problem", "sha256", "exact", "probe", "history", "frontier")).isEmpty())
+            (options.keys - setOf("suite", "problem", "sha256", "exact", "probe", "history", "frontier", "cuts")).isEmpty())
         val probe = options["probe"]?.toBooleanStrict() ?: false
         val historyEnabled = options["history"]?.toBooleanStrict() ?: false
         val frontierEnabled = options["frontier"]?.toBooleanStrict() ?: false
@@ -82,7 +82,8 @@ internal object MpsProofFrontier {
         val execution = checkNotNull(field(prepared.route, "execution"))
         val request = field(execution, "request") as NumericalLinearRequest
         val solveStop = preparationStop or Cancellation.after(10.seconds)
-        val params = TheoryParams(timeout = solveStop, cancellation = solveStop, randomSeed = 3L)
+        val params = TheoryParams(timeout = solveStop, cancellation = solveStop, randomSeed = 3L,
+            sourceCuts = options["cuts"]?.toBooleanStrict() ?: true)
         val authority = request.javaClass.declaredMethods.single {
             it.name == "authorityContext" && it.parameterCount == 2
         }.apply { isAccessible = true }
@@ -141,6 +142,7 @@ internal object MpsProofFrontier {
             val captureStop = Cancellation.after(10.seconds)
             val snapshot = NumericalFrontierSnapshot(context, captureStop, scale)
             val frontier = snapshot.capture(invocation)
+            Reports.writeJson(out.resolve("cuts.json").path, snapshot.cuts(invocation))
             val terminal = field(result, "terminal") as SourceEvidence?
             val work = stats(invocation).smt.sourceLp
             Reports.writeJson(out.resolve("frontier.json").path, buildJsonObject {
@@ -164,6 +166,7 @@ internal object MpsProofFrontier {
                 put("measurement", "numerical-owner-state-capture")
                 put("branchHistory", historyEnabled)
                 put("boundOrdered", frontierEnabled)
+                put("sourceCuts", params.sourceCuts)
                 put("wholeCliTimingClaim", false)
                 put("sourceVerdictClaim", false)
                 put("independentWitnessCheck", false)

@@ -12,6 +12,7 @@ class SourceInequality(
     val strict: Boolean = false,
 ) {
     private val captured = coefficients.filterValues { !it.isZero }.toMap()
+    internal val supportSize: Int get() = captured.size
     /** Nonzero coefficients in original source coordinates. */
     val coefficients: Map<SourceCoordinate, BigFraction> get() = captured.toMap()
 
@@ -131,6 +132,16 @@ sealed interface SourceDerivation {
         /** Exact inequality with integral coefficients over declared integer coordinates. */
         val inequality: SourceDerivation,
     ) : SourceDerivation
+    /** Round integral integer activity with bounded continuous residuals. */
+    class MixedIntegerRounding(
+        /** Exact row with integral coefficients on its declared integer coordinates. */
+        val inequality: SourceDerivation,
+        bounds: List<SourceDerivation>,
+    ) : SourceDerivation {
+        private val captured = bounds.toList()
+        /** One proved single-coordinate bound for each continuous coordinate in the row. */
+        val bounds: List<SourceDerivation> get() = captured.toList()
+    }
     /** A nonnegative exact combination of inequalities. */
     class Combination(terms: List<Term>) : SourceDerivation {
         private val captured = terms.toList()
