@@ -27,7 +27,7 @@ internal class LinearResidualCompletion(
 ) : AutoCloseable {
     private var rows: List<ExactRationalInequality>? = null
     private var columns = 0
-    private var objective: List<BigFraction> = emptyList()
+    private var objective: List<BigFraction>? = null
     private var admission: SourceLpSparseAdmission? = null
     private var owner: LpScopedSolver? = null
     private var finished = false
@@ -48,13 +48,13 @@ internal class LinearResidualCompletion(
         variables: Int,
         cancellation: Cancellation,
         observe: (String, Long) -> Unit,
-        costs: List<BigFraction> = List(variables) { BigFraction.ZERO },
+        costs: List<BigFraction>? = null,
         small: () -> List<BigFraction>?,
     ): List<BigFraction>? {
         paused = false
         if (cancellation()) return null
         val previous = rows
-        require(costs.size == variables)
+        require(costs == null || costs.size == variables)
         val same = previous != null && columns == variables && objective == costs && previous.size == residual.size &&
             previous.indices.all { id ->
                 val a = previous[id]
@@ -66,7 +66,7 @@ internal class LinearResidualCompletion(
             close()
             rows = residual
             columns = variables
-            objective = costs.toList()
+            objective = costs?.toList()
             point = small()
             if (point != null) finished = true
             if (cancellation() || budget.funding?.paused == true) {
@@ -82,7 +82,7 @@ internal class LinearResidualCompletion(
         if (admission == null) {
             val packed = LinearAuthorityModel.prepare(residual, variables, cancellation) ?: return null
             admission = budget.admitSparse(cancellation) { active ->
-                SparseSourceLp.prepare(packed.rows, packed.columns, costs,
+                SparseSourceLp.prepare(packed.rows, packed.columns, costs ?: List(variables) { BigFraction.ZERO },
                     BigFraction.ZERO, policy, active).also {
                     observe("PrimalRecoverySparseInputEntries", it.metrics.inputEntries)
                     observe("PrimalRecoverySparseInputBits", it.metrics.scalarBits)
@@ -196,7 +196,7 @@ internal class LinearResidualCompletion(
         budget.closeOwner(owner)
         owner = null
         rows = null
-        objective = emptyList()
+        objective = null
         point = null
         floating = null
         lifetime = null
