@@ -2498,6 +2498,33 @@ Retain typed original-source derivations separately from native engine completio
 capture stays optional and unsupported capture withholds mathematical coverage. See
 [source evidence](../docs/13-evidence.md).
 
+### Retained source query funding and rebinding
+
+[8231](https://lab.eignex.com/jobs/8231) and
+[8233](https://lab.eignex.com/jobs/8233) compare retained source sessions at
+`706e08e7d3` and `7085c1e25f` on four hash-pinned original roots, with a 600M
+caller work ledger and 20M slice grants. The candidate retains one preparation and
+one operation per source. On the compact equality layout,
+[8246](https://lab.eignex.com/jobs/8246) at `3bcdc3e28b` reaches misc04inf's
+numerical candidate at 267,223,843 floating work and 2,222 pivots. Its 548,163-work
+bound check declines the candidate; this establishes no bound or source verdict.
+Rentacar advances to 1,568 pivots and 598,088,504 floating work before the finite
+caller ledger exhausts at 600,342,003 total work, including atomic overspend.
+It supplies no candidate. Preparation allocation remains 5.8/16.4 MB respectively.
+Cap6000 and p0033 retain completed root guidance. These captures contain no
+independently checked source witnesses or end-to-end throughput claim.
+
+The identical 32-scope dcmulti binding streams
+[8232](https://lab.eignex.com/jobs/8232) and
+[8234](https://lab.eignex.com/jobs/8234) use those same base/candidate revisions,
+JDK 25.0.4.1 and Mac/aarch64. All 641 assertions per scope preserve their checked
+witness order, side, depth and common digest. Both retain one source owner and
+identical edit counts. Excluding the first four transitions, mean measured thread
+allocation per bind is 25.70/0.58 MB and mean instrumented time is 10.09/1.26 ms.
+This is a scoped binding cost observation; JIT, JFR and a single source limit the
+timing interpretation. Source-checked cold CLI controls measure the consuming solve
+separately.
+
 ### Linear traversal comparison
 
 For bounded MPS traversal diagnostics, compare `param.linear-traversal=automatic`
