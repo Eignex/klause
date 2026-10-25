@@ -25,6 +25,7 @@ import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.util.Cancellation
 
 internal class LinearAuthoritySession(private val budget: SourceLpBudget) : AutoCloseable {
+    private data class Query(val scope: SourceScope, val columns: List<ExactLpColumn>, val inactive: Set<Int>)
     private var rows: List<ExactRationalInequality> = emptyList()
     private var owner: LpScopedSolver? = null
     private var objective: ExactLpObjective? = null
@@ -35,6 +36,7 @@ internal class LinearAuthoritySession(private val budget: SourceLpBudget) : Auto
     private var sparse: SparseSourceLp? = null
     private var rowPolicy: SparseSourceLpRowPolicy? = null
     private var admission: SourceLpSparseAdmission? = null
+    private var query: Query? = null
     private var completed: LpRootGuidance? = null
     private var completedPolicy: SparseSourceLpPolicy? = null
     private var lifetime: LpFloatAllowance? = null
@@ -130,6 +132,7 @@ internal class LinearAuthoritySession(private val budget: SourceLpBudget) : Auto
             rowPolicy == policy.rowPolicy &&
             this.objective?.let { sameObjective(it, objective) } == true &&
             sameRows(rows, packed.rows)
+        val query = Query(scope, packed.columns, packed.inactiveRows)
         if (!compatible) {
             close()
             admission = budget.admitSparse(cancellation) { active ->
@@ -142,13 +145,13 @@ internal class LinearAuthoritySession(private val budget: SourceLpBudget) : Auto
             this.objective = objective.takeIf { it.size == checkNotNull(sparse).model.numVars }
                 ?: ExactLpObjective(costs.map(ExactLpNumber::of) +
                     List(checkNotNull(sparse).emittedRowCount) { zero }, ExactLpNumber.of(constant))
-        } else if (admission == null || authority != scope || sides != packed.columns ||
-            inactive != packed.inactiveRows) {
+        } else if (admission == null || this.query != query) {
             admission?.close()
             admission = budget.admitSparse(checkNotNull(sparse), cancellation) ?: return null
             completed = null
             lifetime = null
         }
+        this.query = query
         val reservation = admission ?: return null
         return budget.resumeSparse(reservation, cancellation) { prepared, active ->
             currentToken = active
@@ -161,9 +164,9 @@ internal class LinearAuthoritySession(private val budget: SourceLpBudget) : Auto
             val current = bind(packed, emittedObjective, active, { prepared.model }, scope, profile)
                 ?: return@resumeSparse null
             completed?.let {
-                val stopped = it.termination == LpFloatTermination.WORK || it.termination == LpFloatTermination.PIVOTS
+                val usable = it.primal != null || it.bound != null || it.conflict != null
                 if (completedPolicy?.certificate == policy.certificate &&
-                    (!stopped || completedPolicy?.floating == profile)) {
+                    (usable || completedPolicy?.floating == profile)) {
                     return@resumeSparse consume(it, prepared, token)
                 }
                 completed = null
@@ -202,6 +205,7 @@ internal class LinearAuthoritySession(private val budget: SourceLpBudget) : Auto
         } else {
             admission?.close()
             admission = null
+            query = null
             completed = null
             lifetime = null
         }
@@ -225,6 +229,7 @@ internal class LinearAuthoritySession(private val budget: SourceLpBudget) : Auto
         rowPolicy = null
         admission?.close()
         admission = null
+        query = null
         completed = null
         completedPolicy = null
         lifetime = null

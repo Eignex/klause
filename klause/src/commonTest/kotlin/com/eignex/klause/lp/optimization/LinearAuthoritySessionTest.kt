@@ -2,7 +2,9 @@ package com.eignex.klause.lp.optimization
 
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
+import com.eignex.klause.lp.SparseSourceLp
 import com.eignex.klause.lp.SparseSourceLpPolicy
+import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpCertifierCost
@@ -12,6 +14,8 @@ import com.eignex.klause.lp.engine.LpRootGuidance
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
+import com.eignex.klause.solver.evidence.SourceCondition
+import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.util.Cancellation
@@ -20,6 +24,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LinearAuthoritySessionTest {
@@ -29,6 +34,40 @@ class LinearAuthoritySessionTest {
         override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
     }
     private val scope = SourceScope(SourceRevision("session-fixture", "exact-affine"))
+
+    @Test
+    fun `batched source rebinding should preserve witnesses strict rows and scope retraction`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.ofLong(5)),
+            ExactRationalInequality(intArrayOf(1), listOf(BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(1), listOf(BigFraction.ONE), BigFraction.ofLong(5)),
+            ExactRationalInequality(intArrayOf(0, 1), List(2) { BigFraction.ONE }, BigFraction.ofLong(9), true),
+        )
+        val costs = List(2) { BigFraction.ONE }
+        val packed = assertNotNull(LinearAuthorityModel.prepare(rows, 2, Cancellation.Never))
+        val child = assertNotNull(LinearAuthorityModel.prepare(rows + ExactRationalInequality(intArrayOf(0),
+            listOf(BigFraction.MINUS_ONE), BigFraction.ofLong(-2)), 2, Cancellation.Never))
+        val model = assertNotNull(SparseSourceLp.prepare(packed.rows,
+            packed.columns.map { it.copy(bounds = ExactLpBounds()) }, costs, BigFraction.ZERO,
+            SparseSourceLpPolicy(), Cancellation.Never).prepared).model
+        LinearAuthoritySession(SourceLpBudget()).use { session ->
+            val owner = assertNotNull(session.bind(packed, model.objective, Cancellation.Never, { model }, scope))
+            val restricted = scope.copy(condition = SourceCondition(lower = mapOf(
+                SourceCoordinate(SourceCoordinate.Kind.Real, 0) to BigFraction.ofLong(2))))
+            assertSame(owner, session.bind(child, model.objective, Cancellation.Never, { model }, restricted))
+            assertEquals(BigFraction.ofLong(2), owner.state.activeSide(0, false)?.side?.number?.value)
+
+            assertSame(owner, session.bind(packed, model.objective, Cancellation.Never, { model }, scope))
+
+            assertEquals(BigFraction.ZERO, owner.state.activeSide(0, false)?.side?.number?.value)
+            assertEquals(listOf(0L, 1L, 2L, 3L), owner.state.assertions.map { it.witness })
+            assertEquals(List(4) { 1 }, owner.state.assertions.map { it.depth })
+            assertEquals(listOf(false, true, false, true), owner.state.assertions.map { it.upper })
+            assertTrue(owner.state.model.column(owner.state.model.numVars - 1).bounds.lower?.strict == true)
+            assertEquals(1L, session.preparations)
+        }
+    }
 
     @Test
     fun `unchanged funding stops should cache until the query allowance is promoted`() {
