@@ -13,10 +13,10 @@ import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolvePass
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.theory.BuiltInEncoderProvider
+import com.eignex.klause.theory.EncodedTheoryFactor
 import com.eignex.klause.theory.Encoder
 import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.theory.EncoderProvider
-import com.eignex.klause.theory.EncodedTheoryFactor
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
@@ -88,6 +88,40 @@ class OpenSourcePreparationTest {
 
         assertEquals(1, planned.model.numFactors)
         assertEquals(1, installations)
+    }
+
+    @Test
+    fun `trailing deletion should retain rows whose attribution remains valid`() {
+        val row = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 1.0)
+        val model = Problem(0, 0, emptyArray(), arrayOf<Factor>(row, row), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
+        val projections = FactorProjectionProviders.Default.prepare(model)
+        val captured = model.componentPlan(projections)
+        val original = requireNotNull(captured.encodedTheoryFragment(model)).factors.first()
+
+        val planned = assertIs<OpenSourcePreparation.Planned>(model.prepareOpenSource(
+            config = PresolveConfig.parse("off,+dependent-rows"), projections = projections, capturedPlan = captured,
+        ))
+
+        assertEquals(1, planned.model.numFactors)
+        assertSame(original, requireNotNull(planned.plan.encodedTheoryFragment(planned.model)).factors.single())
+    }
+
+    @Test
+    fun `deletion after resource declined capture should prepare complete rows`() {
+        val row = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 1.0)
+        val model = Problem(0, 0, emptyArray(), arrayOf<Factor>(row, row), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
+        val projections = FactorProjectionProviders.Default.prepare(model)
+        val captured = model.componentPlan(projections, cancellation = Cancellation { true })
+
+        val planned = assertIs<OpenSourcePreparation.Planned>(model.prepareOpenSource(
+            config = PresolveConfig.parse("off,+dependent-rows"), projections = projections, capturedPlan = captured,
+        ))
+
+        assertEquals(1, planned.model.numFactors)
+        assertNull(planned.plan.encodingDecline)
+        assertEquals(1, requireNotNull(planned.plan.encodedTheoryFragment(planned.model)).numFactors)
     }
 
     @Test
