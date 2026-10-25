@@ -193,7 +193,9 @@ class SymmetryBreakingTest {
 
     @Test
     fun `a value symmetry pin should select a live column`() {
-        val problem = Problem(0, 2, Array(2) { IntDomain(0, 2) }, listOf(AllDifferent(intArrayOf(1)))).bake()
+        val problem = Problem(
+            0, 2, Array(2) { IntDomain(0, 2) }, listOf(Table(intArrayOf(1), longArrayOf(0, 1, 2))),
+        ).bake()
 
         val delta = Presolve.breakSymmetries(problem)
 
@@ -273,7 +275,9 @@ class SymmetryBreakingTest {
     @Test
     fun `value precedence should keep one solution per value-symmetry class`() {
         // Bell(3) = 5 set partitions of three variables.
-        val problem = Problem(0, 3, Array(3) { IntDomain(0, 2) }, List(3) { AllDifferent(intArrayOf(it)) })
+        val problem = Problem(
+            0, 3, Array(3) { IntDomain(0, 2) }, List(3) { Table(intArrayOf(it), longArrayOf(0, 1, 2)) },
+        )
         val broken = precedence(problem)
         val orig = countFeasible(problem)
         val after = countFeasible(broken)
