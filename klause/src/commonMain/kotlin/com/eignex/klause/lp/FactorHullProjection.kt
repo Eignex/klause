@@ -26,7 +26,14 @@ internal fun Factor.lpHullFamily(): HullFamily? = when (this) {
 }
 
 /** Whether this factor's optional LP hull is enabled for the current build. */
-internal fun Factor.lpHullEnabled(flags: HullFlags): Boolean = lpHullFamily()?.let(flags::enabled) ?: true
+internal fun Factor.lpHullEnabled(flags: HullFlags, elementIndexes: Set<Int>? = null): Boolean =
+    (lpHullFamily()?.let(flags::enabled) ?: true) &&
+        (this !is Element || elementIndexes == null || idx in elementIndexes)
+
+internal data class LpHullGroupKey(val family: HullFamily?, val index: Int)
+
+internal fun Factor.lpHullGroupKey(factorId: Int): LpHullGroupKey =
+    LpHullGroupKey(lpHullFamily(), if (this is Element) idx else factorId)
 
 /** The LP columns and rows this factor's optional hull can add over [boxes] — `null` where the build
  *  would emit no hull at all, an open-sided column included, so the gate never sizes a family the
