@@ -59,7 +59,10 @@ internal class MaxSd(
         } ?: Cancellation.Never
         return try {
             session.withCancellation(token) {
-                probeAndOrder(session, varRef, rng, maxProbes, ascending = false, observations = observations)
+                probeAndOrder(
+                    session, varRef, rng, maxProbes, ascending = false, observations = observations,
+                    scoreVisit = if (probeWorkLimit == null) null else session::visitValueScore,
+                )
             }
         } finally {
             observations.probeWork += session.work - start

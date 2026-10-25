@@ -322,7 +322,8 @@ or incomplete counters and larger domains retain residual-domain probing. The
 ordering keeps every candidate, including zero-count alternatives.
 
 The `propagation-guided` recipe bounds a residual-domain ordering to 32 candidate
-probes and 262,144 native work units. Work cancellation is cooperative inside
+probes and 262,144 work units, including each variable visited by residual scoring.
+Work cancellation is cooperative inside
 propagation; restoration and indivisible propagator operations can exceed the
 allowance. A cut probe restores the completed parent and retains its candidate.
 Completed probes retain their order or refutation, and every untested alternative

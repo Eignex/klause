@@ -10,7 +10,7 @@ data class ValueOrderingStats(
     val probes: Long = 0L,
     /** Completed probes that refuted their candidate. */
     val refutations: Long = 0L,
-    /** Native work spent in probing orderings, including interrupted probes and restoration. */
+    /** Work in probing orderings, including interrupted probes, restoration and bounded score visits. */
     val probeWork: Long = 0L,
     /** Orderings that exhausted their local cooperative work allowance. */
     val cappedOrders: Long = 0L,
