@@ -268,19 +268,21 @@ class PortfolioSchedulingTest {
     }
 
     @Test
-    fun `a silent complete arm should reach its first witness despite a competing bandit preference`() {
-        val slices = IntArray(2)
-        val workers = listOf(
-            trackingWorker("preferred", 0, ScriptedSearch({ false }) { slices[0]++ }),
-            trackingWorker("finder", 1, ScriptedSearch({ it == 2 }) { slices[1]++ }),
-        )
-        val bandit = fixedBandit(2, arm = 0)
+    fun `silent siblings should reach their first witness despite a competing bandit preference`() {
+        for (family in listOf(ArmFamily.Backtrack, ArmFamily.LocalSearch)) {
+            val slices = IntArray(2)
+            val workers = listOf(
+                trackingWorker("preferred", 0, ScriptedSearch({ false }) { slices[0]++ }),
+                trackingWorker("finder", 1, ScriptedSearch({ it == 2 }) { slices[1]++ }),
+            ).onEach { it.family = family }
+            val bandit = fixedBandit(2, arm = 0)
 
-        val result = Portfolio(workers, bandit).use {
-            it.minimize(Cancellation { slices.sum() >= 8 })
+            val result = Portfolio(workers, bandit).use {
+                it.minimize(Cancellation { slices.sum() >= 8 })
+            }
+
+            assertEquals(999.0, assertIs<MinimizeResult.WithSample>(result).objectiveValue, "family=$family")
         }
-
-        assertEquals(999.0, assertIs<MinimizeResult.WithSample>(result).objectiveValue)
     }
 
     @Test
