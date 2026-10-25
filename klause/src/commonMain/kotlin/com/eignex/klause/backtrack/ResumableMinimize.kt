@@ -75,15 +75,7 @@ import com.eignex.klause.solver.search.completedSearchSample
 import com.eignex.klause.solver.validation.composedFixpoint
 import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.solver.withSourceSemantics
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.fitsLong
-import com.eignex.klause.util.minus
-import com.eignex.klause.util.plus
-import com.eignex.klause.util.toLongExact
 import com.eignex.klause.util.cancelledWhen
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.ComparableTimeMark
@@ -226,7 +218,7 @@ internal class ResumableMinimize(
     private val externalShared = params.objectiveBoundSupplier != null
     private var lastExternalCutoff = Double.POSITIVE_INFINITY
     private var lastObjBoundAsserted: Long? = null
-    private var lastBoolCutoffRhs: BigInt? = null
+    private var lastBoolCutoffValue: BigFraction? = null
     private var lastOpenCutoff: Long? = null
 
     private fun externalCutoff(): Double {
@@ -644,7 +636,7 @@ internal class ResumableMinimize(
         incumbents = minimizingSampleExchange(problem, params.toleranceCheck)
         objVarBest = null
         lastObjBoundAsserted = null
-        lastBoolCutoffRhs = null
+        lastBoolCutoffValue = null
         lastOpenCutoff = null
         done = null
         pendingIncumbent = null
@@ -846,44 +838,14 @@ internal class ResumableMinimize(
      * (optimum proven). Integer constraints are independent of this Boolean cost view.
      */
     private fun postBoolObjectiveCutoffAtRoot(): Boolean {
-        if (!params.pbObjectiveCutoff || problem.numRealVars > 0 ||
-            objective.intCoefficientValues.any { it != 0L } || objective.realCoefficientValues.any { it != 0.0 }
-        ) return false
+        if (!params.pbObjectiveCutoff) return false
         val best = incumbents.current()?.objective?.exact ?: return false
-        if (best.den != BIG_ONE) return false
-        val cutoffRhs = best.num - bigIntOf(objective.constant) - BIG_ONE
-        if (cutoffRhs == lastBoolCutoffRhs) return false
-        lastBoolCutoffRhs = cutoffRhs
-        val weights = objective.boolWeightValues
-        val nb = minOf(problem.numBoolVars, weights.size)
-        var posSum = bigIntOf(0)
-        var magnitude = bigIntOf(0)
-        var nnz = 0
-        for (b in 0 until nb) {
-            val w = weights[b]
-            if (w == 0L) continue
-            nnz++
-            if (w == Long.MIN_VALUE) return false
-            magnitude += bigIntOf(if (w < 0L) -w else w)
-            if (!magnitude.fitsLong()) return false
-            if (w > 0L) posSum += bigIntOf(w)
-        }
-        if (nnz == 0) return false
-        val exactDegree = posSum - cutoffRhs
-        if (!exactDegree.fitsLong()) return false
-        val degree = exactDegree.toLongExact()
-        if (degree <= 0L) return false // every assignment already beats the cutoff — nothing to enforce
-        val pbWeights = LongArray(nnz)
-        val pbLits = IntArray(nnz)
-        var i = 0
-        for (b in 0 until nb) {
-            val w = weights[b]
-            if (w == 0L) continue
-            pbWeights[i] = if (w < 0L) -w else w
-            pbLits[i] = Lit.make(b, w < 0L)
-            i++
-        }
-        return session.addLearnedPb(pbWeights, pbLits, degree, lbd = 1, permanent = true) is PropagationResult.Unsat
+        if (best == lastBoolCutoffValue) return false
+        val cutoff = booleanObjectiveCutoff(problem, objective, best) ?: return false
+        lastBoolCutoffValue = best
+        return session.addLearnedPb(
+            cutoff.weights, cutoff.literals, cutoff.degree, lbd = 1, permanent = true,
+        ) is PropagationResult.Unsat
     }
 
     /** Offer [sample] (objective [o]) to [incumbents]; fires inline telemetry and returns the incumbent
