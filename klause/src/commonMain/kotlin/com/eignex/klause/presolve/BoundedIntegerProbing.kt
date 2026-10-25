@@ -7,6 +7,7 @@ import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.RootWorkAccounting
+import com.eignex.klause.propagation.rootDeductions
 import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
 
@@ -27,7 +28,7 @@ internal object BoundedIntegerProbing {
             return base
         }
         val budget = cancellation.presolveBudget() ?: return base
-        val token = budget.slice(minOf(MAX_PROBE_WORK, budget.remaining() / 8)) or cancellation
+        val token = cancellation or budget.slice(minOf(MAX_PROBE_WORK, budget.remaining() / 8))
         if (token()) return base
         val state = PropagationState(PropagationProblem(problem), base.toAssumptions(), nativeSat = true)
         state.cancelFloor = 0
@@ -46,7 +47,12 @@ internal object BoundedIntegerProbing {
             }
             if (state.runCancelled || accounting()) return base
             val session = PropagationSession.prepared(state, accounting, null)
-            ProbeRun(problem, base, config, session, accounting).run()
+            val result = ProbeRun(problem, base, config, session, accounting).run()
+            if (result is PropagationResult.Unsat) return result
+            accounting.charge(problem.numBoolVars.toLong() + problem.numIntVars)
+            val extra = state.rootDeductions(base.toAssumptions())
+            if (extra.isEmpty && extra.toAssumptions().deductions.isEmpty) result
+            else (result as PropagationResult.Implied).merge(extra)
         } finally {
             accounting.flush()
         }
