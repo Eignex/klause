@@ -11,7 +11,7 @@ import kotlin.test.assertTrue
 class LpBoundCertificationTest {
     @Test
     fun `independent dual denominators should certify a bound on free columns`() {
-        val coefficients = listOf(101L, 103L, 107L, 109L)
+        val coefficients = listOf(101L, 103L, 107L, 109L, 1L)
         val zero = ExactLpNumber.of(0L)
         val source = assertNotNull(LpExactState(ExactLpModel(
             coefficients.mapIndexed { row, value -> listOf(ExactLpEntry(row, ExactLpNumber.of(value))) },
@@ -19,21 +19,24 @@ class LpBoundCertificationTest {
             coefficients.map { ExactLpColumn(ExactLpBounds()) } +
                 coefficients.map { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
             coefficients.map { ExactLpRow() },
-            ExactLpObjective(coefficients.map { ExactLpNumber.of(-1L) } + coefficients.map { zero }),
+            ExactLpObjective(coefficients.indices.map { ExactLpNumber.of(if (it < 4) -1L else 0L) } +
+                coefficients.map { zero }),
         )).toWorkingModel())
 
-        val result = certifyLpBoundOnly(source, coefficients.map { -1.0 / it }.toDoubleArray(),
-            ReconstructionLimits(maxAttempts = 1))
+        for (noise in listOf(0.0, -1e-8)) {
+            val duals = coefficients.take(4).map { -1.0 / it } + noise
+            val result = certifyLpBoundOnly(source, duals.toDoubleArray(), ReconstructionLimits(maxAttempts = 1))
 
-        val multipliers = coefficients.map { BigFraction.ofLong(-it).reciprocal() }
-        val bound = assertNotNull(result.bound)
-        assertEquals(multipliers, bound.dualMultipliers)
-        assertEquals(multipliers.reduce(BigFraction::plus), bound.value)
-        assertEquals(0, result.metrics.pointChecks)
-        assertEquals(1, result.metrics.attempts)
-        assertEquals(2, result.metrics.dualChecks)
-        assertNotNull(result.metrics.vectorRejection)
-        assertNotNull(bound.support)
+            val multipliers = coefficients.take(4).map { BigFraction.ofLong(-it).reciprocal() } + BigFraction.ZERO
+            val bound = assertNotNull(result.bound)
+            assertEquals(multipliers, bound.dualMultipliers)
+            assertEquals(multipliers.reduce(BigFraction::plus), bound.value)
+            assertEquals(0, result.metrics.pointChecks)
+            assertEquals(1, result.metrics.attempts)
+            assertEquals(2, result.metrics.dualChecks)
+            assertNotNull(result.metrics.vectorRejection)
+            assertNotNull(bound.support)
+        }
     }
 
     @Test
