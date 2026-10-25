@@ -4,6 +4,7 @@ import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.SparseSourceLpLimits
 import com.eignex.klause.lp.SparseSourceLpPolicy
+import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.satisfiesSourceRows
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
@@ -16,6 +17,26 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LinearResidualCompletionTest {
+    @Test
+    fun `a residual lifetime should use cumulative caller funding beyond the baseline floating allowance`() {
+        val funding = SourceLpFunding(1_000_000L, 64L * 1024L * 1024L)
+        val budget = SourceLpBudget(funding = funding)
+        val policy = SparseSourceLpPolicy(floating = LpFloatAllowance(1L, 1))
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1), List(2) { BigFraction.ofLong(3) }, BigFraction.ONE),
+            ExactRationalInequality(intArrayOf(0, 1), List(2) { BigFraction.ofLong(-3) }, BigFraction.MINUS_ONE),
+        )
+        funding.grant(1_000_000L)
+
+        val point = LinearResidualCompletion(budget, policy).use {
+            it.complete(rows, 2, Cancellation.Never, { _, _ -> }, small = { null })
+        }
+
+        assertTrue(assertNotNull(point).satisfiesSourceRows(rows))
+        assertTrue(funding.spent > 1L)
+        assertFalse(funding.exhausted)
+    }
+
     @Test
     fun `sparse completion should recover an exact rational point outside small input admission`() {
         val rows = listOf(
