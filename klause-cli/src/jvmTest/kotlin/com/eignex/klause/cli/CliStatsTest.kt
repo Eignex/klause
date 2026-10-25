@@ -27,10 +27,10 @@ import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.RunStats
 import com.eignex.klause.solver.result.SchedulingStats
 import com.eignex.klause.solver.result.SearchStats
-import com.eignex.klause.solver.result.ValueOrderingStats
 import com.eignex.klause.solver.result.SmtStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SourceLpWorkStats
+import com.eignex.klause.solver.result.ValueOrderingStats
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.parseBigInt
 import com.eignex.kumulant.stat.summary.SumResult
