@@ -80,7 +80,7 @@ class LpRetainedSourcesTest {
             restored.commit()
             assertEquals(BigFraction.ONE, assertNotNull(sources.liveBounds(domains)[column].upper).number.value)
             assertEquals(BigFraction.ONE, assertNotNull(owner.solve()).lowerBound)
-            assertEquals(8, owner.state.model.n)
+            assertEquals(relaxation.model.n, owner.state.model.n)
         }
     }
 
