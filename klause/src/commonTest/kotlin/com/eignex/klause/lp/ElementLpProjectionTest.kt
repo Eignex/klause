@@ -36,9 +36,9 @@ class ElementLpProjectionTest {
 
     @Test
     fun `selector admission counts retained choices in long arrays`() {
-        for (offset in listOf(-9, 0, 11)) {
+        for (offset in listOf(-9, 0, 11, Int.MIN_VALUE, Int.MAX_VALUE)) {
             val domain = IntDomain(offset.toLong(), offset + 4095L)
-                .excludeValues(LongArray(4094) { offset + it + 1L })!!
+                .excludeValues(LongArray(4094) { offset.toLong() + it + 1L })!!
             val factor = Element(0, 1, LongArray(4096) { it.toLong() }, false, offset)
             val problem = Problem(0, 2, arrayOf(domain, IntDomain(0, 4095)), arrayOf(factor))
 
@@ -73,5 +73,24 @@ class ElementLpProjectionTest {
 
         assertNull(estimate)
         assertEquals(0, relaxation.colReq.count { it != null })
+    }
+
+    @Test
+    fun `different indexes retain independent choices`() {
+        val problem = Problem(
+            0, 4, Array(4) { IntDomain(0, 1) },
+            arrayOf(
+                Element(0, 2, longArrayOf(0, 1), false, 0),
+                Element(1, 3, longArrayOf(1, 0), false, 0),
+            ),
+        )
+        val relaxation = CpToLpRelaxation(
+            problem, LinearObjective(intCoefficients = longArrayOf(0, 0, 1, 1)), elementHull = true,
+        ).build(RootDomains(problem))
+
+        val solution = solveLp(relaxation.model)
+
+        assertEquals(FloatLpStatus.OPTIMAL, solution.status)
+        assertEquals(0.0, solution.objectiveValue, 1e-7)
     }
 }
