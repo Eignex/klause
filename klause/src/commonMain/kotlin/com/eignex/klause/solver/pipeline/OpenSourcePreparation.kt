@@ -8,10 +8,12 @@ import com.eignex.klause.presolve.PresolvePipeline
 import com.eignex.klause.presolve.observePreparation
 import com.eignex.klause.presolve.preparationInterrupted
 import com.eignex.klause.solver.PreparedFactorProjections
+import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.PresolveLane
 import com.eignex.klause.solver.result.PresolvePreparationStage
 import com.eignex.klause.theory.EncoderDecline
+import com.eignex.klause.theory.RetainedLinearEncoding
 import com.eignex.klause.util.Cancellation
 import kotlin.time.TimeSource
 
@@ -40,7 +42,7 @@ internal sealed interface OpenSourcePreparation {
 /**
  * Prepare this source model, then select its complete open route from what preparation produced.
  *
- * A source rewrite requires fresh planning because factor ownership is indexed by the selected model.
+ * A source rewrite requires fresh ownership because factor indices belong to the selected model.
  * An unchanged model can retain the captured plan under its identical projection binding.
  */
 internal fun Problem.prepareOpenSource(
@@ -86,8 +88,25 @@ internal fun PreparedSource.planned(
 ) { token, observation ->
     val selected = capturedPlan?.takeIf { it.reusableFor(model, projections) }
         ?.takeUnless { token.charge(1L); token() }
-        ?: projections?.forEngineView(model)?.let { model.componentPlan(it, cancellation = token) }
-        ?: model.componentPlan(cancellation = token)
+        ?: run {
+            var retained: RetainedLinearEncoding? = null
+            val selection = budget.observePreparation(
+                PresolvePreparationStage.SOURCE_SELECTION, PresolveLane.SOURCE, model, token,
+            ) { selectionToken, _ ->
+                val mapping = if (model === problem && projections?.providers === FactorProjectionProviders.Default) {
+                    retainedFactors(selectionToken)
+                } else null
+                retained = mapping?.let { capturedPlan?.retainedEncoding(it, projections) }
+                if (retained != null) requireNotNull(projections).retained(requireNotNull(mapping))
+                else projections?.forEngineView(model) ?: FactorProjectionProviders.Default.prepare(model)
+            }
+            budget.observePreparation(
+                PresolvePreparationStage.SOURCE_OWNERSHIP, PresolveLane.SOURCE, model, token,
+            ) { ownershipToken, _ ->
+                model.buildComponentPlan(selection, cancellation = ownershipToken, retained = retained,
+                    preparationBudget = budget)
+            }
+        }
     val plan = if (!token() && selected.theoryPipeline == ProblemPipeline.FINITE_CP) {
         requireNotNull(selected.forLinearConditions(model, retainEmptyTheory = true, cancellation = token)) {
             "source preparation lost the selected arithmetic completion"

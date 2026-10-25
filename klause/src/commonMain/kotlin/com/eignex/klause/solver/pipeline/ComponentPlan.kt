@@ -5,18 +5,24 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.RetainedFactors
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.CpIntId
+import com.eignex.klause.presolve.PresolveBudget
+import com.eignex.klause.presolve.observePreparation
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.solver.encodingPreparationScope
 import com.eignex.klause.solver.supportsCompleteDifferenceTheory
+import com.eignex.klause.solver.result.PresolveLane
+import com.eignex.klause.solver.result.PresolvePreparationStage
 import com.eignex.klause.theory.EncodedTheoryFactor
 import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.theory.EncodingTarget
+import com.eignex.klause.theory.RetainedLinearEncoding
 import com.eignex.klause.theory.conditionedLinearSupported
 import com.eignex.klause.theory.linearTheoryModel
 import com.eignex.klause.theory.qflra.supportsExactLira
@@ -61,6 +67,7 @@ class ComponentPlan internal constructor(
     },
     private val installedFragment: Problem? = null,
     internal val encodingDecline: EncoderDecline? = null,
+    private val completeEncodings: Map<EncodingTarget, Problem> = emptyMap(),
 ) {
     init {
         factorProjections.requireSource(source)
@@ -313,6 +320,11 @@ class ComponentPlan internal constructor(
         source === spec && factorProjections === projections && hasTheoryComponent &&
             encodingDecline != EncoderDecline.RESOURCE
 
+    internal fun retainedEncoding(mapping: RetainedFactors, projections: PreparedFactorProjections?): RetainedLinearEncoding? =
+        if (source === mapping.source && factorProjections === projections &&
+            projections?.providers === FactorProjectionProviders.Default && encodingDecline == null
+        ) RetainedLinearEncoding(mapping, completeEncodings) else null
+
     private fun requireBelongsTo(spec: Problem) {
         require(spec === source) {
             "component plan belongs to a different source model"
@@ -363,6 +375,14 @@ fun Problem.componentPlan(
     projections: PreparedFactorProjections,
     preferFinite: Boolean = false,
     cancellation: Cancellation,
+): ComponentPlan = buildComponentPlan(projections, preferFinite, cancellation)
+
+internal fun Problem.buildComponentPlan(
+    projections: PreparedFactorProjections,
+    preferFinite: Boolean = false,
+    cancellation: Cancellation,
+    retained: RetainedLinearEncoding? = null,
+    preparationBudget: PresolveBudget? = null,
 ): ComponentPlan {
     projections.requireSource(this)
     if (preferFinite) {
@@ -382,11 +402,14 @@ fun Problem.componentPlan(
         else IntVariableOwner.THEORY
     }
     val stop = cancellation.encodingPreparationScope()
-    fun install(target: EncodingTarget, indices: List<Int>, onDecline: (EncoderDecline) -> Unit): Problem? {
-        val request = projections.requestEncoders(target, indices, cancellation = stop,
-            completeFiniteConditions = true, onDecline = onDecline) ?: return null
-        return projections.linearTheoryModel(request, onDecline)
-    }
+    fun install(target: EncodingTarget, indices: List<Int>, onDecline: (EncoderDecline) -> Unit): Problem? =
+        preparationBudget.observePreparation(PresolvePreparationStage.SOURCE_ROWS, PresolveLane.SOURCE, this, stop) {
+                token, _ ->
+            retained?.model(target, indices, token) ?: projections.requestEncoders(target, indices, cancellation = token,
+                completeFiniteConditions = true, onDecline = onDecline)?.let {
+                projections.linearTheoryModel(it, onDecline)
+            }
+        }
     var initialResourceDecline = false
     var fullLinearDecline: EncoderDecline? = null
     var fullDifferenceDecline: EncoderDecline? = null
@@ -512,7 +535,11 @@ fun Problem.componentPlan(
         if (route != ProblemPipeline.UNSUPPORTED_OPEN) null
         else if (preparationStopped || stop() || linearDecline == EncoderDecline.RESOURCE ||
             differenceDecline == EncoderDecline.RESOURCE) EncoderDecline.RESOURCE
-        else linearDecline ?: differenceDecline ?: fullLinearDecline ?: fullDifferenceDecline)
+        else linearDecline ?: differenceDecline ?: fullLinearDecline ?: fullDifferenceDecline,
+        if (initialResourceDecline || preparationStopped || stop()) emptyMap() else buildMap {
+            if (linear != null) put(EncodingTarget.LINEAR, linear)
+            if (difference != null) put(EncodingTarget.DIFFERENCE, difference)
+        })
 }
 
 /**

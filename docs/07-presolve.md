@@ -456,10 +456,15 @@ canonical factors; original value sets, reconstruction and assertion premises st
 authoritative after selection.
 
 An unchanged source can reuse its captured open component plan only with the
-identical model object and factor-projection binding. Rewrites, appended objective
-rows, different bindings and resource-declined captures require fresh planning.
-Only immutable selections cross this boundary; each execution opens private search
-state.
+identical model object and factor-projection binding. A certified source deletion
+can retain built-in descriptors and completed immutable linear or difference rows
+through an ordered retained-factor mapping. Declarations, source coordinates,
+semantics, settings and implied flags must agree, and reconstruction must be empty.
+Ownership and complete-fragment admission are rebuilt against the reduced source;
+retained rows receive its factor attribution. Private real auxiliaries, conditioned
+rows, custom providers, changed dependencies, different bindings and resource
+declines require fresh preparation. Selection, row preparation and ownership have
+separate preparation observations. Each execution opens private search state.
 
 Factor-backed polynomial execution runs the same source-safe schedule before
 rebuilding polynomial ownership and encodings. Its typed source mapping reconstructs
