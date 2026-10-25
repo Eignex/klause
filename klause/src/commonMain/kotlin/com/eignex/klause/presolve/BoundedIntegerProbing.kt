@@ -21,7 +21,11 @@ internal object BoundedIntegerProbing {
         config: BakeConfig,
         cancellation: Cancellation,
     ): PropagationResult {
-        if (problem.numIntVars == 0 || config.probeTotalBudget == 0 || config.probeBudgetPerVar == 0) return base
+        if (problem.numIntVars == 0) return base
+        if (config.probeTotalBudget == 0 || config.probeBudgetPerVar == 0) {
+            cancellation.interruptPresolveInvocation()
+            return base
+        }
         val budget = cancellation.presolveBudget()
         val token = budget?.let { it.slice(minOf(MAX_PROBE_WORK, it.remaining() / 8)) or cancellation } ?: cancellation
         if (token()) return base
@@ -58,9 +62,10 @@ internal object BoundedIntegerProbing {
             var changed: Boolean
             do {
                 val before = acc
-                val order = RootBaker.sacProbeOrder(problem, acc, weights, rng)
+                val order = RootBaker.sacProbeOrder(problem, acc, weights, rng, cancellation)
                 for (interior in listOf(false, true)) {
                     for (v in order) {
+                        cancellation.charge(1)
                         if (cancellation()) return acc
                         if (perVar[v] >= config.probeBudgetPerVar) {
                             cancellation.interruptPresolveInvocation()
