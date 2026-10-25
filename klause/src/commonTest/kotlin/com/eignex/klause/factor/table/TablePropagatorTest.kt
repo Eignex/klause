@@ -3,6 +3,7 @@ package com.eignex.klause.factor.table
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.PropagationReasonOracle
+import com.eignex.klause.factor.table.internals.TableGroupCache
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
@@ -32,6 +33,41 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class TablePropagatorTest {
+
+    @Test
+    fun `grouped table guidance should count rows without a private live set`() {
+        val xs = intArrayOf(0, 1)
+        val tuples = longArrayOf(0, 0, 1, 0, 1, 1)
+        val cache = TableGroupCache(2, tuples, null)
+        cache.setNoop(longArrayOf(0, 0), longArrayOf(1, 1))
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) }, arrayOf<Factor>(Table(xs, tuples)))
+        val state = PropagationState(problem, Assumptions.None)
+        val provider = TablePropagator(intArrayOf(), xs, xs, tuples, 2, 3, null, cache)
+        check(provider.propagate(state, 0))
+
+        val counts = assertNotNull(provider.supportCounts(state, 0, 0, longArrayOf(0, 1)) { true })
+
+        assertEquals(listOf(1, 2), counts.supporting.toList())
+        assertEquals(3, counts.total)
+    }
+
+    @Test
+    fun `grouped table guidance should screen rows outside live domains`() {
+        val xs = intArrayOf(0, 1)
+        val tuples = longArrayOf(0, 0, 0, 1, 1, 2)
+        val cache = TableGroupCache(2, tuples, null)
+        cache.setNoop(longArrayOf(0, 1), longArrayOf(1, 2))
+        val problem = Problem(0, 2, arrayOf(IntDomain(0, 1), IntDomain(1, 2)), arrayOf<Factor>(Table(xs, tuples)))
+        val state = PropagationState(problem, Assumptions.None)
+        val provider = TablePropagator(intArrayOf(), xs, xs, tuples, 2, 3, null, cache)
+        check(provider.propagate(state, 0))
+
+        val counts = assertNotNull(provider.supportCounts(state, 0, 0, longArrayOf(0, 1)) { true })
+
+        assertEquals(listOf(1, 1), counts.supporting.toList())
+        assertEquals(2, counts.total)
+    }
+
 
     @Test
     fun `indexed table deductions should be implied by their historical reasons`() {
