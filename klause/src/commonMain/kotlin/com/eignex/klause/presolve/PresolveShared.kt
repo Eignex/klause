@@ -125,8 +125,7 @@ internal object PresolveShared {
         factors: List<Factor>,
         intDomains: Array<IntDomain> = problem.rootIntDomains(),
         bakeConfig: BakeConfig = BakeConfig.NONE,
-        // Extends the Boolean namespace for the one transform that mints variables
-        // ([BinaryColumnSubstitution]): ids `[problem.numBoolVars, numBoolVars)` are the fresh ones, so
+        // Extends the Boolean namespace for substitutions: ids `[problem.numBoolVars, numBoolVars)` are fresh, so
         // every existing factor still addresses the same variable.
         numBoolVars: Int = problem.numBoolVars,
         // Root deductions the [factors] alone do not imply, carried into the rebuild's own bake.

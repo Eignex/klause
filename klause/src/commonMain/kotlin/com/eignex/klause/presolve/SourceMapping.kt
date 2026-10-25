@@ -117,6 +117,8 @@ internal fun SourceMapping.retainedCoordinates(cancellation: Cancellation = Canc
 
                 is RebuildStep.IntegerFromLiteral -> if (step.variable in ints.indices) ints[step.variable] = -1
 
+                is RebuildStep.TupleValue -> if (step.variable in ints.indices) ints[step.variable] = -1
+
                 is RebuildStep.QuotientValue -> if (step.variable in ints.indices) ints[step.variable] = -1
             }
         }

@@ -560,6 +560,16 @@ enum class PresolvePass(
         autoEligible = true,
     ),
 
+    /** Replace exclusively owned Table partitions of plain AllDifferent by Boolean placement choices. */
+    SUBSTITUTE_TUPLE_PACKING(
+        "tuple-packing",
+        Stage.EXTERNAL,
+        Capability.FINITE,
+        PresolveTiming.MEDIUM,
+        preservesSolutionSet = true,
+        autoEligible = false,
+    ),
+
     /** LP-relaxation harvest: fold the LP's proven domain tightenings, redundant-row removals, root
      *  infeasibility and implied equalities into the problem. Run outside this enum's round engine, in
      *  [PresolvePipeline]'s presolve↔harvest fixpoint, gated on this entry. `EXHAUSTIVE` (it does an LP

@@ -275,6 +275,24 @@ occurrence index supplies no projection, and completed rows survive a later stop
 
 ### Structural reductions
 
+Opt-in finite `+tuple-packing` replaces positive ground Tables partitioning one
+plain AllDifferent by Boolean placement choices. Each Table chooses exactly one
+distinct row; each occupied value has capacity one across all choices. When the
+value universe equals the scope size, every capacity row requires exact coverage.
+Rows with repeated occupied values or entries outside established root domains
+are excluded. Two groups requiring the same value refute the packing even when
+every scalar coordinate retains support. Cardinality propagation, Boolean branching
+and the ordinary core LP projection consume the shared incidence rows.
+
+The substitution requires exclusive coordinate ownership by the partition's Tables
+and AllDifferent, with no objective use, optional positions, exceptions or repeated
+roles. Other uses retain the original factors. Original integer slots are pinned;
+typed reconstruction reads their selected tuple before truncating fresh Boolean
+coordinates. Deduplicated rows give one Boolean extension per source assignment,
+preserving solution multiplicity. Admission caps a scope at 4,096 coordinates,
+retained choices at 65,536, tuple cells at 262,144 and construction at 1,048,576
+charged visits. Interrupted construction publishes no partial substitution.
+
 Opt-in `+extensional` preserves shared tuples across ground Tables and MDDs. Table
 semijoins retain rows with a matching tuple on at least two shared columns. MDD
 composition intersects the diagram with a trie of the table's shared-column

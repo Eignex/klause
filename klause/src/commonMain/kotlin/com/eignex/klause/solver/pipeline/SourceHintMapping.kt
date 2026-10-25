@@ -147,6 +147,7 @@ internal fun SourceMapping.affineReconstructions(cancellation: Cancellation): Ma
             val written = when (step) {
                 is RebuildStep.AffineValue -> step.variable.also { affine[it] = step }
                 is RebuildStep.IntegerFromLiteral -> step.variable
+                is RebuildStep.TupleValue -> step.variable
                 is RebuildStep.QuotientValue -> step.variable
                 else -> continue
             }
