@@ -75,6 +75,11 @@ separate; see [MPS semantics](05-arithmetic-formats.md).
 Consumers decide when to request certified bounds, fixings, conflicts or witnesses
 and how to apply and retract them. Their policy stays outside the engine.
 
+Finite tuple-packing substitution exposes placement selectors as ordinary Boolean
+columns. Per-Table choice rows and shared occupied-value capacities use the core
+cardinality projection, independently of scalar Table hull admission. Native source
+reconstruction recovers the selected tuples; an LP point alone supplies no witness.
+
 ### Bounding and explanations
 
 [LpPropagator](../klause/src/commonMain/kotlin/com/eignex/klause/lp/bounding/LpPropagator.kt)

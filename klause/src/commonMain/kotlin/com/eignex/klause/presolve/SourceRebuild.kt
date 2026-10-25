@@ -45,6 +45,9 @@ internal sealed interface RebuildStep {
 
     class IntegerFromLiteral(val variable: Int, val literal: Int) : RebuildStep
 
+    /** Recover one source coordinate from the unique selected row of a finite table. */
+    class TupleValue(val variable: Int, val literals: IntArray, val values: LongArray) : RebuildStep
+
     /** Give Boolean [variable] the truth of its defining integer comparison, before clause polarity. */
     class ComparisonValue(val variable: Int, val intVar: Int, val op: LinearOp, val bound: Long) : RebuildStep
 
@@ -119,6 +122,10 @@ internal class SourceRebuilds(steps: List<RebuildStep>, val sourceBoolVars: Int?
         when (step) {
             is RebuildStep.CopyLiteral -> RebuildStep.CopyLiteral(step.variable, step.source)
             is RebuildStep.IntegerFromLiteral -> RebuildStep.IntegerFromLiteral(step.variable, step.literal)
+            is RebuildStep.TupleValue -> {
+                require(step.literals.size == step.values.size)
+                RebuildStep.TupleValue(step.variable, step.literals.copyOf(), step.values.copyOf())
+            }
             is RebuildStep.ComparisonValue ->
                 RebuildStep.ComparisonValue(step.variable, step.intVar, step.op, step.bound)
             is RebuildStep.SatisfyClauses -> RebuildStep.SatisfyClauses(step.variable, step.clauses.map { it.copyOf() })
@@ -145,7 +152,7 @@ internal class SourceRebuilds(steps: List<RebuildStep>, val sourceBoolVars: Int?
     /** Whether any step reads or recovers an integer column, so a lane knows if it must carry values. */
     val touchesInts: Boolean get() = steps.any {
         it is RebuildStep.AffineValue || it is RebuildStep.QuotientValue || it is RebuildStep.ComparisonValue ||
-            it is RebuildStep.IntegerFromLiteral
+            it is RebuildStep.IntegerFromLiteral || it is RebuildStep.TupleValue
     }
 
     /**
@@ -156,6 +163,10 @@ internal class SourceRebuilds(steps: List<RebuildStep>, val sourceBoolVars: Int?
      */
     fun rebuildInto(bools: BooleanArray, ints: LongArray) {
         for (step in steps) {
+            if (step is RebuildStep.TupleValue) {
+                ints[step.variable] = tupleValue(step, bools)
+                continue
+            }
             if (step is RebuildStep.IntegerFromLiteral) {
                 ints[step.variable] = if (Lit.evaluate(step.literal, bools[Lit.variable(step.literal)])) 1L else 0L
                 continue
@@ -193,6 +204,10 @@ internal class SourceRebuilds(steps: List<RebuildStep>, val sourceBoolVars: Int?
      */
     fun rebuildInto(bools: BooleanArray, ints: Array<BigInt>) {
         for (step in steps) {
+            if (step is RebuildStep.TupleValue) {
+                ints[step.variable] = bigIntOf(tupleValue(step, bools))
+                continue
+            }
             if (step is RebuildStep.IntegerFromLiteral) {
                 ints[step.variable] = bigIntOf(
                     if (Lit.evaluate(step.literal, bools[Lit.variable(step.literal)])) 1L else 0L,
@@ -232,6 +247,18 @@ internal class SourceRebuilds(steps: List<RebuildStep>, val sourceBoolVars: Int?
             }
             rebuildBool(step, bools)
         }
+    }
+
+    private fun tupleValue(step: RebuildStep.TupleValue, bools: BooleanArray): Long {
+        var selected = -1
+        for (index in step.literals.indices) {
+            val literal = step.literals[index]
+            if (!Lit.evaluate(literal, bools[Lit.variable(literal)])) continue
+            require(selected < 0) { "tuple reconstruction requires one selected row" }
+            selected = index
+        }
+        require(selected >= 0) { "tuple reconstruction requires one selected row" }
+        return step.values[selected]
     }
 
     private inline fun affineValue(step: RebuildStep.AffineValue, value: (Int) -> BigInt): BigInt {
@@ -279,7 +306,7 @@ internal class SourceRebuilds(steps: List<RebuildStep>, val sourceBoolVars: Int?
                 // Recovered by the value evaluators, which alone know the width to compute it at.
                 is RebuildStep.AffineValue, is RebuildStep.QuotientValue -> Unit
 
-                is RebuildStep.ComparisonValue, is RebuildStep.IntegerFromLiteral ->
+                is RebuildStep.ComparisonValue, is RebuildStep.IntegerFromLiteral, is RebuildStep.TupleValue ->
                     error("literal and comparison reconstruction requires integer coordinates")
             }
         }
