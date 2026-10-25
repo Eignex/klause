@@ -13,10 +13,64 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PropagationSessionTest {
+    @Test
+    fun `interrupted reseeding should retract an incomplete equality before retrying`() {
+        var armed = false
+        lateinit var session: PropagationSession
+        val token = Cancellation {
+            armed && session.litTruth(session.boundGeLit(0, 16, true)) == true
+        }
+        session = PropagationSession(Problem(0, 2, Array(2) { IntDomain(0, 255) }, emptyArray()), token)
+        repeat(128) { session.boundGeLit(0, it.toLong() + 1, true) }
+        val desired = Assumptions.None.withInt(0, 129).withInt(1, 17)
+        armed = true
+
+        assertIs<PropagationResult.Implied>(session.reseedFrom(desired))
+
+        assertTrue(session.fixpointCancelled)
+        assertEquals(0, session.decisionLevel)
+        assertEquals(IntDomain(0, 255), session.intDomain(0))
+        assertEquals(IntDomain(0, 255), session.intDomain(1))
+        armed = false
+        assertIs<PropagationResult.Implied>(session.reseedFrom(desired))
+        assertFalse(session.fixpointCancelled)
+        assertEquals(IntDomain(129, 129), session.intDomain(0))
+        assertEquals(IntDomain(17, 17), session.intDomain(1))
+    }
+
+    @Test
+    fun `cancelled reseeding should retain only its completed prefix`() {
+        for (boolean in listOf(false, true)) {
+            var armed = false
+            lateinit var session: PropagationSession
+            val token = Cancellation {
+                armed && if (boolean) session.boolValue(0) == true else session.intDomain(0).isFixed
+            }
+            session = PropagationSession(Problem(2, 2, Array(2) { IntDomain(0, 1) }, emptyArray()), token)
+            val desired = if (boolean) {
+                Assumptions.None.withBool(0, true).withBool(1, true)
+            } else {
+                Assumptions.None.withInt(0, 1).withInt(1, 1)
+            }
+            armed = true
+
+            assertIs<PropagationResult.Implied>(session.reseedFrom(desired))
+
+            assertTrue(session.fixpointCancelled)
+            assertEquals(1, session.decisionLevel)
+            if (boolean) assertNull(session.boolValue(1)) else assertEquals(IntDomain(0, 1), session.intDomain(1))
+            armed = false
+            assertIs<PropagationResult.Implied>(session.reseedFrom(desired))
+            assertFalse(session.fixpointCancelled)
+            assertEquals(2, session.decisionLevel)
+        }
+    }
+
     @Test
     fun `cancelled seeding should leave the remaining assumptions unapplied`() {
         for (boolean in listOf(false, true)) {

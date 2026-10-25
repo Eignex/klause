@@ -150,6 +150,7 @@ internal fun LpEngine.pinToward(
     rounding: LpRounding = LpRounding.NEAREST,
     targetOf: (col: Int) -> Double?,
 ): Sample? {
+    if (session.fixpointCancelled) return null
     val intOrder = (0 until problem.numIntVars).sortedBy { v ->
         targetOf(relaxation.intColOf[v])?.let { abs(it - round(it)) } ?: Double.MAX_VALUE
     }
@@ -157,6 +158,7 @@ internal fun LpEngine.pinToward(
         val d = session.intDomain(v)
         if (d.min == d.max) continue
         if (!pinIntTowardLp(session, v, targetOf(relaxation.intColOf[v]), d.min, d.max, rounding)) return null
+        if (session.fixpointCancelled) return null
     }
     val boolOrder = (0 until problem.numBoolVars).sortedByDescending { b ->
         targetOf(relaxation.boolColOf[b])?.let { abs(it - 0.5) } ?: -1.0
@@ -169,8 +171,11 @@ internal fun LpEngine.pinToward(
             LpRounding.UP -> target > 0.0
             LpRounding.DOWN -> target >= 1.0
         }
-        if (session.pinBool(b, first) !is PropagationResult.Unsat) continue
+        val result = session.pinBool(b, first)
+        if (session.fixpointCancelled) return null
+        if (result !is PropagationResult.Unsat) continue
         if (session.pinBool(b, !first) is PropagationResult.Unsat) return null
+        if (session.fixpointCancelled) return null
     }
     return snapshotAssignment(session)
 }
