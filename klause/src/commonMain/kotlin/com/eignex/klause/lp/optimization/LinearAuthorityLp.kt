@@ -56,7 +56,7 @@ internal class LinearAuthorityLp(
     private var guidanceRows: List<ExactRationalInequality>? = null
     private var guidanceInactive: Set<Int> = emptySet()
     private var guidancePacked: LinearAuthorityModel? = null
-    private val residual = LinearResidualCompletion(budget, guidancePolicy)
+    private var residualCompletion: LinearResidualCompletion? = null
     val preparations: Long get() = session?.preparations ?: 0L
     val reuses: Long get() = session?.reuses ?: 0L
     fun invalidateGuidance() = session?.invalidateGuidance() ?: Unit
@@ -211,7 +211,8 @@ internal class LinearAuthorityLp(
         guidanceRows = null
         guidanceInactive = emptySet()
         guidancePacked = null
-        residual.close()
+        residualCompletion?.close()
+        residualCompletion = null
         session?.close()
     }
 
@@ -221,7 +222,10 @@ internal class LinearAuthorityLp(
         progress: LinearPrimalRecoveryProgress,
     ): List<BigFraction>? = session?.withGuidance(cancellation) { token ->
         recoverLinearPrimal(coordinates, point, rows, inactive, token, complete = { residual, columns, active ->
-            this.residual.complete(residual, columns, active, observe) {
+            val retained = residualCompletion ?: LinearResidualCompletion(budget, guidancePolicy).also {
+                residualCompletion = it
+            }
+            retained.complete(residual, columns, active, observe) {
                 LinearAuthorityLp(budget, { shape ->
                     onShape(shape)
                     if (shape.prepared) {
@@ -234,7 +238,7 @@ internal class LinearAuthorityLp(
                         onDecline = { observe("PrimalRecoveryExactAdmission$it", 1L) })
                         ?.result?.exactPrimal?.take(columns)
                 }
-            }.also { progress.pending = this.residual.paused }
+            }.also { progress.pending = retained.paused }
         }, observe = { stage, count ->
             if (stage == "PrimalRecoveryWork") budget.observe(refinement = count)
             if (stage == "PrimalRecoveryAllocation") budget.funding?.charge(0L, count)
