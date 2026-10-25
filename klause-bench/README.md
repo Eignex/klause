@@ -1255,6 +1255,9 @@ A move source that emits no candidates records source-coordinate assignments,
 ordered violated factors and exact degrees before the first 256 candidate draws
 and every 512 draws thereafter. A separate one-draw run omits greedy repair,
 retaining the initial assignment and RNG integer fields without extra random draws.
+That run stops at the observer before candidate generation; its retained state then
+traces the production greedy pass one coordinate at a time through reflection.
+The diagnostic stop supplies no solver verdict or worker-failure evidence.
 Model keys, domains, objectives, source bytes and
 build identity remain alongside the walk. Hint construction uses the production
 mapping through reflection and fails on an internal shape mismatch. Each arm has
