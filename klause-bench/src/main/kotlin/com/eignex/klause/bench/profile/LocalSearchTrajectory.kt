@@ -7,6 +7,7 @@ import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.formats.xcsp3.Xcsp3
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.localsearch.CostShaping
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchParams
@@ -57,7 +58,7 @@ internal object LocalSearchTrajectory {
         out.resolve("request.txt").writeText(args.joinToString("\n"))
         val parsed = Xcsp3.parse(bytes.decodeToString())
         val objective = requireNotNull(parsed.objective).toLinearObjective()
-        require(parsed.sense == com.eignex.klause.ir.ObjectiveSense.MINIMIZE)
+        require(parsed.sense == ObjectiveSense.MINIMIZE)
         val seed = options.getValue("seed").toLong()
         val moves = options.getValue("moves").toLong().also { require(it in 1..1_000_000) }
         for (rewrite in listOf(false, true)) {
