@@ -57,6 +57,7 @@ internal class LinearAuthorityLp(
     private var guidanceInactive: Set<Int> = emptySet()
     private var guidancePacked: LinearAuthorityModel? = null
     private var residualCompletion: LinearResidualCompletion? = null
+    private var objectiveCompletion: LinearResidualCompletion? = null
     val preparations: Long get() = session?.preparations ?: 0L
     val reuses: Long get() = session?.reuses ?: 0L
     fun invalidateGuidance() = session?.invalidateGuidance() ?: Unit
@@ -213,6 +214,8 @@ internal class LinearAuthorityLp(
         guidancePacked = null
         residualCompletion?.close()
         residualCompletion = null
+        objectiveCompletion?.close()
+        objectiveCompletion = null
         session?.close()
     }
 
@@ -244,6 +247,23 @@ internal class LinearAuthorityLp(
             if (stage == "PrimalRecoveryAllocation") budget.funding?.charge(0L, count)
             observe(stage, count)
         }, progress = progress)
+    }
+
+    fun refine(
+        coordinates: List<SourceCoordinate>, point: List<BigFraction>, rows: List<ExactRationalInequality>,
+        inactive: Set<Int>, costs: List<BigFraction>, cancellation: Cancellation, observe: (String, Long) -> Unit,
+    ): List<BigFraction>? = session?.withGuidance(cancellation) { token ->
+        refineLinearPrimal(coordinates, point, rows, inactive, costs, token, complete = { residual, objective, active ->
+            val retained = objectiveCompletion ?: LinearResidualCompletion(budget, guidancePolicy,
+                guidancePolicy.floating).also { objectiveCompletion = it }
+            retained.complete(residual, objective.size, active, { stage, count ->
+                observe(stage.replace("PrimalRecovery", "PrimalRefinement"), count)
+            }, costs = objective, small = { null })
+        }, observe = { stage, count ->
+            if (stage == "PrimalRefinementWork") budget.observe(refinement = count)
+            if (stage == "PrimalRefinementAllocation") budget.funding?.charge(0L, count)
+            observe(stage, count)
+        })
     }
 
     fun combination(
