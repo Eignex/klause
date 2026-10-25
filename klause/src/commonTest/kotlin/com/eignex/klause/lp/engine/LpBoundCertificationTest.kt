@@ -51,6 +51,54 @@ class LpBoundCertificationTest {
     }
 
     @Test
+    fun `deferred singleton columns should recover after the coupled dual core`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = assertNotNull(LpExactState(ExactLpModel(
+            listOf(
+                listOf(ExactLpEntry(0, ExactLpNumber.of(3L)), ExactLpEntry(1, ExactLpNumber.of(1L))),
+                listOf(ExactLpEntry(1, ExactLpNumber.of(2L)), ExactLpEntry(2, ExactLpNumber.of(1L))),
+                listOf(ExactLpEntry(1, ExactLpNumber.of(1L)), ExactLpEntry(2, ExactLpNumber.of(3L))),
+            ),
+            listOf(ExactLpNumber.of(3L), ExactLpNumber.of(4L), ExactLpNumber.of(4L)),
+            List(3) { ExactLpColumn(ExactLpBounds()) } +
+                List(3) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
+            List(3) { ExactLpRow() },
+            ExactLpObjective(List(3) { ExactLpNumber.of(-1L) } + List(3) { zero }),
+        )).toWorkingModel())
+        val basis = Basis(intArrayOf(0, 1, 2), Array(6) { if (it < 3) VarStatus.BASIC else VarStatus.AT_LOWER })
+
+        val result = certifyLpBoundOnly(source, doubleArrayOf(-0.2 + 1e-10, -0.4 - 1e-10, -0.2 + 1e-10),
+            ReconstructionLimits(maxAttempts = 1), basis = basis)
+
+        assertEquals(BigFraction.ofLong(-3L), assertNotNull(result.bound).value)
+        val repair = assertNotNull(result.metrics.basisRepair)
+        assertEquals(1, repair.peeledColumns)
+        assertEquals(1, repair.solvedComponents)
+        assertEquals(2, result.metrics.dualChecks)
+    }
+
+    @Test
+    fun `eliminated logical basics should contribute their costs to dual repair`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = assertNotNull(LpExactState(ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)), ExactLpEntry(1, ExactLpNumber.of(3L)))),
+            listOf(ExactLpNumber.of(5L), ExactLpNumber.of(3L)),
+            listOf(ExactLpColumn(ExactLpBounds())) + List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
+            List(2) { ExactLpRow() },
+            ExactLpObjective(listOf(ExactLpNumber.of(-1L), ExactLpNumber.of(2L), zero)),
+        )).toWorkingModel())
+        val basis = Basis(intArrayOf(1, 0), arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.AT_LOWER))
+
+        val result = certifyLpBoundOnly(source, doubleArrayOf(2.0, -1.0 + 1e-10),
+            ReconstructionLimits(maxAttempts = 1), basis = basis)
+
+        val bound = assertNotNull(result.bound)
+        assertEquals(BigFraction.ofLong(7L), bound.value)
+        assertEquals(listOf(BigFraction.ofLong(2L), BigFraction.MINUS_ONE), bound.dualMultipliers)
+        assertEquals(2, result.metrics.dualChecks)
+    }
+
+    @Test
     fun `singular retained basis should supply no bound on an open objective`() {
         val basis = Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.AT_LOWER))
 
