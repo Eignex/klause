@@ -272,6 +272,7 @@ object PresolvePipeline {
                 eligible = { seeded.numIntVars > 0 },
                 unchanged = { null },
                 output = { it?.problem ?: seeded },
+                refuted = { it?.problem?.baked is PropagationResult.Unsat },
             ) { TuplePackingSubstitution.substitute(seeded, context.objectiveIntVars, cancellation) }
         }
         val packed = packing?.problem ?: seeded

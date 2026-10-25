@@ -12,6 +12,8 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.FloatLpStatus
+import com.eignex.klause.lp.engine.LpVerdict
+import com.eignex.klause.lp.engine.solveAndCertify
 import com.eignex.klause.lp.engine.solveLp
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.RootDomains
@@ -53,7 +55,7 @@ class TuplePackingSubstitutionTest {
         val result = assertNotNull(TuplePackingSubstitution.substitute(source, emptySet()))
         val packing = CpToLpRelaxation(result.problem, null).build(RootDomains(result.problem))
 
-        assertEquals(FloatLpStatus.INFEASIBLE, solveLp(packing.model).status)
+        assertEquals(LpVerdict.INFEASIBLE, solveAndCertify(packing.model).verdict)
     }
 
     @Test
@@ -63,6 +65,7 @@ class TuplePackingSubstitutionTest {
         val expected = BacktrackSolver(source.bake()).enumerate(BacktrackParams(randomSeed = 0L))
             .map { it.ints.toList() }.toList()
         val result = assertNotNull(TuplePackingSubstitution.substitute(source.bake(), emptySet()))
+        assertEquals(8, result.choices)
         val reconstruct = assertNotNull(result.rebuild.asSampleLift())
 
         val actual = BacktrackSolver(result.problem).enumerate(BacktrackParams(randomSeed = 0L))
