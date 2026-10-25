@@ -182,7 +182,9 @@ internal object AffineSingletons {
 
             else -> null
         }
-        val pivotable: ((Linear, Int) -> Boolean)? = if (objectiveRewrite == null && domainPivotable == null) null else {
+        val pivotable: ((Linear, Int) -> Boolean)? = if (objectiveRewrite == null && domainPivotable == null) {
+            null
+        } else {
             { definition, pivot ->
                 (objectiveRewrite?.permits(definition, pivot) ?: true) &&
                     (domainPivotable?.invoke(definition.vars[pivot], definition.vars.size - 1) ?: true)
