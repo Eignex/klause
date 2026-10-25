@@ -12,7 +12,7 @@ data class ValueOrderingStats(
     val refutations: Long = 0L,
     /** Work in probing orderings, including interrupted probes, restoration and bounded score visits. */
     val probeWork: Long = 0L,
-    /** Orderings that exhausted their local cooperative work allowance. */
+    /** Orderings stopped by their local cooperative work allowance. */
     val cappedOrders: Long = 0L,
 ) {
     /** Add observations from independent worker lifetimes. */
