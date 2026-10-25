@@ -42,6 +42,19 @@ object RootBaker {
     fun reseed(problem: BakedProblem, config: BakeConfig): BakedProblem {
         if (!config.anyEnabled || problem.alreadyFolded) return problem
         val extra = bake(problem, config)
+        return fold(problem, extra)
+    }
+
+    internal fun reseedBounded(problem: BakedProblem, config: BakeConfig): BakedProblem {
+        val base = problem.baked
+        if (base !is PropagationResult.Implied) return problem
+        val extra = observeTier(problem, PresolvePass.PROBE_INT_HOLES, base) { initial, token ->
+            BoundedIntegerProbing.bake(problem, initial, config, token)
+        }
+        return fold(problem, extra)
+    }
+
+    private fun fold(problem: BakedProblem, extra: PropagationResult): BakedProblem {
         if (extra === problem.baked) return problem
         return BakedProblem(
             settings = problem.settings,
@@ -230,7 +243,7 @@ object RootBaker {
      *  the factors in its conflict via [bumpFactorWeights], steering the next pass toward related vars
      *  (Boussemart, Hemery, Lecoutre and Sais, "Boosting Systematic Search by Weighting Constraints",
      *  ECAI 2004). Ties break by a seeded per-pass random key, avoiding variable-id order bias. */
-    private fun sacProbeOrder(
+    internal fun sacProbeOrder(
         problem: BakedProblem,
         acc: PropagationResult.Implied,
         factorWeights: DoubleArray,
