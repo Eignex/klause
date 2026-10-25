@@ -20,6 +20,7 @@ import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.linearRows
 import com.eignex.klause.presolve.PresolveBudget
+import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
@@ -58,7 +59,9 @@ internal object AffineObjectiveProfile {
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
         for ((index, request) in requests.withIndex()) {
             val options = request.associate { it.substringBefore('=') to it.substringAfter('=') }
-            require(options.keys == setOf("suite", "problem", "sha256"))
+            val required = setOf("suite", "problem", "sha256")
+            require(options.keys.containsAll(required) && (options.keys - required - "presolve").isEmpty())
+            val presolve = options["presolve"]?.let { PresolveConfig.parse(it) } ?: PresolveConfig.DEFAULT
             val source = Catalog.uncapped(options.getValue("suite")).problems
                 .single { it.name == options.getValue("problem") }
             val bytes = CorpusFiles.open(CorpusFetcher.resolve(source.source)).use { it.readBytes() }
@@ -98,6 +101,7 @@ internal object AffineObjectiveProfile {
                     val started = System.nanoTime()
                     val prepared = FinitePipeline.prepare(FinitePipelineRequest(
                         model, FiniteEngine.BACKTRACK, objective,
+                        presolveConfig = presolve, explicitPresolveConfig = options.containsKey("presolve"),
                         cancellation = stop, solveCancellation = stop, presolveBudget = budget,
                         preparedPlan = plan, transformObjective = rewrite,
                     ))
@@ -110,6 +114,7 @@ internal object AffineObjectiveProfile {
                         put("problem", source.name)
                         put("exact", exact)
                         put("rewrite", rewrite)
+                        put("presolve", options["presolve"] ?: "default")
                         put("preparationNs", elapsed)
                         put("preparationWork", budget.spent())
                         put("cancelled", stop())
@@ -207,6 +212,8 @@ internal object AffineObjectiveProfile {
         put("factors", buildJsonArray {
             for (factor in model.factors) add(buildJsonObject {
                 put("kind", factor::class.simpleName)
+                put("intVars", JsonArray(factor.intVars.map { JsonPrimitive(it) }))
+                put("boolVars", JsonArray(factor.boolVars.map { JsonPrimitive(it) }))
                 put("key", factor.structuralKey().toString())
                 put("form", factor.linearForm?.let { it::class.simpleName })
                 put("rows", JsonArray(factor.linearRows.map(::row)))

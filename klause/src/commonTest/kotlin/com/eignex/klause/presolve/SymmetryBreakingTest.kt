@@ -4,6 +4,8 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
+import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.factor.global.ValuePrecede
 import com.eignex.klause.factor.symmetry.SymmetryHandling
 import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.factor.table.Table
@@ -81,6 +83,102 @@ class SymmetryBreakingTest {
     private fun pos(v: Int) = Lit.make(v, true)
 
     @Test
+    fun `unread finite columns should receive no symmetry factors`() {
+        val problem = Problem(3, 3, Array(3) { IntDomain(0, 2) }, emptyList()).bake()
+
+        assertTrue(Presolve.breakSymmetries(problem).isEmpty)
+        assertTrue(Presolve.breakValuePrecedence(problem).isEmpty)
+    }
+
+    @Test
+    fun `live scalar symmetries should exclude unread integer and Boolean columns`() {
+        val problem = Problem(
+            4,
+            4,
+            Array(4) { IntDomain(0, 2) },
+            listOf(
+                Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.LE, 2),
+                Clause(intArrayOf(pos(1), pos(3))),
+            ),
+        ).bake()
+
+        val delta = Presolve.breakSymmetries(problem)
+
+        assertTrue(delta.addedFactors.any { it is SymmetryHandling })
+        assertTrue(delta.addedFactors.any { it is Linear })
+        assertTrue(delta.addedFactors.any { it is Clause })
+        assertTrue(delta.addedFactors.all { factor ->
+            factor.intVars.all { it == 1 || it == 3 } && factor.boolVars.all { it == 1 || it == 3 }
+        })
+    }
+
+    @Test
+    fun `active objective columns should remain fixed in finite symmetry discovery`() {
+        val problem = Problem(
+            4,
+            4,
+            Array(4) { IntDomain(0, 2) },
+            listOf(
+                Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.LE, 2),
+                Clause(intArrayOf(pos(1), pos(3))),
+            ),
+        ).bake()
+
+        val delta = Presolve.breakSymmetries(problem, objectiveIntVars = setOf(1), objectiveBoolVars = setOf(1))
+
+        assertTrue(delta.isEmpty)
+    }
+
+    @Test
+    fun `unread domains should neither split value orbits nor enter precedence chains`() {
+        val problem = Problem(
+            0,
+            3,
+            arrayOf(IntDomain(0, 2), IntDomain(0, 1), IntDomain(0, 2)),
+            listOf(AllDifferent(intArrayOf(0, 2))),
+        ).bake()
+
+        for (delta in listOf(Presolve.breakSymmetries(problem), Presolve.breakValuePrecedence(problem))) {
+            val chains = delta.addedFactors.filterIsInstance<ValuePrecede>()
+
+            assertEquals(setOf(0L to 1L, 1L to 2L), chains.map { it.s to it.t }.toSet())
+            assertTrue(chains.all { it.xs.contentEquals(intArrayOf(0, 2)) })
+        }
+    }
+
+    @Test
+    fun `a value symmetry pin should select a live column`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 2) }, listOf(AllDifferent(intArrayOf(1)))).bake()
+
+        val delta = Presolve.breakSymmetries(problem)
+
+        assertEquals(1, delta.addedFactors.size)
+        assertTrue(delta.addedFactors.single().intVars.contentEquals(intArrayOf(1)))
+    }
+
+    @Test
+    fun `affine reconstructed columns should stay absent from symmetry factors`() {
+        val problem = Problem(
+            0,
+            3,
+            Array(3) { IntDomain(0, 4) },
+            listOf(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 2), LinearOp.EQ, 0),
+                Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 0),
+                Linear(intArrayOf(1), intArrayOf(2), LinearOp.LE, 2),
+            ),
+        ).bake()
+        val affine = Presolve.eliminateAffineSingletons(problem)
+        val residual = problem.withPassDelta(affine, BakeConfig.NONE).bake()
+
+        val symmetry = Presolve.breakSymmetries(residual)
+
+        assertEquals(setOf(0, 1), affine.rebuild.steps.filterIsInstance<RebuildStep.AffineValue>().map { it.variable }.toSet())
+        assertTrue(residual.factors.all { factor -> factor.intVars.all { it == 2 } })
+        assertTrue(symmetry.addedFactors.all { factor -> factor.intVars.all { it == 2 } })
+    }
+
+    @Test
     fun `symmetry breaking should keep a row-symmetric matrix satisfiable`() {
         // Ordering each column orbit independently would cut both solutions of this single orbit.
         fun eq(a: Int, b: Int) = listOf(
@@ -129,7 +227,7 @@ class SymmetryBreakingTest {
     @Test
     fun `value precedence should keep one solution per value-symmetry class`() {
         // Bell(3) = 5 set partitions of three variables.
-        val problem = Problem(0, 3, Array(3) { IntDomain(0, 2) }, emptyList())
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 2) }, List(3) { AllDifferent(intArrayOf(it)) })
         val broken = precedence(problem)
         val orig = countFeasible(problem)
         val after = countFeasible(broken)

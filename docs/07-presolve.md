@@ -405,7 +405,11 @@ no deductions, and established pins are not emitted again.
 
 Symmetry breaking verifies candidate transpositions by remapping every factor, then
 orders verified orbits while protecting objective columns. Value precedence breaks
-value symmetry. Both stay off for solution-set-sensitive queries.
+value symmetry. Both lanes hold unread integer and Boolean columns fixed, including
+columns retained only for reconstruction. Value-orbit discovery ignores unread
+domains, and value pins and precedence chains use only columns with live factor
+readers. Active-column scans charge and poll the pass token; an interrupted scan
+posts no break. Both passes stay off for solution-set-sensitive queries.
 
 Boolean probing retains failed-literal units and bounds implied by both polarities;
 integer and open-range probing extend this to bounds and holes. Compilation, incidence,

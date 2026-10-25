@@ -2877,7 +2877,9 @@ proof. The wider corpus and standalone/companion controls remain separate eviden
 `bench.profile.AffineObjectiveProfile` takes `batch64=` containing a base64-encoded
 JSON list of `suite=ID`, `problem=NAME`, `sha256=HEX` argument lists. It retains the
 original MPS bytes, original translation rows and complete prepared factor keys,
-rows, domains and objectives. Default and exact source policies each compare
+rows, integer/Boolean readers, domains and objectives. Optional `presolve=CONFIG`
+selects the same finite pass controls as ordinary solves, including symmetry and
+affine counterfactuals. Default and exact source policies each compare
 objective substitution enabled and disabled through the full finite preparation.
 Preparation work, elapsed time and interruption are diagnostic observations;
 source-matched ordinary lab solves and witness checks qualify search outcomes.
