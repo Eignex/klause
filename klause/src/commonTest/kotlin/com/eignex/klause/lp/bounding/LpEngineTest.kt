@@ -35,20 +35,21 @@ class LpEngineTest {
     @Test
     fun `root pruning retains complete useful element property groups`() {
         val problem = Problem(
-            0, 3, arrayOf(IntDomain(0, 1), IntDomain(0, 2), IntDomain(0, 9)),
+            0, 4, arrayOf(IntDomain(0, 2), IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 9)),
             arrayOf(
-                Element(0, 1, longArrayOf(1, 2), false, 0),
-                Element(0, 2, longArrayOf(8, 9), false, 0),
+                Element(0, 1, longArrayOf(0, 1, 0), false, 0),
+                Element(0, 2, longArrayOf(1, 0, 1), false, 0),
+                Element(0, 3, longArrayOf(8, 9, 8), false, 0),
             ),
         )
         LpEngine(
-            problem, LinearObjective(intCoefficients = longArrayOf(0, 1, 0)),
+            problem, LinearObjective(intCoefficients = longArrayOf(0, 1, 1, 0)),
             LpParams(lpConfig = LpConfig.AUTO), SolveStatsSink("groups"),
         ).use { engine ->
             engine.pruneIneffectiveHulls(Cancellation.Never)
 
             val relaxation = assertNotNull(engine.lpRelaxer).build(PropagationSession(problem))
-            assertEquals(setOf(0, 1), relaxation.hullFactorIds.toSet())
+            assertEquals(setOf(0, 1, 2), relaxation.hullFactorIds.toSet())
         }
     }
 
