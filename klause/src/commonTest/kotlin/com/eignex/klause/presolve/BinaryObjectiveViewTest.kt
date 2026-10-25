@@ -71,7 +71,7 @@ class BinaryObjectiveViewTest {
     }
 
     @Test
-    fun `unrepresentable channel costs should decline without wrapping`() {
+    fun `overflowing signed reuse should retain exact costs through a fresh channel`() {
         val problem = Problem(
             1, 1, arrayOf(IntDomain(0, 1)),
             listOf(ReifiedLinear(0, longArrayOf(1), intArrayOf(0), LinearOp.EQ, 0)),
@@ -82,7 +82,26 @@ class BinaryObjectiveViewTest {
             LinearObjective(intCoefficients = longArrayOf(1), constant = Long.MAX_VALUE),
         )
 
-        for (objective in objectives) assertNull(BinaryObjectiveView.create(problem, objective))
+        for (objective in objectives) {
+            val view = checkNotNull(BinaryObjectiveView.create(problem, objective))
+            assertEquals(2, view.numBoolVars)
+            for (value in 0L..1L) {
+                val sample = Sample(booleanArrayOf(value == 0L, value == 1L), longArrayOf(value))
+                assertEquals(objective.evaluateExact(sample), view.objective.evaluateExact(sample))
+            }
+        }
+    }
+
+    @Test
+    fun `a fixed cost beyond constant storage should remain an exact Boolean term`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(1, 1)), emptyList()).bake()
+        val original = LinearObjective(intCoefficients = longArrayOf(1), constant = Long.MAX_VALUE)
+
+        val view = checkNotNull(BinaryObjectiveView.create(problem, original))
+        val sample = Sample(booleanArrayOf(true), longArrayOf(1))
+
+        assertEquals(1, view.numBoolVars)
+        assertEquals(original.evaluateExact(sample), view.objective.evaluateExact(sample))
     }
 
     @Test

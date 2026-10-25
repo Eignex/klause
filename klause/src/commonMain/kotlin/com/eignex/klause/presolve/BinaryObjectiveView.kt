@@ -44,25 +44,29 @@ internal class BinaryObjectiveView(
                 val coefficient = bigIntOf(objective.intCoefficientValues[v])
                 if (v % 256 == 0 && problem.cancellation()) return null
                 if (objective.intCoefficientValues[v] == 0L) continue
-                if (ranges.min(v) == ranges.max(v)) {
-                    if (ranges.min(v) == 1L) constant += coefficient
+                if (ranges.max(v) == 0L) continue
+                val shifted = constant + coefficient
+                if (ranges.min(v) == 1L && shifted.fitsLong()) {
+                    constant = shifted
                     continue
                 }
-                var literal = literals[v]
-                if (literal == Lit.NONE) {
-                    literal = Lit.make(weights.size, true)
-                    factors.add(ReifiedLinear(weights.size, longArrayOf(1), intArrayOf(v), LinearOp.EQ, 1))
-                    weights.add(bigIntOf(0))
+                val literal = literals[v]
+                val id = if (literal == Lit.NONE) -1 else Lit.variable(literal)
+                val positive = literal != Lit.NONE && Lit.isPositive(literal)
+                val merged = when {
+                    id < 0 -> coefficient
+                    positive -> weights[id] + coefficient
+                    else -> weights[id] - coefficient
                 }
-                val id = Lit.variable(literal)
-                if (Lit.isPositive(literal)) {
-                    weights[id] += coefficient
+                if (id >= 0 && merged.fitsLong() && (positive || shifted.fitsLong())) {
+                    weights[id] = merged
+                    if (!positive) constant = shifted
                 } else {
-                    constant += coefficient
-                    weights[id] -= coefficient
+                    // A fresh positive channel retains the source coefficient when signed reuse would overflow.
+                    factors.add(ReifiedLinear(weights.size, longArrayOf(1), intArrayOf(v), LinearOp.EQ, 1))
+                    weights.add(coefficient)
                 }
             }
-            if (!constant.fitsLong() || weights.any { !it.fitsLong() }) return null
             return BinaryObjectiveView(
                 factors,
                 objective.copy(
