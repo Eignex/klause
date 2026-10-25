@@ -252,7 +252,11 @@ object PresolvePipeline {
         ) { token, observation ->
             val selected = projections?.forEngineView(prebaked)
             val root = if (selected == null) prebaked.bake(token) else prebaked.bake(selected, token)
-            val probed = RootBaker.reseed(root, bakeConfig)
+            val explicit = RootBaker.reseed(root, bakeConfig)
+            val boundedProbing = config.emphasis == PresolveEmphasis.DEFAULT && currentObjective == null &&
+                config.overrides[PresolvePass.PROBE_INT_HOLES] == null &&
+                config.overrides[PresolvePass.PROBE_INT_BOUNDS] == null
+            val probed = if (boundedProbing) RootBaker.reseedBounded(explicit, bakeConfig) else explicit
             if (probed.baked is PropagationResult.Unsat) observation.preparationRefuted()
             root to probed
         }
