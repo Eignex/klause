@@ -18,6 +18,29 @@ import kotlin.test.assertTrue
 
 class LinearResidualCompletionTest {
     @Test
+    fun `an objective lifetime cap should survive fresh caller funding`() {
+        val funding = SourceLpFunding(1_000_000L, 64L * 1024L * 1024L)
+        val budget = SourceLpBudget(funding = funding)
+        val rows = listOf(ExactRationalInequality(intArrayOf(0, 1), List(2) { BigFraction.MINUS_ONE },
+            BigFraction.MINUS_ONE))
+        funding.grant(100_000L)
+
+        LinearResidualCompletion(budget, SparseSourceLpPolicy(), LpFloatAllowance(1L, 1)).use { completion ->
+            assertNull(completion.complete(rows, 2, Cancellation.Never, { _, _ -> },
+                List(2) { BigFraction.ONE }, small = { null }))
+            val work = budget.measuredFloatWork
+            funding.grant(100_000L)
+            val repeated = completion.complete(rows, 2, Cancellation.Never, { _, _ -> },
+                List(2) { BigFraction.ONE }, small = { error("retained lifetime") })
+
+            assertNull(repeated)
+            assertFalse(completion.paused)
+            assertEquals(work, budget.measuredFloatWork)
+            assertEquals(1, budget.operations)
+        }
+    }
+
+    @Test
     fun `changed objective costs should discard a completed residual point`() {
         val rows = listOf(
             ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.ofLong(3)),

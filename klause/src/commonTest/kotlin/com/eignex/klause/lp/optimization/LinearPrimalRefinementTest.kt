@@ -15,17 +15,16 @@ class LinearPrimalRefinementTest {
     private val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
 
     @Test
-    fun `objective refinement should preserve a wide exact pin and exclude inactive rows`() {
+    fun `objective refinement should preserve a wide exact pin`() {
         val wide = BigFraction.ofLong(9007199254740993L)
         val rows = listOf(
             ExactRationalInequality(intArrayOf(0, 1), List(2) { BigFraction.MINUS_ONE },
                 (wide + BigFraction.ONE).negated()),
-            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.ZERO),
         )
         val initial = listOf(BigFraction.ofLong(10), wide)
 
         val refined = LinearResidualCompletion(SourceLpBudget(), SparseSourceLpPolicy()).use { completion ->
-            refineLinearPrimal(listOf(real, integer), initial, rows, setOf(1),
+            refineLinearPrimal(listOf(real, integer), initial, rows, emptySet(),
                 listOf(BigFraction.ofLong(2), BigFraction.MINUS_ONE), Cancellation.Never,
                 complete = { residual, costs, token ->
                     completion.complete(residual, costs.size, token, { _, _ -> }, costs, small = { null })
@@ -33,7 +32,17 @@ class LinearPrimalRefinementTest {
         }
 
         assertEquals(listOf(BigFraction.ONE, wide), refined)
-        assertEquals(listOf(BigFraction.ofLong(10), wide), initial)
+    }
+
+    @Test
+    fun `inactive rows should not restrict objective refinement`() {
+        val rows = listOf(ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.MINUS_ONE))
+
+        val refined = refineLinearPrimal(listOf(real), listOf(BigFraction.ONE), rows, setOf(0),
+            listOf(BigFraction.ONE), Cancellation.Never, complete = { _, _, _ -> listOf(BigFraction.ZERO) },
+            observe = { _, _ -> })
+
+        assertEquals(listOf(BigFraction.ZERO), refined)
     }
 
     @Test
