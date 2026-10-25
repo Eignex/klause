@@ -18,6 +18,17 @@ import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.pipeline.ExecutionOperation
+import com.eignex.klause.solver.pipeline.FiniteEngine
+import com.eignex.klause.solver.pipeline.FiniteSolveOutcome
+import com.eignex.klause.solver.pipeline.FiniteSolveVerdict
+import com.eignex.klause.solver.pipeline.SourceAttachment
+import com.eignex.klause.solver.pipeline.SourceExecutionPolicy
+import com.eignex.klause.solver.pipeline.SourceExecutionRequest
+import com.eignex.klause.solver.pipeline.SourceExecutionResult
+import com.eignex.klause.solver.pipeline.SourceSetup
+import com.eignex.klause.solver.pipeline.SourceSetupRequest
+import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -152,6 +163,60 @@ class BinaryObjectiveViewTest {
 
         assertEquals(4L, original.evaluateLong(sample))
         assertTrue(2 * sample.intValue(0) + 2 * sample.intValue(1) + sample.intValue(2) >= 3)
+    }
+
+    @Test
+    fun `shared opposite channels should coalesce their signed costs exactly`() {
+        val problem = Problem(
+            1, 2, Array(2) { IntDomain(0, 1) },
+            listOf(
+                ReifiedLinear(0, longArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+                ReifiedLinear(0, longArrayOf(1), intArrayOf(1), LinearOp.EQ, 0),
+            ),
+        ).bake()
+        val original = LinearObjective(longArrayOf(7), longArrayOf(3, 5), constant = 11)
+
+        val view = checkNotNull(BinaryObjectiveView.create(problem, original))
+
+        assertEquals(listOf(5L), view.objective.boolWeights.toList())
+        assertEquals(16L, view.objective.constant)
+        for (value in 0L..1L) {
+            val sample = Sample(booleanArrayOf(value == 1L), longArrayOf(value, 1L - value))
+            assertEquals(original.evaluateExact(sample), view.objective.evaluateExact(sample))
+        }
+    }
+
+    @Test
+    fun `source execution should retain original objective direction and coordinates`() {
+        val source = Problem(
+            0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
+        )
+        val objective = LinearObjective(intCoefficients = longArrayOf(-3, 5), constant = 7)
+        val config = PresolveConfig(overrides = PresolvePass.entries.associateWith {
+            it == PresolvePass.SUBSTITUTE_BINARY_COLUMNS
+        })
+        for (maximize in listOf(false, true)) {
+            val invocation = SourceSetup.prepare(SourceSetupRequest(
+                SourceAttachment(source), ExecutionOperation.OPTIMIZE, FiniteEngine.BACKTRACK, objective, maximize,
+            ))
+            val policy = SourceExecutionPolicy(portfolioArms = 1, explicitPresolve = true)
+
+            val result = assertIs<SourceExecutionResult.Finite>(SourceSetup.execute(SourceExecutionRequest(
+                invocation, presolveConfig = config,
+                finiteRequest = { shape -> policy.finiteRequest(shape, FiniteEngine.BACKTRACK, config) },
+            )))
+            val optimum = assertIs<FiniteSolveOutcome.Completed>(result.result.outcome)
+            val sample = checkNotNull(optimum.bestSample)
+
+            assertEquals(FiniteSolveVerdict.OPTIMAL, optimum.verdict)
+            assertEquals(if (maximize) 12L else 4L, objective.evaluateLong(sample))
+            assertEquals(0, sample.numBoolVars)
+            assertEquals(2, sample.numIntVars)
+            val plan = checkNotNull(result.result.preparation.executionPlan)
+            assertEquals(objective, plan.objective)
+            assertEquals(maximize, plan.maximize)
+        }
     }
 
     @Test

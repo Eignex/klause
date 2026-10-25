@@ -856,12 +856,15 @@ internal class ResumableMinimize(
         val weights = objective.boolWeightValues
         val nb = minOf(problem.numBoolVars, weights.size)
         var posSum = bigIntOf(0)
+        var magnitude = bigIntOf(0)
         var nnz = 0
         for (b in 0 until nb) {
             val w = weights[b]
             if (w == 0L) continue
             nnz++
             if (w == Long.MIN_VALUE) return false
+            magnitude += bigIntOf(if (w < 0L) -w else w)
+            if (!magnitude.fitsLong()) return false
             if (w > 0L) posSum += bigIntOf(w)
         }
         if (nnz == 0) return false
