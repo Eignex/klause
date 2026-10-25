@@ -1,6 +1,8 @@
 package com.eignex.klause.presolve
 
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.RetainedFactors
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.PresolveStats
 import kotlin.time.Duration
@@ -44,6 +46,9 @@ internal class PreparedSource(
 
     /** Whether preparation rewrote the model. */
     val changed: Boolean get() = problem !== source
+
+    internal fun retainedFactors(cancellation: Cancellation): RetainedFactors? =
+        if (infeasible || !rebuild.isEmpty) null else RetainedFactors.between(source, problem, cancellation)
 
     /** Terse summary of this phase alone, in the shape every route reports. */
     val stats: PresolveStats get() = PresolveStats(

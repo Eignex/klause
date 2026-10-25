@@ -307,7 +307,9 @@ Engine-specific caches belong to the projection that built them.
 `FactorProjectionProviders.prepare(problem)` captures immutable propagation,
 scoring, relaxation and theory encoder descriptors against one canonical `Problem`.
 A null descriptor marks an unsupported role and an explicit inert descriptor a
-deliberate absence. A rewritten model selects against its own factors.
+deliberate absence. A rewritten model selects against its own factors; a certified
+deletion may retain built-in descriptors through the checked
+[retained-factor mapping](07-presolve.md#source-routing-and-encoder-selection).
 
 Direct and equivalent encoders enforce the whole factor; conditioned encoders
 require captured source pins; relaxation-only descriptors confer no ownership.

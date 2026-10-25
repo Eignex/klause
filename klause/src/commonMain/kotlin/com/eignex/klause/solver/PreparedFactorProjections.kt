@@ -9,6 +9,7 @@ import com.eignex.klause.factor.global.Distinct
 import com.eignex.klause.factor.objective.ObjectiveBoundFactor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.RetainedFactors
 import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.VarRemap
@@ -120,6 +121,11 @@ class PreparedFactorProjections internal constructor(
                 val encoder = selected[factorIndices[it]]
                 if (remap == null) encoder else encoder.remapped(remap)
             } })
+    }
+
+    internal fun retained(mapping: RetainedFactors): PreparedFactorProjections {
+        requireSource(mapping.source)
+        return projected(mapping.target, mapping.sourceIndices())
     }
 
     internal fun withAppendedFactors(view: Problem): PreparedFactorProjections {
