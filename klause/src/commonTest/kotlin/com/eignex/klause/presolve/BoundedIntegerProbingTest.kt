@@ -13,8 +13,25 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertSame
 
 class BoundedIntegerProbingTest {
+    @Test
+    fun `unmetered preparation should leave the optional pilot unfunded`() {
+        val source = Problem(
+            0, 3, Array(3) { IntDomain(0, 1) },
+            listOf(
+                Table(intArrayOf(0, 1), longArrayOf(0, 1, 1, 0)),
+                Table(intArrayOf(1, 2), longArrayOf(0, 1, 1, 0)),
+                Table(intArrayOf(2, 0), longArrayOf(0, 1, 1, 0)),
+            ),
+        ).bake()
+
+        val result = RootBaker.reseedBounded(source, BakeConfig())
+
+        assertSame(source, result)
+    }
+
     @Test
     fun `completed root refutation should remain terminal`() {
         val budget = PresolveBudget(Long.MAX_VALUE)
