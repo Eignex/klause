@@ -55,7 +55,8 @@ class FinitePipelineTest {
                 Table(intArrayOf(2, 0), longArrayOf(0, 1, 1, 0)),
             ),
         )
-        for (spec in listOf("default", "off,+probe-int-holes", "off,+probe-int-holes,+strengthen", "default,+probe-int-holes")) {
+        val specs = listOf("default", "off,+probe-int-holes", "off,+probe-int-holes,+strengthen", "default,+probe-int-holes")
+        for (spec in specs) {
             for (stopAfterRefutation in listOf(false, true)) {
                 val budget = PresolveBudget(Long.MAX_VALUE)
                 val token = Cancellation {
