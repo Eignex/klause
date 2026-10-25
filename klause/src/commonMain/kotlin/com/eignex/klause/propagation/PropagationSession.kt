@@ -210,6 +210,14 @@ class PropagationSession private constructor(
     internal val rootPropagationNanos: Long
     internal val work: Long get() = state.work
     internal val valueOrdering = ValueOrderingStatsSink()
+    internal fun visitValueScore(): Boolean {
+        if (cancellation()) {
+            probeCancelled = true
+            return false
+        }
+        state.work++
+        return true
+    }
     internal val propagationNanos: Long get() = state.propagationNanos
 
     internal fun <T> withCancellation(token: Cancellation, operation: () -> T): T {

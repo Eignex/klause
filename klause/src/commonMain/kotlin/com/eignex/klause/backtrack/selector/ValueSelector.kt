@@ -100,6 +100,7 @@ internal fun probeAndOrder(
     maxProbes: Int,
     ascending: Boolean,
     observations: ValueOrderingStatsSink? = null,
+    scoreVisit: (() -> Boolean)? = null,
 ): Sequence<Long> {
     val candidates: LongArray = when (varRef) {
         is VarRef.Bool -> longArrayOf(0L, 1L)
@@ -147,15 +148,22 @@ internal fun probeAndOrder(
             is VarRef.Bool -> session.probeBool(varRef.varId, v != 0L)
             is VarRef.IntVar -> session.probeInt(varRef.varId, v)
         } ?: break
-        probed++
         observations?.let {
             it.probes++
             if (r is Unsat) it.refutations++
         }
+        if (r is Unsat) {
+            probed++
+            settled.add(v)
+            continue
+        }
+        val post = try {
+            logRemainingDomainProduct(session, scoreVisit)
+        } finally {
+            session.popLast()
+        } ?: break
+        probed++
         settled.add(v)
-        if (r is Unsat) continue
-        val post = logRemainingDomainProduct(session)
-        session.popLast()
         scored.add(v to post)
     }
     // Whatever the probes did not reach still has to be offered, or the search would silently skip
@@ -186,12 +194,16 @@ internal fun probeAndOrder(
 
 /** Sum of `ln(size)` over every unpinned variable (bools count as `ln 2` when free). Log-
  *  space to dodge `Double` overflow on problems with hundreds of free vars. */
-internal fun logRemainingDomainProduct(session: PropagationSession): Double {
+internal fun logRemainingDomainProduct(session: PropagationSession, visit: (() -> Boolean)? = null): Double? {
     var s = 0.0
     val p = session.problem
     val ln2 = ln(2.0)
-    for (v in 0 until p.numBoolVars) if (session.boolValue(v) == null) s += ln2
+    for (v in 0 until p.numBoolVars) {
+        if (visit != null && !visit()) return null
+        if (session.boolValue(v) == null) s += ln2
+    }
     for (v in 0 until p.numIntVars) {
+        if (visit != null && !visit()) return null
         val sz = session.intDomain(v).valueCount
         if (sz > 1) s += ln(sz.toDouble())
     }
