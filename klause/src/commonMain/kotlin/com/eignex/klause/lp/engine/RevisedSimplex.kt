@@ -975,8 +975,11 @@ internal class RevisedSimplex(
         chargeWork()
         cursor.checkpoint(work.ops)
         while (retainFundingStop && !cancellation()) {
-            val stop = remainingStop(progress) ?: break
-            if (stop != LpFloatTermination.WORK && stop != LpFloatTermination.PIVOTS) break
+            val stop = when {
+                effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit -> LpFloatTermination.WORK
+                progress.iterations >= maxIterations -> LpFloatTermination.PIVOTS
+                else -> break
+            }
             observations.termination = stop
             cursor.pauseAt(work.ops)
             observations.termination = null
