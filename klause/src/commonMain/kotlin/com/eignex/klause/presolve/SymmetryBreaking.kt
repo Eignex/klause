@@ -85,17 +85,9 @@ internal object SymmetryBreaking {
         ) return SourceDelta()
         if (problem.factors.any { it is SymmetryHandling }) return SourceDelta()
         if (generatorRoundCost(problem) > GENERATOR_ROUND_COST_BUDGET) return SourceDelta()
-        // A column no factor reads is decided by no lane, so ordering it buys nothing and only adds a row the
-        // theory then has to carry; it is held fixed like an objective column.
-        val readInts = BooleanArray(problem.numIntVars)
-        val readBools = BooleanArray(problem.numBoolVars)
-        for (f in problem.factors) {
-            for (v in f.intVars) readInts[v] = true
-            for (v in f.boolVars) readBools[v] = true
-        }
-        val heldInts = objectiveIntVars + readInts.indices.filter { !readInts[it] }
-        val heldBools = objectiveBoolVars + readBools.indices.filter { !readBools[it] }
-        val columns = SourceColumns(problem)
+        val columns = activeColumns(problem, SourceColumns(problem), cancellation) ?: return SourceDelta()
+        val heldInts = columns.heldInts(objectiveIntVars)
+        val heldBools = columns.heldBools(objectiveBoolVars)
         val extra = ArrayList<Factor>()
         extra.addAll(transpositionOrders(problem, columns, heldInts, heldBools, cancellation))
         extra.addAll(breakValueSymmetry(problem, columns, heldInts, cancellation, chainPrecedence = false))
@@ -123,12 +115,15 @@ internal object SymmetryBreaking {
         // enforces every generator's lex-leader `V ≤lex σ(V)` at each search node, sound because the orbit
         // lex-minimum satisfies it (Crawford, Ginsberg, Luks and Roy, "Symmetry-breaking predicates for
         // search problems", KR 1996).
-        val generators = findGenerators(problem, columns, objectiveIntVars, objectiveBoolVars, cancellation)
+        val active = activeColumns(problem, columns, cancellation) ?: return emptyList()
+        val heldInts = active.heldInts(objectiveIntVars)
+        val heldBools = active.heldBools(objectiveBoolVars)
+        val generators = findGenerators(problem, active, heldInts, heldBools, cancellation)
         // For an orbit whose members are *individually* interchangeable (each single transposition is
         // itself an automorphism — a scalar symmetric group, not a lockstep matrix), the full total
         // order is sound and strictly stronger than the generator lex, so post it too.
-        val scalarLex = scalarTotalOrders(problem, generators, objectiveIntVars, objectiveBoolVars)
-        val valuePins = breakValueSymmetry(problem, columns, objectiveIntVars, cancellation, chainPrecedence = true)
+        val scalarLex = scalarTotalOrders(problem, generators, heldInts, heldBools)
+        val valuePins = breakValueSymmetry(problem, active, heldInts, cancellation, chainPrecedence = true)
         val extra = ArrayList<Factor>()
         if (generators.isNotEmpty()) extra.add(SymmetryHandling(generators))
         extra.addAll(scalarLex)
@@ -311,6 +306,8 @@ internal object SymmetryBreaking {
         cancellation: Cancellation = Cancellation.Never,
     ): List<List<Long>>? {
         if (problem.numIntVars == 0 || cancellation()) return null
+        val active = (0 until problem.numIntVars).filter { columns.active(it) }
+        if (active.isEmpty()) return null
         val allAnonymous = problem.factors.all { it.isValueAnonymous() }
         // Verifying value swaps re-keys the whole factor set, so on a model whose factors carry large
         // constant data (wide tables) the keying dominates while almost never yielding a value symmetry —
@@ -328,7 +325,7 @@ internal object SymmetryBreaking {
         val base: Map<StructuralKey, Int> by lazy { PresolveShared.structuralKeyMultiset(problem.factors.asList()) }
         var lo = Long.MAX_VALUE
         var hi = Long.MIN_VALUE
-        for (v in 0 until problem.numIntVars) {
+        for (v in active) {
             val d = columns.finite(v) ?: continue
             if (d.min < lo) lo = d.min
             if (d.max > hi) hi = d.max
@@ -337,7 +334,7 @@ internal object SymmetryBreaking {
         // Size skip: the incidence scan below visits every value in [lo, hi] against every int
         // variable, so a wide span across many variables is too costly to be worth the value pins.
         // Written as `hi > lo + perVarSpan` to stay overflow-safe when the bounds straddle Long extremes.
-        val perVarSpan = VALUE_ORBIT_SCAN_BUDGET / problem.numIntVars.coerceAtLeast(1)
+        val perVarSpan = VALUE_ORBIT_SCAN_BUDGET / active.size
         if (hi > lo + perVarSpan) return null
         // Group values by domain-incidence signature: same set of containing variables ⇒ a candidate
         // orbit (a swap within it maps every domain to itself). The incident variable ids, in
@@ -347,9 +344,9 @@ internal object SymmetryBreaking {
             // Bail on a fired presolve budget — the scan and the per-candidate keying below are the
             // value-symmetry phase's cost; returning what is grouped so far only forgoes value pins.
             if (cancellation()) return null
-            cancellation.charge(problem.numIntVars.toLong())
+            cancellation.charge(active.size.toLong())
             val sig = LongArrayList()
-            for (x in 0 until problem.numIntVars) if (columns.contains(x, value)) sig.add(x.toLong())
+            for (x in active) if (columns.contains(x, value)) sig.add(x.toLong())
             if (!sig.isEmpty()) incidence.getOrPut(RefineKey(sig.toLongArray())) { ArrayList() }.add(value)
         }
         val orbits = ArrayList<List<Long>>()
@@ -384,7 +381,8 @@ internal object SymmetryBreaking {
         cancellation: Cancellation = Cancellation.Never,
     ): PassDelta {
         val n = problem.numIntVars
-        val columns = FiniteColumns(problem)
+        val columns = activeColumns(problem, FiniteColumns(problem), cancellation) ?: return PassDelta()
+        val heldInts = columns.heldInts(objectiveIntVars)
         val orbits = verifiedValueOrbits(problem, columns, cancellation) ?: return PassDelta()
         val extra = ArrayList<Factor>()
         for (orbit in orbits) {
@@ -393,7 +391,7 @@ internal object SymmetryBreaking {
             orbit.forEach { orbitSet.add(it) }
             val seq = IntArrayList()
             for (x in 0 until n) {
-                if (x !in objectiveIntVars && domainWithin(columns.finite(x), orbitSet)) seq.add(x)
+                if (x !in heldInts && domainWithin(columns.finite(x), orbitSet)) seq.add(x)
             }
             if (seq.size < 2) continue
             val sortedValues = orbit.sorted()
@@ -472,6 +470,8 @@ internal object SymmetryBreaking {
 
     /** The values each integer column admits, as far as the lane running the search knows them. */
     private interface ColumnValues {
+        fun active(v: Int): Boolean = true
+
         /** The finite value set of column [v], or null when [v] has an open side. */
         fun finite(v: Int): IntDomain?
 
@@ -483,6 +483,46 @@ internal object SymmetryBreaking {
 
         /** A colour seed equal for two Boolean columns exactly when they admit the same values. */
         fun boolSeed(v: Int): RefineKey
+    }
+
+    private class ActiveColumns(
+        private val columns: ColumnValues,
+        private val readInts: BooleanArray,
+        private val readBools: BooleanArray,
+    ) : ColumnValues by columns {
+        override fun active(v: Int): Boolean = readInts[v]
+
+        override fun finite(v: Int): IntDomain? = if (readInts[v]) columns.finite(v) else null
+
+        override fun contains(v: Int, value: Long): Boolean = readInts[v] && columns.contains(v, value)
+
+        fun heldInts(objective: Set<Int>): Set<Int> = objective + readInts.indices.filter { !readInts[it] }
+
+        fun heldBools(objective: Set<Int>): Set<Int> = objective + readBools.indices.filter { !readBools[it] }
+    }
+
+    private fun activeColumns(problem: Problem, columns: ColumnValues, cancellation: Cancellation): ActiveColumns? {
+        cancellation.charge(problem.numIntVars.toLong() + problem.numBoolVars)
+        if (cancellation()) return null
+        val readInts = BooleanArray(problem.numIntVars)
+        val readBools = BooleanArray(problem.numBoolVars)
+        var visits = 0
+        for (factor in problem.factors) {
+            cancellation.charge(1L)
+            if (cancellation()) return null
+            for (variable in factor.intVars) {
+                cancellation.charge(1L)
+                if (visits++ and 63 == 0 && cancellation()) return null
+                readInts[variable] = true
+            }
+            for (variable in factor.boolVars) {
+                cancellation.charge(1L)
+                if (visits++ and 63 == 0 && cancellation()) return null
+                readBools[variable] = true
+            }
+        }
+        // Reconstructed columns have no remaining readers; posting a break would put them back into search.
+        return ActiveColumns(columns, readInts, readBools)
     }
 
     /**
