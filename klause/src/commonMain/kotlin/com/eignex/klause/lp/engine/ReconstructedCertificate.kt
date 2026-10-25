@@ -51,6 +51,8 @@ internal enum class LpPointRejection {
 
 internal enum class ReconstructionPhase { INPUT, POINT, DUAL, RAY, SUPPORT, VIOLATION, VECTOR, SCHEDULE }
 
+internal data class ReconstructionDualRejection(val column: Int, val upper: Boolean, val reduced: BigFraction)
+
 internal data class ReconstructionMetrics(
     val attempts: Int,
     val pointChecks: Int,
@@ -66,6 +68,7 @@ internal data class ReconstructionMetrics(
     val maxBits: Int,
     val decline: ReconstructionDecline?,
     val phase: ReconstructionPhase,
+    val dualRejection: ReconstructionDualRejection? = null,
 )
 
 internal class ReconstructedCertificate(
@@ -96,6 +99,7 @@ internal class ReconstructionMeter(
     var raySuccesses = 0
     var vectorRestarts = 0
     var verificationRestarts = 0
+    var dualRejection: ReconstructionDualRejection? = null
     private var work = 0L
     private var allocation = 0L
     private var maxBits = 0
@@ -159,7 +163,7 @@ internal class ReconstructionMeter(
 
     fun snapshot(decline: ReconstructionDecline?) = ReconstructionMetrics(
         attempts, pointChecks, dualChecks, rayChecks, pointSuccesses, dualSuccesses, raySuccesses,
-        vectorRestarts, verificationRestarts, work, allocation, maxBits, decline, phase,
+        vectorRestarts, verificationRestarts, work, allocation, maxBits, decline, phase, dualRejection,
     )
 }
 
@@ -359,7 +363,10 @@ private class FixedReconstructionVerifier(
             val sign = sign(d)
             if (sign != 0) {
                 val upper = sign < 0
-                val side = (if (upper) a.bounds[j].upper else a.bounds[j].lower) ?: return null
+                val side = (if (upper) a.bounds[j].upper else a.bounds[j].lower) ?: run {
+                    meter.dualRejection = ReconstructionDualRejection(j, upper, big(d))
+                    return null
+                }
                 value = plus(value, times(d, from(side.number.value)))
                 selected += ExactSimplexBound(j, upper)
                 strict = strict || side.strict
@@ -436,7 +443,10 @@ private class BigReconstructionVerifier(
             val sign = sign(d)
             if (sign != 0) {
                 val upper = sign < 0
-                val side = (if (upper) a.bounds[j].upper else a.bounds[j].lower) ?: return null
+                val side = (if (upper) a.bounds[j].upper else a.bounds[j].lower) ?: run {
+                    meter.dualRejection = ReconstructionDualRejection(j, upper, big(d))
+                    return null
+                }
                 value = plus(value, times(d, from(side.number.value)))
                 selected += ExactSimplexBound(j, upper)
                 strict = strict || side.strict
