@@ -88,7 +88,9 @@ internal class LinearResidualCompletion(
         }
         val reservation = checkNotNull(admission)
         while (!cancellation() && budget.funding?.paused != true && !finished) {
+            var consulted = false
             budget.resumeSparse(reservation, cancellation) { prepared, active ->
+                consulted = true
                 currentToken = active
                 val current = owner ?: LpScopedSolver(LpExactState(prepared.model), token,
                     context = budget.context, iterationLimit = policy.floating.iterations,
@@ -146,7 +148,10 @@ internal class LinearResidualCompletion(
                 if (point != null) observe("PrimalRecoverySparseCompleted", 1L)
                 point
             }
-            if (owner == null) break
+            if (!consulted) {
+                finished = !cancellation() && budget.funding?.paused != true
+                break
+            }
         }
         paused = !finished && !cancellation() && budget.funding?.paused == true
         if (finished) {
