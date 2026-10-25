@@ -2286,7 +2286,7 @@ unsupported external check. Witness checking does not establish native optimalit
 Encoding, assembly, factorization and certification remain atomic and can overrun
 a slice.
 
-### Continuous candidate owner reuse
+### Checked residual objectives
 
 `bench.profile.MpsResidualObjective` replays saved MPS witnesses with all discrete
 coordinates fixed and attempts a bounded continuous objective solve. Its `batch64=`
@@ -2295,6 +2295,27 @@ and the saved `witness` line. It records the original and refined objective in
 source units, the working objective scale, exact completion work, allocation and
 a fresh `checkMpsWitness` result. Run it through a bounded lab profile job; native
 source checks do not constitute independent witness or proof validation.
+
+[Fixed-pin replay 8339](https://lab.eignex.com/jobs/8339), at `b738c5d89a` on
+Mac/aarch64, retains four witnesses from [8302](https://lab.eignex.com/jobs/8302).
+With unchanged discrete pins, the residual modglob point improves from
+312,428,931.7216991 to 35,147,088.883410625 and rgn from 97.59999892 to 82.19999924.
+Modglob's exact nominal fixed-pin bound equals its refined objective; its remaining
+gap to the 20.78–21.11M finite controls requires different pins in that nominal
+system. The ordinary finite witnesses have only tiny rational-rounding improvements.
+Discrete objective terms alone do not measure pin quality: pins constrain continuous
+costs too. The replay's nominal bounds establish no optimum under declared source
+tolerance, and refinement consumes only checked primal coordinates.
+
+The residual modglob refinement uses 2,951,676 floating work units and 203 pivots,
+plus 858,825 reconstruction/basis work units; rgn uses 108,019 and 35, plus 54,741.
+Their metered exact recovery allocations are about 17.9 MB and 3.1 MB. Native
+original-source checks accept all four refined points. Independent solchecker
+cannot consume modglob's nonterminating rational output; that is an unsupported
+validation route, not an independent witness check. These captures measure the
+mechanism and do not establish production throughput.
+
+### Continuous candidate owner reuse
 
 Continuous local-search candidates use fresh numerical owners. The
 [retained-owner prototype](https://github.com/Eignex/klause/tree/codex/mps-completion-reuse-prototype-3456)

@@ -30,6 +30,7 @@ import com.sun.management.ThreadMXBean
 import java.io.File
 import java.lang.management.ManagementFactory
 import java.math.BigDecimal
+import java.math.BigInteger
 import java.util.Base64
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.Json
@@ -143,6 +144,8 @@ internal object MpsResidualObjective {
             put("revision", Reports.readGitSha())
             put("sourceSha256", sha256(bytes))
             put("originalSourceObjective", original.objective.toString())
+            put("originalSourceExactlyFeasible", original.exact)
+            put("sourceSemantics", NumericalResidualProfile.json(source.semantics))
             put("sourceObjectiveConstant", constant.toString())
             put("fixedDiscreteCost", discreteCost.toString())
             put("originalContinuousCost", (checkNotNull(original.objective) - constant - discreteCost).toString())
@@ -151,6 +154,7 @@ internal object MpsResidualObjective {
             put("refinedContinuousCost", checked?.objective?.let { (it - constant - discreteCost).toString() })
             put("nativeProposal", refined != null)
             put("originalSourceChecked", checked != null)
+            put("refinedSourceExactlyFeasible", checked?.exact)
             put("independentWitnessCheck", false)
             put("fixedPinNominalBound", bound?.let {
                 (((it.claim as SourceClaim.Bound).value as SourceValue.Rational).value * scale.reciprocal()).toString()
@@ -172,8 +176,8 @@ internal object MpsResidualObjective {
         val parts = text.split('/')
         if (parts.size == 2) return BigFraction.of(parts[0].toBigInteger(), parts[1].toBigInteger())
         val value = BigDecimal(text)
-        return if (value.scale() < 0) BigFraction.of(value.toBigIntegerExact(), java.math.BigInteger.ONE) else
-            BigFraction.of(value.unscaledValue(), java.math.BigInteger.TEN.pow(value.scale()))
+        return if (value.scale() < 0) BigFraction.of(value.toBigIntegerExact(), BigInteger.ONE) else
+            BigFraction.of(value.unscaledValue(), BigInteger.TEN.pow(value.scale()))
     }
 
     private fun call(owner: Any, name: String, vararg args: Any?): Any? =
