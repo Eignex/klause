@@ -109,8 +109,8 @@ class LinearAuthoritySessionTest {
         ), 1, Cancellation.Never))
         val funding = SourceLpFunding(1_000_000L, 1_000_000L)
         var interrupt = true
-        val budget = SourceLpBudget(maxOperations = 1, funding = funding, onWork = {
-            if (interrupt) {
+        val budget = SourceLpBudget(maxOperations = 1, funding = funding, onWork = { work ->
+            if (interrupt && work.preparationWork > 0L) {
                 interrupt = false
                 funding.charge(funding.availableWork)
             }
