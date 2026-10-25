@@ -5,6 +5,7 @@ import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.intdomain.intDomainFromSurvivors
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.baked
@@ -16,6 +17,18 @@ import kotlin.test.assertIs
 import kotlin.test.assertSame
 
 class BoundedIntegerProbingTest {
+    @Test
+    fun `unproductive sparse probing should retain the original model`() {
+        val budget = PresolveBudget(Long.MAX_VALUE)
+        val source = Problem(
+            0, 1, arrayOf(intDomainFromSurvivors(longArrayOf(Long.MIN_VALUE, 0, Long.MAX_VALUE))), emptyList(),
+        ).bake(budget.orSpent(Cancellation.Never))
+
+        val result = RootBaker.reseedBounded(source, BakeConfig())
+
+        assertSame(source, result)
+    }
+
     @Test
     fun `interior probes should preserve both endpoints and exclude unsupported shared values`() {
         val budget = PresolveBudget(Long.MAX_VALUE)

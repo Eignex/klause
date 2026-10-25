@@ -6,6 +6,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.binarySearchInt
 
 /**
  * Runs the propagation engine over an immutable `Problem` and reports deductions beyond [assumptions].
@@ -94,9 +95,13 @@ internal fun PropagationState.rootDeductions(assumptions: Assumptions): Propagat
         }
         val values = domain.spanOrNull()
         if (values != null && values.size <= domain.holeCount) {
-            intSetKeys.add(variable)
-            values.forEach { intSetValues.add(it) }
-            intSetOffsets.add(intSetValues.size)
+            val seed = assumptions.deductions
+            val previous = seed.intSetKeys.binarySearchInt(variable)
+            if (previous < 0 || values.size < seed.intSetOffsets[previous + 1] - seed.intSetOffsets[previous]) {
+                intSetKeys.add(variable)
+                values.forEach { intSetValues.add(it) }
+                intSetOffsets.add(intSetValues.size)
+            }
             continue
         }
         val original = state.rootDomains[variable]
