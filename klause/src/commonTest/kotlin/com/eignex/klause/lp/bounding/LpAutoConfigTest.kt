@@ -5,6 +5,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.NValue
 import com.eignex.klause.factor.scheduling.Cumulative
+import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -23,6 +24,18 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LpAutoConfigTest {
+    @Test
+    fun `element admission charges shared index choices once`() {
+        val problem = Problem(
+            0, 5, Array(5) { IntDomain(0, 39) },
+            Array(4) { Element(0, it + 1, LongArray(40) { value -> value.toLong() }, false, 0) },
+        )
+
+        val plan = LpAutoConfig.resolve(problem, LpConfig.AUTO)
+
+        assertTrue(plan.element)
+    }
+
     private fun problem(vararg factors: Factor, intVars: Int = 3, realVars: Int = 0): Problem = Problem(
         0,
         intVars,

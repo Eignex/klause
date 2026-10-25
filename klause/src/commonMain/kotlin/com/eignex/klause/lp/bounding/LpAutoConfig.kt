@@ -26,6 +26,7 @@ import com.eignex.klause.factor.table.Mdd
 import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.ElementLpChoices
 import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.RootBoxes
 import com.eignex.klause.lp.lpHullFamily
@@ -454,10 +455,11 @@ object LpAutoConfig {
         var cols = 0L
         var rows = 0L
         var any = false
+        val elementChoices = ElementLpChoices()
         for (f in problem.factors) {
             if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
             if (f.lpHullFamily() != family) continue
-            val e = prepareLpHull(f, boxes) ?: continue
+            val e = (if (f is Element) prepareLpHull(f, boxes, elementChoices) else prepareLpHull(f, boxes)) ?: continue
             cols += e.cols
             rows += e.rows
             any = true

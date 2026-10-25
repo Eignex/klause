@@ -1,7 +1,9 @@
 package com.eignex.klause.lp
 
 import com.eignex.klause.factor.table.Element
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
 import com.eignex.klause.util.IntArrayList
 
 /**
@@ -10,7 +12,7 @@ import com.eignex.klause.util.IntArrayList
  * domain), with rows `Σ_p y_p = 1`, the index channel `Σ_p (p + off)·y_p = idx`, and the result channel
  * `Σ_p arr[p]·y_p = result`. A variable array keeps the selectors and index channel but relaxes the
  * bilinear result channel with two big-M rows per position forcing `result = arr[p]` when `y_p = 1`.
- * Large arrays are skipped.
+ * Admission counts retained root choices, with a bounded enumeration allowance.
  *
  * The selectors enumerate `idx`'s root box and the one-hot row then confines the column to what was
  * enumerated, so over a side the model leaves open the hull would drop positions the model admits —
@@ -19,11 +21,11 @@ import com.eignex.klause.util.IntArrayList
  */
 internal fun Element.emitLpRelaxation(builder: RelaxationBuilder) {
     if (!builder.hullEnabled()) return
-    if (arr.size > MAX_ELEM) return
     if (!builder.statesBothBounds(idx)) return
+    val choices = retainedChoices(builder.rootDomain(idx)) ?: return
     val selCols = IntArrayList()
     val positions = IntArrayList()
-    emitSelectorsAndIndexChannel(builder, selCols, positions)
+    emitSelectorsAndIndexChannel(builder, choices, selCols, positions)
     val k = selCols.size
     if (k == 0) return
     if (arrIsVars) emitResultBigM(builder, selCols, positions) else emitResultChannel(builder, selCols, positions)
@@ -35,47 +37,69 @@ internal fun Element.estimateLpHull(boxes: RootBoxes): LpSizeEstimate? {
     return result
 }
 
-internal suspend fun SequenceScope<Unit>.prepareLpHull(factor: Element, boxes: RootBoxes): LpSizeEstimate? {
+internal suspend fun SequenceScope<Unit>.prepareLpHull(
+    factor: Element,
+    boxes: RootBoxes,
+    shared: ElementLpChoices = ElementLpChoices(),
+): LpSizeEstimate? {
     val arr = factor.arr
     val idx = factor.idx
     val result = factor.result
     val arrIsVars = factor.arrIsVars
     val indexOffset = factor.indexOffset
 
-    if (arr.size > MAX_ELEM) return null
     if (!boxes.statesBothBounds(idx)) return null
-    val box = boxes.domain(idx)
+    val choices = factor.retainedChoices(boxes.domain(idx)) ?: return null
     // The big-M result channel spans the result's box and the entry's, so it arrives only for the
     // positions whose two boxes are both the model's own — sizing it over the rest would budget rows
     // the build declines.
     val linkable = arrIsVars && boxes.statesBothBounds(result)
-    var k = 0L
     var linked = 0L
-    for (p in arr.indices) {
-        if ((p.toLong() + indexOffset.toLong()) !in box) continue
-        k++
+    var added = 0L
+    for ((position, value) in choices.withIndex()) {
+        if ((position + 1) % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+        val p = (value - indexOffset.toLong()).toInt()
+        if (shared.columns.add(idx to value)) added++
         if (linkable && boxes.statesBothBounds(arr[p].toInt())) linked++
     }
-    if (k == 0L) return null
     // Constant array: Σ y = 1 + index channel + result channel (3 rows). Variable array:
     // Σ y = 1 + index channel + two big-M rows per linked selector.
-    return LpSizeEstimate(cols = k, rows = if (arrIsVars) 2L + 2L * linked else 3L)
+    // Retained source regions can each carry the same channel rows while sharing their columns.
+    return LpSizeEstimate(cols = added, rows = 2L + if (arrIsVars) 2L * linked else 1L)
+}
+
+internal class ElementLpChoices {
+    val columns = HashSet<Pair<Int, Long>>()
+}
+
+internal interface SharedIndexChoices {
+    fun indexChoiceColumn(index: Int, value: Long): Int
+    fun indexChoiceBlock(index: Int, values: LongArray): Boolean
+}
+
+private fun Element.retainedChoices(domain: IntDomain): LongArray? {
+    if (arr.isEmpty()) return null
+    val lo = indexOffset.toLong()
+    val hi = lo + arr.size - 1L
+    if (domain.max < lo || domain.min > hi) return null
+    val retained = domain.withMinAtLeast(lo).withMaxAtMost(hi).spanOrNull(MAX_CHOICES.toLong()) ?: return null
+    return LongArray(retained.size) { retained.valueAt(it) }.takeIf { it.isNotEmpty() }
 }
 
 /** The shared one-hot selectors `Σ_p y_p = 1` and index channel `Σ_p (p + off)·y_p = idx`. */
 private fun Element.emitSelectorsAndIndexChannel(
     builder: RelaxationBuilder,
+    choices: LongArray,
     selCols: IntArrayList,
     positions: IntArrayList,
 ) {
     val off = indexOffset
-    val box = builder.rootDomain(idx)
     val live = builder.liveDomain(idx)
-    for (p in arr.indices) {
-        val idxVal = p.toLong() + off.toLong()
-        if (idxVal !in box) continue
+    val shared = builder as? SharedIndexChoices
+    for (idxVal in choices) {
+        val p = (idxVal - off.toLong()).toInt()
         selCols.add(
-            builder.auxColumn(
+            shared?.indexChoiceColumn(idx, idxVal) ?: builder.auxColumn(
                 0L,
                 if (idxVal in live) 1L else 0L,
                 presence = longArrayOf(idx.toLong(), idxVal),
@@ -86,6 +110,7 @@ private fun Element.emitSelectorsAndIndexChannel(
     }
     val k = selCols.size
     if (k == 0) return
+    if (shared != null && !shared.indexChoiceBlock(idx, choices)) return
     builder.row(selCols.toIntArray(), LongArray(k) { 1L }, LinearOp.EQ, 1L, Contribution.HULL)
     val idxCols = IntArray(k + 1)
     val idxVals = LongArray(k + 1)
@@ -135,5 +160,4 @@ private fun Element.emitResultBigM(builder: RelaxationBuilder, selCols: IntArray
     }
 }
 
-/** Arrays longer than this are skipped — the added selector columns would dominate. */
-private const val MAX_ELEM: Int = 256
+private const val MAX_CHOICES: Int = 1024
