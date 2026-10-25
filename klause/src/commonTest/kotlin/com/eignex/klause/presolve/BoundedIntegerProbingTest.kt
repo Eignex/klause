@@ -13,7 +13,6 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import kotlin.test.assertTrue
 
 class BoundedIntegerProbingTest {
     @Test
@@ -49,20 +48,21 @@ class BoundedIntegerProbingTest {
 
     @Test
     fun `a completed failed probe should retain its exclusion at the probe cap`() {
-        val budget = PresolveBudget(Long.MAX_VALUE)
-        val source = Problem(
-            0, 2, Array(2) { IntDomain(0, 3) },
-            listOf(
-                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
-                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2),
-            ),
-        ).bake(budget.orSpent(Cancellation.Never))
+        for (cap in listOf(1, 2)) {
+            val budget = PresolveBudget(Long.MAX_VALUE)
+            val source = Problem(
+                0, 2, Array(2) { IntDomain(0, 3) },
+                listOf(
+                    Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                    Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2),
+                ),
+            ).bake(budget.orSpent(Cancellation.Never))
 
-        val result = RootBaker.reseedBounded(source, BakeConfig(probeTotalBudget = 1))
+            val result = RootBaker.reseedBounded(source, BakeConfig(probeTotalBudget = cap))
 
-        assertTrue(result.rootIntDomain(0).min >= 1L)
-        assertTrue(result.rootIntDomain(1).min >= 1L)
-        assertEquals(1L, budget.probeCalls)
-        assertEquals(PresolveInvocationOutcome.INTERRUPTED, budget.invocations.single().outcome)
+            assertEquals(cap, (0..1).count { result.rootIntDomain(it).min >= 1L })
+            assertEquals(cap.toLong(), budget.probeCalls)
+            assertEquals(PresolveInvocationOutcome.INTERRUPTED, budget.invocations.single().outcome)
+        }
     }
 }
