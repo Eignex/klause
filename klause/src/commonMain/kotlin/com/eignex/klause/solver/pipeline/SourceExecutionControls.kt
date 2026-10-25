@@ -46,7 +46,10 @@ internal fun bindSourceExecutionControls(
         invocation.canonicalPolynomial)
     val resolvedPresolve = preparation.config.takeIf { presolveConfig != null || preparation.requested }
     val stop = cancellation or timeout or invocation.cancellation
-    val finiteOptions = options.withoutPresolve().without("node-limit", "dry-run-presolve")
+    val companions = invocation.request.linearTraversal == LinearTraversal.FINITE_COMPANIONS
+    val finiteOptions = options.withoutPresolve().without("node-limit", "dry-run-presolve").let {
+        if (companions) it.without("source-lp-work-limit", "source-lp-allocation-limit", "source-lp-operations") else it
+    }
         .overriddenBy(ExecutionOptions(ExecutionOption.seed(seed)))
     val finite: (FiniteSolveShape) -> FiniteSolveRequest = { shape ->
         val supplied = finiteRequest?.invoke(shape)
@@ -63,13 +66,23 @@ internal fun bindSourceExecutionControls(
             )
         } else {
             require(supplied.cores == cores) { "finite factory supplied a different lane count" }
-            supplied.withSourceControls(finiteOptions, budget, seed, stop, policy, resolvedPresolve, prepareOnly)
+            supplied.withSourceControls(finiteOptions, budget, seed, stop, policy, resolvedPresolve, prepareOnly,
+                numericalCompanions = companions)
         }
     }
     if (kind == SourceExecutionKind.FINITE || kind == SourceExecutionKind.REFUTED) {
         options.validateKnown()
         return SourceExecutionControls(
-            TheoryParams(nodeBudget = budget, randomSeed = seed, timeout = timeout, cancellation = cancellation),
+            TheoryParams(nodeBudget = budget, randomSeed = seed, timeout = timeout, cancellation = cancellation,
+                maxDecisions = reader[ExecutionOption.maxDecisions] ?: Long.MAX_VALUE,
+                maxFlips = reader[ExecutionOption.maxFlips] ?: Long.MAX_VALUE,
+                maxInstructions = reader[ExecutionOption.maxInstructions],
+                sourceLpWorkLimit = if (companions) reader.defaulted(ExecutionOption.sourceLpWorkLimit,
+                    TheoryParams().sourceLpWorkLimit) ?: Long.MAX_VALUE else TheoryParams().sourceLpWorkLimit,
+                sourceLpAllocationLimit = if (companions) reader.defaulted(ExecutionOption.sourceLpAllocationLimit,
+                    TheoryParams().sourceLpAllocationLimit) ?: Long.MAX_VALUE else TheoryParams().sourceLpAllocationLimit,
+                sourceLpOperations = if (companions) reader[ExecutionOption.sourceLpOperations]
+                    ?: Int.MAX_VALUE else Int.MAX_VALUE),
             PolynomialTheoryParams(),
             null,
             null,
@@ -196,6 +209,7 @@ private fun FiniteSolveRequest.withSourceControls(
     policy: SourceExecutionPolicy,
     resolvedPresolve: PresolveConfig?,
     preparationOnly: Boolean,
+    numericalCompanions: Boolean,
 ): FiniteSolveRequest {
     require(sourceControls == null) { "native finite controls must use the typed source execution constructor" }
     require(nodeBudget == null || nodeBudget === budget) { "finite factory supplied a different node allowance" }
@@ -209,8 +223,10 @@ private fun FiniteSolveRequest.withSourceControls(
         presolveBudget = presolveBudget, cores = cores,
         executionOptions = policy.options(
             engine,
-            executionOptions.withoutPresolve()
-                .without("node-limit", "dry-run-presolve").overriddenBy(options),
+            executionOptions.withoutPresolve().without("node-limit", "dry-run-presolve").let {
+                if (numericalCompanions) it.without("source-lp-work-limit", "source-lp-allocation-limit",
+                    "source-lp-operations") else it
+            }.overriddenBy(options),
         ),
         randomSeed = seed, defaultArms = policy.arms(engine, cores, defaultArms),
         lpConfig = policy.lpConfig(engine, lpConfig),

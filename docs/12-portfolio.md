@@ -164,6 +164,29 @@ pending proposals keep their scope until completion. Global proofs remain numeri
 derivations with complete sibling coverage. The independent companion recipe keeps
 the same workers and quotas while withholding incumbent and bound imports.
 
+The opt-in finite companion policy keeps the ordinary finite recipes, arm identities,
+seeds, sharing channels and completion authority. It appends numerical frontier and
+joint-repair workers to sequential mixed optimization over binary integers and
+continuous columns, with at most 4,096 numeric columns and 16,384 factors. Complete
+affine capture and LP bounding must be available. Explicit recipes, annotations,
+parallel pools and purely integer models retain their finite composition.
+
+Each appended worker keeps at most four seconds of active search, 250 milliseconds
+and 5,000 work units per segment. Atomic preparation and certification can overrun;
+overspend retires that worker at its next turn without claiming exhaustion. Workers
+cannot reseed to renew these limits. The two owners divide the containing numerical
+work and allocation ceilings equally and retain their query funding across slices.
+They consume the finite scheduler's checked exact incumbent exchange. Joint repair
+has witness authority. A numerical optimum or refutation can complete the finite
+invocation only after its typed terminal verifies against the same captured working
+model and objective; the finite pipeline retains original-source reconstruction and
+qualification. Other numerical terminals and incomplete coverage carry no completion
+authority. Finite workers' ordinary terminal admission remains available throughout.
+
+Companion statistics distinguish active-time retirement and checked completions.
+The numerical-first recipe separately records its finite worker's actual native
+optimum, refutation or cutoff exhaustion before withholding its proof authority.
+
 ## Scheduling
 
 The scheduler assigns bounded slices, revisits pending preparation and reseeds stale

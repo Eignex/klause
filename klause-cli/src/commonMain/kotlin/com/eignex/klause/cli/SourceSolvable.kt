@@ -176,11 +176,12 @@ private fun CommonOptions.takeLinearTraversal(): LinearTraversal {
     val choices = entries.map { entry ->
         when (entry.substringAfter('=')) {
             "automatic" -> LinearTraversal.AUTOMATIC
+            "finite-companions" -> LinearTraversal.FINITE_COMPANIONS
             "numerical" -> LinearTraversal.NUMERICAL
             "numerical-frontier" -> LinearTraversal.NUMERICAL_FRONTIER
             "numerical-companions" -> LinearTraversal.NUMERICAL_COMPANIONS
             "numerical-companions-independent" -> LinearTraversal.NUMERICAL_COMPANIONS_INDEPENDENT
-            else -> usageError("linear-traversal expects automatic, numerical, numerical-frontier, " +
+            else -> usageError("linear-traversal expects automatic, finite-companions, numerical, numerical-frontier, " +
                 "numerical-companions or numerical-companions-independent")
         }
     }.distinct()

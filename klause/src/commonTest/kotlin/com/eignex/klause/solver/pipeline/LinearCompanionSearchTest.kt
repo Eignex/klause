@@ -45,6 +45,7 @@ class LinearCompanionSearchTest {
                 it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1, accepted::add)
             }
 
+            assertEquals(1L, result?.stats?.smt?.completeSearchStages?.get("linearCompanionNativeOptimal"))
             if (valid) {
                 val point = assertIs<MinimizeResult.BestFound>(result)
                 assertEquals(1, accepted.size)

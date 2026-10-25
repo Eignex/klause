@@ -11,6 +11,7 @@ import com.eignex.klause.portfolio.PortfolioExecutor
 import com.eignex.klause.portfolio.PortfolioIncumbents
 import com.eignex.klause.portfolio.PortfolioTerminalCheck
 import com.eignex.klause.portfolio.PortfolioWorker
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
@@ -53,6 +54,7 @@ internal class PortfolioInvocation(
     evidence: PortfolioEvidence,
     objective: LinearObjective? = null,
     onFault: ((ArmFault) -> Unit)? = null,
+    private val optimizationIncumbents: PortfolioIncumbents<BigFraction>? = null,
     policy: (List<PortfolioWorker>) -> PortfolioInvocationPolicy = { PortfolioInvocationPolicy() },
 ) : PortfolioExecutor {
     init { require(factories.isNotEmpty()) { "portfolio invocation requires admitted arm factories" } }
@@ -114,7 +116,9 @@ internal class PortfolioInvocation(
         onImprovement: ((AttributedImprovement) -> Unit)?,
     ): MinimizeResult {
         check(!closed) { "portfolio invocation is closed" }
-        return portfolio.minimize(controls.cancellation or cancellation, onImprovement)
+        val incumbents = optimizationIncumbents
+        return if (incumbents == null) portfolio.minimize(controls.cancellation or cancellation, onImprovement)
+        else portfolio.minimize(controls.cancellation or cancellation, onImprovement, incumbents)
     }
 
     fun <V> minimize(

@@ -664,6 +664,7 @@ final enum class com.eignex.klause.solver.pipeline/LinearSourceConclusion : kotl
 
 final enum class com.eignex.klause.solver.pipeline/LinearTraversal : kotlin/Enum<com.eignex.klause.solver.pipeline/LinearTraversal> { // com.eignex.klause.solver.pipeline/LinearTraversal|null[0]
     enum entry AUTOMATIC // com.eignex.klause.solver.pipeline/LinearTraversal.AUTOMATIC|null[0]
+    enum entry FINITE_COMPANIONS // com.eignex.klause.solver.pipeline/LinearTraversal.FINITE_COMPANIONS|null[0]
     enum entry NUMERICAL // com.eignex.klause.solver.pipeline/LinearTraversal.NUMERICAL|null[0]
     enum entry NUMERICAL_COMPANIONS // com.eignex.klause.solver.pipeline/LinearTraversal.NUMERICAL_COMPANIONS|null[0]
     enum entry NUMERICAL_COMPANIONS_INDEPENDENT // com.eignex.klause.solver.pipeline/LinearTraversal.NUMERICAL_COMPANIONS_INDEPENDENT|null[0]

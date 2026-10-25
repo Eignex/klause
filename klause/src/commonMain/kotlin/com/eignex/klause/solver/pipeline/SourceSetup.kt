@@ -139,6 +139,9 @@ enum class LinearTraversal {
 
     /** Use the companion recipe while withholding cross-worker incumbent and bound imports. */
     NUMERICAL_COMPANIONS_INDEPENDENT,
+
+    /** Retain finite recipes and selectively append bounded numerical workers. */
+    FINITE_COMPANIONS,
 }
 
 /** Captures one source route and retains its operation binding for execution. */

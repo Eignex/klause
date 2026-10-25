@@ -24,9 +24,11 @@ internal class LinearCompanionSearch(
     context: SourceProofContext,
     private val binding: EngineInvocation,
     private val objective: LinearObjective,
+    private val observationPrefix: String = "linearCompanion",
     private val observations: () -> Map<String, Long> = { emptyMap() },
 ) : InstructionSlicedSearch, ReseedGuard, ResumableSearch by search {
     private val context = context.withLinearAuthority()
+    private var nativeCompletion: MinimizeResult? = null
     init {
         if (binding.scope != context.scope || binding.executionObjective !== objective) {
             val failure = IllegalArgumentException("linear companion has another source scope or execution objective")
@@ -36,7 +38,15 @@ internal class LinearCompanionSearch(
     }
     override val stats get() = search.stats.let { stats ->
         stats.copy(smt = stats.smt.copy(completeSearchStages =
-            stats.smt.completeSearchStages.orEmpty() + observations()))
+            stats.smt.completeSearchStages.orEmpty() + observations() + mapOf(
+                "${observationPrefix}NativeOptimal" to if (nativeCompletion is MinimizeResult.Optimal) 1L else 0L,
+                "${observationPrefix}NativeRefuted" to if (nativeCompletion is MinimizeResult.Infeasible) 1L else 0L,
+                "${observationPrefix}NativeExhausted" to if (when (val completed = nativeCompletion) {
+                    is MinimizeResult.BestFound -> completed.reason == TerminationReason.SearchExhausted
+                    is MinimizeResult.Unknown -> completed.reason == TerminationReason.SearchExhausted
+                    else -> false
+                }) 1L else 0L,
+            )))
     }
     override val canReseed: Boolean get() = false
     override val chargedInstructions: Long get() =
@@ -67,6 +77,7 @@ internal class LinearCompanionSearch(
             return MinimizeResult.BestFound(published, value, TerminationReason.BudgetExhausted, stats)
         }
         val result = run { candidate -> checked(candidate)?.let(onIncumbent) } ?: return null
+        nativeCompletion = result
         return if (result is MinimizeResult.WithSample) checked(result)
             ?: MinimizeResult.Unknown(TerminationReason.Unsupported, stats)
         else MinimizeResult.Unknown(TerminationReason.Unsupported, stats)

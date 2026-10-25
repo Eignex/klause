@@ -352,7 +352,8 @@ internal class OpenPortfolio(
                         } else linear?.let {
                             { it.sharedLowerBound().also { bound -> if (bound.isFinite()) floorReads++ } }
                         })
-                    LinearCompanionSearch(solver.resumable(objective, params), context, binding, objective) {
+                    LinearCompanionSearch(solver.resumable(objective, params), context, binding, objective,
+                        observationPrefix = "finiteCompanion") {
                         mapOf("finiteCompanionCutoffReads" to cutoffReads, "finiteCompanionBoundReads" to floorReads)
                     }
                 }) { _, _, _, _ -> error("finite companion runs only by slice") }
