@@ -5,6 +5,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.LongArrayList
 
 /**
  * Element's LP relaxation. A constant array gives the exact convex hull: a one-hot selector `y_p ∈ [0,1]` per
@@ -82,8 +83,16 @@ private fun Element.retainedChoices(domain: IntDomain): LongArray? {
     val lo = indexOffset.toLong()
     val hi = lo + arr.size - 1L
     if (domain.max < lo || domain.min > hi) return null
-    val retained = domain.withMinAtLeast(lo).withMaxAtMost(hi).spanOrNull(MAX_CHOICES.toLong()) ?: return null
-    return LongArray(retained.size) { retained.valueAt(it) }.takeIf { it.isNotEmpty() }
+    val retained = LongArrayList()
+    var value = maxOf(lo, domain.min)
+    if (value !in domain) value = domain.higher(value)
+    while (value <= hi) {
+        if (retained.size == MAX_CHOICES) return null
+        retained.add(value)
+        if (value == domain.max) break
+        value = domain.higher(value)
+    }
+    return retained.toLongArray().takeIf { it.isNotEmpty() }
 }
 
 /** The shared one-hot selectors `Σ_p y_p = 1` and index channel `Σ_p (p + off)·y_p = idx`. */
