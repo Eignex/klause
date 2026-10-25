@@ -13,7 +13,7 @@ import kotlin.random.Random
 
 private const val INITIAL_PROBES = 128
 private const val PROBES_PER_REFUTATION = 32
-private const val MAX_PROBE_WORK = 50_000_000L
+private const val MAX_PROBE_WORK = 8_000_000L
 
 internal object BoundedIntegerProbing {
     fun bake(
