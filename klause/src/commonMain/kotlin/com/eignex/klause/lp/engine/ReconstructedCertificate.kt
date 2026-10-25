@@ -53,6 +53,7 @@ internal enum class ReconstructionPhase { INPUT, POINT, DUAL, RAY, SUPPORT, VIOL
 
 internal data class ReconstructionDualRejection(val column: Int, val upper: Boolean, val reduced: BigFraction)
 internal data class ReconstructionVectorRejection(val commonDenominator: BigInt, val limit: BigInt)
+internal data class ReconstructionEntryRejection(val row: Int, val value: BigFraction)
 
 internal data class ReconstructionMetrics(
     val attempts: Int,
@@ -71,6 +72,7 @@ internal data class ReconstructionMetrics(
     val phase: ReconstructionPhase,
     val dualRejection: ReconstructionDualRejection? = null,
     val vectorRejection: ReconstructionVectorRejection? = null,
+    val entryRejection: ReconstructionEntryRejection? = null,
 )
 
 internal class ReconstructedCertificate(
@@ -103,6 +105,7 @@ internal class ReconstructionMeter(
     var verificationRestarts = 0
     var dualRejection: ReconstructionDualRejection? = null
     var vectorRejection: ReconstructionVectorRejection? = null
+    var entryRejection: ReconstructionEntryRejection? = null
     private var work = 0L
     private var allocation = 0L
     private var maxBits = 0
@@ -167,6 +170,7 @@ internal class ReconstructionMeter(
     fun snapshot(decline: ReconstructionDecline?) = ReconstructionMetrics(
         attempts, pointChecks, dualChecks, rayChecks, pointSuccesses, dualSuccesses, raySuccesses,
         vectorRestarts, verificationRestarts, work, allocation, maxBits, decline, phase, dualRejection, vectorRejection,
+        entryRejection,
     )
 }
 
@@ -805,10 +809,14 @@ private fun reconstructBoundVector(
     meter.phase = ReconstructionPhase.VECTOR
     meter.storage(values.size.toLong() * 32L)
     val limit = if (denominator.magnitudeBitLength() > 63) Long.MAX_VALUE else denominator.toLongExact()
-    return values.map { value ->
+    return values.mapIndexed { row, value ->
         meter.step()
-        val part = reconstructRational(value.toDouble(), maxDenominator = limit, onStep = { meter.step() })
-            ?: return null
+        val floating = value.toDouble()
+        val part = reconstructRational(floating, maxDenominator = limit,
+            tolerance = 1e-9 * maxOf(1.0, kotlin.math.abs(floating)), onStep = { meter.step() }) ?: run {
+            meter.entryRejection = ReconstructionEntryRejection(row, value)
+            return null
+        }
         meter.fraction(BigFraction.of(bigIntOf(part.numerator), bigIntOf(part.denominator)))
     }
 }
