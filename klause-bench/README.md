@@ -2873,6 +2873,17 @@ infrastructure without changing default worker admission.
 
 ### Linear traversal comparison
 
+`param.linear-traversal=finite-companions` keeps the ordinary automatic finite
+portfolio and appends bounded numerical workers to eligible binary/continuous
+models. Compare it with an unmodified default, retaining presolve and full finite
+recipes. `finiteNumericalCompanionActiveMs`/`finiteJointCompanionActiveMs`,
+`Retired`, `Optimal` and `Refuted` suffixes expose each trial's active cost and
+completion. The numerical-first `numerical-companions` control records
+`finiteCompanionNativeOptimal`, `finiteCompanionNativeRefuted` and
+`finiteCompanionNativeExhausted` before withholding finite proof authority.
+These stage fields distinguish worker completion from transport; inspect
+`armFailure.*` and per-arm failures alongside source outcomes.
+
 For bounded MPS traversal diagnostics, compare `param.linear-traversal=automatic`
 with `param.linear-traversal=numerical` through the same source pipeline and pinned
 original bytes. The automatic finite arm can use `engine=cp`, `param.arms=1` and

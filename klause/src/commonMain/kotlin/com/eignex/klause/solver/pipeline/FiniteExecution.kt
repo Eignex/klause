@@ -103,6 +103,7 @@ class FiniteSolveRequest(
     val toleranceCheck: ((Sample) -> Boolean)? = null,
 ) {
     private var capturedSourceControls: SourceFiniteControls? = null
+    internal var numericalCompanionParams: TheoryParams? = null
     internal val sourceControls: SourceFiniteControls? get() = capturedSourceControls
 
     internal constructor(shape: FiniteSolveShape, controls: SourceFiniteControls) : this(
@@ -387,6 +388,7 @@ internal class FiniteExecutionRequest(
     val sourceInvocation: PreparedSourceInvocation? = null,
     val sourceMapping: SourceMapping? = null,
     val sourceControls: SourceFiniteControls? = null,
+    val numericalCompanionParams: TheoryParams? = null,
 )
 
 /** Streaming hooks owned by a rendering frontend. */
@@ -627,6 +629,7 @@ internal fun FinitePipeline.solve(
             sourceInvocation = request.shape.sourceInvocation,
             sourceMapping = preparation.sourceMapping,
             sourceControls = request.sourceControls,
+            numericalCompanionParams = request.numericalCompanionParams,
         ),
         FiniteExecutionCallbacks(
             onSample = { sample ->
@@ -1022,6 +1025,7 @@ private fun executePortfolio(
         preparedPlan = request.preparedPlan,
         cancellation = request.cancellation,
         numericalCompletion = request.executionOptions.numericalCompletion,
+        numericalCompanions = request.numericalCompanionParams,
         sourceHints = request.sourceInvocation?.let { invocation ->
             { strategies ->
                 invocation.heuristicHints(

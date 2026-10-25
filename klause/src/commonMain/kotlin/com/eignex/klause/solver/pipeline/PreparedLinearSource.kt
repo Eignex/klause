@@ -55,7 +55,8 @@ internal fun prepareLinearSource(
                     sharing = request.linearTraversal == LinearTraversal.NUMERICAL_COMPANIONS),
                 view.numericalPlan(objective)))
         }
-    } else if (request.linearTraversal == LinearTraversal.AUTOMATIC && native.numericalRowsSupported(stop)) {
+    } else if (request.linearTraversal in setOf(LinearTraversal.AUTOMATIC, LinearTraversal.FINITE_COMPANIONS) &&
+        native.numericalRowsSupported(stop)) {
         val finite = native.finiteRoute(request.boundCancellation or stop, onLpStats ?: {})
         if (finite is SourceProblemRoute.Finite && finite.problem.requiresExactObjectiveRoute(objective, stop)) {
             SourceProblemRoute.NativeFormula(NativeSourceExecution.Numerical(native, view.numericalPlan(objective)))

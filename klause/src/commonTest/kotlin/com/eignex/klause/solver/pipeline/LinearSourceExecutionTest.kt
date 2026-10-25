@@ -41,6 +41,25 @@ import kotlin.test.assertTrue
 
 class LinearSourceExecutionTest {
     @Test
+    fun `finite companions should retain finite source completion when numerical funding is disabled`() {
+        val source = LinearSourceProblem(
+            listOf(LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE),
+                LinearSourceVariable("r", false, SemanticRational.ZERO, SemanticRational.ONE)),
+            emptyList(), LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
+        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED, linearTraversal = LinearTraversal.FINITE_COMPANIONS))
+        assertIs<SourceProblemRoute.Finite>(invocation.route)
+
+        val result = SourceSetup.execute(SourceExecutionRequest(invocation,
+            ExecutionOptions(ExecutionOption.sourceLpWorkLimit(0), ExecutionOption.maxFlips(0))))
+
+        assertIs<SourceExecutionResult.Finite>(result)
+        assertEquals(LinearSourceConclusion.OPTIMAL, result.linearSource?.conclusion)
+        assertEquals(BigFraction.ZERO, result.linearSource?.incumbent?.objective)
+    }
+
+    @Test
     fun `finite companions should import only floors expressed in their receiver units`() {
         for ((weight, offset) in listOf(1L to 0L, 5L to 7L)) {
             val source = LinearSourceProblem(

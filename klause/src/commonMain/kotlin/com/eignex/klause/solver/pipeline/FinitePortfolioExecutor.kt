@@ -70,11 +70,12 @@ internal fun FinitePipeline.portfolioExecutor(
     cancellation: Cancellation,
     numericalCompletion: Boolean,
     sourceHints: ((Set<ExecutionStrategy>) -> PreparedSourceHints?)? = null,
+    numericalCompanions: TheoryParams? = null,
 ): PortfolioInvocation {
     val profile = ProblemProfile.of(problem, scenario.kind == Kind.COP)
     val identity = ModelIdentity.of(problem, objective)
     val binding = EngineInvocation(preparedPlan, identity, objective)
-    val factories = PortfolioBuilder.factories(
+    val finiteFactories = PortfolioBuilder.factories(
         problem, scenario, objective, lsObjective, definitionalSweep, onEvent,
         profile, numericalCompletion, sourceHints,
     ).map { factory ->
@@ -91,6 +92,10 @@ internal fun FinitePipeline.portfolioExecutor(
             )
         }) { slot -> factory.materialize(slot.index, slot.baseSeed, slot.nodeBudget) }
     }
+    val companions = if (numericalCompanions != null && objective != null &&
+        finiteNumericalCompanionsAdmitted(problem, scenario)
+    ) FiniteNumericalCompanions.prepare(problem, objective, numericalCompanions, cancellation) else null
+    val factories = finiteFactories + companions?.factories(preparedPlan, finiteFactories.size).orEmpty()
     return PortfolioInvocation(
         preparedPlan,
         factories,
@@ -108,6 +113,7 @@ internal fun FinitePipeline.portfolioExecutor(
             .bindInvocation(binding, cancellation),
         objective,
         onFault,
+        optimizationIncumbents = companions?.incumbents,
     ) { workers ->
         val proofShares = clausalProofShares(scenario, profile, workers.map { it.label })
         val shares = if (proofShares.isEmpty()) {

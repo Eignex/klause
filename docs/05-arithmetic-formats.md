@@ -138,6 +138,12 @@ selected by `engine`, keeps the original tolerance and objective, and supplies n
 finite or arithmetic-theory fallback. Numerical traversal retains sibling coverage
 and withholds terminals for interrupted or uncertified leaves.
 
+`FINITE_COMPANIONS` (`--param linear-traversal=finite-companions`) retains automatic
+routing and its finite recipes. Eligible sequential mixed optimization pools append
+bounded numerical frontier and joint-repair workers; [portfolios](12-portfolio.md)
+defines their admission and proof transport. Other pools retain finite execution,
+and open declarations retain the numerical fallback.
+
 `NUMERICAL_FRONTIER`, exposed as `--param linear-traversal=numerical-frontier`,
 uses a retained bound-ordered alternative queue. The same source checking and
 tolerance contracts apply to its shared-search and portfolio consumers.
