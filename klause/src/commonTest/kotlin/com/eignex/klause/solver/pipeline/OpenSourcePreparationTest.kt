@@ -23,6 +23,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotSame
@@ -65,6 +66,26 @@ class OpenSourcePreparationTest {
             assertEquals(fresh.factorOwner(index), planned.plan.factorOwner(index))
             assertEquals(fresh.factorEncoded(index), planned.plan.factorEncoded(index))
         }
+    }
+
+    @Test
+    fun `certified deletion should rebuild arithmetic participation`() {
+        val open = Bits(3).also { it.set(2) }
+        val model = Problem(numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(LongArray(3), longArrayOf(3, 3, 0), open, open),
+            factors = arrayOf<Factor>(
+                Linear(longArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0L),
+                Linear(longArrayOf(0, 0), intArrayOf(0, 2), LinearOp.EQ, 0L),
+            ))
+        val projections = FactorProjectionProviders.Default.prepare(model)
+        val captured = model.componentPlan(projections)
+        assertTrue(captured.factorEncoded(0))
+
+        val planned = assertIs<OpenSourcePreparation.Planned>(model.prepareOpenSource(
+            config = PresolveConfig.parse("off,+dependent-rows"), projections = projections, capturedPlan = captured,
+        ))
+
+        assertFalse(planned.plan.factorEncoded(0))
     }
 
     @Test
