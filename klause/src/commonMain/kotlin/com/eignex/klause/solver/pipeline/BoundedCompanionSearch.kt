@@ -24,12 +24,13 @@ internal class BoundedCompanionSearch(
     override val chargedInstructions: Long get() =
         (search as? InstructionSlicedSearch)?.chargedInstructions ?: search.work
     override val stats get() = search.stats.let { original ->
-        original.copy(smt = original.smt.copy(completeSearchStages = original.smt.completeSearchStages.orEmpty() + mapOf(
+        val stages = mapOf(
             "${prefix}ActiveMs" to active.inWholeMilliseconds,
             "${prefix}Retired" to if (retired) 1L else 0L,
             "${prefix}Optimal" to if (terminal is MinimizeResult.Optimal) 1L else 0L,
             "${prefix}Refuted" to if (terminal is MinimizeResult.Infeasible) 1L else 0L,
-        )))
+        )
+        original.copy(smt = original.smt.copy(completeSearchStages = original.smt.completeSearchStages.orEmpty() + stages))
     }
 
     override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,

@@ -48,7 +48,8 @@ class FiniteNumericalCompanionsTest {
     fun `a checked numerical optimum should complete the same finite working model`() {
         val model = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
-        val context = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val context = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            Cancellation.Never))
         val result = OpenTheoryPipeline.optimizeLinear(context)
 
         val completed = finiteNumericalCompletion(result, context, Cancellation.Never)
@@ -78,7 +79,8 @@ class FiniteNumericalCompanionsTest {
     fun `a restricted numerical proof should not finish its weaker finite invocation`() {
         val model = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
-        val context = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val context = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            Cancellation.Never))
         val restricted = SourceProofContext(context.scope.copy(condition = SourceCondition(
             lower = mapOf(SourceCoordinate(SourceCoordinate.Kind.Integer, 0) to BigFraction.ONE))),
             context.coordinates, context.premises, context.objective, context.objectiveConstant)
