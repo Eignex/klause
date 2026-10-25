@@ -106,6 +106,13 @@ internal object LocalSearchTrajectory {
                                 put("pick", pick)
                                 put("step", state.step)
                                 put("cost", state.cost)
+                            put("randomState", buildJsonObject {
+                                for (field in state.rng.javaClass.declaredFields) {
+                                    if (field.type != Int::class.javaPrimitiveType) continue
+                                    field.isAccessible = true
+                                    put(field.name, field.getInt(state.rng))
+                                }
+                            })
                                 put("workingIntegers", JsonArray((0 until problem.numIntVars).map {
                                     JsonPrimitive(state.assignment.intValue(it))
                                 }))
