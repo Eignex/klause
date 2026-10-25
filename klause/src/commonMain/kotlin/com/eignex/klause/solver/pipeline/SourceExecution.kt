@@ -435,7 +435,7 @@ private fun executeCapturedSource(
                 finite.cancellation or Cancellation { finite.deadlineExceeded() },
                 finite.toleranceCheck == null,
             )
-            val result = if (invocation.request.linearTraversal == LinearTraversal.FINITE_COMPANIONS) {
+            val result = if (invocation.requestsFiniteNumericalCompanions) {
                 FinitePipeline.solve(finite, callbacks.finite, request.theory.boundTo(invocation))
             } else FinitePipeline.solve(finite, callbacks.finite)
             SourceExecutionResult.Finite(invocation, result)
