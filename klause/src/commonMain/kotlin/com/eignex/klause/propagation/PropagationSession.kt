@@ -6,8 +6,8 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.result.ValueOrderingStatsSink
+import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray

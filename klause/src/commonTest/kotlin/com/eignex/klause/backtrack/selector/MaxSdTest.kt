@@ -1,9 +1,9 @@
 package com.eignex.klause.backtrack.selector
 
-import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.table.Table
+import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.table.Mdd
+import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -73,6 +73,24 @@ class MaxSdTest {
         assertTrue(values.isEmpty())
         assertEquals(2L, session.valueOrdering.refutations)
         assertEquals(0, session.decisionLevel)
+    }
+
+    @Test
+    fun `capped ordering should leave subsequent decisions equivalent to a fresh session`() {
+        val problem = Problem(
+            0, 3, Array(3) { IntDomain(0, 2) },
+            arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 3)),
+        )
+        val session = PropagationSession(problem)
+        val fresh = PropagationSession(problem)
+        MaxSd(probeWorkLimit = 1L).values(session, VarRef.IntVar(0), Random(0L)).toList()
+
+        session.pinInt(0, 0L)
+        fresh.pinInt(0, 0L)
+
+        assertEquals((0..2).map { fresh.intDomain(it) }, (0..2).map { session.intDomain(it) })
+        assertEquals(fresh.decisionLevel, session.decisionLevel)
+        assertFalse(session.fixpointCancelled)
     }
 
     @Test
