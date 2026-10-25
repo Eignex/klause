@@ -63,8 +63,9 @@ internal data class ReconstructionBasisMetrics(
     val components: Int = 0,
     val largestComponent: Int = 0,
     val solvedComponents: Int = 0,
-    val work: Long = 0L,
-    val allocation: Long = 0L,
+    val factorWork: Long = 0L,
+    val factorAllocation: Long = 0L,
+    val openBasicColumns: Int = 0,
     val decline: String? = null,
 )
 

@@ -35,7 +35,7 @@ class LpBoundCertificationTest {
         assertEquals(1, repair.solvedComponents)
         assertEquals(0, result.metrics.pointChecks)
         assertEquals(2, result.metrics.dualChecks)
-        assertTrue(repair.work > 0L)
+        assertTrue(repair.factorWork > 0L)
     }
 
     @Test

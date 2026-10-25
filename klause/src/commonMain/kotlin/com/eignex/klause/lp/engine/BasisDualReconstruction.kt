@@ -44,6 +44,7 @@ private class BasisDualRun(
     private var components = 0
     private var largest = 0
     private var solved = 0
+    private var openBasicColumns = 0
     private var factorWork = 0L
     private var factorAllocation = 0L
     private var decline: String? = null
@@ -63,6 +64,11 @@ private class BasisDualRun(
             if (slot >= 0) y[row] = a.costs[basis.basicVars[slot]]
         }
         rhs = layout.structuralSlots.map { a.costs[basis.basicVars[it]] }.toMutableList()
+        openBasicColumns = layout.structuralSlots.count {
+            meter.step()
+            val bounds = a.bounds[basis.basicVars[it]]
+            bounds.lower == null || bounds.upper == null
+        }
         byRow = Array(a.m) { ArrayList() }
         equations = layout.structuralSlots.mapIndexed { equation, slot ->
             val support = ArrayList<Pair<Int, BigFraction>>()
@@ -106,7 +112,7 @@ private class BasisDualRun(
         null
     } finally {
         meter.basisRepair = ReconstructionBasisMetrics(peeledRows, peeledColumns, coreRows, components,
-            largest, solved, factorWork, factorAllocation, decline)
+            largest, solved, factorWork, factorAllocation, openBasicColumns, decline)
     }
 
     // Singleton elimination preserves the remaining equations without creating factor fill.
