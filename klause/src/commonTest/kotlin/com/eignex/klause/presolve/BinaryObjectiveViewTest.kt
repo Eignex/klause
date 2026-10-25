@@ -11,6 +11,7 @@ import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.ir.SourceTolerance
+import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.meta.coreguided.CoreGuidedSearch
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioBuilder
@@ -282,6 +283,27 @@ class BinaryObjectiveViewTest {
             assertTrue(restored.boolValue(0))
             assertEquals(5L, original.evaluateLong(restored))
         }
+    }
+
+    @Test
+    fun `a clausal binary cost view should execute ordinary LP bounding`() {
+        val source = Problem(
+            0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
+        )
+        val original = LinearObjective(intCoefficients = longArrayOf(1, 2))
+        val config = PresolveConfig(overrides = PresolvePass.entries.associateWith {
+            it == PresolvePass.SUBSTITUTE_BINARY_COLUMNS
+        })
+        val prepared = PresolvePipeline.run(source, original, config, false)
+        val objective = checkNotNull(prepared.objective)
+
+        val result = assertIs<MinimizeResult.Optimal>(BacktrackSolver(prepared.problem.bake()).minimize(
+            objective, BacktrackParams(lpConfig = LpConfig.AGGRESSIVE),
+        ))
+
+        assertEquals(1L, original.evaluateLong(prepared.reconstruct(result.sample)))
+        assertTrue(result.stats.lp.rootPasses.sum > 0.0)
     }
 
     @Test

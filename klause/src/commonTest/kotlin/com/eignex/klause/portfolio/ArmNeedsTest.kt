@@ -16,6 +16,7 @@ import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolvePass
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.difference.DifferenceSystem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.objective.LinearObjective
@@ -87,18 +88,25 @@ class ArmNeedsTest {
 
         val arms = PortfolioComposition.compose(PortfolioScenario.sequential(Kind.COP), facts)
 
-        assertTrue(arms.any { it.label == "lp-aggressive" })
+        assertTrue(
+            arms.any { it.label == "lp-aggressive" },
+            "integerLinear=${facts.integerLinear}, origin=${prepared.objective?.binaryIntegerSource != null}, " +
+                "arms=${arms.map { it.label }}, factors=${model.factors.map { it::class.simpleName }}",
+        )
     }
 
     @Test
-    fun `binary cost channels should retain the mixed integer linear companion`() {
+    fun `binary cost channels should retain the linear companion beside difference propagation`() {
         val source = Problem(
             0, 3, arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 2)),
-            listOf(Linear(longArrayOf(2, 3, 1), intArrayOf(0, 1, 2), LinearOp.GE, 4)),
+            listOf(
+                Linear(longArrayOf(2, 3, 1), intArrayOf(0, 1, 2), LinearOp.GE, 4),
+                Linear(longArrayOf(1, -1), intArrayOf(1, 2), LinearOp.LE, 0),
+            ),
         )
         val objective = LinearObjective(intCoefficients = longArrayOf(3, 5))
         val config = PresolveConfig(overrides = PresolvePass.entries.associateWith {
-            it == PresolvePass.SUBSTITUTE_BINARY_COLUMNS
+            it == PresolvePass.SUBSTITUTE_BINARY_COLUMNS || it == PresolvePass.POST_DIFFERENCE_SYSTEM
         })
         val prepared = FinitePipeline.prepare(FinitePipelineRequest(source, FiniteEngine.MIXED, objective, config))
         val model = prepared.executableProblem()
@@ -106,6 +114,7 @@ class ArmNeedsTest {
 
         val arms = PortfolioComposition.compose(PortfolioScenario.sequential(Kind.COP), facts)
 
+        assertTrue(model.factors.any { it is DifferenceSystem })
         assertTrue(arms.any { it.label == "lp-aggressive" })
         assertTrue(arms.any { it.label == "core-guided" })
     }
