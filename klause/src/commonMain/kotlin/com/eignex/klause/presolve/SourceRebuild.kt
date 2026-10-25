@@ -45,7 +45,6 @@ internal sealed interface RebuildStep {
 
     class IntegerFromLiteral(val variable: Int, val literal: Int) : RebuildStep
 
-    /** Recover one source coordinate from the unique selected row of a finite table. */
     class TupleValue(val variable: Int, val literals: IntArray, val values: LongArray) : RebuildStep
 
     /** Give Boolean [variable] the truth of its defining integer comparison, before clause polarity. */
