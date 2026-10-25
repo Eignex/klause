@@ -119,6 +119,42 @@ class GreedyInitTest {
         }
     }
 
+    @Test
+    fun `integer definition inputs should remain eligible without direct factor occurrences`() {
+        val problem = Problem(
+            1, 1, arrayOf(IntDomain(0, 1)),
+            arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true)))),
+        )
+        val state = freshState(problem, 7L)
+        state.invariants = DefinitionalSweep(listOf(
+            DefinitionalSweep.SweepNode.CmpReif(0, longArrayOf(1), intArrayOf(0), 1L, LinearOp.EQ),
+        )).network(problem.numIntVars, problem.numBoolVars)
+        state.assignment.setBool(0, false)
+        state.recompute()
+
+        GreedyInit().run(state)
+
+        assertEquals(1L, state.assignment.intValue(0))
+    }
+
+    @Test
+    fun `boolean definition inputs should remain eligible without direct factor occurrences`() {
+        val problem = Problem(
+            2, 0, emptyArray(),
+            arrayOf<Factor>(Clause(intArrayOf(Lit.make(1, true)))),
+        )
+        val state = freshState(problem, 7L)
+        state.invariants = DefinitionalSweep(listOf(
+            DefinitionalSweep.SweepNode.BoolFold(1, intArrayOf(Lit.make(0, true)), true),
+        )).network(problem.numIntVars, problem.numBoolVars)
+        state.assignment.setBool(1, false)
+        state.recompute()
+
+        GreedyInit().run(state)
+
+        assertTrue(state.assignment.boolValue(0))
+    }
+
     private fun problem(): Problem = Problem(
         numBoolVars = 0,
         numIntVars = 2,
