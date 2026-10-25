@@ -440,8 +440,9 @@ integer into Boolean equivalences when every reader supports the replacement,
 reusing an existing channel literal where one exists. General reified rows,
 value-reading globals keep their integers. Exact finite optimization first exposes
 0/1 integer costs as a Boolean objective, reusing signed comparison literals or
-adding exact equality channels. Fixed costs enter the constant; signed coefficients
-coalesce exactly and a view outside the objective's storage width declines. Mixed
+adding exact equality channels. Fixed costs enter the constant when representable; signed coefficients coalesce
+exactly. A fresh positive channel retains the source coefficient when signed reuse
+or a constant shift exceeds the objective's storage width. Mixed
 integer readers retain their columns and channels. Substituted values are
 reconstructed from their literals, preserving original costs and source coordinates.
 Approximate and solution-set-sensitive invocations retain their objective form.
