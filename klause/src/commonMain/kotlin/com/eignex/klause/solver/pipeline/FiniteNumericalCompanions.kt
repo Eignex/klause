@@ -25,6 +25,7 @@ import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
+import kotlin.time.Duration.Companion.milliseconds
 
 internal fun finiteNumericalCompanionsAdmitted(problem: BakedProblem, scenario: PortfolioScenario): Boolean =
     scenario.cores == 1 && scenario.kind == Kind.COP && scenario.engine == EngineMix.MIXED &&
@@ -59,7 +60,8 @@ internal class FiniteNumericalCompanions private constructor(
         return listOf(
             factory(firstArm, ArmFamily.Backtrack) { slot ->
                 PortfolioWorker.ofMinimize("numerical/finite-companion", firstArm, resumable = {
-                    BoundedCompanionSearch(numericalSearch(local(slot)), "finiteNumericalCompanion")
+                    BoundedCompanionSearch(numericalSearch(local(slot)), "finiteNumericalCompanion",
+                        sliceLimit = 1_000.milliseconds)
                 }) { _, _, _, _ -> error("numerical companion runs only by slice") }.bindEvidence(identity)
             },
             factory(firstArm + 1, ArmFamily.LocalSearch) { slot ->

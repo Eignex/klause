@@ -132,7 +132,12 @@ internal fun FinitePipeline.portfolioExecutor(
         } else {
             proofShares
         }
-        val reserved = if (shares.isEmpty()) booleanIncumbentShares(workers) else shares
+        val finiteReserved = if (shares.isEmpty()) booleanIncumbentShares(workers) else shares
+        val reserved = if (companions == null) finiteReserved else {
+            (if (finiteReserved.isEmpty()) DoubleArray(workers.size) else finiteReserved).also {
+                it[workers.indexOfFirst { worker -> worker.label == "ls/finite-joint-companion" }] = 0.3
+            }
+        }
         val probes = if (scenario.cores == 1 && scenario.engine == EngineMix.MIXED && scenario.kind == Kind.COP &&
             scenario.btPool == null && scenario.lsPool == null
         ) {
