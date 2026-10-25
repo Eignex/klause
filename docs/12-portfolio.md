@@ -186,13 +186,17 @@ overspend retires that worker at its next turn without claiming exhaustion. Work
 cannot reseed to renew these limits. The two owners divide the containing numerical
 work and allocation ceilings equally and retain their query funding across slices.
 They consume the finite scheduler's checked exact incumbent exchange. Joint repair
-has witness authority. A numerical optimum or refutation can complete the finite
+has witness authority. Its full-source check of a completed point uses the containing
+lifetime as an atomic publication step; this time belongs to its active allowance.
+A numerical optimum or refutation can complete the finite
 invocation only after its typed terminal verifies against the same captured working
 model and objective; the finite pipeline retains original-source reconstruction and
 qualification. Other numerical terminals and incomplete coverage carry no completion
 authority. Finite workers' ordinary terminal admission remains available throughout.
 
 Companion statistics distinguish active-time retirement and checked completions.
+`jointRepairPublicationChecks`, `jointRepairPublicationNs` and
+`jointRepairPublicationPauses` identify completed-point verification effort.
 The numerical-first recipe separately records its finite worker's actual native
 optimum, refutation or cutoff exhaustion before withholding its proof authority.
 

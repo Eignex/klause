@@ -37,6 +37,7 @@ internal class JointLinearRepair(
     guidancePolicy: SparseSourceLpPolicy = SparseSourceLpPolicy(),
     private val boundOrdered: Boolean = false,
     private val external: () -> Sample? = { null },
+    private val publicationLifetime: Cancellation? = null,
 ) : ExactNeighborhoodCompletion, AutoCloseable {
     private val stop = params.timeout or params.cancellation
     private val state = OpenTheorySolveState(params)
@@ -222,8 +223,17 @@ internal class JointLinearRepair(
         }
         if (sample != null) {
             val evidence = SourceEvidence(source.scope, SourceClaim.Witness(sample), SourceDerivation.SourceWitness)
-            val checked = SourceEvidenceVerifier(source.withLinearAuthority()).verify(evidence, stop or cancellation)
-            if (cancellation() && !stop()) return ExactNeighborhoodResult.Paused
+            // Full-source point verification has no retained cursor across slice boundaries.
+            val verification = stop or (publicationLifetime ?: cancellation)
+            val mark = TimeSource.Monotonic.markNow()
+            observe("jointRepairPublicationChecks")
+            val checked = SourceEvidenceVerifier(source.withLinearAuthority()).verify(evidence, verification)
+            stages["jointRepairPublicationNs"] = (stages["jointRepairPublicationNs"] ?: 0L) +
+                mark.elapsedNow().inWholeNanoseconds
+            if (publicationLifetime == null && cancellation() && !stop()) {
+                observe("jointRepairPublicationPauses")
+                return ExactNeighborhoodResult.Paused
+            }
             retire()
             if (checked == SourceEvidenceCheck.Checked) {
                 anchor = sample
