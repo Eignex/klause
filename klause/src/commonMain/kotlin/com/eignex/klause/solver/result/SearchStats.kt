@@ -42,7 +42,7 @@ data class SearchStats(
     val inprocessVisits: SumResult = ZERO_COUNT,
     /** Learned clauses with a literal block distance of at most two: the short, reusable ones. */
     val glueClauses: SumResult = ZERO_COUNT,
-    /** Propagation dispatches, watcher/level visits, and linear term inspections, including reasons. */
+    /** Propagation dispatches, watcher/level visits, linear term inspections, reasons and bounded value-score visits. */
     val propagationWork: SumResult = ZERO_COUNT,
     /** Work in the session constructor's root fixpoint. */
     val rootPropagationWork: SumResult = ZERO_COUNT,
