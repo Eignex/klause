@@ -98,6 +98,9 @@ overflow scans and pivot cost selection. A rejected definition leaves other pivo
 of that equality and translations through other definitions available.
 Wider affine expressions, approximate semantics, open-theory
 preparation and protection-only objectives retain objective-column protection.
+Default sequential mixed placement solves retain objective columns as heuristic
+grading coordinates. Explicit presolve selections, parallel execution and other
+finite engines retain exact objective-substitution admission.
 Finite holes and projected hints follow the same reconstruction as factor substitution.
 Independent source evaluation checks the composed adjustment against reconstructed
 witnesses. A mapping never issues a proof certificate. Optional

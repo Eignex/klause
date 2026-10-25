@@ -6,6 +6,7 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.backtrack.SearchOutcome
 import com.eignex.klause.backtrack.toBacktrackParams
+import com.eignex.klause.factor.scheduling.Diffn
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SearchHints
 import com.eignex.klause.localsearch.DefinitionalSweep
@@ -525,7 +526,7 @@ internal fun FinitePipeline.solve(
             preparedPlan = request.shape.preparedPlan,
             engine = request.engine,
             objective = request.shape.linearObjective,
-            transformObjective = request.shape.localSearchObjective == null,
+            transformObjective = request.permitsObjectiveSubstitution(),
             presolveConfig = request.presolveConfig,
             explicitPresolveConfig = request.explicitPresolveConfig,
             solutionSetSensitive = request.solutionSetSensitive ||
@@ -683,6 +684,13 @@ private fun FiniteSolveOutcome.withPresolve(presolve: PresolveStats?): FiniteSol
     )
 
     else -> this
+}
+
+private fun FiniteSolveRequest.permitsObjectiveSubstitution(): Boolean {
+    if (shape.localSearchObjective != null) return false
+    if (!shape.optimize || engine != FiniteEngine.MIXED || cores != 1 || explicitPresolveConfig) return true
+    // Objective aliases retain infeasible grading cues for placement heuristics.
+    return shape.finiteProblem.factors.none { it is Diffn }
 }
 
 /**

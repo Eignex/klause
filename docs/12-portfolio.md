@@ -299,6 +299,10 @@ Recipes select workers from model structure. Explicit pools, backtrack edits and
 source annotations retain their requested composition. Defaults live in
 [portfolio construction](../klause/src/commonMain/kotlin/com/eignex/klause/portfolio).
 
+Default sequential mixed placement portfolios retain explicit objective coordinates
+during [presolve](07-presolve.md#guarantees-and-source-mappings) for heuristic grading.
+An explicit presolve selection retains its objective-substitution admission.
+
 ### Model-specific worker recipes
 
 Curated sequential mixed finite optimization pools diversify both neighborhoods and
