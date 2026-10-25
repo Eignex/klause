@@ -26,8 +26,8 @@ internal object BoundedIntegerProbing {
             cancellation.interruptPresolveInvocation()
             return base
         }
-        val budget = cancellation.presolveBudget()
-        val token = budget?.let { it.slice(minOf(MAX_PROBE_WORK, it.remaining() / 8)) or cancellation } ?: cancellation
+        val budget = cancellation.presolveBudget() ?: return base
+        val token = budget.slice(minOf(MAX_PROBE_WORK, budget.remaining() / 8)) or cancellation
         if (token()) return base
         val state = PropagationState(PropagationProblem(problem), base.toAssumptions(), nativeSat = true)
         state.cancelFloor = 0
