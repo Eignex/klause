@@ -28,10 +28,10 @@ class LpRetainedSourcesTest {
     @Test
     fun `shared element choices retain exact joint bounds across holes and pop`() {
         val problem = Problem(
-            0, 3, arrayOf(IntDomain(0, 2), IntDomain(0, 1), IntDomain(0, 1)),
+            0, 3, arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 1)),
             arrayOf(
-                Element(0, 1, longArrayOf(0, 1, 0), false, 0),
-                Element(0, 2, longArrayOf(7, 1, 0, 1), false, -1),
+                Element(0, 1, longArrayOf(2, 0, 2), false, 0),
+                Element(0, 2, longArrayOf(7, 0, 1, 0), false, -1),
             ),
         )
         var live = problem.finiteIntDomain(0)
@@ -50,6 +50,7 @@ class LpRetainedSourcesTest {
             val relaxation = sources.relaxation(owner.state, domains)
             val column = relaxation.colReq.indices.single { relaxation.colReq[it].contentEquals(longArrayOf(0, 1)) }
             assertEquals(3, relaxation.colReq.count { it != null })
+            assertEquals(3, assertNotNull(relaxation.sourceMap).auxiliaryDefinitions.size)
             assertEquals(BigFraction.ONE, assertNotNull(owner.solve()).lowerBound)
             assertTrue(owner.push())
             live = live.excludeValue(1L)
@@ -59,8 +60,10 @@ class LpRetainedSourcesTest {
             assertTrue(child.columns.isEmpty())
             assertTrue(owner.replaceRows(child.retired, child.columns, child.rows, true, objective = child.objective))
             child.commit()
-            assertEquals(BigFraction.ZERO, assertNotNull(sources.liveBounds(domains)[column].upper).number.value)
-            assertEquals(BigFraction.ONE, assertNotNull(owner.solve()).lowerBound)
+            val absent = assertNotNull(sources.liveBounds(domains)[column].upper)
+            assertEquals(BigFraction.ZERO, absent.number.value)
+            assertTrue(owner.assertBound(column, true, absent, 7L))
+            assertEquals(BigFraction.ofLong(2L), assertNotNull(owner.solve()).lowerBound)
             assertTrue(owner.pop(0))
             sources.retract(0)
             live = problem.finiteIntDomain(0)
