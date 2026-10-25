@@ -2288,6 +2288,14 @@ a slice.
 
 ### Continuous candidate owner reuse
 
+`bench.profile.MpsResidualObjective` replays saved MPS witnesses with all discrete
+coordinates fixed and attempts a bounded continuous objective solve. Its `batch64=`
+argument encodes a JSON array of objects containing `suite`, `problem`, `sha256`
+and the saved `witness` line. It records the original and refined objective in
+source units, the working objective scale, exact completion work, allocation and
+a fresh `checkMpsWitness` result. Run it through a bounded lab profile job; native
+source checks do not constitute independent witness or proof validation.
+
 Continuous local-search candidates use fresh numerical owners. The
 [retained-owner prototype](https://github.com/Eignex/klause/tree/codex/mps-completion-reuse-prototype-3456)
 passed current-pin, conditioned-row, indicator, cancellation and cleanup controls,
