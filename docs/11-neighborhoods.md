@@ -162,6 +162,12 @@ rectangles. Admitted relocations reconcile scalar envelopes as Cumulative moves 
 Geometry checks establish only the Diffn's own satisfaction; complete scoring covers
 the rest.
 
+With at most four overlapping pairs, repair also considers domain boundaries and
+other rectangles' edges for both endpoints of the first collision. At most 128
+rectangles and 128 placement probes admit four candidates. Each relocated
+rectangle must become disjoint from every rectangle it reaches; other collisions
+remain for later repairs. Ordinary pair separation remains available.
+
 ## Completion, restarts and ownership
 
 A candidate needs authoritative continuous values before publication. Completion and
