@@ -36,6 +36,17 @@ class RestartScheduleTest {
     }
 
     @Test
+    fun `large positive luby units should saturate the restart budget`() {
+        val restart = RestartSchedule.from(BacktrackParams(lubyRestartBase = Long.MAX_VALUE))
+        repeat(3) {
+            restart.beginRun()
+            assertFalse(restart.shouldRestart(Long.MAX_VALUE - 1))
+            assertTrue(restart.shouldRestart(Long.MAX_VALUE))
+            restart.onRestart()
+        }
+    }
+
+    @Test
     fun `adaptive restart should leave the per-run budget unbounded`() {
         val restart = RestartSchedule.from(BacktrackParams(adaptiveRestart = true))
         restart.beginRun()

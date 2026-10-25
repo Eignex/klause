@@ -72,6 +72,10 @@ original-unit qualification.
 
 Solver-control flags are common to every mode; `--help` lists every parameter.
 
+`--param luby=N` requires a strictly positive integer. Zero and negative units
+produce a configuration error before worker execution, including when an adaptive
+restart schedule takes precedence.
+
 - `-a` / `--all-solutions`, `-n <count>`: enumeration (satisfy). `-i` is accepted as a
   no-op, since optimization always streams improvements.
 - `-t <ms>` time limit, `-r <seed>`, `-s` statistics, `-v` verbose.

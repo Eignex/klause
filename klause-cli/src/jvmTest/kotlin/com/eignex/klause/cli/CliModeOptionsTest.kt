@@ -74,6 +74,24 @@ class CliModeOptionsTest {
     }
 
     @Test
+    fun `non-positive luby units should exit with a configuration error`() {
+        val fzn = File.createTempFile("cliluby", ".fzn").apply {
+            writeText("var 1..3: x; solve satisfy;")
+            deleteOnExit()
+        }
+        for (base in listOf("0", "-1", Long.MIN_VALUE.toString())) {
+            var code = -1
+            val error = captureErr {
+                code = runCli(arrayOf("-e", "cp", "--param", "luby=$base", fzn.absolutePath))
+            }
+
+            assertEquals(2, code, error)
+            assertTrue("luby" in error && "positive integer" in error, error)
+            assertTrue("ArithmeticException" !in error, error)
+        }
+    }
+
+    @Test
     fun `a malformed instance should surface a clean format diagnostic and the cli error code`() {
         val fzn = File.createTempFile("clibad", ".fzn").apply {
             writeText("var 1..3: x;\nconstraint not_a_real_builtin(;\n")

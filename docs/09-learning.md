@@ -161,7 +161,9 @@ configurable schedules, in precedence order, are:
   focused stages of frequent adaptive restarts.
 - **EMA adaptive** and **LBD adaptive** restart when recent learned LBD is worse than
   the long-run average, using moving averages or bounded windows respectively.
-- **Luby** restarts after a Luby multiple of a fixed decision base.
+- **Luby** restarts after a Luby multiple of a strictly positive decision base.
+  `BacktrackParams.lubyRestartBase = null` disables this schedule; zero and negative
+  bases are rejected when parameters are constructed, including copies.
 
 Both adaptive schedules block a restart while the trail is well above its average,
 since the search is then driving deep toward a model. Learned constraints, activities
