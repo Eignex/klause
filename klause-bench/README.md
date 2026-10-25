@@ -1544,6 +1544,13 @@ control, but loses two seed-17 witnesses and worsens all three seed-41 objective
 CarpetCutting quality improves in four pairs, worsens in three and ties in two.
 This recovery is insufficient for default admission.
 
+[Initialization comparison 8315](https://lab.eignex.com/jobs/8315) retains main
+`7500a0e1ff` against a primary scheduling worker omitting generic greedy repair:
+126 default mixed/P1/30-second cases with the same seven sources and repeated
+seeds. All 43 reported witnesses pass independent checking. Both arms miss all
+three original Cargo seed-3 witnesses; total Cargo-09 coverage falls from six to
+five. This initializer policy is rejected for the recovery.
+
 ### XCSP3 declared intension extrema
 
 [Lab 7973](https://lab.eignex.com/jobs/7973) compares `370fd2fd30` with `51a86c6f10`
