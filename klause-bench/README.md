@@ -3209,6 +3209,65 @@ spend 17,074,248 work and 358,453,908 modeled allocation bytes in total, separat
 from residual assembly and floating work. The allocation is not measured RSS, and
 this diagnostic establishes no paired speedup or default-route quality advantage.
 
+[Logical-core completion 8301](https://lab.eignex.com/jobs/8301), at `cac11c3af2`,
+keeps those source hashes, runtime, options, compiler and Mac/aarch64 identity.
+Removing basic logical unit columns completes three modglob residuals with 190
+reuses under the same 2M/64 MiB certificate envelope. Their combined point and
+basis checks spend 677,762 work and 19,620,135 modeled allocation bytes; maximum
+factor fill is 63 and scalar width 67 bits. Its independently accepted final point
+is 312401375.2256091, without a native optimality proof. Rgn completes seven
+residuals with 248 reuses and retains the independently accepted 104.39999928
+point, also unproved.
+
+Modglob's cumulative modeled funding allocation changes from 537,819,015 to
+405,410,349 bytes, and repair checks from 148 to 256. Rgn changes from 358,092,536
+to 337,355,542 bytes and from 410 to 403 checks. These are bounded progress and
+cost observations on changed search trajectories, not a general throughput claim.
+Residual assembly remains a substantial allocation cost, and feasible completion
+alone establishes no objective-quality advantage over strong defaults.
+
+[Qualification 8302](https://lab.eignex.com/jobs/8302) compares `f1c8bddd7e` with
+its `dc3560c3ac` common base and retains the `0b9f22b574` dispatch defaults as a
+separate strong control. All 120 cases use the same five frozen original sources,
+Mac/aarch64 runtime, compiler, JVM options and independent checker identity:
+P1, 30 s, debug enabled, seeds 1/2/3, default and exact policies separately.
+Companions use `engine=mixed` and `param.linear-traversal=numerical-companions`;
+all arms retain default presolve. The CLI uses a 3 GiB heap, Serial GC and one
+active processor.
+All 108 reported witnesses pass solchecker; native proofs are not independently
+proof-checked. No case fails.
+
+| Source | Current companions to residual completion | Strong controls |
+| --- | --- | --- |
+| modglob | No point to checked 312428931.7216991 in all six cases | Default-mode finite points near 20784597.9163945 remain stronger; exact finite controls have no point. |
+| rgn | 224.19999994 to 97.59999892 in all six cases | Default finite points remain stronger at 82.19999924; exact finite points range from 115.9999998 to 157.20000044. |
+| bell3a | Per-seed objectives match in both policies: 899922.1, 878430.316, 878430.316 | Finite quality varies; completion supplies no native proof. |
+| p0033 | Native optimum 3089 in every pair | All finite controls retain the same native optimum. |
+| gr4x6 | Native optimum 202.35 in every pair | All finite controls retain the same native optimum. |
+
+Gr4x6 keeps 45 numerical checks, 65 retained nodes, zero pending leaves, nine
+incumbent-bound closures and 1,942,663 floating work in every current-companion and
+treatment case. Physical whole-CLI measurements use external time without JFR;
+the following are medians across three seeds, not independent timing repeats.
+
+| Source and policy | Peak RSS KiB, current to recovery | Wall seconds, current to recovery |
+| --- | ---: | ---: |
+| gr4x6 default | 209632 to 209232 | 0.58 to 0.58 |
+| gr4x6 exact | 206928 to 206336 | 0.58 to 0.58 |
+| modglob default | 472800 to 493664 | 30.11 to 30.10 |
+| modglob exact | 481968 to 476368 | 30.10 to 30.10 |
+| rgn default | 563008 to 486592 | 24.03 to 22.83 |
+| rgn exact | 539280 to 486304 | 24.21 to 22.85 |
+
+The gr4x6 current finite defaults take median 4.93/4.39 seconds and
+305936/303152 KiB under default/exact policies. The companion proof/resource
+benefit survives; recovery adds no gr4x6 numerical work. Modglob's default-mode
+RSS increase is a cost of the wider recovery path. These observations establish
+bounded feasibility and quality progress, not a general speedup or admission of a
+replacement for the stronger finite defaults. [Objective refinement](https://github.com/Eignex/klause/issues/3607)
+separates the remaining continuous-choice and discrete-pin objective gaps while
+preserving accepted feasible points.
+
 `bench.profile.MpsProofFrontier` takes `suite=ID problem=NAME sha256=HEX exact=true|false`
 for one hash-matched original source. It uses the same numerical source setup and
 invocation, seed 3 and a ten-second solve deadline under the existing LP allowances.
