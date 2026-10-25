@@ -57,6 +57,7 @@ internal object MpsSparseRoot {
         })
         val entry = options["entry"] ?: "engine"
         require(entry in setOf("engine", "session", "bind"))
+        require(entry == "engine" || options.keys.none { it in setOf("phase1", "values", "start") })
         val funding = options["funding"]?.toLong()
         require(funding == null || (entry == "session" && funding > 0L))
         require(("work" in options) == ("iterations" in options))

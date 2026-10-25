@@ -1111,6 +1111,8 @@ records an assertion digest outside its timed bind, plus thread allocation and
 owner metrics. The first transitions include preparation; later transitions isolate
 retained rebinding. These instrumented streams measure mechanism cost separately
 from source-checked cold CLI comparisons.
+Session and binding entries use production numerical settings; `phase1`, `values`
+and `start` controls apply only to the engine entry.
 
 Each source retains original bytes and build identity. Preparation and guidance
 reports separate work, measured thread allocation, active time, paused versus
@@ -2505,7 +2507,8 @@ capture stays optional and unsupported capture withholds mathematical coverage. 
 `706e08e7d3` and `7085c1e25f` on four hash-pinned original roots, with a 600M
 caller work ledger and 20M slice grants. The candidate retains one preparation and
 one operation per source. On the compact equality layout,
-[8246](https://lab.eignex.com/jobs/8246) at `3bcdc3e28b` reaches misc04inf's
+[8258](https://lab.eignex.com/jobs/8258), integrated on main `5288698ae6` at
+`80a3ac0803`, reaches misc04inf's
 numerical candidate at 267,223,843 floating work and 2,222 pivots. Its 548,163-work
 bound check declines the candidate; this establishes no bound or source verdict.
 Rentacar advances to 1,568 pivots and 598,088,504 floating work before the finite
@@ -2519,7 +2522,8 @@ The identical 32-scope dcmulti binding streams
 [8234](https://lab.eignex.com/jobs/8234) use those same base/candidate revisions,
 JDK 25.0.4.1 and Mac/aarch64. All 641 assertions per scope preserve their checked
 witness order, side, depth and common digest. Both retain one source owner and
-identical edit counts. Excluding the first four transitions, mean measured thread
+identical edit counts, without constructing numerical factors. Excluding the first
+four transitions, mean measured thread
 allocation per bind is 25.70/0.58 MB and mean instrumented time is 10.09/1.26 ms.
 This is a scoped binding cost observation; JIT, JFR and a single source limit the
 timing interpretation. Source-checked cold CLI controls measure the consuming solve
