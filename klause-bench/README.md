@@ -2684,6 +2684,26 @@ This is a scoped binding cost observation; JIT, JFR and a single source limit th
 timing interpretation. Source-checked cold CLI controls measure the consuming solve
 separately.
 
+Cold CLI [8257](https://lab.eignex.com/jobs/8257) compares `cea86e1cd4` and
+`80a3ac0803` on those four roots plus dcmulti, at P1/exact/10 seconds, presolve
+off, debug off, seeds 3/5 and three repeats. All 120 source hashes match their
+frozen identities. Runtime and external dependency bytes match on Mac/aarch64, with a
+3 GiB heap, Serial GC and external whole-CLI resource measurement. All 48 reported
+witnesses pass independent solchecker; native proof claims are not independently
+proof-checked.
+
+The fixed numerical p0033 consumer retains one LP preparation over 6,907 queries
+and 6,906 reuses in every run. Both revisions spend 31,364,243 floating work and
+report native optimality at 3089. Mean physical CLI wall seconds are 5.56/4.77,
+user CPU seconds 11.46/9.90 and peak RSS 367/345 MiB. These six paired runs over
+two seeds are a bounded cost observation, not a general throughput claim.
+The finite LP controls preserve all outcomes and objectives: dcmulti 951693/5,
+cap6000 -99670 and p0033 3089, with p0033 optimal; rentacar and misc04inf supply
+no incumbent. Finite p0033 remains faster at 3.19/3.20 seconds. The other fixed
+numerical sources decline before retained LP preparation and supply no batching
+or sparse-lifetime cost evidence. These results support the checked binding
+infrastructure without changing default worker admission.
+
 ### Linear traversal comparison
 
 For bounded MPS traversal diagnostics, compare `param.linear-traversal=automatic`
