@@ -1575,149 +1575,86 @@ or search evidence.
 
 ### Cargo objective-coordinate trajectories
 
-[Revision brackets 8212](https://lab.eignex.com/jobs/8212) retain the original
-Cargo-09-1s-18_c24 bytes and default mixed/P1/30-second seed-3 settings on
-Mac/aarch64. The three pre-objective revisions find checked witnesses; objective
-substitution and every later bracket retain 133 factors instead of 146 and find
-none. [Refinement 8279](https://lab.eignex.com/jobs/8279) pins the semantic change
-to `9a38fd5417`. Intermediate builds delete only its broken, unused benchmark
-profile; solver and CLI production sources remain historical-identical. The
-preceding `81d4dca3e2` witness passes independent XCSP3 checking.
+[Confirmation 8203](https://lab.eignex.com/jobs/8203) retains the frozen original
+Cargo-09-1s-18_c24 source at default mixed/P1/30 seconds on Mac/aarch64. Seed 3
+finds three independently accepted final witnesses at `f59091a21acf` and none at
+`0b9f22b57412`, without worker faults. [Brackets 8212](https://lab.eignex.com/jobs/8212)
+and [refinement 8279](https://lab.eignex.com/jobs/8279) isolate exact objective
+substitution at `9a38fd5417`: prepared factors fall from 146 to 133. Intermediate
+historical builds delete only a broken unused benchmark profile; their production
+solver and CLI sources remain identical to the historical revisions.
 
-[Capture 8277](https://lab.eignex.com/jobs/8277) compares protected and substituted
-objectives at fixed worker seed 6. Before greedy repair, integer slots 0–314 and
-all six RNG fields match. [Coordinate capture 8284](https://lab.eignex.com/jobs/8284)
-retains the same 328-coordinate order: zero-based entry 49, source `rt[19]`, stays
-at 43439 with the protected alias but moves to 46194 after substitution, while
-the RNG still matches. The first RNG divergence follows entry 68, an eliminated
-objective slot. Inactive-coordinate probes are a secondary change; altered
-infeasible grading drives the first changed repair decision.
+[Capture 8277](https://lab.eignex.com/jobs/8277) and
+[coordinate capture 8284](https://lab.eignex.com/jobs/8284) compare both objective
+representations at worker seed 6. Pre-greedy slots 0–314 and all six RNG fields
+match, as does the 328-coordinate order. At zero-based entry 49, source `rt[19]`,
+the protected value stays 43439 while substitution selects 46194 with identical
+RNG state. Protected grading is 611, with alias 326 equal to 8221, versus 530 after
+substitution. The first RNG divergence follows entry 68, an eliminated objective
+slot. Inactive-coordinate probes are secondary; altered infeasible grading drives
+the first changed repair decision. Exact substitution preserves source semantics;
+these controlled native observations establish neither a correctness defect nor
+default-portfolio equivalence.
 
-These direct fixed-move captures establish a trajectory change, not a solver
-correctness defect or general throughput result. Removing exact objective aliases
-preserves source semantics. Independent checking applies to ordinary lab
-witnesses; the instrumented local-search observations carry no source proof claim.
+The ordinary controls use matched sources, default allowances and repeated seeds
+within each job. Linux and Mac timings are not pooled. Decisive negative results
+remain relevant when selecting the representation:
 
-[Ordinary comparison 8276](https://lab.eignex.com/jobs/8276) completes 180 cases:
-five sources, four revisions, seeds 3/17/41 and three repetitions at default
-mixed/P1/30 seconds on one Linux/amd64 host. Cargo-09 seed 3 retains three checked
-baseline witnesses and none with integrated, inactive-coordinate or broad boundary
-repair. The broad candidate's direct-walk incumbent therefore establishes no
-default recovery. All 33 reported witnesses pass independent checking. Retained
-ALNS failures in some frozen cases do not explain the fault-free original
-[8203 confirmation](https://lab.eignex.com/jobs/8203).
+| Comparison | Candidate | Admission limit |
+|---|---|---|
+| [8276](https://lab.eignex.com/jobs/8276), [8289](https://lab.eignex.com/jobs/8289) | Inactive-coordinate and broad boundary repair | No original seed-3 recovery; the current-base broad variant drops Cargo coverage from two to one and worsens six Carpet objectives. |
+| [8307](https://lab.eignex.com/jobs/8307) | Blocked-separation fallback | One of three original cases; loses two seed-17 witnesses and worsens all three seed-41 objectives. |
+| [8315](https://lab.eignex.com/jobs/8315) | Omit generic greedy initialization | No original recovery; total Cargo coverage falls from six to five. |
+| [8326](https://lab.eignex.com/jobs/8326) | Primary boundary repair and structural admission | At most one original witness; two seed-41 objective losses remain. |
+| [8334](https://lab.eignex.com/jobs/8334) | Balanced sibling discovery, alone or combined | Every arm misses the original three cases despite gains on CarSequencing. |
+| [8341](https://lab.eignex.com/jobs/8341) | Global objective protection | Restores all three original cases but loses all six seed-17/41 witnesses retained by both rewritten controls. |
+| [8351](https://lab.eignex.com/jobs/8351) | Private protected view in the primary slot | Two original witnesses arrive only at 27733–28171 ms. |
+| [8352](https://lab.eignex.com/jobs/8352) | Persistent private view in the full slot | Restores all three at 7263–7588 ms but worsens every seed-41 objective. |
 
-[Current-base comparison 8289](https://lab.eignex.com/jobs/8289) completes 126 cases
-on a second Linux/amd64 host, comparing `1bd3cb70b601` with broad boundary repair
-over seven sources and the same seeds, repetitions and allowances. All 23 reported
-witnesses pass independent checking; neither arm establishes a native proof.
-Cargo-09 finds two checked witnesses in the control and one in the candidate,
-with none at seed 3. CarpetCutting-test12 retains feasibility in all nine pairs,
-but six candidate objectives worsen and three improve. The broad repair is
-rejected for default recovery. Each experiment retains matching sources, runtime,
-non-solver dependencies and invoked launcher bytes within its arms; timings are
-not pooled across hosts or with the Mac captures.
+Frozen ALNS failures retained in 8276 do not explain the fault-free original loss.
+[Isolated CLI bridge 8320](https://lab.eignex.com/jobs/8320) produces three checked
+35682 witnesses under an explicit LS recipe, without establishing default recovery.
+[Capture 8330](https://lab.eignex.com/jobs/8330) reproduces that fixed walk at the
+integrated base; nominal moves alone cannot establish portfolio admission.
+[Phase comparison 8353](https://lab.eignex.com/jobs/8353) retains three original
+witnesses when the protected full view retires after the first global incumbent.
+It improves all three seed-41 objectives against the persistent view, while still
+losing two against the current control.
 
-[Structural fallback 8307](https://lab.eignex.com/jobs/8307) compares `dc3560c3ac`,
-broad boundary repair and boundary placement restricted to blocked axis separation:
-189 cases over the same seven sources, seeds and allowances on Linux/amd64. All
-67 reported witnesses pass independent checking, with no worker failures. The
-fallback finds one of three original Cargo seed-3 witnesses versus none in either
-control, but loses two seed-17 witnesses and worsens all three seed-41 objectives.
-CarpetCutting quality improves in four pairs, worsens in three and ties in two.
-This recovery is insufficient for default admission.
+[Final recovery 8356](https://lab.eignex.com/jobs/8356) compares production revision
+`deba36be53` with frozen main `b461a3e62d`: seven original/held-out identities,
+seeds 3/17/41, three repeats, default mixed/P1/30 seconds on Mac/aarch64. All 50
+reported final witnesses pass independent checking, with no worker faults.
+Cargo-09 coverage rises from five to nine of nine. All three original seed-3 cases
+report first feasibility at 8907/9044/8994 ms; final objectives 13509/13244/13862
+pass independent checking. Seed 17 retains three witnesses versus two, with both
+paired feasible objectives worse. Seed 41 retains all three, with two better and
+one worse objective. CarSequencing and CarpetCutting retain all nine witnesses;
+Carpet objectives improve in three pairs and worsen in six, with zero native
+optimum claims versus one in the control. Carpet admits no private view. Cargo-04,
+Cargo-07, SquarePacking and PegSolitaire remain unresolved in both arms.
 
-[Initialization comparison 8315](https://lab.eignex.com/jobs/8315) retains main
-`7500a0e1ff` against a primary scheduling worker omitting generic greedy repair:
-126 default mixed/P1/30-second cases with the same seven sources and repeated
-seeds. All 43 reported witnesses pass independent checking. Both arms miss all
-three original Cargo seed-3 witnesses; total Cargo-09 coverage falls from six to
-five. This initializer policy is rejected for the recovery.
+Cargo-09 median preparation rises from 290 to 518 ms and metered preparation work
+from 13,584,596 to 28,172,729 within the same shared allowance. Two completed bakes
+report aggregate factor count 279 versus one reporting 133; aggregates do not
+establish model identity. The private handle retires through ordinary scheduler
+closure after the first global witness, preserving its counters.
 
-[Isolated recipe bridge 8320](https://lab.eignex.com/jobs/8320) compares ordinary
-installed CLI runs at `7500a0e1ff` with primary-only boundary repair: seed 6,
-P1/30 seconds and 37500 work units, which price 30000 LS moves. The control
-finds no point; all three candidate repetitions produce independently accepted
-35682 witnesses. This establishes source publication for the isolated recipe,
-without establishing default recovery.
+[Preservation 8357](https://lab.eignex.com/jobs/8357) completes 96 matched cases at
+the same revisions: eight MPS/Distinct identities, seeds 1/3, three repeats and
+default P1/30 seconds. All 72 reported final witnesses pass independent checking,
+with no worker faults. Each arm retains six native optimum claims on cap91
+(`12746375/16`), enigma (`0`), gr4x6 (`4047/20`) and p0033 (`3089`), plus six native
+BlockedQueens-28 UNSAT claims. The satisfiable BlockedQueens-28 control retains six
+checked witnesses; scarce BlockedQueens-56 stays unresolved. Dcmulti retains six
+checked witnesses per arm, with two better and four worse candidate objectives.
+Every preservation case uses one bake and no private view. Native proofs remain
+separate from independent witness checks.
 
-[Integrated comparison 8326](https://lab.eignex.com/jobs/8326) compares
-`02fd784969`, primary-only boundary repair and a structural admission guard over
-the same seven sources, repeated seeds and default allowances on Mac/aarch64.
-All 69 reported final witnesses pass independent checking; runtime, source hashes,
-options and non-solver dependencies match, with no worker failures. Compiler
-configuration is identical; the records do not report compiler fingerprints.
-Boundary repair raises Cargo-09 coverage from three to seven of nine: one of
-three original seed-3 cases, all three seed-17 cases and all three seed-41 cases.
-Its primary arm reports first feasibility at 13201 ms; the final 10485 witness
-passes independent checking. The control has no seed-3 or seed-17 witness.
-Seed-41 objectives change
-from 29742/845/11483 to 20610/16465/14888, retaining two quality losses.
-The admission guard misses seed 3 and is rejected for this recovery.
-
-Both candidates retain all nine checked CarSequencing and CarpetCutting witnesses.
-Boundary CarpetCutting objectives improve in seven pairs, worsen in one and tie
-in one; both arms retain one native optimum, in different repetitions. The guard
-has three better, five worse and one tied objective, without the control's native
-optimum. Native proof claims are separate from independent witness checks.
-The other four sources remain unresolved across all arms. The boundary result
-is partial recovery, without restoring the original three seed-3 witnesses.
-[Capture 8330](https://lab.eignex.com/jobs/8330) reproduces the earlier primary
-35682 native point with identical prepared-model hashes and recorded walk at this
-integrated base; nominal work alone does not explain the default misses.
-
-[Discovery comparison 8334](https://lab.eignex.com/jobs/8334) completes 252 cases
-at that common base, adding least-work sibling selection before the first witness
-both alone and with primary boundary repair. All 93 reported final witnesses pass
-independent checking, with no worker faults. Every arm misses all three original
-seed-3 cases and retains six Cargo-09 witnesses at seeds 17/41. Both balanced
-variants retain all nine CarSequencing witnesses versus seven for the control,
-but this gain does not recover Cargo. Both balanced variants are rejected for that recovery.
-
-[Representation comparison 8341](https://lab.eignex.com/jobs/8341) completes 189
-default mixed/P1 cases on Mac/aarch64 at the same base. Global objective-column
-protection restores all three original seed-3 Cargo-09 witnesses: native first
-feasible times are 8842/9107/9121 ms and independently checked final objectives
-are 9110/10076/11559. Both the current control and an explicit-rewrite control on
-the same candidate binary miss all three. Protection misses all six seed-17/41
-cases that both rewritten controls solve. All 68 reported final witnesses pass
-independent checking, with no worker faults. This rejects global protection as a
-complete recovery and motivates retaining both search representations.
-
-[Private primary comparison 8351](https://lab.eignex.com/jobs/8351) retains the
-rewritten complete-search model and supplies protected objective coordinates to
-the primary LS slot. All 65 reported final witnesses pass independent checking,
-with no worker faults. Cargo-09 seed 3 recovers two of three cases, with native
-first times of 28171/27733 ms and checked final objectives of 15980; global
-protection recovers all three. The private view retains the current control's
-three seed-41 witnesses, with two worse and one better objective. Seed 17 remains
-unresolved in every arm, so this experiment establishes no seed-17 preservation.
-The private primary view is insufficient for full recovery. CarpetCutting retains
-all nine checked witnesses and the control's native optimum, adding one native
-optimum with five better, two worse and two tied final objectives. Its `Element`
-models admit no private view, so those differences do not establish a protection
-effect. Private preparation raises Cargo-04/07 medians from 174/200 to 267/325 ms
-within the same shared preparation allowance.
-
-[Slot comparison 8352](https://lab.eignex.com/jobs/8352) isolates the original
-source at that common base: 36 cases, four representations and the same repeated
-seeds and allowances. All 20 reported final witnesses pass independent checking,
-with no worker faults. The private full slot recovers all three original seed-3
-cases at native first times of 7263/7586/7588 ms, with checked final objectives
-13862/11085/7902; the current control finds none. Both retain one seed-17 witness
-in different repeats and all three seed-41 witnesses. All three private-full
-seed-41 objectives worsen, so persistent private improvement remains a tradeoff.
-
-[Phase comparison 8353](https://lab.eignex.com/jobs/8353) completes 27 cases on
-the same source, comparing current defaults, the persistent full view and a view
-retired at the next scheduling boundary after any global witness. All 16 reported
-final witnesses pass independent checking, with no worker faults. The retiring
-view retains all three original cases at native first times of 7683/7285/7356 ms
-and checked finals of 12560/13847/13375; the current control finds one. All three
-arms retain the seed-41 witnesses and leave seed 17 unresolved. Retiring the view
-improves all three seed-41 objectives against the persistent view; against the
-current control it improves one and worsens two. These are bounded coverage and
-quality results, without a general quality or throughput guarantee.
+Both final comparisons retain original source hashes and matching nonempty runtime,
+options and non-solver dependency receipts. Compiler configuration is identical;
+the records do not report compiler fingerprints. Coverage recovery coexists with
+the listed quality and proof-rate tradeoffs; no general throughput claim follows.
 
 ### XCSP3 declared intension extrema
 
