@@ -184,6 +184,76 @@ internal fun recoverLinearPrimal(
 
 private class LinearPrimalStop(val reason: String) : RuntimeException()
 
+internal fun refineLinearPrimal(
+    coordinates: List<SourceCoordinate>,
+    point: List<BigFraction>,
+    rows: List<ExactRationalInequality>,
+    inactive: Set<Int>,
+    costs: List<BigFraction>,
+    cancellation: Cancellation,
+    complete: (List<ExactRationalInequality>, List<BigFraction>, Cancellation) -> List<BigFraction>?,
+    observe: (String, Long) -> Unit,
+): List<BigFraction>? {
+    val progress = LinearPrimalRecoveryProgress()
+    val meter = LinearPrimalMeter(LinearPrimalRecoveryLimits(), cancellation, progress)
+    return try {
+        meter.reserve(coordinates.size.toLong(), 64L * coordinates.size)
+        if (coordinates.size != point.size || costs.size != point.size) return null
+        val members = coordinates.indices.filter { coordinates[it].kind == SourceCoordinate.Kind.Real }
+        val objective = members.map { meter.number(costs[it]) }
+        if (objective.all { it.isZero }) return null
+        observe("PrimalRefinementAttempts", 1L)
+        val local = IntArray(point.size) { -1 }
+        for (id in members.indices) local[members[id]] = id
+        val residual = ArrayList<ExactRationalInequality>()
+        var entries = 0L
+        for (id in rows.indices) {
+            if (id in inactive) continue
+            val row = rows[id]
+            entries += row.columns.size + 1L
+            if (entries > LinearPrimalRecoveryLimits().entries) throw LinearPrimalStop("Entries")
+            meter.reserve(row.columns.size.toLong() + 1L, 64L + 64L * row.columns.size)
+            var rhs = meter.number(row.rhs)
+            val columns = ArrayList<Int>()
+            val coefficients = ArrayList<BigFraction>()
+            for (entry in row.columns.indices) {
+                val column = row.columns[entry]
+                val coefficient = meter.number(row.coefficients[entry])
+                if (local[column] >= 0) {
+                    columns += local[column]
+                    coefficients += coefficient
+                } else {
+                    if (point[column].den != BIG_ONE) return null
+                    rhs = meter.subtractProduct(rhs, coefficient, point[column])
+                }
+            }
+            if (columns.isEmpty()) {
+                if (if (row.strict) rhs <= BigFraction.ZERO else rhs < BigFraction.ZERO) return null
+            } else residual += ExactRationalInequality(columns.toIntArray(), coefficients, rhs, row.strict)
+        }
+        val refined = complete(residual, objective, cancellation) ?: return null
+        if (refined.size != members.size || !meter.satisfies(refined, residual)) return null
+        var difference = BigFraction.ZERO
+        for (id in members.indices) {
+            difference = meter.subtractProduct(difference, objective[id], refined[id] - point[members[id]])
+        }
+        if (difference <= BigFraction.ZERO) {
+            observe("PrimalRefinementNeutral", 1L)
+            return null
+        }
+        observe("PrimalRefinementImproved", 1L)
+        point.toMutableList().also { values ->
+            for (id in members.indices) values[members[id]] = refined[id]
+        }
+    } catch (stop: LinearPrimalStop) {
+        observe("PrimalRefinement${stop.reason}", 1L)
+        null
+    } finally {
+        observe("PrimalRefinementWork", progress.work)
+        observe("PrimalRefinementAllocation", progress.allocation)
+    }
+}
+
 private class LinearPrimalMeter(
     private val limits: LinearPrimalRecoveryLimits,
     private val token: Cancellation,
