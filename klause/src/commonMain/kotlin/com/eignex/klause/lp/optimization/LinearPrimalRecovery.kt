@@ -235,7 +235,7 @@ internal fun refineLinearPrimal(
             } else residual += ExactRationalInequality(columns.toIntArray(), coefficients, rhs, row.strict)
         }
         val refined = complete(residual, objective, cancellation) ?: return null
-        if (refined.size != members.size || !meter.satisfies(refined, residual)) return null
+        if (refined.size != members.size) return null
         var difference = BigFraction.ZERO
         for (id in members.indices) {
             difference = meter.subtractProduct(difference, objective[id], refined[id])
@@ -245,6 +245,7 @@ internal fun refineLinearPrimal(
             observe("PrimalRefinementNeutral", 1L)
             return null
         }
+        if (!meter.satisfies(refined, residual)) return null
         observe("PrimalRefinementImproved", 1L)
         point.toMutableList().also { values ->
             for (id in members.indices) values[members[id]] = refined[id]
