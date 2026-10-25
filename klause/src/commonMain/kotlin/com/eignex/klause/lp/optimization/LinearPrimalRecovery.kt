@@ -197,11 +197,14 @@ internal fun refineLinearPrimal(
     val progress = LinearPrimalRecoveryProgress()
     val meter = LinearPrimalMeter(LinearPrimalRecoveryLimits(), cancellation, progress)
     return try {
-        meter.reserve(coordinates.size.toLong(), 64L * coordinates.size)
+        meter.reserve(coordinates.size.toLong())
         if (coordinates.size != point.size || costs.size != point.size) return null
+        if (coordinates.indices.none { coordinates[it].kind == SourceCoordinate.Kind.Real && !costs[it].isZero }) {
+            return null
+        }
+        meter.reserve(0L, 64L * coordinates.size)
         val members = coordinates.indices.filter { coordinates[it].kind == SourceCoordinate.Kind.Real }
         val objective = members.map { meter.number(costs[it]) }
-        if (objective.all { it.isZero }) return null
         observe("PrimalRefinementAttempts", 1L)
         val local = IntArray(point.size) { -1 }
         for (id in members.indices) local[members[id]] = id
