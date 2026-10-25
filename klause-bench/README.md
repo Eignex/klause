@@ -1486,6 +1486,26 @@ correctness defect or general throughput result. Removing exact objective aliase
 preserves source semantics. Independent checking applies to ordinary lab
 witnesses; the instrumented local-search observations carry no source proof claim.
 
+[Ordinary comparison 8276](https://lab.eignex.com/jobs/8276) completes 180 cases:
+five sources, four revisions, seeds 3/17/41 and three repetitions at default
+mixed/P1/30 seconds on one Linux/amd64 host. Cargo-09 seed 3 retains three checked
+baseline witnesses and none with integrated, inactive-coordinate or broad boundary
+repair. The broad candidate's direct-walk incumbent therefore establishes no
+default recovery. All 33 reported witnesses pass independent checking. Retained
+ALNS failures in some frozen cases do not explain the fault-free original
+[8203 confirmation](https://lab.eignex.com/jobs/8203).
+
+[Current-base comparison 8289](https://lab.eignex.com/jobs/8289) completes 126 cases
+on a second Linux/amd64 host, comparing `1bd3cb70b601` with broad boundary repair
+over seven sources and the same seeds, repetitions and allowances. All 23 reported
+witnesses pass independent checking; neither arm establishes a native proof.
+Cargo-09 finds two checked witnesses in the control and one in the candidate,
+with none at seed 3. CarpetCutting-test12 retains feasibility in all nine pairs,
+but six candidate objectives worsen and three improve. The broad repair is
+rejected for default recovery. Each experiment retains matching sources, runtime,
+non-solver dependencies and invoked launcher bytes within its arms; timings are
+not pooled across hosts or with the Mac captures.
+
 ### XCSP3 declared intension extrema
 
 [Lab 7973](https://lab.eignex.com/jobs/7973) compares `370fd2fd30` with `51a86c6f10`
