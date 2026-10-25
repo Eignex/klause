@@ -745,12 +745,15 @@ private fun reconstructCandidates(
                     reconstructExactVector(x, denominator, meter)?.let { current.point(it, basis) }
                     current.reconstructedSeated(x, basis, denominator)?.let { current.point(it, basis) }
                 }
-                if (y != null) (reconstructExactVector(y, denominator, meter)
-                    ?: if (goal == ReconstructionGoal.BOUND) reconstructBoundVector(y, denominator, meter) else null)?.let {
-                    val candidate = if (goal == ReconstructionGoal.BOUND) {
-                        repairBoundMultipliers(authority, it, meter)
-                    } else it
-                    current.dual(candidate, ray = false)
+                if (y != null) {
+                    val vector = reconstructExactVector(y, denominator, meter)
+                        ?: if (goal == ReconstructionGoal.BOUND) reconstructBoundVector(y, denominator, meter) else null
+                    vector?.let {
+                        val candidate = if (goal == ReconstructionGoal.BOUND) {
+                            repairBoundMultipliers(authority, it, meter)
+                        } else it
+                        current.dual(candidate, ray = false)
+                    }
                 }
                 if (rho != null && current.point == null) {
                     reconstructExactVector(rho, denominator, meter)?.let {
