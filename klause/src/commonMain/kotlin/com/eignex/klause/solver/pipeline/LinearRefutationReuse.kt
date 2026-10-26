@@ -24,7 +24,7 @@ internal class LinearRefutationReuse(
     private val maximumBytes: Long = 1_048_576L,
 ) {
     private data class Side(val coordinate: SourceCoordinate, val upper: Boolean)
-    private class Entry(val evidence: SourceEvidence, val anchor: Side?, val bytes: Long)
+    private class Entry(val evidence: SourceEvidence, val anchor: Side?, val bytes: Long, val restrictions: Long)
     private class Support {
         val assumptions = linkedSetOf<Side>()
         var nodes = 0
@@ -158,10 +158,11 @@ internal class LinearRefutationReuse(
     fun retain(evidence: SourceEvidence) {
         if (maximumEntries == 0 || maximumBytes == 0L || evidence.claim != SourceClaim.Refutation ||
             evidence.scope.revision != source.scope.revision || evidence.scope.objective != source.scope.objective ||
-            !evidence.scope.condition.implies(source.scope.condition) || cancellation() || budget.funding?.paused == true
+            cancellation() || budget.funding?.paused == true
         ) return
         val condition = evidence.scope.condition
-        if (!spend(1L + source.coordinateCount, 192L * source.coordinateCount)) return
+        if (!spend(1L + 3L * source.coordinateCount, 192L * source.coordinateCount) ||
+            !condition.implies(source.scope.condition)) return
         val bools = condition.bools
         if (source.coordinates.any { it.kind == SourceCoordinate.Kind.Boolean && it.id !in bools }) return
         proofPolls = 0
@@ -207,7 +208,7 @@ internal class LinearRefutationReuse(
         while (entries.size >= maximumEntries || bytes > maximumBytes - retainedBytes) evict()
         val anchor = sides.minWithOrNull(compareBy({ it.coordinate.kind.ordinal }, { it.coordinate.id }, { it.upper }))
         val id = nextId++
-        entries[id] = Entry(retained, anchor, bytes)
+        entries[id] = Entry(retained, anchor, bytes, (sides.size + retainedCondition.bools.size).toLong())
         if (anchor == null) unconditional += id else indexed.getOrPut(anchor) { linkedSetOf() }.add(id)
         retainedBytes += bytes
         peakBytes = maxOf(peakBytes, retainedBytes)
@@ -229,8 +230,8 @@ internal class LinearRefutationReuse(
             lower.keys.asSequence().map { indexed[Side(it, false)].orEmpty().asSequence() } +
             upper.keys.asSequence().map { indexed[Side(it, true)].orEmpty().asSequence() }
         for (id in buckets.flatten()) {
-            if (!spend(1L)) return null
             val entry = entries.getValue(id)
+            if (!spend(1L + entry.restrictions)) return null
             observe("Candidates")
             if (!condition.implies(entry.evidence.scope.condition)) continue
             val imported = SourceEvidence(source.scope.copy(condition = condition), SourceClaim.Refutation,
