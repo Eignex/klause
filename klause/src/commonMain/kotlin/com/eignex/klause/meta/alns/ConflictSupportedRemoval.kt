@@ -1,6 +1,7 @@
 package com.eignex.klause.meta.alns
 
 import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.SourceObjectiveScore
 import com.eignex.klause.backtrack.selector.VariableSelector
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
@@ -165,7 +166,8 @@ internal class ConflictSupportedRemoval(
 
         override fun onSolution(snapshot: Sample) {
             if (observing) {
-                val value = objective.evaluate(snapshot)
+                val value = SourceObjectiveScore(objective.evaluate(snapshot), objective.evaluateExact(snapshot))
+                    .pruningBound
                 if (value <= localCutoff) {
                     localCutoff = value
                     localIncumbent = snapshot
