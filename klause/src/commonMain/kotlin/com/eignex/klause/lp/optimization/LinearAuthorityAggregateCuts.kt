@@ -55,6 +55,7 @@ internal object LinearAuthorityAggregateCuts {
         require(maximumCandidates in 0..64)
         val meter = AggregateMeter(limits, cancellation, observe)
         val candidates = ArrayList<LinearAuthorityCut>()
+        var eligibilityKnown = true
         try {
             meter.reserve(source.premises.size.toLong(), source.premises.size * 128L)
             val rows = ArrayList<LinearAuthorityAggregateTerm>()
@@ -73,7 +74,12 @@ internal object LinearAuthorityAggregateCuts {
                 when (name) {
                     "AggregateWork" -> meter.reserve(count)
                     "AggregateAllocation" -> meter.reserve(0L, count)
-                    else -> observe(name, count)
+                    else -> {
+                        if (name.endsWith("Limit") || name == "AggregateStopped" || name.endsWith("Identity")) {
+                            eligibilityKnown = false
+                        }
+                        observe(name, count)
+                    }
                 }
             }
             val derivedStop = object : Cancellation {
@@ -101,7 +107,7 @@ internal object LinearAuthorityAggregateCuts {
                     candidates += cut
                 }
             }
-            observe("AggregateProjectionComplete", 1L)
+            observe(if (eligibilityKnown) "AggregateProjectionComplete" else "AggregateProjectionIncomplete", 1L)
         } catch (stop: AggregateStop) {
             observe("AggregateProjection${stop.reason}", 1L)
         }
