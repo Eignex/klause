@@ -79,7 +79,7 @@ internal object MpsRepairReplay {
             val condition = conditionType.constructors.single { it.parameterCount == 4 }
                 .newInstance(emptyMap<Int, Boolean>(), pins, pins, cutoff)
             val stop = Cancellation.after(allowance.milliseconds)
-            val params = TheoryParams(cancellation = stop, sourceLpOperations = operations,
+            val params = TheoryParams(timeout = stop, sourceLpOperations = operations,
                 sourceLpWorkLimit = work)
             val ownerType = Class.forName(PIPELINE + "JointLinearRepair")
             val policy = Class.forName("com.eignex.klause.lp.SparseSourceLpPolicy").getConstructor().newInstance()
@@ -116,11 +116,12 @@ internal object MpsRepairReplay {
                     BigFraction.ONE.numerator) == value })
                 if (result.javaClass.simpleName == "Witness") check(objective.evaluateExact(candidate) < cutoff)
             }
+            val reason = call(attempt, "getReason")?.toString() ?: if (stop()) "Timeout" else null
             val status = when (result.javaClass.simpleName) {
                 "Witness" -> "improvement"
                 "Refuted" -> "conditioned-closure"
-                "Paused" -> "pause"
-                else -> when (call(attempt, "getReason").toString()) {
+                "Paused" -> if (stop()) "cancelled" else "pause"
+                else -> when (reason) {
                     "BudgetExhausted" -> "budget-exhaustion"
                     "Timeout", "Cancelled" -> "cancelled"
                     "SearchExhausted" -> if (verified != null) "feasible-nonimprovement" else "conditioned-exhaustion"
@@ -130,7 +131,7 @@ internal object MpsRepairReplay {
             val report = buildJsonObject {
                 put("owner", "mixed-residual")
                 put("status", status)
-                put("reason", call(attempt, "getReason")?.toString())
+                put("reason", reason)
                 put("sourceScope", NumericalResidualProfile.json(context.scope))
                 put("requestedFreed", JsonArray(freedNames.map(::JsonPrimitive)))
                 put("effectiveFreedIntegers", JsonArray(freed.sorted().map(::JsonPrimitive)))
