@@ -190,6 +190,7 @@ internal object RepairOwnerReplay {
                         var usageBefore: ClauseUsage? = null
                         var usageAfter: ClauseUsage? = null
                         var observationNs = 0L
+                        var observationBytes = 0L
                         val nativeOutcome = when {
                             stop() -> Outcome(null, stopped(stop), before)
                             budget.exhausted() -> Outcome(null, TerminationReason.BudgetExhausted, before)
@@ -203,14 +204,17 @@ internal object RepairOwnerReplay {
                                 if (kind == "cp-retained") retained = native
                                 else transient = native as AutoCloseable
                                 val observationStart = System.nanoTime()
+                                val observationAllocation = bean.getThreadAllocatedBytes(thread)
                                 usageBefore = clauseUsage(checkNotNull(native), stop)
                                 observationNs += System.nanoTime() - observationStart
+                                observationBytes += bean.getThreadAllocatedBytes(thread) - observationAllocation
                                 val completed = complete(checkNotNull(native), scope, stop, preparation,
                                     fragmentAllowance)
                                 val afterStart = System.nanoTime()
+                                val afterAllocation = bean.getThreadAllocatedBytes(thread)
                                 usageAfter = clauseUsage(checkNotNull(native), stop)
                                 observationNs += System.nanoTime() - afterStart
-                                call(budget, "spendMoves", (usageBefore.used.size + usageAfter.used.size).toLong())
+                                observationBytes += bean.getThreadAllocatedBytes(thread) - afterAllocation
                                 completed
                             }
                             else -> {
@@ -226,7 +230,8 @@ internal object RepairOwnerReplay {
                             }
                         }
                         if (native != null) previousCutoff = scope.cutoff
-                        val outcome = if (funded()) nativeOutcome.copy(reason = TerminationReason.BudgetExhausted)
+                        val outcome = if (funded() && nativeOutcome.reason != TerminationReason.SearchExhausted)
+                            nativeOutcome.copy(reason = TerminationReason.BudgetExhausted)
                             else nativeOutcome
                         if (native != null && kind.endsWith("cold")) {
                             if (kind == "mixed-cold") {
@@ -343,6 +348,11 @@ internal object RepairOwnerReplay {
                             put("carriedSourceLpAllocation", mixedAllocation)
                             put("carriedSourceLpOperations", mixedOperations)
                             put("reuseObservationNs", observationNs)
+                            put("reuseObservationThreadBytes", observationBytes)
+                            put("reuseObservationVisits", (usageBefore?.used?.size ?: 0) +
+                                (usageAfter?.used?.size ?: 0))
+                            put("reuseObservationIncludedInWorkAllowance", false)
+                            put("elapsedIncludesReuseObservation", true)
                             put("retainedClauseUses", reuse(usageBefore, usageAfter))
                             put("statsBefore", NumericalResidualProfile.json(before))
                             put("statsAfter", NumericalResidualProfile.json(outcome.stats))

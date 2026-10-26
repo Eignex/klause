@@ -82,7 +82,8 @@ internal object LocalSearchTrajectory {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val required = setOf("suite", "problem", "sha256", "recipe", "seed", "moves")
         val optional = setOf("sliceMillis", "sliceWork", "greedy", "repairs", "controls", "center", "source64",
-            "ownerReplay", "ownerWork", "ownerFragmentWork", "ownerSelectors", "selectorsFromWalk")
+            "ownerReplay", "ownerWork", "ownerFragmentWork", "ownerSelectors", "selectorsFromWalk",
+            "ownerConflicts")
         require(options.keys.containsAll(required) && options.keys.all {
             it in required || it in optional || it == "selectors"
         })
@@ -116,12 +117,14 @@ internal object LocalSearchTrajectory {
         val ownerReplay = options["ownerReplay"]?.toBooleanStrict() ?: false
         val ownerSelectors = options["ownerSelectors"]?.toBooleanStrict() ?: false
         val selectorsFromWalk = options["selectorsFromWalk"]?.toBooleanStrict() ?: false
+        val ownerConflicts = options["ownerConflicts"]?.toBooleanStrict() ?: false
         val sourceCheck = if (repairCapture) parsed.problem.bake() else null
         require(!exactControls || repairCapture)
         require(!selectors || repairCapture)
         require(!ownerReplay || exactControls)
         require(!ownerSelectors || selectors)
         require(!selectorsFromWalk || selectors)
+        require(!ownerConflicts || selectorsFromWalk)
         val sourceInputs = parsed.intVarNames.values.distinct().filter { it !in parsed.definedVars }.toIntArray()
         out.resolve("source-inputs.json").writeText(buildJsonObject {
             put("declaredInputs", JsonArray(sourceInputs.map(::JsonPrimitive)))
@@ -202,7 +205,8 @@ internal object LocalSearchTrajectory {
             }.toString())
             if (selectors && !selectorsFromWalk) SemanticRepairComparison.capture(problem, workingObjective,
                 requireNotNull(initial),
-                sweep, sourceInputs, prepared, checkNotNull(sourceCheck), out, seed)
+                sweep, sourceInputs, prepared, checkNotNull(sourceCheck), out, seed,
+                evaluateRepairs = !ownerSelectors)
             if (ownerSelectors && !selectorsFromWalk) RepairOwnerReplay.replay(out.resolve("selectors.jsonl"),
                 problem, workingObjective,
                 prepared, checkNotNull(sourceCheck), sourceInputs, out.resolve("owners-selectors.jsonl"), seed,
@@ -383,8 +387,9 @@ internal object LocalSearchTrajectory {
                 val center = walkCenter
                 val unavailable = when {
                     center == null -> "bounded walk returned no feasible incumbent"
-                    problem.numBoolVars != 0 -> "semantic capture requires an integer-only working frame"
-                    plan.sourceIntCount != problem.numIntVars ||
+                    plan.sourceBoolCount != problem.numBoolVars ||
+                        (0 until plan.sourceBoolCount).any { plan.booleanCoordinate(it) != it } ||
+                        plan.sourceIntCount != problem.numIntVars ||
                         (0 until plan.sourceIntCount).any { plan.integerCoordinate(it) != it } ||
                         prepared.reconstruct(center) != center -> "semantic capture requires an unchanged source frame"
                     problem.factors.none { it is AllDifferent || it is Cumulative || it is Diffn } ->
@@ -409,13 +414,28 @@ internal object LocalSearchTrajectory {
                     put("globalProofClaim", false)
                 }.toString())
                 if (unavailable == null) {
-                    SemanticRepairComparison.capture(problem, workingObjective, checkNotNull(center), sweep,
-                        sourceInputs, prepared, checkNotNull(sourceCheck), out, seed)
+                    val checkedCenter = checkNotNull(center)
+                    val sourceModel = checkNotNull(sourceCheck)
+                    SemanticRepairComparison.capture(problem, workingObjective, checkedCenter, sweep,
+                        sourceInputs, prepared, sourceModel, out, seed,
+                        evaluateRepairs = !ownerSelectors)
                     if (ownerSelectors) RepairOwnerReplay.replay(out.resolve("selectors.jsonl"), problem,
-                        workingObjective, prepared, checkNotNull(sourceCheck), sourceInputs,
+                        workingObjective, prepared, sourceModel, sourceInputs,
                         out.resolve("owners-selectors.jsonl"), seed,
                         options["ownerWork"]?.toLong() ?: 200_000L,
                         options["ownerFragmentWork"]?.toLong() ?: 2_000L)
+                    if (ownerConflicts) for (mode in listOf("source-root", "sampled-fragment")) {
+                        val directory = out.resolve("conflict-$mode").apply { mkdirs() }
+                        val selections = directory.resolve("selections.jsonl")
+                        FiniteConflictSelection.compare(problem, workingObjective, checkedCenter, seed, sweep,
+                            selections, acquisitionMode = mode) { sample, token ->
+                            FiniteConflictSelection.checkSource(sourceModel, prepared.reconstruct(sample), token)
+                        }
+                        RepairOwnerReplay.replay(selections, problem, workingObjective, prepared, sourceModel,
+                            sourceInputs, directory.resolve("owners.jsonl"), seed,
+                            options["ownerWork"]?.toLong() ?: 200_000L,
+                            options["ownerFragmentWork"]?.toLong() ?: 2_000L)
+                    }
                 }
             }
         }

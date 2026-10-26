@@ -579,7 +579,7 @@ internal object FiniteConflictSelection {
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun checkSource(problem: BakedProblem, sample: Sample, stop: Cancellation): Boolean {
+    internal fun checkSource(problem: BakedProblem, sample: Sample, stop: Cancellation): Boolean {
         val verifier = Class.forName("com.eignex.klause.solver.validation.FiniteWitnessVerificationKt")
             .methods.single { it.name == "finiteWitnessVerifier" && it.parameterCount == 5 }
             .invoke(null, problem, null, Assumptions.None, stop, null) as CandidateVerifier<Sample, Double?>
