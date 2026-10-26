@@ -169,7 +169,7 @@ internal object MpsRepairReplay {
             println("mixed repair $index: $status")
         }
         if (request["ownerReplay"]?.jsonPrimitive?.content?.toBooleanStrict() == true) {
-            MpsRepairOwners.inspect(request, source, model, context, objective, center, columns, out)
+            MpsRepairOwners.inspect(request, source, model, context, objective, center, columns, scale, out)
         }
     }
 

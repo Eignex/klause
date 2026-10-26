@@ -26,7 +26,7 @@ import kotlin.time.Duration.Companion.seconds
 
 internal object MpsRepairOwners {
     fun inspect(request: JsonObject, source: LinearSourceProblem, model: Problem, context: SourceProofContext,
-        objective: LinearObjective, center: Sample, columns: IntArray, out: File,
+        objective: LinearObjective, center: Sample, columns: IntArray, scale: BigFraction, out: File,
     ) {
         val missing = (0 until model.numIntVars).filter {
             !model.intBounds.hasLower(it) || !model.intBounds.hasUpper(it)
@@ -87,6 +87,16 @@ internal object MpsRepairOwners {
             put("status", "captured")
             put("sourceSha256", request.getValue("sha256").jsonPrimitive.content)
             put("sourceScope", NumericalResidualProfile.json(context.scope))
+            put("sourceSemantics", NumericalResidualProfile.json(source.semantics))
+            put("sourceObjectiveScale", scale.toString())
+            put("sourceObjectiveSense", source.objective?.sense?.toString())
+            put("sourceColumns", JsonArray(columns.indices.map { index -> buildJsonObject {
+                val column = columns[index]
+                put("name", source.variables[index].name)
+                put("declaredInteger", source.variables[index].integer)
+                put("workingKind", if (Term.isInt(column)) "integer" else "real")
+                put("workingIndex", if (Term.isInt(column)) Term.intVar(column) else Term.realVar(column))
+            } }))
             put("freeSourceRealIntegerBackings", JsonArray(backings.map(::JsonPrimitive)))
             put("finiteDomainsInvented", false)
             put("mixedUsesOriginalSourceRows", true)
