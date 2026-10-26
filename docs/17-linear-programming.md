@@ -260,8 +260,9 @@ at most 4,096 nodes and depth 64; each retention or lookup shares at most 100,00
 verification polls across its candidates. Source, restriction and proof scalars
 retain 4,096-bit numerator and denominator limits. Source reconstruction, proof replay,
 indexing, allocation and eviction charge cumulative source LP funding. Unknown or
-cancelled checks close no additional alternative. Ordinary traversal keeps reuse
-disabled.
+cancelled checks close no additional alternative. Metadata visits and scratch
+allocation are charged before their source maps are copied. Ordinary traversal
+keeps reuse disabled.
 
 ### Leaf completion
 

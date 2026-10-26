@@ -24,6 +24,8 @@ class SourcePremise(
 
     private val captured = guards.toMap()
     private val capturedIntegers = integerPins.toMap()
+    internal val guardCount: Int get() = captured.size
+    internal val integerPinCount: Int get() = capturedIntegers.size
     /** Boolean source pins required to use this premise. */
     val guards: Map<Int, Boolean> get() = captured.toMap()
     /** Exact integer source equalities required to use this premise. */
