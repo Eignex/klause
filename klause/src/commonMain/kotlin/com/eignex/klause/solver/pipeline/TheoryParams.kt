@@ -97,7 +97,7 @@ data class TheoryParams(
     val maxInstructions: Long? = null,
     /** Cumulative source LP preparation, numerical and certification work, including admission overhead. */
     val sourceLpWorkLimit: Long = 1_000_000_000L,
-    /** Cumulative sparse source preparation and modeled retained coverage allocation in bytes. */
+    /** Cumulative source preparation, proof replay and modeled retained coverage allocation in bytes. */
     val sourceLpAllocationLimit: Long = 512L * 1024L * 1024L,
     /** Optional source LP operation ceiling, independent of cumulative numerical work. */
     val sourceLpOperations: Int = Int.MAX_VALUE,
@@ -107,6 +107,8 @@ data class TheoryParams(
     val sourcePointCuts: Boolean = false,
     /** Enable bounded source-bound aggregation for numerical frontier traversal. */
     val sourceAggregateCuts: Boolean = false,
+    /** Reuse checked refutations within one numerical traversal under their proved source restrictions. */
+    val sourceRefutationReuse: Boolean = false,
 ) {
     init {
         require(sourceLpWorkLimit >= 0 && sourceLpAllocationLimit >= 0 && sourceLpOperations >= 0)

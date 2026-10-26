@@ -5093,6 +5093,29 @@ incumbent acquisition remain limits; automatic routing is unchanged. This
 qualification supports consumed scoped refutations, not a general runtime or
 optimization improvement.
 
+#### Scoped refutation reuse
+
+Preliminary [bell3a capture 8419](https://lab.eignex.com/jobs/8419) and
+[egout capture 8420](https://lab.eignex.com/jobs/8420) use `fcef2a3251`, the
+maintained same-parent capture, exact semantics, source cuts, seed 3 and P1.
+Original MPS hashes match 8087 and are enforced by the capture. Bell3a retains
+20 of 391 attempted observations with eight checked refutations; egout retains
+18 of 268 with six. Both reach the 16 MiB observation limit, so omitted states
+remain unknown. These instrumented captures establish no throughput comparison.
+
+Egout queries 7 and 11 retain identical exact refutation derivations, including
+four source premise IDs, rational weights and upper restrictions on integer
+coordinates 2 and 3. Their restrictions on coordinates 0 and 1 differ. Original
+scopes pass fresh native checks; reducing those scopes needs its own check.
+This is a concrete reuse candidate, without a reduced-scope proof or an independent
+exported-proof check. Consumer qualification remains pending.
+
+`param.source-refutation-reuse=true` enables the experimental invocation-local
+consumer for ordinary numerical traversals. The default keeps it disabled.
+Stage observations distinguish candidates, scope reductions, checked imports,
+avoided numerical queries, verification work, cumulative modeled allocation,
+retained bytes and evictions. Modeled allocation is separate from physical RSS.
+
 #### Checked source rounding cuts
 
 [Qualification 8117](https://lab.eignex.com/jobs/8117) compares `f59091a21a` with

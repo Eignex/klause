@@ -60,6 +60,39 @@ class LinearAuthorityInvocationTest {
     }
 
     @Test
+    fun `scoped refutation reuse should skip numerical queries while proving every integer alternative`() {
+        val left = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
+        val right = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val half = BigFraction.ofLong(2).reciprocal()
+        val sum = mapOf(left to BigFraction.ONE, right to BigFraction.ONE)
+        val source = SourceProofContext(scope, setOf(integer, left, right, real), mapOf(
+            "left" to SourcePremise(SourceInequality(mapOf(left to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "right" to SourcePremise(SourceInequality(mapOf(right to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "sum-upper" to SourcePremise(SourceInequality(sum, half)),
+            "sum-lower" to SourcePremise(SourceInequality(sum.mapValues { it.value.negated() }, half.negated())),
+            "positive" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ofLong(2),
+                real to BigFraction.MINUS_ONE), BigFraction.ONE)),
+            "negative" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ofLong(-2),
+                real to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE)),
+        ), mapOf(real to BigFraction.ONE))
+        val params = TheoryParams(sourceCuts = false)
+
+        val baseline = LinearAuthorityInvocation(source, params, boundOrdered = true).use { it.run { _, _ -> } }
+        val reused = LinearAuthorityInvocation(source, params.copy(sourceRefutationReuse = true),
+            boundOrdered = true).use { it.run { _, _ -> } }
+
+        assertEquals(SourceClaim.Refutation, assertNotNull(baseline.terminal).claim)
+        val terminal = assertNotNull(reused.terminal)
+        assertEquals(SourceClaim.Refutation, terminal.claim)
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
+        val stages = assertNotNull(reused.stats.smt.completeSearchStages)
+        assertTrue(stages.getValue("numericalAvoidedQueries") > 0L)
+        assertTrue(reused.stats.smt.sourceLp.operations < baseline.stats.smt.sourceLp.operations)
+        assertEquals(0L, stages["numericalPendingLeaves"])
+    }
+
+    @Test
     fun `retained frontier should consume checked mixed source cuts`() {
         val source = SourceProofContext(scope, setOf(integer, real), mapOf(
             "mixed" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ofLong(-2),
