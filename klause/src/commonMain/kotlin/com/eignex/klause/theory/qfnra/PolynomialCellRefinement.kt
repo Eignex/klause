@@ -18,8 +18,16 @@ internal sealed interface PolynomialCellScope {
 
     class Source private constructor(
         override val source: PolynomialRealFormula,
-        val predicates: List<PolynomialAtom>,
+        predicates: List<PolynomialAtom>,
     ) : PolynomialCellScope {
+        private val mandatory = predicates.toTypedArray()
+        val predicates: List<PolynomialAtom> get() = mandatory.toList()
+
+        fun supports(predicate: PolynomialAtom, arithmetic: PolynomialArithmetic): Boolean = mandatory.any {
+            arithmetic.step()
+            it == predicate
+        }
+
         companion object {
             fun prepare(source: PolynomialRealFormula, arithmetic: PolynomialArithmetic): Source =
                 Source(source, PolynomialFormula.normalize(source, arithmetic).forcedAtoms(arithmetic)
@@ -70,11 +78,7 @@ internal class CheckedPolynomialCell private constructor(
             algebraic: AlgebraicArithmetic,
         ): CheckedPolynomialCell? {
             arithmetic.step()
-            if (scope is PolynomialCellScope.Source && scope.predicates.none {
-                    arithmetic.step()
-                    it == predicate
-                }
-            ) return null
+            if (scope is PolynomialCellScope.Source && !scope.supports(predicate, arithmetic)) return null
             if (predicate.polynomial.termCount > MAX_CELL_TERMS) return null
             val terms = predicate.polynomial.terms
             var variable: Int? = null
@@ -122,12 +126,12 @@ internal class CheckedPolynomialCell private constructor(
 }
 
 internal data class PolynomialCellStats(
-    var candidates: Long = 0,
-    var checkedCells: Long = 0,
-    var repeatedCandidates: Long = 0,
-    var repairedCoordinates: Long = 0,
-    var declined: Long = 0,
-    var work: Long = 0,
+    val candidates: Long = 0,
+    val checkedCells: Long = 0,
+    val repeatedCandidates: Long = 0,
+    val repairedCoordinates: Long = 0,
+    val declined: Long = 0,
+    val work: Long = 0,
 )
 
 internal class PolynomialCellRefinement(
@@ -137,18 +141,26 @@ internal class PolynomialCellRefinement(
     limits: PolynomialLimits,
     private val onCell: (CheckedPolynomialCell) -> Unit,
 ) {
-    val stats = PolynomialCellStats()
+    private var candidateCount = 0L
+    private var cellCount = 0L
+    private var repeatedCount = 0L
+    private var repairCount = 0L
+    private var declineCount = 0L
+    private var spentWork = 0L
+    val stats: PolynomialCellStats get() = PolynomialCellStats(
+        candidateCount, cellCount, repeatedCount, repairCount, declineCount, spentWork,
+    )
     private val retained = ArrayList<CheckedPolynomialCell>()
     val cells: List<CheckedPolynomialCell> get() = retained.toList()
     private var parentStopped = false
     private val meter = WorkMeter {
-        stats.work += it
+        spentWork += it
         parent.charge(it)
     }
     private val token = object : Cancellation {
         override fun isCancelled(): Boolean {
             if (parent()) parentStopped = true
-            return parentStopped || stats.work >= MAX_CELL_WORK
+            return parentStopped || spentWork >= MAX_CELL_WORK
         }
         override fun deadline() = parent.deadline()
         override fun workMeter(): WorkMeter = meter
@@ -234,13 +246,13 @@ internal class PolynomialCellRefinement(
         var value = initial
         while (true) {
             arithmetic.step()
-            stats.candidates++
+            candidateCount++
             val rejected = unary.firstOrNull { atom ->
                 arithmetic.step()
                 atom.holds(algebraic.signAt(atom.polynomial, mapOf(variable to value))).not()
             }
             if (rejected == null) {
-                if (algebraic.compare(value, initial) != 0) stats.repairedCoordinates++
+                if (algebraic.compare(value, initial) != 0) repairCount++
                 return value
             }
             val support = if (sourceAtoms.any { arithmetic.step(); it == rejected }) {
@@ -251,14 +263,14 @@ internal class PolynomialCellRefinement(
                 it.variable == variable && (it.scope === scope || it.scope === sourceScope)
             }
             if (existing.any { arithmetic.step(); it.contains(value, algebraic) }) {
-                stats.repeatedCandidates++
+                repeatedCount++
             } else {
                 if (retained.size == MAX_CELL_COUNT) return null
                 val cell = CheckedPolynomialCell.rejected(rejected, support, value, arithmetic, algebraic)
                     ?: return null
                 arithmetic.step()
                 retained.add(cell)
-                stats.checkedCells++
+                cellCount++
                 onCell(cell)
             }
             value = next(variable, scope) ?: return null
@@ -303,16 +315,16 @@ internal class PolynomialCellRefinement(
     }
 
     private fun <T> optional(block: () -> T): T? {
-        if (stats.work >= MAX_CELL_WORK) return null
+        if (spentWork >= MAX_CELL_WORK) return null
         return try {
             arithmetic.step()
             block()
         } catch (stop: PolynomialInterrupted) {
             if (parentStopped) throw stop
-            stats.declined++
+            declineCount++
             null
         } catch (_: PolynomialResourceLimit) {
-            stats.declined++
+            declineCount++
             null
         }
     }
