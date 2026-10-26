@@ -1,8 +1,8 @@
 package com.eignex.klause.bench.source
 
 import java.io.File
-import java.io.FilterInputStream
-import java.io.IOException
+import com.github.luben.zstd.ZstdInputStreamNoFinalizer
+import com.github.luben.zstd.ZstdOutputStreamNoFinalizer
 import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
@@ -43,7 +43,7 @@ internal object CorpusFiles {
     /** The format extension of [file], looking past the compression suffix (`foo.mps.zst` → `mps`). */
     fun formatExtension(file: File): String = plainPath(file.name).substringAfterLast('.', "")
 
-    /** The plain bytes of [file], decompressing a `.zst` through the system `zstd`. */
+    /** The plain bytes of [file], decompressing a `.zst` in the current JVM. */
     fun open(file: File): InputStream = if (isCompressed(file)) decompress(file) else file.inputStream()
 
     fun readText(file: File): String = open(file).bufferedReader().use { it.readText() }
@@ -73,7 +73,9 @@ internal object CorpusFiles {
     fun compress(plain: File): File {
         val packed = File(plain.path + SUFFIX)
         val partial = File(plain.path + PARTIAL_SUFFIX)
-        exec(listOf("zstd", "-q", "-f", "-$LEVEL", plain.absolutePath, "-o", partial.absolutePath))
+        plain.inputStream().use { input ->
+            ZstdOutputStreamNoFinalizer(partial.outputStream(), LEVEL).setChecksum(true).use { input.copyTo(it) }
+        }
         val expected = sha256 { update(it, plain) }
         val actual = sha256 { digest -> decompress(partial).use { it.feed(digest) } }
         if (!expected.contentEquals(actual)) {
@@ -121,46 +123,5 @@ internal object CorpusFiles {
         }
     }
 
-    private fun decompress(file: File): InputStream {
-        val proc = try {
-            ProcessBuilder("zstd", "-dcq", file.absolutePath)
-                .redirectError(ProcessBuilder.Redirect.INHERIT)
-                .start()
-        } catch (e: IOException) {
-            throw IllegalStateException("cannot run zstd to read $file; is zstd installed?", e)
-        }
-        return ProcessInputStream(proc, file)
-    }
-
-    private fun exec(cmd: List<String>) {
-        val rc = try {
-            ProcessBuilder(cmd).inheritIO().start().waitFor()
-        } catch (e: IOException) {
-            throw IllegalStateException("cannot run ${cmd.first()}; is it installed?", e)
-        }
-        check(rc == 0) { "command failed (exit $rc): ${cmd.joinToString(" ")}" }
-    }
-
-    /** A decompressor's stdout that checks the exit code once fully read, so a corrupt archive fails the
-     *  read instead of yielding truncated text. Closing early stops the decompressor. */
-    private class ProcessInputStream(private val proc: Process, private val file: File) :
-        FilterInputStream(proc.inputStream) {
-        private var drained = false
-
-        override fun read(): Int = super.read().also { if (it < 0) drained = true }
-
-        override fun read(b: ByteArray, off: Int, len: Int): Int =
-            super.read(b, off, len).also { if (it < 0) drained = true }
-
-        override fun close() {
-            super.close()
-            if (!drained) {
-                proc.destroy()
-                proc.waitFor()
-                return
-            }
-            val rc = proc.waitFor()
-            check(rc == 0) { "zstd failed decompressing $file (exit $rc)" }
-        }
-    }
+    private fun decompress(file: File): InputStream = ZstdInputStreamNoFinalizer(file.inputStream())
 }

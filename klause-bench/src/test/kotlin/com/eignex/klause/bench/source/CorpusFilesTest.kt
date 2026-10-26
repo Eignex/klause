@@ -1,13 +1,29 @@
 package com.eignex.klause.bench.source
 
 import java.io.File
+import java.io.IOException
+import java.io.RandomAccessFile
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class CorpusFilesTest {
+    @Test
+    fun `a truncated compressed instance fails instead of returning partial source`() {
+        val root = Files.createTempDirectory("corpusfiles").toFile()
+        try {
+            val packed = CorpusFiles.compress(File(root, "inst.cnf").apply { writeText("p cnf 2 1\n1 -2 0\n") })
+            RandomAccessFile(packed, "rw").use { it.setLength(packed.length() - 1) }
+
+            assertFailsWith<IOException> { CorpusFiles.readText(packed) }
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
 
     @Test
     fun `readText should return the plain text of a compressed instance`() {
