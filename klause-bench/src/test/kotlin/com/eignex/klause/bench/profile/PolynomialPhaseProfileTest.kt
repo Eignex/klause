@@ -8,6 +8,19 @@ import kotlin.test.assertTrue
 
 class PolynomialPhaseProfileTest {
     @Test
+    fun `fixed integer completion retains its original coordinate map`() {
+        val source = "(declare-const i Int) (declare-const x Real) (assert (= (* x x) i))"
+
+        val trace = PolynomialPhaseProfile.PhaseAccess().measure(source, capture = true,
+            fixedIntegers = mapOf("i" to "2"))
+
+        assertEquals("Satisfiable", trace.result)
+        assertEquals("0", requireNotNull(trace.sourceCoordinates)["integer.i"])
+        assertEquals("2", requireNotNull(trace.failureCapture)["Scope"]?.get("condition.lower.0"))
+        assertEquals(trace.nativeWork, trace.chargeSum)
+    }
+
+    @Test
     fun `pipeline dimensions distinguish declarations from product lowering coordinates`() {
         val source = "(declare-const x Real) (assert (= (* x x) 2))"
 

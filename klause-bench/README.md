@@ -884,6 +884,32 @@ different prepared owner yields `NotPolynomial`. This option is separate from
 Use the alternating bounded-probe profile for deterministic observed/plain parity;
 pair phase attribution with source-matched ordinary CLI records.
 
+`capture=true` retains bounded exact nonlinear failure observations in direct or
+prepared traces. `capture=both` also runs the same query without capture and writes
+`plain-trace.json`; completed deterministic controls must preserve their outcome
+and exact witness. `maximumWork=N` sets one containing native allowance per query.
+Captured work includes observation and can reach that allowance sooner. Compare
+native work and component duration separately; neither establishes CLI speedup.
+
+Capture keeps the first rejected probe and first rejected CAD prefix, exact
+normalized/active predicates, signed regional premises, condition bounds, numeric
+reverse fibres, source coordinate names, snapshot identity and the latest operation
+with its projection operands. Algebraic coordinates retain defining rational
+coefficients, root index and isolating endpoints. Each record part permits 512
+entries and 16,384 key/value characters; a polynomial permits 128 terms, each
+monomial 64 coordinates, and coefficients 4,096 bits. Incomplete parts say
+`complete=false`; an interrupted copy sets `InterruptedCapture`. Repetition compares
+at most 256 exact representations, with `RepetitionComplete=false` beyond that;
+it does not decide equality of independently represented algebraic numbers.
+Copies poll and charge the containing query. No observation authorizes exclusion.
+
+Request entries may include `fixedIntegers={"name":"integer"}` to measure a raw
+fixed-integer real completion. Every original integer declaration requires a fixing;
+decimal integer strings permit at most 256 digits. These conditions retain their
+original coordinate map and lower/upper equality pins. Prepared traces use their
+own model coordinate names. Ordinary `pipeline=true|both` runs retain their separate
+source-admission/publication scope and supply no capture of those worker queries.
+
 Add `pipeline=true` after the request argument to observe source admission and the same
 MIXED/P1/seed3 satisfaction execution used by default CLI polynomial requests.
 That mode records the common termination reason, native/resource and search

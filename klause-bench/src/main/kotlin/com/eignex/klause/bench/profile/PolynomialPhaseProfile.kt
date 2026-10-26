@@ -28,6 +28,7 @@ import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.klause.util.parseBigInt
 import java.io.File
 import java.lang.management.ManagementFactory
 import java.util.Base64
@@ -40,14 +41,17 @@ import kotlinx.serialization.json.Json
 internal object PolynomialPhaseProfile {
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.size in 1..4 && args[0].startsWith("request64="))
+        require(args.size in 1..6 && args[0].startsWith("request64="))
         val options = args.drop(1).associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.size == args.size - 1 && options.keys.all {
-            it in setOf("pipeline", "timeoutMs", "repeats", "prepared")
+            it in setOf("pipeline", "timeoutMs", "repeats", "prepared", "capture", "maximumWork")
         })
         require(options["pipeline"] == null || options["pipeline"] in setOf("true", "both"))
         require(options["prepared"] == null || options["prepared"] == "true")
         require(options["prepared"] == null || options["pipeline"] == null)
+        require(options["capture"] == null || options["capture"] in setOf("true", "both"))
+        val capture = options["capture"] != null
+        val maximumWork = options["maximumWork"]?.toLong()?.also { require(it >= 0) }
         val preparedMode = options["prepared"] == "true"
         val pipelineMode = options["pipeline"] != null
         val directMode = options["pipeline"] != "true"
@@ -74,7 +78,9 @@ internal object PolynomialPhaseProfile {
             "jvmOptions" to ManagementFactory.getRuntimeMXBean().inputArguments.joinToString(" "),
             "containingTimeoutMs" to timeoutMs.toString(),
             "repeats" to repeats.toString(),
-            "maximumWork" to "null",
+            "maximumWork" to maximumWork.toString(),
+            "diagnosticMaximumWork" to maximumWork.toString(),
+            "failureCapture" to options["capture"].toString(),
             "representationLimits" to "default",
             "route" to if (preparedMode) "unconditioned prepared polynomial service; no CP root pins or publication"
                 else if (pipelineMode && directMode) "paired direct query and default MIXED pipeline/P1/seed3"
@@ -98,13 +104,19 @@ internal object PolynomialPhaseProfile {
             }
             if (preparedMode) {
                 directory.resolve("prepared-trace.json").writeText(
-                    Json.encodeToString(access.measure(text, timeoutMs = timeoutMs, prepared = true)),
+                    Json.encodeToString(access.measure(text, maximumWork, timeoutMs, prepared = true, capture = capture)),
                 )
             } else if (directMode) {
                 directory.resolve("gate.json").writeText(Json.encodeToString(access.gate(text, timeoutMs)))
                 directory.resolve("trace.json").writeText(
-                    Json.encodeToString(access.measure(text, timeoutMs = timeoutMs)),
+                    Json.encodeToString(access.measure(text, maximumWork, timeoutMs,
+                        capture = capture, fixedIntegers = source.fixedIntegers)),
                 )
+            }
+            if (options["capture"] == "both") {
+                directory.resolve("plain-trace.json").writeText(Json.encodeToString(
+                    access.measure(text, maximumWork, timeoutMs, prepared = preparedMode,
+                        fixedIntegers = source.fixedIntegers)))
             }
         }
     }
@@ -244,6 +256,8 @@ internal object PolynomialPhaseProfile {
         private val progress = queryType.methods.singleOrNull { it.name == "getProgress" }
         private val partialConflicts = progress?.returnType?.methods?.singleOrNull { it.name == "getPartialConflicts" }
         private val conflictObserver = queryType.methods.singleOrNull { it.name == "setPartialConflictObserver" }
+        private val captureType = Class.forName(prefix + "PolynomialFailureCapture")
+        private val setCapture = queryType.getMethod("setFailureCapture", captureType)
         private val atomType = Class.forName(prefix + "PolynomialAtom")
         private val atomPolynomial = atomType.getMethod("getPolynomial")
         private val atomRelation = atomType.getMethod("getRelation")
@@ -256,7 +270,7 @@ internal object PolynomialPhaseProfile {
         }
 
         private fun parsed(text: String, token: Cancellation): Any =
-            parse.invoke(parser.getField("INSTANCE").get(null), text, token, false, false)
+            parse.invoke(parser.getField("INSTANCE").get(null), text, token, true, false)
 
         fun gate(text: String, timeoutMs: Long = 60_000L): PhaseGate {
             var charges = 0L
@@ -293,6 +307,8 @@ internal object PolynomialPhaseProfile {
             maximumWork: Long? = null,
             timeoutMs: Long = 60_000L,
             prepared: Boolean = false,
+            capture: Boolean = false,
+            fixedIntegers: Map<String, String> = emptyMap(),
         ): PhaseTrace {
             val clock = Cancellation.after(timeoutMs.milliseconds)
             var charges = 0L
@@ -307,6 +323,8 @@ internal object PolynomialPhaseProfile {
                 override fun deadline() = clock.deadline()
                 override fun workMeter(): WorkMeter = meter
             }
+            var names: Map<String, String> = emptyMap()
+            var integerFixings: Map<Int, BigFraction> = emptyMap()
             val source = if (prepared) {
                 val parsed = SmtLib.parse(text, cancellation = token)
                 val invocation = SourceSetup.prepare(SourceSetupRequest(
@@ -315,6 +333,8 @@ internal object PolynomialPhaseProfile {
                 val problem = (invocation.route as? SourceProblemRoute.PolynomialTheory)?.request?.problem
                     ?: return PhaseTrace(emptyList(), "NotPolynomial", invocation.route.javaClass.simpleName,
                         null, 0, 0, charges, stop)
+                names = problem.realVarNames.mapKeys { "real.${it.key}" }.mapValues { it.value.toString() } +
+                    problem.boolVarNames.mapKeys { "bool.${it.key}" }.mapValues { it.value.toString() }
                 Triple(
                     problem.javaClass.getDeclaredField("formula").apply { isAccessible = true }.get(problem),
                     problem.javaClass.getDeclaredField("totalBoolCount").apply { isAccessible = true }.getInt(problem),
@@ -322,14 +342,30 @@ internal object PolynomialPhaseProfile {
                 )
             } else {
                 val parsed = parsed(text, token)
+                @Suppress("UNCHECKED_CAST")
+                val integers = sourceType.getMethod("getIntVarNames").invoke(parsed) as Map<String, Int>
+                require(integers.keys == fixedIntegers.keys) { "Every integer declaration needs an exact fixing" }
+                integerFixings = fixedIntegers.map { (name, value) ->
+                    require(value.matches(Regex("-?[0-9]{1,256}")))
+                    integers.getValue(name) to BigFraction.of(parseBigInt(value), parseBigInt("1"))
+                }.toMap()
+                names = listOf("real" to "getRealVarNames", "bool" to "getBoolVarNames", "integer" to "getIntVarNames")
+                    .flatMap { (kind, getter) ->
+                        @Suppress("UNCHECKED_CAST")
+                        val mapping = sourceType.getMethod(getter).invoke(parsed) as Map<String, Int>
+                        mapping.map { (name, id) -> "$kind.$name" to id.toString() }
+                    }.toMap()
                 Triple(formula.invoke(parsed), boolCount.invoke(parsed) as Int, realCount.invoke(parsed) as Int)
             }
             val original = source.first
-            val fixed = fixings.invoke(null, original, { check(!token()) })
+            @Suppress("UNCHECKED_CAST")
+            val fixed = (fixings.invoke(null, original, { check(!token()) }) as Map<Int, BigFraction>) + integerFixings
             val preparationCharges = charges
             val owner = query.newInstance(original, source.second, source.third,
                 params.newInstance(token, maximumWork, limitsType.getConstructor().newInstance()),
                 condition.newInstance(emptyMap<Int, Boolean>(), fixed, fixed))
+            val captured = if (capture) captureType.getConstructor().newInstance().also { setCapture.invoke(owner, it) }
+                else null
             var conflictPremises: Int? = null
             var conflictPreview: List<String>? = null
             var conflictPreviewComplete: Boolean? = null
@@ -379,7 +415,18 @@ internal object PolynomialPhaseProfile {
                 result.javaClass.methods.singleOrNull { it.name == "getResource" }?.invoke(result)?.toString(),
                 nativeWork, charges - preparationCharges, preparationCharges, stop, source.second, source.third,
                 partialConflictPremises = conflictPremises, partialConflictPreview = conflictPreview,
-                partialConflictPreviewComplete = conflictPreviewComplete)
+                partialConflictPreviewComplete = conflictPreviewComplete,
+                sourceCoordinates = names,
+                failureCapture = captured?.let { value ->
+                    listOf("Scope", "Context", "Operation", "FirstFailure", "FirstCadFailure").associateWith { field ->
+                        @Suppress("UNCHECKED_CAST")
+                        (captureType.getMethod("get$field").invoke(value) as? Map<String, String>).orEmpty()
+                    }
+                },
+                failureObservations = captured?.let { value ->
+                    listOf("Failures", "RepeatedFirstFailure", "RepetitionComplete", "InterruptedCapture")
+                        .associateWith { captureType.getMethod("get$it").invoke(value).toString() }
+                })
         }
 
         private fun previewConflictAtom(atom: Any): Pair<String, Boolean> {
@@ -404,7 +451,12 @@ internal object PolynomialPhaseProfile {
 }
 
 @Serializable
-private data class PhaseSource(val suite: String, val problem: String, val sha256: String)
+private data class PhaseSource(
+    val suite: String,
+    val problem: String,
+    val sha256: String,
+    val fixedIntegers: Map<String, String> = emptyMap(),
+)
 
 @Serializable
 internal data class PhaseGate(
@@ -440,6 +492,9 @@ internal data class PhaseTrace(
     val partialConflictPremises: Int? = null,
     val partialConflictPreview: List<String>? = null,
     val partialConflictPreviewComplete: Boolean? = null,
+    val sourceCoordinates: Map<String, String>? = null,
+    val failureCapture: Map<String, Map<String, String>>? = null,
+    val failureObservations: Map<String, String>? = null,
 )
 
 @Serializable

@@ -17,6 +17,17 @@ internal class PolynomialFormulaReduction private constructor(
     val eliminatedCount: Int get() = fibres?.count ?: 0
     val requiresOriginalCheck: Boolean get() = booleansReduced || fibres != null
 
+    fun captureReconstruction(writer: FailureWriter) {
+        var fibre = fibres
+        var index = 0
+        while (fibre != null && !writer.exhausted) {
+            writer.put("rootFibre.$index.variable", fibre.variable.toString())
+            writer.polynomial("rootFibre.$index.replacement", fibre.replacement)
+            fibre = fibre.previous
+            index++
+        }
+    }
+
     fun reconstruct(
         assignment: QfNraAssignment,
         arithmetic: PolynomialArithmetic,
