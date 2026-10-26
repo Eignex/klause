@@ -58,9 +58,10 @@ internal class NumericalSelectionSnapshot(private val stop: Cancellation) {
         val instance = type.getField("INSTANCE").get(null)
         val run = type.declaredMethods.single { it.name == "run" }
         val select = type.declaredMethods.single { it.name == "runSelected" }
-        for (record in records(journal).take(4)) {
+        val parents = records(journal).asSequence().filter { field(it, "point") != null }
+            .distinctBy { (field(it, "context") as SourceProofContext).scope }.take(4)
+        for (record in parents) {
             if (stop()) return
-            if (field(record, "point") == null) continue
             val all = rows(record).indices.toSet()
             for (name in listOf("disabled", "all", "selected")) for (repeat in 0..1) {
                 if (stop()) return
