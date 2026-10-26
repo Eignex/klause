@@ -177,6 +177,16 @@ class GlobalScoringViewsTest {
         assertEquals("interval-table", GlobalScoringViews.alternate(table).reason)
     }
 
+    @Test
+    fun `trie output declines when explicit rows fit but transition words exceed the bound`() {
+        val table = Table(intArrayOf(0), LongArray(GlobalScoringViews.MAX_CELLS / 3 + 1) { it.toLong() })
+
+        val result = GlobalScoringViews.alternate(table)
+
+        assertEquals("cell-limit", result.reason)
+        assertNull(result.factor)
+    }
+
     @ParameterizedTest
     @ValueSource(ints = [0, 2, 8])
     fun `cancelled construction publishes no alternate relation`(polls: Int) {
