@@ -241,15 +241,14 @@ internal object CorpusFetcher {
         dir.mkdirs()
         val zip = File(cacheRoot, "${c.id}.zip")
         try {
-            URI(c.url).toURL().openStream().use { input -> zip.outputStream().use { input.copyTo(it) } }
-            extractZip(zip, dir)
-            dropOversized(c, dir)
-            // Competition archives ship individually compressed instances, which need unpacking before zstd.
-            decompressInPlace(dir)
-            compress(dir)
-        } catch (failure: Exception) {
-            dir.deleteRecursively()
-            throw failure
+            runCatching {
+                URI(c.url).toURL().openStream().use { input -> zip.outputStream().use { input.copyTo(it) } }
+                extractZip(zip, dir)
+                dropOversized(c, dir)
+                // Competition archives ship individually compressed instances, which need unpacking before zstd.
+                decompressInPlace(dir)
+                compress(dir)
+            }.onFailure { dir.deleteRecursively() }.getOrThrow()
         } finally {
             zip.delete()
         }
