@@ -4746,6 +4746,30 @@ Collection and scoring debit the containing source funding. Qualification must
 separate consumed choices, checked outcomes, total work, modeled allocation and
 whole-process memory; the option is disabled by default.
 
+[Pilot 8586](https://lab.eignex.com/jobs/8586), at `3fb3878bb6`, completes 48
+ten-second P1 cases on four frozen MPS sources, seeds 1/3 and default/exact
+policies. Installed distribution, runtime/options and build fingerprint match on
+Linux/amd64; workers differ. All 23 reported witnesses pass the independent
+source checker. Native proofs have no independent proof check.
+
+On p0033 the consumer changes 26 choices and retains checked objective 3089.
+Checks grow from 1,995 to 2,433, retained nodes from 2,051 to 2,579, funded work
+from 27,600,734 to 32,951,173 and modeled allocation from 5,118,124 to 14,885,779
+bytes. Source order completes all four native proofs; the consumer completes
+three, with one final proof lost at the containing deadline despite zero pending
+leaves. More conflicts accompany more search and establish no efficiency gain.
+Rgn, bell3a and egout consume no changed choices and produce no numerical
+incumbents. Their finite controls retain stronger source-checked outcomes.
+Bounded retention leaves later support states unknown. These observations oppose
+policy promotion; changed wall-cutoff frontiers establish no throughput benefit.
+
+[Fixed-operation capture 8589](https://lab.eignex.com/jobs/8589), at `dd4ac66bbc`,
+retains 32 states before the 8 MiB journal limit, with 26 changed choices.
+All 128 cut derivations, 29 available bounds and three refutations pass fresh
+native checks in their recorded scopes. Inspection completes; later records remain
+unavailable. Its separate inspection allowance supplies neither an independent
+witness/proof check nor a whole-process timing claim.
+
 #### Active rows before Boolean completion
 
 [8424](https://lab.eignex.com/jobs/8424) and

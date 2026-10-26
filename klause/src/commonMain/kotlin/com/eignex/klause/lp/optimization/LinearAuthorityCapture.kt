@@ -46,9 +46,9 @@ internal data class LinearAuthorityCapturedQuery(
 
 // Source values and derivations are immutable; numerical owners, queries and their buffers never escape.
 internal class LinearAuthorityCapture(
-    private val maximumRecords: Int,
-    private val maximumEntries: Long,
-    private val maximumBytes: Long,
+    private var maximumRecords: Int,
+    private var maximumEntries: Long,
+    private var maximumBytes: Long,
     private val stop: Cancellation,
 ) {
     init {
@@ -68,6 +68,13 @@ internal class LinearAuthorityCapture(
     var attempted: Long = 0L
         private set
     private var recordedAttempt = 0L
+
+    fun restrict(records: Int, entries: Long, bytes: Long) {
+        require(records >= 0 && entries >= 0 && bytes >= 0)
+        maximumRecords = minOf(maximumRecords, records)
+        maximumEntries = minOf(maximumEntries, entries)
+        maximumBytes = minOf(maximumBytes, bytes)
+    }
 
     private fun spend(count: Long, allocation: Long): Boolean {
         if (stop() || count > maximumEntries - entries || allocation > maximumBytes - bytes) {

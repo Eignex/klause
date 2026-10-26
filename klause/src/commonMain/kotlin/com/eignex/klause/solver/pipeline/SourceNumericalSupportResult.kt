@@ -3,6 +3,7 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.optimization.LinearActiveRefutation
 import com.eignex.klause.lp.optimization.LinearPinnedRefutation
+import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.util.Cancellation
@@ -96,7 +97,7 @@ internal fun sourceNumericalRefutationSupport(
             else -> false
         }
     }
-    if (evidence.scope != feedback.scope || !spend(1) ||
+    if (evidence.claim != SourceClaim.Refutation || evidence.scope != feedback.scope || !spend(1) ||
         !add(feedback.scope.condition.bools.keys.map { SourceCoordinate(SourceCoordinate.Kind.Boolean, it) }) ||
         !visit(evidence.derivation, 0) || !spend(coordinates.size + premises.size + assumptions.size)) {
         return SourceNumericalSupportResult.Unavailable(feedback, failure)

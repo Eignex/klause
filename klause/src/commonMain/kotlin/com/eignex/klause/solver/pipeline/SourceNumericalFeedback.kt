@@ -104,6 +104,7 @@ internal class SourceNumericalFeedback(
             chargedBytes = journal.bytes
             consumed = journal.attempted
         }
+        journal.restrict(64, 250_000L, 8L * 1024 * 1024)
     }
 
     fun acquire(

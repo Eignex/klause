@@ -204,6 +204,7 @@ internal object MpsProofFrontier {
                 put("branchHistory", historyEnabled)
                 put("boundOrdered", frontierEnabled)
                 put("sourceCuts", params.sourceCuts)
+                put("supportBranching", params.sourceSupportBranching)
                 put("sourceLpOperationAllowance", params.sourceLpOperations)
                 put("activeRows", activeRows)
                 put("wholeCliTimingClaim", false)

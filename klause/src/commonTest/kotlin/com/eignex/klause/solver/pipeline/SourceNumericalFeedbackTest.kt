@@ -4,7 +4,9 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.optimization.LinearAuthority
+import com.eignex.klause.lp.optimization.LinearAuthorityCapture
 import com.eignex.klause.lp.optimization.LinearAuthorityCapturedQuery
+import com.eignex.klause.lp.optimization.LinearAuthorityResult
 import com.eignex.klause.lp.optimization.LinearPinnedRefutation
 import com.eignex.klause.lp.optimization.atScope
 import com.eignex.klause.lp.optimization.withLinearAuthority
@@ -191,6 +193,24 @@ class SourceNumericalFeedbackTest {
         assertEquals(SourceNumericalFeedbackResult.Unavailable(source, null,
             SourceNumericalFeedbackResult.Reason.Cancelled),
             result)
+    }
+
+    @Test
+    fun `an attached observer should not expand runtime feedback retention`() {
+        val funding = SourceLpFunding(1_000_000L, 4_000_000L).apply { grant(1_000_000L) }
+        val feedback = SourceNumericalFeedback(funding, Cancellation.Never)
+        val journal = LinearAuthorityCapture(1000, 1_000_000L, 16_000_000L, Cancellation.Never)
+        val result = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use { authority ->
+            authority.capture = journal
+            feedback.attach(authority)
+            repeat(65) { journal.record(source, null, null, null, LinearAuthorityResult()) }
+            feedback.consume(source)
+        }
+
+        assertEquals(64, journal.records.size)
+        assertEquals(SourceNumericalFeedbackResult.Reason.Retention,
+            assertIs<SourceNumericalFeedbackResult.Unavailable>(result).reason)
+        assertTrue(funding.allocated > 0L)
     }
 
     @Test
