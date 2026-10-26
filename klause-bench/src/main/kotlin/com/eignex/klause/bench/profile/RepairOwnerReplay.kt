@@ -3,6 +3,7 @@ package com.eignex.klause.bench.profile
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.localsearch.CandidateCompletion
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
@@ -11,6 +12,9 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceProofContext
+import com.eignex.klause.solver.incumbent.Candidate
+import com.eignex.klause.solver.incumbent.CandidateVerifier
+import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.FinitePipelinePreparation
 import com.eignex.klause.solver.pipeline.TheoryParams
@@ -61,7 +65,7 @@ internal object RepairOwnerReplay {
         val freedType = Class.forName("com.eignex.klause.meta.alns.FreedVars")
         require(controls.length() in 0..4L * 1024 * 1024)
         val controlBytes = controls.readBytes()
-        val controlHash = com.eignex.klause.bench.metric.sha256(controlBytes)
+        val controlHash = sha256(controlBytes)
         val entries = controlBytes.decodeToString().lines().filter(String::isNotBlank)
         if (problem.numRealVars != 0) {
             file.bufferedWriter().use { writer ->
@@ -170,8 +174,7 @@ internal object RepairOwnerReplay {
                                 val afterStart = System.nanoTime()
                                 usageAfter = clauseUsage(checkNotNull(native), stop)
                                 observationNs += System.nanoTime() - afterStart
-                                call(budget, "spendMoves", ((usageBefore?.used?.size ?: 0) +
-                                    (usageAfter?.used?.size ?: 0)).toLong())
+                                call(budget, "spendMoves", (usageBefore.used.size + usageAfter.used.size).toLong())
                                 completed
                             }
                             else -> {
@@ -376,16 +379,18 @@ internal object RepairOwnerReplay {
         val verifier = Class.forName("com.eignex.klause.solver.validation.FiniteWitnessVerificationKt")
             .methods.single { it.name == "finiteWitnessVerifier" && it.parameterCount == 5 }
             .invoke(null, problem, null, Assumptions.None, stop, null)
-            as com.eignex.klause.solver.incumbent.CandidateVerifier<Sample, Double?>
-        val checked = verifier.verify(com.eignex.klause.solver.incumbent.Candidate(sample, null))
-        check(checked !is com.eignex.klause.solver.incumbent.Verification.Rejected)
-        return checked is com.eignex.klause.solver.incumbent.Verification.Accepted
+            as CandidateVerifier<Sample, Double?>
+        val checked = verifier.verify(Candidate(sample, null))
+        check(checked !is Verification.Rejected)
+        return checked is Verification.Accepted
     }
 
     private fun sample(value: Sample) = buildJsonObject {
         put("bools", JsonArray(value.bools.map(::JsonPrimitive)))
         put("ints", JsonArray((0 until value.numIntVars).map { JsonPrimitive(value.exactIntValue(it).toString()) }))
-        put("exactReals", value.exactReals?.let { JsonArray(it.map { value -> JsonPrimitive(value.toString()) }) }
+        put("exactReals", value.exactReals?.let {
+            JsonArray(it.map { coordinate -> JsonPrimitive(coordinate.toString()) })
+        }
             ?: JsonNull)
         put("approximateReals", JsonArray(value.reals.map(::JsonPrimitive)))
     }
