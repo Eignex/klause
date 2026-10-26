@@ -104,6 +104,7 @@ internal class LinearAuthorityCapture(
                 value.bounds.all { proof(it, depth + 1) }
             is LinearPinnedObjective -> proof(value.bound, depth + 1)
             is LinearPinnedRefutation -> proof(value.conflict, depth + 1)
+            is LinearActiveRefutation -> proof(value.conflict, depth + 1)
             else -> false
         }
     }
@@ -114,6 +115,7 @@ internal class LinearAuthorityCapture(
         template: LinearAuthorityTemplate?,
         point: Map<SourceCoordinate, BigFraction>?,
         result: LinearAuthorityResult,
+        numericSource: SourceProofContext? = null,
     ) {
         if (result.paused) return
         attempted++
@@ -124,7 +126,7 @@ internal class LinearAuthorityCapture(
         val open = source.coordinates.any {
             it.kind == SourceCoordinate.Kind.Boolean && it.id !in source.scope.condition.bools
         }
-        val numeric = template?.numeric ?: source
+        val numeric = numericSource ?: template?.numeric ?: source
         for ((id, premise) in source.premises) {
             if (!spend(1L, 96L + id.length * 2L) || !row(premise.inequality) ||
                 !spend(premise.guards.size.toLong(), premise.guards.size * 48L) ||
@@ -175,9 +177,10 @@ internal class LinearAuthorityCapture(
             query?.coordinates.orEmpty().toList(),
             cited.toList(), query?.inactive.orEmpty().toSet(), point?.toMap(), candidates.toList(),
             template?.cuts?.observations.orEmpty().toMap(), result.bound, refutation, when {
+                refutation != null -> "checked-refutation"
+                open && query != null -> "active-no-refutation"
                 open -> "open-booleans"
                 query == null -> "query-unavailable"
-                refutation != null -> "checked-refutation"
                 point == null -> "point-unavailable"
                 result.bound == null -> "bound-unavailable"
                 else -> "completed"

@@ -37,6 +37,49 @@ class LinearActiveRowsTest {
         objective = SourceObjective("cost", ObjectiveSense.MINIMIZE))
 
     @Test
+    fun `a captured delayed state should permit a source checked partial refutation`() {
+        val source = SourceProofContext(scope, setOf(real, bool), mapOf(
+            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.MINUS_ONE)),
+        ), mapOf(bool to BigFraction.ONE))
+        val capture = LinearAuthorityCapture(1, 100_000L, 1_000_000L, Cancellation.Never)
+        capture.record(source, null, null, null, LinearAuthorityResult())
+
+        val replay = LinearAuthorityReplay.activeRows(capture.records.single(), 20_000_000L, 67_108_864L,
+            Cancellation.Never)
+
+        val checked = assertNotNull(replay.query)
+        assertEquals(scope, checked.context.scope)
+        assertEquals("checked-refutation", checked.state)
+        assertEquals(emptyMap(), checked.numeric.objective)
+        assertNull(checked.point)
+        assertNull(checked.bound)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority())
+            .verify(assertNotNull(checked.refutation)))
+    }
+
+    @Test
+    fun `observing an active query should preserve its numerical accounting`() {
+        val source = SourceProofContext(scope, setOf(real, bool), mapOf(
+            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ), mapOf(bool to BigFraction.ONE))
+        val captures = listOf(null, LinearAuthorityCapture(1, 100_000L, 1_000_000L, Cancellation.Never))
+
+        val work = captures.map { capture ->
+            val funding = SourceLpFunding(20_000_000L, 67_108_864L).apply { grant(20_000_000L) }
+            val budget = SourceLpBudget(funding = funding)
+            LinearActiveRows(source, budget).use {
+                it.check(SourceCondition(), Cancellation.Never, capture = capture)
+            }
+            listOf(budget.operations.toLong(), funding.spent, funding.allocated,
+                budget.measuredPreparationWork, budget.measuredFloatWork, budget.measuredContinuationWork,
+                budget.measuredConflictCertificationWork)
+        }
+
+        assertEquals(work[0], work[1])
+    }
+
+    @Test
     fun `feasibility consultation should refute active strict rows before Boolean completion`() {
         val source = SourceProofContext(scope, setOf(real, bool), mapOf(
             "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),

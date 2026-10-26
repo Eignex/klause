@@ -63,6 +63,8 @@ internal object NumericalActiveRowsControls {
                 val started = System.nanoTime()
                 val invocation = NumericalFrontierSnapshot.open(source,
                     params.copy(timeout = stop, cancellation = stop), frontier = frontier, activeRows = active)
+                val selection = if (round == 0) NumericalSelectionSnapshot(Cancellation.after(30.seconds)) else null
+                val journal = selection?.attach(invocation)
                 val result = try {
                     NumericalFrontierSnapshot.run(invocation) { _, _ -> }
                 } finally {
@@ -70,6 +72,18 @@ internal object NumericalActiveRowsControls {
                 }
                 val elapsed = System.nanoTime() - started
                 val progress = stats(invocation)
+                if (journal != null) {
+                    val inspection = NumericalSelectionSnapshot(Cancellation.after(10.seconds))
+                    val arm = if (active) "active" else "delayed"
+                    Reports.writeJson(out.resolve("$name-$arm-states.json").path, inspection.capture(journal))
+                    if (!active) {
+                        val replayFile = out.resolve("$name-active-consultations.jsonl")
+                        replayFile.writeText("")
+                        NumericalSelectionSnapshot(Cancellation.after(10.seconds)).replayActiveRows(journal) {
+                            replayFile.appendText(it.toString() + "\n")
+                        }
+                    }
+                }
                 val terminal = field(result, "terminal") as SourceEvidence?
                 val bound = field(result, "bound") as SourceEvidence?
                 val checkStop = Cancellation.after(10.seconds)

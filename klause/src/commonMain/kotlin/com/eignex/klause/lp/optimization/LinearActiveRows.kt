@@ -46,6 +46,7 @@ internal class LinearActiveRows(
 
     fun check(
         condition: SourceCondition, cancellation: Cancellation, begin: () -> Boolean = { true },
+        capture: LinearAuthorityCapture? = null,
     ): LinearActiveResult {
         if (cancellation()) {
             invalidate()
@@ -116,6 +117,7 @@ internal class LinearActiveRows(
         pending = null
         finished = evidence == null
         if (evidence != null) state = null
+        capture?.record(branch, query, null, null, LinearAuthorityResult(evidence = evidence), query.context)
         return LinearActiveResult(evidence, attempted = resumed == null)
     }
 

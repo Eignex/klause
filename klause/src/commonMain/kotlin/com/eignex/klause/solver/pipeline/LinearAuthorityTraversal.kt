@@ -20,6 +20,7 @@ import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceProofContext
+import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.evidence.integerPinBounds
 import com.eignex.klause.solver.search.ComponentResult
@@ -103,6 +104,15 @@ internal class LinearAuthorityTraversal(
         observations[stage] = (observations[stage] ?: 0L) + 1L
     }
 
+    private fun linkCapture(scope: SourceScope) {
+        val capture = authority.capture ?: return
+        val parent = path.getOrNull(path.lastIndex - 1)?.second
+        val split = parent?.split
+        val sibling = split?.let { if (current === it.below) it.above else it.below }
+        capture.link(scope, parent?.let { source.scope.copy(condition = it.condition) },
+            sibling?.let { it.coveredBound ?: it.result?.bound }, incumbent()?.second)
+    }
+
     private fun splitCreated() {
         pending++
         retained += 2
@@ -180,7 +190,7 @@ internal class LinearAuthorityTraversal(
         ) {
             authority.capture?.record(source.atScope(source.scope.copy(condition = current.condition)),
                 null, null, null, LinearAuthorityResult())
-            val partial = activeRows?.check(current.condition, cancellation, context::consumeCheck)
+            val partial = activeRows?.check(current.condition, cancellation, context::consumeCheck, authority.capture)
                 ?: return SearchNodeDisposition.Expand
             if (partial.attempted) observe("numericalPartialChecks")
             if (partial.captureDeclined) observe("numericalPartialIncompleteCaptures")
@@ -189,6 +199,7 @@ internal class LinearAuthorityTraversal(
                 observe("numericalPartialPauses")
                 return SearchNodeDisposition.Pause
             }
+            linkCapture(source.scope.copy(condition = current.condition))
             partial.evidence?.let {
                 current.result = LinearAuthorityResult(evidence = it)
                 pending--
@@ -240,11 +251,7 @@ internal class LinearAuthorityTraversal(
             return SearchNodeDisposition.Pause
         }
         current.pending = false
-        val parent = path.getOrNull(path.lastIndex - 1)?.second
-        val parentSplit = parent?.split
-        val sibling = parentSplit?.let { if (current === it.below) it.above else it.below }
-        authority.capture?.link(branch.scope, parent?.let { source.scope.copy(condition = it.condition) },
-            sibling?.let { it.coveredBound ?: it.result?.bound }, incumbent()?.second)
+        linkCapture(branch.scope)
         current.result = if (result.primalStages.isEmpty()) result else result.copy(primalStages = emptyMap())
         observe("numericalChecks")
         if (result.coordinateConflict) observe("numericalCoordinateConflicts")
