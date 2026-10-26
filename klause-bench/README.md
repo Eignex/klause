@@ -1446,6 +1446,28 @@ bound on previously unused retained clauses becoming useful in unit/conflict
 propagation, split by permanent status; flags are never cleared, repeated uses of
 already marked clauses remain unknown, and observation work/time are charged and
 reported. These observations supply no global proof or throughput claim.
+Common control loading and source-center checking are recorded separately in
+`owners-*-preparation.json`; per-candidate original-source verification time and
+allocation are separate from each owner's native interval.
+
+[Finite owner replay 8518](https://lab.eignex.com/jobs/8518), at `862c575692`,
+consumes the merged capture on Linux/amd64 across assignment, resource and
+placement exchange controls, with strict coordinate-descent and strong structured
+recipes. All 147 conditions have identical centers, effective freedoms, complement
+pins and exact cutoffs across five owners. Each sequence has 100,000 containing
+decision equivalents, ten seconds, and 2,000 equivalents/two seconds per fragment;
+no fragment overspends. LS and both CP owners find the same fifteen native
+source-accepted improvements. LS retains feasible nonimprovements in the other
+132 conditions; CP closes those conditioned cutoffs. Mixed declines all native
+global shapes rather than dropping a source constraint. Cold CP uses 35 decision
+nodes versus 32 retained, without newly useful retained clause flags in these tiny
+controls. Retained CP allocates 134.6 million cumulative thread bytes versus
+43.2 million cold; LS uses 235,200 moves and 1.067 billion thread bytes.
+These ordered, instrumented observations establish neither a retained throughput
+gain nor independent witness certification, a global proof or ordinary admission.
+The pilots 8479/8489 expose segment-end LS charging and do not qualify per-fragment
+owner costs; native instruction caps enforce the work boundary in 8518.
+
 Model keys, domains, objectives, source bytes and
 build identity remain alongside the walk. Inputs admit at most 64 MiB,
 4,096 Boolean/integer coordinates and 8,192 factors. Hint construction uses the production

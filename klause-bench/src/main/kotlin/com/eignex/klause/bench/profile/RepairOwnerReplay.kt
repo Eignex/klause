@@ -61,6 +61,10 @@ internal object RepairOwnerReplay {
         fragmentAllowance: Long = 2_000L,
     ) {
         require(allowance > 0 && fragmentAllowance > 0)
+        val bean = ManagementFactory.getThreadMXBean() as ThreadMXBean
+        val thread = Thread.currentThread().threadId()
+        val setupStarted = System.nanoTime()
+        val setupAllocation = bean.getThreadAllocatedBytes(thread)
         val scopeOwner = Class.forName("com.eignex.klause.meta.alns.RepairScope").getField("INSTANCE").get(null)
         val freedType = Class.forName("com.eignex.klause.meta.alns.FreedVars")
         require(controls.length() in 0..4L * 1024 * 1024)
@@ -101,8 +105,15 @@ internal object RepairOwnerReplay {
                 entry.getValue("centerObjective").jsonPrimitive.content.toDouble(),
                 entry.getValue("selector").jsonPrimitive.content)
         }
-        val bean = ManagementFactory.getThreadMXBean() as ThreadMXBean
-        val thread = Thread.currentThread().threadId()
+        file.resolveSibling("${file.nameWithoutExtension}-preparation.json").writeText(buildJsonObject {
+            put("controlFileSha256", controlHash)
+            put("controlBytes", controlBytes.size)
+            put("sourceCheckedCenters", scopes.size)
+            put("elapsedNs", System.nanoTime() - setupStarted)
+            put("threadBytes", bean.getThreadAllocatedBytes(thread) - setupAllocation)
+            put("containingOwnerAllowanceStarted", false)
+            put("independentWitnessCheck", false)
+        }.toString())
         file.bufferedWriter().use { writer ->
             for (kind in listOf("ls", "cp-cold", "cp-retained", "mixed-cold", "mixed-retained")) {
                 val budget = NodeBudget(allowance)
@@ -211,7 +222,11 @@ internal object RepairOwnerReplay {
                                 it in scope.freedInts || sample.exactIntValue(it) == scope.center.exactIntValue(it)
                             })
                         }
+                        val verificationStarted = System.nanoTime()
+                        val verificationAllocation = bean.getThreadAllocatedBytes(thread)
                         val checked = sample?.let { checkSource(source, prepared.reconstruct(it), lifetime) }
+                        val verificationNs = System.nanoTime() - verificationStarted
+                        val verificationBytes = bean.getThreadAllocatedBytes(thread) - verificationAllocation
                         val improving = sample != null && checked == true &&
                             objective.evaluateExact(sample) < scope.cutoff
                         val status = when {
@@ -271,6 +286,8 @@ internal object RepairOwnerReplay {
                             put("workCurrency", "NodeBudget decision equivalents; native counters are separate")
                             put("elapsedNs", elapsed)
                             put("threadBytes", allocation)
+                            put("sourceVerificationNs", verificationNs)
+                            put("sourceVerificationThreadBytes", verificationBytes)
                             put("preparationNs", outcome.preparationNs)
                             put("slicePauses", outcome.pauses)
                             put("carriedSourceLpWork", mixedWork)
