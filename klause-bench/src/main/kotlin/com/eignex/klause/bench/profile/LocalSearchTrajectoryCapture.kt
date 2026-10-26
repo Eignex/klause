@@ -116,6 +116,7 @@ internal fun trajectoryPair(
     right: TrajectoryView,
 ): JsonObject {
     require(candidates.size <= 32)
+    val started = System.nanoTime()
     val leftDecline = left.load(source)
     val rightDecline = right.load(source)
     return buildJsonObject {
@@ -144,6 +145,7 @@ internal fun trajectoryPair(
             }))
             check(leftBefore == left.snapshot() && rightBefore == right.snapshot())
         }
+        put("diagnosticNanos", System.nanoTime() - started)
     }
 }
 
