@@ -23,6 +23,24 @@ import kotlinx.serialization.json.jsonPrimitive
 
 class ChannelTrajectoryTest {
     @Test
+    fun `reconstructed source columns can load outside placeholder execution domains`() {
+        val problem = Problem(0, 2, arrayOf(IntDomain(0, 0), IntDomain(0, 2)), emptyArray())
+        val left = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        val right = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        val coordinates = VarRemap(intArrayOf(), intArrayOf(-1, 1))
+        val reconstruct = { sample: Sample ->
+            Sample(booleanArrayOf(), longArrayOf(sample.intValue(1) + 10, sample.intValue(1)))
+        }
+
+        val pair = trajectoryPair(Sample(booleanArrayOf(), longArrayOf(11, 1)), emptyList(),
+            TrajectoryView("left", left, coordinates, reconstruct = reconstruct),
+            TrajectoryView("right", right, coordinates, reconstruct = reconstruct))
+
+        assertEquals("paired", pair.getValue("leftLoad").jsonPrimitive.content)
+        assertEquals("paired", pair.getValue("rightLoad").jsonPrimitive.content)
+    }
+
+    @Test
     fun `searched channel moves report a changed source destination`() {
         val problem = Problem(1, 1, arrayOf(IntDomain(0, 1)),
             arrayOf(ReifiedLinear(0, longArrayOf(1), intArrayOf(0), LinearOp.EQ, 1)))

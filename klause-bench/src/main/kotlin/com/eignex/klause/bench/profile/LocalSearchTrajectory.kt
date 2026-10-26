@@ -85,8 +85,24 @@ internal object LocalSearchTrajectory {
         out.resolve("source.xml").writeBytes(bytes)
         out.resolve("request.txt").writeText(args.joinToString("\n"))
         val parsed = Xcsp3.parse(bytes.decodeToString())
-        require(parsed.problem.numBoolVars.toLong() + parsed.problem.numIntVars <= TRAJECTORY_COORDINATE_LIMIT)
-        require(parsed.problem.numFactors <= TRAJECTORY_FACTOR_LIMIT)
+        if (parsed.problem.numBoolVars.toLong() + parsed.problem.numIntVars > TRAJECTORY_COORDINATE_LIMIT ||
+            parsed.problem.numFactors > TRAJECTORY_FACTOR_LIMIT
+        ) {
+            out.resolve("decline.json").writeText(buildJsonObject {
+                put("decline", "source-size")
+                put("sourceSha256", options.getValue("sha256"))
+                put("declaredSemantics", parsed.semantics.declared.toString())
+                put("effectiveSemantics", parsed.semantics.effective.toString())
+                put("settings", parsed.problem.settings.toString())
+                put("sourceBooleans", parsed.problem.numBoolVars)
+                put("sourceIntegers", parsed.problem.numIntVars)
+                put("sourceFactors", parsed.problem.numFactors)
+                put("coordinateLimit", TRAJECTORY_COORDINATE_LIMIT)
+                put("factorLimit", TRAJECTORY_FACTOR_LIMIT)
+                put("sourceVerdictClaim", false)
+            }.toString())
+            return
+        }
         val objective = parsed.objective?.toLinearObjective()
         require(parsed.sense == ObjectiveSense.MINIMIZE)
         val channel = options["channel"]?.let { ChannelView.valueOf(it) }
@@ -180,6 +196,7 @@ internal object LocalSearchTrajectory {
             val hints = heuristicHints(invocation, prepared, stop)
             val maintained = hints?.let { getter(it, "getSweep") as DefinitionalSweep? }
             val sweep = variant.channel.sweep(maintained, stop)
+            val coordinates = trajectoryCoordinates(invocation, prepared, stop)
             check(!stop())
             val gradient = hints?.let { getter(it, "getObjective") as IncrementalObjective? }
             out.resolve("model-$rewrite.json").writeText(buildJsonObject {
@@ -188,6 +205,7 @@ internal object LocalSearchTrajectory {
                 put("channel", variant.channel.name)
                 put("maintainedDefinitions", maintained?.size ?: 0)
                 put("retainedDefinitions", sweep?.size ?: 0)
+                put("coordinateProjection", if (coordinates == null) "declined" else "retained production coordinates")
                 put("functionalObjectiveTreatment", if (channel == null) "view-specific" else "held fixed")
                 put("factors", buildJsonArray {
                     for (factor in problem.factors) add(buildJsonObject {
@@ -208,6 +226,10 @@ internal object LocalSearchTrajectory {
                 put("correspondenceAdmission", "slot-preserving load plus complete source round trip")
                 put("sourceVerdictClaim", false)
             }.toString())
+            if (coordinates == null) {
+                out.resolve("decline-$rewrite.txt").writeText("unsupported-source-coordinate-projection\n")
+                continue
+            }
             var baseline: List<Any?>? = null
             for (mode in if (repairCapture) listOf("initial", "walk", "repair") else listOf("initial", "walk")) {
                 val walk = mode != "initial"
@@ -353,10 +375,7 @@ internal object LocalSearchTrajectory {
                         }
                         views += TrajectoryView(
                             rewrite.toString(), shadow,
-                            VarRemap(
-                                IntArray(parsed.problem.numBoolVars) { if (it < problem.numBoolVars) it else -1 },
-                                IntArray(parsed.problem.numIntVars) { if (it < problem.numIntVars) it else -1 },
-                            ),
+                            coordinates,
                             initial.shaping.objective, prepared.reconstruct,
                             { activeSweep?.sweep(shadow.assignment, shadow.rootDomains) },
                             initial.seeding.ownerInt,
@@ -466,6 +485,22 @@ internal object LocalSearchTrajectory {
     private fun getter(owner: Any, name: String): Any? = owner.javaClass.methods.single {
         it.name.substringBefore('$') == name && it.parameterCount == 0
     }.invoke(owner)
+
+    internal fun trajectoryCoordinates(
+        invocation: PreparedSourceInvocation,
+        prepared: FinitePipelinePreparation,
+        stop: Cancellation,
+    ): VarRemap? {
+        val mapping = getter(prepared, "getSourceMapping") ?: return null
+        val plan = getter(invocation, "getEnginePlan") ?: return null
+        val sourceMethods = Class.forName("com.eignex.klause.solver.pipeline.SourceHintMappingKt").methods
+        val planned = sourceMethods.single { it.name == "sourceCoordinates" }.invoke(null, plan, stop)
+            as VarRemap? ?: return null
+        val projected = Class.forName("com.eignex.klause.presolve.SourceMappingKt").methods.single {
+            it.name == "retainedCoordinates"
+        }.invoke(null, mapping, stop) as VarRemap? ?: return null
+        return sourceMethods.single { it.name == "followedBy" }.invoke(null, planned, projected, stop) as VarRemap?
+    }
 
     private fun heuristicHints(
         invocation: PreparedSourceInvocation,
