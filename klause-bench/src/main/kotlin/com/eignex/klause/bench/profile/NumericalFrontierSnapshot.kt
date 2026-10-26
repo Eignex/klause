@@ -269,9 +269,9 @@ internal class NumericalFrontierSnapshot(
             return type.getDeclaredConstructor(SourceProofContext::class.java, TheoryParams::class.java,
                 Function0::class.java, stateType, Boolean::class.javaPrimitiveType, authorityType,
                 Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType, fundingType,
-                Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType)
+                Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType, Function1::class.java)
                 .newInstance(context, params, { null }, state, history, null, frontier, false,
-                    funding, frontier && params.sourceCuts, activeRows)
+                    funding, frontier && params.sourceCuts, activeRows, null)
         }
 
         fun run(

@@ -94,7 +94,8 @@ internal class LinearAuthorityInvocation(
         SourceLpBudget(maxOperations = params.sourceLpOperations, onWork = state.smt::observeSourceLp,
             funding = funding), stop, ::paused, ::offer,
         { incumbent?.let { sample -> value?.let { sample to it } } }, useBranchHistory, borrowedAuthority,
-        useGuidance = boundOrdered || guidance, inheritBounds = boundOrdered, useCuts = cuts,
+        useGuidance = boundOrdered || guidance || params.sourceSupportBranching || onNumericalFeedback != null,
+        inheritBounds = boundOrdered, useCuts = cuts,
         useActiveRows = activeRows, useSupportBranching = params.sourceSupportBranching,
         onNumericalFeedback = onNumericalFeedback)
     private val session = SearchComponentSet(listOf(component)).session(params.maxLeaves, stop).also {
