@@ -204,10 +204,10 @@ internal object RepairOwnerReplay {
                                 if (kind == "cp-retained") retained = native
                                 else transient = native as AutoCloseable
                                 val observationStart = System.nanoTime()
-                                val observationAllocation = bean.getThreadAllocatedBytes(thread)
+                                val beforeAllocation = bean.getThreadAllocatedBytes(thread)
                                 usageBefore = clauseUsage(checkNotNull(native), stop)
                                 observationNs += System.nanoTime() - observationStart
-                                observationBytes += bean.getThreadAllocatedBytes(thread) - observationAllocation
+                                observationBytes += bean.getThreadAllocatedBytes(thread) - beforeAllocation
                                 val completed = complete(checkNotNull(native), scope, stop, preparation,
                                     fragmentAllowance)
                                 val afterStart = System.nanoTime()
@@ -230,7 +230,8 @@ internal object RepairOwnerReplay {
                             }
                         }
                         if (native != null) previousCutoff = scope.cutoff
-                        val outcome = if (funded() && nativeOutcome.reason != TerminationReason.SearchExhausted)
+                        val outcome = if (funded() &&
+                            nativeOutcome.reason != TerminationReason.SearchExhausted)
                             nativeOutcome.copy(reason = TerminationReason.BudgetExhausted)
                             else nativeOutcome
                         if (native != null && kind.endsWith("cold")) {
