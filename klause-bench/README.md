@@ -84,6 +84,14 @@ resource-limited or incomplete procedures can return UNKNOWN. The
 [manifest](smoke-corpus/nonlinear-integer-v1/manifest.json) pins original hashes and
 Apache-2.0 attribution.
 
+`nonlinear-integer-cells-v1` fixes seventeen univariate cell-consumer controls,
+with eight core cases and nine cases from held-out families. The matching
+`smtlib-nonlinear-integer-cells-v1` suite separates mathematical expectations from
+bounded integer-search outcomes. The `-core-v1` and `-holdout-v1` named sets retain
+their complete memberships. The [fixture notes](smoke-corpus/nonlinear-integer-cells-v1/README.md)
+describe repeated tuple support, exact endpoints, conditional predicates, mixed
+completion and degree limits; the manifest there pins source hashes and licences.
+
 `continuous-mip-v1` fixes 167 MIPLIB 2017 optimization sources with both integer
 and continuous columns. It includes finite and open routes and selects every member
 without a changing reference filter. It is separate from the smaller `mip` theme set.
