@@ -14,6 +14,7 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.baked
 import com.eignex.klause.solver.Sample
@@ -113,7 +114,7 @@ internal object FiniteConflictSelection {
         val guidanceType = Class.forName("com.eignex.klause.meta.alns.ConflictSupportedRemoval")
         val freedType = Class.forName("com.eignex.klause.meta.alns.FreedVars")
         val scope = Class.forName("com.eignex.klause.meta.alns.RepairScope").getField("INSTANCE").get(null)
-        val rootFixed = problem.baked as? com.eignex.klause.propagation.PropagationResult.Implied
+        val rootFixed = problem.baked as? PropagationResult.Implied
         val eligible = (0 until problem.numBoolVars + problem.numIntVars).filter { coordinate ->
             if (coordinate < problem.numBoolVars) rootFixed?.boolValueOrNull(coordinate) == null else
                 !problem.rootIntDomain(coordinate - problem.numBoolVars).isFixed
@@ -198,8 +199,9 @@ internal object FiniteConflictSelection {
                         val bools = effective?.let { get(it, "Bools") as IntArray } ?: intArrayOf()
                         val ints = effective?.let { get(it, "Ints") as IntArray } ?: intArrayOf()
                         val matched = effective != null && bools.size + ints.size == requestedCount
-                        val pins = effective?.let {
-                            scope.javaClass.methods.single { it.name == "pins" }.invoke(scope, problem, center, it)
+                        val pins = effective?.let { scopeVars ->
+                            scope.javaClass.methods.single { it.name == "pins" }
+                                .invoke(scope, problem, center, scopeVars)
                                 as Assumptions
                         }
                         val selectionNanos = System.nanoTime() - selectionStarted
@@ -239,8 +241,10 @@ internal object FiniteConflictSelection {
                             put("scopedAttributions", JsonArray(attributions.map { entry ->
                                 val attribution = checkNotNull(entry)
                                 buildJsonObject {
-                                    put("bools", JsonArray((get(attribution, "Bools") as IntArray).map(::JsonPrimitive)))
-                                    put("ints", JsonArray((get(attribution, "Ints") as IntArray).map(::JsonPrimitive)))
+                                    put("bools", JsonArray(
+                                        (get(attribution, "Bools") as IntArray).map(::JsonPrimitive)))
+                                    put("ints", JsonArray(
+                                        (get(attribution, "Ints") as IntArray).map(::JsonPrimitive)))
                                     put("cutoff", get(attribution, "Cutoff") as Double)
                                     (get(attribution, "LocalIncumbent") as Sample?)?.let {
                                         put("localIncumbentObjective", objective.evaluateExact(it).toString())
