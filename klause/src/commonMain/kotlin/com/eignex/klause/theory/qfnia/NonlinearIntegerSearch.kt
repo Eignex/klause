@@ -13,6 +13,7 @@ internal data class NonlinearIntegerParams(
     val maximumCandidates: Long = 1024,
     val strategy: NonlinearIntegerStrategy = NonlinearIntegerStrategy.MIXED,
     val seed: Long = 1,
+    val reuseSourceCells: Boolean = false,
 ) {
     init { require(maximumCandidates >= 0) }
 }
@@ -23,6 +24,7 @@ internal data class NonlinearIntegerStats(
     val repairs: Long,
     val checks: Long,
     val polynomial: QfNraStats,
+    val cells: NonlinearIntegerCellStats = NonlinearIntegerCellStats(),
 )
 
 internal data class NonlinearIntegerExecution(val result: QfNraResult, val stats: NonlinearIntegerStats)

@@ -13,6 +13,25 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class CliModeSmtTest {
+    @Test
+    fun `SMT integer cell reuse should report avoided completions without an unsat claim`() {
+        val source = File.createTempFile("nia-cells", ".smt2").apply {
+            writeText("(declare-const n Int) (declare-const q Int) (assert (= (* n n) 2)) (check-sat)")
+            deleteOnExit()
+        }
+
+        val output = capture {
+            assertEquals(0, runCli(arrayOf("-e", "cp", "-s", "--param", "nia-candidates=12",
+                "--param", "nia-cell-refinement=true", "--param", "nia-cell-reuse=true", source.absolutePath)))
+        }
+
+        assertTrue("unknown" in output.lines(), output)
+        assertTrue("; niaCellProducer=true" in output.lines(), output)
+        assertTrue("; niaCellReuse=true" in output.lines(), output)
+        assertTrue(output.lines().any { it.matches(Regex("; niaExcludedTuples=[1-9][0-9]*")) }, output)
+        assertTrue(output.lines().any { it.matches(Regex("; niaRepeatedSupports=[1-9][0-9]*")) }, output)
+    }
+
 
     @Test
     fun `SMT inconsistent integer scalar equations should print unsat from the refuted route`() {

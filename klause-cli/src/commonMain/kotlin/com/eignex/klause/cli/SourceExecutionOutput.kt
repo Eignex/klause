@@ -223,4 +223,16 @@ internal fun reportNativeSatisfaction(
         ) + execution.resource?.let { listOf("nraResource" to it.name) }.orEmpty()
     }
     output.onAllowanceStatistics(pairs)
+    execution.integerCells?.let { cells ->
+        output.onAllowanceStatistics(listOf(
+            "niaCellProducer" to cells.producerEnabled.toString(),
+            "niaCellReuse" to cells.reuseEnabled.toString(),
+            "niaCellObserved" to cells.observed.toString(),
+            "niaCellRetained" to cells.retained.toString(),
+            "niaCellDeclined" to cells.declined.toString(),
+            "niaExcludedTuples" to cells.excludedTuples.toString(),
+            "niaRepeatedSupports" to cells.repeatedSupports.toString(),
+            "niaCompletionChecks" to cells.completionChecks.toString(),
+        ))
+    }
 }

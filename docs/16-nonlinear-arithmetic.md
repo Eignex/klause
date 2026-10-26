@@ -42,6 +42,14 @@ to complete real coordinates and correlated Booleans. Failure refutes only that
 candidate. Wide exponents use compact squaring DAGs, so values such as zero and
 signed units stay checkable without expanding the polynomial degree.
 
+An optional cell consumer filters unvisited, in-window tuples before their fixed
+completion. It admits only checked mandatory predicates of the cursor's identical
+unconditioned source formula, on original integer coordinates. Query and regional
+cells decline. Exact algebraic ceiling and floor convert each admitted cell to its
+integer hull, preserving open and closed endpoints at arbitrary precision. A hull
+representation decline removes that cell's authority. These exclusions skip
+completion calls; exhausting them still supplies no whole-source refutation.
+
 #### Strategies
 
 Candidate traversal enumerates integer tuples around zero and source constants,
@@ -94,6 +102,14 @@ segments, while cancellation still polls inside arithmetic. One cancellation and
 work scope spans candidate generation, all completion queries and the final source
 check. Conditioned calls keep original Boolean pins and numeric windows; candidate
 fixings never widen them.
+
+The optional producer and integer consumer are independently controlled and disabled
+by default. Each cursor retains at most eight source cells. Admission, integer hull
+conversion and membership use its containing arithmetic allowance; cached hulls and
+support-hit counts survive slices and retire on close. Integer hulls never refute
+partial real repair windows. Invocation observations sum private cursor admissions,
+declines, newly excluded tuples, repeated support hits and completion calls; they
+do not authorize cross-cursor proof reuse.
 
 ### Implementation
 
