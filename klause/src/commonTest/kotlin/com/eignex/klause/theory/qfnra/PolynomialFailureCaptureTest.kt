@@ -33,8 +33,11 @@ class PolynomialFailureCaptureTest {
     @Test
     fun `a resumed search stop retains its own operation after interleaved root work`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
-        val graphs = (0 until 6).joinToString(" ") { "(= x$it (+ (* x${it + 1} x${it + 1}) 1))" }
-        val source = SmtLibPolynomial.parse("$declarations (assert (and $graphs (= (* x6 x6) 2)))")
+        val optional = (1..12).joinToString(" ") { "(<= (^ (+ x2 $it) 8) 1)" }
+        val source = SmtLibPolynomial.parse(
+            "$declarations (declare-const gate Bool) " +
+                "(assert (and (= x0 (+ (* x1 x1) 1)) (= x2 (+ (* x3 x3) 1)) (or gate (and $optional))))",
+        )
         val capture = PolynomialFailureCapture()
         var stopped = false
         val query = QfNraQuery(source.formula, source.boolCount, source.realCount,
@@ -50,7 +53,7 @@ class PolynomialFailureCaptureTest {
             result = query.next()
         }
 
-        assertTrue(stopped)
+        assertTrue(stopped, "No suspended search: ${query.progress}; ${capture.operation["stage"]}")
         assertEquals(QfNraReason.Interrupted, assertIs<QfNraResult.Unknown>(result).reason)
         assertTrue(capture.operation["stage"] != "root-reduction")
     }

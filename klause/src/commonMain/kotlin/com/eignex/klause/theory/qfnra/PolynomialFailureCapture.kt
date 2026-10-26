@@ -78,7 +78,8 @@ internal class PolynomialFailureCapture {
             put("work", work.toString())
             atoms("signedPremises", premises)
         }
-        firstSignConflict = copied + ("complete" to
+        firstSignConflict = copied + context.mapKeys { "context.${it.key}" } +
+            operation.mapKeys { "operation.${it.key}" } + ("complete" to
             listOf(scope, context, operation, copied).all { it["complete"] == "true" }.toString())
     }
 

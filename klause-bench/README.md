@@ -909,8 +909,9 @@ normalized/active predicates, signed regional premises, condition bounds, numeri
 reverse fibres, source coordinate names, snapshot identity and the latest operation
 with its projection operands. The first representation refusal keeps its own
 operation/support record across later attempts. Algebraic coordinates retain defining rational
-coefficients, root index and isolating endpoints. Each record part permits 512
-entries and 16,384 key/value characters; a polynomial permits 128 terms, each
+coefficients, root index and isolating endpoints. Each copied record part permits
+512 data entries and 16,384 key/value characters before metadata and field prefixes;
+a polynomial permits 128 terms, each
 monomial 64 coordinates, and coefficients 4,096 bits. Incomplete parts say
 `complete=false`; an interrupted copy sets `InterruptedCapture`. Repetition compares
 at most 256 exact representations, with `RepetitionComplete=false` beyond that;
