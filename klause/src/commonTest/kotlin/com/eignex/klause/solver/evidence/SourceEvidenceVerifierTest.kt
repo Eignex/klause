@@ -468,10 +468,55 @@ class SourceEvidenceVerifierTest {
         for (upper in listOf(BigFraction.ZERO, BigFraction.MINUS_ONE)) {
             val consumer = scope.copy(condition = SourceCondition(upper = mapOf(x to upper)))
             val source = SourceProofContext(consumer, setOf(x), premises)
-            val evidence = SourceEvidence(consumer, SourceClaim.Refutation, SourceDerivation.Import(imported))
+            for (claim in listOf(SourceClaim.Refutation, SourceClaim.Bound(BigFraction.ofLong(2)),
+                SourceClaim.Bound(BigFraction.ofLong(2), strict = true))) {
+                val evidence = SourceEvidence(consumer, claim, SourceDerivation.Import(imported))
 
-            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(evidence))
+                assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(evidence))
+            }
         }
+    }
+
+    @Test
+    fun `an imported refutation should require an objective scope for a bound`() {
+        val unscoped = scope.copy(objective = null)
+        val source = SourceProofContext(unscoped, setOf(x), mapOf(
+            "conflict" to SourcePremise(SourceInequality(emptyMap(), BigFraction.MINUS_ONE))))
+        val refutation = SourceEvidence(unscoped, SourceClaim.Refutation, SourceDerivation.Premise("conflict"))
+
+        val checked = SourceEvidenceVerifier(source).verify(SourceEvidence(unscoped,
+            SourceClaim.Bound(BigFraction.ONE), SourceDerivation.Import(refutation)))
+
+        assertIs<SourceEvidenceCheck.Rejected>(checked)
+    }
+
+    @Test
+    fun `an imported refutation should not establish a witness or attainment`() {
+        val source = SourceProofContext(scope, setOf(x), mapOf(
+            "conflict" to SourcePremise(SourceInequality(emptyMap(), BigFraction.MINUS_ONE))),
+            mapOf(x to BigFraction.ONE))
+        val refutation = SourceEvidence(scope, SourceClaim.Refutation, SourceDerivation.Premise("conflict"))
+        val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0),
+            exactReals = listOf(BigFraction.ONE))
+
+        for (claim in listOf(SourceClaim.Witness(sample),
+            SourceClaim.Optimal(sample, SourceValue.Rational(BigFraction.ONE)))) {
+            val checked = SourceEvidenceVerifier(source).verify(
+                SourceEvidence(scope, claim, SourceDerivation.Import(refutation)))
+
+            assertIs<SourceEvidenceCheck.Rejected>(checked)
+        }
+    }
+
+    @Test
+    fun `an unavailable refutation import should withhold objective bounds`() {
+        val refutation = SourceEvidence(scope, SourceClaim.Refutation,
+            SourceDerivation.Unavailable("contradiction not retained"))
+
+        val checked = SourceEvidenceVerifier(context).verify(SourceEvidence(scope,
+            SourceClaim.Bound(BigFraction.ONE), SourceDerivation.Import(refutation)))
+
+        assertIs<SourceEvidenceCheck.Unavailable>(checked)
     }
 
     @Test
@@ -527,9 +572,11 @@ class SourceEvidenceVerifierTest {
         for (condition in conditions) {
             val consumer = scope.copy(condition = condition)
             val source = SourceProofContext(consumer, setOf(x), premises)
-            val evidence = SourceEvidence(consumer, SourceClaim.Refutation, SourceDerivation.Import(imported))
+            for (claim in listOf(SourceClaim.Refutation, SourceClaim.Bound(BigFraction.ofLong(2)))) {
+                val evidence = SourceEvidence(consumer, claim, SourceDerivation.Import(imported))
 
-            assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(source).verify(evidence))
+                assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(source).verify(evidence))
+            }
         }
     }
 
@@ -558,9 +605,11 @@ class SourceEvidenceVerifierTest {
         val imported = SourceEvidence(scope, SourceClaim.Refutation, SourceDerivation.Premise("conflict"))
         val changed = SourcePremise(SourceInequality(emptyMap(), BigFraction.ZERO))
         val source = SourceProofContext(scope, setOf(x), mapOf("conflict" to changed))
-        val evidence = SourceEvidence(scope, SourceClaim.Refutation, SourceDerivation.Import(imported))
+        for (claim in listOf(SourceClaim.Refutation, SourceClaim.Bound(BigFraction.ofLong(2)))) {
+            val evidence = SourceEvidence(scope, claim, SourceDerivation.Import(imported))
 
-        assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(source).verify(evidence))
+            assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(source).verify(evidence))
+        }
     }
 
     @Test
