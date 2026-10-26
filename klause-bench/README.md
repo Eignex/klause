@@ -1451,6 +1451,12 @@ has an exact feasible center and lower-bound witness.
 count-matched random repair prefix under explicit complement pins. The fragment
 draw uses `seed + 1`; final selector ties use `seed`. Both acquisition arms retain
 their actual origin pins and share the same prefix.
+`semantic=Assignment|Resource|Placement` adds the corresponding
+`SemanticBlockRemoval` control from the selected revision. It retains the complete
+returned packet, including fixed role coordinates, and matches counts using only
+movable source inputs. A size mismatch records a decline without repair; packets
+are neither truncated nor retried to meet the target. Construction and closure
+consume the same containing deadline, with visit and allocation costs retained.
 
 Random, objective and adjacency removal compare with CP-conflict-supported removal
 at the same center and requested count. A separate acquisition-ablated random arm

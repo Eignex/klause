@@ -13,6 +13,7 @@ import com.eignex.klause.formats.xcsp3.Xcsp3
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.localsearch.CostShaping
 import com.eignex.klause.localsearch.DefinitionalSweep
+import com.eignex.klause.localsearch.InvariantNetwork
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.localsearch.acceptance.AcceptanceRule
@@ -61,8 +62,9 @@ internal object FiniteConflictSelection {
         val ints: IntArray,
         val pins: Assumptions?,
         val attempts: Int,
+        val searchedInputs: Int,
     ) {
-        fun matches(count: Int): Boolean = pins != null && bools.size + ints.size == count
+        fun matches(count: Int): Boolean = pins != null && searchedInputs == count
     }
 
     @JvmStatic
@@ -84,7 +86,9 @@ internal object FiniteConflictSelection {
     private fun capture(args: Array<String>, out: File) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val required = setOf("suite", "problem", "sha256", "center", "seed")
-        require(options.keys.containsAll(required) && options.keys.all { it in required || it == "acquisition" })
+        require(options.keys.containsAll(required) && options.keys.all {
+            it in required || it in setOf("acquisition", "semantic")
+        })
         val reference = Catalog.uncapped(options.getValue("suite")).problems
             .single { it.name == options.getValue("problem") }
         val bytes = CorpusFiles.open(CorpusFetcher.resolve(reference.source)).use {
@@ -133,6 +137,7 @@ internal object FiniteConflictSelection {
             null,
             out.resolve("selections.jsonl"),
             options["acquisition"] ?: "source-root",
+            options["semantic"],
         ) { sample, stop -> checkSource(problem, sample, stop) }
     }
 
@@ -144,14 +149,19 @@ internal object FiniteConflictSelection {
         sweep: DefinitionalSweep?,
         file: File,
         acquisitionMode: String = "source-root",
+        semanticKind: String? = null,
         checkSource: (Sample, Cancellation) -> Boolean,
     ) {
         require(acquisitionMode in setOf("source-root", "sampled-fragment"))
+        require(semanticKind == null || semanticKind in setOf("Assignment", "Resource", "Placement"))
         require(problem.numRealVars == 0 && problem.numBoolVars.toLong() + problem.numIntVars <= 1024)
         require(checkSource(center, Cancellation.after(5.seconds)))
         val destroy = Class.forName("com.eignex.klause.meta.alns.DestroyOperator")
         val companion = destroy.getField("Companion").get(null)
-        val destroyMethod = destroy.methods.single { it.name == "destroy" }
+        val destroyMethod = destroy.methods.single { it.name == "destroy" && it.parameterCount == 5 }
+        val scopedDestroyMethod = if (semanticKind == null) null else {
+            destroy.methods.single { it.name == "destroy" && it.parameterCount == 7 }
+        }
         val guidanceType = Class.forName("com.eignex.klause.meta.alns.ConflictSupportedRemoval")
         val freedType = Class.forName("com.eignex.klause.meta.alns.FreedVars")
         val scope = Class.forName("com.eignex.klause.meta.alns.RepairScope").getField("INSTANCE").get(null)
@@ -163,7 +173,9 @@ internal object FiniteConflictSelection {
                 !problem.rootIntDomain(coordinate - problem.numBoolVars).isFixed
             }
         }
-        fun select(operator: Any, drawSeed: Long, count: Int, stop: Cancellation): Selection {
+        fun select(operator: Any, drawSeed: Long, count: Int, stop: Cancellation,
+            completePacket: Boolean = false,
+        ): Selection {
             val total = problem.numBoolVars + problem.numIntVars
             fun coordinates(value: Any): List<Int> = (get(value, "Bools") as IntArray).toList() +
                 (get(value, "Ints") as IntArray).map { problem.numBoolVars + it }
@@ -172,11 +184,15 @@ internal object FiniteConflictSelection {
             var raw: Any
             do {
                 attempts++
-                raw = checkNotNull(destroyMethod.invoke(operator, Random(drawSeed), problem, center, objective,
-                    (rawCount + 0.25) / total))
+                val fraction = (rawCount + 0.25) / total
+                raw = checkNotNull(if (completePacket) {
+                    checkNotNull(scopedDestroyMethod).invoke(operator, Random(drawSeed), problem, center, objective,
+                        fraction, Assumptions.None, stop)
+                } else destroyMethod.invoke(operator, Random(drawSeed), problem, center, objective, fraction))
                 rawCount++
-            } while (coordinates(raw).count { it in eligible } < count && rawCount <= total && !stop())
-            val selected = coordinates(raw).filter { it in eligible }
+            } while (!completePacket && coordinates(raw).count { it in eligible } < count &&
+                rawCount <= total && !stop())
+            val selected = coordinates(raw).filter { completePacket || it in eligible }
             val requestedBools = selected.filter { it < problem.numBoolVars }.toIntArray()
             val requestedInts = selected.filter { it >= problem.numBoolVars }
                 .map { it - problem.numBoolVars }.toIntArray()
@@ -190,7 +206,9 @@ internal object FiniteConflictSelection {
                 scope.javaClass.methods.single { it.name == "pins" }.invoke(scope, problem, center, scopeVars)
                     as Assumptions
             }
-            return Selection(requestedBools, requestedInts, bools, ints, pins, attempts)
+            val searchedInputs = bools.count { it in eligible } +
+                ints.count { problem.numBoolVars + it in eligible }
+            return Selection(requestedBools, requestedInts, bools, ints, pins, attempts, searchedInputs)
         }
         val allocation = ManagementFactory.getThreadMXBean() as ThreadMXBean
         check(allocation.isThreadAllocatedMemorySupported)
@@ -198,7 +216,9 @@ internal object FiniteConflictSelection {
         val thread = Thread.currentThread().threadId()
         file.bufferedWriter().use { writer ->
             for (requestedCount in listOf(2, 4, 8).filter { it <= eligible.size }) {
-                for (arm in listOf("random", "objective", "adjacency", "conflict", "acquisition-ablated")) {
+                val arms = listOf("random", "objective", "adjacency", "conflict", "acquisition-ablated") +
+                    if (semanticKind == null) emptyList() else listOf("semantic")
+                for (arm in arms) {
                     val stop = Cancellation.after(5.seconds)
                     val allowance = NodeBudget(DECISIONS)
                     val started = System.nanoTime()
@@ -258,8 +278,19 @@ internal object FiniteConflictSelection {
                             } ?: false
                         }
                         val acquisitionNanos = System.nanoTime() - acquisitionStarted
+                        val selectionStarted = System.nanoTime()
                         val operator = when (arm) {
                             "conflict" -> guidance
+
+                            "semantic" -> {
+                                val type = Class.forName("com.eignex.klause.meta.alns.SemanticBlockRemoval")
+                                val kindType = Class.forName("com.eignex.klause.meta.alns.SemanticBlockRemoval\$Kind")
+                                type.getDeclaredConstructor(kindType, InvariantNetwork::class.java,
+                                    Int::class.javaPrimitiveType, Int::class.javaPrimitiveType,
+                                    Int::class.javaPrimitiveType).newInstance(
+                                    kindType.enumConstants.single { it.toString() == semanticKind },
+                                    sweep?.network(problem.numIntVars, problem.numBoolVars), 32, 4096, 65_536)
+                            }
 
                             "objective" -> companion.javaClass.methods.single { it.name == "getWorstObjective" }
                                 .invoke(companion)
@@ -269,8 +300,7 @@ internal object FiniteConflictSelection {
 
                             else -> companion.javaClass.methods.single { it.name == "getRandom" }.invoke(companion)
                         }
-                        val selectionStarted = System.nanoTime()
-                        val selected = select(operator, seed, requestedCount, stop)
+                        val selected = select(operator, seed, requestedCount, stop, completePacket = arm == "semantic")
                         val requestedBools = selected.requestedBools
                         val requestedInts = selected.requestedInts
                         val bools = selected.bools
@@ -348,6 +378,7 @@ internal object FiniteConflictSelection {
                                 put("center", sample(center))
                                 put("centerObjective", objective.evaluateExact(center).toString())
                                 put("requestedCount", requestedCount)
+                                put("effectiveSearchedInputs", selected.searchedInputs)
                                 put("effectiveCountMatched", matched)
                                 put("requestedBools", JsonArray(requestedBools.map(::JsonPrimitive)))
                                 put("requestedInts", JsonArray(requestedInts.map(::JsonPrimitive)))
@@ -409,6 +440,12 @@ internal object FiniteConflictSelection {
                                 put("acquisitionNanos", acquisitionNanos)
                                 put("selectionNanos", selectionNanos)
                                 put("selectionAttempts", selectionAttempts)
+                                if (arm == "semantic") {
+                                    put("semanticKind", semanticKind)
+                                    put("semanticDecline", get(operator, "LastDecline")?.toString())
+                                    put("semanticVisits", get(operator, "LastVisits") as Int)
+                                    put("semanticSearchedInputs", get(operator, "LastSearchedInputs") as Int)
+                                }
                                 put("remainingRepairDecisions", remaining)
                                 put("repairNodes", result?.stats?.search?.nodes?.sum ?: 0.0)
                                 put("containingWork", DECISIONS)
