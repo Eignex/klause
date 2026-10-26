@@ -685,7 +685,7 @@ private fun FiniteSolveRequest.preparationRequest(
     return FinitePipelineRequest(
         problem = shape.finiteProblem, componentPlan = shape.componentPlan, preparedPlan = shape.preparedPlan,
         engine = engine, objective = shape.linearObjective,
-        transformObjective = !protectObjective && shape.localSearchObjective == null,
+        transformObjective = false,
         presolveConfig = presolveConfig, explicitPresolveConfig = explicitPresolveConfig,
         solutionSetSensitive = solutionSetSensitive ||
             (shape.sourceInvocation != null && operation == ExecutionOperation.ENUMERATE),
