@@ -58,22 +58,43 @@ class LinearRefutationReuseTest {
 
     @Test
     fun `support lookup should accept equal and stronger bounds`() {
-        val reuse = LinearRefutationReuse(source, SourceLpBudget(), Cancellation.Never)
-        reuse.retain(evidence)
+        for (upper in listOf(true, false)) {
+            val coefficient = if (upper) BigFraction.MINUS_ONE else BigFraction.ONE
+            val context = SourceProofContext(scope, setOf(x), mapOf("bound" to SourcePremise(
+                SourceInequality(mapOf(x to coefficient), BigFraction.MINUS_ONE))))
+            val conflict = LinearPinnedRefutation(SourceDerivation.Combination(listOf(
+                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("bound")),
+                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(x, upper)),
+            )))
+            val condition = SourceCondition().bound(x, BigFraction.ZERO, upper)
+            val reuse = LinearRefutationReuse(context, SourceLpBudget(), Cancellation.Never)
+            reuse.retain(SourceEvidence(scope.copy(condition = condition), SourceClaim.Refutation, conflict))
 
-        for (upper in listOf(BigFraction.ZERO, BigFraction.MINUS_ONE)) {
-            assertNotNull(reuse.find(SourceCondition(upper = mapOf(x to upper))))
+            for (value in listOf(BigFraction.ZERO, coefficient)) {
+                assertNotNull(reuse.find(SourceCondition().bound(x, value, upper)))
+            }
         }
     }
 
     @Test
     fun `support lookup should reject weaker and unrelated bounds`() {
-        val reuse = LinearRefutationReuse(source, SourceLpBudget(), Cancellation.Never)
-        reuse.retain(evidence)
-        val conditions = listOf(SourceCondition(), SourceCondition(upper = mapOf(x to BigFraction.ONE)),
-            SourceCondition(lower = mapOf(x to BigFraction.ofLong(2))))
+        for (upper in listOf(true, false)) {
+            val coefficient = if (upper) BigFraction.MINUS_ONE else BigFraction.ONE
+            val context = SourceProofContext(scope, setOf(x), mapOf("bound" to SourcePremise(
+                SourceInequality(mapOf(x to coefficient), BigFraction.MINUS_ONE))))
+            val conflict = LinearPinnedRefutation(SourceDerivation.Combination(listOf(
+                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("bound")),
+                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(x, upper)),
+            )))
+            val condition = SourceCondition().bound(x, BigFraction.ZERO, upper)
+            val reuse = LinearRefutationReuse(context, SourceLpBudget(), Cancellation.Never)
+            reuse.retain(SourceEvidence(scope.copy(condition = condition), SourceClaim.Refutation, conflict))
+            val conditions = listOf(SourceCondition(),
+                SourceCondition().bound(x, coefficient.negated(), upper),
+                SourceCondition().bound(x, coefficient.negated(), !upper))
 
-        for (condition in conditions) assertNull(reuse.find(condition))
+            for (candidate in conditions) assertNull(reuse.find(candidate))
+        }
     }
 
     @Test
