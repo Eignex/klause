@@ -3322,6 +3322,36 @@ Both Linux/amd64 captures retain original hashes, identity mappings, settings,
 cutoffs/pins and JAR/runtime identities. Ordered JFR-instrumented timings establish
 no throughput claim; native checks establish no independent witness or proof claim.
 
+[8540](https://lab.eignex.com/jobs/8540) and [8541](https://lab.eignex.com/jobs/8541),
+at `8fedad8329`, add the actual semantic selectors, three-input targets and the
+three-/four-input cycle controls. Both use identical JAR/runtime identities and
+the same allowance, owner, centers and seeds. Across 936 attempts, 102 semantic
+packet sizes mismatch their target and decline without repair or truncation.
+All 834 admitted counts match, with 164 acquired, 229 repaired and 834 descent
+points passing native original-source checks. Every admitted descent reaches a
+qualified coordinate-policy endpoint; all improvements survive it. Source hashes
+match all 48 requests. The 135 earlier root CP selections and outcomes reproduce.
+
+Matched fragment-origin improvements are:
+
+| Source | Movable counts | Trials | Conflict | Ablated random | Semantic | Adjacency | Objective |
+|---|---|---:|---:|---:|---:|---:|---:|
+| Assignment cycle | 3 | 3 | 0 | 0 | 3 | 1 | 0 |
+| Resource cycle | 2/3 | 6 | 0 | 0 | 3 | 1 | 0 |
+| Placement cycle | 3 | 3 | 1 | 0 | 3 | 3 | 0 |
+| Assignment four-cycle | 4 | 3 | 0 | 0 | 3 | 1 | 0 |
+
+The placement gain uses 9 native units and 3.01 MB thread allocation against
+ablated random's 5 units/2.91 MB and semantic removal's 13 units/2.80 MB.
+Its acquisition finds no improvement at this matched target. Assignment/resource
+attributions remain unavailable. Root acquisition reaches every cycle's optimum;
+its points remain separately credited. Complete semantic scopes equal or exceed
+conflict repairs on the two-input controls. Neither signal nor row-sized semantic
+freedoms improve Latin at the matched four-input target. Retain bounded conflict
+ranking for opt-in comparisons; these results reject promoting it over the existing
+selectors or acquisition companions. They do not decide numerical feedback or
+establish broad finite-source performance.
+
 ### Prepared board-restart outcomes
 
 The coordinate-changing treatment in [#3447](https://github.com/Eignex/klause/pull/3447)
