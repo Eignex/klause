@@ -127,6 +127,25 @@ class SourceNumericalFeedbackTest {
     }
 
     @Test
+    fun `cutoff construction should preserve objective direction and constant`() {
+        val funding = SourceLpFunding(1_000_000L, 4_000_000L).apply { grant(1_000_000L) }
+        val cutoff = SourceNumericalCutoff(BigFraction.ofLong(5), "improve")
+        for (sense in ObjectiveSense.entries) {
+            val context = SourceProofContext(scope.copy(objective = SourceObjective("2x+3", sense)),
+                source.coordinates, source.premises, mapOf(x to BigFraction.ofLong(2)), BigFraction.ofLong(3))
+
+            val query = assertNotNull(cutoff.applyTo(context, funding))
+
+            val expected = BigFraction.ofLong(if (sense == ObjectiveSense.MINIMIZE) 2L else -2L)
+            val row = query.premises.getValue("improve").inequality
+            assertEquals(mapOf(x to expected), row.coefficients)
+            assertEquals(expected, row.rhs)
+            assertTrue(row.strict)
+            assertTrue(cutoff.enforcedBy(query))
+        }
+    }
+
+    @Test
     fun `cutoff refutation support should remain local to the conditioned source`() {
         val funding = SourceLpFunding(1_000_000L, 4_000_000L).apply { grant(1_000_000L) }
         val feedback = SourceNumericalFeedback(funding, Cancellation.Never)

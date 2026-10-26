@@ -22,19 +22,37 @@ internal data class SourceNumericalCutoff(val value: BigFraction, val premise: S
         if (cancellation() || funding.paused || source.scope.objective == null || !source.affineObjectiveAvailable) {
             return null
         }
-        val entries = source.coordinates.size.toLong() + source.premises.size + source.objective.size
+        val coordinates = source.coordinates
+        val premises = source.premises
+        val objective = source.objective
+        var entries = coordinates.size.toLong() + premises.size + objective.size
         funding.charge(1L + entries, 256L + entries * 48L)
         if (entries > 250_000L || cancellation() || funding.exhausted ||
             value.num.magnitudeBitLength() > 4096 || value.den.magnitudeBitLength() > 4096 ||
             source.objectiveConstant.num.magnitudeBitLength() > 4096 ||
             source.objectiveConstant.den.magnitudeBitLength() > 4096) return null
-        if (premise in source.premises) return source.takeIf(::enforcedBy)
+        for (row in premises.values) {
+            val count = row.inequality.supportSize.toLong() + row.guards.size + row.integerPins.size
+            entries += count
+            funding.charge(count, count * 128L)
+            if (entries > 250_000L || cancellation() || funding.paused) return null
+        }
+        for (coefficient in objective.values) {
+            val numerator = coefficient.num.magnitudeBitLength()
+            val denominator = coefficient.den.magnitudeBitLength()
+            funding.charge(1L, 64L + (numerator.toLong() + denominator + 7L) / 8L)
+            if (numerator > 4096 || denominator > 4096 || cancellation() || funding.paused) return null
+        }
+        funding.charge(1L, 256L + (value.num.magnitudeBitLength().toLong() + value.den.magnitudeBitLength() +
+            source.objectiveConstant.num.magnitudeBitLength() + source.objectiveConstant.den.magnitudeBitLength()) / 4L)
+        if (cancellation() || funding.paused) return null
+        if (premise in premises) return source.takeIf(::enforcedBy)
         val minimize = source.scope.objective.sense == ObjectiveSense.MINIMIZE
-        val row = SourceInequality(source.objective.mapValues { (_, coefficient) ->
+        val row = SourceInequality(objective.mapValues { (_, coefficient) ->
             if (minimize) coefficient else coefficient.negated()
         }, if (minimize) value - source.objectiveConstant else source.objectiveConstant - value, strict = true)
-        return SourceProofContext(source.scope, source.coordinates, source.premises + (premise to SourcePremise(row)),
-            source.objective, source.objectiveConstant, source.semanticsChecker, source.semantics)
+        return SourceProofContext(source.scope, coordinates, premises + (premise to SourcePremise(row)),
+            objective, source.objectiveConstant, source.semanticsChecker, source.semantics)
     }
 
     fun enforcedBy(source: SourceProofContext): Boolean {
