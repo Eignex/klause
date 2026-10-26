@@ -41,6 +41,7 @@ internal class LinearActiveRows(
     private var state: State? = null
     private var pending: LinearAuthorityQuery? = null
     private var finished = false
+    private var ownerOpen = false
 
     fun check(
         condition: SourceCondition, cancellation: Cancellation, begin: () -> Boolean = { true },
@@ -69,6 +70,7 @@ internal class LinearActiveRows(
         }
         val zero = BigFraction.ZERO
         val costs = List(query.coordinates.size) { zero }
+        ownerOpen = true
         val guidance = lp.advance(query.closureRows, costs, zero, branch.scope, cancellation,
             query.inactive, query.unconditionalRows)
         if (cancellation()) {
@@ -106,8 +108,26 @@ internal class LinearActiveRows(
         }
         if (budget.funding?.paused == true) return LinearActiveResult(attempted = resumed == null, paused = true)
         pending = null
-        finished = true
+        finished = evidence == null
+        if (evidence != null) state = null
         return LinearActiveResult(evidence, attempted = resumed == null)
+    }
+
+    fun retract() {
+        if (pending != null) {
+            state = null
+            pending = null
+            finished = false
+        }
+        lp.invalidateGuidance()
+    }
+
+    fun release() {
+        if (pending != null) invalidate()
+        if (ownerOpen) {
+            lp.close()
+            ownerOpen = false
+        }
     }
 
     fun invalidate() {
@@ -120,7 +140,8 @@ internal class LinearActiveRows(
     override fun close() {
         state = null
         pending = null
-        lp.close()
+        finished = false
+        release()
     }
 }
 
