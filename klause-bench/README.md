@@ -1437,6 +1437,26 @@ a sixty-second outer deadline; cancellation is recorded. These instrumented walk
 isolate local trajectories; they establish neither default portfolio equivalence,
 throughput, native proof nor independently checked source feasibility.
 
+### Finite conflict selection
+
+`bench.profile.FiniteConflictSelection` takes `suite=ID problem=NAME sha256=HEX
+center=v0,v1,... seed=N` for a hash-pinned XCSP3 optimization source with an explicit
+feasible center. It admits an unchanged integer coordinate frame with every coordinate
+named in the source and no frontend-declared definitions, at most 1,024 coordinates
+and 4,096 factors. The source bytes, request and build identity accompany the records.
+
+Random, objective and adjacency removal compare with CP-conflict-supported removal
+at the same center and requested count. A separate acquisition-ablated random arm
+pays for the same 128-decision CP prefix as the guided arm. Acquisition and repair
+share one 2,000-unit native search allowance and a five-second deadline; capture,
+selection and source checks consume that deadline. Root-fixed coordinates are
+excluded, and effective definition-closed freedom counts must match before repair.
+Records retain captured support weights, unavailable/empty outcomes, acquisition
+points, repaired objectives, native original-source checks, work, allocation and
+separate acquisition/selection clocks. These instrumented controls establish no
+independent witness check, global proof, descent-basin classification or ordinary
+portfolio throughput.
+
 ### Table profiling
 
 `bench.profile.ExtensionalCompositionProfile` accepts `suite=ID problem=NAME

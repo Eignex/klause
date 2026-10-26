@@ -305,6 +305,16 @@ eligible for a later slice, adoption closes the bootstrap handles once, and seed
 acquisition renews no allowance. Imported samples carry no worker state or proof
 authority.
 
+Finite CP conflict-guided removal reads a bounded prefix of the repair's existing
+variable-selection conflict attributions. Its scores name coordinates in the same
+baked model, retaining the originating complement pins and objective cutoff. A hint
+can rank a later freedom at the same center; it cannot assert a clause, prune a repair
+or establish that changing a supported input admits improvement. A changed model,
+objective or center, a new repair, cancellation and close retire the snapshot.
+Missing callbacks and captured empty supports are distinct outcomes. Both use the
+ordinary random removal fallback. Capture admits at most 32 conflicts and 4,096
+coordinates; oversized supports decline as a whole.
+
 ### Handles and exclusive ownership
 
 Local-search handles retain assignment, RNG, factor payloads, restart progress and
