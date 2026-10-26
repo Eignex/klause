@@ -1375,6 +1375,16 @@ outside source readers requires a separate coordinate channel.
 
 ### Local-search trajectories
 
+`bench.profile.ChannelViewApplicability` accepts `request64=BASE64_JSON` containing
+one to eight `{suite, problem, sha256}` records for XCSP3 sources. It reports the
+source hint kinds, admitted source definition nodes, retained nodes when value or
+predicate channels become searched, and bounded native inverse-role applicability.
+Each source has a thirty-second allowance; cancellation and original bytes remain
+with the report. This source-only screen does not stand in for mapped working-model
+applicability or paired-state grading. Inverse-role experiments transpose only
+disjoint native `Inverse` factors, at most sixteen relations of at most 64 entries,
+retaining every other factor, source domain and implied-factor role.
+
 `bench.profile.LocalSearchTrajectory` takes `suite=ID problem=NAME sha256=HEX
 recipe=LABEL seed=N moves=N` for a hash-pinned minimizing XCSP3 source. It compares
 protected and substituted objective coordinates through mixed-route preparation,
