@@ -44,7 +44,9 @@ internal data class LinearAuthorityAggregateProbeResult(
 )
 
 internal object LinearAuthorityAggregateCuts {
-    private class ProbeRow(val term: LinearAuthorityAggregateTerm, val coefficients: Map<SourceCoordinate, BigFraction>) {
+    private class ProbeRow(
+        val term: LinearAuthorityAggregateTerm, val coefficients: Map<SourceCoordinate, BigFraction>,
+    ) {
         val realCount = coefficients.keys.count { it.kind == SourceCoordinate.Kind.Real }
         val hasInteger = coefficients.keys.any { it.kind == SourceCoordinate.Kind.Integer }
     }
