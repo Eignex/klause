@@ -3938,7 +3938,7 @@ from `50000000/230000001` to `25000000/107499989`. Original bytes, exact rows,
 weights, bound citations and scopes remain in the capture. This instrumented
 inspection supplies neither an independent proof check nor a whole-CLI timing claim.
 
-`MpsProofFrontier selection=true` retains up to 64 completed same-parent query
+`MpsProofFrontier frontier=true selection=true` retains up to 64 completed same-parent query
 records in `selection.json`, within one million modeled entries, 16 MiB modeled
 retention and a separate 30-second observation/inspection allowance. Records keep
 exact points before primal recovery, original and Boolean-substituted source
