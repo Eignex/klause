@@ -91,6 +91,21 @@ class SourceNumericalFeedbackTest {
     }
 
     @Test
+    fun `a missing affine objective should differ from a constant objective`() {
+        val funding = SourceLpFunding(1_000_000L, 4_000_000L).apply { grant(1_000_000L) }
+        val feedback = SourceNumericalFeedback(funding, Cancellation.Never)
+        val missing = SourceProofContext(scope, source.coordinates, source.premises)
+        val constant = SourceProofContext(scope, source.coordinates, source.premises, emptyMap())
+        val result = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use { authority ->
+            feedback.acquire(authority, missing).feedback
+        }
+
+        val available = assertIs<SourceNumericalFeedbackResult.Available>(result)
+        assertTrue(available.compatible(missing, null))
+        assertFalse(available.compatible(constant, null))
+    }
+
+    @Test
     fun `guard retraction should expose the newly queried relaxation instead of stale feedback`() {
         val funding = SourceLpFunding(1_000_000L, 4_000_000L).apply { grant(1_000_000L) }
         val feedback = SourceNumericalFeedback(funding, Cancellation.Never)
