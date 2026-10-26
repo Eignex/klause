@@ -1,0 +1,174 @@
+{
+  "cases": [
+    {
+      "suite": "smtlib-nonlinear-integer-cells-v1",
+      "name": "powers/square-1",
+      "path": "klause-bench/smoke-corpus/nonlinear-integer-cells-v1/powers/square-1.smt2",
+      "sha256": "20cf9b97e16df64d191ea2b1b751310d02320662eb8e797493a9b80d25e3e452",
+      "expected": "unsat",
+      "group": "core",
+      "license": "Apache-2.0",
+      "attribution": "Self-authored Eignex Klause regression fixture"
+    },
+    {
+      "suite": "smtlib-nonlinear-integer-cells-v1",
+      "name": "powers/square-2",
+      "path": "klause-bench/smoke-corpus/nonlinear-integer-cells-v1/powers/square-2.smt2",
+      "sha256": "2adad45b1152df996cff758e30c889c9716b230451ffb0f20dc1a15cabf56e79",
+      "expected": "unsat",
+      "group": "core",
+      "license": "Apache-2.0",
+      "attribution": "Self-authored Eignex Klause regression fixture"
+    },
+    {
+      "suite": "smtlib-nonlinear-integer-cells-v1",
+      "name": "powers/square-4",
+      "path": "klause-bench/smoke-corpus/nonlinear-integer-cells-v1/powers/square-4.smt2",
+      "sha256": "0fed07ef60e19acf2cd128913dbd23e0f2f1f948384e05cf26ddb64501506df4",
+      "expected": "unsat",
+      "group": "core",
+      "license": "Apache-2.0",
+      "attribution": "Self-authored Eignex Klause regression fixture"
+    },
+    {
+      "suite": "smtlib-nonlinear-integer-cells-v1",
+      "name": "powers/square-8",
+      "path": "klause-bench/smoke-corpus/nonlinear-integer-cells-v1/powers/square-8.smt2",
+      "sha256": "d57eab354a8935746aef65ef3e5ed6357790e90783fcecbd9d3008bfaa3a9a64",
+      "expected": "unsat",
+      "group": "core",
+      "license": "Apache-2.0",
+      "attribution": "Self-authored Eignex Klause regression fixture"
+    },
+    {
+      "suite": "smtlib-nonlinear-integer-cells-v1",
+      "name": "degree/power-4",
+      "path": "klause-bench/smoke-corpus/nonlinear-integer-cells-v1/degree/power-4.smt2",
+      "sha256": "3e78c39a5492c65297fbf68a4adf72d093a14b24f18c53e0ef1feb885ae5cc55",
+      "expected": "unsat",
+      "group": "core",
+      "license": "Apache-2.0",
+      "attribution": "Self-authored Eignex Klause regression fixture"
+    },
+    {
+      "suite": "smtlib-nonlinear-integer-cells-v1",
+      "name": "degree/power-8",
+      "path": "klause-bench/smoke-corpus/nonlinear-integer-cells-v1/degree/power-8.smt2",
+      "sha256": "e5478e5dd6affa89dee8c5e49e06f6f20de06b84b2b9a611742464da2ed2742f",
+      "expected": "unsat",
+      "group": "core",
+      "license": "Apache-2.0",
+      "attribution": "Self-authored Eignex Klause regression fixture"
+    },
+    {
+      "suite": "smtlib-nonlinear-integer-cells-v1",
+      "name": "degree/power-16",
+      "path": "klause-bench/smoke-corpus/nonlinear-integer-cells-v1/degree/power-16.smt2",
+      "sha256": "1d92b3c4f9a21fad2df0cd6efc123dcd33bd0fcb2e338d1ccc64b04f000d8d8a",
+      "expected": "unsat",
+      "group": "core",
+      "license": "Apache-2.0",
+      "attribution": "Self-authored Eignex Klause regression fixture"
+    },
+    {
+      "suite": "smtlib-nonlinear-integer-cells-v1",
+      "name": "degree/power-17",
+      "path": "klause-bench/smoke-corpus/nonlinear-integer-cells-v1/degree/power-17.smt2",
+      "sha256": "3b2e0ea54c5e33835e738daa2ea40629a9f2fc4dd7bbfd339a07681aaa14707a",
+      "expected": "unsat",
+      "group": "core",
+      "license": "Apache-2.0",
+      "attribution": "Self-authored Eignex Klause regression fixture"
+    },
+    {
+      "suite": "smtlib-nonlinear-integer-cells-v1",
+      "name": "cubic/root-neighbor",
+      "path": "klause-bench/smoke-corpus/nonlinear-integer-cells-v1/cubic/root-neighbor.smt2",
+      "sha256": "9fa570fd4d2097f85d368d3130b1e989f88630df536d8596374cdc8bb46871a3",
+      "expected": "sat",
+      "group": "holdout",
+      "license": "Apache-2.0",
+      "attribution": "Self-authored Eignex Klause regression fixture"
+    },
+    {
+      "suite": "smtlib-nonlinear-integer-cells-v1",
+      "name": "repeated/root-neighbor",
+      "path": "klause-bench/smoke-corpus/nonlinear-integer-cells-v1/repeated/root-neighbor.smt2",
+      "sha256": "ea99e77796eede47dfb3cee7b0fd0ba782f31b046e58700238455b4a97840cc5",
+      "expected": "sat",
+      "group": "holdout",
+      "license": "Apache-2.0",
+      "attribution": "Self-authored Eignex Klause regression fixture"
+    },
+    {
+      "suite": "smtlib-nonlinear-integer-cells-v1",
+      "name": "rational/positive-empty",
+      "path": "klause-bench/smoke-corpus/nonlinear-integer-cells-v1/rational/positive-empty.smt2",
+      "sha256": "3f9a5ba1715f48f657686328c4cbe40107989ceab4148fb573943374496a4661",
+      "expected": "unsat",
+      "group": "holdout",
+      "license": "Apache-2.0",
+      "attribution": "Self-authored Eignex Klause regression fixture"
+    },
+    {
+      "suite": "smtlib-nonlinear-integer-cells-v1",
+      "name": "rational/negative-empty",
+      "path": "klause-bench/smoke-corpus/nonlinear-integer-cells-v1/rational/negative-empty.smt2",
+      "sha256": "84175015e6e8ade464ce6895b0570ec10ad568c45ddfdf52bf046ce78f68988f",
+      "expected": "unsat",
+      "group": "holdout",
+      "license": "Apache-2.0",
+      "attribution": "Self-authored Eignex Klause regression fixture"
+    },
+    {
+      "suite": "smtlib-nonlinear-integer-cells-v1",
+      "name": "annulus/strict-empty",
+      "path": "klause-bench/smoke-corpus/nonlinear-integer-cells-v1/annulus/strict-empty.smt2",
+      "sha256": "3926e6d323236f65ce5f80d2576965df87aacd8e1a23b78b3b6f4b8e041a7595",
+      "expected": "unsat",
+      "group": "holdout",
+      "license": "Apache-2.0",
+      "attribution": "Self-authored Eignex Klause regression fixture"
+    },
+    {
+      "suite": "smtlib-nonlinear-integer-cells-v1",
+      "name": "annulus/closed-neighbor",
+      "path": "klause-bench/smoke-corpus/nonlinear-integer-cells-v1/annulus/closed-neighbor.smt2",
+      "sha256": "09fa642794779b40bc05faec206192edc19800d6c7ffa24575de1fc2c09d67bd",
+      "expected": "sat",
+      "group": "holdout",
+      "license": "Apache-2.0",
+      "attribution": "Self-authored Eignex Klause regression fixture"
+    },
+    {
+      "suite": "smtlib-nonlinear-integer-cells-v1",
+      "name": "boolean/conditional-neighbor",
+      "path": "klause-bench/smoke-corpus/nonlinear-integer-cells-v1/boolean/conditional-neighbor.smt2",
+      "sha256": "2585ca4290c933c7c64b1b6db1464d41d1085c553dfa3ff270c45fcc71d0e12b",
+      "expected": "sat",
+      "group": "holdout",
+      "license": "Apache-2.0",
+      "attribution": "Self-authored Eignex Klause regression fixture"
+    },
+    {
+      "suite": "smtlib-nonlinear-integer-cells-v1",
+      "name": "mixed/singular-empty",
+      "path": "klause-bench/smoke-corpus/nonlinear-integer-cells-v1/mixed/singular-empty.smt2",
+      "sha256": "b557238e232c3f50b5d5fa8279fe11cd56e115e000513d4d129320ba2a2e48a3",
+      "expected": "unsat",
+      "group": "holdout",
+      "license": "Apache-2.0",
+      "attribution": "Self-authored Eignex Klause regression fixture"
+    },
+    {
+      "suite": "smtlib-nonlinear-integer-cells-v1",
+      "name": "wide/integer-neighbor",
+      "path": "klause-bench/smoke-corpus/nonlinear-integer-cells-v1/wide/integer-neighbor.smt2",
+      "sha256": "d1adf7d75bb919a434614db573c37de961f3138355223caaeab639105d23208a",
+      "expected": "sat",
+      "group": "holdout",
+      "license": "Apache-2.0",
+      "attribution": "Self-authored Eignex Klause regression fixture"
+    }
+  ]
+}
