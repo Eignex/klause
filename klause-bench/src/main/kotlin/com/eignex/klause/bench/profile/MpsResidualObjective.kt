@@ -59,15 +59,7 @@ internal object MpsResidualObjective {
     @Suppress("UNCHECKED_CAST")
     fun inspect(request: JsonObject, out: File) {
         fun option(key: String) = request.getValue(key).jsonPrimitive.content
-        val bytes = request["sourceGzip64"]?.jsonPrimitive?.content?.let { encoded ->
-            GZIPInputStream(ByteArrayInputStream(Base64.getDecoder().decode(encoded))).use {
-                it.readNBytes(16 * 1024 * 1024 + 1)
-            }
-        } ?: run {
-            val selected = Catalog.uncapped(option("suite")).problems.single { it.name == option("problem") }
-            CorpusFiles.open(CorpusFetcher.resolve(selected.source)).use { it.readNBytes(16 * 1024 * 1024 + 1) }
-        }
-        require(bytes.size <= 16 * 1024 * 1024 && sha256(bytes) == option("sha256"))
+        val bytes = sourceBytes(request)
         out.resolve("source.mps").writeBytes(bytes)
         out.resolve("request.json").writeText(request.toString())
         val stop = Cancellation.after(20.seconds)
@@ -182,6 +174,20 @@ internal object MpsResidualObjective {
         newValues?.let { next -> out.resolve("refined-witness.txt").writeText("v " +
             source.variables.indices.joinToString(" ") { "${source.variables[it].name}=${next[it]}" } + "\n") }
         println(result)
+    }
+
+    fun sourceBytes(request: JsonObject): ByteArray {
+        fun option(key: String) = request.getValue(key).jsonPrimitive.content
+        val bytes = request["sourceGzip64"]?.jsonPrimitive?.content?.let { encoded ->
+            GZIPInputStream(ByteArrayInputStream(Base64.getDecoder().decode(encoded))).use {
+                it.readNBytes(16 * 1024 * 1024 + 1)
+            }
+        } ?: run {
+            val selected = Catalog.uncapped(option("suite")).problems.single { it.name == option("problem") }
+            CorpusFiles.open(CorpusFetcher.resolve(selected.source)).use { it.readNBytes(16 * 1024 * 1024 + 1) }
+        }
+        require(bytes.size <= 16 * 1024 * 1024 && sha256(bytes) == option("sha256"))
+        return bytes
     }
 
     fun rational(text: String): BigFraction {

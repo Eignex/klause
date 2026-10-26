@@ -28,6 +28,28 @@ import kotlin.test.assertTrue
 
 class JointLinearRepairTest {
     @Test
+    fun `a freed integer should complete its affine backing at a lower objective`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0),
+            longArrayOf(1, 1), null, null), factors = arrayOf(
+            Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.EQ, 0),
+        ))
+        val objective = LinearObjective(intCoefficients = longArrayOf(0, 1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val center = Sample(BooleanArray(0), longArrayOf(1, 1))
+        val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap(), BigFraction.ONE)
+        JointLinearRepair(model, source, objective, TheoryParams(), external = { center }).use { repair ->
+            var result = repair.check(condition, Cancellation.Never)
+            repeat(64) {
+                if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, Cancellation.Never)
+            }
+
+            val point = assertIs<ExactNeighborhoodResult.Witness>(result).sample
+            assertEquals(0L, point.intValue(0))
+            assertEquals(0L, point.intValue(1))
+        }
+    }
+
+    @Test
     fun `an unconsumed improving ray should not report conditioned exhaustion`() {
         val model = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
