@@ -239,6 +239,29 @@ class PolynomialBooleanRegionsTest {
     }
 
     @Test
+    fun `replacement snapshots discard exclusions over reused atom identities`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (declare-const y Real) (declare-const gate Bool) " +
+                "(assert (or gate (and (> x 0) (> y 0) (< (* x y) 0))))",
+        )
+        val arithmetic = PolynomialArithmetic()
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+        val progress = PolynomialQueryProgress()
+        val original = formula.booleanRegions(arithmetic, progress).asSequence().filterNotNull().toList()
+        val replacement = formula.withAtoms(formula.atoms.map { atom ->
+            if (atom.relation == PolynomialRelation.LT) atom.copy(relation = PolynomialRelation.GT) else atom
+        }, arithmetic)
+
+        val regions = replacement.booleanRegions(arithmetic).asSequence().filterNotNull().toList()
+
+        assertEquals(1L, progress.partialConflicts)
+        assertTrue(original.all { it.atoms.isEmpty() && it.bools.getValue(0) })
+        assertTrue(regions.any { it.atoms.isNotEmpty() })
+        assertTrue(regions.any { it.bools[0] == true })
+        assertTrue(formula.atoms.any { it.relation == PolynomialRelation.LT })
+    }
+
+    @Test
     fun `partial conflicts can exhaust both numeric guard alternatives`() {
         val source = SmtLibPolynomial.parse(
             "(declare-const x Real) (declare-const y Real) (declare-const gate Bool) " +
