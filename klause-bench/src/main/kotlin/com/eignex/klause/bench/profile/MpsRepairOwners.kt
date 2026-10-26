@@ -60,14 +60,16 @@ internal object MpsRepairOwners {
                 val report = out.resolve("repair-$index.json")
                 if (!report.exists()) continue
                 val saved = Json.parseToJsonElement(report.readText()).jsonObject
-                val freed = saved.getValue("effectiveFreedIntegers").jsonArray
-                    .map { it.jsonPrimitive.content.toInt() }
+                val freed = saved["effectiveFreedIntegers"]?.jsonArray
+                    ?.map { it.jsonPrimitive.content.toInt() }
                 writer.appendLine(buildJsonObject {
                     put("selector", "captured-mixed-source-freedoms")
                     put("candidateIndex", index)
                     put("center", RepairOwnerReplay.sample(center))
                     put("centerObjective", objective.evaluate(center))
-                    put("effectiveInts", JsonArray((freed + backings).distinct().map(::JsonPrimitive)))
+                    put("effectiveInts", JsonArray(if (freed == null) emptyList()
+                        else (freed + backings).distinct().map(::JsonPrimitive)))
+                    if (freed == null) put("decline", "captured proposal has no available effective scope")
                 }.toString())
             }
         }
