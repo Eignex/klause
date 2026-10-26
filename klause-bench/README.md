@@ -4542,3 +4542,25 @@ support unchanged complete-check accounting, with no partial-policy benefit or
 throughput claim. Useful captured conflicts qualify the bounded internal consumer;
 inactive-state cost and original-source applicability keep automatic activation
 disabled.
+
+### Exact univariate refinement profiles
+
+`PolynomialPhaseProfile refinement=true|both` enables the internal query option;
+`both` retains `control-trace.json` with refinement disabled at the identical revision,
+source bytes, requested fixing, representation limits and containing allowance.
+`cellRefinement` counts candidate coordinates, completed checked cells, repeated
+candidates, repaired coordinates, private declines and cumulative optional native
+work. The containing native snapshot includes refinement and complete fallback.
+The optional path shares 16,384 units across snapshot replacements, admits degree16,
+64-term predicates with 4,096-bit coefficients, and retains at most eight cells.
+Seeds and regional support have a 64-coordinate/premise ceiling. A missing cell or
+candidate is a bounded decline, not a source verdict.
+
+`checkedCells` serializes the completed typed facts after the query: numeric predicates,
+exact algebraic endpoints, closure and source/query/regional scope. Source support
+means a mandatory predicate of the original unconditioned polynomial formula.
+Conditional records retain all query bounds/Booleans; regional records also retain
+signed premise IDs and process-local snapshot/reduction identities. Those identities
+are not persistent source mappings. Serialized diagnostics are not a replay or
+independent proof format. Source checking, native UNSAT, component candidate entry,
+projection counts, total cost and physical resource receipts remain separate claims.
