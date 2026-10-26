@@ -607,7 +607,7 @@ internal object LocalSearchTrajectory {
         }
     }
 
-    private fun getter(owner: Any, name: String): Any? = owner.javaClass.methods.single {
+    internal fun getter(owner: Any, name: String): Any? = owner.javaClass.methods.single {
         it.name.substringBefore('$') == name && it.parameterCount == 0
     }.invoke(owner)
 
