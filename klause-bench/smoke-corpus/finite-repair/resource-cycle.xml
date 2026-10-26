@@ -1,0 +1,20 @@
+<instance format="XCSP3" type="COP">
+  <variables>
+    <var id="x0"> 0 1 </var>
+    <var id="x1"> 0..2 </var>
+    <var id="x2"> 0..2 </var>
+    <var id="x3"> 1 2 </var>
+    <var id="x4"> 0..2 </var>
+    <var id="x5"> 0..2 </var>
+    <var id="x6"> 0 2 </var>
+  </variables>
+  <constraints>
+    <cumulative>
+      <origins> x0 x3 x6 </origins>
+      <lengths> 1 1 1 </lengths>
+      <heights> 1 1 1 </heights>
+      <condition> (le,1) </condition>
+    </cumulative>
+  </constraints>
+  <objectives><minimize> x6 </minimize></objectives>
+</instance>
