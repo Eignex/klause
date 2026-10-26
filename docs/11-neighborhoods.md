@@ -278,6 +278,25 @@ destruction grows breadth-first through factor occurrences; repair scopes releas
 both ends of unit Boolean definitions, and caller pins stay in the repair
 assumptions.
 
+The internal opt-in `SemanticBlockRemoval` selects complete mandatory
+AllDifferent scopes, contiguous windows in a resource's current start order, or
+placement contact blocks within two hops. Resource packets include start,
+duration, demand, presence and capacity roles; rectangle packets include both
+positions and variable sizes. Shared mutable roles expand their packets to a
+fixed point. Optional or excepted assignment shapes and non-positive placement
+geometry decline explicitly. The default removal palette is unchanged.
+
+Block closure follows the supplied immutable definition network upstream from
+selected roles to searched inputs, then downstream from those inputs to affected
+outputs. Conservative Element readers retain alternative selections. Downstream
+outputs do not release unrelated inputs of a shared expression. Root-fixed integer
+roles stay fixed; a required caller pin declines the block. Complement pins use
+the existing repair scope, and ordinary CP retains every source constraint.
+Selection charges visits to the caller's work meter and caps visits, searched
+inputs and working coordinates. Cancellation or a limit returns an explicit
+decline without partial freedoms. Selection retains only bounded diagnostics;
+it has no resumable cursor and does not renew an interrupted allowance.
+
 Before and during its bootstrap, ALNS checks a supplied assignment and the latest
 verified shared incumbent. A candidate must cover all coordinates, satisfy the
 current model and assumptions and pass the shared source witness checker; ALNS

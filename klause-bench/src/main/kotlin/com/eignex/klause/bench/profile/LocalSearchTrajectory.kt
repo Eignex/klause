@@ -77,7 +77,7 @@ internal object LocalSearchTrajectory {
     private fun capture(args: Array<String>, out: File) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val required = setOf("suite", "problem", "sha256", "recipe", "seed", "moves")
-        val optional = setOf("sliceMillis", "sliceWork", "greedy", "repairs", "controls", "center", "source64")
+        val optional = setOf("sliceMillis", "sliceWork", "greedy", "repairs", "controls", "center", "source64", "selectors")
         require(options.keys.containsAll(required) && options.keys.all {
             it in required || it in optional
         })
@@ -107,8 +107,10 @@ internal object LocalSearchTrajectory {
         val repairGreedy = options["greedy"]?.toBooleanStrict() ?: true
         val repairCapture = options["repairs"]?.toBooleanStrict() ?: false
         val exactControls = options["controls"]?.toBooleanStrict() ?: false
+        val selectors = options["selectors"]?.toBooleanStrict() ?: false
         val sourceCheck = if (repairCapture) parsed.problem.bake() else null
         require(!exactControls || repairCapture)
+        require(!selectors || repairCapture)
         val sourceInputs = parsed.intVarNames.values.distinct().filter { it !in parsed.definedVars }.toIntArray()
         out.resolve("source-inputs.json").writeText(buildJsonObject {
             put("declaredInputs", JsonArray(sourceInputs.map(::JsonPrimitive)))
@@ -163,6 +165,8 @@ internal object LocalSearchTrajectory {
             val hints = heuristicHints(invocation, prepared, stop)
             val sweep = hints?.let { getter(it, "getSweep") as DefinitionalSweep? }
             val gradient = hints?.let { getter(it, "getObjective") as IncrementalObjective? }
+            if (selectors) SemanticRepairComparison.capture(problem, workingObjective, requireNotNull(initial),
+                sweep, sourceInputs, prepared, checkNotNull(sourceCheck), out, seed)
             out.resolve("model-$rewrite.json").writeText(buildJsonObject {
                 put("preparationNanos", System.nanoTime() - preparationStarted)
                 put("objective", workingObjective.toString())

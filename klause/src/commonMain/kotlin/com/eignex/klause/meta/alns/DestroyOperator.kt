@@ -4,9 +4,11 @@ import com.eignex.klause.localsearch.LocalSearchProblem
 import com.eignex.klause.localsearch.LocalSearchSession
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.EmptyIntArray
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
@@ -27,6 +29,16 @@ internal fun interface DestroyOperator {
         objective: LinearObjective,
         fraction: Double,
     ): FreedVars
+
+    fun destroy(
+        rng: Random,
+        problem: BakedProblem,
+        incumbent: Sample,
+        objective: LinearObjective,
+        fraction: Double,
+        assumptions: Assumptions,
+        cancellation: Cancellation,
+    ): FreedVars = destroy(rng, problem, incumbent, objective, fraction)
 
     companion object {
         /** Free a uniformly-random subset of `fraction * totalVars` variables: the diversifying baseline. */

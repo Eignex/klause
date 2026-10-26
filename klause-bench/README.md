@@ -1410,6 +1410,16 @@ Scopes of at most six coordinates also enumerate every nonempty proper subset,
 so completed controls can distinguish a coordinated barrier from missed smaller
 freedoms. `recipe=cbls-extended/fixed` adds the existing extended structured source
 to the catalog's fixed plateau recipe for comparison with richer move controls.
+`selectors=true` requires an explicit center and compares the opt-in semantic
+selector with Random, WorstObjective, AdjacencyRelated and eligible source-input
+samples over sixteen seeds. All arms use the same center, ordinary CP owner,
+10,000 decisions per repair and a shared fifteen-second allowance. Existing
+selectors receive the semantic block's source count as their nominal target;
+definition closure and root-fixed exclusions can change the effective count,
+which is recorded rather than clipped. Eligible samples match source counts on
+the definition-free controls. Selector/closure visits, physical selection and
+repair allocations/times, and shared setup cost remain separate. Ordered cold
+captures establish capability and costs, without a throughput claim.
 The capture reports native original-source checks separately from independent
 witness checking and carries no unpinned proof claim. `center=v0,v1,...` admits
 only an unchanged finite coordinate frame without declared definitions, disables
