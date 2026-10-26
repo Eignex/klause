@@ -62,13 +62,16 @@ internal class TrajectoryView(
         return if (sameSource(source, reconstruct(state.assignment.snapshot()))) null else "source-round-trip"
     }
 
-    fun probe(sourceMove: Move): JsonObject {
-        val move = when (sourceMove) {
-            is Move.BoolFlip -> coordinates.bool(sourceMove.varId).takeIf { it >= 0 }?.let { Move.BoolFlip(it) }
-            is Move.IntSet -> coordinates.int(sourceMove.varId).takeIf { it >= 0 }
-                ?.let { Move.IntSet(it, sourceMove.newValue) }
-            else -> null
-        } ?: return buildJsonObject { put("decline", "unmapped-primitive") }
+    private fun projectedMove(sourceMove: Move): Move? = when (sourceMove) {
+        is Move.BoolFlip -> coordinates.bool(sourceMove.varId).takeIf { it >= 0 }?.let { Move.BoolFlip(it) }
+        is Move.IntSet -> coordinates.int(sourceMove.varId).takeIf { it >= 0 }
+            ?.let { Move.IntSet(it, sourceMove.newValue) }
+        else -> null
+    }
+
+    fun admits(sourceMove: Move): Boolean = projectedMove(sourceMove)?.let { candidateDecline(it) == null } == true
+
+    private fun candidateDecline(move: Move): String? {
         val sink = MoveSink(state.assumptions).apply {
             setInvariants(state.invariants)
             setOwners(capturedOwners)
@@ -77,13 +80,18 @@ internal class TrajectoryView(
             is Move.BoolFlip -> sink.addBoolFlip(move.varId)
             is Move.IntSet -> {
                 if (move.newValue !in state.rootDomains[move.varId]) {
-                    return buildJsonObject { put("decline", "candidate-domain") }
+                    return "candidate-domain"
                 }
                 sink.addIntSet(move.varId, move.newValue)
             }
             else -> error("primitive expected")
         }
-        if (sink.list.isEmpty()) return buildJsonObject { put("decline", "candidate-filter") }
+        return if (sink.list.isEmpty()) "candidate-filter" else null
+    }
+
+    fun probe(sourceMove: Move): JsonObject {
+        val move = projectedMove(sourceMove) ?: return buildJsonObject { put("decline", "unmapped-primitive") }
+        candidateDecline(move)?.let { decline -> return buildJsonObject { put("decline", decline) } }
         val boundary = trajectoryRandomBoundary(state)
         val inspection = state.inspectMove(move, objective)
         check(boundary == trajectoryRandomBoundary(state))
@@ -107,6 +115,14 @@ internal class TrajectoryView(
 
     fun snapshot(): JsonObject = buildJsonObject {
         put("source", trajectorySource(reconstruct(state.assignment.snapshot())))
+        put("workingBooleans", JsonArray((0 until state.problem.numBoolVars).map {
+            JsonPrimitive(state.assignment.boolValue(it))
+        }))
+        put("workingIntegers", JsonArray((0 until state.problem.numIntVars).map {
+            JsonPrimitive(state.assignment.intValue(it))
+        }))
+        put("sourceBooleanSlots", JsonArray((0 until coordinates.boolCount).map { JsonPrimitive(coordinates.bool(it)) }))
+        put("sourceIntegerSlots", JsonArray((0 until coordinates.intCount).map { JsonPrimitive(coordinates.int(it)) }))
         put("cost", state.cost)
         put("degrees", JsonArray(state.factorDegree.map(::JsonPrimitive)))
         put("violatedOrder", JsonArray(state.violated.toIntArray().map(::JsonPrimitive)))
@@ -124,8 +140,11 @@ internal fun trajectoryPair(
 ): JsonObject {
     require(candidates.size <= 32)
     val started = System.nanoTime()
+    val leftRandom = trajectoryRandomBoundary(left.state)
+    val rightRandom = trajectoryRandomBoundary(right.state)
     val leftDecline = left.load(source)
     val rightDecline = right.load(source)
+    check(leftRandom == trajectoryRandomBoundary(left.state) && rightRandom == trajectoryRandomBoundary(right.state))
     return buildJsonObject {
         put("source", trajectorySource(source))
         put("left", left.label)

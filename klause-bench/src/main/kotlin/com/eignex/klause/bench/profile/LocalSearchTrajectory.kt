@@ -121,7 +121,8 @@ internal object LocalSearchTrajectory {
         val views = ArrayList<TrajectoryView>()
         val observations = ArrayList<Observation>()
         out.resolve("capture-policy.json").writeText(buildJsonObject {
-            put("revision", Reports.readGitSha())
+            put("revision", Reports.readGitSha() ?: System.getenv("LAB_WORKTREE")?.let(::File)?.name
+                ?.takeIf { it.matches(Regex("[0-9a-f]{40}")) })
             put("sourceSha256", sha256(bytes))
             put("declaredSemantics", parsed.semantics.declared.toString())
             put("effectiveSemantics", parsed.semantics.effective.toString())
@@ -330,21 +331,35 @@ internal object LocalSearchTrajectory {
                 val candidates = ArrayList<Move>()
                 for (variable in 0 until source.numBoolVars) {
                     if (candidates.size == 32) break
-                    candidates += Move.BoolFlip(variable)
+                    val move = Move.BoolFlip(variable)
+                    if (views.all { it.admits(move) }) candidates += move
                 }
                 val first = focus - parsed.problem.numBoolVars
                 val integerOrder = (listOf(first).filter { it in 0 until source.numIntVars } +
                     (0 until source.numIntVars)).distinct()
                 for (variable in integerOrder) {
                     if (candidates.size == 32) break
-                    val domain = requireNotNull(parsed.problem.intDomainOrNull(variable))
                     val current = source.intValue(variable)
-                    for (value in listOf(domain.min, domain.max).distinct()) {
-                        if (value != current && candidates.size < 32) candidates += Move.IntSet(variable, value)
+                    val values = views.flatMap { view ->
+                        val target = view.coordinates.int(variable)
+                        if (target < 0) emptyList() else {
+                            val domain = view.state.rootDomains[target]
+                            buildList {
+                                add(domain.min)
+                                add(domain.max)
+                                if (current > domain.min) add(domain.lower(current))
+                                if (current < domain.max) add(domain.higher(current))
+                            }
+                        }
+                    }
+                    for (value in values.distinct()) {
+                        val move = Move.IntSet(variable, value)
+                        if (value != current && candidates.size < 32 && views.all { it.admits(move) }) candidates += move
                     }
                 }
                 writer.appendLine(buildJsonObject {
                     put("observation", label)
+                    put("candidatePolicy", "common admissible root endpoints and adjacent values; focus coordinate first")
                     put("comparison", trajectoryPair(source, candidates, views[0], views[1]))
                 }.toString())
                 writer.flush()
