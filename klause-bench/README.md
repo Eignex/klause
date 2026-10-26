@@ -1649,6 +1649,28 @@ after descent stay separate from repair acceptance. These instrumented controls
 establish no independent witness check, global proof, basin classification or
 ordinary portfolio throughput.
 
+`numerical=true` adds exact relaxation-disagreement, producer-projected refutation
+support and numerical-acquisition-ablated random arms. These admit the unchanged
+integer frame only when its complete affine source context is available.
+`numerical-cuts=true|false` selects the acquisition's existing cut policy. Each
+numerical acquisition advances the real source authority once; context preparation,
+the strict query-local objective cutoff, capture, projection and selection debit
+one containing source funding ledger. Objective cutoffs retain the supplied source
+direction and units. The same acquisition's recovered incumbent is source-checked
+and separately credited; its pre-recovery point remains relaxation guidance.
+Integral complete points also receive the original-source finite check; fractional
+or incomplete integer points are explicitly not source witnesses.
+
+Numerical comparisons give every arm a 2,000,000-unit containing ceiling, the sum
+of native search units and modeled source work, with the same five-second deadline,
+1,000-decision repair and 128-move descent limits. Both work components, source
+allocation, physical time and thread allocation remain separate; their units do
+not imply equal CPU cost. Numerical owners close within acquisition accounting.
+The existing bounded numerical journal retains scopes, points, masks, supports and
+native evidence checks. Whole-packet/count mismatches and unavailable feedback
+remain explicit. Linear [fixture controls](smoke-corpus/finite-repair-evidence/README.md)
+separate coordinated freedoms, fractional guidance and independent recovery.
+
 ### Table profiling
 
 `bench.profile.ExtensionalCompositionProfile` accepts `suite=ID problem=NAME

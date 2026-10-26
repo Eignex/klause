@@ -1,0 +1,14 @@
+<instance format="XCSP3" type="COP">
+  <variables>
+    <var id="x0"> 0..1 </var>
+    <var id="x1"> 0..1 </var>
+    <var id="x2"> 0..1 </var>
+    <var id="x3"> 0..1 </var>
+    <var id="x4"> 0..1 </var>
+    <var id="x5"> 0..1 </var>
+  </variables>
+  <constraints>
+    <sum><list> x0 x3 </list><coeffs> 1 1 </coeffs><condition> (eq,1) </condition></sum>
+  </constraints>
+  <objectives><minimize> x0 </minimize></objectives>
+</instance>

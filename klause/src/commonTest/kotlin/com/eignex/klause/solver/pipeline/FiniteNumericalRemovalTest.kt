@@ -117,6 +117,32 @@ class FiniteNumericalRemovalTest {
     }
 
     @Test
+    fun `maximizing source cutoffs should retain original objective units`() {
+        val funding = SourceLpFunding(1_000_000, 4_000_000).apply { grant(1_000_000) }
+        val original = requireNotNull(problem.linearAuthorityContext(objective.negated(), ObjectiveSense.MAXIMIZE,
+            Cancellation.Never))
+        val pins = Assumptions.None.withInt(3, 0)
+        val pinned = original.atScope(original.scope.copy(condition = pins.sourceCondition()))
+        val cutoff = SourceNumericalCutoff(BigFraction.MINUS_ONE, "repair-improvement")
+        val query = assertNotNull(cutoff.applyTo(pinned, funding))
+        val publisher = SourceNumericalFeedback(funding, Cancellation.Never)
+        val acquisition = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use {
+            publisher.acquire(it, query, cutoff, cuts = false)
+        }
+        val feedback = assertIs<SourceNumericalFeedbackResult.Available>(acquisition.feedback)
+        val support = publisher.refutationSupport(feedback)
+        val removal = FiniteNumericalRemoval(problem, objective, original, funding,
+            FiniteNumericalRemoval.Signal.Refutation)
+
+        removal.accept(center, pins, query, cutoff, feedback, support)
+        val freed = removal.destroy(Random(17), problem, center, objective, 0.5)
+
+        assertEquals(FiniteNumericalRemoval.Status.Supported, removal.status)
+        assertEquals(setOf(0, 3), freed.ints.toSet())
+        assertEquals(BigFraction.MINUS_ONE, removal.originCutoff?.value)
+    }
+
+    @Test
     fun `foreign finite models objectives and centers should retire numerical guidance`() {
         val funding = SourceLpFunding(1_000_000, 4_000_000).apply { grant(1_000_000) }
         val publisher = SourceNumericalFeedback(funding, Cancellation.Never)
