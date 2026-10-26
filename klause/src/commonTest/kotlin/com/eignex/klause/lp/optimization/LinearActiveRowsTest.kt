@@ -18,7 +18,9 @@ import com.eignex.klause.solver.evidence.SourcePremise
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.shl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -79,12 +81,14 @@ class LinearActiveRowsTest {
                 BigFraction.MINUS_ONE), mapOf(0 to true)),
         ), emptyMap())
 
-        LinearActiveRows(source, SourceLpBudget(), SparseSourceLpPolicy(quantum = 1L)).use {
-            val first = it.check(SourceCondition(bools = mapOf(0 to true)), Cancellation.Never)
+        LinearActiveRows(source, SourceLpBudget(), SparseSourceLpPolicy(quantum = 1L)).use { checker ->
+            val first = checker.check(SourceCondition(bools = mapOf(0 to true)), Cancellation.Never)
             assertTrue(first.paused)
-            var retracted = it.check(SourceCondition(bools = mapOf(0 to false)), Cancellation.Never)
+            var retracted = checker.check(SourceCondition(bools = mapOf(0 to false)), Cancellation.Never)
             repeat(64) {
-                if (retracted.paused) retracted = it.check(SourceCondition(bools = mapOf(0 to false)), Cancellation.Never)
+                if (retracted.paused) {
+                    retracted = checker.check(SourceCondition(bools = mapOf(0 to false)), Cancellation.Never)
+                }
             }
 
             assertEquals(false, retracted.paused)
@@ -121,7 +125,8 @@ class LinearActiveRowsTest {
 
         assertEquals(SourceEvidenceCheck.Checked, checked)
         assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(source.withLinearAuthority()).verify(
-            SourceEvidence(source.scope, SourceClaim.Refutation, LinearPinnedRefutation(combination("lower", "upper")))))
+            SourceEvidence(source.scope, SourceClaim.Refutation,
+                LinearPinnedRefutation(combination("lower", "upper")))))
     }
 
     @Test
@@ -137,6 +142,22 @@ class LinearActiveRowsTest {
 
             assertIs<SourceEvidenceCheck.Rejected>(checked)
         }
+    }
+
+    @Test
+    fun `retracting an activation should revoke its refutation derivation`() {
+        val source = SourceProofContext(scope, setOf(bool, open), mapOf(
+            "guarded" to SourcePremise(SourceInequality(emptyMap(), BigFraction.MINUS_ONE), mapOf(0 to true)),
+        ), emptyMap())
+        val active = source.atScope(scope.copy(condition = SourceCondition(bools = mapOf(0 to true))))
+        val proof = LinearActiveRefutation(SourceDerivation.Premise("guarded"))
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(active.withLinearAuthority()).verify(
+            SourceEvidence(active.scope, SourceClaim.Refutation, proof)))
+
+        val checked = SourceEvidenceVerifier(source.withLinearAuthority()).verify(
+            SourceEvidence(source.scope, SourceClaim.Refutation, proof))
+
+        assertIs<SourceEvidenceCheck.Rejected>(checked)
     }
 
     @Test
@@ -196,6 +217,18 @@ class LinearActiveRowsTest {
 
         assertEquals(emptyMap(), numeric.objective)
         assertEquals(BigFraction.ZERO, numeric.objectiveConstant)
+    }
+
+    @Test
+    fun `oversized active scalars should decline before numerical preparation`() {
+        val large = BigFraction.of(BIG_ONE shl 4096, BIG_ONE)
+        val source = SourceProofContext(scope, setOf(real, bool), mapOf(
+            "wide" to SourcePremise(SourceInequality(mapOf(real to large), BigFraction.ZERO)),
+        ), emptyMap())
+
+        val numeric = source.activeNumericContext(Cancellation.Never)
+
+        assertNull(numeric)
     }
 
     @Test

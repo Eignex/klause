@@ -54,6 +54,7 @@ class LinearAuthorityInvocationTest {
             SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
         val stages = assertNotNull(result.stats.smt.completeSearchStages)
         assertEquals(1L, stages["numericalPartialConflicts"])
+        assertEquals(0L, result.stats.openTheory.openBoolDecisions)
         assertNull(stages["numericalChecks"])
         assertNull(result.incumbent)
     }
