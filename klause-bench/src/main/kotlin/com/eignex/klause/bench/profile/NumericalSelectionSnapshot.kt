@@ -43,11 +43,13 @@ internal class NumericalSelectionSnapshot(private val stop: Cancellation) {
         put("maximumEntries", 1_000_000L)
         put("maximumModeledBytes", 16_777_216L)
         put("attempted", field(journal, "attempted") as Long)
+        put("retainedRecords", records(journal).size)
         put("entries", field(journal, "entries") as Long)
         put("modeledBytes", field(journal, "bytes") as Long)
         put("limited", journal.javaClass.getDeclaredMethod("getLimited").invoke(journal) as Boolean)
         put("independentProofCheck", false)
         put("records", buildJsonArray { records(journal).forEach { if (!stop()) add(query(it)) } })
+        put("inspectionStopped", stop())
     }
 
     fun replay(journal: Any, emit: (JsonObject) -> Unit) {
