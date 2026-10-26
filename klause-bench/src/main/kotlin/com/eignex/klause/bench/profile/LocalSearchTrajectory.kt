@@ -116,6 +116,7 @@ internal object LocalSearchTrajectory {
         val views = ArrayList<TrajectoryView>()
         val observations = ArrayList<Observation>()
         out.resolve("capture-policy.json").writeText(buildJsonObject {
+            put("revision", Reports.readGitSha())
             put("sourceSha256", sha256(bytes))
             put("declaredSemantics", parsed.semantics.declared.toString())
             put("effectiveSemantics", parsed.semantics.effective.toString())
@@ -130,6 +131,7 @@ internal object LocalSearchTrajectory {
             put("sourceVerdictClaim", false)
         }.toString())
         for (rewrite in if (initial == null) listOf(false, true) else listOf(false)) {
+            val preparationStarted = System.nanoTime()
             val stop = Cancellation.after(60.seconds)
             val invocation = SourceSetup.prepare(SourceSetupRequest(
                 if (parsed.definedVars.isEmpty()) SourceAttachment(parsed.problem, parsed.definitionHints)
@@ -152,6 +154,7 @@ internal object LocalSearchTrajectory {
             val sweep = hints?.let { getter(it, "getSweep") as DefinitionalSweep? }
             val gradient = hints?.let { getter(it, "getObjective") as IncrementalObjective? }
             out.resolve("model-$rewrite.json").writeText(buildJsonObject {
+                put("preparationNanos", System.nanoTime() - preparationStarted)
                 put("objective", workingObjective.toString())
                 put("factors", buildJsonArray {
                     for (factor in problem.factors) add(buildJsonObject {
