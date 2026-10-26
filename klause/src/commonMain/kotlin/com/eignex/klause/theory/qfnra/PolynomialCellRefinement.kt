@@ -243,7 +243,9 @@ internal class PolynomialCellRefinement(
                 if (algebraic.compare(value, initial) != 0) stats.repairedCoordinates++
                 return value
             }
-            val support = if (sourceAtoms.any { arithmetic.step(); it == rejected }) checkNotNull(sourceScope) else scope
+            val support = if (sourceAtoms.any { arithmetic.step(); it == rejected }) {
+                checkNotNull(sourceScope)
+            } else scope
             val existing = retained.filter {
                 arithmetic.step()
                 it.variable == variable && (it.scope === scope || it.scope === sourceScope)
@@ -252,7 +254,8 @@ internal class PolynomialCellRefinement(
                 stats.repeatedCandidates++
             } else {
                 if (retained.size == MAX_CELL_COUNT) return null
-                val cell = CheckedPolynomialCell.rejected(rejected, support, value, arithmetic, algebraic) ?: return null
+                val cell = CheckedPolynomialCell.rejected(rejected, support, value, arithmetic, algebraic)
+                    ?: return null
                 arithmetic.step()
                 retained.add(cell)
                 stats.checkedCells++

@@ -29,6 +29,22 @@ class PolynomialPhaseProfileTest {
     }
 
     @Test
+    fun `univariate refinement retains exact checked boundaries and charged work`() {
+        val source = "(declare-const x Real) (assert (= (* x x) 2))"
+
+        val trace = PolynomialPhaseProfile.PhaseAccess().measure(source, refinement = true)
+
+        assertEquals("Satisfiable", trace.result)
+        assertEquals(trace.nativeWork, trace.chargeSum)
+        val cell = requireNotNull(trace.checkedCells).first()
+        assertEquals("Source", cell["scope"])
+        assertEquals("false", cell["lowerClosed"])
+        assertEquals("false", cell["upperClosed"])
+        assertEquals("[-2, 0, 1]", cell["Lower.coefficients"])
+        assertTrue(requireNotNull(trace.cellRefinement)["Work"]!!.toLong() <= 16_384)
+    }
+
+    @Test
     fun `a retained source is decoded without catalog resolution`() {
         val source = "(assert false)".encodeToByteArray()
         val compressed = ByteArrayOutputStream()

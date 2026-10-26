@@ -130,6 +130,7 @@ internal class QfNraQuery(
             val normalized = PolynomialFormula.normalize(conditioned, arithmetic, fixed)
             failureCapture?.scope(normalized, condition, arithmetic)
             cellRefinement?.let { refinement ->
+                failureCapture?.operation("cell-refinement", 0, 0, work.spentWork, arithmetic)
                 refinement.prepare(normalized)
                 val witness = refinement.witness(realCount, fixed) { point, checking, scalars ->
                     checkSample(normalized, point, boolCount, checking, scalars)
