@@ -5553,6 +5553,8 @@ final class <#A: kotlin/Any?> com.eignex.klause.solver.pipeline/ExecutionOption 
             final fun <get-sourceLpWorkLimit>(): com.eignex.klause.solver.pipeline/ExecutionOption<kotlin/Long?> // com.eignex.klause.solver.pipeline/ExecutionOption.Companion.sourceLpWorkLimit.<get-sourceLpWorkLimit>|<get-sourceLpWorkLimit>(){}[0]
         final val sourcePointCuts // com.eignex.klause.solver.pipeline/ExecutionOption.Companion.sourcePointCuts|{}sourcePointCuts[0]
             final fun <get-sourcePointCuts>(): com.eignex.klause.solver.pipeline/ExecutionOption<kotlin/Boolean> // com.eignex.klause.solver.pipeline/ExecutionOption.Companion.sourcePointCuts.<get-sourcePointCuts>|<get-sourcePointCuts>(){}[0]
+        final val sourceRefutationReuse // com.eignex.klause.solver.pipeline/ExecutionOption.Companion.sourceRefutationReuse|{}sourceRefutationReuse[0]
+            final fun <get-sourceRefutationReuse>(): com.eignex.klause.solver.pipeline/ExecutionOption<kotlin/Boolean> // com.eignex.klause.solver.pipeline/ExecutionOption.Companion.sourceRefutationReuse.<get-sourceRefutationReuse>|<get-sourceRefutationReuse>(){}[0]
         final val sources // com.eignex.klause.solver.pipeline/ExecutionOption.Companion.sources|{}sources[0]
             final fun <get-sources>(): com.eignex.klause.solver.pipeline/ExecutionOption<kotlin.collections/List<com.eignex.klause.localsearch.strategy/AxisToken>> // com.eignex.klause.solver.pipeline/ExecutionOption.Companion.sources.<get-sources>|<get-sources>(){}[0]
         final val strategy // com.eignex.klause.solver.pipeline/ExecutionOption.Companion.strategy|{}strategy[0]
@@ -14629,6 +14631,8 @@ final class com.eignex.klause.solver.pipeline/TheoryParams { // com.eignex.klaus
         final fun <get-sourceLpWorkLimit>(): kotlin/Long // com.eignex.klause.solver.pipeline/TheoryParams.sourceLpWorkLimit.<get-sourceLpWorkLimit>|<get-sourceLpWorkLimit>(){}[0]
     final val sourcePointCuts // com.eignex.klause.solver.pipeline/TheoryParams.sourcePointCuts|{}sourcePointCuts[0]
         final fun <get-sourcePointCuts>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/TheoryParams.sourcePointCuts.<get-sourcePointCuts>|<get-sourcePointCuts>(){}[0]
+    final val sourceRefutationReuse // com.eignex.klause.solver.pipeline/TheoryParams.sourceRefutationReuse|{}sourceRefutationReuse[0]
+        final fun <get-sourceRefutationReuse>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/TheoryParams.sourceRefutationReuse.<get-sourceRefutationReuse>|<get-sourceRefutationReuse>(){}[0]
     final val timeout // com.eignex.klause.solver.pipeline/TheoryParams.timeout|{}timeout[0]
         final fun <get-timeout>(): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.pipeline/TheoryParams.timeout.<get-timeout>|<get-timeout>(){}[0]
 

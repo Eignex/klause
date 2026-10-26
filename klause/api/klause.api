@@ -11622,6 +11622,7 @@ public final class com/eignex/klause/solver/pipeline/ExecutionOption$Companion {
 	public final fun getSourceLpOperations ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getSourceLpWorkLimit ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getSourcePointCuts ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getSourceRefutationReuse ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getSources ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getStrategy ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getSubsumeBatch ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
@@ -13019,6 +13020,7 @@ public final class com/eignex/klause/solver/pipeline/TheoryParams {
 	public final fun getSourceLpOperations ()I
 	public final fun getSourceLpWorkLimit ()J
 	public final fun getSourcePointCuts ()Z
+	public final fun getSourceRefutationReuse ()Z
 	public final fun getTimeout ()Lcom/eignex/klause/util/Cancellation;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
