@@ -32,7 +32,6 @@ class CliModeSmtTest {
         assertTrue(output.lines().any { it.matches(Regex("; niaRepeatedSupports=[1-9][0-9]*")) }, output)
     }
 
-
     @Test
     fun `SMT inconsistent integer scalar equations should print unsat from the refuted route`() {
         val source = File.createTempFile("integer-premises", ".smt2").apply {
