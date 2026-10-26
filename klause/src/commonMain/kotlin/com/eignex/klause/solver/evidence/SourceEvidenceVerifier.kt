@@ -180,7 +180,10 @@ class SourceEvidenceVerifier(
                         claim is SourceClaim.Extension) {
                         return reject("import does not establish the requested claim")
                     }
-                    val matching = matchSourceClaims(claim, imported.claim, cancellation)
+                    val matching = if (claim is SourceClaim.Bound && imported.claim == SourceClaim.Refutation) {
+                        if (scope.objective == null) return reject("objective bound has no objective scope")
+                        SourceEvidenceCheck.Checked
+                    } else matchSourceClaims(claim, imported.claim, cancellation)
                     if (matching != SourceEvidenceCheck.Checked) return matching
                     return verify(imported, imported.scope, depth + 1)
                 }
