@@ -157,8 +157,10 @@ interrupted queries. Separation and
 proof policy belong to the adapter, outside `lp.engine`.
 
 Explicit aggregate construction combines two to four source rows with positive
-exact weights before integer rounding. Continuous terms must cancel completely;
-the remaining integer activity is normalized by its rational coefficient gcd.
+exact weights and normalizes the integer activity by its rational coefficient gcd.
+Complete continuous cancellation permits integer rounding. Optional mixed rounding
+instead cites an active source bound for each remaining continuous coordinate,
+preferring the side that retains a negative residual.
 The candidate retains every source owner and its nested combination and rounding
 derivation. Construction bounds combined support at 128 coordinates, retained
 scalars at 256 bits and proof references at 16 KiB. Each attempt has 65,536 work

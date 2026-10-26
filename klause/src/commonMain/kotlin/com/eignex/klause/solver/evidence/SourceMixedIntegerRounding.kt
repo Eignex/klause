@@ -12,6 +12,7 @@ private fun bounded(value: BigFraction): BigFraction {
 
 internal fun mixedIntegerRounding(
     row: SourceInequality, bounds: List<SourceInequality>, cancellation: Cancellation,
+    onArithmetic: (BigFraction, BigFraction) -> Unit = { _, _ -> },
 ): SourceInequality? {
     val coefficients = row.coefficients
     for (value in coefficients.values) {
@@ -27,17 +28,28 @@ internal fun mixedIntegerRounding(
         if (cancellation()) return null
         val (id, coefficient) = bound.coefficients.entries.singleOrNull() ?: return null
         if (id.kind != SourceCoordinate.Kind.Real || id !in coefficients || id in sides) return null
-        val endpoint = bounded(bounded(bound.rhs) * bounded(coefficient).reciprocal())
+        onArithmetic(BigFraction.ONE, bounded(coefficient))
+        val reciprocal = coefficient.reciprocal()
+        onArithmetic(bounded(bound.rhs), reciprocal)
+        val endpoint = bounded(bound.rhs * reciprocal)
         sides[id] = endpoint to (coefficient > BigFraction.ZERO)
-        shifted = bounded(shifted - bounded(coefficients.getValue(id) * endpoint))
+        onArithmetic(coefficients.getValue(id), endpoint)
+        val contribution = bounded(coefficients.getValue(id) * endpoint)
+        onArithmetic(shifted, contribution)
+        shifted = bounded(shifted - contribution)
     }
     if (sides.isEmpty() || coefficients.keys.any { it.kind == SourceCoordinate.Kind.Real && it !in sides }) {
         return null
     }
+    onArithmetic(shifted, BigFraction.ONE)
     val floor = BigFraction.of(shifted.negated().ceilInteger(), BIG_ONE).negated()
+    onArithmetic(shifted, floor)
     val fraction = shifted - floor
     if (fraction.isZero) return null
-    val residualScale = bounded((BigFraction.ONE - fraction).reciprocal())
+    onArithmetic(BigFraction.ONE, fraction)
+    val complement = BigFraction.ONE - fraction
+    onArithmetic(BigFraction.ONE, complement)
+    val residualScale = bounded(complement.reciprocal())
     val result = coefficients.toMutableMap()
     var rhs = floor
     // After shifting, t - s <= floor(b) + f with integral t and s >= 0 implies
@@ -46,9 +58,15 @@ internal fun mixedIntegerRounding(
         if (cancellation()) return null
         val value = coefficients.getValue(id)
         val negative = if (side.second) value > BigFraction.ZERO else value < BigFraction.ZERO
-        val rounded = if (negative) bounded(value * residualScale) else BigFraction.ZERO
+        val rounded = if (negative) {
+            onArithmetic(value, residualScale)
+            bounded(value * residualScale)
+        } else BigFraction.ZERO
         result[id] = rounded
-        rhs = bounded(rhs + bounded(rounded * side.first))
+        onArithmetic(rounded, side.first)
+        val contribution = bounded(rounded * side.first)
+        onArithmetic(rhs, contribution)
+        rhs = bounded(rhs + contribution)
     }
     return SourceInequality(result, rhs)
 }

@@ -389,4 +389,90 @@ class LinearAuthorityAggregateCutsTest {
         assertTrue(charged > 0L)
         assertEquals(observed, charged)
     }
+
+    @Test
+    fun `mixed aggregates should retain checked continuous bound complements and strict source rows`() {
+        val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        for (sign in listOf(BigFraction.MINUS_ONE, BigFraction.ONE)) {
+            for (strict in listOf(false, true)) {
+                val mixed = SourceInequality(left.coefficients + (residual to sign), left.rhs, strict)
+                val bound = SourceInequality(mapOf(residual to sign), BigFraction.ZERO)
+                val source = SourceProofContext(scope, setOf(x, y, real, residual), mapOf(
+                    "left" to SourcePremise(mixed), "right" to SourcePremise(right),
+                    "bound" to SourcePremise(bound)))
+
+                val cut = assertNotNull(LinearAuthorityAggregateCuts.derive(listOf(
+                    LinearAuthorityAggregateTerm(0, "left", mixed),
+                    LinearAuthorityAggregateTerm(1, "right", right),
+                ), Cancellation.Never, allowMixed = true, continuousBounds = mapOf(
+                    (residual to (sign > BigFraction.ZERO)) to LinearAuthorityAggregateTerm(2, "bound", bound))))
+
+                assertEquals(SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ONE, residual to sign),
+                    BigFraction.ONE), cut.inequality)
+                assertTrue(cut.mixed)
+                assertEquals(setOf(0, 1, 2), cut.owners)
+                assertTrue(assertNotNull(LinearAuthorityCuts.prepare(source, Cancellation.Never)).rows.isEmpty())
+                assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+                    SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+            }
+        }
+    }
+
+    @Test
+    fun `mixed aggregates should decline a missing residual bound`() {
+        val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val mixed = SourceInequality(left.coefficients + (residual to BigFraction.MINUS_ONE), left.rhs)
+        val observations = linkedMapOf<String, Long>()
+
+        val cut = LinearAuthorityAggregateCuts.derive(listOf(
+            LinearAuthorityAggregateTerm(0, "left", mixed), LinearAuthorityAggregateTerm(1, "right", right),
+        ), Cancellation.Never, { key, value -> observations[key] = (observations[key] ?: 0L) + value },
+            allowMixed = true)
+
+        assertNull(cut)
+        assertEquals(1L, observations["AggregateMissingBounds"])
+    }
+
+    @Test
+    fun `mixed aggregates should retain the activation premise of a residual bound`() {
+        val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
+        val mixed = SourceInequality(left.coefficients + (residual to BigFraction.MINUS_ONE), left.rhs)
+        val bound = SourceInequality(mapOf(residual to BigFraction.MINUS_ONE), BigFraction.ZERO)
+        val source = SourceProofContext(scope, setOf(x, y, real, residual, bool), mapOf(
+            "left" to SourcePremise(mixed), "right" to SourcePremise(right),
+            "bound" to SourcePremise(bound, mapOf(0 to true))))
+        val cut = assertNotNull(LinearAuthorityAggregateCuts.derive(listOf(
+            LinearAuthorityAggregateTerm(0, "left", mixed), LinearAuthorityAggregateTerm(1, "right", right),
+        ), Cancellation.Never, allowMixed = true, continuousBounds = mapOf(
+            (residual to false) to LinearAuthorityAggregateTerm(2, "bound", bound))))
+        for (enabled in listOf(true, false, true)) {
+            val context = source.atScope(scope.copy(condition = SourceCondition(bools = mapOf(0 to enabled))))
+
+            val check = SourceEvidenceVerifier(context).verify(
+                SourceEvidence(context.scope, SourceClaim.Consequence(cut.inequality), cut.derivation))
+
+            if (enabled) assertEquals(SourceEvidenceCheck.Checked, check)
+            else assertIs<SourceEvidenceCheck.Rejected>(check)
+        }
+    }
+
+    @Test
+    fun `mixed aggregate arithmetic should decline a wide bound endpoint before retaining a cut`() {
+        val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val mixed = SourceInequality(left.coefficients + (residual to BigFraction.MINUS_ONE), left.rhs)
+        val large = BigFraction.of(BIG_ONE shl 127, BIG_ONE)
+        val bound = SourceInequality(mapOf(residual to large.reciprocal().negated()), large)
+        val observations = linkedMapOf<String, Long>()
+
+        val cut = LinearAuthorityAggregateCuts.derive(listOf(
+            LinearAuthorityAggregateTerm(0, "left", mixed), LinearAuthorityAggregateTerm(1, "right", right),
+        ), Cancellation.Never, { key, value -> observations[key] = (observations[key] ?: 0L) + value },
+            LinearAuthorityAggregateLimits(scalarBits = 128), allowMixed = true, continuousBounds = mapOf(
+                (residual to false) to LinearAuthorityAggregateTerm(2, "bound", bound)))
+
+        assertNull(cut)
+        assertEquals(1L, observations["AggregateScalarLimit"])
+        assertTrue(assertNotNull(observations["AggregateWork"]) > 0L)
+    }
 }
