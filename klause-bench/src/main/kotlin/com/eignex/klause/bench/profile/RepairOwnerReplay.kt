@@ -44,7 +44,10 @@ internal object RepairOwnerReplay {
     private data class Scope(
         val id: Int, val center: Sample, val freedBools: IntArray, val freedInts: IntArray,
         val pins: Assumptions, val cutoff: BigFraction, val nativeCutoff: Double, val selector: String,
+        val sourceCutoff: BigFraction?,
     )
+
+    data class PointCheck(val accepted: Boolean, val objective: BigFraction? = null)
 
     private data class Outcome(
         val sample: Sample?, val reason: TerminationReason?, val stats: SolveStats,
@@ -59,7 +62,8 @@ internal object RepairOwnerReplay {
         controls: File, problem: BakedProblem, objective: LinearObjective, prepared: FinitePipelinePreparation,
         source: BakedProblem, inputs: IntArray, file: File, seed: Long, allowance: Long = 100_000L,
         fragmentAllowance: Long = 2_000L,
-        sourceCheck: ((Sample, Cancellation) -> Boolean)? = null, mixedContext: SourceProofContext? = null,
+        sourceCheck: ((Sample, Cancellation) -> PointCheck)? = null, mixedContext: SourceProofContext? = null,
+        sourceMaximize: Boolean = false,
     ) {
         require(allowance > 0 && fragmentAllowance > 0)
         val bean = ManagementFactory.getThreadMXBean() as ThreadMXBean
@@ -67,7 +71,7 @@ internal object RepairOwnerReplay {
         val setupStarted = System.nanoTime()
         val setupAllocation = bean.getThreadAllocatedBytes(thread)
         fun accepted(sample: Sample, stop: Cancellation) =
-            sourceCheck?.invoke(sample, stop) ?: checkSource(source, prepared.reconstruct(sample), stop)
+            sourceCheck?.invoke(sample, stop) ?: PointCheck(checkSource(source, prepared.reconstruct(sample), stop))
         val scopeOwner = Class.forName("com.eignex.klause.meta.alns.RepairScope").getField("INSTANCE").get(null)
         val freedType = Class.forName("com.eignex.klause.meta.alns.FreedVars")
         require(controls.length() in 0..4L * 1024 * 1024)
@@ -111,10 +115,11 @@ internal object RepairOwnerReplay {
             val freed = freedType.getDeclaredConstructor(IntArray::class.java, IntArray::class.java)
                 .newInstance(bools, ints)
             val pins = call(scopeOwner, "pins", problem, center, freed) as Assumptions
-            check(accepted(center, Cancellation.after(2000.milliseconds)))
+            val checked = accepted(center, Cancellation.after(2000.milliseconds))
+            check(checked.accepted)
             Scope(index, center, bools, ints, pins, cutoff,
                 entry.getValue("centerObjective").jsonPrimitive.content.toDouble(),
-                entry.getValue("selector").jsonPrimitive.content)
+                entry.getValue("selector").jsonPrimitive.content, checked.objective)
         }
         file.resolveSibling("${file.nameWithoutExtension}-preparation.json").writeText(buildJsonObject {
             put("controlFileSha256", controlHash)
@@ -237,11 +242,16 @@ internal object RepairOwnerReplay {
                         val verificationAllocation = bean.getThreadAllocatedBytes(thread)
                         val realAuthority = sample == null || problem.numRealVars == 0 ||
                             sample.exactReals?.size == problem.numRealVars
-                        val checked = sample?.takeIf { realAuthority }?.let { accepted(it, lifetime) }
+                        val verification = sample?.takeIf { realAuthority }?.let { accepted(it, lifetime) }
+                        val checked = verification?.accepted
                         val verificationNs = System.nanoTime() - verificationStarted
                         val verificationBytes = bean.getThreadAllocatedBytes(thread) - verificationAllocation
+                        val sourceImproving = scope.sourceCutoff?.let { cutoff -> verification?.objective?.let {
+                            if (sourceMaximize) it > cutoff else it < cutoff
+                        } }
                         val improving = sample != null && checked == true &&
-                            objective.evaluateExact(sample) < scope.cutoff
+                            objective.evaluateExact(sample) < scope.cutoff &&
+                            (scope.sourceCutoff == null || sourceImproving == true)
                         val status = when {
                             improving -> "improvement"
                             checked == true -> "feasible-nonimprovement"
@@ -286,6 +296,9 @@ internal object RepairOwnerReplay {
                             })
                             put("center", sample(scope.center))
                             put("nativeSourceAccepted", checked)
+                            put("sourceCenterObjective", scope.sourceCutoff?.toString())
+                            put("sourceCandidateObjective", verification?.objective?.toString())
+                            put("sourceStrictImprovement", sourceImproving)
                             put("objective", sample?.let { objective.evaluateExact(it).toString() })
                             put("candidate", sample?.let { sample(prepared.reconstruct(it)) } ?: JsonNull)
                             put("conditionedClosure", outcome.reason == TerminationReason.SearchExhausted)
