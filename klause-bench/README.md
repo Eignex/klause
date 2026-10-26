@@ -1599,7 +1599,9 @@ or search evidence.
 
 `LocalSearchTrajectory` accepts `suite`, `problem`, decoded-source `sha256`,
 `recipe`, worker `seed` and `moves`, with optional `greedy`, `sliceMillis` and
-`sliceWork`. It compares protected and substituted minimizing XCSP3 objectives.
+`sliceWork`. Optional `source64` supplies at most 96 KiB of base64-encoded original
+bytes instead of resolving the catalog archive; the required decoded-source hash
+still binds the input. It compares protected and substituted minimizing XCSP3 objectives.
 The source is limited to 64 MiB, 1024 finite coordinates and 4096 factors; each
 walk has at most one million moves and a shared sixty-second preparation/walk
 deadline per representation. `provenance.json`, `request.txt`, unchanged

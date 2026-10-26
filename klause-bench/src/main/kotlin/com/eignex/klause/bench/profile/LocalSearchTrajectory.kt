@@ -77,12 +77,17 @@ internal object LocalSearchTrajectory {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val required = setOf("suite", "problem", "sha256", "recipe", "seed", "moves")
         require(options.keys.containsAll(required) && options.keys.all {
-            it in required || it in setOf("sliceMillis", "sliceWork", "greedy", "repairs", "controls", "center")
+            it in required || it in setOf("sliceMillis", "sliceWork", "greedy", "repairs", "controls", "center", "source64")
         })
-        val reference = Catalog.uncapped(options.getValue("suite")).problems
-            .single { it.name == options.getValue("problem") }
-        val bytes = CorpusFiles.open(CorpusFetcher.resolve(reference.source)).use {
-            it.readNBytes(64 * 1024 * 1024 + 1)
+        val bytes = options["source64"]?.let {
+            require(it.length <= 96 * 1024)
+            Base64.getDecoder().decode(it)
+        } ?: run {
+            val reference = Catalog.uncapped(options.getValue("suite")).problems
+                .single { it.name == options.getValue("problem") }
+            CorpusFiles.open(CorpusFetcher.resolve(reference.source)).use {
+                it.readNBytes(64 * 1024 * 1024 + 1)
+            }
         }
         require(bytes.size <= 64 * 1024 * 1024 && sha256(bytes) == options.getValue("sha256"))
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
@@ -308,6 +313,7 @@ internal object LocalSearchTrajectory {
                             ),
                             initial.shaping.objective, prepared.reconstruct,
                             { activeSweep?.sweep(shadow.assignment, shadow.rootDomains) },
+                            initial.seeding.ownerInt,
                         )
                         traceGreedy(initial, out.resolve("greedy-$rewrite.jsonl")) { position, slot ->
                             observations += Observation(
