@@ -1489,15 +1489,19 @@ has an exact feasible center and lower-bound witness.
 
 Random, objective and adjacency removal compare with CP-conflict-supported removal
 at the same center and requested count. A separate acquisition-ablated random arm
-pays for the same 128-decision CP prefix as the guided arm. Acquisition and repair
-share one 2,000-unit native search allowance and a five-second deadline; capture,
-selection and source checks consume that deadline. Root-fixed coordinates are
+pays for the same 128-decision CP prefix as the guided arm. Acquisition, a repair
+of at most 1,000 decisions and a descent of at most 128 moves share one 2,000-unit
+native search allowance and a five-second deadline; capture, selection and source
+checks consume that deadline. Root-fixed coordinates are
 excluded, and effective definition-closed freedom counts must match before repair.
 Records retain captured support weights, unavailable/empty outcomes, acquisition
 points, repaired objectives, native original-source checks, work, allocation and
-separate acquisition/selection clocks. These instrumented controls establish no
-independent witness check, global proof, descent-basin classification or ordinary
-portfolio throughput.
+separate acquisition/selection clocks. The shared repair trace records the first
+qualified source-coordinate greedy descent endpoint with the declared tie seed;
+censored descents remain unclassified. Source input distance and checked objective
+after descent stay separate from repair acceptance. These instrumented controls
+establish no independent witness check, global proof, basin classification or
+ordinary portfolio throughput.
 
 ### Table profiling
 
