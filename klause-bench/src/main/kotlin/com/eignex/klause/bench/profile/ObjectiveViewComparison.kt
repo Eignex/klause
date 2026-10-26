@@ -82,7 +82,7 @@ internal object ObjectiveViewComparison {
         val required = setOf("suite", "problem", "sha256")
         val optional = setOf(
             "source64", "sourceGzip64", "recipe", "seed", "moves", "timeoutMillis", "screen", "greedy",
-            "preparationEngine",
+            "preparationEngine", "basins",
         )
         require(options.keys.containsAll(required) && options.keys.all { it in required || it in optional })
         val bytes = trajectorySourceBytes(
@@ -127,6 +127,7 @@ internal object ObjectiveViewComparison {
         val timeout = (options["timeoutMillis"]?.toLong() ?: 10000L).also { require(it in 100..60000) }
         val recipe = options["recipe"] ?: "cbls-plateau/ils-basin"
         val greedy = options["greedy"]?.toBooleanStrict() ?: true
+        val basins = options["basins"]?.toBooleanStrict() ?: false
         val preparationEngine = when (options["preparationEngine"] ?: "mixed") {
             "mixed" -> FiniteEngine.MIXED
             "ls" -> FiniteEngine.LOCAL_SEARCH
@@ -140,6 +141,10 @@ internal object ObjectiveViewComparison {
             put("moves", moves)
             put("timeoutMillisIncludingPreparation", timeout)
             put("greedy", greedy)
+            put("basinTrace", basins)
+            put("basinPartitionClaim", false)
+            if (basins) put("basinIntegerInputs", JsonArray(source.intVarNames.values.distinct()
+                .filter { it !in source.definedVars }.map(::JsonPrimitive)))
             put("normalizedClassWeights", true)
             put("costShaping", "linear lambda=1")
             put("maxSourcePoints", 6)
@@ -183,7 +188,7 @@ internal object ObjectiveViewComparison {
             if (initial != null) states += initial
             val remaining = timeout - (prepared.nanos + 999999) / 1000000
             if (remaining > 0) run(source, prepared, view, recipe, seed, moves, greedy, remaining,
-                directory, boundaries, walk = true)
+                directory, boundaries, walk = true, basins = basins)
             else directory.resolve("walk-decline.json").writeText("{\"decline\":\"preparation-time-budget\"}")
         }
         out.resolve("paired.jsonl").bufferedWriter().use { writer ->
@@ -266,6 +271,7 @@ internal object ObjectiveViewComparison {
         out: File,
         boundaries: MutableList<Boundary>,
         walk: Boolean = false,
+        basins: Boolean = false,
     ): TrajectoryView? {
         val problem = prepared.pipeline.problem as BakedProblem
         val objective = requireNotNull(prepared.pipeline.objective)
@@ -316,6 +322,8 @@ internal object ObjectiveViewComparison {
                 perMoveInvariants = prepared.sweep != null && recipe.perMoveInvariants,
                 seedImplicitOnRestart = recipe.seedImplicitOnRestart,
             )
+            val trace = if (walk && basins) RepairTrajectory.attach(solver,
+                "${view.name.lowercase()} $recipeName; normalized linear shaping 1; worker seed $seed") else null
             val params = LocalSearchParams(
                 randomSeed = seed, maxFlips = moves, cancellation = stop,
                 costShaping = CostShaping.Linear(lambda = 1.0),
@@ -383,6 +391,10 @@ internal object ObjectiveViewComparison {
                         }
                     }.toString())
                     out.resolve("$label-stats.txt").writeText(run.stats.toString())
+                }
+                if (trace != null) {
+                    val inputs = source.intVarNames.values.distinct().filter { it !in source.definedVars }.toIntArray()
+                    RepairTrajectory.write(trace, prepared.pipeline, inputs, out.resolve("walk-basins.jsonl"))
                 }
             }
         }
