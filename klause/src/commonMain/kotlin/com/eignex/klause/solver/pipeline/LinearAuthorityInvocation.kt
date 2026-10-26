@@ -53,6 +53,7 @@ internal class LinearAuthorityInvocation(
         ?: SourceLpFunding(params.sourceLpWorkLimit, params.sourceLpAllocationLimit),
     cuts: Boolean = boundOrdered && params.sourceCuts,
     activeRows: Boolean = false,
+    onNumericalFeedback: ((SourceNumericalFeedbackResult) -> Unit)? = null,
 ) : AutoCloseable {
     init {
         require(borrowedAuthority?.funding == null || borrowedAuthority.funding === funding) {
@@ -94,7 +95,8 @@ internal class LinearAuthorityInvocation(
             funding = funding), stop, ::paused, ::offer,
         { incumbent?.let { sample -> value?.let { sample to it } } }, useBranchHistory, borrowedAuthority,
         useGuidance = boundOrdered || guidance, inheritBounds = boundOrdered, useCuts = cuts,
-        useActiveRows = activeRows)
+        useActiveRows = activeRows, useSupportBranching = params.sourceSupportBranching,
+        onNumericalFeedback = onNumericalFeedback)
     private val session = SearchComponentSet(listOf(component)).session(params.maxLeaves, stop).also {
         it.bindOpenTheoryWork(state.work)
     }
