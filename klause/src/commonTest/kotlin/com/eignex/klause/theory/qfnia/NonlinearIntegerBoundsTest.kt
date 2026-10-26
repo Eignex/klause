@@ -18,8 +18,12 @@ class NonlinearIntegerBoundsTest {
     @Test
     fun `strict wide integer endpoints should exclude the boundary in either source order`() {
         val endpoint = "100000000000000000000"
-        val below = PolynomialCondition(upper = mapOf(0 to BigFraction.of(parseBigInt("99999999999999999999"), BIG_ONE)))
-        val above = PolynomialCondition(lower = mapOf(0 to BigFraction.of(parseBigInt("100000000000000000001"), BIG_ONE)))
+        val below = PolynomialCondition(
+            upper = mapOf(0 to BigFraction.of(parseBigInt("99999999999999999999"), BIG_ONE)),
+        )
+        val above = PolynomialCondition(
+            lower = mapOf(0 to BigFraction.of(parseBigInt("100000000000000000001"), BIG_ONE)),
+        )
         val cases = listOf(
             "(< n $endpoint)" to below,
             "(> $endpoint n)" to below,
@@ -62,10 +66,13 @@ class NonlinearIntegerBoundsTest {
 
         val bounds = source.integerBounds(PolynomialCondition(), PolynomialArithmetic())
 
-        assertEquals(PolynomialCondition(
-            lower = mapOf(0 to BigFraction.MINUS_ONE),
-            upper = mapOf(0 to BigFraction.ofLong(-2)),
-        ), bounds)
+        assertEquals(
+            PolynomialCondition(
+                lower = mapOf(0 to BigFraction.MINUS_ONE),
+                upper = mapOf(0 to BigFraction.ofLong(-2)),
+            ),
+            bounds,
+        )
     }
 
     @Test
@@ -80,11 +87,14 @@ class NonlinearIntegerBoundsTest {
 
         val bounds = source.integerBounds(condition, PolynomialArithmetic())
 
-        assertEquals(PolynomialCondition(
-            bools = mapOf(0 to true),
-            lower = mapOf(0 to fraction, 1 to BigFraction.MINUS_ONE),
-            upper = condition.upper,
-        ), bounds)
+        assertEquals(
+            PolynomialCondition(
+                bools = mapOf(0 to true),
+                lower = mapOf(0 to fraction, 1 to BigFraction.MINUS_ONE),
+                upper = condition.upper,
+            ),
+            bounds,
+        )
         assertEquals(fraction, condition.lower[1])
     }
 
@@ -125,8 +135,12 @@ class NonlinearIntegerBoundsTest {
     private fun problem(text: String): NonlinearIntegerProblem {
         val parsed = SmtLibPolynomial.parse(text, allowIntegers = true)
         return NonlinearIntegerProblem(
-            parsed.formula, parsed.realCount, parsed.boolCount,
-            parsed.intVarNames, parsed.realVarNames, parsed.boolVarNames,
+            parsed.formula,
+            parsed.realCount,
+            parsed.boolCount,
+            parsed.intVarNames,
+            parsed.realVarNames,
+            parsed.boolVarNames,
         )
     }
 }
