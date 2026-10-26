@@ -58,12 +58,13 @@ internal class NumericalSelectionSnapshot(private val stop: Cancellation) {
             if (stop()) return
             if (field(record, "point") == null) continue
             val all = rows(record).indices.toSet()
-            for ((name, mask) in listOf("disabled" to emptySet(), "all" to all)) {
+            for ((name, mask) in listOf("disabled" to emptySet(), "all" to all)) for (repeat in 0..1) {
                 if (stop()) return
                 val replay = run.invoke(instance, record, mask, 20_000_000L, 67_108_864L, stop)
                 emit(buildJsonObject {
                     put("originalQuery", field(record, "id") as Int)
                     put("mask", name)
+                    put("repeat", repeat)
                     put("diagnosticOnly", true)
                     put("maximumWork", 20_000_000L)
                     put("maximumAllocation", 67_108_864L)

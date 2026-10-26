@@ -4008,10 +4008,35 @@ values and visited-row eligibility limits. Missing values are unknown.
 operations so observation-on/off controls can stop before the wall deadline.
 
 Optional `replay=true` separately replays at most four retained point states with
-empty and all-candidate masks, flushing `selection-replays.jsonl`. Each replay has
+empty and all-candidate masks, twice per mask, flushing `selection-replays.jsonl`. Each replay has
 one source operation, 20M cumulative work and 64 MiB modeled allocation under a
 shared ten-second diagnostic deadline. Replay creates fresh owners; its work and
 native checks are separate from traversal accounting and independent witness
 validation. The capture's existing original bytes, hash, native-system identity,
 objective scale, revision, settings and platform bind both files. Neither diagnostic
 establishes whole-CLI timing or a source verdict.
+Replay prepares a fresh basis; a retained warm-start child can therefore have a
+different point or certified bound. Repeated fresh replays test determinism for
+one exact query and mask. The original captured point remains the scoring state.
+
+[Observation-on 8431](https://lab.eignex.com/jobs/8431) and
+[observation-off 8432](https://lab.eignex.com/jobs/8432), at `06e1a59e3b`, use the
+same original `rgn` hash as 8265, one Linux/amd64 host, matching installed bytes,
+runtime and options, seed 3 and default tolerance. Both stop at 32 LP operations
+with identical stage counters: 63 checks and retained nodes, 5,482,611 floating
+work, 230,751 preparation work, 1,841,250 bound-certificate work and 54,861
+conflict-certificate work. Physical observation overhead is not a throughput claim.
+The journal retains nine states before its conservative modeled byte allowance;
+360 candidate checks, nine local bounds and four available sibling bounds pass
+fresh native verification. Later missing observations remain unknown.
+
+[Exact p0033 capture 8433](https://lab.eignex.com/jobs/8433) uses that revision and
+host with its 8265 original hash. All 57 states fit: ten checked refutations,
+28 completed points and 19 unavailable points. All 228 candidate checks pass.
+For each of the first four parents, all-cuts replay gives a stronger checked bound
+than empty-mask replay. Root work is 28,679 versus 32,019, respectively, within
+one operation each. In the four `rgn` replay parents, no candidate has positive
+violation at the uncut point and empty/all masks give identical checked bounds.
+These states support point-based selection experiments while preserving useful
+rounding controls. Native derivation checks are separate from independent witness
+or exported-proof validation; the diagnostic establishes no source verdict.

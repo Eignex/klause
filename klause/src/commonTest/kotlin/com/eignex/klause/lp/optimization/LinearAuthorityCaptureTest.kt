@@ -54,6 +54,20 @@ class LinearAuthorityCaptureTest {
     }
 
     @Test
+    fun `retracting a cut mask should remove its stronger retained coordinate side`() {
+        val capture = LinearAuthorityCapture(2, 10_000L, 1_000_000L, Cancellation.Never)
+        LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
+            authority.capture = capture
+            authority.advance(source, Cancellation.Never, cuts = true)
+            authority.advance(source, Cancellation.Never, cuts = true, cutMask = emptySet())
+        }
+
+        val retracted = capture.records.last()
+        assertEquals(BigFraction.ofLong(2).reciprocal(), retracted.point?.get(x))
+        assertFalse(retracted.cuts.single().installed)
+    }
+
+    @Test
     fun `explicit replay should reproduce a point and freshly checked bound under the same mask`() {
         val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, Cancellation.Never)
         LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
