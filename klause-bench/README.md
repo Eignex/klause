@@ -5320,3 +5320,15 @@ terminal return, including reflection and in-loop diagnostic rendering. They exc
 source parsing/preparation and final trace serialization. Thread allocation is absent
 when unsupported; it measures cumulative Java allocation rather than retained or peak
 physical memory. These instrumented, ordered arms do not establish warmed throughput.
+
+[Prefix controls 8632](https://lab.eignex.com/jobs/8632), at `41b0b686cb`, preserve
+ten native SAT, five native UNSAT and one deadline stop per arm. Six cases bypass
+twenty unary evaluations, with five repeated uses and no cross-owner reuse. The first
+regional trace rejects candidate zero using the checked open cell between the roots
+of `x1² = 2`, retaining its signed premises, condition, snapshot and reduction owner.
+The fifteen completed pairs add 244 containing work units in total; the stopped pair
+has different deadline frontiers and supplies no matched-work cost comparison.
+These are numeric-family reuses with zero partial-sign conflicts, not Boolean clauses
+or additional certified cells. SAT assignments in this diagnostic lack independent
+source-check receipts. These controls establish bounded reuse, without a speedup or
+source-verdict qualification claim.

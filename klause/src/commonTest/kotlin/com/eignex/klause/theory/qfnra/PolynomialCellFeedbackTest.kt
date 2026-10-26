@@ -33,7 +33,7 @@ class PolynomialCellFeedbackTest {
             PolynomialBooleanRegion(mapOf(0 to true), emptyMap()), Any())
         val feedback = PolynomialCellFeedback(source.formula, condition)
 
-        assertTrue(feedback.rejects(0, predicate, scope, zero, listOf(cell), arithmetic, algebraic))
+        assertNotNull(feedback.rejection(0, predicate, scope, zero, listOf(cell), arithmetic, algebraic))
 
         val trace = assertNotNull(feedback.firstRegionUse)
         assertTrue(trace.current === scope)
@@ -61,10 +61,10 @@ class PolynomialCellFeedbackTest {
         val second = PolynomialCellScope.Region(source.formula, condition, snapshot,
             PolynomialBooleanRegion(mapOf(0 to true), mapOf(1 to true)), Any())
 
-        assertTrue(feedback.rejects(0, predicate, first, zero, listOf(cell), arithmetic, algebraic))
-        val reused = feedback.rejects(0, predicate, second, zero, emptyList(), arithmetic, algebraic)
+        assertNotNull(feedback.rejection(0, predicate, first, zero, listOf(cell), arithmetic, algebraic))
+        val reused = feedback.rejection(0, predicate, second, zero, emptyList(), arithmetic, algebraic)
 
-        assertTrue(reused)
+        assertNotNull(reused)
         val trace = assertNotNull(feedback.firstCrossRegionUse)
         assertEquals(first.premises, trace.origin.premises)
         assertEquals(second.premises, trace.current.premises)
@@ -84,13 +84,13 @@ class PolynomialCellFeedbackTest {
             val cell = assertNotNull(CheckedPolynomialCell.rejected(predicate, support, zero, arithmetic, algebraic))
             val feedback = PolynomialCellFeedback(source.formula, condition)
             val scope = PolynomialCellScope.Query(source.formula, condition, snapshot)
-            assertTrue(feedback.rejects(0, predicate, scope, zero, listOf(cell), arithmetic, algebraic))
+            assertNotNull(feedback.rejection(0, predicate, scope, zero, listOf(cell), arithmetic, algebraic))
 
             val boundary = assertNotNull(cell.upper)
-            val rejected = feedback.rejects(0, predicate, scope, boundary, emptyList(), arithmetic, algebraic)
+            val rejected = feedback.rejection(0, predicate, scope, boundary, emptyList(), arithmetic, algebraic)
 
-            assertEquals(cell.upperClosed, rejected)
-            assertFalse(feedback.rejects(0, predicate, scope, algebraic.rational(BigFraction.ofLong(2)),
+            assertEquals(cell.upperClosed, rejected != null)
+            assertNull(feedback.rejection(0, predicate, scope, algebraic.rational(BigFraction.ofLong(2)),
                 emptyList(), arithmetic, algebraic))
         }
     }
@@ -110,11 +110,11 @@ class PolynomialCellFeedbackTest {
         val zero = algebraic.rational(BigFraction.ZERO)
         val cell = assertNotNull(CheckedPolynomialCell.rejected(predicate, scope, zero, arithmetic, algebraic))
         val feedback = PolynomialCellFeedback(source.formula, condition)
-        assertTrue(feedback.rejects(0, predicate, scope, zero, listOf(cell), arithmetic, algebraic))
+        assertNotNull(feedback.rejection(0, predicate, scope, zero, listOf(cell), arithmetic, algebraic))
 
         val widened = PolynomialCellScope.Query(source.formula, PolynomialCondition(), snapshot)
 
-        assertFalse(feedback.rejects(0, predicate, widened, zero, listOf(cell), arithmetic, algebraic))
+        assertNull(feedback.rejection(0, predicate, widened, zero, listOf(cell), arithmetic, algebraic))
     }
 
     @Test
@@ -130,13 +130,13 @@ class PolynomialCellFeedbackTest {
         val cell = assertNotNull(CheckedPolynomialCell.rejected(predicate, support, zero, arithmetic, algebraic))
         val feedback = PolynomialCellFeedback(source.formula, condition)
         val scope = PolynomialCellScope.Query(source.formula, condition, snapshot)
-        assertTrue(feedback.rejects(0, predicate, scope, zero, listOf(cell), arithmetic, algebraic))
+        assertNotNull(feedback.rejection(0, predicate, scope, zero, listOf(cell), arithmetic, algebraic))
         val replacement = PolynomialFormula.normalize(source.formula, arithmetic)
 
         feedback.replaceSnapshot(replacement, arithmetic)
 
         val current = PolynomialCellScope.Query(source.formula, condition, replacement)
-        assertFalse(feedback.rejects(0, predicate, current, zero, emptyList(), arithmetic, algebraic))
+        assertNull(feedback.rejection(0, predicate, current, zero, emptyList(), arithmetic, algebraic))
     }
 
     @Test
@@ -152,11 +152,11 @@ class PolynomialCellFeedbackTest {
         val zero = algebraic.rational(BigFraction.ZERO)
         val cell = assertNotNull(CheckedPolynomialCell.rejected(predicate, scope, zero, arithmetic, algebraic))
         val feedback = PolynomialCellFeedback(source.formula, condition)
-        assertTrue(feedback.rejects(0, predicate, scope, zero, listOf(cell), arithmetic, algebraic))
+        assertNotNull(feedback.rejection(0, predicate, scope, zero, listOf(cell), arithmetic, algebraic))
 
         val sibling = PolynomialCellScope.Region(source.formula, condition, snapshot, premises, Any())
 
-        assertFalse(feedback.rejects(0, predicate, sibling, zero, listOf(cell), arithmetic, algebraic))
+        assertNull(feedback.rejection(0, predicate, sibling, zero, listOf(cell), arithmetic, algebraic))
     }
 
     @Test
@@ -176,13 +176,13 @@ class PolynomialCellFeedbackTest {
             val one = algebraic.rational(BigFraction.ONE)
             val cell = assertNotNull(CheckedPolynomialCell.rejected(predicate, scope, one, arithmetic, algebraic))
             val feedback = PolynomialCellFeedback(source.formula, condition)
-            assertTrue(feedback.rejects(0, predicate, scope, one, listOf(cell), arithmetic, algebraic))
+            assertNotNull(feedback.rejection(0, predicate, scope, one, listOf(cell), arithmetic, algebraic))
             val premises = if (numeric) PolynomialBooleanRegion(emptyMap(), mapOf(0 to false))
                 else PolynomialBooleanRegion(mapOf(0 to false), emptyMap())
 
             val retracted = PolynomialCellScope.Region(source.formula, condition, snapshot, premises, owner)
 
-            assertFalse(feedback.rejects(0, predicate, retracted, one, emptyList(), arithmetic, algebraic))
+            assertNull(feedback.rejection(0, predicate, retracted, one, emptyList(), arithmetic, algebraic))
         }
     }
 
@@ -201,7 +201,7 @@ class PolynomialCellFeedbackTest {
         val scope = PolynomialCellScope.Query(other.formula, condition, snapshot)
         val feedback = PolynomialCellFeedback(other.formula, condition)
 
-        assertFalse(feedback.rejects(0, predicate, scope, zero, listOf(cell), arithmetic, algebraic))
+        assertNull(feedback.rejection(0, predicate, scope, zero, listOf(cell), arithmetic, algebraic))
     }
 
     @Test
@@ -220,7 +220,7 @@ class PolynomialCellFeedbackTest {
 
         val different = predicate.copy(relation = PolynomialRelation.NE)
 
-        assertFalse(feedback.rejects(0, different, scope, zero, listOf(cell), arithmetic, algebraic))
+        assertNull(feedback.rejection(0, different, scope, zero, listOf(cell), arithmetic, algebraic))
     }
 
     @Test
@@ -238,12 +238,12 @@ class PolynomialCellFeedbackTest {
         val second = assertNotNull(CheckedPolynomialCell.rejected(predicate, support, two, arithmetic, algebraic))
         val scope = PolynomialCellScope.Query(source.formula, condition, snapshot)
         val feedback = PolynomialCellFeedback(source.formula, condition, maximumCells = 1)
-        assertTrue(feedback.rejects(0, predicate, scope, zero, listOf(first), arithmetic, algebraic))
+        assertNotNull(feedback.rejection(0, predicate, scope, zero, listOf(first), arithmetic, algebraic))
 
         feedback.admit(second, arithmetic)
 
-        assertFalse(feedback.rejects(0, predicate, scope, zero, emptyList(), arithmetic, algebraic))
-        assertTrue(feedback.rejects(0, predicate, scope, two, emptyList(), arithmetic, algebraic))
+        assertNull(feedback.rejection(0, predicate, scope, zero, emptyList(), arithmetic, algebraic))
+        assertNotNull(feedback.rejection(0, predicate, scope, two, emptyList(), arithmetic, algebraic))
     }
 
     @Test
@@ -260,13 +260,13 @@ class PolynomialCellFeedbackTest {
         val cell = assertNotNull(CheckedPolynomialCell.rejected(predicate, support, zero, arithmetic, algebraic))
         val scope = PolynomialCellScope.Query(source.formula, condition, snapshot)
         val feedback = PolynomialCellFeedback(source.formula, condition)
-        assertFalse(feedback.rejects(0, predicate, scope, zero, emptyList(), arithmetic, algebraic))
+        assertNull(feedback.rejection(0, predicate, scope, zero, emptyList(), arithmetic, algebraic))
         stopped = true
 
         assertFailsWith<PolynomialInterrupted> { feedback.admit(cell, arithmetic) }
 
         stopped = false
-        assertFalse(feedback.rejects(0, predicate, scope, zero, emptyList(), arithmetic, algebraic))
+        assertNull(feedback.rejection(0, predicate, scope, zero, emptyList(), arithmetic, algebraic))
     }
 
     @Test
@@ -345,8 +345,11 @@ class PolynomialCellFeedbackTest {
         )
         val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
         val invocation = service.invocation(QfNraParams(cellRefinement = true, cellFeedback = true))
+        var checkedCells = 0
+        invocation.checkedCellObserver = { checkedCells++ }
         val pending = invocation.prepareCheck()
         assertNull(pending.next())
+        assertTrue(checkedCells > 0)
 
         invocation.close()
 

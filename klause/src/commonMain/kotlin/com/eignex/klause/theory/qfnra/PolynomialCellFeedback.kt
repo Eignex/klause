@@ -61,7 +61,7 @@ internal class PolynomialCellFeedback(
         snapshot = replacement
     }
 
-    fun rejects(
+    fun rejection(
         variable: Int,
         required: PolynomialAtom,
         scope: PolynomialCellScope,
@@ -69,10 +69,10 @@ internal class PolynomialCellFeedback(
         available: List<CheckedPolynomialCell>,
         arithmetic: PolynomialArithmetic,
         algebraic: AlgebraicArithmetic,
-    ): Boolean {
+    ): CheckedPolynomialCell? {
         step(arithmetic)
         lookups++
-        if (!enter(scope, arithmetic)) return false
+        if (!enter(scope, arithmetic)) return null
         if (rebuild) {
             for (index in 0 until minOf(MAX_FEEDBACK_CELLS, available.size)) {
                 step(arithmetic)
@@ -102,9 +102,9 @@ internal class PolynomialCellFeedback(
                     firstCrossRegionUse = PolynomialCellFeedbackUse(cell, origin, current, value)
                 }
             }
-            return true
+            return cell
         }
-        return false
+        return null
     }
 
     fun admit(cell: CheckedPolynomialCell, arithmetic: PolynomialArithmetic) {

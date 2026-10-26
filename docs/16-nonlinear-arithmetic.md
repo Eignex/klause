@@ -317,8 +317,10 @@ their signed premises and opaque reduction owner. The pool keeps at most eight
 references, drops facts after premise retraction and clears on snapshot replacement.
 Eligible immutable producer facts can rebuild it under the current scope. Admission,
 lookup and eviction poll and charge the caller; endpoint comparisons use its exact
-arithmetic. These numeric filters supply no Boolean clause and preserve the producer's
-candidate traversal, full witness checks and complete CAD fallback. The option is
+arithmetic. A hit already eligible for the producer's candidate selector establishes
+repeated membership without a second comparison. These numeric filters supply no
+Boolean clause and preserve the producer's candidate traversal, full witness checks
+and complete CAD fallback. The option is
 disabled by default.
 
 Optional query failure capture retains bounded exact observations of rejected probe

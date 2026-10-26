@@ -249,11 +249,11 @@ internal class PolynomialCellRefinement(
         while (true) {
             arithmetic.step()
             candidateCount++
-            var reused = false
+            var reused: CheckedPolynomialCell? = null
             val rejected = unary.firstOrNull { atom ->
                 arithmetic.step()
-                reused = feedback?.rejects(variable, atom, scope, value, retained, arithmetic, algebraic) == true
-                reused ||
+                reused = feedback?.rejection(variable, atom, scope, value, retained, arithmetic, algebraic)
+                reused != null ||
                     atom.holds(algebraic.signAt(atom.polynomial, mapOf(variable to value))).not()
             }
             if (rejected == null) {
@@ -263,12 +263,16 @@ internal class PolynomialCellRefinement(
             val support = if (sourceAtoms.any { arithmetic.step(); it == rejected }) {
                 checkNotNull(sourceScope)
             } else scope
-            val existing = retained.filter {
-                arithmetic.step()
-                it.variable == variable && (it.scope === scope || it.scope === sourceScope)
-            }
-            val repeated = (reused && support === sourceScope) ||
+            val known = reused
+            val repeated = if (known != null && (known.scope === scope || known.scope === sourceScope)) {
+                true
+            } else {
+                val existing = retained.filter {
+                    arithmetic.step()
+                    it.variable == variable && (it.scope === scope || it.scope === sourceScope)
+                }
                 existing.any { arithmetic.step(); it.contains(value, algebraic) }
+            }
             if (repeated) {
                 repeatedCount++
             } else {
