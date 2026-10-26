@@ -27,6 +27,7 @@ import com.eignex.klause.solver.IncumbentBootstrapSearch
 import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.RepairSearch
+import com.eignex.klause.solver.RepairSearchStep
 import com.eignex.klause.solver.ResumableOptimizer
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
@@ -1169,15 +1170,16 @@ class AlnsTest {
         val retained = object : RepairSearch {
             override val stats: SolveStats
                 get() = SolveStats(search = SearchStats(nodes = SumResult(cumulativeNodes.toDouble())))
-            override fun repair(
+            override fun begin(
                 assumptions: Assumptions,
                 decisionBudget: Long,
                 cutoff: Double,
                 cancellation: Cancellation,
-            ): Sample {
+            ) {
                 cumulativeNodes += 5
-                return incumbent
             }
+            override fun runSlice(cancellation: Cancellation, millis: Long, work: Long) =
+                RepairSearchStep(incumbent, TerminationReason.SearchExhausted)
         }
         val context = RepairContext(
             inner = NoFeasibleLs(problem),
