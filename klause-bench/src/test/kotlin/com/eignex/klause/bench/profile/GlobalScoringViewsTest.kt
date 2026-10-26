@@ -149,13 +149,33 @@ class GlobalScoringViewsTest {
         assertEquals("interval-table", GlobalScoringViews.alternate(table).reason)
     }
 
-    @Test
-    fun `cancelled construction publishes no alternate relation`() {
-        val table = Table(intArrayOf(0), longArrayOf(1, 2))
-        val result = GlobalScoringViews.alternate(table, Cancellation { true })
+    @ParameterizedTest
+    @ValueSource(ints = [0, 2, 8])
+    fun `cancelled construction publishes no alternate relation`(polls: Int) {
+        val table = Table(intArrayOf(0, 1, 2), longArrayOf(0, 1, 0, 1, 0, 2, 2, 1, 2, 0, 1, 0))
+        var remaining = polls
+        val result = GlobalScoringViews.alternate(table, Cancellation { remaining-- == 0 })
 
         assertEquals("cancelled", result.reason)
         assertNull(result.factor)
+    }
+
+    @Test
+    fun `overflowing weighted paths decline without wrapping their cost`() {
+        val diagram = Mdd(intArrayOf(0, 1), intArrayOf(1, 1, 1), intArrayOf(0, 4, 8),
+            longArrayOf(0, 0, 0, Long.MAX_VALUE, 0, 1, 0, 1), 0, intArrayOf(0), 4, 2)
+
+        assertEquals("weight-overflow", GlobalScoringViews.alternate(diagram).reason)
+    }
+
+    @Test
+    fun `oversized distinctness keeps native scoring and an explicit decline`() {
+        val count = GlobalScoringViews.MAX_ARITY + 1
+        val problem = Problem(0, count, Array(count) { IntDomain(0, count.toLong()) },
+            arrayOf(AllDifferent(IntArray(count) { it })))
+        val selection = GlobalScoringViews.pairwise(problem, LocalSearchProblem(problem))
+
+        assertEquals("arity-limit", selection.admissions.single().reason)
     }
 
     private fun pairwise(problem: Problem): LocalSearchState {
@@ -180,7 +200,8 @@ class GlobalScoringViewsTest {
                 val diagram = assertIs<Mdd>(GlobalScoringViews.alternate(table).factor)
                 val roundTrip = assertIs<Table>(GlobalScoringViews.alternate(diagram).factor)
                 listOf(table, diagram, roundTrip).map { factor ->
-                    LocalSearchState(LocalSearchModel.open(Problem(0, 3, Array(3) { IntDomain(0, 2) }, arrayOf(factor))),
+                    LocalSearchState(LocalSearchModel.open(
+                        Problem(0, 3, Array(3) { IntDomain(0, 2) }, arrayOf(factor))),
                         Random(7))
                 }
             }
