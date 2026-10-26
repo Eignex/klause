@@ -297,6 +297,9 @@ fallback. Optional failure supplies no refutation.
 
 Checked cells retain exact algebraic endpoints, openness and their numeric predicate.
 Source support requires a mandatory predicate of the unconditioned immutable source.
+Source and query intervals retain their captured coordinate meaning. An eliminated
+CAD slot holds a placeholder until reconstruction; reuse needs a checked coordinate
+map or an explicit surviving-predicate match before reading that slot.
 Other cells retain the query condition and snapshot; regional cells additionally keep
 signed source premises and an opaque affine-reduction owner. Such cells cannot cross
 owners without checked source reconstruction. Integer point coverage does not imply

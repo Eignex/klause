@@ -251,4 +251,37 @@ class PolynomialCellRefinementTest {
             assertEquals(required + 1, invocation.stats.workSpent)
         }
     }
+
+    @Test
+    fun `regional cells retain signed premises and their reduction owner`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (declare-const y Real) (declare-const gate Bool) " +
+                "(assert (or gate (and (= x y) (> (* x y) 1))))",
+        )
+        val arithmetic = PolynomialArithmetic()
+        val normalized = PolynomialFormula.normalize(source.formula, arithmetic)
+        val numeric = normalized.booleanRegions(arithmetic).asSequence().filterNotNull()
+            .first { it.atoms.size == normalized.atoms.size }
+        val premises = PolynomialBooleanRegion(numeric.atoms, numeric.bools + mapOf(0 to false))
+        val reduction = PolynomialAffineReduction.prepare(normalized, premises, 2, arithmetic)
+            .asSequence().filterNotNull().first()
+        val variable = reduction.atoms.first { it.polynomial.variables.isNotEmpty() }.polynomial.variables.single()
+        val refinement = PolynomialCellRefinement(source.formula, PolynomialCondition(), QfNraWork(QfNraParams()),
+            PolynomialLimits()) {}
+        refinement.prepare(normalized)
+        val first = assertNotNull(refinement.region(normalized, premises, reduction))
+        assertNotNull(first.repair(variable, AlgebraicArithmetic().rational(BigFraction.ZERO)))
+        val firstCount = refinement.cells.size
+        val second = assertNotNull(refinement.region(normalized, premises, reduction))
+
+        assertNotNull(second.repair(variable, AlgebraicArithmetic().rational(BigFraction.ZERO)))
+
+        val scope = assertIs<PolynomialCellScope.Region>(refinement.cells.first().scope)
+        assertEquals(premises, scope.premises)
+        assertTrue(scope === first.scope)
+        assertTrue(first.scope.reduction !== second.scope.reduction)
+        val appended = refinement.cells.drop(firstCount)
+        assertTrue(appended.isNotEmpty())
+        assertTrue(appended.all { it.scope === second.scope })
+    }
 }

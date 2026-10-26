@@ -996,6 +996,35 @@ claims have no independent certificates. Single regression samples establish no
 timing comparison. Small-case costs can rise substantially: strict-root
 contradiction spends 826→23,469 units and quartic no-real-root 1462→16,929.
 
+### Exact univariate refinement profiles
+
+`PolynomialPhaseProfile refinement=true|both` enables the internal query option;
+`both` retains `control-trace.json` with refinement disabled at the identical revision,
+source bytes, requested fixing, representation limits and containing allowance.
+`cellRefinement` counts candidate coordinates, completed checked cells, repeated
+candidates, repaired coordinates, private declines and cumulative optional native
+work. The containing native snapshot includes refinement and complete fallback.
+The optional path shares 16,384 units across snapshot replacements, admits degree 16,
+64-term predicates with 4,096-bit coefficients, and retains at most eight cells.
+Seeds and regional support have a 64-coordinate/premise ceiling. A missing cell or
+candidate is a bounded decline, not a source verdict.
+
+`checkedCells` serializes the completed typed facts after the query: numeric predicates,
+exact algebraic endpoints, closure and source/query/regional scope. Source support
+means a mandatory predicate of the original unconditioned polynomial formula.
+Conditional records retain all query bounds/Booleans; regional records also retain
+signed premise IDs and process-local snapshot/reduction identities. Those identities
+are not persistent source mappings. Source/query cells require an active-coordinate
+map or surviving-predicate match when a reduced CAD sample contains eliminated
+placeholder slots. Serialized diagnostics are not a replay or
+independent proof format. Source checking, native UNSAT, component candidate entry,
+projection counts, total cost and physical resource receipts remain separate claims.
+
+Original-source witness checking runs through an ordinary CLI experiment at a pinned
+activation revision, using the existing source reconstruction, model rendering and Lab
+checkers. Component traces keep their native verdict scope; prepared slot arrays have
+no original-source correspondence in this diagnostic.
+
 ### Element hull admission capture
 
 `bench.profile.ElementHullProfile` takes `suite=ID problem=NAME sha256=HEX` for a
@@ -3563,6 +3592,32 @@ claims have no independent certificates. Hash-bound requests, original bytes,
 traces, runtime/build identities and checker receipts stay outside Git in the Lab
 records and the retained nonlinear-refinement campaign.
 
+### Checked univariate predicate cells
+
+[Prepared 8622](https://lab.eignex.com/jobs/8622) and
+[holdouts 8623](https://lab.eignex.com/jobs/8623) compare the internal producer with
+its disabled control at `38cff63082`, P1, ten-second query budgets, a 3 GiB child
+heap and default representation limits. All nine prepared and seventeen holdout
+outcome pairs match. Prepared Economics derives six checked source cells in
+thirteen coordinate attempts, with five repaired coordinates. Its `x11 > 0`
+support excludes the closed zero section and negative open sector. The producer
+spends its 16,384-unit allowance, then retains the control's seven projected
+polynomials and 38 lifted cells; total native work rises from 218,350 to 234,734.
+Mbo and the three large interrupted prepared cases also exhaust this private
+allowance without a candidate. A zero entry count does not establish that no
+useful predicate exists.
+
+The seventeen holdouts produce 33 checked cells: 31 with direct source support
+and two conditional cells on the canonical degeneracy identities. Their retained
+fixings remain explicit. Negated equality uses 617 native units against 3,735;
+repeated-section uses 314 against 594. Positive-dimensional nullification reaches
+a component witness with zero lifted cells against three, using exclusions
+from independent unary predicates. Strict-root contradiction instead grows from
+181 to 3,069 units. These observations establish bounded capability and mixed costs,
+with the option disabled by default. Native UNSAT is separate from independent
+source proof checking. Coordinate attempts, main rejected representations, complete
+model counts and ordinary published witnesses are distinct observation surfaces.
+
 ### Polynomial Boolean bookkeeping
 
 The first-region control in `PolynomialBooleanRegionsTest` excludes normalization
@@ -5199,25 +5254,3 @@ support unchanged complete-check accounting, with no partial-policy benefit or
 throughput claim. Useful captured conflicts qualify the bounded internal consumer;
 inactive-state cost and original-source applicability keep automatic activation
 disabled.
-
-### Exact univariate refinement profiles
-
-`PolynomialPhaseProfile refinement=true|both` enables the internal query option;
-`both` retains `control-trace.json` with refinement disabled at the identical revision,
-source bytes, requested fixing, representation limits and containing allowance.
-`cellRefinement` counts candidate coordinates, completed checked cells, repeated
-candidates, repaired coordinates, private declines and cumulative optional native
-work. The containing native snapshot includes refinement and complete fallback.
-The optional path shares 16,384 units across snapshot replacements, admits degree16,
-64-term predicates with 4,096-bit coefficients, and retains at most eight cells.
-Seeds and regional support have a 64-coordinate/premise ceiling. A missing cell or
-candidate is a bounded decline, not a source verdict.
-
-`checkedCells` serializes the completed typed facts after the query: numeric predicates,
-exact algebraic endpoints, closure and source/query/regional scope. Source support
-means a mandatory predicate of the original unconditioned polynomial formula.
-Conditional records retain all query bounds/Booleans; regional records also retain
-signed premise IDs and process-local snapshot/reduction identities. Those identities
-are not persistent source mappings. Serialized diagnostics are not a replay or
-independent proof format. Source checking, native UNSAT, component candidate entry,
-projection counts, total cost and physical resource receipts remain separate claims.
