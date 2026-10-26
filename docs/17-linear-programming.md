@@ -172,13 +172,15 @@ checked-candidate pass. Existing candidate IDs are preserved; appending produces
 a new template identity. Full owner and coordinate indices must belong to that
 template, and copying and indexing costs debit the containing source allowance.
 The proposal producer owns and funds derivation construction separately.
-An optional template policy projects a continuous coordinate by combining its
+`source-aggregate-cuts=true` enables a template policy for numerical frontier
+traversal when source separation is enabled. It projects a continuous coordinate by combining its
 source row with the first singleton source bound of opposite coefficient sign.
 It applies checked rounding to the residual, using the first source bound sides
 for the remaining continuous coordinates. The cached family retains at most 64
 proposals under 500,000 preparation work and 8 MiB modeled allocation, with
 per-attempt limits shared with explicit aggregation. Stopped or limited
 preparation reports its decline and leaves only completed proposals available.
+Aggregation is disabled by default.
 
 ### Root preparation
 

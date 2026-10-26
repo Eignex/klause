@@ -82,6 +82,31 @@ class LinearAuthorityInvocationTest {
     }
 
     @Test
+    fun `retained frontier should consume a source bound aggregate within one LP operation`() {
+        val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val source = SourceProofContext(scope, setOf(integer, real, residual), mapOf(
+            "row" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ofLong(2),
+                real to BigFraction.MINUS_ONE, residual to BigFraction.ONE), BigFraction.ofLong(3))),
+            "real-lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "real-upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ofLong(2))),
+            "residual-lower" to SourcePremise(SourceInequality(mapOf(residual to BigFraction.MINUS_ONE),
+                BigFraction.ZERO)),
+            "residual-upper" to SourcePremise(SourceInequality(mapOf(residual to BigFraction.ONE),
+                BigFraction.ofLong(100))),
+        ), mapOf(integer to BigFraction.MINUS_ONE, real to BigFraction.ONE))
+
+        val result = LinearAuthorityInvocation(source,
+            TheoryParams(sourceAggregateCuts = true, sourceLpOperations = 1), boundOrdered = true).use {
+            it.run { _, _ -> }
+        }
+
+        val terminal = assertNotNull(result.terminal)
+        assertEquals(SourceValue.Rational(BigFraction.MINUS_ONE), assertIs<SourceClaim.Optimal>(terminal.claim).value)
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
+    }
+
+    @Test
     fun `frontier should consume a sparse residual rejected by small scalar admission`() {
         val reals = (0 until 129).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
         val coefficients = reals.take(65).associateWith { checkNotNull(BigFraction.ofDouble(3.141592653589793)) }

@@ -60,7 +60,7 @@ internal object MpsProofFrontier {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val supported = setOf("suite", "problem", "sha256", "exact", "probe", "history", "frontier", "cuts",
             "selection", "replay", "operations", "activeRows", "supportBranching", "pointCuts", "aggregate-probe",
-            "aggregate-mixed", "aggregate-replay")
+            "aggregate-mixed", "aggregate-replay", "aggregateCuts")
         require(options.keys.containsAll(setOf("suite", "problem", "sha256", "exact")) &&
             (options.keys - supported).isEmpty())
         val probe = options["probe"]?.toBooleanStrict() ?: false
@@ -101,6 +101,7 @@ internal object MpsProofFrontier {
         val params = TheoryParams(timeout = solveStop, cancellation = solveStop, randomSeed = 3L,
             sourceCuts = options["cuts"]?.toBooleanStrict() ?: true,
             sourcePointCuts = options["pointCuts"]?.toBooleanStrict() ?: false,
+            sourceAggregateCuts = options["aggregateCuts"]?.toBooleanStrict() ?: false,
             sourceLpOperations = options["operations"]?.toInt()?.also { require(it in 1..256) } ?: Int.MAX_VALUE)
         val authority = request.javaClass.declaredMethods.single {
             it.name == "authorityContext" && it.parameterCount == 2
@@ -234,6 +235,7 @@ internal object MpsProofFrontier {
                 put("sourceCuts", params.sourceCuts)
                 put("supportBranching", supportBranching)
                 put("pointCuts", params.sourcePointCuts)
+                put("aggregateCuts", params.sourceAggregateCuts)
                 put("aggregateProbe", aggregateProbe)
                 put("aggregateMixed", aggregateMixed)
                 put("aggregateReplay", aggregateReplay)

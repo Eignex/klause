@@ -5449,6 +5449,10 @@ allocation; all four share a 30-second deadline.
 Discovery costs remain in the pair report. The replay reports installed and
 checked candidate IDs, exact bounds, native checks and per-arm costs. These
 diagnostic replays establish neither warm-basis parity nor whole-CLI throughput.
+`aggregateCuts=true` enables cached source-bound projections in the measured
+frontier traversal itself. Ordinary CLI experiments use
+`param=source-aggregate-cuts=true`; the default is false and `source-cuts=false`
+disables both individual and aggregate separation.
 
 [Mixed-pair probe 8519](https://lab.eignex.com/jobs/8519), at `6f92f17c4b`, uses
 the same original `rgn` source hash and traversal settings as 8478. Root query 0
