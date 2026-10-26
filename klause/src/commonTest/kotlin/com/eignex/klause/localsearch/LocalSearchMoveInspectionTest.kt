@@ -1,6 +1,7 @@
 package com.eignex.klause.localsearch
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -16,6 +17,7 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 
 class LocalSearchMoveInspectionTest {
     @Test
@@ -70,11 +72,11 @@ class LocalSearchMoveInspectionTest {
 
     @Test
     fun `inspection includes maintained compound outputs and restores them`() {
-        val problem = Problem(0, 3, Array(3) { IntDomain(0, 8) }, arrayOf(
-            Linear(longArrayOf(1, 1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
-        ))
+        val problem = Problem(
+            0, 3, arrayOf(IntDomain(0, 4), IntDomain(0, 4), IntDomain(0, 16)), arrayOf(Product(0, 1, 2)),
+        )
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(1))
-        state.invariants = DefinitionalSweep.infer(problem, intArrayOf(2))?.network(3, 0)
+        state.invariants = assertNotNull(DefinitionalSweep.infer(problem)).network(3, 0)
         state.recompute()
 
         val observed = state.inspectMove(
@@ -82,9 +84,9 @@ class LocalSearchMoveInspectionTest {
             LinearObjective(intCoefficients = longArrayOf(0, 0, 1)),
         )
 
-        assertContentEquals(longArrayOf(2, 3, 5), observed.assignment.ints)
+        assertContentEquals(longArrayOf(2, 3, 6), observed.assignment.ints)
         assertContentEquals(intArrayOf(0), observed.factorDegrees)
-        assertEquals(5.0, observed.objectiveDelta)
+        assertEquals(6.0, observed.objectiveDelta)
         assertContentEquals(longArrayOf(0, 0, 0), state.assignment.snapshot().ints)
         assertEquals(0L, state.cost)
     }

@@ -9546,6 +9546,19 @@ final class com.eignex.klause.localsearch/LocalSearchModel { // com.eignex.klaus
     }
 }
 
+final class com.eignex.klause.localsearch/LocalSearchMoveInspection { // com.eignex.klause.localsearch/LocalSearchMoveInspection|null[0]
+    final val assignment // com.eignex.klause.localsearch/LocalSearchMoveInspection.assignment|{}assignment[0]
+        final fun <get-assignment>(): com.eignex.klause.solver/Sample // com.eignex.klause.localsearch/LocalSearchMoveInspection.assignment.<get-assignment>|<get-assignment>(){}[0]
+    final val factorDegrees // com.eignex.klause.localsearch/LocalSearchMoveInspection.factorDegrees|{}factorDegrees[0]
+        final fun <get-factorDegrees>(): kotlin/IntArray // com.eignex.klause.localsearch/LocalSearchMoveInspection.factorDegrees.<get-factorDegrees>|<get-factorDegrees>(){}[0]
+    final val netDelta // com.eignex.klause.localsearch/LocalSearchMoveInspection.netDelta|{}netDelta[0]
+        final fun <get-netDelta>(): kotlin/Long // com.eignex.klause.localsearch/LocalSearchMoveInspection.netDelta.<get-netDelta>|<get-netDelta>(){}[0]
+    final val objectiveDelta // com.eignex.klause.localsearch/LocalSearchMoveInspection.objectiveDelta|{}objectiveDelta[0]
+        final fun <get-objectiveDelta>(): kotlin/Double // com.eignex.klause.localsearch/LocalSearchMoveInspection.objectiveDelta.<get-objectiveDelta>|<get-objectiveDelta>(){}[0]
+    final val weightedNetDelta // com.eignex.klause.localsearch/LocalSearchMoveInspection.weightedNetDelta|{}weightedNetDelta[0]
+        final fun <get-weightedNetDelta>(): kotlin/Double // com.eignex.klause.localsearch/LocalSearchMoveInspection.weightedNetDelta.<get-weightedNetDelta>|<get-weightedNetDelta>(){}[0]
+}
+
 final class com.eignex.klause.localsearch/LocalSearchParams : com.eignex.klause.solver/SolverParams { // com.eignex.klause.localsearch/LocalSearchParams|null[0]
     constructor <init>(kotlin/Long = ..., kotlin/Long? = ..., com.eignex.klause.backtrack/NodeBudget? = ..., kotlin/Long? = ..., com.eignex.klause.propagation/Assumptions = ..., com.eignex.klause.util/Cancellation = ..., kotlin/Function1<com.eignex.klause.solver.result/SearchEvent, kotlin/Unit>? = ..., com.eignex.klause.localsearch/CostShaping = ..., com.eignex.klause.solver.objective/IncrementalObjective? = ..., com.eignex.klause.solver/Sample? = ..., com.eignex.klause.solver.incumbent/IncumbentExchange<com.eignex.klause.solver/Sample, kotlin/Double>? = ..., kotlin/Int = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ...) // com.eignex.klause.localsearch/LocalSearchParams.<init>|<init>(kotlin.Long;kotlin.Long?;com.eignex.klause.backtrack.NodeBudget?;kotlin.Long?;com.eignex.klause.propagation.Assumptions;com.eignex.klause.util.Cancellation;kotlin.Function1<com.eignex.klause.solver.result.SearchEvent,kotlin.Unit>?;com.eignex.klause.localsearch.CostShaping;com.eignex.klause.solver.objective.IncrementalObjective?;com.eignex.klause.solver.Sample?;com.eignex.klause.solver.incumbent.IncumbentExchange<com.eignex.klause.solver.Sample,kotlin.Double>?;kotlin.Int;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean){}[0]
 
@@ -9750,6 +9763,7 @@ final class com.eignex.klause.localsearch/LocalSearchState { // com.eignex.klaus
     final fun apply(com.eignex.klause.localsearch/Move) // com.eignex.klause.localsearch/LocalSearchState.apply|apply(com.eignex.klause.localsearch.Move){}[0]
     final fun breakScore(com.eignex.klause.localsearch/Move): kotlin/Int // com.eignex.klause.localsearch/LocalSearchState.breakScore|breakScore(com.eignex.klause.localsearch.Move){}[0]
     final fun greedyPickByShapedBreak(kotlin.collections/List<com.eignex.klause.localsearch/Move>): com.eignex.klause.localsearch/Move? // com.eignex.klause.localsearch/LocalSearchState.greedyPickByShapedBreak|greedyPickByShapedBreak(kotlin.collections.List<com.eignex.klause.localsearch.Move>){}[0]
+    final fun inspectMove(com.eignex.klause.localsearch/Move, com.eignex.klause.solver.objective/Objective? = ...): com.eignex.klause.localsearch/LocalSearchMoveInspection // com.eignex.klause.localsearch/LocalSearchState.inspectMove|inspectMove(com.eignex.klause.localsearch.Move;com.eignex.klause.solver.objective.Objective?){}[0]
     final fun makeScore(com.eignex.klause.localsearch/Move): kotlin/Int // com.eignex.klause.localsearch/LocalSearchState.makeScore|makeScore(com.eignex.klause.localsearch.Move){}[0]
     final fun netDelta(com.eignex.klause.localsearch/Move): kotlin/Long // com.eignex.klause.localsearch/LocalSearchState.netDelta|netDelta(com.eignex.klause.localsearch.Move){}[0]
     final fun objectiveDelta(com.eignex.klause.solver.objective/Objective, com.eignex.klause.localsearch/Move): kotlin/Double? // com.eignex.klause.localsearch/LocalSearchState.objectiveDelta|objectiveDelta(com.eignex.klause.solver.objective.Objective;com.eignex.klause.localsearch.Move){}[0]

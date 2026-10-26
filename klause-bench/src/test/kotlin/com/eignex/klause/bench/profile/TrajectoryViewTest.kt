@@ -1,6 +1,7 @@
 package com.eignex.klause.bench.profile
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.ir.DefinitionHint
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
@@ -54,7 +55,12 @@ class TrajectoryViewTest {
     @Test
     fun `inconsistent maintained output has no paired source state`() {
         val view = view(1, 1)
-        val sweep = requireNotNull(DefinitionalSweep.infer(view.state.problem, intArrayOf(1)))
+        val sweep = requireNotNull(DefinitionalSweep.fromSource(view.state.problem, listOf(
+            DefinitionHint.Linear(
+                1, longArrayOf(1, -1),
+                arrayOf(DefinitionHint.Operand.Variable(0), DefinitionHint.Operand.Variable(1)), 0,
+            ),
+        )))
         view.state.invariants = sweep.network(2, 0)
         val maintained = TrajectoryView(
             "maintained", view.state, view.coordinates,
