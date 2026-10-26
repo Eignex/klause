@@ -2,6 +2,7 @@ package com.eignex.klause.theory.qfnia
 
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.ir.NonlinearIntegerProblem
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.QfNraParams
 import com.eignex.klause.theory.qfnra.QfNraResult
@@ -15,6 +16,38 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class NonlinearIntegerCursorTest {
+    @Test
+    fun `failed tuple should preserve satisfiable neighbors under opposite Boolean conditions`() {
+        val parsed = SmtLibPolynomial.parse(
+            "(declare-const n Int) (declare-const r Real) (declare-const b Bool) " +
+                "(assert (= (* n n) 1)) (assert (= (* r r) 0)) " +
+                "(assert (or (and b (< n 0)) (and (not b) (> n 0))))",
+            allowIntegers = true,
+        )
+        val source = NonlinearIntegerProblem(
+            parsed.formula,
+            parsed.realCount,
+            parsed.boolCount,
+            parsed.intVarNames,
+            parsed.realVarNames,
+            parsed.boolVarNames,
+        )
+        for ((pin, expected) in listOf(true to BigFraction.MINUS_ONE, false to BigFraction.ONE)) {
+            NonlinearIntegerCursor(
+                source,
+                NonlinearIntegerParams(strategy = NonlinearIntegerStrategy.LOCAL_SEARCH, maximumCandidates = 2),
+                PolynomialCondition(bools = mapOf(0 to pin)),
+            ).use { cursor ->
+                assertNull(cursor.runSlice(maximumCandidates = 1))
+                val witness = assertIs<QfNraResult.Satisfiable>(requireNotNull(cursor.runSlice()).result).assignment
+
+                assertEquals(expected, witness.realValue(0).rational)
+                assertEquals(BigFraction.ZERO, witness.realValue(1).rational)
+                assertEquals(pin, witness.boolValue(0))
+            }
+        }
+    }
+
     @Test
     fun `candidate slices should preserve traversal and cumulative arithmetic work`() {
         val parsed = SmtLibPolynomial.parse("(declare-const x Int) (assert (= (* x x) 2))", allowIntegers = true)
