@@ -234,6 +234,11 @@ backings of original real columns. Backings participate in connectivity as bridg
 remain free in every residual and consume no discrete seed or freedom quota.
 Canonical integer declarations without a separate source mapping remain eligible.
 
+The diagnostic source-input pass tries a narrow neighborhood for each discrete
+seed after a checked cutoff changes, before honoring wider nonadaptive proposals.
+Pending candidates and cumulative funding survive each slice. Adaptive proposals
+keep their selected widths; the pass supplies no coverage or proof authority.
+
 Each candidate runs the shared numerical traversal with a borrowed source LP
 authority. Candidate coverage and compatible LP state survive slice boundaries;
 changed pins retire candidate coverage before opening another query. Search and LP

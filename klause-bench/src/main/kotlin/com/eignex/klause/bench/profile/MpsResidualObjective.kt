@@ -95,6 +95,10 @@ internal object MpsResidualObjective {
                 if (Term.isInt(column)) Term.intVar(column) else Term.realVar(column)) to values[id]
         }
         val point = coordinates.map { mapped[it] ?: (checkNotNull(original.objective) * scale) }
+        if ("jointWalkMillis" in request) {
+            MpsJointWalk.inspect(request, source, numerical, context, columns, mapped, scale, out)
+            return
+        }
         if ("repairSets" in request) {
             MpsRepairReplay.inspect(request, source, numerical, context, columns, mapped, scale, out)
             return
