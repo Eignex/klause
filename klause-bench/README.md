@@ -3881,6 +3881,12 @@ alternate arm order, preserving the exact source JSON/hash, objective units, ful
 owner lifecycle time, decisions, complete checks and separate work counters. These
 controls establish native scope behavior and cost; they are neither ordinary MPS
 performance measurements nor independent proof checks.
+Warmups also retain the shared numerical journal in `*-states.json`. Delayed
+open states receive separately funded feasibility consultations in
+`*-active-consultations.jsonl`, with at most two operations, 20M work and 64 MiB
+modeled allocation per state under a shared ten-second inspection deadline.
+These counterfactual queries publish no point or bound and do not guide traversal.
+Measured rounds disable observation. Stops and omitted observations remain unknown.
 For an original MPS request, `activeRows=compare` applies the same paired lifecycle
 comparison to one shared prepared source context. Original bytes/hash, effective
 semantics, objective scale and tolerance coverage accompany the native results.
