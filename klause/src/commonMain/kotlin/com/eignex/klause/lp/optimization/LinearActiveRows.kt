@@ -25,6 +25,7 @@ internal data class LinearActiveResult(
     val attempted: Boolean = false,
     val unchanged: Boolean = false,
     val paused: Boolean = false,
+    val captureDeclined: Boolean = false,
 )
 
 internal class LinearActiveRows(
@@ -58,7 +59,7 @@ internal class LinearActiveRows(
             val numeric = branch.activeNumericContext(cancellation) { work, allocation ->
                 budget.observe(preparation = work)
                 budget.funding?.charge(0L, allocation)
-            } ?: return LinearActiveResult()
+            } ?: return LinearActiveResult(captureDeclined = !cancellation())
             if (budget.funding?.paused == true) return LinearActiveResult(paused = true)
             val next = State(numeric.premises.mapValues { it.value.inequality }, condition.lower, condition.upper)
             if (next == state && finished) return LinearActiveResult(unchanged = true)
@@ -170,6 +171,8 @@ internal fun SourceProofContext.activeNumericContext(
         val rows = linkedMapOf<String, SourcePremise>()
         val coordinates = this.coordinates
         if (!visit(coordinates.size + booleans.size + lower.size + upper.size)) return null
+        if (booleans.keys.any { SourceCoordinate(SourceCoordinate.Kind.Boolean, it) !in coordinates } ||
+            (lower.keys + upper.keys).any { it !in coordinates }) return null
         for (bound in lower.values + upper.values) {
             if (!visit() || !scalar(bound)) return null
         }
