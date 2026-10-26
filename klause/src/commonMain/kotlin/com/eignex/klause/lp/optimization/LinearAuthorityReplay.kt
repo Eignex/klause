@@ -74,11 +74,22 @@ internal object LinearAuthorityReplay {
         maximumWork: Long,
         maximumAllocation: Long,
         stop: Cancellation,
+    ): LinearAuthorityReplayResult = solve(query, mask, additional, cuts, false,
+        maximumWork, maximumAllocation, stop)
+
+    fun boundProjections(
+        query: LinearAuthorityCapturedQuery, maximumWork: Long, maximumAllocation: Long, stop: Cancellation,
+    ): LinearAuthorityReplayResult = solve(query, null, emptyList(), true, true,
+        maximumWork, maximumAllocation, stop)
+
+    private fun solve(
+        query: LinearAuthorityCapturedQuery, mask: Set<Int>?, additional: List<LinearAuthorityCut>,
+        cuts: Boolean, aggregate: Boolean, maximumWork: Long, maximumAllocation: Long, stop: Cancellation,
     ): LinearAuthorityReplayResult {
         val funding = SourceLpFunding(maximumWork, maximumAllocation).apply { grant(maximumWork) }
         val budget = SourceLpBudget(maxOperations = 1, funding = funding)
         val capture = LinearAuthorityCapture(1, 1_000_000L, 16_777_216L, stop)
-        LinearAuthority(budget, retainLp = true, additionalCuts = additional).use { authority ->
+        LinearAuthority(budget, retainLp = true, additionalCuts = additional, aggregateCuts = aggregate).use { authority ->
             authority.capture = capture
             var result: LinearAuthorityResult
             do {

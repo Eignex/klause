@@ -41,6 +41,7 @@ internal class LinearAuthority(
     private val retainLp: Boolean = false,
     guidancePolicy: SparseSourceLpPolicy = SparseSourceLpPolicy(),
     additionalCuts: List<LinearAuthorityCut> = emptyList(),
+    private val aggregateCuts: Boolean = false,
 ) : AutoCloseable {
     init { require(additionalCuts.size <= 64) }
     private val additionalCuts = additionalCuts.toList()
@@ -276,14 +277,7 @@ internal class LinearAuthority(
                 ?: LinearAuthorityTemplate.prepare(source, cancellation, cuts) { work ->
                     cutPreparationWork += work
                     budget.observe(preparation = work)
-                }?.let { prepared ->
-                    if (!cuts) prepared else prepared.withAdditional(additionalCuts,
-                        Cancellation { cancellation() || budget.funding?.paused == true }) { work, allocation ->
-                        cutPreparationWork += work
-                        budget.observe(preparation = work)
-                        budget.funding?.charge(0L, allocation)
-                    }
-                }?.also {
+                }?.let { if (cuts) withAdditionalCuts(it, cancellation) else it }?.also {
                     template = it
                     retainedCutPeak = maxOf(retainedCutPeak, it.cuts?.rows?.size?.toLong() ?: 0L)
                     retainedMixedCutPeak = maxOf(retainedMixedCutPeak,
@@ -300,6 +294,37 @@ internal class LinearAuthority(
             activeCutPeak = maxOf(activeCutPeak, it.activeCuts.toLong())
             activeMixedCutPeak = maxOf(activeMixedCutPeak, it.activeMixedCuts.toLong())
         }
+    }
+
+    private fun withAdditionalCuts(
+        prepared: LinearAuthorityTemplate, cancellation: Cancellation,
+    ): LinearAuthorityTemplate? {
+        if (!aggregateCuts && additionalCuts.isEmpty()) return prepared
+        val funded = Cancellation { cancellation() || budget.funding?.paused == true }
+        val generated = if (aggregateCuts) LinearAuthorityAggregateCuts.prepareBoundProjections(
+            prepared.numeric, funded, { name, count ->
+                when (name) {
+                    "AggregateWork" -> cutCost(count, 0L)
+                    "AggregateAllocation" -> cutCost(0L, count)
+                    else -> {
+                        val key = "numericalCut$name"
+                        cutEligibility[key] = (cutEligibility[key] ?: 0L) + count
+                    }
+                }
+            }, maximumCandidates = 64 - additionalCuts.size) else emptyList()
+        if (funded()) return null
+        val additional = if (generated.isEmpty()) additionalCuts else {
+            cutCost(1L, 64L + (generated.size + additionalCuts.size) * 8L)
+            if (funded()) return null
+            additionalCuts + generated
+        }
+        return prepared.withAdditional(additional, funded, ::cutCost)
+    }
+
+    private fun cutCost(work: Long, allocation: Long) {
+        cutPreparationWork += work
+        budget.observe(preparation = work)
+        budget.funding?.charge(0L, allocation)
     }
 
     private fun checkSource(
