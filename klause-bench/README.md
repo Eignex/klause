@@ -3644,6 +3644,18 @@ one CPU and a 4,608 MiB cgroup limit. Their final `memory.current` observations 
 1,684,279,296, 1,589,030,912 and 1,691,287,552 bytes, with no OOM or limit events.
 These whole-profile readings are neither peak nor per-arm memory measurements.
 
+[Ordinary source checking 8648](https://lab.eignex.com/jobs/8648) compares seventy
+identities at `d05f174ec7` and the one-line activation build `cba0c4f8f4`, on
+Mac/aarch64, P1/seed 3/10s with a 3 GiB heap. All paired source hashes, outcomes and
+CLI exits match. Each arm retains 41 SAT, 26 native UNSAT, one UNKNOWN and two
+unchanged source-admission failures. Of the SAT witnesses, 18 pass Dolmen 0.10 and
+21 pass Z3 5.1.0; one power-syntax check is unknown and one DIMACS witness is
+unchecked. Native UNSAT has no independent certificate. Across 59 completed native
+pairs, recorded `nraWork` totals 5,752,275 in control and 5,903,557 with refinement:
+five decreases and 54 increases. Ordinary mixed power rises from 48,240 to 49,992,
+despite the direct fixed-query reduction. These costs retain the disabled default;
+the activation build is separate from the published implementation.
+
 ### Polynomial Boolean bookkeeping
 
 The first-region control in `PolynomialBooleanRegionsTest` excludes normalization
