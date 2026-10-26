@@ -5488,6 +5488,21 @@ projection preparation and LP certification. This is a useful retained subset;
 the proposal cap leaves the rest of the source-projection family unexamined.
 It does not establish a universal candidate ceiling or whole-frontier benefit.
 
+[Frontier integration 8610](https://lab.eignex.com/jobs/8610), at `e2622b92d8`,
+enables the cached family in the retained traversal on the same original `rgn`
+source, default tolerance, seed 3, Linux/amd64, P1 and 32 LP operations. The root
+installs 40 individual cuts and 64 aggregates and reproduces 8590's checked bound.
+All 104 cuts and the bound pass fresh native checks in each of the six retained
+query records. The traversal prepares once and reuses the owner 31 times, reaching
+a checked root bound of about 63 with 30 checked bounds, 61 retained nodes and
+28 pending alternatives. It publishes no incumbent or terminal source verdict.
+Total funded work is 14,081,025 and modeled allocation is 2,524,401 bytes, including
+73,674 cut-preparation work and 546,560 cut-verification work. Floating work is
+10,684,978; bound and conflict certification spend 2,853,848 and 164,378 respectively.
+The 16 MiB capture journal retains six of 61 attempted records, leaving later
+point inspection unavailable. This verifies traversal consumption and costs;
+whole-CLI comparisons and held-out qualification are separate measurements.
+
 [Infrastructure control 8481](https://lab.eignex.com/jobs/8481) pairs
 `133546fd6f` and `2161236173` with aggregation disabled, across `gr4x6`, `p0033`,
 `rgn` and `pp08aCUTS`, seeds 1 and 3, default and exact policies, and individual,
