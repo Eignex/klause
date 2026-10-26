@@ -681,11 +681,15 @@ private fun FiniteSolveRequest.preparationRequest(
     stop: Cancellation,
     protectObjective: Boolean = false,
 ): FinitePipelineRequest {
+    val diagnosticView = executionOptions.reader()[ExecutionOption.diagnosticObjectiveView]
+    require(diagnosticView == null || engine == FiniteEngine.LOCAL_SEARCH)
     val preparationStop = if (shape.sourceInvocation == null) presolveCancellation else presolveCancellation or stop
     return FinitePipelineRequest(
         problem = shape.finiteProblem, componentPlan = shape.componentPlan, preparedPlan = shape.preparedPlan,
         engine = engine, objective = shape.linearObjective,
-        transformObjective = !protectObjective && shape.localSearchObjective == null,
+        transformObjective = if (diagnosticView == null) {
+            !protectObjective && shape.localSearchObjective == null
+        } else diagnosticView == "substituted",
         presolveConfig = presolveConfig, explicitPresolveConfig = explicitPresolveConfig,
         solutionSetSensitive = solutionSetSensitive ||
             (shape.sourceInvocation != null && operation == ExecutionOperation.ENUMERATE),
@@ -1092,7 +1096,9 @@ private fun executePortfolio(
         request.problem,
         scenario,
         objective = request.objective,
-        lsObjective = request.localSearchObjective,
+        lsObjective = request.localSearchObjective.takeIf {
+            request.executionOptions.reader()[ExecutionOption.diagnosticObjectiveView] in setOf(null, "functional")
+        },
         definitionalSweep = request.definitionalSweep,
         onEvent = request.onPortfolioEvent,
         onFault = request.onPortfolioFault,
@@ -1102,7 +1108,7 @@ private fun executePortfolio(
         numericalCompanions = request.numericalCompanionParams,
         sourceHints = request.sourceInvocation?.let { invocation ->
             { strategies ->
-                invocation.heuristicHints(
+                val hints = invocation.heuristicHints(
                     request.problem,
                     request.objective,
                     request.sourceMapping,
@@ -1110,6 +1116,14 @@ private fun executePortfolio(
                     strategies,
                     request.preparedPlan.capabilities,
                 )
+                val diagnosticView = request.executionOptions.reader()[ExecutionOption.diagnosticObjectiveView]
+                if (diagnosticView != null) {
+                    println("c diagnostic-objective-view=$diagnosticView " +
+                        "functionalAvailable=${hints?.objective != null} sweepAvailable=${hints?.sweep != null}")
+                }
+                if (diagnosticView in setOf("retained", "substituted")) {
+                    PreparedSourceHints(hints?.sweep, null)
+                } else hints
             }
         },
         objectiveCoordinates = request.objectiveCoordinates,

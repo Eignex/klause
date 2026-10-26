@@ -100,6 +100,9 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
 
     /** Tuning and resource settings, separate from source declarations. */
     companion object {
+        internal val diagnosticObjectiveView: ExecutionOption<String> =
+            ExecutionOption("diagnostic-objective-view", ValueKind.STRING)
+
         /** Stop after supported source or finite preparation without constructing search workers. */
         val dryRunPresolve: ExecutionOption<Boolean> = ExecutionOption("dry-run-presolve", ValueKind.BOOLEAN)
 
@@ -376,6 +379,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
 
         internal val byId by lazy {
             listOf(
+                diagnosticObjectiveView,
                 dryRunPresolve, affinePivotOrder, presolveAbortFraction, presolveMaxRounds,
                 presolveProbePerVar, presolveProbeTotal,
                 nodeLimit, openWorkLimit, sourceLpWorkLimit, sourceLpAllocationLimit, sourceLpOperations, sourceCuts,

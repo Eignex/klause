@@ -630,6 +630,9 @@ internal fun buildPortfolioScenario(
     val reseedStaleThreshold = p[ExecutionOption.reseedStaleThreshold]
     val reportLsResiduals = p[ExecutionOption.lsResiduals] ?: false
     val reportLsPhaseTimes = p[ExecutionOption.lsPhaseTimes] ?: false
+    p[ExecutionOption.diagnosticObjectiveView]?.let { view ->
+        require(view in setOf("retained", "substituted", "functional"))
+    }
     if (reseedStaleThreshold != null && reseedStaleThreshold < 0) {
         pipelineConfigError("reseed-stale-threshold must be >= 0")
     }
