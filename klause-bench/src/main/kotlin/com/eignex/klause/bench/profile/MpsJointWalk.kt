@@ -19,6 +19,8 @@ import com.sun.management.ThreadMXBean
 import java.io.File
 import java.lang.management.ManagementFactory
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -72,6 +74,7 @@ internal object MpsJointWalk {
                         improvements++
                         writer.appendLine(buildJsonObject {
                             put("objective", value.toString())
+                            put("sourcePoint", JsonArray(point.map { JsonPrimitive(it.toString()) }))
                             put("elapsedNs", System.nanoTime() - start)
                             put("nativeSourceChecked", true)
                             put("sourceExactlyFeasible", accepted.exact)
@@ -97,6 +100,7 @@ internal object MpsJointWalk {
         val stats = call(search, "getStats") as SolveStats
         out.resolve("joint-walk.json").writeText(buildJsonObject {
             put("sourceInputPass", inputPass)
+            put("sourceSha256", request.getValue("sha256").jsonPrimitive.content)
             put("seed", seed)
             put("allowanceMillis", millis)
             put("allowanceSourceLpOperations", 256)

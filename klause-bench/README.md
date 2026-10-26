@@ -2614,6 +2614,27 @@ strictly improved cutoff. Adaptive ALNS retains its requested widths. Pending
 conditions and pass position survive slices; the pass supplies no local or global
 exhaustion claim. This option is a diagnostic consumer, not default admission.
 
+[Source-role controls 8455](https://lab.eignex.com/jobs/8455), at `fba60b259a`,
+repeat the twenty conditions with declared inputs eligible as seeds and complement
+pins. Pair scopes contain two original inputs and broad scopes contain 32;
+modglob's two checked improvements and all rgn outcomes match the baseline.
+The extra freedoms alone establish no better basin or quality.
+
+[Retained walks 8474](https://lab.eignex.com/jobs/8474), at `418e3e7fb3`, compare
+the same checked centers with and without the source-input pass. Each has thirty
+seconds, 256 LP operations, one billion LP work units and the existing 512 MiB
+modeled allocation funding limit. On modglob, the unchanged schedule publishes one
+checked improvement to 35.11M before timing out in a broad repair. The pass
+publishes twelve exact original-source-feasible improvements to 24.72M, then ends
+at its modeled allocation funding boundary: 119,301,837 work, 550,068,394 cumulative
+modeled allocation bytes, 46 checks and fifteen candidates. Its instrumented wall
+time is 7.15 seconds and cumulative thread allocation 2,966,698,768 bytes, versus
+30 seconds and 27,475,404,008 thread bytes for the control. These ledgers are
+distinct from retained memory or RSS. Rgn stays at 82.2 in both walks with identical
+native work and selected-coordinate totals. Ordered diagnostic runs establish no
+uniform throughput gain, independent witness certification or source optimality;
+ordinary execution and stronger finite controls remain qualification gates.
+
 [Fixed-pin replay 8339](https://lab.eignex.com/jobs/8339), at `b738c5d89a` on
 Mac/aarch64, retains four witnesses from [8302](https://lab.eignex.com/jobs/8302).
 With unchanged discrete pins, the residual modglob point improves from
