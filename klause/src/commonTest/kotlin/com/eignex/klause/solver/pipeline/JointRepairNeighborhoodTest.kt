@@ -49,7 +49,8 @@ class JointRepairNeighborhoodTest {
     @Test
     fun `fractional integer backed reals should not displace source input seeds`() {
         val columns = (0..3).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
-        val source = SourceProofContext(SourceScope(SourceRevision("backing-seeds", "exact")), columns.toSet(), emptyMap())
+        val source = SourceProofContext(SourceScope(SourceRevision("backing-seeds", "exact")),
+            columns.toSet(), emptyMap())
         val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 4, 0, Cancellation.Never,
             sourceIntegers = intArrayOf(0, 2, 3)))
         repair.guide(mapOf(columns[0] to 0.25, columns[1] to 0.5))
