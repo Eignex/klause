@@ -79,15 +79,18 @@ internal object LocalSearchTrajectory {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val required = setOf("suite", "problem", "sha256", "recipe", "seed", "moves")
         val optional = setOf(
-            "sliceMillis", "sliceWork", "greedy", "repairs", "controls", "center", "source64", "channel", "presolve",
+            "sliceMillis", "sliceWork", "greedy", "repairs", "controls", "center", "source64", "sourceGzip64",
+            "channel", "presolve",
             "ownerReplay", "ownerWork", "ownerFragmentWork", "ownerSelectors", "selectorsFromWalk",
         )
         require(options.keys.containsAll(required) && options.keys.all {
             it in required || it in optional || it == "selectors"
         })
         require(options["presolve"] == null || options["presolve"] in setOf("default", "off"))
-        val bytes = trajectorySourceBytes(options.getValue("suite"), options.getValue("problem"),
-            options.getValue("sha256"), options["source64"])
+        val bytes = trajectorySourceBytes(
+            options.getValue("suite"), options.getValue("problem"), options.getValue("sha256"),
+            options["source64"], options["sourceGzip64"],
+        )
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
         out.resolve("source.xml").writeBytes(bytes)
         out.resolve("request.txt").writeText(args.joinToString("\n"))
@@ -624,7 +627,7 @@ internal object LocalSearchTrajectory {
         return sourceMethods.single { it.name == "followedBy" }.invoke(null, planned, projected, stop) as VarRemap?
     }
 
-    private fun heuristicHints(
+    internal fun heuristicHints(
         invocation: PreparedSourceInvocation,
         prepared: FinitePipelinePreparation,
         stop: Cancellation,
