@@ -9,6 +9,7 @@ import java.nio.file.Files
 import java.util.zip.CRC32
 import java.util.zip.CheckedInputStream
 import java.util.zip.ZipFile
+import org.tukaani.xz.LZMAInputStream
 
 /**
  * Resolves a [ProblemSource] to a concrete [File] on disk.
@@ -26,7 +27,7 @@ internal object CorpusFetcher {
 
     /** Compression suffix → the system decompressor that strips it in place (see [decompressInPlace]), ahead
      *  of the recompression to zstd. */
-    private val DECOMPRESS_TOOLS = mapOf("xz" to "unxz", "bz2" to "bunzip2", "gz" to "gunzip", "lzma" to "unlzma")
+    private val DECOMPRESS_TOOLS = mapOf("xz" to "unxz", "bz2" to "bunzip2", "gz" to "gunzip")
 
     /** The workspace root: `-Dklause.workspace.root`, otherwise the nearest ancestor of the working
      *  directory holding `klause-mzn-lib/`. */
@@ -292,12 +293,21 @@ internal object CorpusFetcher {
         // Some archives (e.g. the 2007 PB tarball) store read-only dirs/files; decompressing in place
         // must write the plain file and unlink the packed one, which a read-only parent dir forbids.
         run("chmod", "-R", "u+w", dir.absolutePath)
+        for (packed in dir.walkTopDown().filter { it.isFile && it.extension == "lzma" }) unpackLzma(packed)
         for ((ext, tool) in DECOMPRESS_TOOLS) {
             val packed = dir.walkTopDown().filter { it.isFile && it.extension == ext }.map { it.absolutePath }.toList()
             if (packed.isEmpty()) continue
             log("decompressing ${packed.size} .$ext instance(s) in '${dir.name}'")
             for (chunk in packed.chunked(500)) runCmd(null, listOf(tool, "-q", "-f") + chunk)
         }
+    }
+
+    internal fun unpackLzma(packed: File) {
+        val plain = File(packed.parentFile, packed.name.removeSuffix(".lzma"))
+        packed.inputStream().use { raw ->
+            LZMAInputStream(raw).use { input -> plain.outputStream().use { input.copyTo(it) } }
+        }
+        check(packed.delete()) { "cannot remove unpacked instance: $packed" }
     }
 
     /** Store every instance under a freshly extracted [dir] zstd-compressed. */

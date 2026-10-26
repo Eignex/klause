@@ -269,12 +269,12 @@ before/after fetch. This JVM's used collections stay pinned; parallel bench proc
 sharing a cache should prefetch or disable eviction, as the lab does. Metadata avoids
 full tree scans; `.trash` renames make interrupted deletion resumable.
 ZIP collections extract through the JDK with entry checksum and destination checks;
-failed ZIP fetches remove partial collections. Individually compressed members still
-require their system decompressor (`unxz`, `bunzip2`, `gunzip` or `unlzma`).
+failed ZIP fetches remove partial collections. LZMA members use XZ for Java;
+XZ, bzip2 and gzip members use `unxz`, `bunzip2` and `gunzip`.
 
 CNF, WCNF, OPB, WBO, XML, SMT-LIB and MPS collections can use `.zst`; MiniZinc
-source/data and cloned collections stay plain. `zstd` must be on `PATH` and
-CLI decompression is inside measured solve time. Hashes use decompressed bytes.
+source/data and cloned collections stay plain. zstd-jni handles stored frames in
+the bench JVM; decompression is inside measured solve time. Hashes use decompressed bytes.
 Compression writes beside the original, verifies SHA-256, then replaces it;
 interrupted migration can resume.
 
