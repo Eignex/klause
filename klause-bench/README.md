@@ -5467,6 +5467,11 @@ including a continuous-only cancelling row, before checked integer rounding.
 It retains exact weights, owner indices, positive violations and fresh native
 checks separately from the input source-row residuals. This bounded family excludes
 mixed residual rounding and aggregates of three or more rows.
+`aggregate-mixed=true` adds every shared opposite-sign continuous pivot and applies
+checked mixed rounding to the remaining residuals. Its bound index keeps the first
+active singleton source side, preferring a negative residual; each cited side
+retains its activation premises. This mode also includes continuous bound rows as
+aggregation sources. It does not enumerate other bound choices or wider aggregates.
 Inspection has 20M cumulative work, 64 MiB modeled allocation, 256-bit retained
 scalars, 128-coordinate combined support, 16 KiB proof references and at most 64
 positive candidates per parent. Native proof verification shares 100,000 steps per
@@ -5474,6 +5479,16 @@ parent. Parent serialization and pair inspection each have a separate 20-second
 diagnostic deadline and issue no LP queries. Complete pair scans, unavailable
 points, stopped proof checks and retention limits retain distinct observations;
 zero candidates in an incomplete report establish no applicability result.
+
+[Pure-pair probe 8478](https://lab.eignex.com/jobs/8478), at `f7a11d71cd`, retains
+the original `rgn` hash, default tolerance, seed 3 and a 32-operation traversal on
+Linux/amd64. All nine retained parents complete their 20,301 pair visits and 40
+explicit combinations: 20 combinations eliminate integer activity and 20 leave
+continuous residuals. No positive pure-cancellation cut is found. The diagnostic
+spends 597,879 modeled work and 13,657,142 modeled allocation bytes, with zero LP
+queries. Exact input-row residuals are recorded separately from cut efficacy, and
+the retention-limited journal leaves later states unknown. This result selects
+mixed-residual inspection rather than a general aggregation rejection.
 
 [Observation-on 8431](https://lab.eignex.com/jobs/8431) and
 [observation-off 8432](https://lab.eignex.com/jobs/8432), at `06e1a59e3b`, use the
