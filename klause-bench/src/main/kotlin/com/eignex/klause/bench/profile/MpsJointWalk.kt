@@ -98,17 +98,24 @@ internal object MpsJointWalk {
             }
         }
         val stats = call(search, "getStats") as SolveStats
+        val declined = NumericalFrontierSnapshot.field(owner, "declined") as Boolean
         out.resolve("joint-walk.json").writeText(buildJsonObject {
             put("sourceInputPass", inputPass)
             put("sourceSha256", request.getValue("sha256").jsonPrimitive.content)
             put("seed", seed)
             put("allowanceMillis", millis)
             put("allowanceSourceLpOperations", 256)
+            put("allowanceSourceLpWork", params.sourceLpWorkLimit)
+            put("allowanceSourceLpAllocation", params.sourceLpAllocationLimit)
             put("initialSourceObjective", checked.objective.toString())
             put("bestSourceObjective", best.toString())
             put("sourceCheckedImprovements", improvements)
-            put("reason", if (stop()) TerminationReason.Timeout.toString()
-                else TerminationReason.BudgetExhausted.toString())
+            put("nativePreparationDeclined", declined)
+            put("reason", when {
+                stop() -> TerminationReason.Timeout.toString()
+                declined -> TerminationReason.Unsupported.toString()
+                else -> TerminationReason.BudgetExhausted.toString()
+            })
             put("elapsedNs", System.nanoTime() - start)
             put("threadBytes", bean.getThreadAllocatedBytes(thread) - allocation)
             put("stats", NumericalResidualProfile.json(stats))
