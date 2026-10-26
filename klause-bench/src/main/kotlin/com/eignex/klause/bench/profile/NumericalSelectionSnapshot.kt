@@ -16,6 +16,7 @@ import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceScope
+import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.util.Cancellation
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -29,8 +30,7 @@ internal class NumericalSelectionSnapshot(private val stop: Cancellation) {
         val type = Class.forName("com.eignex.klause.lp.optimization.LinearAuthorityCapture")
         val journal = type.getDeclaredConstructor(Int::class.javaPrimitiveType, Long::class.javaPrimitiveType,
             Long::class.javaPrimitiveType, Cancellation::class.java).newInstance(64, 1_000_000L, 16_777_216L, stop)
-        val authority = checkNotNull(field(checkNotNull(field(invocation, "component")), "authority"))
-        authority.javaClass.getDeclaredField("capture").apply { isAccessible = true }.set(authority, journal)
+        invocation.javaClass.getDeclaredMethod("captureTo", type).invoke(invocation, journal)
         return journal
     }
 
@@ -41,7 +41,7 @@ internal class NumericalSelectionSnapshot(private val stop: Cancellation) {
         put("attempted", field(journal, "attempted") as Long)
         put("entries", field(journal, "entries") as Long)
         put("modeledBytes", field(journal, "bytes") as Long)
-        put("limited", field(journal, "limited") as Boolean)
+        put("limited", journal.javaClass.getDeclaredMethod("getLimited").invoke(journal) as Boolean)
         put("independentProofCheck", false)
         put("records", buildJsonArray { records(journal).forEach { if (!stop()) add(query(it)) } })
     }
@@ -87,6 +87,8 @@ internal class NumericalSelectionSnapshot(private val stop: Cancellation) {
         return buildJsonObject {
             put("id", field(record, "id") as Int)
             put("state", field(record, "state") as String)
+            put("boundDisposition", field(record, "boundDisposition") as String)
+            (field(record, "parentQuery") as Int?)?.let { put("parentQuery", it) }
             put("scope", scope(context.scope))
             put("system", system(context))
             put("numericSystem", system(numeric))
@@ -132,7 +134,9 @@ internal class NumericalSelectionSnapshot(private val stop: Cancellation) {
                 (field(record, name) as SourceEvidence?)?.let { evidence -> put(name, buildJsonObject {
                     put("scope", scope(evidence.scope))
                     put("claim", evidence.claim::class.simpleName)
-                    (evidence.claim as? SourceClaim.Bound)?.let { put("value", it.value.toString()) }
+                    (evidence.claim as? SourceClaim.Bound)?.let {
+                        put("value", (it.value as SourceValue.Rational).value.toString())
+                    }
                     put("derivation", proof(evidence.derivation))
                     val originalScope = SourceProofContext(evidence.scope, context.coordinates, context.premises,
                         context.objective, context.objectiveConstant, LinearAuthoritySemantics(context))

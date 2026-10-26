@@ -4,6 +4,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.optimization.LinearApproach
 import com.eignex.klause.lp.optimization.LinearAuthority
+import com.eignex.klause.lp.optimization.LinearAuthorityCapture
 import com.eignex.klause.lp.optimization.LinearAuthorityResult
 import com.eignex.klause.lp.optimization.atScope
 import com.eignex.klause.lp.optimization.floorSplit
@@ -61,6 +62,10 @@ internal class LinearAuthorityTraversal(
         } else if (!shape.admitted) observe("numericalLpShapesOutsideDimensionGuard")
     }, retainLp = true)
     private val initialCutObservations = authority.cutObservations()
+
+    fun captureTo(journal: LinearAuthorityCapture) {
+        authority.capture = journal
+    }
 
     override fun close() {
         if (ownsAuthority) authority.close()
