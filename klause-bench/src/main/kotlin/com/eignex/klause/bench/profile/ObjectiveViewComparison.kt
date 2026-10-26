@@ -308,12 +308,19 @@ internal object ObjectiveViewComparison {
             )
             out.resolve("$label-incumbents.jsonl").bufferedWriter().use { incumbents ->
                 var improvements = 0
+                var firstIncumbentNanos: Long? = null
+                var lastIncumbent: MinimizeResult.WithSample? = null
+                var lastIncumbentNanos: Long? = null
                 solver.resumable(objective, params).use { run ->
                     val onIncumbent: (MinimizeResult.WithSample) -> Unit = { candidate ->
+                        val elapsed = System.nanoTime() - started
+                        if (firstIncumbentNanos == null) firstIncumbentNanos = elapsed
+                        lastIncumbent = candidate
+                        lastIncumbentNanos = elapsed
                         if (improvements++ < 16) {
                             val point = prepared.pipeline.reconstruct(candidate.sample)
                             incumbents.appendLine(buildJsonObject {
-                                put("elapsedNanos", System.nanoTime() - started)
+                                put("elapsedNanos", elapsed)
                                 put("objective", sourceObjective.evaluateExact(point).toString())
                                 put("source", trajectorySource(point))
                                 put("independentWitnessCheck", false)
@@ -344,6 +351,15 @@ internal object ObjectiveViewComparison {
                         put("modelPreparationAllocatedBytes", prepared.allocatedBytes)
                         put("sourceVerdictClaim", false)
                         put("cliRoutingEquivalence", false)
+                        put("nativeIncumbentsObserved", improvements)
+                        put("firstNativeIncumbentNanos", firstIncumbentNanos)
+                        put("lastNativeIncumbentNanos", lastIncumbentNanos)
+                        lastIncumbent?.let { candidate ->
+                            val point = prepared.pipeline.reconstruct(candidate.sample)
+                            put("lastObservedSource", trajectorySource(point))
+                            put("lastObservedSourceObjective", sourceObjective.evaluateExact(point).toString())
+                            put("independentWitnessCheck", false)
+                        }
                         observed?.assignment?.let { point ->
                             put("source", trajectorySource(prepared.pipeline.reconstruct(point)))
                             put("objective",
