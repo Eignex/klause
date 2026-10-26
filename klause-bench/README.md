@@ -1629,6 +1629,8 @@ each perform two full loads and 32 candidate pairs. Each accepted primitive runs
 one ordinary reversible `inspectMove` probe, capturing factor grades, raw/weighted
 hard deltas and the selected objective delta; destination equality is reported
 separately. Pins, definitions, domains and implicit owners can reject a candidate.
+Candidate selection scans source slots, prioritizing the current greedy coordinate,
+and keeps common admissible root endpoints and adjacent values without random draws.
 These bounded diagnostics are additional work, separate from free-walk budgets
 and timing; they grant no source witness or proof authority.
 
