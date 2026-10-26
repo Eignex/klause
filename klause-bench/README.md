@@ -1628,6 +1628,11 @@ histories remain separate.
 Preparation and thread allocations, native incumbent source-expression values,
 RNG boundaries, raw/weighted/objective deltas and model keys remain separate.
 Censored walks retain their last observed native incumbent separately from a terminal verdict.
+`basins=true` adds the existing native repair trace, bounded to 32 attempts and
+4,096 working coordinates. Its source-projected frames and declared integer-input distances separate
+policy local optima, feasible stalls, restarts and censored attempts; they do not
+classify a whole source basin or certify a partition. Trace copies consume the walk
+allowance, while source projection and serialization run after the walk.
 Private initialization/probe diagnostics run outside the walk allowance. Walk time
 includes passive recording overhead; ordinary CLI lab runs with source validation
 supply independent witness checks and whole-process resource measurements.
