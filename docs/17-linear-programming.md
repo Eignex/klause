@@ -248,7 +248,8 @@ growing sibling proof. A new repair scope owns a separate invocation.
 `source-refutation-reuse=true` enables a traversal-owned index of checked source
 refutations. Exact cited coordinate sides select candidates; full scope implication
 and a fresh source import check authorize closing the matching leaf before its
-numerical query. Only refutations enter the index. Incumbent-bound closures and
+numerical query. Reused refutations emit no fresh numerical feedback. Only
+refutations enter the index. Incumbent-bound closures and
 failed improvement queries supply no unconditional conflict. The original source,
 objective, invocation window and complete Boolean substitution remain bound to the
 opening, including when it borrows a numerical owner.
