@@ -77,6 +77,7 @@ internal object GlobalScoringViews {
             starts[layer] = records.size
             for ((edge, to) in edges[layer]) {
                 if (stop()) return Relation(null, "cancelled", work)
+                if (records.size + 3 > MAX_CELLS) return Relation(null, "cell-limit", work)
                 records.add(edge.first.toLong())
                 records.add(edge.second)
                 records.add(to.toLong())
