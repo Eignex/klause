@@ -48,6 +48,9 @@ internal object MpsRepairReplay {
         val work = request["repairWork"]?.jsonPrimitive?.content?.toLong() ?: 1_000_000_000L
         require(allowance in 1..30_000 && operations in 1..4096 && work in 1..1_000_000_000L)
         val center = sample(model, mapped, centerObjective * scale)
+        val sourceIntegers = columns.indices.filter { source.variables[it].integer }
+            .map { Term.intVar(columns[it]) }
+        val realBackings = columns.indices.filter { !source.variables[it].integer && Term.isInt(columns[it]) }
         val comparison = request["comparisonWitness"]?.jsonPrimitive?.content?.removePrefix("v ")?.trim()
             ?.split(Regex("\\s+"))?.associate {
                 it.substringBefore('=') to MpsResidualObjective.rational(it.substringAfter('='))
@@ -74,7 +77,7 @@ internal object MpsRepairReplay {
                 require(coordinate.kind == SourceCoordinate.Kind.Integer)
                 coordinate.id
             }.toSet()
-            val pins = (0 until model.numIntVars).filter { it !in freed }.associateWith {
+            val pins = sourceIntegers.filter { it !in freed }.associateWith {
                 mapped.getValue(SourceCoordinate(SourceCoordinate.Kind.Integer, it))
             }
             val conditionType = Class.forName(PIPELINE + "ExactNeighborhoodCondition")
@@ -137,6 +140,7 @@ internal object MpsRepairReplay {
                 put("sourceScope", NumericalResidualProfile.json(context.scope))
                 put("requestedFreed", JsonArray(freedNames.map(::JsonPrimitive)))
                 put("effectiveFreedIntegers", JsonArray(freed.sorted().map(::JsonPrimitive)))
+                put("freeSourceRealIntegerBackings", JsonArray(realBackings.map { JsonPrimitive(source.variables[it].name) }))
                 put("complementPins", buildJsonObject { pins.forEach { (id, value) -> put(id.toString(), value.toString()) } })
                 put("strictWorkingCutoff", cutoff.toString())
                 put("sourceCenterObjective", checked.objective.toString())
@@ -180,6 +184,7 @@ internal object MpsRepairReplay {
         val owner = type.constructors.single { it.parameterCount == 8 }.newInstance(
             model, context, objective, params, policy, true, { center }, stop)
         val result = linkedMapOf<Int, List<String>>()
+        val working = linkedMapOf<Int, List<String>>()
         var prepared = false
         try {
             val prepare = type.getDeclaredMethod("prepare", Cancellation::class.java).apply { isAccessible = true }
@@ -203,8 +208,11 @@ internal object MpsRepairReplay {
                         round, BigFraction.ONE, cutoff))
                     val pins = call(condition, "getLower") as Map<Int, BigFraction>
                     check(pins == call(condition, "getUpper"))
-                    result[index] = columns.indices.filter { column ->
+                    working[index] = columns.indices.filter { column ->
                         Term.isInt(columns[column]) && Term.intVar(columns[column]) !in pins
+                    }.map { source.variables[it].name }
+                    result[index] = columns.indices.filter { column ->
+                        source.variables[column].integer && Term.intVar(columns[column]) !in pins
                     }.map { source.variables[it].name }
                 }
             }
@@ -215,6 +223,9 @@ internal object MpsRepairReplay {
                 put("threadBytes", bean.getThreadAllocatedBytes(thread) - allocation)
                 put("stats", NumericalResidualProfile.json(call(owner, "getStats")))
                 put("freedSets", buildJsonObject { result.forEach { (index, names) ->
+                    put(index.toString(), JsonArray(names.map(::JsonPrimitive)))
+                } })
+                put("workingFreedSets", buildJsonObject { working.forEach { (index, names) ->
                     put(index.toString(), JsonArray(names.map(::JsonPrimitive)))
                 } })
                 put("costIncludedInRepairAttempts", false)
