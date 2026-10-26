@@ -45,30 +45,47 @@ private class DiagnosticPairwiseDistinct(private val relation: AllDifferent, nat
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = degree(state) != 0
 
-    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Long): Int =
-        degree(state, intVar, newValue) - degree(state)
+    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Long): Int {
+        val oldValue = state.assignment.intValue(intVar)
+        if (oldValue == newValue) return 0
+        val oldCounted = oldValue !in relation.exceptSet
+        val newCounted = newValue !in relation.exceptSet
+        var delta = 0
+        for (left in relation.vars.indices) {
+            if (relation.vars[left] != intVar || !present(state, left)) continue
+            for (right in relation.vars.indices) {
+                if (right == left || (relation.vars[right] == intVar && right < left) ||
+                    !present(state, right)
+                ) continue
+                val before = state.assignment.intValue(relation.vars[right])
+                val after = if (relation.vars[right] == intVar) newValue else before
+                if (oldCounted && before == oldValue) delta--
+                if (newCounted && after == newValue) delta++
+            }
+        }
+        return delta
+    }
 
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int =
         degree(state, boolVar = boolVar) - degree(state)
 
-    private fun degree(state: LocalSearchState, intVar: Int = -1, newValue: Long = 0, boolVar: Int = -1): Int {
-        fun present(position: Int): Boolean {
-            if (relation.presents.isEmpty()) return true
-            val literal = relation.presents[position]
-            val variable = Lit.variable(literal)
-            return Lit.evaluate(literal, state.assignment.boolValue(variable) xor (variable == boolVar))
-        }
-        fun value(position: Int): Long = if (relation.vars[position] == intVar) newValue
-            else state.assignment.intValue(relation.vars[position])
+    private fun degree(state: LocalSearchState, boolVar: Int = -1): Int {
         var pairs = 0
         for (left in relation.vars.indices) {
-            if (!present(left)) continue
-            val value = value(left)
+            if (!present(state, left, boolVar)) continue
+            val value = state.assignment.intValue(relation.vars[left])
             if (value in relation.exceptSet) continue
             for (right in left + 1 until relation.vars.size) {
-                if (present(right) && value(right) == value) pairs++
+                if (present(state, right, boolVar) && state.assignment.intValue(relation.vars[right]) == value) pairs++
             }
         }
         return pairs
+    }
+
+    private fun present(state: LocalSearchState, position: Int, boolVar: Int = -1): Boolean {
+        if (relation.presents.isEmpty()) return true
+        val literal = relation.presents[position]
+        val variable = Lit.variable(literal)
+        return Lit.evaluate(literal, state.assignment.boolValue(variable) xor (variable == boolVar))
     }
 }

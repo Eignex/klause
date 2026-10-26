@@ -71,6 +71,34 @@ class GlobalScoringViewsTest {
     }
 
     @ParameterizedTest
+    @ValueSource(ints = [0, 1, 2, 3])
+    fun `integer probes reconcile every aliased value under each presence assignment`(presence: Int) {
+        val factor = AllDifferent(intArrayOf(0, 0, 1, 2),
+            intArrayOf(Lit.make(0, true), Lit.make(1, false), Lit.make(0, true), Lit.make(1, true)), longArrayOf(0))
+        val state = pairwise(Problem(2, 3, Array(3) { IntDomain(0, 2) }, arrayOf(factor)))
+        state.assignment.setBool(0, presence and 1 != 0)
+        state.assignment.setBool(1, presence and 2 != 0)
+        for (a in 0L..2L) for (b in 0L..2L) for (c in 0L..2L) {
+            state.assignment.setInt(0, a)
+            state.assignment.setInt(1, b)
+            state.assignment.setInt(2, c)
+            state.recompute()
+            for (id in 0..2) for (value in 0L..2L) {
+                val old = state.assignment.intValue(id)
+                val before = state.cost
+                val move = Move.IntSet(id, value)
+                val delta = state.netDelta(move)
+
+                state.apply(move)
+
+                assertEquals(before + delta, state.cost)
+                state.apply(Move.IntSet(id, old))
+                assertEquals(before, state.cost)
+            }
+        }
+    }
+
+    @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `ground table and diagram grades agree for every small assignment and primitive probe`(repeated: Boolean) {
         val states = groundControls.getValue(repeated)
