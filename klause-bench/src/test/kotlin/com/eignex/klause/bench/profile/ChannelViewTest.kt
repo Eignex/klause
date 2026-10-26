@@ -6,6 +6,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
@@ -14,8 +15,37 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 
 class ChannelViewTest {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `inverse role views expose the same small source swap neighborhood`(transpose: Boolean) {
+        val source = Problem(0, 6, Array(6) { IntDomain(0, 2) },
+            arrayOf(Inverse(intArrayOf(0, 1, 2), intArrayOf(3, 4, 5))))
+        val problem = if (transpose) assertNotNull(inverseAssignmentView(source, Cancellation.Never)) else source
+        val baked = problem.bake()
+        val neighbors = HashSet<List<Long>>()
+
+        for (seed in 0L until 16L) {
+            val state = LocalSearchState(baked, Random(seed))
+            for ((variable, value) in longArrayOf(2, 0, 1, 1, 2, 0).withIndex()) {
+                state.assignment.setInt(variable, value)
+            }
+            state.recompute()
+            val sink = MoveSink()
+            state.factors[0].proposeStructuredMoves(state, 0, sink)
+            for (move in sink.list) neighbors += state.inspectMove(move).assignment.ints.toList()
+        }
+
+        assertEquals(setOf(
+            listOf(0L, 2L, 1L, 0L, 2L, 1L),
+            listOf(1L, 0L, 2L, 1L, 0L, 2L),
+            listOf(2L, 1L, 0L, 2L, 1L, 0L),
+        ), neighbors)
+    }
+
     @Test
     fun `searched channel factories use the admitted definition network`() {
         val program = parseFlatZinc("var bool: b; var 0..1: y; " +
