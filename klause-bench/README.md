@@ -1403,6 +1403,9 @@ factors and reuses their repairs and swaps; it changes proposals while retaining
 both source arrays. Channel comparisons use local-search-route preparation and
 also admit satisfaction sources.
 No general inverse or deterministic extension of an inconsistent channel is supplied.
+Optional `presolve=off` holds both views before presolve, distinguishing channel
+ownership from representation changes that erase or reconstruct its coordinates.
+The default preserves production preparation; explicit centers also disable presolve.
 Optional `source64=BASE64` supplies at most 96 KiB of base64-encoded original bytes
 without catalog extraction; the source mode and bytes are retained with the capture.
 Optional `sliceMillis=N sliceWork=N` repeatedly resumes the same handle under

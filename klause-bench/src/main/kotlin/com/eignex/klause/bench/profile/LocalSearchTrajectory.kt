@@ -74,11 +74,12 @@ internal object LocalSearchTrajectory {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val required = setOf("suite", "problem", "sha256", "recipe", "seed", "moves")
         val optional = setOf(
-            "sliceMillis", "sliceWork", "greedy", "repairs", "controls", "center", "source64", "channel",
+            "sliceMillis", "sliceWork", "greedy", "repairs", "controls", "center", "source64", "channel", "presolve",
         )
         require(options.keys.containsAll(required) && options.keys.all {
             it in required || it in optional
         })
+        require(options["presolve"] == null || options["presolve"] in setOf("default", "off"))
         val bytes = trajectorySourceBytes(options.getValue("suite"), options.getValue("problem"),
             options.getValue("sha256"), options["source64"])
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
@@ -133,6 +134,7 @@ internal object LocalSearchTrajectory {
         }
         require(initial == null || parsed.definedVars.isEmpty())
         require(initial == null || channel == null)
+        val skipPresolve = initial != null || options["presolve"] == "off"
         val views = ArrayList<TrajectoryView>()
         val observations = ArrayList<Observation>()
         out.resolve("capture-policy.json").writeText(buildJsonObject {
@@ -148,6 +150,7 @@ internal object LocalSearchTrajectory {
             put("architecture", System.getProperty("os.arch"))
             put("channel", channel?.name)
             put("preparationEngine", engine.name)
+            put("presolve", if (skipPresolve) "off" else "default")
             put("objectiveTreatment", when {
                 objective == null -> "none"
                 channel == null -> "protected versus substituted"
@@ -175,7 +178,7 @@ internal object LocalSearchTrajectory {
             val prepared = FinitePipeline.prepare(FinitePipelineRequest(
                 requireNotNull(plan.model), engine, objective,
                 cancellation = stop, solveCancellation = stop, presolveBudget = PresolveBudget(1_375_000_000L),
-                presolveConfig = if (initial == null) PresolveConfig.DEFAULT else PresolveConfig.NONE,
+                presolveConfig = if (skipPresolve) PresolveConfig.NONE else PresolveConfig.DEFAULT,
                 preparedPlan = plan, transformObjective = variant.transformObjective, randomSeed = seed,
             ))
             check(!stop() && prepared.presolve?.infeasible != true)
