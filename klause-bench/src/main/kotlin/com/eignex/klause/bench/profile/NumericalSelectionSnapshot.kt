@@ -144,7 +144,8 @@ internal class NumericalSelectionSnapshot(private val stop: Cancellation) {
     }
 
     fun evidence(context: SourceProofContext, evidence: SourceEvidence): JsonObject = buildJsonObject {
-        require(context.scope.revision == evidence.scope.revision && context.scope.objective == evidence.scope.objective)
+        require(context.scope.revision == evidence.scope.revision &&
+            context.scope.objective == evidence.scope.objective)
         put("scope", scope(evidence.scope))
         put("claim", evidence.claim::class.simpleName)
         (evidence.claim as? SourceClaim.Bound)?.let {
