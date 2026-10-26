@@ -39,6 +39,14 @@ in original objective units and direction; refutations must derive an exact
 contradiction. A branch flag, traversal exhaustion or engine identity supplies no
 authority.
 
+An active-linear refutation substitutes only established Boolean coefficients and
+uses rows with established Boolean guards and independently established integer
+pins. Its checker reconstructs that subset from the original source in the claimed
+scope, preserving strictness and bound premises. It establishes only a scoped
+contradiction; omitted rows and unresolved objective terms supply neither a witness
+nor an objective bound. Complete pinned derivations retain their complete-scope
+requirement.
+
 `IntegerRounding` first checks its cited inequality, then requires integral
 coefficients over declared integer coordinates. It rounds a closed right side
 down, or a strict right side to `ceil(rhs) - 1`. Source guards and integer pins

@@ -64,6 +64,15 @@ class LinearAuthoritySemantics(private val source: SourceProofContext) : SourceS
     override fun derivation(
         claim: SourceClaim, derivation: SourceDerivation.Extension, scope: SourceScope, cancellation: Cancellation,
     ): SourceEvidenceCheck {
+        if (derivation is LinearActiveRefutation) {
+            if (!compatible(scope) || (claim != SourceClaim.Refutation && claim !is SourceClaim.Bound)) {
+                return SourceEvidenceCheck.Rejected("active rows establish only a scoped contradiction")
+            }
+            val numeric = source.atScope(scope).activeNumericContext(cancellation)
+                ?: return SourceEvidenceCheck.Unavailable("active row capture incomplete")
+            return SourceEvidenceVerifier(numeric).verify(
+                SourceEvidence(scope, SourceClaim.Refutation, derivation.conflict), cancellation)
+        }
         if (claim != SourceClaim.Refutation && !source.affineObjectiveAvailable) {
             return SourceEvidenceCheck.Unavailable("exact affine objective unavailable")
         }

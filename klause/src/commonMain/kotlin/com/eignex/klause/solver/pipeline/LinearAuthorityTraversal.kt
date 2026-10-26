@@ -3,6 +3,7 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.optimization.LinearApproach
+import com.eignex.klause.lp.optimization.LinearActiveRows
 import com.eignex.klause.lp.optimization.LinearAuthority
 import com.eignex.klause.lp.optimization.LinearAuthorityCapture
 import com.eignex.klause.lp.optimization.LinearAuthorityResult
@@ -44,6 +45,7 @@ internal class LinearAuthorityTraversal(
     private val useGuidance: Boolean = false,
     private val inheritBounds: Boolean = false,
     private val useCuts: Boolean = true,
+    useActiveRows: Boolean = false,
 ) : SearchBrancher, SearchBranchProposal, SearchNodePolicy, AutoCloseable {
     override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
 
@@ -62,12 +64,14 @@ internal class LinearAuthorityTraversal(
         } else if (!shape.admitted) observe("numericalLpShapesOutsideDimensionGuard")
     }, retainLp = true)
     private val initialCutObservations = authority.cutObservations()
+    private val activeRows = if (useActiveRows) LinearActiveRows(source, budget) else null
 
     fun captureTo(journal: LinearAuthorityCapture) {
         authority.capture = journal
     }
 
     override fun close() {
+        activeRows?.close()
         if (ownsAuthority) authority.close()
     }
     private val root = CoverageNode(source.scope.condition)
@@ -162,20 +166,38 @@ internal class LinearAuthorityTraversal(
     }
 
     override fun retract(decisionLevel: Int) {
+        activeRows?.invalidate()
         while (path.last().first > decisionLevel) path.removeAt(path.lastIndex)
     }
 
     override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
         if (cancellation()) return SearchNodeDisposition.Indeterminate
         if (pause()) return SearchNodeDisposition.Pause
+        if (current.result?.evidence?.claim == SourceClaim.Refutation) return SearchNodeDisposition.Prune
         if (source.coordinates.any {
                 it.kind == SourceCoordinate.Kind.Boolean && context.boolValue(it.id) == null
             }
         ) {
             authority.capture?.record(source.atScope(source.scope.copy(condition = current.condition)),
                 null, null, null, LinearAuthorityResult())
+            val partial = activeRows?.check(current.condition, cancellation, context::consumeCheck)
+                ?: return SearchNodeDisposition.Expand
+            if (partial.attempted) observe("numericalPartialChecks")
+            if (partial.unchanged) observe("numericalPartialUnchangedStates")
+            if (partial.paused) {
+                observe("numericalPartialPauses")
+                return SearchNodeDisposition.Pause
+            }
+            partial.evidence?.let {
+                current.result = LinearAuthorityResult(evidence = it)
+                pending--
+                observe("numericalPartialConflicts")
+                observe("numericalClosedLeaves")
+                return SearchNodeDisposition.Prune
+            }
             return SearchNodeDisposition.Expand
         }
+        activeRows?.close()
         if (inheritBounds && current.result == null && current.split == null && closeInheritedBound()) {
             return SearchNodeDisposition.Prune
         }
