@@ -52,6 +52,27 @@ class NonlinearIntegerCellsTest {
     }
 
     @Test
+    fun `a closed fractional section should exclude no integer tuple`() {
+        for ((constant, numerator) in listOf("(/ 1 2)" to 1L, "(/ (- 1) 2)" to -1L)) {
+            val source = SmtLibPolynomial.parse("(declare-const n Real) (assert (distinct n $constant))")
+            val arithmetic = PolynomialArithmetic()
+            val algebraic = AlgebraicArithmetic(arithmetic)
+            val scope = PolynomialCellScope.Source.prepare(source.formula, arithmetic)
+            val point = BigFraction.of(bigIntOf(numerator), bigIntOf(2))
+            val cell = assertNotNull(CheckedPolynomialCell.rejected(scope.predicates.single(), scope,
+                algebraic.rational(point), arithmetic, algebraic))
+            val cells = NonlinearIntegerCells(source.formula, listOf(0), arithmetic)
+            cells.retain(cell)
+
+            for (value in listOf(-1L, 0L, 1L)) {
+                val excluded = cells.excludes(listOf(bigIntOf(value)), algebraic)
+
+                assertFalse(excluded)
+            }
+        }
+    }
+
+    @Test
     fun `wide strict hulls should retain every integer bit at either sign`() {
         val magnitude = parseBigInt("100000000000000000000")
         for ((predicate, endpoint, direction) in listOf(
