@@ -141,10 +141,6 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** Checked numerical source-row separation control. */
         val sourceCuts: ExecutionOption<Boolean> = ExecutionOption("source-cuts", ValueKind.BOOLEAN)
 
-        /** Rank numerical integer splits using the generating point and checked cut supports. */
-        val sourceSupportBranching: ExecutionOption<Boolean> =
-            ExecutionOption("source-support-branching", ValueKind.BOOLEAN)
-
         /** Native polynomial or function arithmetic work; null means unlimited. */
         val nraWorkLimit: ExecutionOption<Long?> = ExecutionOption("nra-work-limit", ValueKind.ALLOWANCE)
 
@@ -383,7 +379,6 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 dryRunPresolve, affinePivotOrder, presolveAbortFraction, presolveMaxRounds,
                 presolveProbePerVar, presolveProbeTotal,
                 nodeLimit, openWorkLimit, sourceLpWorkLimit, sourceLpAllocationLimit, sourceLpOperations, sourceCuts,
-                sourceSupportBranching,
                 nraWorkLimit, nraDenseCoefficients, nraMatrixCells, niaCandidates, niaMoves,
                 maxFlips, maxInstructions, alnsIterations, sharedRestart, openBranching,
                 openHintFlips, openHintMinSplits,

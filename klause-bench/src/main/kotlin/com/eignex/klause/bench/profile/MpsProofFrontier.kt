@@ -91,8 +91,8 @@ internal object MpsProofFrontier {
         val execution = checkNotNull(field(prepared.route, "execution"))
         val request = field(execution, "request") as NumericalLinearRequest
         val solveStop = preparationStop or Cancellation.after(10.seconds)
+        val supportBranching = options["supportBranching"]?.toBooleanStrict() ?: false
         val params = TheoryParams(timeout = solveStop, cancellation = solveStop, randomSeed = 3L,
-            sourceSupportBranching = options["supportBranching"]?.toBooleanStrict() ?: false,
             sourceCuts = options["cuts"]?.toBooleanStrict() ?: true,
             sourceLpOperations = options["operations"]?.toInt()?.also { require(it in 1..256) } ?: Int.MAX_VALUE)
         val authority = request.javaClass.declaredMethods.single {
@@ -120,7 +120,8 @@ internal object MpsProofFrontier {
         }
         val system = NumericalFrontierSnapshot.system(context)
         Reports.writeJson(out.resolve("native-system.json").path, system)
-        val invocation = NumericalFrontierSnapshot.open(context, params, historyEnabled, frontierEnabled, activeRows)
+        val invocation = NumericalFrontierSnapshot.open(context, params, historyEnabled, frontierEnabled, activeRows,
+            supportBranching)
         val selection = NumericalSelectionSnapshot(Cancellation.after(30.seconds))
         val journal = if (options["selection"]?.toBooleanStrict() == true) selection.attach(invocation) else null
         val history = ArrayList<JsonObject>()
@@ -204,7 +205,7 @@ internal object MpsProofFrontier {
                 put("branchHistory", historyEnabled)
                 put("boundOrdered", frontierEnabled)
                 put("sourceCuts", params.sourceCuts)
-                put("supportBranching", params.sourceSupportBranching)
+                put("supportBranching", supportBranching)
                 put("sourceLpOperationAllowance", params.sourceLpOperations)
                 put("activeRows", activeRows)
                 put("wholeCliTimingClaim", false)

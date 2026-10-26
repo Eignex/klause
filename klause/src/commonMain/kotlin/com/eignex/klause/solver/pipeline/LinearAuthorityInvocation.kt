@@ -53,6 +53,7 @@ internal class LinearAuthorityInvocation(
         ?: SourceLpFunding(params.sourceLpWorkLimit, params.sourceLpAllocationLimit),
     cuts: Boolean = boundOrdered && params.sourceCuts,
     activeRows: Boolean = false,
+    supportBranching: Boolean = false,
     onNumericalFeedback: ((SourceNumericalFeedbackResult) -> Unit)? = null,
 ) : AutoCloseable {
     init {
@@ -94,9 +95,9 @@ internal class LinearAuthorityInvocation(
         SourceLpBudget(maxOperations = params.sourceLpOperations, onWork = state.smt::observeSourceLp,
             funding = funding), stop, ::paused, ::offer,
         { incumbent?.let { sample -> value?.let { sample to it } } }, useBranchHistory, borrowedAuthority,
-        useGuidance = boundOrdered || guidance || params.sourceSupportBranching || onNumericalFeedback != null,
+        useGuidance = boundOrdered || guidance || supportBranching || onNumericalFeedback != null,
         inheritBounds = boundOrdered, useCuts = cuts,
-        useActiveRows = activeRows, useSupportBranching = params.sourceSupportBranching,
+        useActiveRows = activeRows, useSupportBranching = supportBranching,
         onNumericalFeedback = onNumericalFeedback)
     private val session = SearchComponentSet(listOf(component)).session(params.maxLeaves, stop).also {
         it.bindOpenTheoryWork(state.work)

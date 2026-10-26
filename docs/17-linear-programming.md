@@ -316,7 +316,7 @@ references and retains the complete Boolean substitution and query cutoff. An
 unsupported projection declines; it performs neither proof replay nor scope
 reduction. Its coordinate set supplies ranking only.
 
-The opt-in `source-support-branching` consumer orders integer splits by near-tight,
+An internal research consumer orders integer splits by near-tight,
 installed checked cut supports, preferring smaller supports and greater fractional
 distance from an integer, with source-order ties and fallback. Both complementary
 alternatives remain in coverage. Feedback never supplies pruning or parent proof

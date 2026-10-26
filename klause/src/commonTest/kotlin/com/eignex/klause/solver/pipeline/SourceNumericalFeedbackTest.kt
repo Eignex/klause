@@ -250,8 +250,8 @@ class SourceNumericalFeedbackTest {
     @Test
     fun `feedback traversal should preserve complementary checked coverage`() {
         val records = arrayListOf<SourceNumericalFeedbackResult>()
-        val result = LinearAuthorityInvocation(source, TheoryParams(sourceCuts = false,
-            sourceSupportBranching = true), boundOrdered = true, onNumericalFeedback = records::add).use {
+        val result = LinearAuthorityInvocation(source, TheoryParams(sourceCuts = false), boundOrdered = true,
+            supportBranching = true, onNumericalFeedback = records::add).use {
             it.run { _, _ -> }
         }
 
