@@ -44,7 +44,7 @@ internal object RepairOwnerReplay {
     private data class Scope(
         val id: Int, val center: Sample, val freedBools: IntArray, val freedInts: IntArray,
         val pins: Assumptions, val cutoff: BigFraction, val nativeCutoff: Double, val selector: String,
-        val sourceCutoff: BigFraction?,
+        val sourceCutoff: BigFraction?, val capturedObjective: String, val unavailable: String?,
     )
 
     data class PointCheck(val accepted: Boolean, val objective: BigFraction? = null)
@@ -117,9 +117,11 @@ internal object RepairOwnerReplay {
             val pins = call(scopeOwner, "pins", problem, center, freed) as Assumptions
             val checked = accepted(center, Cancellation.after(2000.milliseconds))
             check(checked.accepted)
+            val decline = entry["decline"]?.takeUnless { it == JsonNull }?.jsonPrimitive?.content
             Scope(index, center, bools, ints, pins, cutoff,
-                entry.getValue("centerObjective").jsonPrimitive.content.toDouble(),
-                entry.getValue("selector").jsonPrimitive.content, checked.objective)
+                objective.evaluate(center), entry.getValue("selector").jsonPrimitive.content, checked.objective,
+                entry.getValue("centerObjective").jsonPrimitive.content,
+                if (bools.isEmpty() && ints.isEmpty() && decline != null) "selector declined: $decline" else null)
         }
         file.resolveSibling("${file.nameWithoutExtension}-preparation.json").writeText(buildJsonObject {
             put("controlFileSha256", controlHash)
@@ -161,26 +163,25 @@ internal object RepairOwnerReplay {
                         val stop = lifetime or Cancellation.after(2000.milliseconds) or funded
                         activeStop = stop
                         activeCenter = scope.center
-                        val looser = previousCutoff?.let { scope.cutoff > it } == true
+                        val allocationStart = bean.getThreadAllocatedBytes(thread)
+                        val start = System.nanoTime()
+                        val unavailable = scope.unavailable ?: when {
+                            kind.startsWith("cp") && BigFraction.ofDouble(scope.cutoff.toDouble()) != scope.cutoff ->
+                                "exact cutoff is not representable by the retained CP double contract"
+                            else -> null
+                        }
+                        val looser = unavailable == null && previousCutoff?.let { scope.cutoff > it } == true
                         if (looser && retained != null) {
                             if (kind == "mixed-retained") accountMixed(retained)
                             (retained as AutoCloseable).close()
                             retained = null
                             epoch++
                         }
-                        previousCutoff = scope.cutoff
                         val before = retained?.let { call(it, "getStats") as SolveStats } ?: SolveStats.EMPTY
-                        val allocationStart = bean.getThreadAllocatedBytes(thread)
-                        val start = System.nanoTime()
                         var native: Any? = null
                         var usageBefore: ClauseUsage? = null
                         var usageAfter: ClauseUsage? = null
                         var observationNs = 0L
-                        val unavailable = when {
-                            kind.startsWith("cp") && BigFraction.ofDouble(scope.cutoff.toDouble()) != scope.cutoff ->
-                                "exact cutoff is not representable by the retained CP double contract"
-                            else -> null
-                        }
                         val nativeOutcome = when {
                             stop() -> Outcome(null, stopped(stop), before)
                             budget.exhausted() -> Outcome(null, TerminationReason.BudgetExhausted, before)
@@ -216,6 +217,7 @@ internal object RepairOwnerReplay {
                                     ?: Outcome(null, TerminationReason.Unsupported, SolveStats.EMPTY, preparation)
                             }
                         }
+                        if (native != null) previousCutoff = scope.cutoff
                         val outcome = if (funded()) nativeOutcome.copy(reason = TerminationReason.BudgetExhausted)
                             else nativeOutcome
                         if (native != null && kind.endsWith("cold")) {
@@ -267,6 +269,7 @@ internal object RepairOwnerReplay {
                         writer.appendLine(buildJsonObject {
                             put("centerId", scope.id)
                             put("owner", kind)
+                            put("ownerSeed", seed)
                             put("selector", scope.selector)
                             put("epoch", epoch)
                             put("status", status)
@@ -277,7 +280,9 @@ internal object RepairOwnerReplay {
                             put("strictWorkingCutoff", scope.cutoff.toString())
                             put("cutoffRule", "strict improvement on the checked control center")
                             put("controlFileSha256", controlHash)
-                            put("capturedNativeCutoff", scope.nativeCutoff)
+                            put("capturedCenterObjective", scope.capturedObjective)
+                            put("nativeCenterObjective", scope.nativeCutoff)
+                            put("selectorUnavailable", scope.unavailable != null)
                             put("effectiveBools", JsonArray(scope.freedBools.map(::JsonPrimitive)))
                             put("effectiveInts", JsonArray(scope.freedInts.map(::JsonPrimitive)))
                             put("scopeNamespace", "captured prepared finite slots")

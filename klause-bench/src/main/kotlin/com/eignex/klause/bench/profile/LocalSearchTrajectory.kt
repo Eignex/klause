@@ -78,7 +78,7 @@ internal object LocalSearchTrajectory {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val required = setOf("suite", "problem", "sha256", "recipe", "seed", "moves")
         val optional = setOf("sliceMillis", "sliceWork", "greedy", "repairs", "controls", "center", "source64",
-            "ownerReplay", "ownerWork", "ownerFragmentWork")
+            "ownerReplay", "ownerWork", "ownerFragmentWork", "ownerSelectors")
         require(options.keys.containsAll(required) && options.keys.all {
             it in required || it in optional || it == "selectors"
         })
@@ -110,10 +110,12 @@ internal object LocalSearchTrajectory {
         val exactControls = options["controls"]?.toBooleanStrict() ?: false
         val selectors = options["selectors"]?.toBooleanStrict() ?: false
         val ownerReplay = options["ownerReplay"]?.toBooleanStrict() ?: false
+        val ownerSelectors = options["ownerSelectors"]?.toBooleanStrict() ?: false
         val sourceCheck = if (repairCapture) parsed.problem.bake() else null
         require(!exactControls || repairCapture)
         require(!selectors || repairCapture)
         require(!ownerReplay || exactControls)
+        require(!ownerSelectors || selectors)
         val sourceInputs = parsed.intVarNames.values.distinct().filter { it !in parsed.definedVars }.toIntArray()
         out.resolve("source-inputs.json").writeText(buildJsonObject {
             put("declaredInputs", JsonArray(sourceInputs.map(::JsonPrimitive)))
@@ -192,6 +194,10 @@ internal object LocalSearchTrajectory {
             }.toString())
             if (selectors) SemanticRepairComparison.capture(problem, workingObjective, requireNotNull(initial),
                 sweep, sourceInputs, prepared, checkNotNull(sourceCheck), out, seed)
+            if (ownerSelectors) RepairOwnerReplay.replay(out.resolve("selectors.jsonl"), problem, workingObjective,
+                prepared, checkNotNull(sourceCheck), sourceInputs, out.resolve("owners-selectors.jsonl"), seed,
+                options["ownerWork"]?.toLong() ?: 200_000L,
+                options["ownerFragmentWork"]?.toLong() ?: 2_000L)
             var baseline: List<Any?>? = null
             for (mode in if (repairCapture) listOf("initial", "walk", "repair") else listOf("initial", "walk")) {
                 val walk = mode != "initial"
