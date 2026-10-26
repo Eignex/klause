@@ -44,6 +44,7 @@ internal class LinearRefutationReuse(
     private val counts = linkedMapOf<String, Long>()
     private val checker by lazy { source.withLinearAuthority() }
     private var sourceShape: Pair<Long, Long>? = null
+    private var sourceWidthDeclined = false
 
     init { require(maximumEntries >= 0 && maximumBytes >= 0L) }
 
@@ -74,10 +75,13 @@ internal class LinearRefutationReuse(
 
     private fun scalar(value: BigFraction, support: Support): Boolean {
         val bits = value.num.magnitudeBitLength().toLong() + value.den.magnitudeBitLength()
-        if (bits > 8192L || !spend(1L)) return false
+        if (!admitted(value) || !spend(1L)) return false
         support.bytes += 64L + (bits + 7L) / 8L
         return support.bytes <= maximumBytes
     }
+
+    private fun admitted(value: BigFraction): Boolean =
+        value.num.magnitudeBitLength() <= 4096 && value.den.magnitudeBitLength() <= 4096
 
     private fun support(proof: SourceDerivation, captured: Support, depth: Int = 0): Boolean {
         if (depth >= 64 || ++captured.nodes > 4096 || !spend(1L, 32L)) return false
@@ -108,14 +112,26 @@ internal class LinearRefutationReuse(
 
     private fun shape(): Pair<Long, Long>? {
         sourceShape?.let { return it }
+        if (sourceWidthDeclined) return null
         if (!spend(1L, 256L + 48L * (source.coordinateCount + source.premiseCount))) return null
         var units = 1L + source.coordinateCount
         var bytes = 256L + 48L * source.coordinateCount
         for (premise in source.premises.values) {
             val entries = 1L + premise.inequality.supportSize + premise.guards.size + premise.integerPins.size
             if (!spend(entries)) return null
+            if (!(premise.inequality.coefficients.values + premise.inequality.rhs +
+                    premise.integerPins.values).all(::admitted)) {
+                sourceWidthDeclined = true
+                observe("WidthDeclines")
+                return null
+            }
             units += entries
             bytes += 128L + 96L * entries
+        }
+        if (!(source.objective.values + source.objectiveConstant).all(::admitted)) {
+            sourceWidthDeclined = true
+            observe("WidthDeclines")
+            return null
         }
         return (units to bytes).also { sourceShape = it }
     }
@@ -156,6 +172,10 @@ internal class LinearRefutationReuse(
         }
         val lower = condition.lower
         val upper = condition.upper
+        if (!(lower.values + upper.values).all(::admitted)) {
+            observe("WidthDeclines")
+            return
+        }
         val required = source.scope.condition
         val reduced = SourceCondition(bools,
             required.lower + lower.filterKeys { Side(it, false) in captured.assumptions },
@@ -201,6 +221,10 @@ internal class LinearRefutationReuse(
         val lower = condition.lower
         val upper = condition.upper
         if (!spend(1L + lower.size + upper.size, 48L * (lower.size + upper.size))) return null
+        if (!(lower.values + upper.values).all(::admitted)) {
+            observe("WidthDeclines")
+            return null
+        }
         val buckets = sequenceOf(unconditional.asSequence()) +
             lower.keys.asSequence().map { indexed[Side(it, false)].orEmpty().asSequence() } +
             upper.keys.asSequence().map { indexed[Side(it, true)].orEmpty().asSequence() }
