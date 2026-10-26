@@ -186,7 +186,9 @@ class PolynomialTheoryServiceTest {
 
         service.invocation().use { invocation ->
             for (pin in listOf(true, false, true)) {
-                val result = invocation.check(PolynomialCondition(bools = mapOf(0 to pin), lower = fixed, upper = fixed))
+                val result = invocation.check(PolynomialCondition(
+                    bools = mapOf(0 to pin), lower = fixed, upper = fixed,
+                ))
 
                 if (pin) assertIs<QfNraResult.Unsatisfiable>(result) else {
                     val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
