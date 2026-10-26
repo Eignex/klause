@@ -22,7 +22,7 @@ internal object GlobalScoringViews {
     const val MAX_PATHS = 1024
     const val MAX_WORK = 262_144
 
-    data class Admission(val factor: Int, val view: String, val reason: String?, val cells: Int = 0)
+    data class Admission(val factor: Int, val view: String, val reason: String?)
     data class Selection(val provider: ScoringProjectionProvider, val admissions: List<Admission>)
     data class Relation(val factor: Factor?, val reason: String?, val work: Int)
 

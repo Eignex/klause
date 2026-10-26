@@ -1630,7 +1630,7 @@ trajectory points, without local-exhaustion or basin classifications.
 Other globals, including affine `Distinct`, retain their canonical scores.
 
 Ground tables become tries using only their explicit rows. MDDs become tables
-using only accepted paths: at most 64 columns, 65,536 input/output words, 1,024
+using only accepted paths: at most 64 columns, 65,536 words per input array or output relation, 1,024
 accepted paths and 262,144 construction visits. Short tables, nondeterministic
 weighted diagrams, overflowing path sums and oversized relations decline without
 publishing partial views. Deterministic weighted paths include their summed cost
@@ -1697,6 +1697,49 @@ before opening states: 15 tables and 105 MDDs imply 130,869,060 private extensio
 cells against the 1,048,576-cell diagnostic limit. The remaining factors are 14
 lexicographic constraints. This is an explicit payload boundary, without a search
 or general inapplicability claim. The source remains in the ordinary cohort.
+
+[Source-checked comparison 8533](https://lab.eignex.com/jobs/8533) retains all ten
+frozen sources, seeds 3/7/11 and two repeats. Native and pairwise score-only arms
+use `3514ea77f5`, explicit one-arm `cbls/fixed`, greedy/implicit seeding disabled,
+LP off and presolve off. Ordinary LS recipes and mixed/default-LP/default-presolve
+controls use `133546fd6f`. Each case has P1, 10 s and 2,500 shared work units,
+admitting at most 2,000 LS instructions. The ordinary controls retain their
+configured composition; this allowance need not exercise every configured arm.
+Corpus decoding belongs to selection preparation, and every record retains its
+original decoded-source hash. All 240 cases complete after infrastructure retries;
+the four killed CLI records remain failures.
+
+| Treatment | Independently valid feasible records | Unknown | Native infeasible | Failed CLI |
+| --- | --- | --- | --- | --- |
+| Native score only | 14 | 46 | 0 | 0 |
+| Pairwise score only | 12 | 48 | 0 | 0 |
+| Ordinary LS recipes | 16 | 40 | 0 | 4 |
+| Ordinary mixed defaults | 18 | 36 | 6 | 0 |
+
+Every feasible record passes XCSP3-tools SolutionChecker 2.5.1 at `ca58fc79a4`,
+checker JAR SHA-256 `388d47f7…038b7`; no feasible record remains unchecked.
+The six infeasible mixed results are native proofs on the overlapping-table
+control, without independent proof validation. Both score-only arms cover the two
+small satisfiable controls; native grading additionally covers HyperSudoku seed 7
+in both repeats, while pairwise grading adds no source. Ordinary controls also
+recover QuasiGroup, and mixed covers HyperSudoku seed 11.
+
+For HyperSudoku seed 7/repeat 0, native grading produces its checked witness at
+818 ms process time after 1,142 moves/1,427 work units; pairwise grading consumes
+2,000 moves/2,500 work units without one. Frontend and preparation times are
+110/65 ms native and 167/31 ms pairwise. Whole-CLI GNU time reports 0.89 s wall
+time for each, 0.77/0.80 s user CPU and 98,032/95,936 KiB peak RSS. These runs use
+Temurin 25.0.4.1, `-Xmx3g`, Serial GC and one active processor. Allocation is not
+collected by this external timer. The four WordDesign LS failures have exit 137
+and associated cgroup OOM receipts under the 4,608 MiB group limit; they are not
+unknown solver verdicts or scoring-view gains.
+
+Keep these alternatives in bench tooling. Unweighted Table/MDD substitution
+offers no grading distinction; the weighted fixture establishes semantics and
+grade differences without a useful checked-search result. Pairwise collision
+grading loses checked coverage and adds none against the native and ordinary
+controls at this allowance. This supplies no runtime admission prerequisite for
+#3620 or #3621. Other weighted grades, fragments and budgets remain untested.
 
 ### Cargo objective-coordinate trajectories
 
