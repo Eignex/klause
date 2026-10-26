@@ -6,6 +6,9 @@ import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
+import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.factor.scheduling.Cumulative
+import com.eignex.klause.factor.scheduling.Diffn
 import com.eignex.klause.formats.xcsp3.Xcsp3
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.VarRemap
@@ -55,6 +58,7 @@ import kotlin.random.Random
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -78,7 +82,7 @@ internal object LocalSearchTrajectory {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val required = setOf("suite", "problem", "sha256", "recipe", "seed", "moves")
         val optional = setOf("sliceMillis", "sliceWork", "greedy", "repairs", "controls", "center", "source64",
-            "ownerReplay", "ownerWork", "ownerFragmentWork", "ownerSelectors")
+            "ownerReplay", "ownerWork", "ownerFragmentWork", "ownerSelectors", "selectorsFromWalk")
         require(options.keys.containsAll(required) && options.keys.all {
             it in required || it in optional || it == "selectors"
         })
@@ -111,11 +115,13 @@ internal object LocalSearchTrajectory {
         val selectors = options["selectors"]?.toBooleanStrict() ?: false
         val ownerReplay = options["ownerReplay"]?.toBooleanStrict() ?: false
         val ownerSelectors = options["ownerSelectors"]?.toBooleanStrict() ?: false
+        val selectorsFromWalk = options["selectorsFromWalk"]?.toBooleanStrict() ?: false
         val sourceCheck = if (repairCapture) parsed.problem.bake() else null
         require(!exactControls || repairCapture)
         require(!selectors || repairCapture)
         require(!ownerReplay || exactControls)
         require(!ownerSelectors || selectors)
+        require(!selectorsFromWalk || selectors)
         val sourceInputs = parsed.intVarNames.values.distinct().filter { it !in parsed.definedVars }.toIntArray()
         out.resolve("source-inputs.json").writeText(buildJsonObject {
             put("declaredInputs", JsonArray(sourceInputs.map(::JsonPrimitive)))
@@ -127,6 +133,7 @@ internal object LocalSearchTrajectory {
             Sample(booleanArrayOf(), it)
         }
         require(initial == null || parsed.definedVars.isEmpty())
+        require(!selectorsFromWalk || initial == null)
         val views = ArrayList<TrajectoryView>()
         val observations = ArrayList<Observation>()
         out.resolve("capture-policy.json").writeText(buildJsonObject {
@@ -147,7 +154,7 @@ internal object LocalSearchTrajectory {
             put("diagnosticWork", "separate private states; two full loads and at most 64 reversible probes per pair")
             put("sourceVerdictClaim", false)
         }.toString())
-        for (rewrite in if (initial == null) listOf(false, true) else listOf(false)) {
+        for (rewrite in if (initial == null && !selectorsFromWalk) listOf(false, true) else listOf(false)) {
             val preparationStarted = System.nanoTime()
             val stop = Cancellation.after(60.seconds)
             val invocation = SourceSetup.prepare(SourceSetupRequest(
@@ -159,7 +166,8 @@ internal object LocalSearchTrajectory {
             val prepared = FinitePipeline.prepare(FinitePipelineRequest(
                 requireNotNull(plan.model), FiniteEngine.MIXED, objective,
                 cancellation = stop, solveCancellation = stop, presolveBudget = PresolveBudget(1_375_000_000L),
-                presolveConfig = if (initial == null) PresolveConfig.DEFAULT else PresolveConfig.NONE,
+                presolveConfig = if (initial == null && !selectorsFromWalk) PresolveConfig.DEFAULT
+                    else PresolveConfig.NONE,
                 preparedPlan = plan, transformObjective = rewrite, randomSeed = seed,
             ))
             check(!stop() && prepared.presolve?.infeasible != true)
@@ -192,13 +200,18 @@ internal object LocalSearchTrajectory {
                 put("correspondenceAdmission", "slot-preserving load plus complete source round trip")
                 put("sourceVerdictClaim", false)
             }.toString())
-            if (selectors) SemanticRepairComparison.capture(problem, workingObjective, requireNotNull(initial),
+            if (selectors && !selectorsFromWalk) SemanticRepairComparison.capture(problem, workingObjective,
+                requireNotNull(initial),
                 sweep, sourceInputs, prepared, checkNotNull(sourceCheck), out, seed)
-            if (ownerSelectors) RepairOwnerReplay.replay(out.resolve("selectors.jsonl"), problem, workingObjective,
+            if (ownerSelectors && !selectorsFromWalk) RepairOwnerReplay.replay(out.resolve("selectors.jsonl"),
+                problem, workingObjective,
                 prepared, checkNotNull(sourceCheck), sourceInputs, out.resolve("owners-selectors.jsonl"), seed,
                 options["ownerWork"]?.toLong() ?: 200_000L,
                 options["ownerFragmentWork"]?.toLong() ?: 2_000L)
             var baseline: List<Any?>? = null
+            var walkCenter: Sample? = null
+            var walkNanos = 0L
+            var walkBytes = 0L
             for (mode in if (repairCapture) listOf("initial", "walk", "repair") else listOf("initial", "walk")) {
                 val walk = mode != "initial"
                 val label = if (mode == "walk") rewrite.toString() else "$mode-$rewrite"
@@ -300,6 +313,11 @@ internal object LocalSearchTrajectory {
                         }
                         val runNanos = System.nanoTime() - started
                         val runBytes = allocation.getThreadAllocatedBytes(thread) - beforeBytes
+                        if (mode == "walk") {
+                            walkCenter = result?.assignment
+                            walkNanos = runNanos
+                            walkBytes = runBytes
+                        }
                         if (walk && result != null && sourceCheck != null) {
                             RepairTrajectory.writeResult(out.resolve("witness-$label.json"), result, prepared,
                                 sourceCheck, picks, runNanos, runBytes)
@@ -359,6 +377,45 @@ internal object LocalSearchTrajectory {
                             )
                         }
                     }
+                }
+            }
+            if (selectorsFromWalk) {
+                val center = walkCenter
+                val unavailable = when {
+                    center == null -> "bounded walk returned no feasible incumbent"
+                    problem.numBoolVars != 0 -> "semantic capture requires an integer-only working frame"
+                    plan.sourceIntCount != problem.numIntVars ||
+                        (0 until plan.sourceIntCount).any { plan.integerCoordinate(it) != it } ||
+                        prepared.reconstruct(center) != center -> "semantic capture requires an unchanged source frame"
+                    problem.factors.none { it is AllDifferent || it is Cumulative || it is Diffn } ->
+                        "no supported semantic relation"
+                    else -> null
+                }
+                val witness = out.resolve("witness-false.json")
+                out.resolve("selector-center.json").writeText(buildJsonObject {
+                    put("origin", "bounded walk incumbent")
+                    put("recipe", options.getValue("recipe"))
+                    put("sourceSha256", sha256(bytes))
+                    put("walkWitnessSha256", if (witness.exists()) sha256(witness.readBytes()) else null)
+                    put("status", if (unavailable == null) "available" else "unavailable")
+                    put("reason", unavailable)
+                    put("center", center?.let(RepairTrajectory::sample) ?: JsonNull)
+                    put("nativeSourceAccepted", center != null)
+                    put("acquisitionElapsedNs", walkNanos)
+                    put("acquisitionThreadBytes", walkBytes)
+                    put("acquisitionIncludedInOwnerAllowance", false)
+                    put("completedDescentEvidence", "repairs-false.jsonl contains separate native descent events")
+                    put("independentWitnessCheck", false)
+                    put("globalProofClaim", false)
+                }.toString())
+                if (unavailable == null) {
+                    SemanticRepairComparison.capture(problem, workingObjective, checkNotNull(center), sweep,
+                        sourceInputs, prepared, checkNotNull(sourceCheck), out, seed)
+                    if (ownerSelectors) RepairOwnerReplay.replay(out.resolve("selectors.jsonl"), problem,
+                        workingObjective, prepared, checkNotNull(sourceCheck), sourceInputs,
+                        out.resolve("owners-selectors.jsonl"), seed,
+                        options["ownerWork"]?.toLong() ?: 200_000L,
+                        options["ownerFragmentWork"]?.toLong() ?: 2_000L)
                 }
             }
         }
