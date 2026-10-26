@@ -9,6 +9,8 @@ import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -53,6 +55,25 @@ class RepairTraceTest {
         assertEquals(1, trace.attempts.size)
         assertEquals(2L, trace.coordinateReads)
         assertEquals(1L, trace.declined)
+    }
+
+    @Test
+    fun `known infeasibility should remain distinct from unfinished repairs`() {
+        val trace = RepairTrace("typed repair outcomes")
+        val sample = Sample(booleanArrayOf(), longArrayOf(0))
+        for ((result, verdict, reason) in listOf(
+            Triple(MinimizeResult.Infeasible(), "Infeasible", null),
+            Triple(MinimizeResult.Unknown(TerminationReason.Cancelled), "Unknown", TerminationReason.Cancelled),
+            Triple(MinimizeResult.Unknown(TerminationReason.BudgetExhausted), "Unknown", TerminationReason.BudgetExhausted),
+        )) {
+            val attempt = assertNotNull(trace.begin("control", 7, sample, sample))
+
+            trace.recordResult(attempt, result)
+
+            assertEquals(verdict, attempt.repairVerdict)
+            assertEquals(reason, attempt.repairReason)
+            assertNull(attempt.endpoint)
+        }
     }
 
     @Test

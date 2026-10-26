@@ -385,6 +385,9 @@ internal class Alns(
                         telemetry.repairCpNodes += nodes
                         telemetry.repairLsMoves += moves
                     },
+                    recordRepairResult = attempt?.let { entry ->
+                        { result -> repairTrace?.recordResult(entry, result) }
+                    },
                 )
                 val repairStarted = TimeSource.Monotonic.markNow()
                 val repaired = repairOperators[repairIdx].repair(context)

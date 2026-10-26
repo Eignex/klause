@@ -50,6 +50,8 @@ internal object RepairTrajectory {
                     put("seed", get(entry, "Seed") as Long?)
                     put("descentRule", get(trace, "DescentRule").toString())
                     put("endpoint", get(entry, "Endpoint").toString())
+                    put("repairVerdict", get(entry, "RepairVerdict") as String?)
+                    put("repairReason", get(entry, "RepairReason")?.toString())
                     put("basinClassified", false)
                     for (scope in listOf("RequestedBools", "RequestedInts", "EffectiveBools", "EffectiveInts")) {
                         put(scope.replaceFirstChar { it.lowercase() },
@@ -150,6 +152,11 @@ internal object RepairTrajectory {
                         put("center", sample(center))
                         put("centerObjective", objective.evaluate(center))
                         put("result", result::class.simpleName)
+                        put("reason", when (result) {
+                            is MinimizeResult.Unknown -> result.reason.toString()
+                            is MinimizeResult.BestFound -> result.reason.toString()
+                            else -> null
+                        })
                         put("completedLocalExhaustion", completed)
                         put("strictImprovement", result.assignment?.let {
                             objective.evaluateExact(it) < objective.evaluateExact(center)

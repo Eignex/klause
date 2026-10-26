@@ -1,6 +1,8 @@
 package com.eignex.klause.localsearch
 
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.TerminationReason
 
 internal enum class RepairEndpoint {
     PolicyLocalOptimum, FeasibleStall, Restarted, Repaired, Unresolved, Censored,
@@ -30,6 +32,10 @@ internal class RepairTrace(
     ) {
         val frames = mutableListOf<Frame>()
         var endpoint: RepairEndpoint? = null
+            internal set
+        var repairVerdict: String? = null
+            internal set
+        var repairReason: TerminationReason? = null
             internal set
     }
 
@@ -84,5 +90,21 @@ internal class RepairTrace(
         if (attempt == null || attempt.endpoint != null) return
         if (sample != null) record(attempt, "endpoint", sample, cost)
         attempt.endpoint = endpoint
+    }
+
+    fun recordResult(attempt: Attempt, result: MinimizeResult) {
+        if (attempt.endpoint != null) return
+        attempt.repairVerdict = when (result) {
+            is MinimizeResult.Optimal -> "Optimal"
+            is MinimizeResult.BestFound -> "BestFound"
+            is MinimizeResult.Infeasible -> "Infeasible"
+            is MinimizeResult.Unbounded -> "Unbounded"
+            is MinimizeResult.Unknown -> "Unknown"
+        }
+        attempt.repairReason = when (result) {
+            is MinimizeResult.BestFound -> result.reason
+            is MinimizeResult.Unknown -> result.reason
+            else -> null
+        }
     }
 }
