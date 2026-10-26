@@ -91,7 +91,9 @@ internal object GlobalScoringViews {
     private fun diagramTable(mdd: Mdd, stop: Cancellation): Relation {
         val width = mdd.seq.size + if (mdd.cost >= 0) 1 else 0
         if (width > MAX_ARITY) return Relation(null, "arity-limit", 0)
-        if (mdd.transitions.size > MAX_CELLS) return Relation(null, "cell-limit", 0)
+        if (mdd.transitions.size > MAX_CELLS || mdd.accepting.size > MAX_CELLS) {
+            return Relation(null, "cell-limit", 0)
+        }
         if (mdd.layerStarts.first() != 0 || mdd.layerStarts.last() != mdd.transitions.size ||
             mdd.numStatesPerLayer.any { it <= 0 } || mdd.initial !in 0 until mdd.numStatesPerLayer[0] ||
             mdd.accepting.any { it !in 0 until mdd.numStatesPerLayer.last() }

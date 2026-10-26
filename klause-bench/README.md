@@ -1767,6 +1767,9 @@ weights, native payload maintenance and native proposals. It admits at most 64
 positions and 64 excepted values per factor. Greedy initialization and implicit
 seeding are disabled in both walks. This compares one shared weight per source
 factor; it does not give separate learned weights to individual disequalities.
+Walks normalize weights by factor class and retain allocated learned weights;
+paired shadow probes use unit weights. Completed fixed-work endpoints are budgeted
+trajectory points, without local-exhaustion or basin classifications.
 Other globals, including affine `Distinct`, retain their canonical scores.
 
 Ground tables become tries using only their explicit rows. MDDs become tables
@@ -1786,6 +1789,57 @@ preparation, native work and available thread allocations accompany the capture.
 Fixture captures cover collision ranking, optional/excepted aliases and weighted
 cost grading. Captured points have no independent witness or proof authority;
 instrumented walk timings do not establish ordinary solver throughput.
+
+At `efc74e907e`, [mandatory and weighted controls](https://lab.eignex.com/jobs/8509)
+retain exact source/destination pairing and show changed pairwise collision grades.
+For `[0,0,0,1,1]`, native distinctness gives both tested repairs delta -1;
+pairwise grading gives -2 and -1. The weighted MDD/table fixture reverses some
+adjacent symbol rankings, but the direct cost repair from 2 to 5 is best under
+both grades. That fixture supplies no complementary-witness result.
+
+[Overlap MDD](https://lab.eignex.com/jobs/8510),
+[overlap tables](https://lab.eignex.com/jobs/8511) and eight admitted
+[Eternity tables](https://lab.eignex.com/jobs/8517) retain equal unweighted grades
+and primitive deltas at mapped states. Both representations minimize positional
+Hamming distance over the same accepted words; this rejects grading diversity
+for this unweighted substitution. Each Eternity trie consumes 980 row-cell
+visits and 144,160–144,272 thread-allocated bytes; the other 41 relations retain
+the capture-limit decline. No domain product is constructed.
+
+The same captures and [BlockedQueens](https://lab.eignex.com/jobs/8512),
+[MagicSquare-sum](https://lab.eignex.com/jobs/8513),
+[QuasiGroup](https://lab.eignex.com/jobs/8514),
+[HyperSudoku](https://lab.eignex.com/jobs/8515) and
+[AnotherMagicSquare](https://lab.eignex.com/jobs/8516) compare satisfaction walks
+with seeds 3/7/11, 2,000 moves and a four-second deadline per walk. All admitted
+walks finish within the deadline. Magic-square-3 reaches native SAT under both
+grades, taking 15/8/7 native moves against 15/32/78 pairwise moves. HyperSudoku
+reaches native SAT only under native grading, at 1,471 moves for seed 7.
+The other walks exhaust the move allowance. Their common unit-weight native
+endpoint grades are:
+
+| Source | Native walk, seeds 3/7/11 | Pairwise walk, seeds 3/7/11 |
+| --- | --- | --- |
+| BlockedQueens | 6 / 4 / 5 | 8 / 4 / 5 |
+| MagicSquare-sum | 7 / 7 / 14 | 9 / 14 / 12 |
+| QuasiGroup | 83 / 22 / 47 | 26 / 36 / 106 |
+| HyperSudoku | 11 / 0 / 14 | 6 / 8 / 9 |
+| AnotherMagicSquare | 80 / 145 / 68 | 96 / 120 / 84 |
+| Eternity | 31 / 34 / 30 | 40 / 47 / 47 |
+
+These bounded endpoints have no local-exhaustion claim. Changed grades and
+trajectories add no native witness here; the reserved families include a lost
+HyperSudoku witness and worse Eternity endpoints under the common metric.
+Captures retain preparation, moves, allocations and runtime/dependency hashes
+on Linux/amd64 with Temurin 25.0.4.1. Their ordered, instrumented timings provide
+no ordinary-route speedup or independent source-witness claim.
+
+[WordDesign admission](https://lab.eignex.com/jobs/8526), at `5e403b8b48`, loads
+the original catalog source with decoded SHA-256 `341306d8…bcbeda` and declines
+before opening states: 15 tables and 105 MDDs imply 130,869,060 private extensional
+cells against the 1,048,576-cell diagnostic limit. The remaining factors are 14
+lexicographic constraints. This is an explicit payload boundary, without a search
+or general inapplicability claim. The source remains in the ordinary cohort.
 
 ### Cargo objective-coordinate trajectories
 
