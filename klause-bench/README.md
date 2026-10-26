@@ -5440,10 +5440,12 @@ points, stopped proof checks and retention limits retain distinct observations;
 zero candidates in an incomplete report establish no applicability result.
 
 `aggregate-replay=true` retains the first parent with fresh source-checked
-aggregate proposals and writes `aggregate-replays.jsonl`. Three fresh-basis arms
+aggregate proposals and writes `aggregate-replays.jsonl`. Four fresh-basis arms
 disable separation, enable individual cuts, and append the accepted aggregates to
-the individual family before native admission. Each arm has one LP operation,
-20M work and 64 MiB modeled allocation; all three share a 30-second deadline.
+the individual family before native admission. The fourth arm prepares bounded
+opposite-bound projections directly from the same source, including discovery
+in its query costs. Each arm has one LP operation, 20M work and 64 MiB modeled
+allocation; all four share a 30-second deadline.
 Discovery costs remain in the pair report. The replay reports installed and
 checked candidate IDs, exact bounds, native checks and per-arm costs. These
 diagnostic replays establish neither warm-basis parity nor whole-CLI throughput.
@@ -5459,6 +5461,18 @@ Root discovery and proof checks spend 1,042,668 modeled work and 35,367,372 mode
 allocation bytes. Query 1 reaches the shared allocation limit, leaving its proof
 checks and all later states unknown. These are separation observations; checked
 bound improvement requires an inserted-cut comparison.
+
+[Root insertion replay 8577](https://lab.eignex.com/jobs/8577), at `179b91e487`,
+uses the same original `rgn` hash and Linux/amd64 settings. All three fresh-basis
+arms finish within one operation, with fresh native bound checks. The individual
+bound is `921805910255297432406579/18889465931478580854784` (about 48.8).
+Appending the five checked proposals raises it to
+`2070285411688286118435853/37778931862957161709568` (about 54.8).
+Individual query work/allocation are 956,585/421,164 bytes; the aggregate arm uses
+1,073,195/441,568, excluding the separately reported discovery cost. Disabled
+separation uses 420,964/262,364 and certifies about 48.8. All 45 aggregate-arm
+candidates pass native admission. This motivates a bounded cached source-bound
+projection family; it does not establish whole-frontier throughput.
 
 [Infrastructure control 8481](https://lab.eignex.com/jobs/8481) pairs
 `133546fd6f` and `2161236173` with aggregation disabled, across `gr4x6`, `p0033`,

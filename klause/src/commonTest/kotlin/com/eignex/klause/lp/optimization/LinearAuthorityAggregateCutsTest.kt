@@ -41,6 +41,33 @@ class LinearAuthorityAggregateCutsTest {
         BigFraction.ZERO)
 
     @Test
+    fun `opposite bound projection should strengthen a checked sparse bound before mixed rounding`() {
+        val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val source = SourceProofContext(scope.copy(objective = SourceObjective("projection", ObjectiveSense.MINIMIZE)),
+            setOf(x, real, residual), mapOf(
+                "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                    real to BigFraction.MINUS_ONE, residual to BigFraction.ONE), BigFraction.ofLong(3))),
+                "real-lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+                "real-upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ofLong(2))),
+                "residual-lower" to SourcePremise(SourceInequality(mapOf(residual to BigFraction.MINUS_ONE),
+                    BigFraction.ZERO)),
+                "residual-upper" to SourcePremise(SourceInequality(mapOf(residual to BigFraction.ONE),
+                    BigFraction.ofLong(100))),
+            ), mapOf(x to BigFraction.MINUS_ONE, real to BigFraction.ONE))
+        for ((aggregate, expected) in listOf(false to (BigFraction.ofLong(-3) *
+            BigFraction.ofLong(2).reciprocal()), true to BigFraction.MINUS_ONE)) {
+            LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = aggregate).use { authority ->
+                val result = authority.advance(source, Cancellation.Never, cuts = true)
+
+                assertEquals(SourceValue.Rational(expected),
+                    assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
+                assertEquals(SourceEvidenceCheck.Checked,
+                    SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)))
+            }
+        }
+    }
+
+    @Test
     fun `appending an aggregate should stop at the shared allocation allowance`() {
         val source = SourceProofContext(scope.copy(objective = SourceObjective("sum", ObjectiveSense.MINIMIZE)),
             setOf(x, y, real), mapOf("left" to SourcePremise(left), "right" to SourcePremise(right)),

@@ -4,6 +4,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceInequality
+import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRoundingLimit
 import com.eignex.klause.solver.evidence.mixedIntegerRounding
 import com.eignex.klause.util.BIG_ONE
@@ -45,6 +46,68 @@ internal data class LinearAuthorityAggregateProbeResult(
 )
 
 internal object LinearAuthorityAggregateCuts {
+    fun prepareBoundProjections(
+        source: SourceProofContext, cancellation: Cancellation,
+        observe: (String, Long) -> Unit = { _, _ -> }, maximumCandidates: Int = 64,
+        limits: LinearAuthorityAggregateLimits = LinearAuthorityAggregateLimits(
+            work = 500_000L, allocation = 8_388_608L),
+    ): List<LinearAuthorityCut> {
+        require(maximumCandidates in 0..64)
+        val meter = AggregateMeter(limits, cancellation, observe)
+        val candidates = ArrayList<LinearAuthorityCut>()
+        try {
+            meter.reserve(source.premises.size.toLong(), source.premises.size * 128L)
+            val rows = ArrayList<LinearAuthorityAggregateTerm>()
+            val bounds = HashMap<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm>()
+            for ((owner, entry) in source.premises.entries.withIndex()) {
+                meter.reserve(1L, 128L + entry.key.length * 2L)
+                val term = LinearAuthorityAggregateTerm(owner, entry.key, entry.value.inequality)
+                rows += term
+                if (term.inequality.supportSize != 1) continue
+                val (id, coefficient) = term.inequality.coefficients.entries.single()
+                if (id.kind != SourceCoordinate.Kind.Real) continue
+                meter.reserve(1L, 96L)
+                bounds.getOrPut(id to (coefficient > BigFraction.ZERO)) { term }
+            }
+            val charge: (String, Long) -> Unit = { name, count ->
+                when (name) {
+                    "AggregateWork" -> meter.reserve(count)
+                    "AggregateAllocation" -> meter.reserve(0L, count)
+                    else -> observe(name, count)
+                }
+            }
+            val derivedStop = object : Cancellation {
+                override fun isCancelled(): Boolean = cancellation()
+                override fun deadline() = cancellation.deadline()
+            }
+            for (term in rows) {
+                meter.reserve(1L + term.inequality.supportSize, term.inequality.supportSize * 64L)
+                val coefficients = term.inequality.coefficients
+                if (coefficients.keys.none { it.kind == SourceCoordinate.Kind.Integer } ||
+                    coefficients.keys.any { it.kind == SourceCoordinate.Kind.Boolean }) continue
+                for ((id, coefficient) in coefficients) {
+                    meter.reserve(1L)
+                    if (id.kind != SourceCoordinate.Kind.Real) continue
+                    val bound = bounds[id to (coefficient < BigFraction.ZERO)] ?: continue
+                    if (candidates.size >= maximumCandidates) stopAggregate("RetentionLimit")
+                    val pivot = bound.inequality.coefficients.getValue(id)
+                    val boundWeight = meter.number(if (coefficient > BigFraction.ZERO) coefficient
+                        else coefficient.negated())
+                    val sourceWeight = meter.number(if (pivot > BigFraction.ZERO) pivot else pivot.negated())
+                    meter.reserve(1L, 256L)
+                    val cut = derive(listOf(term.copy(weight = sourceWeight), bound.copy(weight = boundWeight)),
+                        derivedStop, charge, allowMixed = true, continuousBounds = bounds) ?: continue
+                    meter.reserve(1L, 128L + cut.inequality.supportSize * 64L)
+                    candidates += cut
+                }
+            }
+            observe("AggregateProjectionComplete", 1L)
+        } catch (stop: AggregateStop) {
+            observe("AggregateProjection${stop.reason}", 1L)
+        }
+        return candidates.toList()
+    }
+
     private class ProbeRow(
         val term: LinearAuthorityAggregateTerm, val coefficients: Map<SourceCoordinate, BigFraction>,
     ) {
