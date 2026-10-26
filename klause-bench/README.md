@@ -2504,6 +2504,11 @@ conditioned bounds, pause/terminal reasons, checked candidate objectives, native
 work, wall time and thread allocation separately. A conditioned closure can retain
 a feasible nonimproving point and never establishes a source refutation or source
 optimum. The capture is instrumented and makes no whole-CLI speedup claim.
+An entry `{"count":2,"round":1}` instead captures the existing mixed selector's
+freed set with its actual source LP guidance before replaying it at the saved
+center. Root guidance/index/selection work is recorded separately in
+`selection.json` and is excluded from each cold repair allowance; these captures
+compare repair capability at fixed freedoms, not total selector throughput.
 
 [Fixed-pin replay 8339](https://lab.eignex.com/jobs/8339), at `b738c5d89a` on
 Mac/aarch64, retains four witnesses from [8302](https://lab.eignex.com/jobs/8302).
