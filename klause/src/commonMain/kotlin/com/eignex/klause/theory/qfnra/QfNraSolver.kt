@@ -246,7 +246,10 @@ internal class QfNraQuery(
         work.booleanTheoryResourceRefusals = work.booleanTheoryResourceRefusals ?: 0
         val regions = reducedFormula.booleanRegions(arithmetic, progress) { partialConflictObserver?.invoke(it) }
         var incomplete: PolynomialResource? = null
-        while (regions.hasNext()) {
+        while (true) {
+            failureCapture?.operation("boolean-region", progress.searchSnapshot, progress.regions,
+                work.spentWork, arithmetic)
+            if (!regions.hasNext()) break
             val region = regions.next()
             if (region == null) {
                 yield(null)
@@ -263,6 +266,8 @@ internal class QfNraQuery(
                     work.booleanTheoryConstantRefutations = constants + minOf(1L, Long.MAX_VALUE - constants)
                     continue
                 }
+                failureCapture?.operation("regional-reduction", progress.searchSnapshot, progress.regions,
+                    work.spentWork, arithmetic)
                 val reducing = PolynomialAffineReduction.prepare(reducedFormula, region, realCount, arithmetic) {
                     val sections = checkNotNull(work.equationalSections)
                     work.equationalSections = sections + minOf(1L, Long.MAX_VALUE - sections)
@@ -369,6 +374,7 @@ internal class QfNraQuery(
                             return@sequence
                         }
                     } catch (stop: PolynomialResourceLimit) {
+                        failureCapture?.refused(stop.resource.name)
                         if (complete) throw stop
                         // A larger required family can admit a section that avoids the refused projection.
                         finishProjection = true
@@ -377,6 +383,7 @@ internal class QfNraQuery(
                     yield(null)
                 } while (!complete)
             } catch (stop: PolynomialResourceLimit) {
+                failureCapture?.refused(stop.resource.name)
                 // An incomplete region can be skipped for SAT search, but withholds source exhaustion.
                 if (incomplete == null) incomplete = stop.resource
                 val refusals = checkNotNull(work.booleanTheoryResourceRefusals)

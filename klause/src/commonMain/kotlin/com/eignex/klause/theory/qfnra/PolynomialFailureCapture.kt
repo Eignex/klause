@@ -17,6 +17,8 @@ internal class PolynomialFailureCapture {
         private set
     var firstCadFailure: Map<String, String>? = null
         private set
+    var firstRefusal: Map<String, String>? = null
+        private set
     var failures: Long = 0
         private set
     var repeatedFirstFailure: Long = 0
@@ -28,6 +30,11 @@ internal class PolynomialFailureCapture {
         private set
     var interruptedCapture: Boolean = false
         private set
+
+    fun refused(resource: String) {
+        if (firstRefusal == null) firstRefusal = operation.mapKeys { "operation.${it.key}" } +
+            context.mapKeys { "context.${it.key}" } + ("resource" to resource)
+    }
 
     private fun capture(arithmetic: PolynomialArithmetic, block: FailureWriter.() -> Unit): Map<String, String> {
         interruptedCapture = true
@@ -117,7 +124,15 @@ internal class PolynomialFailureCapture {
         // Comparing a bounded exact representation supplies repetition evidence, not real equality or proof.
         val key = capture(arithmetic) {
             put("snapshot", snapshot.toString())
-            failed?.let { put("failedAtom", it.toString()) }
+            failed?.let {
+                put("failedAtom", it.toString())
+                put("failedRelation", formula.atoms[it].relation.name)
+                polynomial("failedPolynomial", formula.atoms[it].polynomial)
+            }
+            region?.let {
+                for ((id, truth) in it.atoms) { if (exhausted) break; put("premise.$id", truth.toString()) }
+                for ((id, truth) in it.bools) { if (exhausted) break; put("boolean.$id", truth.toString()) }
+            }
             for ((id, value) in point) { if (exhausted) break; scalar("point.$id", value) }
         }
         if (firstFailure != null && (region == null || firstCadFailure != null)) {

@@ -3,6 +3,9 @@ package com.eignex.klause.theory.qfnra
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.Polynomial
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
+import com.eignex.klause.arithmetic.polynomial.PolynomialTerm
+import com.eignex.klause.arithmetic.polynomial.Monomial
+import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.simplex.exact.BigFraction
@@ -11,8 +14,37 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.test.assertFailsWith
 
 class PolynomialFailureCaptureTest {
+    @Test
+    fun `wide operands mark the capture incomplete`() {
+        val polynomial = Polynomial.of((0..128).map {
+            PolynomialTerm(Monomial.of(mapOf(0 to it)), BigFraction.ONE)
+        })
+        val capture = PolynomialFailureCapture()
+
+        capture.operation("elimination", 2, 1, 10, PolynomialArithmetic(), listOf(polynomial), 0)
+
+        assertEquals("false", capture.operation["complete"])
+        assertEquals("129", capture.operation["operand.0.terms"])
+        assertTrue(capture.operation.values.sumOf { it.length } < 16_384)
+    }
+
+    @Test
+    fun `a containing work stop publishes no partial copy`() {
+        val work = QfNraWork(QfNraParams(maximumWork = 2))
+        val capture = PolynomialFailureCapture()
+
+        assertFailsWith<PolynomialInterrupted> {
+            capture.operation("projection", 1, 1, 0, PolynomialArithmetic(work), listOf(Polynomial.ONE))
+        }
+
+        assertTrue(capture.interruptedCapture)
+        assertTrue(capture.operation.isEmpty())
+        assertEquals(2L, work.spentWork)
+    }
+
     @Test
     fun `completed observation preserves a strict irrational witness`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (and (= (* x x) 2) (> x 0)))")

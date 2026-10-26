@@ -420,7 +420,7 @@ internal object PolynomialPhaseProfile {
                 partialConflictPreviewComplete = conflictPreviewComplete,
                 sourceCoordinates = names,
                 failureCapture = captured?.let { value ->
-                    listOf("Scope", "Context", "Operation", "FirstFailure", "FirstCadFailure").associateWith { field ->
+                    listOf("Scope", "Context", "Operation", "FirstFailure", "FirstCadFailure", "FirstRefusal").associateWith { field ->
                         @Suppress("UNCHECKED_CAST")
                         (captureType.getMethod("get$field").invoke(value) as? Map<String, String>).orEmpty()
                     }
