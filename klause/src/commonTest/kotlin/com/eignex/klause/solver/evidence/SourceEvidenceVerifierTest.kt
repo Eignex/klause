@@ -475,6 +475,42 @@ class SourceEvidenceVerifierTest {
     }
 
     @Test
+    fun `a refutation should survive fresh checking after an unused restriction is removed`() {
+        val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val restricted = scope.copy(condition = SourceCondition(
+            lower = mapOf(other to BigFraction.ONE), upper = mapOf(x to BigFraction.ZERO)))
+        val proof = SourceDerivation.Combination(listOf(
+            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("lower")),
+            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(x, upper = true)),
+        ))
+        val reduced = scope.copy(condition = SourceCondition(upper = mapOf(x to BigFraction.ZERO)))
+        val original = SourceProofContext(restricted, setOf(x, other), premises)
+        val consumer = SourceProofContext(reduced, setOf(x, other), premises)
+
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(original).verify(
+            SourceEvidence(restricted, SourceClaim.Refutation, proof)))
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(consumer).verify(
+            SourceEvidence(reduced, SourceClaim.Refutation, proof)))
+    }
+
+    @Test
+    fun `fresh refutation checking should reject removal of an implicit integer activation restriction`() {
+        val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val guarded = SourcePremise(SourceInequality(emptyMap(), BigFraction.MINUS_ONE), emptyMap(),
+            mapOf(integer to BigFraction.ZERO))
+        val restricted = scope.copy(condition = SourceCondition(
+            lower = mapOf(integer to BigFraction.ZERO), upper = mapOf(integer to BigFraction.ZERO)))
+        val proof = SourceDerivation.Premise("guarded")
+        val original = SourceProofContext(restricted, setOf(integer), mapOf("guarded" to guarded))
+        val consumer = SourceProofContext(scope, setOf(integer), mapOf("guarded" to guarded))
+
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(original).verify(
+            SourceEvidence(restricted, SourceClaim.Refutation, proof)))
+        assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(consumer).verify(
+            SourceEvidence(scope, SourceClaim.Refutation, proof)))
+    }
+
+    @Test
     fun `conditional refutation imports should reject weaker and unrelated numeric scopes`() {
         val restricted = scope.copy(condition = SourceCondition(upper = mapOf(x to BigFraction.ZERO)))
         val proof = SourceDerivation.Combination(listOf(
