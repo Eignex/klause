@@ -2605,6 +2605,15 @@ The capture selects source-role-preserving proposal diagnosis, without changing
 production admission, proving a basin, or replacing the stronger 20.78M finite
 modglob controls. Nominal conditioned bounds establish no tolerance-source optimum.
 
+`jointWalkMillis=30000` runs the actual retained mixed driver from the checked
+saved center under one 256-operation, 1-billion-work lifetime. It writes checked
+incumbent trajectories and costs instead of independent cold conditions. Optional
+`sourceInputPass=true` enables an internal nonadaptive proposal-order experiment:
+a source-input seed pass of pair freedoms precedes wider requests after each
+strictly improved cutoff. Adaptive ALNS retains its requested widths. Pending
+conditions and pass position survive slices; the pass supplies no local or global
+exhaustion claim. This option is a diagnostic consumer, not default admission.
+
 [Fixed-pin replay 8339](https://lab.eignex.com/jobs/8339), at `b738c5d89a` on
 Mac/aarch64, retains four witnesses from [8302](https://lab.eignex.com/jobs/8302).
 With unchanged discrete pins, the residual modglob point improves from

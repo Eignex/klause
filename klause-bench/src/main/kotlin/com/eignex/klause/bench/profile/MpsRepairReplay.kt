@@ -249,7 +249,7 @@ internal object MpsRepairReplay {
         return result
     }
 
-    private fun sample(model: Problem, mapped: Map<SourceCoordinate, BigFraction>, objective: BigFraction): Sample {
+    fun sample(model: Problem, mapped: Map<SourceCoordinate, BigFraction>, objective: BigFraction): Sample {
         require(model.numBoolVars == 0)
         val integers = List(model.numIntVars) { mapped.getValue(SourceCoordinate(SourceCoordinate.Kind.Integer, it)) }
         require(integers.all { it.den == BIG_ONE })
