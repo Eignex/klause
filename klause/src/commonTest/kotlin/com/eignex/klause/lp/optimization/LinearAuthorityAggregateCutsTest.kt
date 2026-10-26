@@ -41,6 +41,26 @@ class LinearAuthorityAggregateCutsTest {
         BigFraction.ZERO)
 
     @Test
+    fun `appending an aggregate should stop at the shared allocation allowance`() {
+        val source = SourceProofContext(scope.copy(objective = SourceObjective("sum", ObjectiveSense.MINIMIZE)),
+            setOf(x, y, real), mapOf("left" to SourcePremise(left), "right" to SourcePremise(right)),
+            mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE))
+        val cut = assertNotNull(LinearAuthorityAggregateCuts.derive(listOf(
+            LinearAuthorityAggregateTerm(0, "left", left), LinearAuthorityAggregateTerm(1, "right", right),
+        ), Cancellation.Never))
+        val funding = SourceLpFunding(1_000_000L, 1L).apply { grant(1_000_000L) }
+        LinearAuthority(SourceLpBudget(funding = funding), retainLp = true,
+            additionalCuts = listOf(cut)).use { authority ->
+            val result = authority.advance(source, Cancellation.Never, cuts = true)
+
+            assertTrue(funding.exhausted)
+            assertTrue(funding.allocated > 0L)
+            assertTrue(result.paused)
+            assertNull(result.bound)
+        }
+    }
+
+    @Test
     fun `appending a false proposal should leave its row without authority`() {
         val source = SourceProofContext(scope, setOf(x, y, real), mapOf(
             "left" to SourcePremise(left), "right" to SourcePremise(right)))

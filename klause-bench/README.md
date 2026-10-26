@@ -5460,6 +5460,21 @@ allocation bytes. Query 1 reaches the shared allocation limit, leaving its proof
 checks and all later states unknown. These are separation observations; checked
 bound improvement requires an inserted-cut comparison.
 
+[Infrastructure control 8481](https://lab.eignex.com/jobs/8481) pairs
+`133546fd6f` and `2161236173` with aggregation disabled, across `gr4x6`, `p0033`,
+`rgn` and `pp08aCUTS`, seeds 1 and 3, default and exact policies, and individual,
+disabled and default traversal arms. All 96 cases finish on Mac/aarch64 with the
+same original source hashes per problem, 10-second budgets, P1, 3 GiB SerialGC and
+debug enabled. All 48 base/candidate pairs retain verdict coverage. Fixed-frontier
+arms reproduce exact objectives and modeled work; timed default searches vary in
+incumbents and work and support no throughput claim. Both revisions prove
+`gr4x6` and `p0033`. The 80 emitted witnesses pass MIPLIB solchecker
+`1.0.4+eignex-lab-longnum-1`, executable SHA-256
+`2292d8dd2e14d43dd7c4962069dc278e216a7143eff4e1ce3c42278043c4c0c8`.
+The 16 frontier `pp08aCUTS` cases emit no witness. Independent feasibility checks
+do not validate the native optimality certificates. This control qualifies the
+inactive infrastructure, before aggregate policy is enabled.
+
 [Pure-pair probe 8478](https://lab.eignex.com/jobs/8478), at `f7a11d71cd`, retains
 the original `rgn` hash, default tolerance, seed 3 and a 32-operation traversal on
 Linux/amd64. All nine retained parents complete their 20,301 pair visits and 40
