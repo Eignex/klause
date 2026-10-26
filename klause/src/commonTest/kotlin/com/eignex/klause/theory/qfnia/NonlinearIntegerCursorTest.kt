@@ -54,14 +54,24 @@ class NonlinearIntegerCursorTest {
         )
         val params = NonlinearIntegerParams(strategy = NonlinearIntegerStrategy.SEARCH)
         val lower = mapOf(0 to BigFraction.ZERO)
-        val narrow = solveNonlinearIntegers(source, params, PolynomialCondition(
-            lower = lower, upper = mapOf(0 to BigFraction.ONE),
-        ))
+        val narrow = solveNonlinearIntegers(
+            source,
+            params,
+            PolynomialCondition(
+                lower = lower,
+                upper = mapOf(0 to BigFraction.ONE),
+            ),
+        )
         assertIs<QfNraResult.Unsatisfiable>(narrow.result)
 
-        val widened = solveNonlinearIntegers(source, params, PolynomialCondition(
-            lower = lower, upper = mapOf(0 to BigFraction.ofLong(2)),
-        ))
+        val widened = solveNonlinearIntegers(
+            source,
+            params,
+            PolynomialCondition(
+                lower = lower,
+                upper = mapOf(0 to BigFraction.ofLong(2)),
+            ),
+        )
 
         val witness = assertIs<QfNraResult.Satisfiable>(widened.result).assignment
         assertEquals(BigFraction.ofLong(2), witness.realValue(0).rational)
