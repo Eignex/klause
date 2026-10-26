@@ -10,7 +10,7 @@ import java.security.MessageDigest
 
 /**
  * Corpus file IO for plain and zstd-compressed instances. All readers use [open],
- * [readText] or [withPlainFile]; decompression is included in solve timing.
+ * [readText] or [withPlainFile]; [unpack] materializes original bytes for file consumers.
  */
 internal object CorpusFiles {
 
@@ -65,6 +65,16 @@ internal object CorpusFiles {
         } finally {
             dir.deleteRecursively()
         }
+    }
+
+    fun unpack(file: File): File {
+        if (!isCompressed(file)) return file
+        val plain = File(plainPath(file.path))
+        withPlainFile(file) { staged ->
+            Files.move(staged.toPath(), plain.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        }
+        check(file.delete()) { "cannot remove unpacked instance: $file" }
+        return plain
     }
 
     /** Replace the plain instance [plain] with `<plain>.zst`, returning the compressed file. The archive is
