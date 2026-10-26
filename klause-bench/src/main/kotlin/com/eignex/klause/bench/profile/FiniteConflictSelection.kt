@@ -158,10 +158,7 @@ internal object FiniteConflictSelection {
         require(checkSource(center, Cancellation.after(5.seconds)))
         val destroy = Class.forName("com.eignex.klause.meta.alns.DestroyOperator")
         val companion = destroy.getField("Companion").get(null)
-        val destroyMethod = destroy.methods.single { it.name == "destroy" && it.parameterCount == 5 }
-        val scopedDestroyMethod = if (semanticKind == null) null else {
-            destroy.methods.single { it.name == "destroy" && it.parameterCount == 7 }
-        }
+        val destroyMethod = destroy.methods.single { it.name == "destroy" && it.parameterCount == 7 }
         val guidanceType = Class.forName("com.eignex.klause.meta.alns.ConflictSupportedRemoval")
         val freedType = Class.forName("com.eignex.klause.meta.alns.FreedVars")
         val scope = Class.forName("com.eignex.klause.meta.alns.RepairScope").getField("INSTANCE").get(null)
@@ -185,10 +182,8 @@ internal object FiniteConflictSelection {
             do {
                 attempts++
                 val fraction = (rawCount + 0.25) / total
-                raw = checkNotNull(if (completePacket) {
-                    checkNotNull(scopedDestroyMethod).invoke(operator, Random(drawSeed), problem, center, objective,
-                        fraction, Assumptions.None, stop)
-                } else destroyMethod.invoke(operator, Random(drawSeed), problem, center, objective, fraction))
+                raw = checkNotNull(destroyMethod.invoke(operator, Random(drawSeed), problem, center, objective,
+                    fraction, Assumptions.None, stop))
                 rawCount++
             } while (!completePacket && coordinates(raw).count { it in eligible } < count &&
                 rawCount <= total && !stop())
