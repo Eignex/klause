@@ -11,6 +11,7 @@ import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -72,6 +73,32 @@ class TrajectoryViewTest {
 
         assertEquals("source-round-trip", unsupported)
         assertNull(supported)
+    }
+
+    @Test
+    fun `linear and functional objectives agree on maintained affine candidate destinations`() {
+        val linear = LinearObjective(intCoefficients = longArrayOf(0, 1))
+        val views = List(2) { index ->
+            val original = view(1, 1)
+            val sweep = requireNotNull(DefinitionalSweep.fromSource(original.state.problem, listOf(
+                DefinitionHint.Linear(1, longArrayOf(1, -1), arrayOf(
+                    DefinitionHint.Operand.Variable(0), DefinitionHint.Operand.Variable(1)), 0),
+            )))
+            original.state.invariants = sweep.network(2, 0)
+            TrajectoryView(
+                "objective-$index", original.state, original.coordinates,
+                if (index == 0) linear else requireNotNull(sweep.functionalObjective(linear)),
+                synchronize = { sweep.sweep(original.state.assignment, original.state.rootDomains) },
+            )
+        }
+
+        val pair = trajectoryPair(Sample(booleanArrayOf(), longArrayOf(2, 2)),
+            listOf(Move.IntSet(0, 1)), views[0], views[1])
+
+        val candidate = pair.getValue("candidates").jsonArray.single().jsonObject
+        assertEquals("true", candidate.getValue("pairedDestination").jsonPrimitive.content)
+        assertEquals(candidate["left"], candidate["right"])
+        assertEquals("-1.0", candidate.getValue("left").jsonObject.getValue("objectiveDelta").jsonPrimitive.content)
     }
 
     @Test
