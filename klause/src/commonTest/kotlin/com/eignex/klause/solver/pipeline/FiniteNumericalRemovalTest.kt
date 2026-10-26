@@ -5,6 +5,8 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.localsearch.DefinitionalSweep
+import com.eignex.klause.localsearch.InvariantNetwork
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.optimization.LinearAuthority
@@ -15,6 +17,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.sourceCondition
+import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
@@ -184,6 +187,54 @@ class FiniteNumericalRemovalTest {
     }
 
     @Test
+    fun `numerical selections should close through supplied definitions`() {
+        val funding = SourceLpFunding(1_000_000, 4_000_000).apply { grant(1_000_000) }
+        val publisher = SourceNumericalFeedback(funding, Cancellation.Never)
+        val acquisition = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use {
+            publisher.acquire(it, source, cuts = false)
+        }
+        val network = InvariantNetwork(listOf(DefinitionalSweep.SweepNode.IntDef(
+            FunctionalObjective.Lin(3, 1, longArrayOf(1), arrayOf(FunctionalObjective.Operand.v(0)), 1),
+            intArrayOf(0))), 4, 0)
+        val removal = FiniteNumericalRemoval(problem, objective, source, funding,
+            FiniteNumericalRemoval.Signal.Disagreement, definitions = network)
+        removal.accept(center, Assumptions.None, source, null, acquisition.feedback)
+
+        val freed = removal.destroy(Random(17), problem, center, objective, 0.25)
+
+        assertEquals(FiniteNumericalRemoval.Status.Supported, removal.status)
+        assertEquals(setOf(0, 3), freed.ints.toSet())
+    }
+
+    @Test
+    fun `a pinned dependent output should decline the entire numerical selection`() {
+        val model = Problem(0, 4, Array(4) { IntDomain(0, 1) },
+            listOf(Linear(longArrayOf(1, 1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0L))).bake()
+        val incumbent = Sample(booleanArrayOf(), longArrayOf(1, 0, 1, 0))
+        val pins = Assumptions.None.withInt(2, 1)
+        val original = requireNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            Cancellation.Never)).let { it.atScope(it.scope.copy(condition = pins.sourceCondition())) }
+        val funding = SourceLpFunding(1_000_000, 4_000_000).apply { grant(1_000_000) }
+        val publisher = SourceNumericalFeedback(funding, Cancellation.Never)
+        val acquisition = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use {
+            publisher.acquire(it, original, cuts = false)
+        }
+        val network = InvariantNetwork(listOf(DefinitionalSweep.SweepNode.IntDef(FunctionalObjective.Plus(2,
+            FunctionalObjective.Operand.v(0), FunctionalObjective.Operand.v(1)), intArrayOf(0, 1))), 4, 0)
+        val removal = FiniteNumericalRemoval(model, objective, original, funding,
+            FiniteNumericalRemoval.Signal.Disagreement, pins, network)
+        removal.accept(incumbent, pins, original, null, acquisition.feedback)
+        assertEquals(FiniteNumericalRemoval.Status.Supported, removal.status)
+
+        val freed = removal.destroy(Random(17), model, incumbent, objective, 0.25, pins, Cancellation.Never)
+
+        assertTrue(freed.isEmpty)
+        assertEquals(FiniteNumericalRemoval.Status.ClosureDeclined, removal.status)
+        assertEquals("BlockedPin", removal.unavailableReason)
+        assertNull(removal.originScope)
+    }
+
+    @Test
     fun `exhausted funding should decline numerical selection without partial freedoms`() {
         val funding = SourceLpFunding(1_000_000, 4_000_000).apply { grant(1_000_000) }
         val publisher = SourceNumericalFeedback(funding, Cancellation.Never)
@@ -220,6 +271,26 @@ class FiniteNumericalRemovalTest {
 
         assertEquals(FiniteNumericalRemoval.Status.Cancelled, removal.status)
         assertTrue(freed.ints.isEmpty() && freed.bools.isEmpty())
+        assertNull(removal.originScope)
+    }
+
+    @Test
+    fun `the selection call cancellation should interrupt ranking without partial freedoms`() {
+        val funding = SourceLpFunding(1_000_000, 4_000_000).apply { grant(1_000_000) }
+        val publisher = SourceNumericalFeedback(funding, Cancellation.Never)
+        val acquisition = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use {
+            publisher.acquire(it, source, cuts = false)
+        }
+        val removal = FiniteNumericalRemoval(problem, objective, source, funding,
+            FiniteNumericalRemoval.Signal.Disagreement)
+        removal.accept(center, Assumptions.None, source, null, acquisition.feedback)
+        var polls = 0
+
+        val freed = removal.destroy(Random(17), problem, center, objective, 0.5,
+            Assumptions.None, Cancellation { ++polls >= 3 })
+
+        assertTrue(freed.isEmpty)
+        assertEquals(FiniteNumericalRemoval.Status.Cancelled, removal.status)
         assertNull(removal.originScope)
     }
 }

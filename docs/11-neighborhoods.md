@@ -332,6 +332,9 @@ selection debit the producer's containing funding; cancellation or exhausted
 funding declines selection as a whole. Model, objective, center or caller-pin
 changes retire guidance, and close releases its query scope. These rankings
 neither assert deductions nor establish that a selected repair can improve.
+When supplied, the immutable definition network closes both guided and fallback
+selections through the shared block closure. Required caller pins decline the
+whole block; closure visits and bounded working storage debit the same funding.
 
 ### Handles and exclusive ownership
 
