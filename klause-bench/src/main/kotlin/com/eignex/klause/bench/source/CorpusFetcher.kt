@@ -20,7 +20,7 @@ import org.tukaani.xz.LZMAInputStream
  *    thereafter.
  *  - [ProblemSource.InCode] has no file and is resolved by the solver layer, not here.
  *
- * Fetched instances are stored zstd-compressed (see [CorpusFiles]), so a resolved file may be
+ * Fetched instances can be stored zstd-compressed (see [CorpusFiles]), so a resolved file may be
  * `<name>.<ext>.zst`; read it through [CorpusFiles], never directly.
  */
 internal object CorpusFetcher {
