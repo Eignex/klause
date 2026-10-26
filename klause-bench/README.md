@@ -5306,6 +5306,15 @@ polls/charges the caller, and exact endpoint comparisons also enter the containi
 native and optional refinement work. Compare total costs, actual avoided evaluations
 and region progress alongside outcomes.
 
+`CandidateUses`, `CandidateWork` and `CandidateDeclines` isolate numeric atom checks
+that consult the view outside the producer allowance. Their separate cumulative
+8,192-unit allowance still charges the containing query and survives snapshot changes.
+Regional scope copies and replacement cleanup remain separately charged to the caller.
+These checks may reject a required positive atom at the same point and position as
+its ordinary evaluation; they supply no family or Boolean exclusion. Private stops
+decline the hint and retain the original evaluation. Source/query facts must match
+the active predicate and scope; regional facts retain their original producer owner.
+
 `firstCellFeedbackReuse` retains the first observed use across regional owners,
 including its checked predicate/cell, signed regional premises, numeric conditions
 and process-local source/snapshot/reduction identities. Scope previews cap condition

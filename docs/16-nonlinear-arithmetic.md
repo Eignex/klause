@@ -320,8 +320,13 @@ lookup and eviction poll and charge the caller; endpoint comparisons use its exa
 arithmetic. A hit already eligible for the producer's candidate selector establishes
 repeated membership without a second comparison. These numeric filters supply no
 Boolean clause and preserve the producer's candidate traversal, full witness checks
-and complete CAD fallback. The option is
-disabled by default.
+and complete CAD fallback. Numeric atom checking can also consult retained cells
+after candidate production declines. This read-only path has a separate cumulative
+8,192-unit allowance charged to the same query, retaining the producer's scope or a
+fresh regional owner that admits only eligible Source/query facts. It preserves atom
+order and independent-family bookkeeping; private resource or allowance declines run
+the original atom check, while an enclosing stop remains terminal. Both paths share
+the bounded view. The option is disabled by default.
 
 Optional query failure capture retains bounded exact observations of rejected probe
 points and CAD prefixes, their signed premises, numeric reconstruction fibres and
