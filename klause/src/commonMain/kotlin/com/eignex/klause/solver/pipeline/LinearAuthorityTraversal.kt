@@ -322,7 +322,7 @@ internal class LinearAuthorityTraversal(
                 else if (useBranchHistory) branchHistory.select(result.fractional, cancellation)
                 else result.fractional.firstOrNull()
             val selected = candidate?.floorSplit() ?: (coordinate to threshold)
-            if (selected != result.split) observe("numericalHistorySelections")
+            if (supportBranching == null && selected != result.split) observe("numericalHistorySelections")
             current.split = CoverageSplit.Integer(selected.first, selected.second, current.condition, candidate)
             splitCreated()
             observe("numericalFractionalSplits")
