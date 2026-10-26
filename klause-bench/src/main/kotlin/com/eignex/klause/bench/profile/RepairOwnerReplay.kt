@@ -44,7 +44,7 @@ internal object RepairOwnerReplay {
 
     private data class Outcome(
         val sample: Sample?, val reason: TerminationReason?, val stats: SolveStats,
-        val preparationNs: Long = 0L, val bound: Any? = null,
+        val preparationNs: Long = 0L, val bound: Any? = null, val pauses: Long = 0L,
     )
 
     private data class ClauseUsage(
@@ -108,6 +108,13 @@ internal object RepairOwnerReplay {
                 var mixedWork = 0L
                 var mixedAllocation = 0L
                 var mixedOperations = 0
+                fun accountMixed(owner: Any) {
+                    val stages = (call(owner, "getStats") as SolveStats).smt.completeSearchStages.orEmpty()
+                    mixedWork += stages["jointRepairFundedWork"] ?: 0L
+                    mixedAllocation += stages["jointRepairFundedAllocation"] ?: 0L
+                    mixedOperations += call(checkNotNull(NumericalFrontierSnapshot.field(owner, "budget")),
+                        "getOperations") as Int
+                }
                 var activeStop: Cancellation = Cancellation.Never
                 var activeCenter: Sample? = null
                 val dynamic = object : Cancellation {
@@ -121,6 +128,7 @@ internal object RepairOwnerReplay {
                         activeCenter = scope.center
                         val looser = previousCutoff?.let { scope.cutoff > it } == true
                         if (looser && retained != null) {
+                            if (kind == "mixed-retained") accountMixed(retained)
                             (retained as AutoCloseable).close()
                             retained = null
                             epoch++
@@ -175,11 +183,7 @@ internal object RepairOwnerReplay {
                         }
                         if (native != null && kind.endsWith("cold")) {
                             if (kind == "mixed-cold") {
-                                val stages = outcome.stats.smt.completeSearchStages.orEmpty()
-                                mixedWork += stages["jointRepairFundedWork"] ?: 0L
-                                mixedAllocation += stages["jointRepairFundedAllocation"] ?: 0L
-                                mixedOperations += call(checkNotNull(NumericalFrontierSnapshot.field(native, "budget")),
-                                    "getOperations") as Int
+                                accountMixed(native)
                             }
                             (native as AutoCloseable).close()
                             transient = null
@@ -252,6 +256,10 @@ internal object RepairOwnerReplay {
                             put("elapsedNs", elapsed)
                             put("threadBytes", allocation)
                             put("preparationNs", outcome.preparationNs)
+                            put("slicePauses", outcome.pauses)
+                            put("carriedSourceLpWork", mixedWork)
+                            put("carriedSourceLpAllocation", mixedAllocation)
+                            put("carriedSourceLpOperations", mixedOperations)
                             put("reuseObservationNs", observationNs)
                             put("retainedClauseUses", reuse(usageBefore, usageAfter))
                             put("statsBefore", NumericalResidualProfile.json(before))
@@ -294,13 +302,15 @@ internal object RepairOwnerReplay {
         call(owner, "begin", scope.pins, Long.MAX_VALUE, scope.cutoff.toDouble(), stop)
         val prepared = preparation + System.nanoTime() - start
         var result: Any
+        var pauses = 0L
         do {
             result = checkNotNull(call(owner, "runSlice", Cancellation.Never, 10L, 64L))
+            if (call(result, "getReason") == null) pauses++
         } while (call(result, "getReason") == null && !stop())
         val reason = call(result, "getReason") as TerminationReason?
             ?: if (stop()) stopped(stop) else null
         return Outcome(call(result, "getSample") as Sample?, reason,
-            call(owner, "getStats") as SolveStats, prepared)
+            call(owner, "getStats") as SolveStats, prepared, pauses = pauses)
     }
 
     private fun mixed(problem: BakedProblem, objective: LinearObjective, stop: Cancellation, budget: NodeBudget,
@@ -327,11 +337,13 @@ internal object RepairOwnerReplay {
             .single { it.parameterCount == 4 }.newInstance(bools, pins, pins, scope.cutoff)
         var attempt: Any
         var result: Any
+        var pauses = 0L
         do {
             val before = call(owner, "getWork") as Long
             attempt = checkNotNull(call(owner, "attempt", condition, Cancellation.Never))
             call(budget, "spendMoves", 1L + ceil(((call(owner, "getWork") as Long) - before) * 0.8).toLong())
             result = checkNotNull(call(attempt, "getResult"))
+            if (result.javaClass.simpleName == "Paused") pauses++
         } while (result.javaClass.simpleName == "Paused" && !stop() && !budget.exhausted())
         val reason = when {
             result.javaClass.simpleName == "Refuted" -> TerminationReason.SearchExhausted
@@ -340,7 +352,7 @@ internal object RepairOwnerReplay {
             else -> call(attempt, "getReason") as TerminationReason?
         }
         return Outcome(call(attempt, "getFeasiblePoint") as Sample?, reason,
-            call(owner, "getStats") as SolveStats, preparation, call(attempt, "getBound"))
+            call(owner, "getStats") as SolveStats, preparation, call(attempt, "getBound"), pauses)
     }
 
     @Suppress("UNCHECKED_CAST")
