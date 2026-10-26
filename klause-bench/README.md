@@ -4762,6 +4762,11 @@ Rgn, bell3a and egout consume no changed choices and produce no numerical
 incumbents. Their finite controls retain stronger source-checked outcomes.
 Bounded retention leaves later support states unknown. These observations oppose
 policy promotion; changed wall-cutoff frontiers establish no throughput benefit.
+On seed 1's shared worker, whole-CLI peak RSS changes from 159,332 to 168,504
+KiB under default policy and 161,792 to 165,592 KiB under exact policy. External
+wall times change from 8.36 to 10.00 s and 8.49 to 9.80 s, respectively.
+These pairs are not independent timing repetitions. Four resource receipts fail
+artifact retrieval with HTTP 502; missing physical measurements remain unknown.
 
 [Fixed-operation capture 8589](https://lab.eignex.com/jobs/8589), at `dd4ac66bbc`,
 retains 32 states before the 8 MiB journal limit, with 26 changed choices.

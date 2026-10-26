@@ -308,7 +308,9 @@ cannot claim a cutoff-conditioned conflict. Cancellation, missing queries,
 retention and funding exhaustion remain explicit unavailable outcomes.
 Acquisition returns the existing authority result alongside feedback, preserving
 recovered incumbents for separate source checking and acquisition credit. A funded
-cutoff helper constructs a query-local strict objective row in source units.
+cutoff helper constructs a query-local strict row in the captured context's
+objective units and direction. Callers retain any frontend scale and coordinate
+mapping; the helper does not infer that outer conversion.
 Bounded refutation-support projection visits captured premise and assumption
 references and retains the complete Boolean substitution and query cutoff. An
 unsupported projection declines; it performs neither proof replay nor scope
