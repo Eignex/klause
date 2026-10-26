@@ -5292,3 +5292,23 @@ support unchanged complete-check accounting, with no partial-policy benefit or
 throughput claim. Useful captured conflicts qualify the bounded internal consumer;
 inactive-state cost and original-source applicability keep automatic activation
 disabled.
+
+### Regional checked-cell feedback profiles
+
+`PolynomialPhaseProfile refinement=true feedback=true|both` selects private numeric
+feedback with the same checked producer. `both` adds `feedback-control-trace.json`
+with feedback disabled and refinement enabled at the identical revision and settings.
+The feedback option requires `refinement=true`; it cannot silently compare different
+producers. `cellFeedback` records admissions, lookups, completed uses, repeated uses,
+uses under distinct regional owners, evictions, snapshot replacements and scope declines.
+`MetadataVisits` counts attempted metadata visits, not total feedback work; every visit
+polls/charges the caller, and exact endpoint comparisons also enter the containing
+native and optional refinement work. Compare total costs, actual avoided evaluations
+and region progress alongside outcomes.
+
+`firstCellFeedbackReuse` retains the first observed use across regional owners,
+including its checked predicate/cell, signed regional premises, numeric conditions
+and process-local source/snapshot/reduction identities. Scope previews cap condition
+maps and wide coefficients and mark incomplete rendering. The engine retains the
+exact guards; these diagnostic strings supply no proof or persistent source mapping.
+An absent trace establishes no cross-region reuse, even when lookup counts are nonzero.

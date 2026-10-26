@@ -46,6 +46,17 @@ class PolynomialPhaseProfileTest {
     }
 
     @Test
+    fun `feedback traces retain charged numeric lookup activity`() {
+        val source = "(declare-const x Real) (assert (= (* x x) 2))"
+
+        val trace = PolynomialPhaseProfile.PhaseAccess().measure(source, refinement = true, feedback = true)
+
+        assertEquals("Satisfiable", trace.result)
+        assertEquals(trace.nativeWork, trace.chargeSum)
+        assertTrue(requireNotNull(trace.cellFeedback)["Lookups"]!!.toLong() > 0)
+    }
+
+    @Test
     fun `a retained source is decoded without catalog resolution`() {
         val source = "(assert false)".encodeToByteArray()
         val compressed = ByteArrayOutputStream()

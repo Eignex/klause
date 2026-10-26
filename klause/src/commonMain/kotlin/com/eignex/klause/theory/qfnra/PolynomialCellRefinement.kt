@@ -139,6 +139,7 @@ internal class PolynomialCellRefinement(
     private val condition: PolynomialCondition,
     private val parent: QfNraWork,
     limits: PolynomialLimits,
+    private val feedback: PolynomialCellFeedback? = null,
     private val onCell: (CheckedPolynomialCell) -> Unit,
 ) {
     private var candidateCount = 0L
@@ -174,6 +175,7 @@ internal class PolynomialCellRefinement(
 
     fun prepare(normalized: PolynomialFormula) {
         optional {
+            feedback?.replaceSnapshot(normalized, arithmetic)
             sourceScope = PolynomialCellScope.Source.prepare(source, arithmetic)
             sourceAtoms = checkNotNull(sourceScope).predicates
             seedAtoms = normalized.forcedAtoms(arithmetic).orEmpty().take(MAX_CELL_PREMISES)
@@ -247,9 +249,12 @@ internal class PolynomialCellRefinement(
         while (true) {
             arithmetic.step()
             candidateCount++
+            var reused = false
             val rejected = unary.firstOrNull { atom ->
                 arithmetic.step()
-                atom.holds(algebraic.signAt(atom.polynomial, mapOf(variable to value))).not()
+                reused = feedback?.rejects(variable, atom, scope, value, retained, arithmetic, algebraic) == true
+                reused ||
+                    atom.holds(algebraic.signAt(atom.polynomial, mapOf(variable to value))).not()
             }
             if (rejected == null) {
                 if (algebraic.compare(value, initial) != 0) repairCount++
@@ -262,7 +267,9 @@ internal class PolynomialCellRefinement(
                 arithmetic.step()
                 it.variable == variable && (it.scope === scope || it.scope === sourceScope)
             }
-            if (existing.any { arithmetic.step(); it.contains(value, algebraic) }) {
+            val repeated = (reused && support === sourceScope) ||
+                existing.any { arithmetic.step(); it.contains(value, algebraic) }
+            if (repeated) {
                 repeatedCount++
             } else {
                 if (retained.size == MAX_CELL_COUNT) return null
@@ -272,6 +279,7 @@ internal class PolynomialCellRefinement(
                 retained.add(cell)
                 cellCount++
                 onCell(cell)
+                feedback?.admit(cell, arithmetic)
             }
             value = next(variable, scope) ?: return null
         }
