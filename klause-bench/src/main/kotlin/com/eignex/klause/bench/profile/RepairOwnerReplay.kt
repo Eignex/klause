@@ -53,7 +53,10 @@ internal object RepairOwnerReplay {
     ) {
         val scopeOwner = Class.forName("com.eignex.klause.meta.alns.RepairScope").getField("INSTANCE").get(null)
         val freedType = Class.forName("com.eignex.klause.meta.alns.FreedVars")
-        val entries = controls.readLines().filter(String::isNotBlank)
+        require(controls.length() in 0..4L * 1024 * 1024)
+        val controlBytes = controls.readBytes()
+        val controlHash = com.eignex.klause.bench.metric.sha256(controlBytes)
+        val entries = controlBytes.decodeToString().lines().filter(String::isNotBlank)
         if (problem.numRealVars != 0) {
             file.bufferedWriter().use { writer ->
                 for (id in entries.indices) for (owner in listOf("ls", "cp-cold", "cp-retained", "mixed-cold", "mixed-retained")) {
@@ -158,6 +161,15 @@ internal object RepairOwnerReplay {
                         val elapsed = System.nanoTime() - start
                         val allocation = bean.getThreadAllocatedBytes(thread) - allocationStart
                         val sample = outcome.sample
+                        if (sample != null) {
+                            check(sample.numBoolVars == scope.center.numBoolVars && sample.numIntVars == scope.center.numIntVars)
+                            check((0 until sample.numBoolVars).all {
+                                it in scope.freedBools || sample.boolValue(it) == scope.center.boolValue(it)
+                            })
+                            check((0 until sample.numIntVars).all {
+                                it in scope.freedInts || sample.exactIntValue(it) == scope.center.exactIntValue(it)
+                            })
+                        }
                         val checked = sample?.let { checkSource(source, prepared.reconstruct(it), stop) }
                         val improving = sample != null && checked == true && objective.evaluateExact(sample) < scope.cutoff
                         val status = when {
@@ -179,7 +191,7 @@ internal object RepairOwnerReplay {
                             put("unavailable", unavailable)
                             put("strictWorkingCutoff", scope.cutoff.toString())
                             put("cutoffRule", "strict improvement on the checked control center")
-                            put("controlFileSha256", com.eignex.klause.bench.metric.sha256(controls.readBytes()))
+                            put("controlFileSha256", controlHash)
                             put("capturedNativeCutoff", scope.nativeCutoff)
                             put("effectiveBools", JsonArray(scope.freedBools.map(::JsonPrimitive)))
                             put("effectiveInts", JsonArray(scope.freedInts.map(::JsonPrimitive)))
