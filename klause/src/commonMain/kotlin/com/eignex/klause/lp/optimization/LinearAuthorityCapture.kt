@@ -76,8 +76,15 @@ internal class LinearAuthorityCapture(
     private fun scalar(value: BigFraction): Boolean = spend(1L,
         64L + (value.num.magnitudeBitLength().toLong() + value.den.magnitudeBitLength() + 7L) / 8L)
 
-    private fun row(value: SourceInequality): Boolean = spend(1L, 96L) && scalar(value.rhs) &&
+    private fun row(value: SourceInequality): Boolean = spend(1L + value.supportSize, 96L + value.supportSize * 48L) &&
+        scalar(value.rhs) &&
         value.coefficients.all { (_, coefficient) -> spend(1L, 48L) && scalar(coefficient) }
+
+    fun point(coordinates: List<SourceCoordinate>, values: List<BigFraction>): Map<SourceCoordinate, BigFraction>? {
+        if (values.size != coordinates.size || !spend(values.size.toLong(), values.size * 48L) ||
+            !values.all(::scalar)) return null
+        return coordinates.indices.associate { coordinates[it] to values[it] }
+    }
 
     private fun proof(value: SourceDerivation, depth: Int = 0): Boolean {
         if (depth >= 64 || !spend(1L, 64L)) return false
@@ -112,11 +119,14 @@ internal class LinearAuthorityCapture(
         val open = source.coordinates.any {
             it.kind == SourceCoordinate.Kind.Boolean && it.id !in source.scope.condition.bools
         }
-        val numeric = if (open) source else source.numericContext()
-        for ((id, premise) in numeric.premises) {
+        val numeric = template?.numeric ?: source
+        for ((id, premise) in source.premises) {
             if (!spend(1L, 96L + id.length * 2L) || !row(premise.inequality) ||
                 !spend(premise.guards.size.toLong(), premise.guards.size * 48L) ||
                 !premise.integerPins.values.all(::scalar)) return
+        }
+        if (numeric !== source) for (premise in numeric.premises.values) {
+            if (!row(premise.inequality)) return
         }
         if (!spend(numeric.coordinates.size.toLong(), numeric.coordinates.size * 48L) ||
             !numeric.objective.values.all(::scalar) || !scalar(numeric.objectiveConstant)) return

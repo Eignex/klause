@@ -272,7 +272,7 @@ internal class LinearAuthority(
         if (capture?.accepting == true && capturedPoint == null) {
             val point = guide?.point ?: solved.result.exactPrimal?.take(coordinates.size)
             if (point != null && point.size == coordinates.size) {
-                capturedPoint = coordinates.indices.associate { coordinates[it] to point[it] }
+                capturedPoint = capture?.point(coordinates, point)
             }
         }
         val closure = solved.result
