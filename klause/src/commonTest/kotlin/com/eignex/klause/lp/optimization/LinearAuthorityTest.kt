@@ -73,6 +73,25 @@ class LinearAuthorityTest {
     }
 
     @Test
+    fun `pinned refutation imports should replay under stronger scopes with the original source checker`() {
+        val source = SourceProofContext(scope, setOf(real), mapOf(
+            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE)),
+        )).withLinearAuthority()
+        val restricted = scope.copy(condition = SourceCondition(upper = mapOf(real to BigFraction.ZERO)))
+        val proof = LinearPinnedRefutation(SourceDerivation.Combination(listOf(
+            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("lower")),
+            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(real, upper = true)),
+        )))
+        val imported = SourceEvidence(restricted, SourceClaim.Refutation, proof)
+        val stronger = scope.copy(condition = SourceCondition(upper = mapOf(real to BigFraction.MINUS_ONE)))
+
+        val check = SourceEvidenceVerifier(source.atScope(stronger)).verify(
+            SourceEvidence(stronger, SourceClaim.Refutation, SourceDerivation.Import(imported)))
+
+        assertEquals(SourceEvidenceCheck.Checked, check)
+    }
+
+    @Test
     fun `suspended sparse refutations should lift column sides and charge certificate work once`() {
         val coordinates = (0 until 129).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
         val other = coordinates[1]
