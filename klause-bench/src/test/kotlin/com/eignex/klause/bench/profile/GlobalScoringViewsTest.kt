@@ -160,6 +160,17 @@ class GlobalScoringViewsTest {
     }
 
     @Test
+    fun `oversized accepting data declines before indexing a small diagram`() {
+        val diagram = Mdd(intArrayOf(0), intArrayOf(1, 1), intArrayOf(0, 3), longArrayOf(0, 0, 0),
+            0, IntArray(GlobalScoringViews.MAX_CELLS + 1), 3)
+
+        val result = GlobalScoringViews.alternate(diagram)
+
+        assertEquals("cell-limit", result.reason)
+        assertNull(result.factor)
+    }
+
+    @Test
     fun `path expansion stops before publishing a partial relation`() {
         val layers = 11
         val diagram = Mdd(IntArray(layers) { it }, IntArray(layers + 1) { 1 }, IntArray(layers + 1) { it * 6 },
