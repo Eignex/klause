@@ -5,6 +5,10 @@ import com.eignex.klause.bench.catalog.FetchMethod
 import com.eignex.klause.bench.catalog.ProblemSource
 import java.io.File
 import java.net.URI
+import java.nio.file.Files
+import java.util.zip.CRC32
+import java.util.zip.CheckedInputStream
+import java.util.zip.ZipFile
 
 /**
  * Resolves a [ProblemSource] to a concrete [File] on disk.
@@ -235,14 +239,40 @@ internal object CorpusFetcher {
     private fun zip(c: ExternalCollection, dir: File) {
         dir.mkdirs()
         val zip = File(cacheRoot, "${c.id}.zip")
-        URI(c.url).toURL().openStream().use { input -> zip.outputStream().use { input.copyTo(it) } }
-        run("unzip", "-q", "-o", zip.absolutePath, "-d", dir.absolutePath)
-        zip.delete()
-        dropOversized(c, dir)
-        // Competition archives ship instances individually compressed (XCSP3 `*.xml.lzma`, MaxSAT
-        // `*.wcnf.xz`, MIPLIB `*.mps.gz`); unzip leaves them packed, so recompress them to zstd.
-        decompressInPlace(dir)
-        compress(dir)
+        try {
+            URI(c.url).toURL().openStream().use { input -> zip.outputStream().use { input.copyTo(it) } }
+            extractZip(zip, dir)
+            dropOversized(c, dir)
+            // Competition archives ship individually compressed instances, which need unpacking before zstd.
+            decompressInPlace(dir)
+            compress(dir)
+        } catch (failure: Exception) {
+            dir.deleteRecursively()
+            throw failure
+        } finally {
+            zip.delete()
+        }
+    }
+
+    internal fun extractZip(archive: File, directory: File) {
+        val root = directory.toPath().toAbsolutePath().normalize()
+        Files.createDirectories(root)
+        ZipFile(archive).use { zip ->
+            for (entry in zip.entries().asSequence()) {
+                val target = root.resolve(entry.name).normalize()
+                require(target.startsWith(root)) { "ZIP entry escapes its collection: ${entry.name}" }
+                if (entry.isDirectory) {
+                    Files.createDirectories(target)
+                } else {
+                    Files.createDirectories(target.parent)
+                    val checksum = CRC32()
+                    CheckedInputStream(zip.getInputStream(entry), checksum).use { input ->
+                        Files.newOutputStream(target).use { input.copyTo(it) }
+                    }
+                    require(checksum.value == entry.crc) { "ZIP entry checksum mismatch: ${entry.name}" }
+                }
+            }
+        }
     }
 
     /** Drop extracted files over [ExternalCollection.maxFileMb] (measured on the still-compressed
