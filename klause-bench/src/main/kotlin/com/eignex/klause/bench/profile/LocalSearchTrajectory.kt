@@ -14,15 +14,23 @@ import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.klause.localsearch.acceptance.AcceptanceRule
 import com.eignex.klause.localsearch.movesource.ConfiguredSource
 import com.eignex.klause.localsearch.movesource.GreedyInit
 import com.eignex.klause.localsearch.movesource.MoveSource
 import com.eignex.klause.localsearch.movesource.MoveSourceId
+import com.eignex.klause.localsearch.movesource.ObjectiveSeed
 import com.eignex.klause.localsearch.movesource.Phase
 import com.eignex.klause.localsearch.movesource.Pool
+import com.eignex.klause.localsearch.strategy.FeasibleDescent
+import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
+import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.portfolio.LocalSearchCatalog
 import com.eignex.klause.presolve.PresolveBudget
+import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.ExecutionOperation
@@ -50,7 +58,7 @@ internal object LocalSearchTrajectory {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val required = setOf("suite", "problem", "sha256", "recipe", "seed", "moves")
         require(options.keys.containsAll(required) && options.keys.all {
-            it in required || it == "sliceMillis" || it == "sliceWork" || it == "greedy"
+            it in required || it in setOf("sliceMillis", "sliceWork", "greedy", "repairs", "controls", "center")
         })
         val reference = Catalog.uncapped(options.getValue("suite")).problems
             .single { it.name == options.getValue("problem") }
@@ -72,7 +80,22 @@ internal object LocalSearchTrajectory {
         val sliceMillis = options["sliceMillis"]?.toLong()?.also { require(it > 0L) } ?: Long.MAX_VALUE
         val sliceWork = options["sliceWork"]?.toLong()?.also { require(it > 0L) } ?: Long.MAX_VALUE
         val repairGreedy = options["greedy"]?.toBooleanStrict() ?: true
-        for (rewrite in listOf(false, true)) {
+        val repairCapture = options["repairs"]?.toBooleanStrict() ?: false
+        val exactControls = options["controls"]?.toBooleanStrict() ?: false
+        val sourceCheck = if (repairCapture) parsed.problem.bake() else null
+        require(!exactControls || repairCapture)
+        val sourceInputs = parsed.intVarNames.values.distinct().filter { it !in parsed.definedVars }.toIntArray()
+        out.resolve("source-inputs.json").writeText(buildJsonObject {
+            put("declaredInputs", JsonArray(sourceInputs.map(::JsonPrimitive)))
+            put("declaredDefinitions", JsonArray(parsed.definedVars.map(::JsonPrimitive)))
+            put("scope", "named source declarations excluding frontend-declared definitions")
+        }.toString())
+        val initial = options["center"]?.split(',')?.map(String::toLong)?.toLongArray()?.let {
+            require(it.size == parsed.problem.numIntVars && parsed.problem.numBoolVars == 0)
+            Sample(booleanArrayOf(), it)
+        }
+        require(initial == null || parsed.definedVars.isEmpty())
+        for (rewrite in if (initial == null) listOf(false, true) else listOf(false)) {
             val stop = Cancellation.after(60.seconds)
             val invocation = SourceSetup.prepare(SourceSetupRequest(
                 if (parsed.definedVars.isEmpty()) SourceAttachment(parsed.problem, parsed.definitionHints)
@@ -83,11 +106,14 @@ internal object LocalSearchTrajectory {
             val prepared = FinitePipeline.prepare(FinitePipelineRequest(
                 requireNotNull(plan.model), FiniteEngine.MIXED, objective,
                 cancellation = stop, solveCancellation = stop, presolveBudget = PresolveBudget(1_375_000_000L),
+                presolveConfig = if (initial == null) PresolveConfig.DEFAULT else PresolveConfig.NONE,
                 preparedPlan = plan, transformObjective = rewrite, randomSeed = seed,
             ))
             check(!stop() && prepared.presolve?.infeasible != true)
             val problem = prepared.problem as BakedProblem
             val workingObjective = requireNotNull(prepared.objective)
+            require(initial == null || (initial.numIntVars == problem.numIntVars &&
+                prepared.reconstruct(initial) == initial)) { "explicit center needs an unchanged coordinate frame" }
             val hints = heuristicHints(invocation, prepared, stop)
             val sweep = hints?.let { getter(it, "getSweep") as DefinitionalSweep? }
             val gradient = hints?.let { getter(it, "getObjective") as IncrementalObjective? }
@@ -102,8 +128,10 @@ internal object LocalSearchTrajectory {
                 put("domains", JsonArray(problem.rootIntDomains().map { JsonPrimitive(it.toString()) }))
                 put("sourceVerdictClaim", false)
             }.toString())
-            for (walk in listOf(false, true)) {
-                val label = if (walk) rewrite.toString() else "initial-$rewrite"
+            var baseline: List<Any?>? = null
+            for (mode in if (repairCapture) listOf("initial", "walk", "repair") else listOf("initial", "walk")) {
+                val walk = mode != "initial"
+                val label = if (mode == "walk") rewrite.toString() else "$mode-$rewrite"
                 out.resolve("walk-$label.jsonl").bufferedWriter().use { writer ->
                     var picks = 0L
                     var captured: LocalSearchState? = null
@@ -159,7 +187,12 @@ internal object LocalSearchTrajectory {
                             }
                         }
                     }
-                    val recipe = LocalSearchCatalog.byLabel(options.getValue("recipe")).withSources {
+                    val recipeName = options.getValue("recipe")
+                    val selected = if (recipeName == "source-coordinate-descent") LocalSearchRecipe(recipeName,
+                        SourceDrivenStrategy(sources = listOf(ConfiguredSource(ObjectiveSeed())),
+                            acceptance = AcceptanceRule.GreedyDescent, feasibleDescent = FeasibleDescent.SelfOwned))
+                    else LocalSearchCatalog.byLabel(recipeName)
+                    val recipe = selected.withSources {
                         listOf(ConfiguredSource(recorder)) + it
                     }
                     val solver = LocalSearchSolver(
@@ -168,10 +201,13 @@ internal object LocalSearchTrajectory {
                         definitionalSweep = sweep, perMoveInvariants = sweep != null && recipe.perMoveInvariants,
                         seedImplicitOnRestart = recipe.seedImplicitOnRestart,
                     )
+                    val trace = if (mode == "repair") RepairTrajectory.attach(solver,
+                        "${options.getValue("recipe")}; linear shaping 1; seeded tie stream $seed") else null
                     val params = LocalSearchParams(
                         randomSeed = seed, maxFlips = if (walk) moves else 1L, cancellation = stop,
                         costShaping = CostShaping.Linear(lambda = 1.0), lsObjective = gradient,
                         normalizeWeightsByClass = true, reportResiduals = true,
+                        initialAssignment = initial,
                     )
                     solver.resumable(workingObjective, params).use { run ->
                         val result = try {
@@ -186,6 +222,25 @@ internal object LocalSearchTrajectory {
                         out.resolve("result-$label.txt").writeText(
                             "picks=$picks\ncancelled=${stop()}\nresult=$result\nstats=${run.stats}\n",
                         )
+                        if (walk && result != null && !stop()) {
+                            if (sourceCheck != null && result.assignment != null) {
+                                RepairTrajectory.checkSource(sourceCheck, prepared.reconstruct(checkNotNull(result.assignment)))
+                            }
+                            val stats = run.stats.ls
+                            val signature = listOf(result.assignment, result.objectiveValue, picks, stats.moves.sum,
+                                stats.restarts.sum, stats.stalls.sum, stats.boardRestartChanges.sum,
+                                stats.boardRestartDeclines.sum)
+                            if (mode == "walk") baseline = signature
+                            if (mode == "repair") {
+                                check(baseline == signature) { "repair observation changed the fixed-work walk" }
+                                out.resolve("parity-$rewrite.txt").writeText("witness/objective/picks/work/restarts/stalls/board counts match\n")
+                            }
+                        }
+                    }
+                    if (trace != null) {
+                        RepairTrajectory.write(trace, prepared, sourceInputs, out.resolve("repairs-$rewrite.jsonl"))
+                        if (exactControls) RepairTrajectory.controls(trace, problem, workingObjective,
+                            out.resolve("controls-$rewrite.jsonl"), seed, prepared, checkNotNull(sourceCheck))
                     }
                     if (!walk) traceGreedy(checkNotNull(captured), out.resolve("greedy-$rewrite.jsonl"))
                 }

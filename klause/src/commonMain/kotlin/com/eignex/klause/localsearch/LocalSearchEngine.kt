@@ -67,6 +67,8 @@ internal class LocalSearchEngine(
             if (released) return
             released = true
             preparedBoardRestart = null
+            repairTrace?.finish(tracedRestart, RepairEndpoint.Censored)
+            tracedRestart = null
             searchOwned.store(false)
         }
     }
@@ -127,6 +129,26 @@ internal class LocalSearchEngine(
     private val configuredRestart: RestartPolicy =
         strategy.schedule.restart ?: restartPolicy
     private var preparedBoardRestart: PreparedBoardRestart? = null
+    internal var repairTrace: RepairTrace? = null
+    private var tracedRestart: RepairTrace.Attempt? = null
+
+    private fun traceStart(state: LocalSearchState, anchor: Sample?, seed: Long?, owner: String) {
+        val trace = repairTrace ?: return
+        if (!trace.admits(problem.numBoolVars, problem.numIntVars, problem.numRealVars)) return
+        tracedRestart = trace.begin(owner, seed, state.assignment.snapshot(), anchor)
+    }
+
+    private fun traceStage(stage: String, state: LocalSearchState) {
+        if (tracedRestart != null) repairTrace?.record(tracedRestart, stage, state.assignment.snapshot(),
+            state.cost.takeUnless { stage == "perturbed" })
+    }
+
+    private fun traceEnd(endpoint: RepairEndpoint, state: LocalSearchState) {
+        if (tracedRestart != null) {
+            repairTrace?.finish(tracedRestart, endpoint, state.assignment.snapshot(), state.cost)
+            tracedRestart = null
+        }
+    }
 
     // When a definitionalSweep is present or seedImplicitOnRestart is set, every restart is followed
     // by implicit feasible-init and/or the sweep plus a recompute, so all restart call sites get the
@@ -148,6 +170,7 @@ internal class LocalSearchEngine(
                 val previousBest = state.bestCostSeen
                 configuredRestart.restart(state, bestSoFar)
                 preparedBoardRestart?.afterPolicy(state)
+                traceStage("perturbed", state)
                 prepareAssignment(state)
                 state.recompute()
                 state.bestCostSeen = minOf(previousBest, state.cost)
@@ -761,6 +784,7 @@ internal class LocalSearchEngine(
         timing: LocalSearchPhaseTimer? = null,
     ) {
         val state = newMinimizeState(guide, params, effectiveAssumptions, warm, checkpoint, timing)
+        traceStart(state, params.initialAssignment, params.randomSeed, "initial-descent")
         val progress = LocalSearchProgress(state, params, warm, sink)
         // An objective whose sum can pass the 64-bit range is scored from snapshots, which sum it exactly; the live
         // assignment's Long evaluation would wrap.
@@ -1007,6 +1031,7 @@ internal class LocalSearchEngine(
                             continue
                         }
                         restarts.onLocalOptimum(state, state.assignment.snapshot(), obj)
+                        traceEnd(RepairEndpoint.FeasibleStall, state)
                         liveCompletion = null
                         restartAndRepair(state, restartAnchor(), params, checkpoint, ::reportProgress)
                         stallCount++
@@ -1083,8 +1108,10 @@ internal class LocalSearchEngine(
                                 moveEvaluation == null && state.booleanRepairs == null)
                         ) {
                             restarts.onLocalOptimum(state, state.assignment.snapshot(), obj)
+                            traceEnd(RepairEndpoint.PolicyLocalOptimum, state)
                         } else {
                             restarts.onFeasibleStall(state, state.assignment.snapshot(), obj)
+                            traceEnd(RepairEndpoint.FeasibleStall, state)
                         }
                         liveCompletion = null
                         restartAndRepair(state, restartAnchor(), params, checkpoint, ::reportProgress)
@@ -1139,6 +1166,7 @@ internal class LocalSearchEngine(
             roundFeedback?.record(costBefore, state.cost, totalFlips)
         }
         reportProgress()
+        traceEnd(RepairEndpoint.Censored, state)
         val reason = if (cancelled) TerminationReason.Cancelled else TerminationReason.BudgetExhausted
         sink.stop()
         sink.timedOut = reason == TerminationReason.BudgetExhausted
@@ -1288,6 +1316,8 @@ internal class LocalSearchEngine(
         checkpoint: LocalSearchCheckpoint?,
         onPause: () -> Unit,
     ) = state.phaseTimer.inPhase("seeding") {
+        traceEnd(RepairEndpoint.Restarted, state)
+        traceStart(state, anchor, params.randomSeed, "restart")
         val policy = configuredRestart as? IteratedLocalSearchRestart
         val observation = if (policy != null && (anchor != null || policy.incumbents.isNotEmpty())) {
             PreparedBoardRestart.capture(state)
@@ -1296,11 +1326,16 @@ internal class LocalSearchEngine(
         try {
             state.boardCoverage.invalidate()
             restarts.restart(state, anchor)
-            if (definitionalSweep == null && !seedImplicitOnRestart) observation?.afterPolicy(state)
+            if (definitionalSweep == null && !seedImplicitOnRestart) {
+                observation?.afterPolicy(state)
+                traceStage("perturbed", state)
+            }
             observation?.afterPreparation(state)
+            traceStage("prepared", state)
             val repaired = !greedyRepairOnRestart || !isLargeEnoughForGreedy() ||
                 greedyRepairPass(state, params, checkpoint, onPause)
             if (repaired && observation != null) policy?.recordBoardRestart(observation.finish(state))
+            if (repaired) traceStage("repaired", state)
         } finally {
             preparedBoardRestart = null
         }
