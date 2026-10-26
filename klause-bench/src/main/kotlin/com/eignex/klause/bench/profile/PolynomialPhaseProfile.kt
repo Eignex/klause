@@ -301,6 +301,7 @@ internal object PolynomialPhaseProfile {
         private val stats = queryType.getMethod("getStats")
         private val progress = queryType.methods.singleOrNull { it.name == "getProgress" }
         private val feedbackStats = queryType.getMethod("getCellFeedbackStats")
+        private val feedbackUse = queryType.getMethod("getFirstCellFeedbackUse")
         private val feedbackReuse = queryType.getMethod("getFirstCellFeedbackReuse")
         private val partialConflicts = progress?.returnType?.methods?.singleOrNull { it.name == "getPartialConflicts" }
         private val conflictObserver = queryType.methods.singleOrNull { it.name == "setPartialConflictObserver" }
@@ -445,6 +446,7 @@ internal object PolynomialPhaseProfile {
             var lastProjected = 0L
             var lastStage: Triple<Long, Long, Long>? = null
             var firstFeedback: Map<String, String>? = null
+            var firstUse: Map<String, String>? = null
             var result: Any?
             do {
                 result = next.invoke(owner)
@@ -452,6 +454,9 @@ internal object PolynomialPhaseProfile {
                 val snapshot = stats.invoke(owner)
                 val projected = snapshot.javaClass.getMethod("getProjectedPolynomials").invoke(snapshot) as Long
                 val observed = progress?.invoke(owner)
+                if (refinement && firstUse == null) {
+                    firstUse = feedbackUse.invoke(owner)?.let(::feedbackTrace)
+                }
                 if (refinement && firstFeedback == null) {
                     firstFeedback = feedbackReuse.invoke(owner)?.let(::feedbackTrace)
                 }
@@ -493,6 +498,7 @@ internal object PolynomialPhaseProfile {
                         .associateWith { value.javaClass.getMethod("get$it").invoke(value).toString() }
                 },
                 firstCellFeedbackReuse = firstFeedback,
+                firstCellFeedbackUse = firstUse,
                 sourceCoordinates = names,
                 originalSourceCoordinates = originalNames,
                 coordinateNamespace = if (prepared) "prepared-polynomial-model" else "raw-polynomial-source",
@@ -579,6 +585,19 @@ internal object PolynomialPhaseProfile {
                 }
             }
             result["scopePreviewComplete"] = complete.toString()
+            val candidate = requireNotNull(read(use, "Value"))
+            val coefficients = read(candidate, "DefiningCoefficients") as List<*>
+            var candidateComplete = coefficients.size <= 17
+            fun fraction(value: BigFraction): String = if (value.num.magnitudeBitLength() > 4096 ||
+                value.den.magnitudeBitLength() > 4096) {
+                candidateComplete = false
+                "[wide coefficient]"
+            } else value.toString()
+            result["candidate.coefficients"] = coefficients.take(17).map { fraction(it as BigFraction) }.toString()
+            result["candidate.root"] = read(candidate, "RootIndex").toString()
+            result["candidate.lower"] = fraction(read(candidate, "LowerBound") as BigFraction)
+            result["candidate.upper"] = fraction(read(candidate, "UpperBound") as BigFraction)
+            result["candidatePreviewComplete"] = candidateComplete.toString()
             return result
         }
 
@@ -650,6 +669,7 @@ internal data class PhaseTrace(
     val cellRefinement: Map<String, String>? = null,
     val cellFeedback: Map<String, String>? = null,
     val firstCellFeedbackReuse: Map<String, String>? = null,
+    val firstCellFeedbackUse: Map<String, String>? = null,
     val sourceCoordinates: Map<String, String>? = null,
     val originalSourceCoordinates: Map<String, String>? = null,
     val coordinateNamespace: String? = null,

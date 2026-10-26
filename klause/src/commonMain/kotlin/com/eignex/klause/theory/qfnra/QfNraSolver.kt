@@ -114,6 +114,7 @@ internal class QfNraQuery(
     } else null
     val cellStats: PolynomialCellStats? get() = cellRefinement?.stats
     val cellFeedbackStats: PolynomialCellFeedbackStats? get() = cellFeedback?.stats
+    val firstCellFeedbackUse: PolynomialCellFeedbackUse? get() = cellFeedback?.firstRegionUse
     val firstCellFeedbackReuse: PolynomialCellFeedbackUse? get() = cellFeedback?.firstCrossRegionUse
     val checkedCells: List<CheckedPolynomialCell> get() = cellRefinement?.cells.orEmpty()
     var projectionObserver: ((Int, List<Polynomial>, Polynomial?) -> Unit)? = null

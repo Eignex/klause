@@ -21,6 +21,7 @@ internal class PolynomialCellFeedbackUse(
     val cell: CheckedPolynomialCell,
     val origin: PolynomialCellScope.Region,
     val current: PolynomialCellScope.Region,
+    val value: AlgebraicReal,
 )
 
 internal class PolynomialCellFeedback(
@@ -44,6 +45,8 @@ internal class PolynomialCellFeedback(
     private var scopeDeclines = 0L
     private var metadataVisits = 0L
     var firstCrossRegionUse: PolynomialCellFeedbackUse? = null
+        private set
+    var firstRegionUse: PolynomialCellFeedbackUse? = null
         private set
     val stats: PolynomialCellFeedbackStats get() = PolynomialCellFeedbackStats(
         admitted, lookups, uses, reuses, crossRegionUses, evicted,
@@ -90,10 +93,13 @@ internal class PolynomialCellFeedback(
             val current = scope as? PolynomialCellScope.Region
             val origin = entry.firstRegion
             if (current != null && origin == null) entry.firstRegion = current
+            if (current != null && firstRegionUse == null) {
+                firstRegionUse = PolynomialCellFeedbackUse(cell, origin ?: current, current, value)
+            }
             if (origin != null && current != null && origin.reduction !== current.reduction) {
                 crossRegionUses++
                 if (firstCrossRegionUse == null) {
-                    firstCrossRegionUse = PolynomialCellFeedbackUse(cell, origin, current)
+                    firstCrossRegionUse = PolynomialCellFeedbackUse(cell, origin, current, value)
                 }
             }
             return true
@@ -180,6 +186,7 @@ internal class PolynomialCellFeedback(
         active = null
         rebuild = true
         firstCrossRegionUse = null
+        firstRegionUse = null
     }
 
     private fun step(arithmetic: PolynomialArithmetic) {
