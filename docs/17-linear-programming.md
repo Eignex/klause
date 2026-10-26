@@ -245,6 +245,22 @@ An immutable traversal invocation retains its checked global bound when fresh
 coverage supplies an equal or weaker value, avoiding repeated verification of the
 growing sibling proof. A new repair scope owns a separate invocation.
 
+`source-refutation-reuse=true` enables a traversal-owned index of checked source
+refutations. Exact cited coordinate sides select candidates; full scope implication
+and a fresh source import check authorize closing the matching leaf before its
+numerical query. Only refutations enter the index. Incumbent-bound closures and
+failed improvement queries supply no unconditional conflict. The original source,
+objective, invocation window and complete Boolean substitution remain bound to the
+opening, including when it borrows a numerical owner.
+
+The index retains at most 256 entries and 1 MiB of modeled proof/scope storage,
+evicting the oldest entry when either capacity is reached. Support traversal admits
+at most 4,096 nodes and depth 64; each retention or lookup shares at most 100,000
+verification polls across its candidates. Source reconstruction, proof replay,
+indexing, allocation and eviction charge cumulative source LP funding. Unknown or
+cancelled checks close no additional alternative. Ordinary traversal keeps reuse
+disabled.
+
 ### Leaf completion
 
 Finite optimization keeps a pinned real-leaf request across portfolio slices.

@@ -19,6 +19,14 @@ semantics and objective, may assume only restrictions implied by the importing
 scope, and are rechecked against the same premises. A conditioned refutation cannot
 refute a weaker parent invocation.
 
+Opt-in numerical refutation reuse belongs to one immutable traversal invocation.
+Its source rows, semantics and objective remain bound to that opening. A proof's
+numeric restrictions can shrink only after a fresh exact check; the original
+invocation restrictions and complete Boolean substitution remain present. Implied
+integer activation bounds can require restrictions absent from the explicit proof
+support, so an unsuccessful reduction retains only the checked original scope.
+Each compatible import is rechecked before it closes a leaf.
+
 `Problem.sourceProofContext` binds the original IR's declared bounds and rows.
 Guarded premises keep their Boolean pins and integer indicator equalities; open
 integer sides provide no finite-box premise, and derived restrictions need their own
