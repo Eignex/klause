@@ -5324,6 +5324,29 @@ not default-admission or throughput claims.
 The selection work counter is part of preparation work, and selection allocation
 is part of funded allocation; these counters must not be added to their totals.
 
+[Point-selection rgn 8547](https://lab.eignex.com/jobs/8547) and
+[p0033 8549](https://lab.eignex.com/jobs/8549), at `21c8b56c12` on Linux/amd64,
+compare fresh disabled/all/selected queries twice under identical source scopes.
+All 48 replay bounds and 1,088 candidate checks pass fresh native verification;
+every repeated scope/arm pair reproduces its exact point, bound and modeled costs,
+and none reaches its allowance. The p0033 sample contains three distinct scopes
+because its base and selected root queries both occupy journal records.
+
+At the p0033 root, selected IDs 0/1/2 preserve the four-cut bound while disabled
+separation is weaker. The two-query selected round costs 52,375 work units and
+82,320 modeled bytes, versus 28,679 and 39,084 with all cuts and 27,284 and 33,332
+with separation disabled. On rgn, none of the forty cuts excludes the replayed
+points. Selection omits all forty physical rows and uses one operation. Root work
+is 450,500 versus 956,585 with all cuts, but selection allocation is 359,900 bytes
+versus 262,364 when disabled. The all-cut exact bound is slightly stronger than
+the identical selected/disabled bound; excluding satisfied rows does not establish
+exact certificate parity. These are same-parent work and capability results, not
+ordinary solve speedups or grounds for default promotion.
+
+[Rebased p0033 8570](https://lab.eignex.com/jobs/8570), at `f37b058b74`, reproduces
+all 24 replay operation counts, masks, exact bounds, work and modeled allocation
+after integration with active-row capture. All available replay bounds recheck.
+
 #### Source numerical decision feedback
 
 `MpsProofFrontier supportBranching=true` enables an internal decision consumer of the
