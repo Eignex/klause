@@ -187,10 +187,16 @@ internal interface RepairSearch : AutoCloseable {
      * the best strictly-better completion found, or null.
      */
     fun repair(assumptions: Assumptions, decisionBudget: Long, cutoff: Double, cancellation: Cancellation): Sample? {
+        return repairStep(assumptions, decisionBudget, cutoff, cancellation).sample
+    }
+
+    fun repairStep(
+        assumptions: Assumptions, decisionBudget: Long, cutoff: Double, cancellation: Cancellation,
+    ): RepairSearchStep {
         begin(assumptions, decisionBudget, cutoff, cancellation)
         while (true) {
             val step = runSlice(Cancellation.Never, Long.MAX_VALUE, -1L)
-            if (step.reason != null) return step.sample
+            if (step.reason != null) return step
         }
     }
 

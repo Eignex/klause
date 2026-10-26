@@ -59,6 +59,10 @@ fragment starts. Starting a sibling retires the old trail and slice while retain
 compatible learned clauses and LP state. Closing releases both, and terminal
 observations remain readable.
 
+ALNS records retained repair observations as a best found point or an unknown
+result with that scoped stop reason. The observation carries no unpinned
+infeasibility or optimality claim; an unconsumed improving ray remains unavailable.
+
 ## Counting and sampling
 
 Counting builds an isolated conditioned model: integer domains carry the scope's

@@ -77,7 +77,8 @@ internal object LocalSearchTrajectory {
     private fun capture(args: Array<String>, out: File) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val required = setOf("suite", "problem", "sha256", "recipe", "seed", "moves")
-        val optional = setOf("sliceMillis", "sliceWork", "greedy", "repairs", "controls", "center", "source64")
+        val optional = setOf("sliceMillis", "sliceWork", "greedy", "repairs", "controls", "center", "source64",
+            "ownerReplay")
         require(options.keys.containsAll(required) && options.keys.all {
             it in required || it in optional || it == "selectors"
         })
@@ -108,9 +109,11 @@ internal object LocalSearchTrajectory {
         val repairCapture = options["repairs"]?.toBooleanStrict() ?: false
         val exactControls = options["controls"]?.toBooleanStrict() ?: false
         val selectors = options["selectors"]?.toBooleanStrict() ?: false
+        val ownerReplay = options["ownerReplay"]?.toBooleanStrict() ?: false
         val sourceCheck = if (repairCapture) parsed.problem.bake() else null
         require(!exactControls || repairCapture)
         require(!selectors || repairCapture)
+        require(!ownerReplay || exactControls)
         val sourceInputs = parsed.intVarNames.values.distinct().filter { it !in parsed.definedVars }.toIntArray()
         out.resolve("source-inputs.json").writeText(buildJsonObject {
             put("declaredInputs", JsonArray(sourceInputs.map(::JsonPrimitive)))
@@ -315,6 +318,9 @@ internal object LocalSearchTrajectory {
                         RepairTrajectory.write(trace, prepared, sourceInputs, out.resolve("repairs-$rewrite.jsonl"))
                         if (exactControls) RepairTrajectory.controls(trace, problem, workingObjective,
                             out.resolve("controls-$rewrite.jsonl"), seed, prepared, checkNotNull(sourceCheck))
+                        if (ownerReplay) RepairOwnerReplay.replay(out.resolve("controls-$rewrite.jsonl"),
+                            problem, workingObjective, prepared, checkNotNull(sourceCheck), sourceInputs,
+                            out.resolve("owners-$rewrite.jsonl"), seed)
                     }
                     if (!walk) {
                         val initial = checkNotNull(captured)
