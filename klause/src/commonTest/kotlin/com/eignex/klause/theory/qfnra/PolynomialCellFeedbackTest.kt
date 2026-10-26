@@ -19,6 +19,29 @@ import kotlin.test.assertTrue
 
 class PolynomialCellFeedbackTest {
     @Test
+    fun `a regional reuse trace retains its rejected numeric candidate`() {
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
+        val arithmetic = PolynomialArithmetic()
+        val algebraic = AlgebraicArithmetic(arithmetic)
+        val snapshot = PolynomialFormula.normalize(source.formula, arithmetic)
+        val condition = PolynomialCondition()
+        val support = PolynomialCellScope.Source.prepare(source.formula, arithmetic)
+        val predicate = support.predicates.single()
+        val zero = algebraic.rational(BigFraction.ZERO)
+        val cell = assertNotNull(CheckedPolynomialCell.rejected(predicate, support, zero, arithmetic, algebraic))
+        val scope = PolynomialCellScope.Region(source.formula, condition, snapshot,
+            PolynomialBooleanRegion(mapOf(0 to true), emptyMap()), Any())
+        val feedback = PolynomialCellFeedback(source.formula, condition)
+
+        assertTrue(feedback.rejects(0, predicate, scope, zero, listOf(cell), arithmetic, algebraic))
+
+        val trace = assertNotNull(feedback.firstRegionUse)
+        assertTrue(trace.current === scope)
+        assertEquals(0, algebraic.compare(zero, trace.value))
+        assertNull(feedback.firstCrossRegionUse)
+    }
+
+    @Test
     fun `source cells survive unrelated Boolean prefixes within one snapshot`() {
         val source = SmtLibPolynomial.parse(
             "(declare-const x Real) (declare-const a Bool) (declare-const b Bool) " +

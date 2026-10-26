@@ -5312,3 +5312,6 @@ and process-local source/snapshot/reduction identities. Scope previews cap condi
 maps and wide coefficients and mark incomplete rendering. The engine retains the
 exact guards; these diagnostic strings supply no proof or persistent source mapping.
 An absent trace establishes no cross-region reuse, even when lookup counts are nonzero.
+`firstCellFeedbackUse` also records reuse within one regional owner. Both traces keep
+the actual rejected numeric candidate's defining coefficients, root and isolating
+bounds, with an explicit completeness flag for bounded rendering.
