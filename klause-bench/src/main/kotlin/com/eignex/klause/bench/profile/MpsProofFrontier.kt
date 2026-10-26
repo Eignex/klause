@@ -55,7 +55,7 @@ internal object MpsProofFrontier {
         require(Runtime.getRuntime().availableProcessors() == 1)
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val supported = setOf("suite", "problem", "sha256", "exact", "probe", "history", "frontier", "cuts",
-            "selection", "replay")
+            "selection", "replay", "operations")
         require(options.keys.containsAll(setOf("suite", "problem", "sha256", "exact")) &&
             (options.keys - supported).isEmpty())
         val probe = options["probe"]?.toBooleanStrict() ?: false
@@ -85,7 +85,8 @@ internal object MpsProofFrontier {
         val request = field(execution, "request") as NumericalLinearRequest
         val solveStop = preparationStop or Cancellation.after(10.seconds)
         val params = TheoryParams(timeout = solveStop, cancellation = solveStop, randomSeed = 3L,
-            sourceCuts = options["cuts"]?.toBooleanStrict() ?: true)
+            sourceCuts = options["cuts"]?.toBooleanStrict() ?: true,
+            sourceLpOperations = options["operations"]?.toInt()?.also { require(it in 1..256) } ?: Int.MAX_VALUE)
         val authority = request.javaClass.declaredMethods.single {
             it.name == "authorityContext" && it.parameterCount == 2
         }.apply { isAccessible = true }
@@ -180,6 +181,7 @@ internal object MpsProofFrontier {
                 put("branchHistory", historyEnabled)
                 put("boundOrdered", frontierEnabled)
                 put("sourceCuts", params.sourceCuts)
+                put("sourceLpOperationAllowance", params.sourceLpOperations)
                 put("wholeCliTimingClaim", false)
                 put("sourceVerdictClaim", false)
                 put("independentWitnessCheck", false)
