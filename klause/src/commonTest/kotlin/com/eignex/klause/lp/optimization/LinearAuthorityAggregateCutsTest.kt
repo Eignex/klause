@@ -2,6 +2,7 @@ package com.eignex.klause.lp.optimization
 
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceClaim
+import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
@@ -16,6 +17,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.shl
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -68,6 +70,31 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
+    fun `aggregate candidates should retain activation premises from every source row`() {
+        val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
+        val pin = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val source = SourceProofContext(scope, setOf(x, y, real, bool, pin), mapOf(
+            "left" to SourcePremise(left, mapOf(0 to true)),
+            "right" to SourcePremise(right, emptyMap(), mapOf(pin to BigFraction.ONE))))
+        val cut = assertNotNull(LinearAuthorityAggregateCuts.derive(listOf(
+            LinearAuthorityAggregateTerm(0, "left", left, BigFraction.ONE),
+            LinearAuthorityAggregateTerm(1, "right", right, BigFraction.ONE),
+        ), Cancellation.Never))
+        val established = SourceCondition(bools = mapOf(0 to true),
+            lower = mapOf(pin to BigFraction.ONE), upper = mapOf(pin to BigFraction.ONE))
+        for (condition in listOf(established, SourceCondition(lower = established.lower, upper = established.upper),
+            SourceCondition(bools = established.bools, lower = established.lower), established)) {
+            val scoped = source.atScope(scope.copy(condition = condition))
+
+            val check = SourceEvidenceVerifier(scoped).verify(
+                SourceEvidence(scoped.scope, SourceClaim.Consequence(cut.inequality), cut.derivation))
+
+            if (condition == established) assertEquals(SourceEvidenceCheck.Checked, check)
+            else assertIs<SourceEvidenceCheck.Rejected>(check)
+        }
+    }
+
+    @Test
     fun `strict aggregate endpoints should round below an integral right side`() {
         for ((leftStrict, rightStrict) in listOf(true to false, false to true)) {
             val strictLeft = SourceInequality(left.coefficients, BigFraction.ofLong(4), leftStrict)
@@ -109,10 +136,13 @@ class LinearAuthorityAggregateCutsTest {
         val terms = listOf(
             LinearAuthorityAggregateTerm(0, "left", left, BigFraction.ONE),
             LinearAuthorityAggregateTerm(1, "right", right, BigFraction.ONE),
-            LinearAuthorityAggregateTerm(2, "third", left, BigFraction.ONE),
+            LinearAuthorityAggregateTerm(2, "third",
+                SourceInequality(mapOf(x to BigFraction.ofLong(2)), BigFraction.ZERO), BigFraction.ONE),
         )
+        assertNotNull(LinearAuthorityAggregateCuts.derive(terms, Cancellation.Never))
         for (limits in listOf(LinearAuthorityAggregateLimits(rows = 2),
-            LinearAuthorityAggregateLimits(support = 1), LinearAuthorityAggregateLimits(proofBytes = 1),
+            LinearAuthorityAggregateLimits(support = 1), LinearAuthorityAggregateLimits(support = 2),
+            LinearAuthorityAggregateLimits(proofBytes = 1),
             LinearAuthorityAggregateLimits(work = 1),
             LinearAuthorityAggregateLimits(allocation = 1))) {
             val cut = LinearAuthorityAggregateCuts.derive(terms, Cancellation.Never, limits = limits)
@@ -171,6 +201,7 @@ class LinearAuthorityAggregateCutsTest {
             { key, value -> observations[key] = (observations[key] ?: 0L) + value })
 
         assertNull(cut)
+        assertTrue(assertNotNull(first["AggregateWork"]) > 0L)
         assertEquals(first.mapValues { (_, value) -> value * 2L }, observations)
     }
 
