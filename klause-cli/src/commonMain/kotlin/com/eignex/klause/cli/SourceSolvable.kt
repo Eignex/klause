@@ -41,6 +41,7 @@ internal fun sourceSolvable(
     }
     val start = TimeSource.Monotonic.markNow()
     var lpStats = LpStats()
+    val diagnosticProviders = common.diagnosticGlobalScoring(problem)
     val invocation = common.routingPreparationCancellation().use { stop ->
         SourceSetup.prepare(
             SourceSetupRequest(
@@ -55,6 +56,7 @@ internal fun sourceSolvable(
                 maximize = maximize,
                 cancellation = stop,
                 boundCancellation = common.routingCancellation(),
+                providers = diagnosticProviders,
             ),
             onLpStats = { lpStats = it },
         )

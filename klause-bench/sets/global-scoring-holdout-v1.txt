@@ -1,0 +1,4 @@
+# Whole-family holdouts, excluded from scoring-view selection.
+xcsp3-csp/HyperSudoku-03_c24
+xcsp3-csp/AnotherMagicSquare-05_c23
+xcsp3-csp/Eternity-07-07_c22
