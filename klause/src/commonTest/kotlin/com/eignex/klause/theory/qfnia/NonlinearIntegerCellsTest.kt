@@ -12,8 +12,10 @@ import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.PolynomialFormula
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.minus
 import com.eignex.klause.util.parseBigInt
 import com.eignex.klause.util.plus
+import com.eignex.klause.util.unaryMinus
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -50,24 +52,26 @@ class NonlinearIntegerCellsTest {
     }
 
     @Test
-    fun `wide irrational hulls should preserve integer neighbors beyond machine words`() {
-        val source = SmtLibPolynomial.parse(
-            "(declare-const n Real) (assert (= (* (- n 100000000000000000000) " +
-                "(- n 100000000000000000000)) 2))",
-        )
-        val arithmetic = PolynomialArithmetic()
-        val algebraic = AlgebraicArithmetic(arithmetic)
-        val center = parseBigInt("100000000000000000000")
-        val scope = PolynomialCellScope.Source.prepare(source.formula, arithmetic)
-        val cell = assertNotNull(CheckedPolynomialCell.rejected(scope.predicates.single(), scope,
-            algebraic.rational(BigFraction.of(center, BIG_ONE)), arithmetic, algebraic))
-        val cells = NonlinearIntegerCells(source.formula, listOf(0), arithmetic)
-        cells.retain(cell)
+    fun `wide strict hulls should retain every integer bit at either sign`() {
+        val magnitude = parseBigInt("100000000000000000000")
+        for ((predicate, endpoint, direction) in listOf(
+            Triple("(< n 100000000000000000000)", magnitude, BIG_ONE),
+            Triple("(> n (- 100000000000000000000))", -magnitude, -BIG_ONE),
+        )) {
+            val source = SmtLibPolynomial.parse("(declare-const n Real) (assert $predicate)")
+            val arithmetic = PolynomialArithmetic()
+            val algebraic = AlgebraicArithmetic(arithmetic)
+            val scope = PolynomialCellScope.Source.prepare(source.formula, arithmetic)
+            val cell = assertNotNull(CheckedPolynomialCell.rejected(scope.predicates.single(), scope,
+                algebraic.rational(BigFraction.of(endpoint + direction, BIG_ONE)), arithmetic, algebraic))
+            val cells = NonlinearIntegerCells(source.formula, listOf(0), arithmetic)
+            cells.retain(cell)
 
-        for ((offset, expected) in listOf(-2 to false, -1 to true, 0 to true, 1 to true, 2 to false)) {
-            val excluded = cells.excludes(listOf(center + bigIntOf(offset.toLong())), algebraic)
+            val excluded = cells.excludes(listOf(endpoint + direction), algebraic)
 
-            assertEquals(expected, excluded)
+            assertTrue(excluded)
+            assertFalse(cells.excludes(listOf(endpoint), algebraic))
+            assertFalse(cells.excludes(listOf(endpoint - direction), algebraic))
         }
     }
 
