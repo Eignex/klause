@@ -3594,6 +3594,16 @@ records and the retained nonlinear-refinement campaign.
 
 ### Checked univariate predicate cells
 
+[Raw 8621](https://lab.eignex.com/jobs/8621) compares twelve direct queries at
+`38cff63082`, including fixed integer tuples and Boolean scaling controls. All
+outcome pairs match: five SAT, five native UNSAT and two interrupted queries.
+The fixed power query derives two cells in three coordinate attempts and reaches
+its witness with 1,390 native units against 1,612. Its quadratic cell retains
+`n = 2` as a query condition; its strict-positive cell has mandatory source support.
+Raw Economics derives four source cells but adds 2,142 units without changing the
+fallback trajectory. The large raw cases produce no checked cells. These direct
+component queries do not establish ordinary CLI publication or integer-search gains.
+
 [Prepared 8622](https://lab.eignex.com/jobs/8622) and
 [holdouts 8623](https://lab.eignex.com/jobs/8623) compare the internal producer with
 its disabled control at `38cff63082`, P1, ten-second query budgets, a 3 GiB child
@@ -3617,6 +3627,22 @@ from independent unary predicates. Strict-root contradiction instead grows from
 with the option disabled by default. Native UNSAT is separate from independent
 source proof checking. Coordinate attempts, main rejected representations, complete
 model counts and ordinary published witnesses are distinct observation surfaces.
+
+Matched failure captures [8655](https://lab.eignex.com/jobs/8655) and
+[8656](https://lab.eignex.com/jobs/8656) retain all 21 raw/prepared outcome pairs.
+The fixed power query removes three main rejected representations, including one
+repeat of the first rejection. Raw Economics retains one main rejection per arm;
+prepared Economics retains 28, including one repeat. Raw sorting retains 180 with
+two repeats per arm. Large prepared sorting/kissing captures are incomplete, so
+their differing counts do not establish a reduction. Representation equality is
+bounded diagnostic equality, not semantic algebraic equality; coordinate seed
+attempts are counted separately. Observer copy work is intrusive and excluded from
+the clean total-work comparisons.
+
+The clean raw, prepared and holdout profiles run under Linux/amd64, Java 25.0.4.1,
+one CPU and a 4,608 MiB cgroup limit. Their final `memory.current` observations are
+1,684,279,296, 1,589,030,912 and 1,691,287,552 bytes, with no OOM or limit events.
+These whole-profile readings are neither peak nor per-arm memory measurements.
 
 ### Polynomial Boolean bookkeeping
 
