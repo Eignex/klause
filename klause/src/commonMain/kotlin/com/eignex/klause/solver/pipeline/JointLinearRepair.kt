@@ -281,7 +281,9 @@ internal class JointLinearRepair(
         retire()
         return JointRepairAttempt(
             if (result.terminal?.claim == SourceClaim.Refutation) ExactNeighborhoodResult.Refuted
-            else ExactNeighborhoodResult.Undecided, result.reason, result.incumbent, result.bound)
+            else ExactNeighborhoodResult.Undecided,
+            if (result.terminal?.claim is SourceClaim.Ray) TerminationReason.Unsupported else result.reason,
+            result.incumbent, result.bound)
     }
 
     private fun retire() {
