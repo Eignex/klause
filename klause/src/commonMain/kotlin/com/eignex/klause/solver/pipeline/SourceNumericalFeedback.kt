@@ -5,16 +5,42 @@ import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.optimization.LinearAuthority
 import com.eignex.klause.lp.optimization.LinearAuthorityCapture
 import com.eignex.klause.lp.optimization.LinearAuthorityCapturedQuery
+import com.eignex.klause.lp.optimization.LinearAuthorityResult
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.evidence.SourceInequality
+import com.eignex.klause.solver.evidence.SourcePremise
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.magnitudeBitLength
 
 internal data class SourceNumericalCutoff(val value: BigFraction, val premise: String) {
+    init { require(premise.isNotBlank()) }
+    fun applyTo(
+        source: SourceProofContext, funding: SourceLpFunding, cancellation: Cancellation = Cancellation.Never,
+    ): SourceProofContext? {
+        if (cancellation() || funding.paused || source.scope.objective == null || !source.affineObjectiveAvailable) {
+            return null
+        }
+        val entries = source.coordinates.size.toLong() + source.premises.size + source.objective.size
+        funding.charge(1L + entries, 256L + entries * 48L)
+        if (entries > 250_000L || cancellation() || funding.exhausted ||
+            value.num.magnitudeBitLength() > 4096 || value.den.magnitudeBitLength() > 4096 ||
+            source.objectiveConstant.num.magnitudeBitLength() > 4096 ||
+            source.objectiveConstant.den.magnitudeBitLength() > 4096) return null
+        if (premise in source.premises) return source.takeIf(::enforcedBy)
+        val minimize = source.scope.objective.sense == ObjectiveSense.MINIMIZE
+        val row = SourceInequality(source.objective.mapValues { (_, coefficient) ->
+            if (minimize) coefficient else coefficient.negated()
+        }, if (minimize) value - source.objectiveConstant else source.objectiveConstant - value, strict = true)
+        return SourceProofContext(source.scope, source.coordinates, source.premises + (premise to SourcePremise(row)),
+            source.objective, source.objectiveConstant, source.semanticsChecker, source.semantics)
+    }
+
     fun enforcedBy(source: SourceProofContext): Boolean {
         if (source.scope.objective == null || !source.affineObjectiveAvailable) return false
         val row = source.premises[premise] ?: return false
-        val minimize = source.scope.objective?.sense == ObjectiveSense.MINIMIZE
+        val minimize = source.scope.objective.sense == ObjectiveSense.MINIMIZE
         val coefficients = source.objective.mapValues { (_, value) -> if (minimize) value else value.negated() }
         val rhs = if (minimize) value - source.objectiveConstant else source.objectiveConstant - value
         return row.guards.isEmpty() && row.integerPins.isEmpty() && row.inequality.strict &&
@@ -35,7 +61,8 @@ internal sealed interface SourceNumericalFeedbackResult {
                 query.context.coordinates == source.coordinates && query.context.premises == source.premises &&
                 query.context.objective == source.objective &&
                 query.context.objectiveConstant == source.objectiveConstant &&
-                query.context.semantics == source.semantics
+                query.context.semantics == source.semantics &&
+                query.context.semanticsChecker === source.semanticsChecker
     }
 
     data class Unavailable(
@@ -46,6 +73,11 @@ internal sealed interface SourceNumericalFeedbackResult {
 
     enum class Reason { Cancelled, Funding, Retention, Paused, MissingQuery, Incompatible }
 }
+
+internal data class SourceNumericalAcquisition(
+    val result: LinearAuthorityResult,
+    val feedback: SourceNumericalFeedbackResult,
+)
 
 // Exact-valued relaxation coordinates are guidance, including when a bound was certified.
 internal class SourceNumericalFeedback(
@@ -79,15 +111,18 @@ internal class SourceNumericalFeedback(
         source: SourceProofContext,
         cutoff: SourceNumericalCutoff? = null,
         cuts: Boolean = true,
-    ): SourceNumericalFeedbackResult {
+    ): SourceNumericalAcquisition {
         attach(authority)
         val result = authority.advance(source, cancellation, cuts = cuts)
-        return consume(source, cutoff, result.paused)
+        return SourceNumericalAcquisition(result, consume(source, cutoff, result.paused))
     }
 
     fun detach(authority: LinearAuthority) {
         if (authority.capture === owned) authority.capture = null
     }
+
+    fun refutationSupport(record: SourceNumericalFeedbackResult.Available): SourceNumericalSupportResult =
+        sourceNumericalRefutationSupport(record, funding, cancellation)
 
     fun consume(
         source: SourceProofContext,
