@@ -631,7 +631,8 @@ the complete source context.
 
 The internal active-row consultation uses a zero objective and a separately
 checked partial-scope refutation. Source scanning admits at most 100,000 visits
-and 4,096-bit input and Boolean-substitution rationals; incomplete capture declines.
+within the remaining funded work, with 4,096-bit input and Boolean-substitution
+rationals; incomplete capture declines.
 Boolean substitution precedes independent integer-pin admission. Sparse closure
 conflicts use the existing exact certificate lift; small strict systems can use
 the exact strict-feasibility operation. Preparation, modeled allocation and
