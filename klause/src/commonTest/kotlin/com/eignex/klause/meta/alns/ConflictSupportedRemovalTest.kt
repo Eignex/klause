@@ -12,6 +12,7 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.incumbent.IncumbentSource
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.search.BranchingConflict
 import com.eignex.klause.solver.search.VarRef
@@ -21,6 +22,7 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class ConflictSupportedRemovalTest {
@@ -62,6 +64,19 @@ class ConflictSupportedRemovalTest {
         assertEquals(plainCalls, observedCalls)
         assertEquals(control.assignment, observed.assignment)
         assertEquals(control.stats.search.nodes, observed.stats.search.nodes)
+    }
+
+    @Test
+    fun `pooled starting witnesses should decline attribution and preserve the search parameters`() {
+        val guidance = ConflictSupportedRemoval(problem, objective)
+        val params = BacktrackParams(pooledIncumbents = IncumbentSource { null })
+
+        val observed = guidance.observe(params)
+        guidance.begin(center, Assumptions.None, 0.0, Cancellation.Never)
+
+        assertSame(params, observed)
+        assertEquals(ConflictGuidanceStatus.Unsupported, guidance.status)
+        assertNull(guidance.originPins)
     }
 
     @Test
