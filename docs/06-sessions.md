@@ -273,7 +273,9 @@ An unfunded query keeps its pending alternative and owner; cumulative exhaustion
 ends the worker without proving exhaustion. Coverage splits debit modeled storage
 for both children and their captured condition maps. Resuming cannot renew either ceiling.
 `source-lp-work-limit` defaults to one billion units and
-`source-lp-allocation-limit` to 512 MiB. `source-cuts` controls checked source-row
+`source-lp-allocation-limit` to 512 MiB. Opt-in checked refutation reuse charges
+support indexing, source reconstruction, proof replay, storage and eviction to
+these same ceilings. `source-cuts` controls checked source-row
 separation in numerical frontier traversal. `source-lp-operations` supplies an independent
 operation ceiling for controlled comparisons. Other source LP clients retain their
 operation-based admission policy.

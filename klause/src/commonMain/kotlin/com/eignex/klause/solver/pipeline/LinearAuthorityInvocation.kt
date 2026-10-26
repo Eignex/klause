@@ -94,7 +94,7 @@ internal class LinearAuthorityInvocation(
             funding = funding), stop, ::paused, ::offer,
         { incumbent?.let { sample -> value?.let { sample to it } } }, useBranchHistory, borrowedAuthority,
         useGuidance = boundOrdered || guidance, inheritBounds = boundOrdered, useCuts = cuts,
-        useActiveRows = activeRows)
+        useActiveRows = activeRows, useRefutationReuse = params.sourceRefutationReuse)
     private val session = SearchComponentSet(listOf(component)).session(params.maxLeaves, stop).also {
         it.bindOpenTheoryWork(state.work)
     }
