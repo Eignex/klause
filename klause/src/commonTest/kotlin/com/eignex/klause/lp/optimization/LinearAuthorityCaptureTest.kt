@@ -74,6 +74,31 @@ class LinearAuthorityCaptureTest {
     }
 
     @Test
+    fun `explicit replay should preserve strict premises under established Boolean guards`() {
+        val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
+        val guarded = SourceProofContext(scope.copy(condition = SourceCondition(bools = mapOf(0 to true))),
+            setOf(x, bool), mapOf("strict" to SourcePremise(SourceInequality(
+                mapOf(x to BigFraction.ofLong(-2)), BigFraction.MINUS_ONE, strict = true), mapOf(0 to true))),
+            mapOf(x to BigFraction.ONE))
+        val template = assertNotNull(LinearAuthorityTemplate.prepare(guarded, Cancellation.Never, cuts = true))
+        val query = assertNotNull(LinearAuthorityQuery.prepare(guarded, template, Cancellation.Never,
+            cutMask = emptySet()))
+        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, Cancellation.Never)
+        capture.record(guarded, query, template, mapOf(x to BigFraction.ofLong(2).reciprocal()),
+            LinearAuthorityResult())
+
+        val replay = LinearAuthorityReplay.run(capture.records.single(), emptySet(), 1_000_000L, 4_000_000L,
+            Cancellation.Never)
+
+        val record = assertNotNull(replay.query)
+        assertEquals(guarded.scope, record.context.scope)
+        assertTrue(record.cited.first().first.strict)
+        assertEquals(BigFraction.ofLong(2).reciprocal(), record.cuts.single().violation)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(guarded.withLinearAuthority())
+            .verify(assertNotNull(record.bound)))
+    }
+
+    @Test
     fun `observer should preserve source operations and numerical accounting`() {
         val baseline = SourceLpBudget()
         val observed = SourceLpBudget()
