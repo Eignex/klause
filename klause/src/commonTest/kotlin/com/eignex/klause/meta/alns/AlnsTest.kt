@@ -57,6 +57,28 @@ import kotlin.test.assertTrue
 class AlnsTest {
 
     @Test
+    fun `accepted nonbest centers should retain the standing best cutoff`() {
+        val problem = selectProblem()
+        val best = selectOptimum()
+        val worse = Sample(BooleanArray(SELECT_WEIGHTS.size) { true }, LongArray(0))
+        val trace = RepairTrace("ALNS accepted nonbest centers")
+        val alns = Alns(inner = bootstrapAt(problem, best),
+            destroyOperators = listOf(DestroyOperator.Random), repairOperators = listOf(RepairOperator { worse }),
+            acceptance = AcceptanceCriterion.RandomWalk, minDestroyFraction = 1.0, maxDestroyFraction = 1.0,
+            maxIterations = 2, flipsPerIteration = 1)
+        alns.repairTrace = trace
+
+        alns.minimize(selectObjective, LocalSearchParams(initialAssignment = best, randomSeed = 7))
+
+        val attempt = trace.attempts.last()
+        assertEquals(worse, attempt.center)
+        assertEquals(best, attempt.bestSample)
+        assertEquals(selectObjective.evaluate(best), attempt.bestObjectiveCutoff)
+        assertEquals(selectObjective.evaluateExact(best), attempt.exactBestObjective)
+        assertTrue(attempt.scopeComplete)
+    }
+
+    @Test
     fun `available incumbents should start repair without bootstrapping`() {
         val problem = selectProblem()
         val seed = Sample(BooleanArray(SELECT_WEIGHTS.size) { true }, LongArray(0))

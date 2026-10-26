@@ -1,5 +1,6 @@
 package com.eignex.klause.localsearch
 
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
@@ -36,6 +37,14 @@ internal class RepairTrace(
         var repairVerdict: String? = null
             internal set
         var repairReason: TerminationReason? = null
+            internal set
+        var bestObjectiveCutoff: Double? = null
+            internal set
+        var exactBestObjective: BigFraction? = null
+            internal set
+        var bestSample: Sample? = null
+            internal set
+        var scopeComplete: Boolean = false
             internal set
     }
 
@@ -106,5 +115,12 @@ internal class RepairTrace(
             is MinimizeResult.Unknown -> result.reason
             else -> null
         }
+    }
+
+    fun recordBest(attempt: Attempt, cutoff: Double, sample: Sample, exact: BigFraction) {
+        require(sample.numBoolVars.toLong() + sample.numIntVars + sample.numRealVars <= maxCoordinates)
+        attempt.bestObjectiveCutoff = cutoff
+        attempt.exactBestObjective = exact
+        attempt.bestSample = sample
     }
 }

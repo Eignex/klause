@@ -363,6 +363,10 @@ internal class Alns(
                     destroyed.bools, destroyed.ints, freed?.bools ?: intArrayOf(), freed?.ints ?: intArrayOf(),
                 )
                 tracedRepair = attempt
+                if (attempt != null) {
+                    attempt.scopeComplete = freed != null
+                    repairTrace?.recordBest(attempt, bestObj, bestSample, objective.evaluateExact(bestSample))
+                }
                 if (freed == null) {
                     repairTrace?.finish(attempt, RepairEndpoint.Censored)
                     iter++

@@ -7,6 +7,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.acceptance.AcceptanceRule
 import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
@@ -64,7 +65,9 @@ class RepairTraceTest {
         for ((result, verdict, reason) in listOf(
             Triple(MinimizeResult.Infeasible(), "Infeasible", null),
             Triple(MinimizeResult.Unknown(TerminationReason.Cancelled), "Unknown", TerminationReason.Cancelled),
-            Triple(MinimizeResult.Unknown(TerminationReason.BudgetExhausted), "Unknown", TerminationReason.BudgetExhausted),
+            Triple(
+                MinimizeResult.Unknown(TerminationReason.BudgetExhausted), "Unknown", TerminationReason.BudgetExhausted,
+            ),
         )) {
             val attempt = assertNotNull(trace.begin("control", 7, sample, sample))
 
@@ -74,6 +77,23 @@ class RepairTraceTest {
             assertEquals(reason, attempt.repairReason)
             assertNull(attempt.endpoint)
         }
+    }
+
+    @Test
+    fun `the best cutoff witness should remain distinct from a worse center`() {
+        val trace = RepairTrace("accepted nonbest center")
+        val center = Sample(booleanArrayOf(), longArrayOf(1))
+        val best = Sample(booleanArrayOf(), longArrayOf(0))
+        val exact = BigFraction.ofLong(-9_007_199_254_740_993)
+        val objective = LinearObjective(intCoefficients = longArrayOf(1), constant = -9_007_199_254_740_993)
+        val attempt = assertNotNull(trace.begin("alns", 7, center, center))
+
+        trace.recordBest(attempt, objective.evaluate(best), best, objective.evaluateExact(best))
+
+        assertEquals(center, attempt.center)
+        assertEquals(best, attempt.bestSample)
+        assertEquals(-9_007_199_254_740_992.0, attempt.bestObjectiveCutoff)
+        assertEquals(exact, attempt.exactBestObjective)
     }
 
     @Test

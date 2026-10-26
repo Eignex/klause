@@ -2993,6 +2993,41 @@ solve seconds change from 2.760/2.789 to 2.677/2.815 on the small source and fro
 coexists with a small-source mean loss; this is not uniform optimization recovery
 or a general speedup.
 
+### Source repair distance and exact freedoms
+
+[Capture 8427](https://lab.eignex.com/jobs/8427), at `30c3d4b7f7`, runs the three
+self-authored finite repair controls on Linux/amd64 with seed 7 and 128 counted
+moves per walk. Objective-coordinate and existing structured descent each have
+an unobserved and observed repetition. Two additional assignment captures use
+instruction slices; their phase records match the unsliced records byte for byte.
+All eight final-witness/objective/pick/work/restart/stall comparisons pass.
+Original source hashes, runtime, compiler, dependency and solver/CLI identities
+remain in the capture. All 196 bounded CP completions pass native original-source
+checks; those checks establish no independently checked proof or unpinned optimum.
+
+For each relation, complete two-coordinate freedoms admit strict improvements at
+three of four coordinate-descent endpoints. Eight individual freedoms admit none;
+sixteen size-matched samples find two improvements. Existing structured descent
+reaches objective zero on every source, and complete blocks admit no improvement
+at its three recorded feasible endpoints. This separates a missed coordinated
+completion from exhaustion at a stronger endpoint. It supplies no reason to replace
+the existing structured sources or admit a removal policy into default routing.
+
+Assignment and resource blocks spend one CP node per completion; placement blocks
+spend two. Individual controls spend zero or one. These units remain separate from
+physical time. The trace retains at most 32 attempts, with 942/1,256 modeled
+coordinate reads on the coordinate-descent controls and 102/136 on structured
+controls; 97 further coordinate-descent attempts decline capture. Censored records
+receive no basin label. Per-walk thread allocations and elapsed time are retained,
+but the cold ordered instrumented repetitions establish no overhead or speedup claim.
+
+[Source checks 8434](https://lab.eignex.com/jobs/8434), at `272a5fea2a`, retain
+all three original hashes and run CP, mixed and structured LS with seeds 7/19,
+P1, two seconds and presolve disabled. All 18 final witnesses have objective zero
+and pass XCSP3-tools SolutionChecker 2.5.1 at `ca58fc79a4`. Native proof claims
+remain separate from those independent witness checks. The small controls select
+the observation contract; larger coordinated barriers require further comparisons.
+
 ### Prepared board-restart outcomes
 
 The coordinate-changing treatment in [#3447](https://github.com/Eignex/klause/pull/3447)

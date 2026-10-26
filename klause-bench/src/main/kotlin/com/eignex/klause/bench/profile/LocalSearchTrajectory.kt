@@ -257,7 +257,8 @@ internal object LocalSearchTrajectory {
                             if (mode == "walk") baseline = signature
                             if (mode == "repair") {
                                 check(baseline == signature) { "repair observation changed the fixed-work walk" }
-                                out.resolve("parity-$rewrite.txt").writeText("witness/objective/picks/work/restarts/stalls/board counts match\n")
+                                out.resolve("parity-$rewrite.txt").writeText(
+                                    "witness/objective/picks/work/restarts/stalls/board counts match\n")
                             }
                         }
                     }
