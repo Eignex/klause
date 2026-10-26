@@ -25,11 +25,13 @@ internal data class LinearAuthorityAggregateLimits(
     val rows: Int = 4,
     val support: Int = 128,
     val scalarBits: Int = 256,
+    val proofBytes: Long = 16_384L,
     val work: Long = 65_536L,
     val allocation: Long = 1024L * 1024L,
 ) {
     init {
-        require(rows >= 2 && support > 0 && scalarBits in 1..4096 && work >= 0L && allocation >= 0L)
+        require(rows >= 2 && support > 0 && scalarBits in 1..4096 &&
+            proofBytes >= 0L && work >= 0L && allocation >= 0L)
     }
 }
 
@@ -43,20 +45,26 @@ internal object LinearAuthorityAggregateCuts {
         observe("AggregateAttempts", 1L)
         return try {
             meter.reserve(1L)
-            if (terms.size !in 2..limits.rows || terms.any { it.owner < 0 || it.premise.isBlank() } ||
-                terms.map { it.owner }.distinct().size != terms.size ||
-                terms.map { it.premise }.distinct().size != terms.size) return null
+            if (terms.size !in 2..limits.rows) throw AggregateStop("RowLimit")
             meter.reserve(terms.size.toLong(), terms.size * 128L)
+            val identityCharacters = terms.sumOf { it.premise.length.toLong() }
+            val proofBytes = identityCharacters * 2L + terms.size * (128L + (limits.scalarBits + 7L) / 4L)
+            if (proofBytes > limits.proofBytes) throw AggregateStop("ProofLimit")
+            meter.reserve(identityCharacters, proofBytes)
+            if (terms.any { it.owner < 0 || it.premise.isBlank() } ||
+                terms.map { it.owner }.distinct().size != terms.size ||
+                terms.map { it.premise }.distinct().size != terms.size) throw AggregateStop("SourceIdentity")
             val coefficients = linkedMapOf<SourceCoordinate, BigFraction>()
             var rhs = BigFraction.ZERO
             var strict = false
             for (term in terms) {
                 val weight = meter.number(term.weight)
-                if (weight <= BigFraction.ZERO || term.inequality.supportSize > limits.support) return null
+                if (weight <= BigFraction.ZERO) throw AggregateStop("NonpositiveWeight")
+                if (term.inequality.supportSize > limits.support) throw AggregateStop("SupportLimit")
                 val row = term.inequality.coefficients
                 meter.reserve(row.size.toLong(), row.size * 64L)
                 for ((id, value) in row) {
-                    if (id.kind == SourceCoordinate.Kind.Boolean) return null
+                    if (id.kind == SourceCoordinate.Kind.Boolean) throw AggregateStop("BooleanActivity")
                     if (id !in coefficients && coefficients.size >= limits.support) {
                         throw AggregateStop("SupportLimit")
                     }
@@ -67,7 +75,11 @@ internal object LinearAuthorityAggregateCuts {
                 strict = strict || term.inequality.strict
             }
             val activity = coefficients.filterValues { !it.isZero }
-            if (activity.isEmpty() || activity.keys.any { it.kind != SourceCoordinate.Kind.Integer }) {
+            if (activity.isEmpty()) {
+                observe("AggregateNoIntegerActivity", 1L)
+                return null
+            }
+            if (activity.keys.any { it.kind != SourceCoordinate.Kind.Integer }) {
                 observe("AggregateContinuousResidual", 1L)
                 return null
             }
@@ -101,6 +113,7 @@ internal object LinearAuthorityAggregateCuts {
                 SourceDerivation.Combination.Term(meter.multiply(it.weight, scale),
                     SourceDerivation.Premise(it.premise))
             }))
+            meter.reserve(1L)
             observe("AggregateCandidates", 1L)
             LinearAuthorityCut(terms.first().owner, SourceInequality(normalized, rounded), proof,
                 owners = terms.mapTo(linkedSetOf()) { it.owner })

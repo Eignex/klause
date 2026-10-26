@@ -105,14 +105,15 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
-    fun `aggregate admission should bound source count support work and allocation`() {
+    fun `aggregate admission should bound source count support proof work and allocation`() {
         val terms = listOf(
             LinearAuthorityAggregateTerm(0, "left", left, BigFraction.ONE),
             LinearAuthorityAggregateTerm(1, "right", right, BigFraction.ONE),
             LinearAuthorityAggregateTerm(2, "third", left, BigFraction.ONE),
         )
         for (limits in listOf(LinearAuthorityAggregateLimits(rows = 2),
-            LinearAuthorityAggregateLimits(support = 1), LinearAuthorityAggregateLimits(work = 1),
+            LinearAuthorityAggregateLimits(support = 1), LinearAuthorityAggregateLimits(proofBytes = 1),
+            LinearAuthorityAggregateLimits(work = 1),
             LinearAuthorityAggregateLimits(allocation = 1))) {
             val cut = LinearAuthorityAggregateCuts.derive(terms, Cancellation.Never, limits = limits)
 
@@ -136,6 +137,41 @@ class LinearAuthorityAggregateCutsTest {
         assertEquals(1L, observations["AggregateScalarLimit"])
         assertTrue(assertNotNull(observations["AggregateWork"]) > 0L)
         assertTrue(assertNotNull(observations["AggregateAllocation"]) > 0L)
+    }
+
+    @Test
+    fun `large cancelling coefficients should retain their exact source proof`() {
+        val large = BigFraction.of(BIG_ONE shl 127, BIG_ONE)
+        val largeLeft = SourceInequality(mapOf(x to BigFraction.ofLong(2), real to large), BigFraction.ofLong(3))
+        val largeRight = SourceInequality(mapOf(y to BigFraction.ofLong(2), real to large.negated()), BigFraction.ZERO)
+        val source = SourceProofContext(scope, setOf(x, y, real), mapOf(
+            "left" to SourcePremise(largeLeft), "right" to SourcePremise(largeRight)))
+
+        val cut = assertNotNull(LinearAuthorityAggregateCuts.derive(listOf(
+            LinearAuthorityAggregateTerm(0, "left", largeLeft, BigFraction.ONE),
+            LinearAuthorityAggregateTerm(1, "right", largeRight, BigFraction.ONE),
+        ), Cancellation.Never))
+
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
+    fun `repeated declined aggregates should retain every failed attempt cost`() {
+        val observations = linkedMapOf<String, Long>()
+        val terms = listOf(
+            LinearAuthorityAggregateTerm(0, "left", left, BigFraction.ONE),
+            LinearAuthorityAggregateTerm(1, "right", right, BigFraction.ofLong(2)),
+        )
+        LinearAuthorityAggregateCuts.derive(terms, Cancellation.Never,
+            { key, value -> observations[key] = (observations[key] ?: 0L) + value })
+        val first = observations.toMap()
+
+        val cut = LinearAuthorityAggregateCuts.derive(terms, Cancellation.Never,
+            { key, value -> observations[key] = (observations[key] ?: 0L) + value })
+
+        assertNull(cut)
+        assertEquals(first.mapValues { (_, value) -> value * 2L }, observations)
     }
 
     @Test
