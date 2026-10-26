@@ -14,6 +14,28 @@ import kotlin.test.assertSame
 
 class SearchRunTest {
     @Test
+    fun `root reset should retire an exhausted fragment budget`() {
+        var remaining = 1
+        var prune = false
+        val session = SearchSession(emptyList())
+        session.initialize()
+        val run = session.openRun(1, decisionBudget = SearchDecisionBudget { remaining-- > 0 },
+            nodePolicy = object : SearchNodePolicy {
+                override fun beforeBranch(context: SearchContext): SearchNodeDisposition =
+                    if (prune) SearchNodeDisposition.Prune else SearchNodeDisposition.Expand
+            })
+        assertIs<SearchRunEvent.Satisfied>(run.next())
+        assertEquals(SearchRunEvent.Indeterminate.Budget, run.next())
+        session.popTo(0)
+        prune = true
+
+        run.reset()
+        val completed = run.next()
+
+        assertEquals(SearchRunEvent.Exhausted, completed)
+    }
+
+    @Test
     fun `a cancelled assertion should retry its unrefuted alternative after a pause`() {
         for (cancelAfterConflict in listOf(false, true)) {
             var cancelled = false
