@@ -259,17 +259,17 @@ internal class LinearAuthorityTraversal(
                 else -> SearchNodeDisposition.Indeterminate
             }
         }
-        if (!current.pending && current.split == null) {
-            refutations?.find(current.condition)?.let { evidence ->
+        if (refutations != null && !current.pending && current.split == null) {
+            refutations.find(current.condition)?.let { evidence ->
                 current.result = LinearAuthorityResult(evidence = evidence)
                 pending--
                 observe("numericalClosedLeaves")
                 observe("numericalAvoidedQueries")
                 return SearchNodeDisposition.Prune
             }
+            if (cancellation()) return SearchNodeDisposition.Indeterminate
+            if (pause()) return SearchNodeDisposition.Pause
         }
-        if (cancellation()) return SearchNodeDisposition.Indeterminate
-        if (pause()) return SearchNodeDisposition.Pause
         if (!current.pending && !context.consumeCheck()) return SearchNodeDisposition.Indeterminate
         val branch = if (queriedNode === current) checkNotNull(queriedSource) else
             source.atScope(source.scope.copy(condition = current.condition)).also {
