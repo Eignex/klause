@@ -73,7 +73,8 @@ internal class FiniteNumericalCompanions private constructor(
                 val limits = local(slot)
                 val repair = slot.own(JointLinearRepair(model, context, objective, limits,
                     boundOrdered = true, external = { incumbents.exchange.current()?.assignment },
-                    publicationLifetime = limits.cancellation or limits.timeout))
+                    publicationLifetime = limits.cancellation or limits.timeout,
+                    sourceIntegers = plan.jointRepairIntegers(model)))
                 val worker = exactNeighborhoodWorker("ls/finite-joint-companion", firstArm + 1, objective,
                     limits.cancellation, limits.timeout, { repair.exhausted },
                     open = { repair.search(adaptive = false, seed = slot.seed) })
