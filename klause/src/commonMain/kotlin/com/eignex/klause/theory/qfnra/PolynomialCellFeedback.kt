@@ -94,7 +94,10 @@ internal class PolynomialCellFeedback(
         step(arithmetic)
         if (candidateWork >= maximumCandidateWork) return null
         if (premises.atoms.size > MAX_FEEDBACK_PREMISES ||
-            premises.bools.size > MAX_FEEDBACK_PREMISES - premises.atoms.size) return null
+            premises.bools.size > MAX_FEEDBACK_PREMISES - premises.atoms.size) {
+            scopeDeclines++
+            return null
+        }
         return producer ?: PolynomialCellScope.Region(source, condition, snapshot,
             PolynomialBooleanRegion(premises.atoms.mapValues { step(arithmetic); it.value },
                 premises.bools.mapValues { step(arithmetic); it.value }), Any())
@@ -159,7 +162,7 @@ internal class PolynomialCellFeedback(
         if (rebuild || availableCount != available.size) {
             for (index in 0 until minOf(MAX_FEEDBACK_CELLS, available.size)) {
                 step(arithmetic)
-                admit(available[index], arithmetic)
+                admit(available[index], arithmetic, origin = null)
             }
             rebuild = false
             availableCount = available.size
@@ -192,14 +195,18 @@ internal class PolynomialCellFeedback(
         return null
     }
 
-    fun admit(cell: CheckedPolynomialCell, arithmetic: PolynomialArithmetic) {
+    fun admit(
+        cell: CheckedPolynomialCell,
+        arithmetic: PolynomialArithmetic,
+        origin: PolynomialCellScope? = active,
+    ) {
         step(arithmetic)
         val context = active ?: return
         if (cell.scope.source !== source) return
         val regional = cell.scope as? PolynomialCellScope.Region
         if (regional != null && (regional.premises.atoms.size > MAX_FEEDBACK_PREMISES ||
                 regional.premises.bools.size > MAX_FEEDBACK_PREMISES - regional.premises.atoms.size)) return
-        val entry = Entry(cell, context)
+        val entry = Entry(cell, origin)
         if (!valid(entry, context)) return
         for (retained in entries) {
             step(arithmetic)
@@ -282,7 +289,7 @@ internal class PolynomialCellFeedback(
 
     private class Entry(
         val cell: CheckedPolynomialCell,
-        origin: PolynomialCellScope,
+        origin: PolynomialCellScope?,
         var uses: Long = 0,
     ) {
         var firstRegion: PolynomialCellScope.Region? = origin as? PolynomialCellScope.Region

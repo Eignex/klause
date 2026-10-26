@@ -5320,6 +5320,8 @@ including its checked predicate/cell, signed regional premises, numeric conditio
 and process-local source/snapshot/reduction identities. Scope previews cap condition
 maps and wide coefficients and mark incomplete rendering. The engine retains the
 exact guards; these diagnostic strings supply no proof or persistent source mapping.
+An origin is an observed producing regional context or the first successful regional
+lookup; importing a bank fact does not assign it a regional origin.
 An absent trace establishes no cross-region reuse, even when lookup counts are nonzero.
 `firstCellFeedbackUse` also records reuse within one regional owner. Both traces keep
 the actual rejected numeric candidate's defining coefficients, root and isolating
