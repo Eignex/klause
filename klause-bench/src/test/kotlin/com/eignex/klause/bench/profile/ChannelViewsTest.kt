@@ -2,7 +2,6 @@ package com.eignex.klause.bench.profile
 
 import com.eignex.klause.factor.global.Inverse
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
-import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep
@@ -80,17 +79,28 @@ class ChannelViewsTest {
     }
 
     @Test
-    fun `aliased and competing inverse channels decline without a partial view`() {
-        val cases = listOf(
-            arrayOf<Factor>(Inverse(intArrayOf(0, 1), intArrayOf(0, 1))),
-            arrayOf<Factor>(Inverse(intArrayOf(0, 1), intArrayOf(2, 3)),
-                Inverse(intArrayOf(2, 3), intArrayOf(4, 5))),
-        )
-        for (factors in cases) {
-            val source = Problem(0, 6, Array(6) { IntDomain(0, 1) }, factors)
+    fun `aliased inverse channels decline without a partial view`() {
+        val source = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            arrayOf(Inverse(intArrayOf(0, 1), intArrayOf(0, 1))))
 
-            assertNull(inverseAssignmentView(source, Cancellation.Never))
-        }
+        assertNull(inverseAssignmentView(source, Cancellation.Never))
+    }
+
+    @Test
+    fun `competing inverse channels decline without a partial view`() {
+        val source = Problem(0, 6, Array(6) { IntDomain(0, 1) },
+            arrayOf(Inverse(intArrayOf(0, 1), intArrayOf(2, 3)),
+                Inverse(intArrayOf(2, 3), intArrayOf(4, 5))))
+
+        assertNull(inverseAssignmentView(source, Cancellation.Never))
+    }
+
+    @Test
+    fun `many to one value channels do not supply an inverse assignment view`() {
+        val source = parseFlatZinc("var 1..2: x; var 7..7: y; " +
+            "constraint array_int_element(x, [7, 7], y) :: defines_var(y); solve satisfy;")
+
+        assertNull(inverseAssignmentView(source.problem, Cancellation.Never))
     }
 
     @Test
