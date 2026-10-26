@@ -141,6 +141,9 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** Checked numerical source-row separation control. */
         val sourceCuts: ExecutionOption<Boolean> = ExecutionOption("source-cuts", ValueKind.BOOLEAN)
 
+        /** Point-based selection of checked numerical source rows. */
+        val sourcePointCuts: ExecutionOption<Boolean> = ExecutionOption("source-point-cuts", ValueKind.BOOLEAN)
+
         /** Native polynomial or function arithmetic work; null means unlimited. */
         val nraWorkLimit: ExecutionOption<Long?> = ExecutionOption("nra-work-limit", ValueKind.ALLOWANCE)
 
@@ -385,6 +388,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 dryRunPresolve, affinePivotOrder, presolveAbortFraction, presolveMaxRounds,
                 presolveProbePerVar, presolveProbeTotal,
                 nodeLimit, openWorkLimit, sourceLpWorkLimit, sourceLpAllocationLimit, sourceLpOperations, sourceCuts,
+                sourcePointCuts,
                 nraWorkLimit, nraDenseCoefficients, nraMatrixCells, niaCandidates, niaMoves,
                 niaCellRefinement, niaCellReuse,
                 maxFlips, maxInstructions, alnsIterations, sharedRestart, openBranching,

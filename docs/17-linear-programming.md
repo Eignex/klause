@@ -705,6 +705,22 @@ Observing performs no solve. Explicit replay creates a fresh owner with separate
 cumulative work, allocation, operation and cancellation allowances; it rechecks
 source derivations and cannot publish deductions into the original traversal.
 
+`source-point-cuts=true` opts the retained frontier into point-based separation.
+The first relaxation uses its retained checked mask; a completed point can add
+one selection round at that node. The score combines normalized violation,
+inverse square-root support and objective parallelism. The model-facing cut pool
+and source selector share the greedy parallelism filter. Floating scores guide
+selection; source inequalities and their derivations remain exact rationals.
+Nonfinite projections supply no score. Each call visits at most 8,192 support
+entries with 65,536 modeled scoring work and 1 MiB modeled allocation, within the
+containing cumulative source allowance. A template retains at most 64 selected IDs.
+Changing its source layout clears those IDs; every query rechecks guards, pins and
+derivations. Unselected cut rows are omitted from masked queries, and changed row
+layouts invalidate numerical cursors through the ordinary compatibility checks.
+Completed base bounds survive a paused or declined separation round. Checked base
+incumbents and terminals bypass extra separation. The ordinary default activates
+all accepted source cuts.
+
 ### Tolerance recovery
 
 MPS finite-leaf tolerance recovery can justify a tolerance gap with exact basis

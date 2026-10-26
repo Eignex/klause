@@ -9,6 +9,7 @@ import com.eignex.klause.lp.optimization.LinearAuthorityCapture
 import com.eignex.klause.lp.optimization.LinearAuthorityResult
 import com.eignex.klause.lp.optimization.atScope
 import com.eignex.klause.lp.optimization.floorSplit
+import com.eignex.klause.lp.optimization.strongerLinearBound
 import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
@@ -48,6 +49,7 @@ internal class LinearAuthorityTraversal(
     private val useCuts: Boolean = true,
     useActiveRows: Boolean = false,
     useSupportBranching: Boolean = false,
+    private val pointCuts: Boolean = false,
     private val onNumericalFeedback: ((SourceNumericalFeedbackResult) -> Unit)? = null,
 ) : SearchBrancher, SearchBranchProposal, SearchNodePolicy, AutoCloseable {
     override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
@@ -100,7 +102,8 @@ internal class LinearAuthorityTraversal(
     private var retained = 1L
 
     fun observations(): Map<String, Long> = observations + authority.cutObservations().mapValues { (key, value) ->
-        if (key.endsWith("Work")) value - (initialCutObservations[key] ?: 0L) else value
+        if (key.endsWith("Work") || key.startsWith("numericalCutSelection"))
+            value - (initialCutObservations[key] ?: 0L) else value
     } + mapOf(
         "numericalPendingLeaves" to pending,
         "numericalPeakPendingLeaves" to peakPending,
@@ -142,7 +145,7 @@ internal class LinearAuthorityTraversal(
     fun frontierRank(): BigFraction? {
         val minimizes = source.scope.objective?.sense == com.eignex.klause.ir.ObjectiveSense.MINIMIZE
         return path.mapNotNull { (_, node) ->
-            val claim = (node.coveredBound ?: node.result?.bound)?.claim as? SourceClaim.Bound
+            val claim = (node.coveredBound ?: node.result?.bound ?: node.partialBound)?.claim as? SourceClaim.Bound
             val value = (claim?.value as? SourceValue.Rational)?.value
             if (minimizes) value else value?.negated()
         }.reduceOrNull { left, right -> if (left >= right) left else right }
@@ -258,14 +261,18 @@ internal class LinearAuthorityTraversal(
                 queriedNode = current
                 queriedSource = it
             }
-        val result = if (useGuidance) authority.advance(branch, cancellation, cuts = useCuts)
+        val queried = if (useGuidance && useCuts && pointCuts) authority.advanceWithPointCuts(branch, cancellation)
+            else if (useGuidance) authority.advance(branch, cancellation, cuts = useCuts)
             else authority.check(branch, cancellation)
+        val result = if (current.partialBound == null) queried else
+            queried.copy(bound = strongerLinearBound(current.partialBound, queried.bound))
         for ((stage, count) in result.primalStages) {
             val key = "numerical$stage"
             val previous = observations[key] ?: 0L
             observations[key] = if ("Max" in stage) maxOf(previous, count) else previous + count
         }
         if (result.paused) {
+            current.partialBound = strongerLinearBound(current.partialBound, result.bound)
             feedback?.consume(branch, paused = true)?.let { onNumericalFeedback?.invoke(it) }
             current.pending = true
             observe("numericalLpPauses")
@@ -358,7 +365,7 @@ internal class LinearAuthorityTraversal(
         val minimizes = source.scope.objective?.sense == com.eignex.klause.ir.ObjectiveSense.MINIMIZE
         for ((_, ancestor) in path.dropLast(1).asReversed()) {
             if (cancellation()) return false
-            val inherited = ancestor.coveredBound ?: ancestor.result?.bound ?: continue
+            val inherited = ancestor.coveredBound ?: ancestor.result?.bound ?: ancestor.partialBound ?: continue
             val claim = inherited.claim as? SourceClaim.Bound ?: continue
             val value = (claim.value as? SourceValue.Rational)?.value ?: continue
             if (if (minimizes) value < standing else value > standing) continue
@@ -431,12 +438,13 @@ private class CoverageNode(val condition: SourceCondition) {
     var result: LinearAuthorityResult? = null
     var coveredBound: SourceEvidence? = null
     var pending: Boolean = false
+    var partialBound: SourceEvidence? = null
 
     fun boundCoverage(inherited: SourceEvidence?, minimizes: Boolean, cancellation: Cancellation): BoundCoverage? {
         if (cancellation()) return null
         fun value(evidence: SourceEvidence): BigFraction =
             ((evidence.claim as SourceClaim.Bound).value as SourceValue.Rational).value
-        val bound = listOfNotNull(inherited, coveredBound, result?.bound).reduceOrNull { left, right ->
+        val bound = listOfNotNull(inherited, coveredBound, result?.bound, partialBound).reduceOrNull { left, right ->
             if (if (minimizes) value(left) >= value(right) else value(left) <= value(right)) left else right
         }
         val children = split

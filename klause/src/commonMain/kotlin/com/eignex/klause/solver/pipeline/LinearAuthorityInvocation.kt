@@ -98,7 +98,7 @@ internal class LinearAuthorityInvocation(
         useGuidance = boundOrdered || guidance || supportBranching || onNumericalFeedback != null,
         inheritBounds = boundOrdered, useCuts = cuts,
         useActiveRows = activeRows, useSupportBranching = supportBranching,
-        onNumericalFeedback = onNumericalFeedback)
+        pointCuts = boundOrdered && params.sourcePointCuts, onNumericalFeedback = onNumericalFeedback)
     private val session = SearchComponentSet(listOf(component)).session(params.maxLeaves, stop).also {
         it.bindOpenTheoryWork(state.work)
     }
