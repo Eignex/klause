@@ -42,6 +42,8 @@ import kotlin.random.Random
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -354,6 +356,12 @@ internal object ObjectiveViewComparison {
         }
         if (walk) return null
         val captured = first ?: return null
+        out.resolve("initial-policy.json").writeText(buildJsonObject {
+            put("activeInvariantNetwork", captured.invariants != null)
+            put("heuristicObjective", captured.shaping.objective?.javaClass?.name)
+            put("objectiveIntegerHotspots", JsonArray(captured.shaping.objectiveIntVars.map(::JsonPrimitive)))
+            put("observationPhase", "after private initialization stop; outside walk")
+        }.toString())
         val shadow = LocalSearchState(captured.model, Random(seed), captured.assumptions, captured.projection)
         val activeSweep = prepared.sweep?.takeIf { captured.invariants != null }
         shadow.invariants = activeSweep?.network(problem.numIntVars, problem.numBoolVars)
