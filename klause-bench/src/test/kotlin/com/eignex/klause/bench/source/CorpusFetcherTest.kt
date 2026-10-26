@@ -10,8 +10,27 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import org.tukaani.xz.LZMA2Options
+import org.tukaani.xz.LZMAOutputStream
 
 class CorpusFetcherTest {
+    @Test
+    fun `LZMA unpacking preserves original instance bytes`() {
+        val root = Files.createTempDirectory("corpusfetcher").toFile()
+        try {
+            val packed = File(root, "instance.xml.lzma")
+            val bytes = "<instance>original source</instance>\n".encodeToByteArray()
+            LZMAOutputStream(packed.outputStream(), LZMA2Options(0), bytes.size.toLong()).use { it.write(bytes) }
+
+            CorpusFetcher.unpackLzma(packed)
+
+            assertContentEquals(bytes, File(root, "instance.xml").readBytes())
+            assertFalse(packed.exists())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
     @Test
     fun `ZIP extraction preserves nested instance bytes`() {
         val root = Files.createTempDirectory("corpusfetcher").toFile()

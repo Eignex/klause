@@ -24,6 +24,8 @@ dependencies {
     implementation("com.eignex:kumulant:0.3.4-20261013.194059-67")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+    implementation("org.tukaani:xz:1.12")
+    implementation("com.github.luben:zstd-jni:1.5.7-24")
     // runBlocking + Flow.collect bridge for the suspend Portfolio API in the anytime metric.
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
 }
