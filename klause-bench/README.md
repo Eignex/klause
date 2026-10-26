@@ -1384,6 +1384,8 @@ with the report. This source-only screen does not stand in for mapped working-mo
 applicability or paired-state grading. Inverse-role experiments transpose only
 disjoint native `Inverse` factors, at most sixteen relations of at most 64 entries,
 retaining every other factor, source domain and implied-factor role.
+Optional `source0=BASE64` through `source7=BASE64` supply the corresponding original
+source bytes directly, at most 64 KiB each, checked against the requested hashes.
 
 `bench.profile.LocalSearchTrajectory` takes `suite=ID problem=NAME sha256=HEX
 recipe=LABEL seed=N moves=N` for a hash-pinned minimizing XCSP3 source. It compares
@@ -1391,6 +1393,17 @@ protected and substituted objective coordinates through mixed-route preparation,
 then runs the selected local-search recipe alone with a fixed allowance counting
 moves and restarts, and no shared incumbents. The seed is the worker seed,
 including its portfolio index.
+Optional `channel=SearchedValues|SearchedPredicates|SearchedChannels|InverseAssignment`
+compares the maintained view with one bounded channel treatment. Both arms retain
+objective coordinates and the same functional objective view. Value treatments
+leave Boolean-value and Element outputs searched; predicate treatments leave
+comparison and membership outputs searched. Other admitted definitions remain
+maintained. Inverse assignment transposes the roles of admitted native `Inverse`
+factors and reuses their repairs and swaps; it changes proposals while retaining
+both source arrays. These channel comparisons also admit satisfaction sources.
+No general inverse or deterministic extension of an inconsistent channel is supplied.
+Optional `source64=BASE64` supplies at most 64 KiB of hash-checked original bytes
+without catalog extraction; the source mode and bytes are retained with the capture.
 Optional `sliceMillis=N sliceWork=N` repeatedly resumes the same handle under
 those cooperative allowances; omitted allowances are unbounded. Timed slices
 depend on capture overhead and host speed and do not reproduce portfolio allocation.

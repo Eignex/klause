@@ -1,11 +1,8 @@
 package com.eignex.klause.bench.profile
 
-import com.eignex.klause.bench.catalog.Catalog
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
-import com.eignex.klause.bench.source.CorpusFetcher
-import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.formats.xcsp3.Xcsp3
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.VarRemap
@@ -76,35 +73,32 @@ internal object LocalSearchTrajectory {
     private fun capture(args: Array<String>, out: File) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val required = setOf("suite", "problem", "sha256", "recipe", "seed", "moves")
-        val optional = setOf("sliceMillis", "sliceWork", "greedy", "repairs", "controls", "center", "source64")
+        val optional = setOf("sliceMillis", "sliceWork", "greedy", "repairs", "controls", "center", "source64", "channel")
         require(options.keys.containsAll(required) && options.keys.all {
             it in required || it in optional
         })
-        val bytes = options["source64"]?.let {
-            require(it.length <= 96 * 1024)
-            Base64.getDecoder().decode(it)
-        } ?: run {
-            val reference = Catalog.uncapped(options.getValue("suite")).problems
-                .single { it.name == options.getValue("problem") }
-            CorpusFiles.open(CorpusFetcher.resolve(reference.source)).use {
-                it.readNBytes(64 * 1024 * 1024 + 1)
-            }
-        }
-        require(bytes.size <= 64 * 1024 * 1024 && sha256(bytes) == options.getValue("sha256"))
+        val bytes = trajectorySourceBytes(options.getValue("suite"), options.getValue("problem"),
+            options.getValue("sha256"), options["source64"])
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
         out.resolve("source.xml").writeBytes(bytes)
         out.resolve("request.txt").writeText(args.joinToString("\n"))
         val parsed = Xcsp3.parse(bytes.decodeToString())
         require(parsed.problem.numBoolVars.toLong() + parsed.problem.numIntVars <= TRAJECTORY_COORDINATE_LIMIT)
         require(parsed.problem.numFactors <= TRAJECTORY_FACTOR_LIMIT)
-        val objective = requireNotNull(parsed.objective).toLinearObjective()
+        val objective = parsed.objective?.toLinearObjective()
         require(parsed.sense == ObjectiveSense.MINIMIZE)
+        val channel = options["channel"]?.let(ChannelView::valueOf)
+        require(channel != null || objective != null)
+        val variants = if (channel == null) listOf(
+            ViewSpec("false", false, ChannelView.Maintained), ViewSpec("true", true, ChannelView.Maintained),
+        ) else listOf(ViewSpec("maintained", false, ChannelView.Maintained), ViewSpec(channel.name, false, channel))
         val seed = options.getValue("seed").toLong()
         val moves = options.getValue("moves").toLong().also { require(it in 1..1_000_000) }
         val sliceMillis = options["sliceMillis"]?.toLong()?.also { require(it > 0L) } ?: Long.MAX_VALUE
         val sliceWork = options["sliceWork"]?.toLong()?.also { require(it > 0L) } ?: Long.MAX_VALUE
         val repairGreedy = options["greedy"]?.toBooleanStrict() ?: true
         val repairCapture = options["repairs"]?.toBooleanStrict() ?: false
+        require(!repairCapture || objective != null)
         val exactControls = options["controls"]?.toBooleanStrict() ?: false
         val sourceCheck = if (repairCapture) parsed.problem.bake() else null
         require(!exactControls || repairCapture)
@@ -119,18 +113,26 @@ internal object LocalSearchTrajectory {
             Sample(booleanArrayOf(), it)
         }
         require(initial == null || parsed.definedVars.isEmpty())
+        require(initial == null || channel == null)
         val views = ArrayList<TrajectoryView>()
         val observations = ArrayList<Observation>()
         out.resolve("capture-policy.json").writeText(buildJsonObject {
             put("revision", Reports.readGitSha() ?: System.getenv("LAB_WORKTREE")?.let(::File)?.name
                 ?.takeIf { it.matches(Regex("[0-9a-f]{40}")) })
             put("sourceSha256", sha256(bytes))
+            put("sourceMode", if ("source64" in options) "embedded" else "catalog")
             put("declaredSemantics", parsed.semantics.declared.toString())
             put("effectiveSemantics", parsed.semantics.effective.toString())
             put("settings", parsed.problem.settings.toString())
             put("javaRuntime", System.getProperty("java.runtime.version"))
             put("os", System.getProperty("os.name"))
             put("architecture", System.getProperty("os.arch"))
+            put("channel", channel?.name)
+            put("objectiveTreatment", when {
+                objective == null -> "none"
+                channel == null -> "protected versus substituted"
+                else -> "protected in both views"
+            })
             put("pairedStateLimit", 12)
             put("candidatesPerPairLimit", 32)
             put("coordinateLimit", TRAJECTORY_COORDINATE_LIMIT)
@@ -139,32 +141,47 @@ internal object LocalSearchTrajectory {
             put("diagnosticWork", "separate private states; two full loads and at most 64 reversible probes per pair")
             put("sourceVerdictClaim", false)
         }.toString())
-        for (rewrite in if (initial == null) listOf(false, true) else listOf(false)) {
+        for (variant in if (initial == null) variants else variants.take(1)) {
+            val rewrite = variant.label
             val preparationStarted = System.nanoTime()
             val stop = Cancellation.after(60.seconds)
+            val sourceProblem = if (variant.channel == ChannelView.InverseAssignment) {
+                inverseAssignmentView(parsed.problem, stop)
+            } else parsed.problem
+            if (sourceProblem == null) {
+                out.resolve("decline-$rewrite.txt").writeText("unsupported-inverse-assignment\ncancelled=${stop()}\n")
+                continue
+            }
             val invocation = SourceSetup.prepare(SourceSetupRequest(
-                if (parsed.definedVars.isEmpty()) SourceAttachment(parsed.problem, parsed.definitionHints)
-                else SourceAttachment(parsed.problem, parsed.definedVars, emptyList(), parsed.definitionHints),
-                ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED, objective = objective, cancellation = stop,
+                if (parsed.definedVars.isEmpty()) SourceAttachment(sourceProblem, parsed.definitionHints)
+                else SourceAttachment(sourceProblem, parsed.definedVars, emptyList(), parsed.definitionHints),
+                if (objective == null) ExecutionOperation.SATISFY else ExecutionOperation.OPTIMIZE,
+                FiniteEngine.MIXED, objective = objective, cancellation = stop,
             ))
             val plan = requireNotNull(invocation.preparedPlan)
             val prepared = FinitePipeline.prepare(FinitePipelineRequest(
                 requireNotNull(plan.model), FiniteEngine.MIXED, objective,
                 cancellation = stop, solveCancellation = stop, presolveBudget = PresolveBudget(1_375_000_000L),
                 presolveConfig = if (initial == null) PresolveConfig.DEFAULT else PresolveConfig.NONE,
-                preparedPlan = plan, transformObjective = rewrite, randomSeed = seed,
+                preparedPlan = plan, transformObjective = variant.transformObjective, randomSeed = seed,
             ))
             check(!stop() && prepared.presolve?.infeasible != true)
             val problem = prepared.problem as BakedProblem
-            val workingObjective = requireNotNull(prepared.objective)
+            val workingObjective = prepared.objective
             require(initial == null || (initial.numIntVars == problem.numIntVars &&
                 prepared.reconstruct(initial) == initial)) { "explicit center needs an unchanged coordinate frame" }
             val hints = heuristicHints(invocation, prepared, stop)
-            val sweep = hints?.let { getter(it, "getSweep") as DefinitionalSweep? }
+            val maintained = hints?.let { getter(it, "getSweep") as DefinitionalSweep? }
+            val sweep = variant.channel.sweep(maintained, stop)
+            check(!stop())
             val gradient = hints?.let { getter(it, "getObjective") as IncrementalObjective? }
             out.resolve("model-$rewrite.json").writeText(buildJsonObject {
                 put("preparationNanos", System.nanoTime() - preparationStarted)
                 put("objective", workingObjective.toString())
+                put("channel", variant.channel.name)
+                put("maintainedDefinitions", maintained?.size ?: 0)
+                put("retainedDefinitions", sweep?.size ?: 0)
+                put("functionalObjectiveTreatment", "same source functional objective; channel filtering changes ownership")
                 put("factors", buildJsonArray {
                     for (factor in problem.factors) add(buildJsonObject {
                         put("kind", factor::class.simpleName)
@@ -263,7 +280,18 @@ internal object LocalSearchTrajectory {
                         normalizeWeightsByClass = true, reportResiduals = true,
                         initialAssignment = initial,
                     )
-                    solver.resumable(workingObjective, params).use { run ->
+                    if (workingObjective == null) solver.resumableSolve(params).use { run ->
+                        val result = try {
+                            var observed = run.runSlice(stop, sliceMillis, sliceWork)
+                            while (observed == null && !stop()) observed = run.runSlice(stop, sliceMillis, sliceWork)
+                            observed
+                        } catch (_: Captured) {
+                            null
+                        }
+                        out.resolve("result-$label.txt").writeText(
+                            "picks=$picks\ncancelled=${stop()}\nresult=$result\nstats=${run.stats}\n",
+                        )
+                    } else solver.resumable(workingObjective, params).use { run ->
                         val allocation = ManagementFactory.getThreadMXBean() as ThreadMXBean
                         check(allocation.isThreadAllocatedMemorySupported)
                         allocation.isThreadAllocatedMemoryEnabled = true
@@ -303,10 +331,10 @@ internal object LocalSearchTrajectory {
                     }
                     if (trace != null) {
                         RepairTrajectory.write(trace, prepared, sourceInputs, out.resolve("repairs-$rewrite.jsonl"))
-                        if (exactControls) RepairTrajectory.controls(trace, problem, workingObjective,
+                        if (exactControls) RepairTrajectory.controls(trace, problem, checkNotNull(workingObjective),
                             out.resolve("controls-$rewrite.jsonl"), seed, prepared, checkNotNull(sourceCheck))
                     }
-                    if (!walk) {
+                    if (!walk && captured != null) {
                         val initial = checkNotNull(captured)
                         val shadow = LocalSearchState(
                             initial.model, Random(seed), initial.assumptions, initial.projection,
@@ -342,7 +370,8 @@ internal object LocalSearchTrajectory {
             check(observations.size <= 12)
             if (views.size != 2) {
                 writer.appendLine(buildJsonObject {
-                    put("decline", "single-representation")
+                    put("decline", if (initial != null) "single-representation" else "two-initial-states-unavailable")
+                    put("capturedViews", views.size)
                     put("sourceVerdictClaim", false)
                 }.toString())
                 return@use
@@ -393,6 +422,8 @@ internal object LocalSearchTrajectory {
     }
 
     private object Captured : RuntimeException(null, null, false, false)
+
+    private data class ViewSpec(val label: String, val transformObjective: Boolean, val channel: ChannelView)
 
     private data class Observation(val label: String, val source: Sample, val focus: Int = -1)
 

@@ -1,11 +1,7 @@
 package com.eignex.klause.bench.profile
 
-import com.eignex.klause.bench.catalog.Catalog
 import com.eignex.klause.bench.metric.InstalledBuild
-import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
-import com.eignex.klause.bench.source.CorpusFetcher
-import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.formats.xcsp3.Xcsp3
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.util.Cancellation
@@ -24,23 +20,24 @@ import kotlinx.serialization.json.put
 internal object ChannelViewApplicability {
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.size == 1 && args.single().startsWith("request64="))
-        val request = Base64.getDecoder().decode(args.single().substringAfter('='))
+        require(args.size in 1..9 && args.first().startsWith("request64="))
+        val request = Base64.getDecoder().decode(args.first().substringAfter('='))
         require(request.size <= 16 * 1024)
         val sources = Reports.json.parseToJsonElement(request.decodeToString()).jsonArray
         require(sources.size in 1..8)
+        val embedded = args.drop(1).associate { it.substringBefore('=') to it.substringAfter('=') }
+        require(embedded.size == args.size - 1 && embedded.keys.all { key ->
+            (0 until sources.size).any { key == "source$it" }
+        })
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         out.resolve("request.json").writeBytes(request)
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
         for ((index, value) in sources.withIndex()) {
             val input = value.jsonObject
             require(input.keys == setOf("suite", "problem", "sha256"))
-            val reference = Catalog.uncapped(input.getValue("suite").jsonPrimitive.content).problems
-                .single { it.name == input.getValue("problem").jsonPrimitive.content }
-            val bytes = CorpusFiles.open(CorpusFetcher.resolve(reference.source)).use {
-                it.readNBytes(64 * 1024 * 1024 + 1)
-            }
-            require(bytes.size <= 64 * 1024 * 1024 && sha256(bytes) == input.getValue("sha256").jsonPrimitive.content)
+            val bytes = trajectorySourceBytes(input.getValue("suite").jsonPrimitive.content,
+                input.getValue("problem").jsonPrimitive.content, input.getValue("sha256").jsonPrimitive.content,
+                embedded["source$index"])
             val directory = out.resolve("$index").apply { mkdirs() }
             directory.resolve("source.xml").writeBytes(bytes)
             val stop = Cancellation.after(30.seconds)
@@ -52,6 +49,7 @@ internal object ChannelViewApplicability {
             val network = maintained?.network(problem.numIntVars, problem.numBoolVars)
             directory.resolve("applicability.json").writeText(buildJsonObject {
                 put("input", input)
+                put("sourceMode", if ("source$index" in embedded) "embedded" else "catalog")
                 put("effectiveSemantics", parsed.semantics.toString())
                 put("settings", problem.settings.toString())
                 put("javaRuntime", System.getProperty("java.runtime.version"))
