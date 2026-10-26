@@ -146,7 +146,8 @@ Preparation visits at most 65,536 modeled row/support operations with
 stay in the retained template, ahead of changing invocation-bound rows. Every
 query rechecks active cuts against the exact numeric source context under one
 shared 100,000-step proof allowance and premise view; inactive
-Boolean guards or integer pins disable the owner and its cuts together. Retraction
+Boolean guards or integer pins disable their source rows and dependent cuts.
+A cut with several source owners requires every owner to be active. Retraction
 restores those activation masks. Unverified cuts remain inactive and require an
 identity row layout. `source-cuts=false` disables this separation in numerical
 frontier traversal. LP certificates cite the nested source rounding
@@ -154,6 +155,16 @@ derivation, and final source checking repeats Boolean substitution independently
 Preparation and proof traversal report separate work observations, including
 interrupted queries. Separation and
 proof policy belong to the adapter, outside `lp.engine`.
+
+Explicit aggregate construction combines two to four source rows with positive
+exact weights before integer rounding. Continuous terms must cancel completely;
+the remaining integer activity is normalized by its rational coefficient gcd.
+The candidate retains every source owner and its nested combination and rounding
+derivation. Construction bounds combined support at 128 coordinates, retained
+scalars at 256 bits and proof references at 16 KiB. Each attempt has 65,536 work
+units and 1 MiB of modeled allocation, with failed attempts charged to the same
+containing observer and cancellation token. These candidates require source
+verification before admission.
 
 ### Root preparation
 
