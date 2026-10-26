@@ -5315,3 +5315,8 @@ An absent trace establishes no cross-region reuse, even when lookup counts are n
 `firstCellFeedbackUse` also records reuse within one regional owner. Both traces keep
 the actual rejected numeric candidate's defining coefficients, root and isolating
 bounds, with an explicit completeness flag for bounded rendering.
+`queryElapsedNs` and `queryThreadAllocatedBytes` cover query construction through its
+terminal return, including reflection and in-loop diagnostic rendering. They exclude
+source parsing/preparation and final trace serialization. Thread allocation is absent
+when unsupported; it measures cumulative Java allocation rather than retained or peak
+physical memory. These instrumented, ordered arms do not establish warmed throughput.

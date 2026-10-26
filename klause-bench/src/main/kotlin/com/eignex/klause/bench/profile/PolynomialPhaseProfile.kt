@@ -29,6 +29,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.magnitudeBitLength
 import com.eignex.klause.util.parseBigInt
+import com.sun.management.ThreadMXBean
 import java.io.File
 import java.lang.management.ManagementFactory
 import java.util.Base64
@@ -419,6 +420,11 @@ internal object PolynomialPhaseProfile {
             @Suppress("UNCHECKED_CAST")
             val fixed = (fixings.invoke(null, original, { check(!token()) }) as Map<Int, BigFraction>) + integerFixings
             val preparationCharges = charges
+            val allocationBean = (ManagementFactory.getThreadMXBean() as? ThreadMXBean)
+                ?.takeIf { it.isThreadAllocatedMemorySupported }?.apply { isThreadAllocatedMemoryEnabled = true }
+            val thread = Thread.currentThread().threadId()
+            val allocationStart = allocationBean?.getThreadAllocatedBytes(thread)
+            val queryStart = System.nanoTime()
             val owner = query.newInstance(original, source.second, source.third,
                 params.newInstance(token, maximumWork, limitsType.getConstructor().newInstance(), refinement, feedback),
                 condition.newInstance(emptyMap<Int, Boolean>(), fixed, fixed))
@@ -473,6 +479,10 @@ internal object PolynomialPhaseProfile {
                 lastProjected = projected
                 lastStage = stage
             } while (result == null)
+            val queryElapsedNs = System.nanoTime() - queryStart
+            val queryThreadAllocatedBytes = allocationStart?.let {
+                requireNotNull(allocationBean).getThreadAllocatedBytes(thread) - it
+            }
             val snapshot = stats.invoke(owner)
             val nativeWork = snapshot.javaClass.getMethod("getWorkSpent").invoke(snapshot) as Long
             check(charges - preparationCharges == nativeWork) { "Native charge sum differs from snapshot" }
@@ -499,6 +509,8 @@ internal object PolynomialPhaseProfile {
                 },
                 firstCellFeedbackReuse = firstFeedback,
                 firstCellFeedbackUse = firstUse,
+                queryElapsedNs = queryElapsedNs,
+                queryThreadAllocatedBytes = queryThreadAllocatedBytes,
                 sourceCoordinates = names,
                 originalSourceCoordinates = originalNames,
                 coordinateNamespace = if (prepared) "prepared-polynomial-model" else "raw-polynomial-source",
@@ -670,6 +682,8 @@ internal data class PhaseTrace(
     val cellFeedback: Map<String, String>? = null,
     val firstCellFeedbackReuse: Map<String, String>? = null,
     val firstCellFeedbackUse: Map<String, String>? = null,
+    val queryElapsedNs: Long? = null,
+    val queryThreadAllocatedBytes: Long? = null,
     val sourceCoordinates: Map<String, String>? = null,
     val originalSourceCoordinates: Map<String, String>? = null,
     val coordinateNamespace: String? = null,
