@@ -12,7 +12,6 @@ import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
@@ -31,7 +30,7 @@ class ChannelViewsTest {
     }
 
     @Test
-    fun `inverse role transposition preserves feasibility at every source assignment`() {
+    fun `inverse role transposition preserves the grade at every source assignment`() {
         val source = Problem(0, 4, Array(4) { IntDomain(1, 2) },
             arrayOf(Inverse(intArrayOf(0, 1), intArrayOf(2, 3), 1, 1)))
         val view = assertNotNull(inverseAssignmentView(source, Cancellation.Never))
@@ -47,7 +46,7 @@ class ChannelViewsTest {
             primal.recompute()
             inverse.recompute()
 
-            assertEquals(primal.cost == 0L, inverse.cost == 0L, "source assignment $bits")
+            assertEquals(primal.cost, inverse.cost, "source assignment $bits")
         }
     }
 
@@ -65,18 +64,19 @@ class ChannelViewsTest {
     }
 
     @Test
-    fun `inverse role transposition swaps unequal index offsets`() {
+    fun `inverse role transposition accepts a source permutation with unequal offsets`() {
         val source = Problem(0, 4, arrayOf(IntDomain(4, 5), IntDomain(4, 5),
             IntDomain(-2, -1), IntDomain(-2, -1)),
             arrayOf(Inverse(intArrayOf(0, 1), intArrayOf(2, 3), -2, 4)))
         val view = assertNotNull(inverseAssignmentView(source, Cancellation.Never))
-        val channel = view.factors.single() as Inverse
+        val state = LocalSearchState(view.bake(), Random(0))
+        for ((variable, value) in longArrayOf(5, 4, -1, -2).withIndex()) {
+            state.assignment.setInt(variable, value)
+        }
 
-        assertEquals(4, channel.fOffset)
-        assertEquals(-2, channel.gOffset)
-        assertEquals(listOf(2, 3), channel.f.toList())
-        assertEquals(listOf(0, 1), channel.g.toList())
-        assertFalse(channel.f.contentEquals(channel.g))
+        state.recompute()
+
+        assertEquals(0L, state.cost)
     }
 
     @Test
