@@ -3101,7 +3101,20 @@ all three original hashes and run CP, mixed and structured LS with seeds 7/19,
 P1, two seconds and presolve disabled. All 18 final witnesses have objective zero
 and pass XCSP3-tools SolutionChecker 2.5.1 at `ca58fc79a4`. Native proof claims
 remain separate from those independent witness checks. The small controls select
-the observation contract; larger coordinated barriers require further comparisons.
+the observation contract.
+
+[Coordinated barriers 8468](https://lab.eignex.com/jobs/8468), at `e110d0dff2`,
+retains four hash-pinned sources, seed 7 and 128 counted moves with ordinary and
+extended structured recipes. All eight observation-parity checks and 312 native
+source checks pass. Every proper subset of each three- or four-input block fails
+to improve at the recorded centers. Complete blocks improve two ordinary
+assignment-three endpoints, two/three ordinary/extended resource endpoints,
+one placement endpoint under either recipe, and two/one assignment-four
+endpoints. Each comparison visits three endpoints. Extended assignment-three
+already reaches zero at its first endpoint and admits no further block gain.
+This retains the stronger existing remedy and selects resource, placement and
+four-input assignment barriers for bounded selector comparisons. These small
+capability controls establish no default-route admission or general speedup.
 
 ### Prepared board-restart outcomes
 
