@@ -58,8 +58,9 @@ internal object MpsRepairReplay {
             }
         val bean = ManagementFactory.getThreadMXBean() as ThreadMXBean
         val thread = Thread.currentThread().threadId()
+        val proposals = proposals(sets, source, model, context, objective, center, cutoff, columns, allowance, out)
         for ((index, names) in sets.withIndex()) {
-            val freedNames = if (names is JsonPrimitive) {
+            val freedNames = if (names is JsonObject) proposals[index] ?: continue else if (names is JsonPrimitive) {
                 require(names.content == "comparison-disagreement")
                 val point = checkNotNull(comparison)
                 source.variables.indices.filter { source.variables[it].integer && point[it] != sourceValues[it] }
@@ -159,6 +160,77 @@ internal object MpsRepairReplay {
                 source.variables.indices.joinToString(" ") { "${source.variables[it].name}=${next[it]}" } + "\n") }
             println("mixed repair $index: $status")
         }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun proposals(
+        sets: JsonArray, source: LinearSourceProblem, model: Problem, context: SourceProofContext,
+        objective: LinearObjective, center: Sample, cutoff: BigFraction, columns: IntArray,
+        millis: Long, out: File,
+    ): Map<Int, List<String>> {
+        if (sets.none { it is JsonObject }) return emptyMap()
+        val stop = Cancellation.after(millis.milliseconds)
+        val params = TheoryParams(timeout = stop, sourceLpOperations = 256)
+        val type = Class.forName(PIPELINE + "JointLinearRepair")
+        val policy = Class.forName("com.eignex.klause.lp.SparseSourceLpPolicy").getConstructor().newInstance()
+        val bean = ManagementFactory.getThreadMXBean() as ThreadMXBean
+        val thread = Thread.currentThread().threadId()
+        val allocation = bean.getThreadAllocatedBytes(thread)
+        val start = System.nanoTime()
+        val owner = type.constructors.single { it.parameterCount == 8 }.newInstance(
+            model, context, objective, params, policy, true, { center }, stop)
+        val result = linkedMapOf<Int, List<String>>()
+        var prepared = false
+        try {
+            val prepare = type.getDeclaredMethod("prepare", Cancellation::class.java).apply { isAccessible = true }
+            while (!stop() && call(owner, "getExhausted") != true) {
+                if (prepare.invoke(owner, Cancellation.Never) == true) {
+                    prepared = true
+                    break
+                }
+            }
+            if (prepared) {
+                val selector = checkNotNull(NumericalFrontierSnapshot.field(owner, "selection"))
+                val centers = List(model.numIntVars) { BigFraction.of(center.exactIntValue(it), BIG_ONE) } +
+                    center.exactReals.orEmpty()
+                for ((index, specification) in sets.withIndex()) {
+                    if (specification !is JsonObject) continue
+                    require(specification.keys == setOf("count", "round"))
+                    val count = specification.getValue("count").jsonPrimitive.content.toInt()
+                    val round = specification.getValue("round").jsonPrimitive.content.toLong()
+                    require(count in 1..4096 && round in 0..1_000_000)
+                    val condition = checkNotNull(call(selector, "propose", centers, center.bools, count,
+                        round, BigFraction.ONE, cutoff))
+                    val pins = call(condition, "getLower") as Map<Int, BigFraction>
+                    check(pins == call(condition, "getUpper"))
+                    result[index] = columns.indices.filter { column ->
+                        Term.isInt(columns[column]) && Term.intVar(columns[column]) !in pins
+                    }.map { source.variables[it].name }
+                }
+            }
+            out.resolve("selection.json").writeText(buildJsonObject {
+                put("prepared", prepared)
+                put("sourceVerdictClaim", false)
+                put("elapsedNs", System.nanoTime() - start)
+                put("threadBytes", bean.getThreadAllocatedBytes(thread) - allocation)
+                put("stats", NumericalResidualProfile.json(call(owner, "getStats")))
+                put("freedSets", buildJsonObject { result.forEach { (index, names) ->
+                    put(index.toString(), JsonArray(names.map(::JsonPrimitive)))
+                } })
+                put("costIncludedInRepairAttempts", false)
+            }.toString())
+            if (!prepared) for ((index, specification) in sets.withIndex()) {
+                if (specification is JsonObject) out.resolve("repair-$index.json").writeText(buildJsonObject {
+                    put("owner", "mixed-residual")
+                    put("status", if (stop()) "cancelled" else "unavailable")
+                    put("reason", "proposal preparation unavailable")
+                    put("sourceVerdictClaim", false)
+                }.toString())
+            }
+        } finally {
+            (owner as AutoCloseable).close()
+        }
+        return result
     }
 
     private fun sample(model: Problem, mapped: Map<SourceCoordinate, BigFraction>, objective: BigFraction): Sample {
