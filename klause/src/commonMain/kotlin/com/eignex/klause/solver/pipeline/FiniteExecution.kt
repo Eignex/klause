@@ -682,10 +682,12 @@ private fun FiniteSolveRequest.preparationRequest(
     protectObjective: Boolean = false,
 ): FinitePipelineRequest {
     val preparationStop = if (shape.sourceInvocation == null) presolveCancellation else presolveCancellation or stop
+    val channelExperiment = executionOptions.reader()[ExecutionOption.localSearchArm]
+        ?.startsWith("experiment-channel/") == true
     return FinitePipelineRequest(
         problem = shape.finiteProblem, componentPlan = shape.componentPlan, preparedPlan = shape.preparedPlan,
         engine = engine, objective = shape.linearObjective,
-        transformObjective = !protectObjective && shape.localSearchObjective == null,
+        transformObjective = !channelExperiment && !protectObjective && shape.localSearchObjective == null,
         presolveConfig = presolveConfig, explicitPresolveConfig = explicitPresolveConfig,
         solutionSetSensitive = solutionSetSensitive ||
             (shape.sourceInvocation != null && operation == ExecutionOperation.ENUMERATE),
