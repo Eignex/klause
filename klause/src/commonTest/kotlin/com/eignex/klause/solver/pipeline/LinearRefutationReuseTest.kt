@@ -222,6 +222,40 @@ class LinearRefutationReuseTest {
     }
 
     @Test
+    fun `source snapshot admission should charge every premise before a work pause`() {
+        val rows = source.premises + (0 until 1000).associate {
+            "unused/$it" to SourcePremise(SourceInequality(emptyMap(), BigFraction.ZERO))
+        }
+        val context = SourceProofContext(scope, source.coordinates, rows)
+        val funding = SourceLpFunding(1_000_000L, 16_000_000L).apply { grant(32L) }
+        val budget = SourceLpBudget(funding = funding)
+        val reuse = LinearRefutationReuse(context, budget, Cancellation.Never)
+
+        reuse.retain(evidence)
+
+        assertTrue(budget.measuredConflictCertificationWork >= rows.size)
+        assertNull(reuse.find(restricted.condition))
+        assertEquals(0L, reuse.observations()["numericalRefutationReuseRetained"])
+    }
+
+    @Test
+    fun `source metadata scanning should stop at its scratch allocation allowance`() {
+        val rows = source.premises + (0 until 100).associate {
+            "unused/$it" to SourcePremise(SourceInequality(emptyMap(), BigFraction.ZERO))
+        }
+        val context = SourceProofContext(scope, source.coordinates, rows)
+        val funding = SourceLpFunding(1_000_000L, 6_000L).apply { grant(1_000_000L) }
+        val reuse = LinearRefutationReuse(context, SourceLpBudget(funding = funding), Cancellation.Never)
+
+        reuse.retain(evidence)
+
+        assertTrue(funding.exhausted)
+        assertTrue(funding.allocated <= 8_192L)
+        assertNull(reuse.find(restricted.condition))
+        assertEquals(0L, reuse.observations()["numericalRefutationReuseRetained"])
+    }
+
+    @Test
     fun `entry eviction should keep the newer proof and charge cleanup work`() {
         val budget = SourceLpBudget()
         val reuse = LinearRefutationReuse(source, budget, Cancellation.Never, maximumEntries = 1)
