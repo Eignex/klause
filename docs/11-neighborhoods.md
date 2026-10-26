@@ -320,9 +320,9 @@ Invocations with pooled starting witnesses decline capture because their initial
 cutoff tightening need not notify the variable selector.
 
 The pipeline's internal `FiniteNumericalRemoval` consumes scoped numerical
-feedback without owning numerical capture or proof traversal. Exact relaxation
-disagreement and captured refutation support independently prioritize finite
-coordinates, with seeded ties and ordinary random fallback. The adapter admits
+feedback without owning numerical capture or proof traversal. It ranks finite
+coordinates by exact disagreement with captured relaxation points or membership
+in captured refutation supports, with seeded ties and ordinary random fallback. It admits
 an unchanged complete Boolean/integer coordinate frame and exact caller/query
 pins; unmapped coordinates and additional deduced restrictions decline. It checks
 the normalized objective, original premises, semantic checker and actual cutoff
