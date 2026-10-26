@@ -188,6 +188,7 @@ internal fun SourceProofContext.activeNumericContext(
         for (bound in lower.values + upper.values) {
             if (!visit() || !scalar(bound)) return null
         }
+        if (work >= allowance) return null
         val premises = this.premises
         if (!visit(premises.size)) return null
         for ((id, premise) in premises) {
@@ -214,12 +215,15 @@ internal fun SourceProofContext.activeNumericContext(
                     premise.guards, premise.integerPins)
             }
         }
-        val numeric = SourceProofContext(scope, coordinates, rows, emptyMap(), semantics = semantics)
-        val bounds = numeric.integerPinBounds(condition, cancellation) ?: return null
+        if (work >= allowance) return null
+        val bounds = if (rows.values.any { it.integerPins.isNotEmpty() }) {
+            SourceProofContext(scope, coordinates, rows, emptyMap(), semantics = semantics)
+                .integerPinBounds(condition, Cancellation { !visit() }) ?: return null
+        } else null
         val active = linkedMapOf<String, SourcePremise>()
         for ((id, premise) in rows) {
             if (!visit()) return null
-            if (premise.integerPins.isEmpty() || bounds.status(premise.integerPins) == IntegerPinStatus.Established) {
+            if (premise.integerPins.isEmpty() || bounds?.status(premise.integerPins) == IntegerPinStatus.Established) {
                 active[id] = premise
             }
         }
