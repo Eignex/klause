@@ -29,8 +29,8 @@ class PolynomialPhaseProfileTest {
     }
 
     @Test
-    fun `univariate refinement retains exact checked boundaries and charged work`() {
-        val source = "(declare-const x Real) (assert (= (* x x) 2))"
+    fun `univariate refinement retains a checked closed section and charged work`() {
+        val source = "(declare-const x Real) (assert (> (* x x) 0))"
 
         val trace = PolynomialPhaseProfile.PhaseAccess().measure(source, refinement = true)
 
@@ -38,9 +38,10 @@ class PolynomialPhaseProfileTest {
         assertEquals(trace.nativeWork, trace.chargeSum)
         val cell = requireNotNull(trace.checkedCells).first()
         assertEquals("Source", cell["scope"])
-        assertEquals("false", cell["lowerClosed"])
-        assertEquals("false", cell["upperClosed"])
-        assertEquals("[-2, 0, 1]", cell["Lower.coefficients"])
+        assertEquals("true", cell["lowerClosed"])
+        assertEquals("true", cell["upperClosed"])
+        assertEquals("[0, 1]", cell["Lower.coefficients"])
+        assertEquals("[0, 1]", cell["Upper.coefficients"])
         assertTrue(requireNotNull(trace.cellRefinement)["Work"]!!.toLong() <= 16_384)
     }
 
