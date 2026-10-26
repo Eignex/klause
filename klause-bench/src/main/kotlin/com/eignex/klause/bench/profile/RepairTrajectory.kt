@@ -126,7 +126,9 @@ internal object RepairTrajectory {
                 }.take(4).toList()
                 val candidates = mutableListOf<Pair<String, IntArray>>()
                 for ((label, variables) in blocks) {
-                    for (variable in variables) candidates.add("individual" to intArrayOf(variable))
+                    for (subset in properSubsets(variables)) {
+                        candidates.add((if (subset.size == 1) "individual" else "proper-subset") to subset)
+                    }
                     candidates.add(label to variables)
                     val eligible = (0 until problem.numIntVars).filter { !problem.rootIntDomain(it).isFixed }
                     repeat(4) {
@@ -193,6 +195,13 @@ internal object RepairTrajectory {
             put("boundedScanCompleted", !stop() && attempted == planned)
             put("wholeSourceExhaustionClaim", false)
         }.toString())
+    }
+
+    internal fun properSubsets(variables: IntArray): List<IntArray> {
+        require(variables.size in 2..6)
+        return (1 until (1 shl variables.size) - 1).map { mask ->
+            variables.indices.filter { mask and (1 shl it) != 0 }.map { variables[it] }.toIntArray()
+        }
     }
 
     fun writeResult(file: File, result: MinimizeResult, prepared: FinitePipelinePreparation,

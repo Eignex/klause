@@ -9,6 +9,14 @@ import kotlin.test.assertEquals
 
 class RepairTrajectoryTest {
     @Test
+    fun `proper subsets should cover every smaller nonempty freedom`() {
+        val subsets = RepairTrajectory.properSubsets(intArrayOf(0, 3, 6))
+
+        assertEquals(setOf(listOf(0), listOf(3), listOf(6), listOf(0, 3), listOf(0, 6), listOf(3, 6)),
+            subsets.map { it.toList() }.toSet())
+    }
+
+    @Test
     fun `source input distance should exclude auxiliaries and real displacement`() {
         val before = Sample(booleanArrayOf(false), longArrayOf(1, 3), doubleArrayOf(2.0))
         val after = Sample(booleanArrayOf(true), longArrayOf(0, 7), doubleArrayOf(2.5))

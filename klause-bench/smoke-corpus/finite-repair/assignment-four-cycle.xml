@@ -1,0 +1,16 @@
+<instance format="XCSP3" type="COP">
+  <variables>
+    <var id="x0"> 0 1 </var>
+    <var id="x1"> 0..3 </var>
+    <var id="x2"> 0..3 </var>
+    <var id="x3"> 1 2 </var>
+    <var id="x4"> 0..3 </var>
+    <var id="x5"> 0..3 </var>
+    <var id="x6"> 2 3 </var>
+    <var id="x7"> 0..3 </var>
+    <var id="x8"> 0..3 </var>
+    <var id="x9"> 0 3 </var>
+  </variables>
+  <constraints><allDifferent> x0 x3 x6 x9 </allDifferent></constraints>
+  <objectives><minimize> x9 </minimize></objectives>
+</instance>

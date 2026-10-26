@@ -1406,6 +1406,10 @@ AllDifferent, Cumulative and Diffn scopes
 and four size-matched samples at up to four feasible endpoints, using ordinary
 CP minimization with the complement pinned. Each repair has 10,000 decisions and
 the control scan shares ten seconds; unfinished scans grant no exhaustion claim.
+Scopes of at most six coordinates also enumerate every nonempty proper subset,
+so completed controls can distinguish a coordinated barrier from missed smaller
+freedoms. `recipe=cbls-extended/fixed` adds the existing extended structured source
+to the catalog's fixed plateau recipe for comparison with richer move controls.
 The capture reports native original-source checks separately from independent
 witness checking and carries no unpinned proof claim. `center=v0,v1,...` admits
 only an unchanged finite coordinate frame without declared definitions, disables

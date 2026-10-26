@@ -24,6 +24,7 @@ import com.eignex.klause.localsearch.movesource.MoveSourceId
 import com.eignex.klause.localsearch.movesource.ObjectiveSeed
 import com.eignex.klause.localsearch.movesource.Phase
 import com.eignex.klause.localsearch.movesource.Pool
+import com.eignex.klause.localsearch.movesource.SatisfiedStructured
 import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
@@ -242,10 +243,15 @@ internal object LocalSearchTrajectory {
                         }
                     }
                     val recipeName = options.getValue("recipe")
-                    val selected = if (recipeName == "source-coordinate-descent") LocalSearchRecipe(recipeName,
-                        SourceDrivenStrategy(sources = listOf(ConfiguredSource(ObjectiveSeed())),
-                            acceptance = AcceptanceRule.GreedyDescent, feasibleDescent = FeasibleDescent.SelfOwned))
-                    else LocalSearchCatalog.byLabel(recipeName)
+                    val selected = when (recipeName) {
+                        "source-coordinate-descent" -> LocalSearchRecipe(recipeName,
+                            SourceDrivenStrategy(sources = listOf(ConfiguredSource(ObjectiveSeed())),
+                                acceptance = AcceptanceRule.GreedyDescent, feasibleDescent = FeasibleDescent.SelfOwned))
+                        "cbls-extended/fixed" -> LocalSearchCatalog.byLabel("cbls-plateau/fixed").withSources {
+                            it + ConfiguredSource(SatisfiedStructured.sampledExtended(8))
+                        }
+                        else -> LocalSearchCatalog.byLabel(recipeName)
+                    }
                     val recipe = selected.withSources {
                         listOf(ConfiguredSource(recorder)) + it
                     }
