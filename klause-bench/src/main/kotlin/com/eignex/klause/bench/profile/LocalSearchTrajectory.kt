@@ -78,7 +78,7 @@ internal object LocalSearchTrajectory {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val required = setOf("suite", "problem", "sha256", "recipe", "seed", "moves")
         val optional = setOf("sliceMillis", "sliceWork", "greedy", "repairs", "controls", "center", "source64",
-            "ownerReplay")
+            "ownerReplay", "ownerWork", "ownerFragmentWork")
         require(options.keys.containsAll(required) && options.keys.all {
             it in required || it in optional || it == "selectors"
         })
@@ -320,7 +320,9 @@ internal object LocalSearchTrajectory {
                             out.resolve("controls-$rewrite.jsonl"), seed, prepared, checkNotNull(sourceCheck))
                         if (ownerReplay) RepairOwnerReplay.replay(out.resolve("controls-$rewrite.jsonl"),
                             problem, workingObjective, prepared, checkNotNull(sourceCheck), sourceInputs,
-                            out.resolve("owners-$rewrite.jsonl"), seed)
+                            out.resolve("owners-$rewrite.jsonl"), seed,
+                            options["ownerWork"]?.toLong() ?: 100_000L,
+                            options["ownerFragmentWork"]?.toLong() ?: 2_000L)
                     }
                     if (!walk) {
                         val initial = checkNotNull(captured)
