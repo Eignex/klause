@@ -173,7 +173,8 @@ internal object RepairOwnerReplay {
                         val allocationStart = bean.getThreadAllocatedBytes(thread)
                         val start = System.nanoTime()
                         val unavailable = scope.unavailable ?: when {
-                            kind.startsWith("cp") && BigFraction.ofDouble(scope.cutoff.toDouble()) != scope.cutoff ->
+                            kind.startsWith("cp") && (!scope.cutoff.toDouble().isFinite() ||
+                                BigFraction.ofDouble(scope.cutoff.toDouble()) != scope.cutoff) ->
                                 "exact cutoff is not representable by the retained CP double contract"
                             else -> null
                         }
