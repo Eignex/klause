@@ -833,9 +833,6 @@ private fun executeSourceFinite(
         )
         is SourceFiniteControls.LocalSearch -> LocalSearchSolver(
             request.problem,
-            strategy = com.eignex.klause.portfolio.LocalSearchCatalog.byLabel("cbls/fixed").strategy,
-            greedyRepairOnRestart = false,
-            seedImplicitOnRestart = false,
             completion = if (request.problem.numRealVars > 0) LeafRealCompletion(request.problem, null) else null,
         ).solve(controls.params.copy(cancellation = controls.cancellation or request.cancellation))
     }

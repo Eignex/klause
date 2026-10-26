@@ -121,6 +121,7 @@ internal class LocalSearchWorkerConfig private constructor(
         }
         val session = LocalSearchSolver(
             effectiveProblem,
+            greedyRepairOnRestart = false,
             strategy = recipe.strategy,
             optimizeStrategy = recipe.optimizeStrategy,
             definitionalSweep = definitionalSweep,
