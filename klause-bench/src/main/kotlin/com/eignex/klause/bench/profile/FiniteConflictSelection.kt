@@ -87,7 +87,7 @@ internal object FiniteConflictSelection {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val required = setOf("suite", "problem", "sha256", "center", "seed")
         require(options.keys.containsAll(required) && options.keys.all {
-            it in required || it in setOf("acquisition", "semantic")
+            it in required || it in setOf("acquisition", "semantic", "ownerReplay", "ownerWork", "ownerFragmentWork")
         })
         val reference = Catalog.uncapped(options.getValue("suite")).problems
             .single { it.name == options.getValue("problem") }
@@ -139,6 +139,13 @@ internal object FiniteConflictSelection {
             options["acquisition"] ?: "source-root",
             options["semantic"],
         ) { sample, stop -> checkSource(problem, sample, stop) }
+        if (options["ownerReplay"]?.toBooleanStrict() == true) {
+            RepairOwnerReplay.replay(out.resolve("selections.jsonl"), problem, objective,
+                FinitePipelinePreparation(problem, objective, { it }, null), problem,
+                parsed.intVarNames.values.distinct().toIntArray(), out.resolve("owners.jsonl"),
+                options.getValue("seed").toLong(), options["ownerWork"]?.toLong() ?: 200_000L,
+                options["ownerFragmentWork"]?.toLong() ?: 2_000L)
+        }
     }
 
     fun compare(

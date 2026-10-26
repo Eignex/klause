@@ -44,7 +44,7 @@ internal object RepairOwnerReplay {
     private data class Scope(
         val id: Int, val center: Sample, val freedBools: IntArray, val freedInts: IntArray,
         val pins: Assumptions, val cutoff: BigFraction, val nativeCutoff: Double, val selector: String,
-        val sourceCutoff: BigFraction?, val capturedObjective: String, val unavailable: String?,
+        val sourceCutoff: BigFraction?, val captured: JsonObject, val unavailable: String?,
     )
 
     data class PointCheck(val accepted: Boolean, val objective: BigFraction? = null)
@@ -99,8 +99,9 @@ internal object RepairOwnerReplay {
         val scopes = entries.mapIndexed { index, line ->
             val entry = Json.parseToJsonElement(line).jsonObject
             val saved = entry.getValue("center").jsonObject
-            val reals = saved["exactReals"]?.jsonArray?.map { MpsResidualObjective.rational(it.jsonPrimitive.content) }
-                ?: emptyList()
+            val reals = saved["exactReals"]?.jsonArray?.map {
+                MpsResidualObjective.rational(it.jsonPrimitive.content)
+            }.orEmpty()
             require(reals.size == problem.numRealVars)
             val center = Sample(saved.getValue("bools").jsonArray.map { it.jsonPrimitive.content.toBooleanStrict() }
                 .toBooleanArray(), saved.getValue("ints").jsonArray.map { it.jsonPrimitive.content.toLong() }
@@ -118,10 +119,15 @@ internal object RepairOwnerReplay {
             val checked = accepted(center, Cancellation.after(2000.milliseconds))
             check(checked.accepted)
             val decline = entry["decline"]?.takeUnless { it == JsonNull }?.jsonPrimitive?.content
+            val requested = entry["requestedCount"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
             Scope(index, center, bools, ints, pins, cutoff,
                 objective.evaluate(center), entry.getValue("selector").jsonPrimitive.content, checked.objective,
-                entry.getValue("centerObjective").jsonPrimitive.content,
-                if (bools.isEmpty() && ints.isEmpty() && decline != null) "selector declined: $decline" else null)
+                entry, when {
+                    bools.isNotEmpty() || ints.isNotEmpty() -> null
+                    decline != null -> "selector declined: $decline"
+                    requested > 0 -> "selector supplied no effective scope"
+                    else -> null
+                })
         }
         file.resolveSibling("${file.nameWithoutExtension}-preparation.json").writeText(buildJsonObject {
             put("controlFileSha256", controlHash)
@@ -251,14 +257,15 @@ internal object RepairOwnerReplay {
                         val sourceImproving = scope.sourceCutoff?.let { cutoff -> verification?.objective?.let {
                             if (sourceMaximize) it > cutoff else it < cutoff
                         } }
-                        val improving = sample != null && checked == true &&
-                            objective.evaluateExact(sample) < scope.cutoff &&
+                        val workingImproving = sample != null && objective.evaluateExact(sample) < scope.cutoff
+                        val improving = checked == true && workingImproving &&
                             (scope.sourceCutoff == null || sourceImproving == true)
                         val status = when {
                             improving -> "improvement"
                             checked == true -> "feasible-nonimprovement"
                             !realAuthority -> "unavailable"
                             sample != null && checked == false && !lifetime() -> "source-rejected"
+                            sample != null && checked != true -> "unavailable"
                             outcome.reason == TerminationReason.SearchExhausted -> "conditioned-closure"
                             outcome.reason == TerminationReason.BudgetExhausted -> "budget-exhaustion"
                             outcome.reason in setOf(TerminationReason.Cancelled, TerminationReason.Timeout) ->
@@ -280,9 +287,13 @@ internal object RepairOwnerReplay {
                             put("strictWorkingCutoff", scope.cutoff.toString())
                             put("cutoffRule", "strict improvement on the checked control center")
                             put("controlFileSha256", controlHash)
-                            put("capturedCenterObjective", scope.capturedObjective)
+                            put("capturedCenterObjective", scope.captured.getValue("centerObjective"))
                             put("nativeCenterObjective", scope.nativeCutoff)
                             put("selectorUnavailable", scope.unavailable != null)
+                            put("selectorSeed", scope.captured["seed"] ?: JsonNull)
+                            put("selectionCountMatched", scope.captured["sourceCountMatched"]
+                                ?: scope.captured["effectiveCountMatched"] ?: JsonNull)
+                            put("selectionGuidanceStatus", scope.captured["guidanceStatus"] ?: JsonNull)
                             put("effectiveBools", JsonArray(scope.freedBools.map(::JsonPrimitive)))
                             put("effectiveInts", JsonArray(scope.freedInts.map(::JsonPrimitive)))
                             put("scopeNamespace", "captured prepared finite slots")
@@ -304,9 +315,12 @@ internal object RepairOwnerReplay {
                             put("sourceCenterObjective", scope.sourceCutoff?.toString())
                             put("sourceCandidateObjective", verification?.objective?.toString())
                             put("sourceStrictImprovement", sourceImproving)
+                            put("workingStrictImprovement", workingImproving)
                             put("objective", sample?.let { objective.evaluateExact(it).toString() })
                             put("candidate", sample?.let { sample(prepared.reconstruct(it)) } ?: JsonNull)
-                            put("conditionedClosure", outcome.reason == TerminationReason.SearchExhausted)
+                            put("conditionedSearchComplete", outcome.reason == TerminationReason.SearchExhausted)
+                            put("conditionedCutoffClosure", outcome.reason == TerminationReason.SearchExhausted &&
+                                !workingImproving)
                             put("conditionedBound", NumericalResidualProfile.json(outcome.bound))
                             put("globalProofClaim", false)
                             put("independentWitnessCheck", false)
