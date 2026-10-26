@@ -27,11 +27,13 @@ import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.util.Cancellation
 import com.sun.management.ThreadMXBean
+import java.io.ByteArrayInputStream
 import java.io.File
 import java.lang.management.ManagementFactory
 import java.math.BigDecimal
 import java.math.BigInteger
 import java.util.Base64
+import java.util.zip.GZIPInputStream
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -57,8 +59,14 @@ internal object MpsResidualObjective {
     @Suppress("UNCHECKED_CAST")
     private fun inspect(request: JsonObject, out: File) {
         fun option(key: String) = request.getValue(key).jsonPrimitive.content
-        val selected = Catalog.uncapped(option("suite")).problems.single { it.name == option("problem") }
-        val bytes = CorpusFiles.open(CorpusFetcher.resolve(selected.source)).use { it.readNBytes(16 * 1024 * 1024 + 1) }
+        val bytes = request["sourceGzip64"]?.jsonPrimitive?.content?.let { encoded ->
+            GZIPInputStream(ByteArrayInputStream(Base64.getDecoder().decode(encoded))).use {
+                it.readNBytes(16 * 1024 * 1024 + 1)
+            }
+        } ?: run {
+            val selected = Catalog.uncapped(option("suite")).problems.single { it.name == option("problem") }
+            CorpusFiles.open(CorpusFetcher.resolve(selected.source)).use { it.readNBytes(16 * 1024 * 1024 + 1) }
+        }
         require(bytes.size <= 16 * 1024 * 1024 && sha256(bytes) == option("sha256"))
         out.resolve("source.mps").writeBytes(bytes)
         out.resolve("request.json").writeText(request.toString())
