@@ -256,7 +256,8 @@ opening, including when it borrows a numerical owner.
 The index retains at most 256 entries and 1 MiB of modeled proof/scope storage,
 evicting the oldest entry when either capacity is reached. Support traversal admits
 at most 4,096 nodes and depth 64; each retention or lookup shares at most 100,000
-verification polls across its candidates. Source reconstruction, proof replay,
+verification polls across its candidates. Source, restriction and proof scalars
+retain 4,096-bit numerator and denominator limits. Source reconstruction, proof replay,
 indexing, allocation and eviction charge cumulative source LP funding. Unknown or
 cancelled checks close no additional alternative. Ordinary traversal keeps reuse
 disabled.
