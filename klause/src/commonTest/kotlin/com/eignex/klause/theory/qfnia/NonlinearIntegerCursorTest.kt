@@ -17,6 +17,57 @@ import kotlin.test.assertTrue
 
 class NonlinearIntegerCursorTest {
     @Test
+    fun `integer window exhaustion should remain unknown when its real relaxation is satisfiable`() {
+        val parsed = SmtLibPolynomial.parse("(declare-const n Int) (assert (= (* n n) 2))", allowIntegers = true)
+        val source = NonlinearIntegerProblem(
+            parsed.formula,
+            parsed.realCount,
+            parsed.boolCount,
+            parsed.intVarNames,
+            parsed.realVarNames,
+            parsed.boolVarNames,
+        )
+        val condition = PolynomialCondition(
+            lower = mapOf(0 to BigFraction.ZERO),
+            upper = mapOf(0 to BigFraction.ofLong(2)),
+        )
+
+        val execution = solveNonlinearIntegers(
+            source,
+            NonlinearIntegerParams(strategy = NonlinearIntegerStrategy.SEARCH, maximumCandidates = 4),
+            condition,
+        )
+
+        assertIs<QfNraResult.Unknown>(execution.result)
+    }
+
+    @Test
+    fun `wider condition should preserve a witness outside an earlier refuted window`() {
+        val parsed = SmtLibPolynomial.parse("(declare-const n Int) (assert (= (* n n) 4))", allowIntegers = true)
+        val source = NonlinearIntegerProblem(
+            parsed.formula,
+            parsed.realCount,
+            parsed.boolCount,
+            parsed.intVarNames,
+            parsed.realVarNames,
+            parsed.boolVarNames,
+        )
+        val params = NonlinearIntegerParams(strategy = NonlinearIntegerStrategy.SEARCH)
+        val lower = mapOf(0 to BigFraction.ZERO)
+        val narrow = solveNonlinearIntegers(source, params, PolynomialCondition(
+            lower = lower, upper = mapOf(0 to BigFraction.ONE),
+        ))
+        assertIs<QfNraResult.Unsatisfiable>(narrow.result)
+
+        val widened = solveNonlinearIntegers(source, params, PolynomialCondition(
+            lower = lower, upper = mapOf(0 to BigFraction.ofLong(2)),
+        ))
+
+        val witness = assertIs<QfNraResult.Satisfiable>(widened.result).assignment
+        assertEquals(BigFraction.ofLong(2), witness.realValue(0).rational)
+    }
+
+    @Test
     fun `failed tuple should preserve satisfiable neighbors under opposite Boolean conditions`() {
         val parsed = SmtLibPolynomial.parse(
             "(declare-const n Int) (declare-const r Real) (declare-const b Bool) " +
