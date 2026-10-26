@@ -1663,6 +1663,90 @@ family-wide eligibility conclusion. The [frozen Cargo default control](https://l
 returns UNKNOWN in all three 30-second Linux runs; it emits no checked witness.
 Native profile endpoints supply no independent source-witness or portfolio evidence.
 
+The ordinary [reserved comparison](https://lab.eignex.com/jobs/8642) fixes
+`8a850f3c2f`, sole-arm LS, the existing `cbls-plateau/ils-basin` recipe, normalized
+class weights and lambda 1. Discovery families are CarpetCutting, RCPSP,
+SchedulingOS, Warehouse and GBACP; Cargo, FlexibleJobshopScen, TestScheduling,
+BinPacking2 and NurseRostering were reserved as whole holdout families before
+selection. Cargo stays in its separate frozen default control. The other nine
+original sources each receive three views, seeds 3/7/11, a 10,000-move allowance
+with a 30-second deadline, and a separate ten-second allowance. Preparation consumes
+the containing budget. All 162 cases complete: 138 feasible endpoints pass the
+independent original-source XCSP3 checker, six FlexibleJobshopScen seed-7 cases
+and all 18 NurseRostering cases return UNKNOWN. No outcome carries a proof.
+Every original source hash matches its reservation; all 162 external resource
+receipts bind by SHA-256 to their native solve records. Infrastructure failures
+before the accepted recovery supply no solver observations.
+
+Functional-objective availability is true only for GBACP and TestScheduling in
+this cohort. The other seven requested functional treatments fall back to raw
+linear grading and supply no functional-view evidence. Retained and substituted
+views have equal feasibility and exact endpoints in all 27 work-limited groups;
+four time-limited groups differ, without an isolated grading-cause claim. Exact
+checked minimization endpoints below use seed order 3 / 7 / 11. Retained and
+substituted endpoints coincide for both displayed sources.
+
+| Source | Allowance | Retained/substituted | Functional |
+| --- | --- | --- | --- |
+| GBACP-UD04 | 10,000 moves | 687 / 543 / 974 | 614 / 686 / 685, wall-censored |
+| GBACP-UD04 | 10 seconds | 615 / 544 / 833 | 615 / 762 / 759 |
+| TestScheduling-t020m10r03-1 | 10,000 moves | 5060 / 4893 / 5042 | 4944 / 4546 / 4857 |
+| TestScheduling-t020m10r03-1 | 10 seconds | 4954 / 4893 / 4758 | 5090 / 4546 / 4891 |
+
+GBACP functional runs reach only 3,745 / 1,515 / 3,818 moves at the deadline;
+their endpoints are not matched-10,000-move gains. All TestScheduling work runs
+complete 10,000 moves, but whole-CLI wall time rises from 5.71 / 4.38 / 1.53
+seconds to 17.69 / 15.17 / 7.53 seconds, and CPU time from 5.61 / 4.26 / 3.21
+to 17.50 / 14.97 / 9.77 seconds. Peak RSS is 151100 / 139340 / 232608 KiB
+versus 133220 / 132604 / 233248 KiB, so allocation growth in the profiles does
+not imply uniformly higher process memory. GBACP work-run RSS is
+229232 / 133704 / 216336 KiB versus 238320 / 159076 / 238960 KiB.
+Preparation is similar within each source/host: TestScheduling retained
+330 / 294 / 70 ms versus functional 374 / 296 / 71 ms; GBACP retained
+160 / 625 / 157 ms versus functional 171 / 678 / 159 ms. Hint construction
+is common to the treatments before the diagnostic gradient filter.
+
+Native attribution preserves scalar feasible-objective trajectories and first
+feasibility timestamps, while only the final full source instantiation is emitted
+for independent checking. For example, CarpetCutting retained/work seed 3 reports
+first native feasibility at 33 ms, first process-relative feasibility at 310 ms,
+and finishes the CLI at 613 ms with checked objective 1028. CLI completion bounds
+the first available independently checkable witness; the earlier scalar points
+have no independent first-feasibility validation. Whole-process receipts exclude
+the parent bench and independent checker. The JVM uses `-Xmx3g`, Serial GC and
+`ActiveProcessorCount=1`; advisory Mac CPU allowances permit JIT bursts. Every
+source/seed/allowance view triplet shares a host, with Linux and Mac strata kept
+distinct. These observations support within-triplet comparisons, not pooled
+hardware throughput or portfolio claims.
+
+The source-projected endpoint captures at `d1648fa6e9`,
+[GBACP](https://lab.eignex.com/jobs/8660) and
+[reserved TestScheduling](https://lab.eignex.com/jobs/8661), use seeds 3/7 and the
+same bounded profile recipe with `basins=true`. Their 768 matched candidates,
+combined with the earlier 2,176, give 2,944 equal-grade observations at identical
+complete source destinations. Retained and substituted models in these four
+captures have identical prepared linear objectives and factor descriptors, and
+identical source trace prefixes; they supply a coalesced representation control.
+The 367 recorded attempts contain 365 native policy local optima and two censored
+functional GBACP attempts; another 1,629 attempts exceed the trace cap and are
+declined. Trace copies read 2,767,023 coordinates. Distinct declared-input
+endpoints are 25/30 retained versus 15/16 functional for GBACP, and 29/31 versus
+32/27 for TestScheduling. No retained/functional endpoint is shared within these
+bounded prefixes. Integer-input displacement ranges are 0–112 / 5–114 versus
+0–92 / 0–97 for GBACP, and 0–22 / 1–21 versus 1–22 / 1–15 for TestScheduling.
+These are policy-qualified endpoints under changed proposal sets, not exhaustive
+source basins, independently checked profile witnesses or grading diversity.
+
+Retain the existing maintained functional-cone view as a capability-gated
+complementary research candidate: exact closure and complete source correspondence
+admit different searched coordinates, source endpoints and checked quality.
+TestScheduling improves all three work endpoints but loses two of three clock
+comparisons; GBACP has one clock win, one tie and one loss with severe work-run
+censoring. Reject a general substitution-diversity or default/portfolio benefit
+claim. The evidence supports no wider admission, Cargo adjustment or new
+neighborhood, and the diagnostic CLI treatment used by the study is not a
+production selector.
+
 
 ### Finite conflict selection
 
