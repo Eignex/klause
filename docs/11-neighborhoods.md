@@ -319,6 +319,20 @@ Attributions identify activity inputs without a premise-complete branch refutati
 Invocations with pooled starting witnesses decline capture because their initial
 cutoff tightening need not notify the variable selector.
 
+The pipeline's internal `FiniteNumericalRemoval` consumes scoped numerical
+feedback without owning numerical capture or proof traversal. Exact relaxation
+disagreement and captured refutation support independently prioritize finite
+coordinates, with seeded ties and ordinary random fallback. The adapter admits
+an unchanged complete Boolean/integer coordinate frame and exact caller/query
+pins; unmapped coordinates and additional deduced restrictions decline. It checks
+the normalized objective, original premises, semantic checker and actual cutoff
+row before retaining at most 4,096 scores. Missing feedback, missing points,
+agreement and empty captured support remain distinct outcomes. Scoring and
+selection debit the producer's containing funding; cancellation or exhausted
+funding declines selection as a whole. Model, objective, center or caller-pin
+changes retire guidance, and close releases its query scope. These rankings
+neither assert deductions nor establish that a selected repair can improve.
+
 ### Handles and exclusive ownership
 
 Local-search handles retain assignment, RNG, factor payloads, restart progress and
