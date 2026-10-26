@@ -105,7 +105,8 @@ internal class JointRepairNeighborhood private constructor(
                 rows += columns.toIntArray()
             }
             return if (cancellation()) null else
-                JointRepairNeighborhood(integers, rows, Array(occurrences.size) { occurrences[it].toIntArray() }, inputs)
+                JointRepairNeighborhood(integers, rows,
+                    Array(occurrences.size) { occurrences[it].toIntArray() }, inputs)
         }
     }
 }

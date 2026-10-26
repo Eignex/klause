@@ -188,7 +188,8 @@ internal object MpsRepairReplay {
         val thread = Thread.currentThread().threadId()
         val allocation = bean.getThreadAllocatedBytes(thread)
         val start = System.nanoTime()
-        val inputs = columns.indices.filter { source.variables[it].integer }.map { Term.intVar(columns[it]) }.toIntArray()
+        val inputs = columns.indices.filter { source.variables[it].integer }
+            .map { Term.intVar(columns[it]) }.toIntArray()
         val owner = type.constructors.single { it.parameterCount == 9 }.newInstance(
             model, context, objective, params, policy, true, { center }, stop, inputs)
         val result = linkedMapOf<Int, List<String>>()
