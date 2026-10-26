@@ -180,6 +180,49 @@ internal fun trajectoryPair(
     }
 }
 
+internal fun trajectoryCandidates(
+    source: Sample,
+    views: List<TrajectoryView>,
+    focus: Int = -1,
+    priorityInts: IntArray = IntArray(0),
+): List<Move> {
+    val candidates = ArrayList<Move>()
+    val integers = (priorityInts.asList() + listOf(focus - source.numBoolVars) +
+        (0 until source.numIntVars)).filter { it in 0 until source.numIntVars }.distinct()
+    fun integer(variable: Int) {
+        val current = source.intValue(variable)
+        val values = views.flatMap { view ->
+            val target = view.coordinates.int(variable)
+            if (target < 0) emptyList() else {
+                val domain = view.state.rootDomains[target]
+                buildList {
+                    add(domain.min)
+                    add(domain.max)
+                    if (current > domain.min) add(domain.lower(current))
+                    if (current < domain.max) add(domain.higher(current))
+                }
+            }
+        }
+        for (value in values.distinct()) {
+            val move = Move.IntSet(variable, value)
+            if (value != current && candidates.size < 32 && views.all { it.admits(move) }) candidates += move
+        }
+    }
+    for (variable in priorityInts.distinct()) {
+        if (variable in 0 until source.numIntVars && candidates.size < 32) integer(variable)
+    }
+    for (variable in 0 until source.numBoolVars) {
+        if (candidates.size == 32) break
+        val move = Move.BoolFlip(variable)
+        if (views.all { it.admits(move) }) candidates += move
+    }
+    for (variable in integers) {
+        if (candidates.size == 32) break
+        if (variable !in priorityInts) integer(variable)
+    }
+    return candidates
+}
+
 internal fun trajectorySource(sample: Sample): JsonObject = buildJsonObject {
     put("bools", JsonArray(sample.bools.map(::JsonPrimitive)))
     put("ints", JsonArray(sample.ints.map(::JsonPrimitive)))

@@ -1,11 +1,8 @@
 package com.eignex.klause.bench.profile
 
-import com.eignex.klause.bench.catalog.Catalog
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
-import com.eignex.klause.bench.source.CorpusFetcher
-import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.formats.xcsp3.Xcsp3
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.VarRemap
@@ -14,7 +11,6 @@ import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.localsearch.LocalSearchState
-import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.localsearch.acceptance.AcceptanceRule
 import com.eignex.klause.localsearch.movesource.ConfiguredSource
@@ -76,21 +72,16 @@ internal object LocalSearchTrajectory {
     private fun capture(args: Array<String>, out: File) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val required = setOf("suite", "problem", "sha256", "recipe", "seed", "moves")
-        val optional = setOf("sliceMillis", "sliceWork", "greedy", "repairs", "controls", "center", "source64")
+        val optional = setOf(
+            "sliceMillis", "sliceWork", "greedy", "repairs", "controls", "center", "source64", "sourceGzip64",
+        )
         require(options.keys.containsAll(required) && options.keys.all {
             it in required || it in optional
         })
-        val bytes = options["source64"]?.let {
-            require(it.length <= 96 * 1024)
-            Base64.getDecoder().decode(it)
-        } ?: run {
-            val reference = Catalog.uncapped(options.getValue("suite")).problems
-                .single { it.name == options.getValue("problem") }
-            CorpusFiles.open(CorpusFetcher.resolve(reference.source)).use {
-                it.readNBytes(64 * 1024 * 1024 + 1)
-            }
-        }
-        require(bytes.size <= 64 * 1024 * 1024 && sha256(bytes) == options.getValue("sha256"))
+        val bytes = trajectorySourceBytes(
+            options.getValue("suite"), options.getValue("problem"), options.getValue("sha256"),
+            options["source64"], options["sourceGzip64"],
+        )
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
         out.resolve("source.xml").writeBytes(bytes)
         out.resolve("request.txt").writeText(args.joinToString("\n"))
@@ -348,37 +339,7 @@ internal object LocalSearchTrajectory {
                 return@use
             }
             for ((label, source, focus) in observations) {
-                val candidates = ArrayList<Move>()
-                for (variable in 0 until source.numBoolVars) {
-                    if (candidates.size == 32) break
-                    val move = Move.BoolFlip(variable)
-                    if (views.all { it.admits(move) }) candidates += move
-                }
-                val first = focus - parsed.problem.numBoolVars
-                val integerOrder = (listOf(first).filter { it in 0 until source.numIntVars } +
-                    (0 until source.numIntVars)).distinct()
-                for (variable in integerOrder) {
-                    if (candidates.size == 32) break
-                    val current = source.intValue(variable)
-                    val values = views.flatMap { view ->
-                        val target = view.coordinates.int(variable)
-                        if (target < 0) emptyList() else {
-                            val domain = view.state.rootDomains[target]
-                            buildList {
-                                add(domain.min)
-                                add(domain.max)
-                                if (current > domain.min) add(domain.lower(current))
-                                if (current < domain.max) add(domain.higher(current))
-                            }
-                        }
-                    }
-                    for (value in values.distinct()) {
-                        val move = Move.IntSet(variable, value)
-                        if (value != current && candidates.size < 32 && views.all { it.admits(move) }) {
-                            candidates += move
-                        }
-                    }
-                }
+                val candidates = trajectoryCandidates(source, views, focus)
                 writer.appendLine(buildJsonObject {
                     put("observation", label)
                     put(
@@ -425,11 +386,11 @@ internal object LocalSearchTrajectory {
         }
     }
 
-    private fun getter(owner: Any, name: String): Any? = owner.javaClass.methods.single {
+    internal fun getter(owner: Any, name: String): Any? = owner.javaClass.methods.single {
         it.name.substringBefore('$') == name && it.parameterCount == 0
     }.invoke(owner)
 
-    private fun heuristicHints(
+    internal fun heuristicHints(
         invocation: PreparedSourceInvocation,
         prepared: FinitePipelinePreparation,
         stop: Cancellation,

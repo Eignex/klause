@@ -1423,6 +1423,26 @@ a sixty-second outer deadline; cancellation is recorded. These instrumented walk
 isolate local trajectories; they establish neither default portfolio equivalence,
 throughput, native proof nor independently checked source feasibility.
 
+`bench.profile.ObjectiveViewComparison` uses the same hash-pinned source and paired
+probe API for retained linear, exactly substituted linear and retained functional
+objectives. It accepts `suite`, `problem`, `sha256`, optional `recipe`, worker `seed`,
+`moves`, `timeoutMillis`, `greedy`, and `screen=true` for a parse-only capability receipt.
+Each view runs alone; preparation counts against its time allowance. Up to six
+initial/post-greedy source boundaries supply at most 32 common admissible primitive
+moves per view pair, with functional input coordinates sampled first. Complete
+source round trips and identical reconstructed destinations determine correspondence;
+equal seeds or recipes do not establish proposal equivalence. Retained linear and
+functional objectives share a maintained definition network, providing a grading
+control while exposing any changed objective hotspot proposal coordinates.
+Preparation and thread allocations, native incumbent source-expression values,
+RNG boundaries, raw/weighted/objective deltas and model keys remain separate.
+Private initialization/probe diagnostics run outside the walk allowance. Walk time
+includes passive recording overhead; ordinary CLI lab runs with source validation
+supply independent witness checks and whole-process resource measurements.
+Both runners accept `source64` or `sourceGzip64` containing the original source,
+bounded to 96 KiB encoded and 64 MiB inflated, with the original hash mandatory.
+The objective runner also accepts the same bounded `batch64` request form.
+
 ### Table profiling
 
 `bench.profile.ExtensionalCompositionProfile` accepts `suite=ID problem=NAME
