@@ -57,13 +57,17 @@ internal class NumericalSelectionSnapshot(private val stop: Cancellation) {
         val type = Class.forName("com.eignex.klause.lp.optimization.LinearAuthorityReplay")
         val instance = type.getField("INSTANCE").get(null)
         val run = type.declaredMethods.single { it.name == "run" }
+        val select = type.declaredMethods.single { it.name == "runSelected" }
         for (record in records(journal).take(4)) {
             if (stop()) return
             if (field(record, "point") == null) continue
             val all = rows(record).indices.toSet()
-            for ((name, mask) in listOf("disabled" to emptySet(), "all" to all)) for (repeat in 0..1) {
+            for (name in listOf("disabled", "all", "selected")) for (repeat in 0..1) {
                 if (stop()) return
-                val replay = run.invoke(instance, record, mask, 20_000_000L, 67_108_864L, stop)
+                val replay = if (name == "selected") {
+                    select.invoke(instance, record, 20_000_000L, 67_108_864L, stop)
+                } else run.invoke(instance, record, if (name == "all") all else emptySet<Int>(),
+                    20_000_000L, 67_108_864L, stop)
                 emit(buildJsonObject {
                     put("originalQuery", field(record, "id") as Int)
                     put("mask", name)
@@ -71,12 +75,19 @@ internal class NumericalSelectionSnapshot(private val stop: Cancellation) {
                     put("diagnosticOnly", true)
                     put("maximumWork", 20_000_000L)
                     put("maximumAllocation", 67_108_864L)
-                    put("maximumOperations", 1)
+                    put("maximumOperations", if (name == "selected") 2 else 1)
                     put("operations", field(replay, "operations") as Int)
                     put("work", field(replay, "work") as Long)
                     put("allocation", field(replay, "allocation") as Long)
                     put("stopped", field(replay, "stopped") as Boolean)
                     field(replay, "query")?.let { put("query", query(it)) }
+                    @Suppress("UNCHECKED_CAST")
+                    put("queries", buildJsonArray {
+                        (field(replay, "queries") as List<Any>).forEach { add(query(it)) }
+                    })
+                    (field(replay, "strongestBound") as SourceEvidence?)?.let {
+                        put("strongestBound", evidence(field(record, "context") as SourceProofContext, it))
+                    }
                 })
             }
         }

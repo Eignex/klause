@@ -159,7 +159,8 @@ internal class NumericalFrontierSnapshot(
             nodes++
             val nodeCondition = field(node, "condition") as SourceCondition
             val result = field(node, "result")
-            val own = result?.let { field(it, "bound") as SourceEvidence? }
+            val partial = field(node, "partialBound", optional = true) as SourceEvidence?
+            val own = result?.let { field(it, "bound") as SourceEvidence? } ?: partial
             val best = listOfNotNull(inherited, own).reduceOrNull { left, right ->
                 val before = ((left.claim as SourceClaim.Bound).value as SourceValue.Rational).value
                 val after = ((right.claim as SourceClaim.Bound).value as SourceValue.Rational).value
@@ -201,7 +202,8 @@ internal class NumericalFrontierSnapshot(
                 }
                 result?.let { field(it, "evidence") } == null -> pending += buildJsonObject {
                     put("condition", condition(nodeCondition))
-                    put("state", if (result == null) "unvisited" else "unresolved")
+                    put("state", if (partial != null && result == null) "pending-separation"
+                        else if (result == null) "unvisited" else "unresolved")
                     best?.let {
                         put("bound", bound(it))
                         put("inherited", it.scope.condition != nodeCondition)

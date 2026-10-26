@@ -93,6 +93,7 @@ internal class LinearAuthorityQuery private constructor(
                 .mapTo(HashSet()) { active[it] }
             for ((id, cut) in cuts.withIndex()) {
                 if (cancellation()) return null
+                if (cutMask != null && id !in cutMask) continue
                 if (id in accepted && (cutMask == null || id in cutMask)) {
                     activeCuts++
                     if (cut.mixed) activeMixedCuts++

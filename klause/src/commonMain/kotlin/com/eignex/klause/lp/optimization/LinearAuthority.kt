@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.optimization
 
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.SparseSourceLpPolicy
@@ -50,6 +51,16 @@ internal class LinearAuthority(
     private var capturedPoint: Map<SourceCoordinate, BigFraction>? = null
     private var capturedQuery: LinearAuthorityQuery? = null
     private var capturedTemplate: LinearAuthorityTemplate? = null
+    private var pointListener: ((LinearAuthorityQuery, List<BigFraction>) -> Unit)? = null
+    private var pointPolicy: LinearAuthorityPointCuts? = null
+    private var pointFamily: LinearAuthorityTemplate? = null
+    private var pointMask: Set<Int> = emptySet()
+    private class PointRound(
+        val query: LinearAuthorityQuery, val base: LinearAuthorityResult, val mask: Set<Int>,
+    ) {
+        var reported = false
+    }
+    private var pointRound: PointRound? = null
     private var cutPreparationWork = 0L
     private var cutVerificationWork = 0L
     private var retainedCutPeak = 0L
@@ -64,7 +75,7 @@ internal class LinearAuthority(
         "numericalMaxActiveCuts" to activeCutPeak,
         "numericalMaxRetainedMixedCuts" to retainedMixedCutPeak,
         "numericalMaxActiveMixedCuts" to activeMixedCutPeak,
-    ) + cutEligibility
+    ) + cutEligibility + pointPolicy?.observations.orEmpty()
     private class PrimalAttempt(
         val query: LinearAuthorityQuery, val point: List<BigFraction>,
     ) {
@@ -76,7 +87,10 @@ internal class LinearAuthority(
     }
     private var primalAttempt: PrimalAttempt? = null
 
-    fun invalidateGuidance() = lp.invalidateGuidance()
+    fun invalidateGuidance() {
+        pointRound = null
+        lp.invalidateGuidance()
+    }
 
     override fun close() {
         template = null
@@ -84,8 +98,76 @@ internal class LinearAuthority(
         capturedQuery = null
         capturedTemplate = null
         capturedPoint = null
+        pointListener = null
+        pointRound = null
+        pointFamily = null
+        pointMask = emptySet()
         primalAttempt = null
         lp.close()
+    }
+
+    fun advanceWithPointCuts(source: SourceProofContext, cancellation: Cancellation): LinearAuthorityResult {
+        val policy = pointPolicy ?: LinearAuthorityPointCuts(budget).also { pointPolicy = it }
+        if (pointFamily !== template || template?.matches(source) != true || template?.cuts == null) {
+            pointMask = emptySet()
+            pointRound = null
+            pointFamily = template
+        }
+        var pending = pointRound?.takeIf {
+            it.query.matches(source, cuts = true, cutMask = it.query.cutMask)
+        }
+        if (pending == null) {
+            pointRound = null
+            var point: Pair<LinearAuthorityQuery, List<BigFraction>>? = null
+            pointListener = { query, values -> if (point == null) point = query to values }
+            val base = try {
+                advance(source, cancellation, cuts = true, cutMask = pointMask)
+            } finally {
+                pointListener = null
+            }
+            if (base.paused || base.evidence != null || base.incumbent != null || cancellation()) return base
+            val observed = point ?: run {
+                policy.observe("PointUnavailable")
+                return base
+            }
+            val prepared = observed.first
+            val family = template
+            pointFamily = family
+            if (family?.cuts == null ||
+                !prepared.matches(source, cuts = true, cutMask = pointMask)) {
+                policy.observe("PointUnavailable")
+                return base
+            }
+            val selected = policy.select(family.cuts.rows, prepared.coordinates, prepared.costs, prepared.checkedCuts,
+                observed.second, pointMask.intersect(prepared.checkedCuts), cancellation)
+            if (selected == pointMask || budget.funding?.exhausted == true || cancellation()) return base
+            pointMask = selected
+            pending = PointRound(prepared, base, selected)
+            pointRound = pending
+            policy.observe("Rounds")
+            budget.funding?.charge(0L, 1024L + 64L * (base.fractional.size + base.relaxedPoint.size))
+        }
+        if (budget.funding?.exhausted == true || cancellation()) {
+            pointRound = null
+            return pending.base.copy(primalStages = if (pending.reported) emptyMap() else pending.base.primalStages)
+        }
+        val result = advance(source, cancellation, cuts = true, cutMask = pending.mask)
+        if (!result.paused || budget.funding?.exhausted == true || cancellation()) pointRound = null
+        val previousStages = if (pending.reported) emptyMap() else pending.base.primalStages
+        pending.reported = true
+        val stages = (previousStages.keys + result.primalStages.keys).associateWith { key ->
+            val before = previousStages[key] ?: 0L
+            val after = result.primalStages[key] ?: 0L
+            if ("Max" in key) maxOf(before, after) else before + after
+        }
+        if (result.paused && (budget.funding?.exhausted == true || cancellation())) {
+            return pending.base.copy(primalStages = stages)
+        }
+        if (!result.paused && result.evidence == null && result.incumbent == null && result.split == null) {
+            policy.observe("UnavailableRounds")
+            return pending.base.copy(primalStages = stages)
+        }
+        return result.copy(bound = strongerLinearBound(pending.base.bound, result.bound), primalStages = stages)
     }
 
     fun check(source: SourceProofContext, cancellation: Cancellation): LinearAuthorityResult {
@@ -269,6 +351,10 @@ internal class LinearAuthority(
         }
         val solved = guide?.result ?: lp.solve(closureRows, costs, constant, cancellation, inactive)
             ?: return LinearAuthorityResult(paused = budget.funding?.paused == true)
+        pointListener?.let { listener ->
+            val point = guide?.point ?: solved.result.exactPrimal?.take(coordinates.size)
+            if (point != null && point.size == coordinates.size) listener(prepared, point)
+        }
         if (capture?.accepting == true && capturedPoint == null && capturedQuery === prepared) {
             val point = guide?.point ?: solved.result.exactPrimal?.take(coordinates.size)
             if (point != null && point.size == coordinates.size) {
@@ -470,4 +556,16 @@ private fun sample(source: SourceProofContext, coordinates: List<SourceCoordinat
         source.scope.condition.bools.getValue(it)
     }, if (integers.all { it.fitsLong() }) LongArray(integers.size) { integers[it].toLongExact() } else longArrayOf(),
         DoubleArray(reals.size) { reals[it].toDouble() }, exactReals = reals, exactInts = integers)
+}
+
+internal fun strongerLinearBound(left: SourceEvidence?, right: SourceEvidence?): SourceEvidence? {
+    if (left == null) return right
+    if (right == null) return left
+    require(left.scope == right.scope)
+    val before = left.claim as SourceClaim.Bound
+    val after = right.claim as SourceClaim.Bound
+    val first = (before.value as SourceValue.Rational).value
+    val second = (after.value as SourceValue.Rational).value
+    val improves = if (left.scope.objective?.sense == ObjectiveSense.MINIMIZE) second > first else second < first
+    return if (improves || (second == first && after.strict && !before.strict)) right else left
 }

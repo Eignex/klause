@@ -5409,7 +5409,7 @@ operations so observation-on/off controls can stop before the wall deadline.
 
 Optional `replay=true` separately replays at most four retained point states with
 empty and all-candidate masks, twice per mask, flushing `selection-replays.jsonl`.
-Each replay has one source operation, 20M cumulative work and 64 MiB modeled allocation under a
+Each fixed-mask replay has one source operation, 20M cumulative work and 64 MiB modeled allocation under a
 shared ten-second diagnostic deadline. Replay creates fresh owners; its work and
 native checks are separate from traversal accounting and independent witness
 validation. The capture's existing original bytes, hash, native-system identity,
@@ -5446,6 +5446,28 @@ the exact point, scope, bound and modeled work in both fresh repetitions of all
 eight `rgn` parent/mask pairs. All 16 bounds and 640 candidate derivations pass
 fresh native checks; no replay reaches its allowance. The original source hash
 and Linux/amd64 platform match 8431.
+
+
+`--param source-point-cuts=true` enables point-based selection only in the retained
+numerical frontier; `--param source-cuts=false` disables separation. The ordinary
+all-cuts policy remains the default. `MpsProofFrontier pointCuts=true` selects this
+consumer, and replay includes a `selected` arm alongside `all` and `disabled`.
+Each selected replay funds both its base query and at most one separation query
+from the same 20M work/64 MiB allocation envelope, with two source operations;
+the other arms keep one operation. Both generating masks and the strongest checked
+completed bound are retained. A fresh selected arm starts with an empty pool.
+
+Selection retains at most 64 source cut IDs per compatible template and considers
+at most 8,192 support entries, 65,536 scoring work and 1 MiB modeled allocation per
+consultation. Projection/scoring work and allocation debit the containing ledger;
+LP preparation, exact proof checks and numerical work retain their existing costs.
+`numericalCutSelection*` observations distinguish visited/selected rows, unavailable
+scores/points, incomplete scans, pool limits, separation rounds, work and modeled
+allocation. A satisfied installed cut remains available, with its original exact
+source derivation; no score admits or validates a cut. Pending separation retains
+its completed base bound, and a declined round keeps the base split. Checked base
+incumbents and terminals bypass extra separation. These are bounded policy controls,
+not default-admission or throughput claims.
 
 #### Source numerical decision feedback
 

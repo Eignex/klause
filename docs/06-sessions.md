@@ -297,6 +297,8 @@ operation-based admission policy.
 Optional numerical decision feedback debits journal collection, retention and
 support scoring to the same cumulative source funding. Exhausted feedback retains
 source-order branching and every complementary alternative.
+Point-based source separation debits its scoring and projection storage to that
+same ledger; its extra relaxation receives no renewed work or allocation ceiling.
 
 Each retained sparse query takes its finite numerical lifetime from the caller's
 remaining cumulative work, with a proportional pivot allowance. Slice grants limit

@@ -17,6 +17,19 @@ import kotlin.test.assertTrue
 
 class SourceExecutionControlsTest {
     @Test
+    fun `point cut selection should bind to numerical execution`() {
+        val source = SourceAttachment(
+            LinearSourceProblem(listOf(LinearSourceVariable("x", false)), emptyList()), ProblemSettings(),
+        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(source, ExecutionOperation.SATISFY, FiniteEngine.FIXED,
+            linearTraversal = LinearTraversal.NUMERICAL_FRONTIER))
+
+        val request = SourceExecutionRequest(invocation, ExecutionOptions.parse(listOf("source-point-cuts=true")))
+
+        assertTrue(request.theory.sourcePointCuts)
+    }
+
+    @Test
     fun `source cut control should bind to numerical execution`() {
         val source = SourceAttachment(
             LinearSourceProblem(listOf(LinearSourceVariable("x", false)), emptyList()), ProblemSettings(),

@@ -103,6 +103,8 @@ data class TheoryParams(
     val sourceLpOperations: Int = Int.MAX_VALUE,
     /** Enable checked source-row separation for numerical frontier traversal. */
     val sourceCuts: Boolean = true,
+    /** Select checked source cuts at completed numerical frontier points. */
+    val sourcePointCuts: Boolean = false,
 ) {
     init {
         require(sourceLpWorkLimit >= 0 && sourceLpAllocationLimit >= 0 && sourceLpOperations >= 0)
