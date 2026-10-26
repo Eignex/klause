@@ -311,7 +311,7 @@ feasible stalls, interrupted descents and unresolved repairs remain distinct;
 none grants global proof authority. Pending restart phases survive slices and close
 as censored observations. ALNS records requested and effective scopes through the
 same definition closure and caller-pin filtering used to build its repair pins.
-Its best objective threshold, exact value and immutable best witness remain
+Its best objective threshold, exact discrete value and immutable best witness remain
 separate from a current center accepted by a non-monotone policy. A cancelled
 closure leaves its effective scope explicitly unavailable.
 Capture has separate coordinate accounting and consumes no search random draws.

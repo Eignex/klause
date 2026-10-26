@@ -365,7 +365,8 @@ internal class Alns(
                 tracedRepair = attempt
                 if (attempt != null) {
                     attempt.scopeComplete = freed != null
-                    repairTrace?.recordBest(attempt, bestObj, bestSample, objective.evaluateExact(bestSample))
+                    val exact = if (problem.numRealVars == 0) objective.evaluateExact(bestSample) else null
+                    repairTrace?.recordBest(attempt, bestObj, bestSample, exact)
                 }
                 if (freed == null) {
                     repairTrace?.finish(attempt, RepairEndpoint.Censored)

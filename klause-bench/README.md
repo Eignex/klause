@@ -3001,7 +3001,7 @@ moves per walk. Objective-coordinate and existing structured descent each have
 an unobserved and observed repetition. Two additional assignment captures use
 instruction slices; their phase records match the unsliced records byte for byte.
 All eight final-witness/objective/pick/work/restart/stall comparisons pass.
-Original source hashes, runtime, compiler, dependency and solver/CLI identities
+Original source hashes, runtime, dependency and solver/CLI identities
 remain in the capture. All 196 bounded CP completions pass native original-source
 checks; those checks establish no independently checked proof or unpinned optimum.
 
