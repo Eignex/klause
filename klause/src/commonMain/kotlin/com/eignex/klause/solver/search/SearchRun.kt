@@ -560,6 +560,7 @@ class SearchRun internal constructor(
         pendingModel = null
         consumedModel = false
         terminal = null
+        budgetInterrupted = false
         pendingAdvance = false
         pendingCancellation = false
         retryingAssertion = false

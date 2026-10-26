@@ -58,6 +58,8 @@ can resume; the fragment's lifetime cancellation remains terminal until another
 fragment starts. Starting a sibling retires the old trail and slice while retaining
 compatible learned clauses and LP state. Closing releases both, and terminal
 observations remain readable.
+The traversal reset clears the preceding fragment's stopped-budget marker without
+renewing the containing allowance.
 
 ALNS records retained repair observations as a best found point or an unknown
 result with that scoped stop reason. The observation carries no unpinned
