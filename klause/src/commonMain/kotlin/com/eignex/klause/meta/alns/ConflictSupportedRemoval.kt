@@ -14,8 +14,15 @@ import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
 
 internal enum class ConflictGuidanceStatus {
-    Unavailable, EmptySupport, Supported, Incompatible, Limited, Cancelled, Closed,
+    Unavailable, EmptySupport, Supported, Incompatible, Unsupported, Limited, Cancelled, Closed,
 }
+
+internal class ScopedConflictAttribution(
+    val bools: IntArray,
+    val ints: IntArray,
+    val cutoff: Double,
+    val localIncumbent: Sample?,
+)
 
 // Conflict attributions are ranking hints, including when their premises contain repair-local pins.
 internal class ConflictSupportedRemoval(
@@ -27,11 +34,16 @@ internal class ConflictSupportedRemoval(
 ) : DestroyOperator, AutoCloseable {
     private var center: Sample? = null
     private var scores = IntArray(0)
+    private var seen = IntArray(0)
     private var observing = false
     private var hasSupport = false
     private var observed = 0
     private var closed = false
     private var cancellation: Cancellation = Cancellation.Never
+    private var externalCutoff = Double.POSITIVE_INFINITY
+    private var localCutoff = Double.POSITIVE_INFINITY
+    private var localIncumbent: Sample? = null
+    private val captured = mutableListOf<ScopedConflictAttribution>()
 
     var status = ConflictGuidanceStatus.Unavailable
         private set
@@ -51,17 +63,31 @@ internal class ConflictSupportedRemoval(
         return scores.copyOf()
     }
 
+    fun attributions(): List<ScopedConflictAttribution> = captured.toList()
+
     init {
-        require(maxCoordinates > 0 && maxConflicts > 0)
+        require(maxCoordinates in 1..4096 && maxConflicts in 1..32)
     }
 
     fun observe(params: BacktrackParams): BacktrackParams {
         require(params.assumptions == callerAssumptions)
-        return params.copy(variableSelector = observing(params.variableSelector))
+        val supplier = params.objectiveBoundSupplier
+        return params.copy(variableSelector = observing(params.variableSelector),
+            objectiveBoundSupplier = supplier?.let {
+                {
+                    val cutoff = it()
+                    if (observing) {
+                        if (cutoff.isNaN() || cutoff > externalCutoff) discard(ConflictGuidanceStatus.Incompatible)
+                        else externalCutoff = cutoff
+                    }
+                    cutoff
+                }
+            })
     }
 
-    fun recording(repair: RepairOperator): RepairOperator = RepairOperator { context ->
-        begin(context.incumbent, context.pinAssumptions, context.bestObjective, context.params.cancellation)
+    fun recording(repair: BacktrackRepair): RepairOperator = RepairOperator { context ->
+        val cutoff = if (context.repairSearch == null) objective.evaluate(context.incumbent) else context.bestObjective
+        begin(context.incumbent, context.pinAssumptions, cutoff, context.params.cancellation)
         try {
             repair.repair(context)
         } finally {
@@ -79,7 +105,11 @@ internal class ConflictSupportedRemoval(
         discard(ConflictGuidanceStatus.Unavailable)
         cancellation = token
         val count = model.numBoolVars.toLong() + model.numIntVars
-        if (model.numRealVars != 0 || count > maxCoordinates) {
+        if (model.numRealVars != 0) {
+            status = ConflictGuidanceStatus.Unsupported
+            return
+        }
+        if (count > maxCoordinates) {
             status = ConflictGuidanceStatus.Limited
             return
         }
@@ -92,8 +122,10 @@ internal class ConflictSupportedRemoval(
         center = incumbent
         originPins = pins
         originCutoff = cutoff
+        externalCutoff = cutoff
         scores = IntArray(count.toInt())
-        visits += count
+        seen = IntArray(count.toInt())
+        visits += 2L * count
         observed = 0
         hasSupport = false
         capped = false
@@ -116,6 +148,17 @@ internal class ConflictSupportedRemoval(
         override fun onConflict(varRef: VarRef?, conflict: BranchingConflict) {
             capture(conflict.bools, conflict.ints)
             delegate.onConflict(varRef, conflict)
+        }
+
+        override fun onSolution(snapshot: Sample) {
+            if (observing) {
+                val value = objective.evaluate(snapshot)
+                if (value <= localCutoff) {
+                    localCutoff = value
+                    localIncumbent = snapshot
+                }
+            }
+            delegate.onSolution(snapshot)
         }
     }
 
@@ -141,7 +184,8 @@ internal class ConflictSupportedRemoval(
                 discard(ConflictGuidanceStatus.Incompatible)
                 return
             }
-            if (!callerAssumptions.isFrozenBool(b)) {
+            if (seen[b] != observed && !callerAssumptions.isFrozenBool(b)) {
+                seen[b] = observed
                 scores[b]++
                 hasSupport = true
             }
@@ -152,11 +196,16 @@ internal class ConflictSupportedRemoval(
                 discard(ConflictGuidanceStatus.Incompatible)
                 return
             }
-            if (!callerAssumptions.isFrozenInt(i)) {
-                scores[model.numBoolVars + i]++
+            val coordinate = model.numBoolVars + i
+            if (seen[coordinate] != observed && !callerAssumptions.isFrozenInt(i)) {
+                seen[coordinate] = observed
+                scores[coordinate]++
                 hasSupport = true
             }
         }
+        captured.add(ScopedConflictAttribution(bools.copyOf(), ints.copyOf(), minOf(externalCutoff, localCutoff),
+            localIncumbent))
+        visits += bools.size + ints.size
         status = if (hasSupport) ConflictGuidanceStatus.Supported else ConflictGuidanceStatus.EmptySupport
     }
 
@@ -190,8 +239,16 @@ internal class ConflictSupportedRemoval(
 
     private fun discard(reason: ConflictGuidanceStatus) {
         observing = false
+        observed = 0
+        capped = false
+        hasSupport = false
         center = null
+        localIncumbent = null
+        externalCutoff = Double.POSITIVE_INFINITY
+        localCutoff = Double.POSITIVE_INFINITY
+        captured.clear()
         scores = IntArray(0)
+        seen = IntArray(0)
         originPins = null
         originCutoff = null
         status = reason

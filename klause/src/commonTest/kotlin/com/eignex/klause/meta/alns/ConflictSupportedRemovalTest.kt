@@ -87,6 +87,34 @@ class ConflictSupportedRemovalTest {
     }
 
     @Test
+    fun `multiple bound attributions should count a source input once per conflict`() {
+        val guidance = ConflictSupportedRemoval(problem, objective)
+        val observer = guidance.observe(BacktrackParams()).variableSelector.fresh()
+        guidance.begin(center, Assumptions.None, 0.0, Cancellation.Never)
+
+        observer.onConflict(null, BranchingConflict(ints = intArrayOf(0, 0, 0)))
+        observer.onConflict(null, BranchingConflict(ints = intArrayOf(1)))
+
+        assertContentEquals(intArrayOf(0, 0, 1, 1), guidance.weights())
+    }
+
+    @Test
+    fun `attributions should retain the objective cutoff active when they were captured`() {
+        val guidance = ConflictSupportedRemoval(problem, objective)
+        val observer = guidance.observe(BacktrackParams()).variableSelector.fresh()
+        val improved = Sample(BooleanArray(2), longArrayOf(0, 1))
+        guidance.begin(center, Assumptions.None, 2.0, Cancellation.Never)
+        observer.onConflict(null, BranchingConflict(ints = intArrayOf(0)))
+        observer.onSolution(improved)
+
+        observer.onConflict(null, BranchingConflict(ints = intArrayOf(1)))
+
+        assertEquals(listOf(2.0, 1.0), guidance.attributions().map { it.cutoff })
+        assertNull(guidance.attributions().first().localIncumbent)
+        assertEquals(improved, guidance.attributions().last().localIncumbent)
+    }
+
+    @Test
     fun `missing and empty attribution should retain distinct outcomes with random fallback`() {
         for (empty in listOf(false, true)) {
             val guidance = ConflictSupportedRemoval(problem, objective)

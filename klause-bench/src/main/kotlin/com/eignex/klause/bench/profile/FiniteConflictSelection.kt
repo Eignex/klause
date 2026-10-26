@@ -22,12 +22,16 @@ import com.eignex.klause.solver.incumbent.CandidateVerifier
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
+import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import com.sun.management.ThreadMXBean
 import java.io.File
 import java.lang.management.ManagementFactory
+import java.util.Base64
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -39,6 +43,18 @@ internal object FiniteConflictSelection {
 
     @JvmStatic
     fun main(args: Array<String>) {
+        val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
+        if (args.size == 1 && args[0].startsWith("batch64=")) {
+            val requests = Json.decodeFromString<List<List<String>>>(
+                Base64.getDecoder().decode(args[0].substringAfter('=')).decodeToString())
+            require(requests.size in 1..32)
+            for ((index, request) in requests.withIndex()) {
+                capture(request.toTypedArray(), out.resolve("$index").apply { mkdirs() })
+            }
+        } else capture(args, out)
+    }
+
+    private fun capture(args: Array<String>, out: File) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.keys == setOf("suite", "problem", "sha256", "center", "seed"))
         val reference = Catalog.uncapped(options.getValue("suite")).problems
@@ -47,7 +63,6 @@ internal object FiniteConflictSelection {
             it.readNBytes(64 * 1024 * 1024 + 1)
         }
         require(bytes.size <= 64 * 1024 * 1024 && sha256(bytes) == options.getValue("sha256"))
-        val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
         out.resolve("source.xml").writeBytes(bytes)
         out.resolve("request.txt").writeText(args.joinToString("\n"))
@@ -63,6 +78,20 @@ internal object FiniteConflictSelection {
         }
         val center = Sample(booleanArrayOf(), options.getValue("center").split(',').map(String::toLong).toLongArray())
         require(center.numIntVars == problem.numIntVars)
+        out.resolve("model.json").writeText(buildJsonObject {
+            put("sourceSha256", sha256(bytes))
+            put("sourceCoordinateMapping", "identity")
+            put("nativeChecker", "finiteWitnessVerifier with original lowered source and no assumptions")
+            put("independentChecker", "none")
+            put("semantics", problem.semantics.toString())
+            put("settings", problem.settings.toString())
+            put("sourceSense", parsed.sense.name)
+            put("minimizingObjective", objective.toString())
+            put("rootDomains", JsonArray(problem.rootIntDomains().map { JsonPrimitive(it.toString()) }))
+            put("namedInputs", buildJsonObject {
+                for ((name, coordinate) in parsed.intVarNames) put(name, coordinate)
+            })
+        }.toString())
         compare(problem, objective, center, options.getValue("seed").toLong(), null,
             out.resolve("selections.jsonl")) { sample, stop -> checkSource(problem, sample, stop) }
     }
@@ -113,6 +142,7 @@ internal object FiniteConflictSelection {
                         var acquisitionWork = 0L
                         var acquisitionSample: Sample? = null
                         var acquisitionSourceAccepted: Boolean? = null
+                        var acquisitionResult: MinimizeResult? = null
                         var acquisitionImproved = false
                         if (arm == "conflict" || arm == "acquisition-ablated") {
                             guidanceType.methods.single { it.name == "begin" }
@@ -120,6 +150,7 @@ internal object FiniteConflictSelection {
                             val acquiring = (observe.invoke(guidance, base) as BacktrackParams)
                                 .copy(maxDecisions = ACQUISITION_DECISIONS)
                             val result = BacktrackSolver(problem).minimize(objective, acquiring)
+                            acquisitionResult = result
                             guidanceType.methods.single { it.name == "end" }.invoke(guidance)
                             acquisitionNodes = result.stats.search.nodes.sum.toLong()
                             acquisitionWork = allowance.spent
@@ -127,7 +158,8 @@ internal object FiniteConflictSelection {
                             acquisitionImproved = acquisitionSample?.let {
                                 acquisitionSourceAccepted = checkSource(it, stop)
                                 check(acquisitionSourceAccepted == true || stop())
-                                objective.evaluateExact(it) < objective.evaluateExact(center)
+                                acquisitionSourceAccepted == true &&
+                                    objective.evaluateExact(it) < objective.evaluateExact(center)
                             } ?: false
                         }
                         val acquisitionNanos = System.nanoTime() - acquisitionStarted
@@ -176,6 +208,10 @@ internal object FiniteConflictSelection {
                             BacktrackSolver(problem).minimize(objective, base.copy(
                                 assumptions = checkNotNull(pins), maxDecisions = remaining))
                         } else null
+                        val repairSourceAccepted = result?.assignment?.let { checkSource(it, stop) }
+                        check(repairSourceAccepted != false || stop())
+                        val weights = guidanceType.methods.single { it.name == "weights" }
+                            .invoke(guidance) as IntArray
                         writer.appendLine(buildJsonObject {
                             put("selector", arm)
                             put("repairOwner", "finite-cp-cold")
@@ -190,16 +226,32 @@ internal object FiniteConflictSelection {
                             put("effectiveBools", JsonArray(bools.map(::JsonPrimitive)))
                             put("effectiveInts", JsonArray(ints.map(::JsonPrimitive)))
                             put("guidanceStatus", get(guidance, "Status").toString())
+                            put("guidanceConsumed", arm == "conflict" &&
+                                get(guidance, "Status").toString() == "Supported")
                             put("capturedConflicts", get(guidance, "Conflicts") as Int)
                             put("captureCapped", get(guidance, "Capped") as Boolean)
                             put("captureAndSelectionVisits", get(guidance, "Visits") as Long)
-                            put("supportWeightsBoolThenInt", JsonArray((guidanceType.methods.single {
-                                it.name == "weights"
-                            }.invoke(guidance) as IntArray).map(::JsonPrimitive)))
-                            put("originScope", "same model, no assumptions, strict center objective cutoff")
+                            put("supportWeightsBoolThenInt", JsonArray(weights.map(::JsonPrimitive)))
+                            put("originScope", "same model, no assumptions, strict objective cutoff per attribution")
+                            put("initialQueryCutoff", get(guidance, "OriginCutoff") as Double?)
+                            val attributions = guidanceType.methods.single { it.name == "attributions" }
+                                .invoke(guidance) as List<*>
+                            put("scopedAttributions", JsonArray(attributions.map { entry ->
+                                val attribution = checkNotNull(entry)
+                                buildJsonObject {
+                                    put("bools", JsonArray((get(attribution, "Bools") as IntArray).map(::JsonPrimitive)))
+                                    put("ints", JsonArray((get(attribution, "Ints") as IntArray).map(::JsonPrimitive)))
+                                    put("cutoff", get(attribution, "Cutoff") as Double)
+                                    (get(attribution, "LocalIncumbent") as Sample?)?.let {
+                                        put("localIncumbentObjective", objective.evaluateExact(it).toString())
+                                    }
+                                }
+                            }))
                             put("acquisitionNodes", acquisitionNodes)
                             put("acquisitionWork", acquisitionWork)
                             put("acquisitionImproved", acquisitionImproved)
+                            put("acquisitionResult", acquisitionResult?.let { it::class.simpleName })
+                            put("acquisitionReason", reason(acquisitionResult)?.name)
                             acquisitionSample?.let {
                                 put("acquired", sample(it))
                                 put("acquiredObjective", objective.evaluateExact(it).toString())
@@ -217,13 +269,17 @@ internal object FiniteConflictSelection {
                             put("allocatedBytes", allocation.getThreadAllocatedBytes(thread) - startedBytes)
                             put("cancelled", stop())
                             put("repairResult", result?.let { it::class.simpleName })
+                            put("repairReason", reason(result)?.name)
+                            put("completedLocalExhaustion", result != null &&
+                                reason(result) == TerminationReason.SearchExhausted)
                             put("strictImprovement", result?.assignment?.let {
-                                objective.evaluateExact(it) < objective.evaluateExact(center)
+                                repairSourceAccepted == true &&
+                                    objective.evaluateExact(it) < objective.evaluateExact(center)
                             } ?: false)
                             result?.assignment?.let {
                                 put("repaired", sample(it))
                                 put("repairedObjective", objective.evaluateExact(it).toString())
-                                put("nativeSourceAccepted", checkSource(it, stop))
+                                put("nativeSourceAccepted", repairSourceAccepted)
                             }
                             put("globalProofClaim", false)
                             put("descentEndpointClassified", false)
@@ -244,6 +300,13 @@ internal object FiniteConflictSelection {
     private fun sample(value: Sample) = buildJsonObject {
         put("bools", JsonArray(value.bools.map(::JsonPrimitive)))
         put("ints", JsonArray(value.ints.map(::JsonPrimitive)))
+    }
+
+    private fun reason(result: MinimizeResult?): TerminationReason? = when (result) {
+        is MinimizeResult.BestFound -> result.reason
+        is MinimizeResult.Unknown -> result.reason
+        is MinimizeResult.Optimal, is MinimizeResult.Infeasible -> TerminationReason.SearchExhausted
+        else -> null
     }
 
     @Suppress("UNCHECKED_CAST")

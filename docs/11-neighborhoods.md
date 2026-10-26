@@ -307,7 +307,8 @@ authority.
 
 Finite CP conflict-guided removal reads a bounded prefix of the repair's existing
 variable-selection conflict attributions. Its scores name coordinates in the same
-baked model, retaining the originating complement pins and objective cutoff. A hint
+baked model, retaining the originating complement pins and each attribution's
+objective cutoff, including local incumbent tightenings. A hint
 can rank a later freedom at the same center; it cannot assert a clause, prune a repair
 or establish that changing a supported input admits improvement. A changed model,
 objective or center, a new repair, cancellation and close retire the snapshot.

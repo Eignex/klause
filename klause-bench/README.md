@@ -1444,6 +1444,9 @@ center=v0,v1,... seed=N` for a hash-pinned XCSP3 optimization source with an exp
 feasible center. It admits an unchanged integer coordinate frame with every coordinate
 named in the source and no frontend-declared definitions, at most 1,024 coordinates
 and 4,096 factors. The source bytes, request and build identity accompany the records.
+A `batch64` JSON array of argument arrays compares several pinned controls in one
+lab profile. The [weighted Latin control](smoke-corpus/finite-repair-evidence/README.md)
+has an exact feasible center and lower-bound witness.
 
 Random, objective and adjacency removal compare with CP-conflict-supported removal
 at the same center and requested count. A separate acquisition-ablated random arm
