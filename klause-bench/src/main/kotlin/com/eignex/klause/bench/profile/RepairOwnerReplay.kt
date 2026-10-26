@@ -154,7 +154,7 @@ internal object RepairOwnerReplay {
                             stop() -> Outcome(null, stopped(stop), before)
                             budget.exhausted() -> Outcome(null, TerminationReason.BudgetExhausted, before)
                             unavailable != null -> Outcome(null, TerminationReason.Unsupported, before)
-                            kind == "ls" -> local(problem, objective, scope, stop, budget, seed)
+                            kind == "ls" -> local(problem, objective, scope, stop, budget, seed, fragmentAllowance)
                             kind.startsWith("cp") -> {
                                 val opened = System.nanoTime()
                                 native = retained ?: call(BacktrackSolver(problem), "openRepair", objective,
@@ -165,7 +165,8 @@ internal object RepairOwnerReplay {
                                 val observationStart = System.nanoTime()
                                 usageBefore = clauseUsage(checkNotNull(native), stop)
                                 observationNs += System.nanoTime() - observationStart
-                                val completed = complete(checkNotNull(native), scope, stop, preparation)
+                                val completed = complete(checkNotNull(native), scope, stop, preparation,
+                                    fragmentAllowance)
                                 val afterStart = System.nanoTime()
                                 usageAfter = clauseUsage(checkNotNull(native), stop)
                                 observationNs += System.nanoTime() - afterStart
@@ -262,6 +263,8 @@ internal object RepairOwnerReplay {
                             put("containingSpent", budget.spent)
                             put("fragmentAllowance", fragmentAllowance)
                             put("fragmentSpent", budget.spent - fragmentStart)
+                            put("fragmentCooperativeOverspend", (budget.spent - fragmentStart - fragmentAllowance)
+                                .coerceAtLeast(0L))
                             put("workCurrency", "NodeBudget decision equivalents; native counters are separate")
                             put("elapsedNs", elapsed)
                             put("threadBytes", allocation)
@@ -289,7 +292,7 @@ internal object RepairOwnerReplay {
     }
 
     private fun local(problem: BakedProblem, objective: LinearObjective, scope: Scope, stop: Cancellation,
-        budget: NodeBudget, seed: Long,
+        budget: NodeBudget, seed: Long, allowance: Long,
     ): Outcome {
         val start = System.nanoTime()
         val completion = if (problem.numRealVars == 0) null else
@@ -297,8 +300,11 @@ internal object RepairOwnerReplay {
                 .single { it.parameterCount == 2 }.newInstance(problem, objective) as CandidateCompletion
         val solver = LocalSearchSolver(problem, completion = completion)
         val preparation = System.nanoTime() - start
+        val available = minOf(allowance, (budget.limit - budget.spent).coerceAtLeast(0L))
+        val instructions = available / 5 * 4 + available % 5 * 4 / 5
         val result = solver.minimize(objective, LocalSearchParams(assumptions = scope.pins,
-            initialAssignment = scope.center, cancellation = stop, nodeBudget = budget, randomSeed = seed))
+            initialAssignment = scope.center, cancellation = stop, nodeBudget = budget, randomSeed = seed,
+            maxInstructions = instructions))
         return Outcome(result.assignment, when (result) {
             is MinimizeResult.BestFound -> result.reason
             is MinimizeResult.Unknown -> result.reason
@@ -307,9 +313,9 @@ internal object RepairOwnerReplay {
         }, result.stats, preparation)
     }
 
-    private fun complete(owner: Any, scope: Scope, stop: Cancellation, preparation: Long): Outcome {
+    private fun complete(owner: Any, scope: Scope, stop: Cancellation, preparation: Long, allowance: Long): Outcome {
         val start = System.nanoTime()
-        call(owner, "begin", scope.pins, Long.MAX_VALUE, scope.cutoff.toDouble(), stop)
+        call(owner, "begin", scope.pins, allowance, scope.cutoff.toDouble(), stop)
         val prepared = preparation + System.nanoTime() - start
         var result: Any
         var pauses = 0L
