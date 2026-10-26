@@ -242,6 +242,12 @@ A completed candidate must pass the original-source witness check
 before it can update the center or publish an incumbent. Local bounds, refutations
 and exhausted alternatives never leave the heuristic as global claims.
 
+The mixed repair attempt also retains its termination reason, feasible point and
+conditioned bound independently of the driver's improvement verdict. A feasible
+center can accompany a cutoff closure; a slice pause has no terminal reason, while
+lifetime cancellation, budget exhaustion and unavailable completion remain distinct.
+These observations grant no proof outside the exact candidate pins and cutoff.
+
 ### Restart anchors
 
 Optimization restart policies receive only accepted feasible incumbents; before the
