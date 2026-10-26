@@ -1486,6 +1486,22 @@ guidance remain distinct. This conditioned replay uses the exact checked center
 cutoff, with the native acquisition threshold retained separately in the selection
 record; it does not combine acquisition and repair into a policy comparison.
 
+[Semantic owner replay 8579](https://lab.eignex.com/jobs/8579), at `02d362ad1f`,
+consumes 640 actual selector scopes across three- and four-input assignment,
+resource and placement controls, with owner seeds 7 and 19. All five owners share
+the center, effective freedoms, pins and exact cutoff in every scope; 603 scopes
+match the selector's source-input count and the remaining 37 retain their actual
+larger or smaller sets. LS and both CP owners find the same 177 native
+source-accepted improvements. The other 463 scopes yield feasible nonimprovements
+for LS and closed conditioned cutoffs for CP; mixed declines every global shape.
+No fragment overspends its 2,000 decision equivalents. Cold CP uses 500 nodes and
+233.2 million cumulative thread bytes; retained CP uses 359 nodes and 940.8 million
+bytes, without newly useful retained clause flags. LS uses 1,024,000 moves and
+2.666 billion thread bytes. Selector construction/selection costs remain outside
+those owner measurements. These tiny controls support neither a repair-quality
+advantage nor a retained throughput or ordinary admission claim; the strong outer
+walk recipe is separate from the replay's default LS owner.
+
 Model keys, domains, objectives, source bytes and
 build identity remain alongside the walk. Inputs admit at most 64 MiB,
 4,096 Boolean/integer coordinates and 8,192 factors. Hint construction uses the production
