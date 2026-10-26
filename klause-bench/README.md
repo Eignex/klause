@@ -5480,6 +5480,27 @@ diagnostic deadline and issue no LP queries. Complete pair scans, unavailable
 points, stopped proof checks and retention limits retain distinct observations;
 zero candidates in an incomplete report establish no applicability result.
 
+`aggregate-replay=true` retains the first parent with fresh source-checked
+aggregate proposals and writes `aggregate-replays.jsonl`. Three fresh-basis arms
+disable separation, enable individual cuts, and append the accepted aggregates to
+the individual family before native admission. Each arm has one LP operation,
+20M work and 64 MiB modeled allocation; all three share a 30-second deadline.
+Discovery costs remain in the pair report. The replay reports installed and
+checked candidate IDs, exact bounds, native checks and per-arm costs. These
+diagnostic replays establish neither warm-basis parity nor whole-CLI throughput.
+
+[Mixed-pair probe 8519](https://lab.eignex.com/jobs/8519), at `6f92f17c4b`, uses
+the same original `rgn` source hash and traversal settings as 8478. Root query 0
+completes 20,301 pairs and 820 pivot combinations, producing five positively
+violated mixed cuts; all five pass fresh native checks. The largest exact
+violation is `11748520715972943/36028797018963968`. Each combines a singleton
+continuous bound and a mixed source row, then cites three residual bound sides.
+None of the 40 individual cuts has positive violation at that captured point.
+Root discovery and proof checks spend 1,042,668 modeled work and 35,367,372 modeled
+allocation bytes. Query 1 reaches the shared allocation limit, leaving its proof
+checks and all later states unknown. These are separation observations; checked
+bound improvement requires an inserted-cut comparison.
+
 [Pure-pair probe 8478](https://lab.eignex.com/jobs/8478), at `f7a11d71cd`, retains
 the original `rgn` hash, default tolerance, seed 3 and a 32-operation traversal on
 Linux/amd64. All nine retained parents complete their 20,301 pair visits and 40

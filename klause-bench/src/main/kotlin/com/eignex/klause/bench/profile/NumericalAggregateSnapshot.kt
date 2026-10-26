@@ -21,7 +21,9 @@ import kotlinx.serialization.json.put
 
 internal class NumericalAggregateSnapshot(private val stop: Cancellation, private val allowMixed: Boolean = false) {
     @Suppress("UNCHECKED_CAST")
-    fun inspect(journal: Any, emit: (JsonObject) -> Unit) {
+    fun inspect(
+        journal: Any, onAccepted: (Any, List<Any>) -> Unit = { _, _ -> }, emit: (JsonObject) -> Unit,
+    ) {
         val records = field(journal, "retained") as List<Any>
         val type = Class.forName("com.eignex.klause.lp.optimization.LinearAuthorityAggregateCuts")
         val owner = type.getField("INSTANCE").get(null)
@@ -92,6 +94,8 @@ internal class NumericalAggregateSnapshot(private val stop: Cancellation, privat
             }
             val verifier = SourceEvidenceVerifier(numeric)
             val checks = evidence.map { verifier.verify(it, proofStop) }
+            val accepted = cuts.filterIndexed { index, _ -> checks[index] == SourceEvidenceCheck.Checked }
+            if (accepted.isNotEmpty()) onAccepted(record, accepted)
             examined++
             emit(buildJsonObject {
                 put("originalQuery", field(record, "id") as Int)
@@ -174,5 +178,52 @@ internal class NumericalAggregateSnapshot(private val stop: Cancellation, privat
             put("wholeCliTimingClaim", false)
             put("independentProofCheck", false)
         })
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    fun replay(record: Any, candidates: List<Any>, emit: (JsonObject) -> Unit) {
+        val type = Class.forName("com.eignex.klause.lp.optimization.LinearAuthorityReplay")
+        val owner = type.getField("INSTANCE").get(null)
+        val run = type.declaredMethods.single { it.name == "runWithCandidates" }
+        val context = field(record, "context") as SourceProofContext
+        val snapshot = NumericalSelectionSnapshot(stop)
+        for (arm in listOf("disabled", "individual", "individual-and-aggregate")) {
+            if (stop()) return
+            val additional = if (arm == "individual-and-aggregate") candidates else emptyList()
+            val result = run.invoke(owner, record, null, additional, arm != "disabled",
+                20_000_000L, 67_108_864L, stop)
+            emit(buildJsonObject {
+                put("originalQuery", field(record, "id") as Int)
+                put("scope", scope(context.scope))
+                put("arm", arm)
+                put("additionalCandidates", additional.size)
+                put("freshBasis", true)
+                put("diagnosticOnly", true)
+                put("maximumWork", 20_000_000L)
+                put("maximumModeledAllocation", 67_108_864L)
+                put("maximumOperations", 1)
+                put("operations", field(result, "operations") as Int)
+                put("work", field(result, "work") as Long)
+                put("modeledAllocation", field(result, "allocation") as Long)
+                put("stopped", field(result, "stopped") as Boolean)
+                put("independentProofCheck", false)
+                field(result, "query")?.let { query ->
+                    put("state", field(query, "state") as String)
+                    (field(query, "point") as Map<SourceCoordinate, BigFraction>?)?.let {
+                        put("point", coefficients(it))
+                    }
+                    put("cuts", buildJsonArray {
+                        (field(query, "cuts") as List<Any>).forEach { cut -> add(buildJsonObject {
+                            put("id", field(cut, "id") as Int)
+                            put("installed", field(cut, "installed") as Boolean)
+                            put("checked", field(cut, "checked") as Boolean)
+                        }) }
+                    })
+                    for (name in listOf("bound", "refutation")) {
+                        (field(query, name) as SourceEvidence?)?.let { put(name, snapshot.evidence(context, it)) }
+                    }
+                }
+            })
+        }
     }
 }

@@ -22,6 +22,7 @@ internal data class LinearAuthorityCapturedCut(
     val ownerActive: Boolean,
     val checked: Boolean,
     val violation: BigFraction?,
+    val owners: Set<Int> = setOf(owner),
 )
 
 internal data class LinearAuthorityCapturedQuery(
@@ -156,7 +157,9 @@ internal class LinearAuthorityCapture(
         val candidates = ArrayList<LinearAuthorityCapturedCut>()
         val definitions = template?.cuts?.rows.orEmpty()
         for ((id, cut) in definitions.withIndex()) {
-            if (!spend(1L, 128L) || !row(cut.inequality) || !proof(cut.derivation)) return
+            val extraOwners = (cut.owners.size - 1).toLong()
+            if (!spend(1L + extraOwners, 128L + extraOwners * 32L) ||
+                !row(cut.inequality) || !proof(cut.derivation)) return
             var violation: BigFraction? = null
             if (point != null && cut.inequality.coefficients.keys.all { it in point }) {
                 var activity = BigFraction.ZERO
@@ -175,7 +178,8 @@ internal class LinearAuthorityCapture(
             }
             candidates += LinearAuthorityCapturedCut(id, cut.owner, cut.inequality, cut.derivation,
                 query != null && id in query.installedCuts,
-                query != null && cut.owner !in query.inactive, query != null && id in query.checkedCuts, violation)
+                query != null && cut.owners.none { it in query.inactive },
+                query != null && id in query.checkedCuts, violation, cut.owners)
         }
         val refutation = result.evidence?.takeIf { it.claim == SourceClaim.Refutation }
         for (evidence in listOfNotNull(result.bound, refutation)) {

@@ -1,19 +1,23 @@
 package com.eignex.klause.lp.optimization
 
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceCoordinate
+import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceInequality
+import com.eignex.klause.solver.evidence.SourceObjective
 import com.eignex.klause.solver.evidence.SourcePremise
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
+import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
@@ -35,6 +39,48 @@ class LinearAuthorityAggregateCutsTest {
         BigFraction.ofLong(3))
     private val right = SourceInequality(mapOf(y to BigFraction.ofLong(2), real to BigFraction.MINUS_ONE),
         BigFraction.ZERO)
+
+    @Test
+    fun `appending a false proposal should leave its row without authority`() {
+        val source = SourceProofContext(scope, setOf(x, y, real), mapOf(
+            "left" to SourcePremise(left), "right" to SourcePremise(right)))
+        val falseCut = LinearAuthorityCut(0, SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ZERO),
+            SourceDerivation.Premise("left"), owners = setOf(0, 1))
+        val template = assertNotNull(assertNotNull(LinearAuthorityTemplate.prepare(source, Cancellation.Never,
+            cuts = true)).withAdditional(listOf(falseCut), Cancellation.Never))
+
+        val query = assertNotNull(LinearAuthorityQuery.prepare(source, template, Cancellation.Never))
+
+        assertEquals(0, query.activeCuts)
+        assertTrue(query.checkedCuts.isEmpty())
+    }
+
+    @Test
+    fun `an appended aggregate should strengthen a freshly checked sparse bound`() {
+        val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val mixed = SourceInequality(left.coefficients + (residual to BigFraction.MINUS_ONE), left.rhs)
+        val bound = SourceInequality(mapOf(residual to BigFraction.MINUS_ONE), BigFraction.ZERO)
+        val objectiveScope = scope.copy(objective = SourceObjective("aggregate", ObjectiveSense.MINIMIZE))
+        val source = SourceProofContext(objectiveScope, setOf(x, y, real, residual), mapOf(
+            "left" to SourcePremise(mixed), "right" to SourcePremise(right), "bound" to SourcePremise(bound)),
+            mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE, residual to BigFraction.ONE))
+        val cut = assertNotNull(LinearAuthorityAggregateCuts.derive(listOf(
+            LinearAuthorityAggregateTerm(0, "left", mixed), LinearAuthorityAggregateTerm(1, "right", right),
+        ), Cancellation.Never, allowMixed = true, continuousBounds = mapOf(
+            (residual to false) to LinearAuthorityAggregateTerm(2, "bound", bound))))
+        assertTrue(assertNotNull(LinearAuthorityCuts.prepare(source, Cancellation.Never)).rows.isEmpty())
+        for ((additional, expected) in listOf(emptyList<LinearAuthorityCut>() to
+            (BigFraction.ofLong(-3) * BigFraction.ofLong(2).reciprocal()), listOf(cut) to BigFraction.MINUS_ONE)) {
+            LinearAuthority(SourceLpBudget(), retainLp = true, additionalCuts = additional).use { authority ->
+                val result = authority.advance(source, Cancellation.Never, cuts = true)
+
+                assertEquals(SourceValue.Rational(expected),
+                    assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
+                assertEquals(SourceEvidenceCheck.Checked,
+                    SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)))
+            }
+        }
+    }
 
     @Test
     fun `cancelling a continuous coordinate should produce a checked integer cut`() {
@@ -446,12 +492,16 @@ class LinearAuthorityAggregateCutsTest {
             LinearAuthorityAggregateTerm(0, "left", mixed), LinearAuthorityAggregateTerm(1, "right", right),
         ), Cancellation.Never, allowMixed = true, continuousBounds = mapOf(
             (residual to false) to LinearAuthorityAggregateTerm(2, "bound", bound))))
+        val template = assertNotNull(assertNotNull(LinearAuthorityTemplate.prepare(source, Cancellation.Never,
+            cuts = true)).withAdditional(listOf(cut), Cancellation.Never))
         for (enabled in listOf(true, false, true)) {
             val context = source.atScope(scope.copy(condition = SourceCondition(bools = mapOf(0 to enabled))))
 
             val check = SourceEvidenceVerifier(context).verify(
                 SourceEvidence(context.scope, SourceClaim.Consequence(cut.inequality), cut.derivation))
+            val query = assertNotNull(LinearAuthorityQuery.prepare(context, template, Cancellation.Never))
 
+            assertEquals(if (enabled) 1 else 0, query.activeCuts)
             if (enabled) assertEquals(SourceEvidenceCheck.Checked, check)
             else assertIs<SourceEvidenceCheck.Rejected>(check)
         }
