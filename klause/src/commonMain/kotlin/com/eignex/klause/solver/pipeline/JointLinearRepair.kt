@@ -106,35 +106,52 @@ internal class JointLinearRepair(
         return (stages.keys + current.keys).associateWith { combine(it, stages[it] ?: 0, current[it] ?: 0) }
     }
 
-    fun search(adaptive: Boolean, seed: Long = params.randomSeed): ExactNeighborhood = ExactNeighborhood(
-        model.numBoolVars, List(model.numIntVars + model.numRealVars) { BigFraction.ZERO }, this, objective,
-        coordinateValues = { sample ->
-            List(model.numIntVars) { BigFraction.of(sample.exactIntValue(it), BIG_ONE) } + sample.exactReals.orEmpty()
-        }, adaptive = adaptive, seed = seed, nodeBudget = params.nodeBudget?.allowance,
-        maximumMoves = params.maxFlips, maximumInstructions = params.maxInstructions ?: Long.MAX_VALUE,
-        maximumImprovementMoves = if (adaptive) params.alnsIterations.toLong() else null,
-        nativeWork = { work }, completionStats = { stats }, onClose = ::close,
-        prepareBooleanCenter = ::prepare, rootCoordinateValue = ::center,
-        completionExhausted = { exhausted },
-        centerPreparationPending = { rootPreparationPending },
-        proposal = ExactNeighborhoodProposal { centers, bools, count, round, radius, cutoff ->
-            val pooled = external()?.takeIf { sample ->
-                val value = objective?.evaluateExact(sample)
-                (model.numRealVars == 0 || sample.exactReals?.size == model.numRealVars) &&
-                    (cutoff == null || (value != null && value < cutoff)) &&
-                    SourceEvidenceVerifier(source.withLinearAuthority()).verify(SourceEvidence(source.scope,
-                        SourceClaim.Witness(sample), SourceDerivation.SourceWitness), stop) ==
-                    SourceEvidenceCheck.Checked
-            }
-            val from = pooled?.let { sample ->
-                observe("jointRepairImportedCenters")
+    fun search(
+        adaptive: Boolean, seed: Long = params.randomSeed, sourceInputPass: Boolean = false,
+    ): ExactNeighborhood {
+        var focusedCutoff: BigFraction? = null
+        var focusedRemaining = 0
+        return ExactNeighborhood(
+            model.numBoolVars, List(model.numIntVars + model.numRealVars) { BigFraction.ZERO }, this, objective,
+            coordinateValues = { sample ->
                 List(model.numIntVars) { BigFraction.of(sample.exactIntValue(it), BIG_ONE) } +
                     sample.exactReals.orEmpty()
-            } ?: centers
-            requireNotNull(selection).propose(from, pooled?.bools ?: bools, count, round, radius,
-                pooled?.let { objective?.evaluateExact(it) } ?: cutoff)
-        },
-    )
+            }, adaptive = adaptive, seed = seed, nodeBudget = params.nodeBudget?.allowance,
+            maximumMoves = params.maxFlips, maximumInstructions = params.maxInstructions ?: Long.MAX_VALUE,
+            maximumImprovementMoves = if (adaptive) params.alnsIterations.toLong() else null,
+            nativeWork = { work }, completionStats = { stats }, onClose = ::close,
+            prepareBooleanCenter = ::prepare, rootCoordinateValue = ::center,
+            completionExhausted = { exhausted },
+            centerPreparationPending = { rootPreparationPending },
+            proposal = ExactNeighborhoodProposal { centers, bools, count, round, radius, cutoff ->
+                val pooled = external()?.takeIf { sample ->
+                    val value = objective?.evaluateExact(sample)
+                    (model.numRealVars == 0 || sample.exactReals?.size == model.numRealVars) &&
+                        (cutoff == null || (value != null && value < cutoff)) &&
+                        SourceEvidenceVerifier(source.withLinearAuthority()).verify(SourceEvidence(source.scope,
+                            SourceClaim.Witness(sample), SourceDerivation.SourceWitness), stop) ==
+                        SourceEvidenceCheck.Checked
+                }
+                val from = pooled?.let { sample ->
+                    observe("jointRepairImportedCenters")
+                    List(model.numIntVars) { BigFraction.of(sample.exactIntValue(it), BIG_ONE) } +
+                        sample.exactReals.orEmpty()
+                } ?: centers
+                val limit = pooled?.let { objective?.evaluateExact(it) } ?: cutoff
+                if (sourceInputPass && !adaptive && limit != null && limit != focusedCutoff) {
+                    focusedCutoff = limit
+                    focusedRemaining = sourceIntegers?.size ?: model.numIntVars
+                    observe("jointRepairSourceInputPasses")
+                }
+                val width = if (sourceInputPass && !adaptive && round > 0L && focusedRemaining > 0) {
+                    focusedRemaining--
+                    observe("jointRepairSourceInputProposals")
+                    minOf(count, 2)
+                } else count
+                requireNotNull(selection).propose(from, pooled?.bools ?: bools, width, round, radius, limit)
+            },
+        )
+    }
 
     private fun prepare(cancellation: Cancellation): Boolean {
         check(!closed)
