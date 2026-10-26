@@ -12,3 +12,20 @@ diagonal weights are nonnegative. The feasible center
 `0,1,2,3,1,0,3,2,2,3,0,1,3,2,1,0` attains that bound. These exact expectations
 exercise finite CP acquisition and matched freedom controls; they establish no
 ordinary-route performance result or independent checker verdict.
+
+The `linear-*.xml` controls are self-authored under the same Apache-2.0 license.
+Every declaration is a finite binary input with unchanged source coordinates.
+`linear-exchange` has center `1,0,0,0,0,0`, objective one and optimum zero;
+both `x0` and `x3` must change to improve. `linear-three-cycle` has center
+`1,0,0,1,0,0,1`; `linear-four-cycle` has center `1,0,0,1,0,0,1,0,0,1`.
+Each has objective one and optimum zero at all-zero inputs, and every improving
+completion changes all three or four active inputs. Other declarations are
+unrelated inputs. A scoped refutation need not mention every active input, so
+freeing its support alone need not admit an improving completion.
+
+`linear-knapsack` has center `1,0,0,1,0,0,1,0`, objective three and integer optimum
+two, attained by `1,0,0,1,0,0,0,0`. One selected input cannot supply weight five;
+`x0=x3=1` does. Its declared-row relaxation has optimum `4/3`, attained by
+`x0=0`, `x3=1/3`, `x6=1`. This point is relaxation guidance, not an integer
+source witness. Numerical cuts can change the working relaxation; the retained
+cut mask and exact point determine each observation.
