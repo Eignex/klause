@@ -59,7 +59,8 @@ internal object MpsProofFrontier {
         }
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val supported = setOf("suite", "problem", "sha256", "exact", "probe", "history", "frontier", "cuts",
-            "selection", "replay", "operations", "activeRows", "supportBranching", "pointCuts", "aggregate-probe")
+            "selection", "replay", "operations", "activeRows", "supportBranching", "pointCuts", "aggregate-probe",
+            "aggregate-mixed")
         require(options.keys.containsAll(setOf("suite", "problem", "sha256", "exact")) &&
             (options.keys - supported).isEmpty())
         val probe = options["probe"]?.toBooleanStrict() ?: false
@@ -69,6 +70,8 @@ internal object MpsProofFrontier {
         require(activeOption in setOf("false", "true", "compare"))
         val activeRows = activeOption == "true"
         val aggregateProbe = options["aggregate-probe"]?.toBooleanStrict() ?: false
+        val aggregateMixed = options["aggregate-mixed"]?.toBooleanStrict() ?: false
+        require(!aggregateMixed || aggregateProbe)
         val exact = options.getValue("exact").toBooleanStrict()
         val selected = Catalog.uncapped(options.getValue("suite")).problems
             .single { it.name == options.getValue("problem") }
@@ -188,7 +191,7 @@ internal object MpsProofFrontier {
                     Reports.writeJson(out.resolve("aggregate-parents.json").path,
                         NumericalSelectionSnapshot(Cancellation.after(20.seconds)).capture(journal))
                     out.resolve("aggregate-pairs.jsonl").writeText("")
-                    NumericalAggregateSnapshot(Cancellation.after(20.seconds)).inspect(journal) {
+                    NumericalAggregateSnapshot(Cancellation.after(20.seconds), aggregateMixed).inspect(journal) {
                         out.resolve("aggregate-pairs.jsonl").appendText(it.toString() + "\n")
                     }
                 }
@@ -220,6 +223,7 @@ internal object MpsProofFrontier {
                 put("supportBranching", supportBranching)
                 put("pointCuts", params.sourcePointCuts)
                 put("aggregateProbe", aggregateProbe)
+                put("aggregateMixed", aggregateMixed)
                 put("sourceLpOperationAllowance", params.sourceLpOperations)
                 put("activeRows", activeRows)
                 put("wholeCliTimingClaim", false)

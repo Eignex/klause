@@ -475,4 +475,65 @@ class LinearAuthorityAggregateCutsTest {
         assertEquals(1L, observations["AggregateScalarLimit"])
         assertTrue(assertNotNull(observations["AggregateWork"]) > 0L)
     }
+
+    @Test
+    fun `mixed pair inspection should expose a checked missing inference at a row feasible point`() {
+        val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val mixed = SourceInequality(left.coefficients + (residual to BigFraction.MINUS_ONE), left.rhs)
+        val bound = SourceInequality(mapOf(residual to BigFraction.MINUS_ONE), BigFraction.ZERO)
+        val source = SourceProofContext(scope, setOf(x, y, real, residual), mapOf(
+            "left" to SourcePremise(mixed), "right" to SourcePremise(right), "bound" to SourcePremise(bound)))
+        val quarter = BigFraction.ofLong(4).reciprocal()
+        val point = mapOf(x to quarter * BigFraction.ofLong(3), y to quarter * BigFraction.ofLong(3),
+            real to quarter * BigFraction.ofLong(6), residual to BigFraction.ZERO)
+
+        val result = LinearAuthorityAggregateCuts.inspectPairs(listOf(
+            LinearAuthorityAggregateTerm(0, "left", mixed), LinearAuthorityAggregateTerm(1, "right", right),
+            LinearAuthorityAggregateTerm(2, "bound", bound),
+        ), emptySet(), point, Cancellation.Never, allowMixed = true)
+
+        assertTrue(result.complete)
+        assertEquals(true, result.activeSourceRowsSatisfied)
+        assertEquals(listOf(BigFraction.ofLong(2).reciprocal()), result.violations)
+        val cut = result.candidates.single()
+        assertTrue(cut.mixed)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
+    fun `mixed pair inspection should require an active continuous bound owner`() {
+        val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val mixed = SourceInequality(left.coefficients + (residual to BigFraction.MINUS_ONE), left.rhs)
+        val bound = SourceInequality(mapOf(residual to BigFraction.MINUS_ONE), BigFraction.ZERO)
+        val quarter = BigFraction.ofLong(4).reciprocal()
+        val point = mapOf(x to quarter * BigFraction.ofLong(3), y to quarter * BigFraction.ofLong(3),
+            real to quarter * BigFraction.ofLong(6), residual to BigFraction.ZERO)
+        for (inactive in listOf(emptySet(), setOf(2), emptySet())) {
+            val result = LinearAuthorityAggregateCuts.inspectPairs(listOf(
+                LinearAuthorityAggregateTerm(0, "left", mixed), LinearAuthorityAggregateTerm(1, "right", right),
+                LinearAuthorityAggregateTerm(2, "bound", bound),
+            ), inactive, point, Cancellation.Never, allowMixed = true)
+
+            assertTrue(result.complete)
+            assertEquals(if (inactive.isEmpty()) 1 else 0, result.candidates.size)
+        }
+    }
+
+    @Test
+    fun `a scalar limited candidate should withhold complete pair inspection`() {
+        val large = BigFraction.of(BIG_ONE shl 127, BIG_ONE)
+        val largeLeft = SourceInequality(mapOf(x to BigFraction.ofLong(2), real to large), BigFraction.ofLong(3))
+        val largeRight = SourceInequality(mapOf(y to BigFraction.ofLong(2), real to large.negated()), BigFraction.ZERO)
+        val point = mapOf(x to BigFraction.ZERO, y to BigFraction.ZERO, real to BigFraction.ZERO)
+
+        val result = LinearAuthorityAggregateCuts.inspectPairs(listOf(
+            LinearAuthorityAggregateTerm(0, "left", largeLeft), LinearAuthorityAggregateTerm(1, "right", largeRight),
+        ), emptySet(), point, Cancellation.Never,
+            limits = LinearAuthorityAggregateLimits(scalarBits = 128))
+
+        assertFalse(result.complete)
+        assertTrue(result.candidates.isEmpty())
+        assertEquals(true, result.activeSourceRowsSatisfied)
+    }
 }

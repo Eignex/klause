@@ -19,7 +19,7 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-internal class NumericalAggregateSnapshot(private val stop: Cancellation) {
+internal class NumericalAggregateSnapshot(private val stop: Cancellation, private val allowMixed: Boolean = false) {
     @Suppress("UNCHECKED_CAST")
     fun inspect(journal: Any, emit: (JsonObject) -> Unit) {
         val records = field(journal, "retained") as List<Any>
@@ -75,7 +75,7 @@ internal class NumericalAggregateSnapshot(private val stop: Cancellation) {
             }
             val remaining = limits.newInstance(4, 128, 256, 16_384L, maximumWork - work,
                 maximumAllocation - allocation)
-            val result = inspect.invoke(owner, rows, inactive, point, active, observe, remaining, 64)
+            val result = inspect.invoke(owner, rows, inactive, point, active, observe, remaining, 64, allowMixed)
             val cuts = field(result, "candidates") as List<Any>
             val violations = field(result, "violations") as List<BigFraction>
             val evidence = cuts.map { cut ->
@@ -96,7 +96,10 @@ internal class NumericalAggregateSnapshot(private val stop: Cancellation) {
             emit(buildJsonObject {
                 put("originalQuery", field(record, "id") as Int)
                 put("scope", scope(numeric.scope))
-                put("family", "two-source-complete-continuous-cancellation-integer-rounding")
+                put("family", if (allowMixed) "two-source-pivot-cancellation-and-mixed-rounding"
+                    else "two-source-complete-continuous-cancellation-integer-rounding")
+                put("mixedResiduals", allowMixed)
+                put("boundPolicy", "first-active-source-side-preferring-negative-residual")
                 put("lpQueries", 0)
                 put("maximumAggregateRows", 4)
                 put("examinedAggregateRows", 2)
@@ -127,8 +130,12 @@ internal class NumericalAggregateSnapshot(private val stop: Cancellation) {
                     for (index in cuts.indices) {
                         val cut = cuts[index]
                         val row = field(cut, "inequality") as SourceInequality
-                        val rounding = field(cut, "derivation") as SourceDerivation.IntegerRounding
-                        val combination = rounding.inequality as SourceDerivation.Combination
+                        val rounding = field(cut, "derivation") as SourceDerivation
+                        val combination = when (rounding) {
+                            is SourceDerivation.IntegerRounding -> rounding.inequality
+                            is SourceDerivation.MixedIntegerRounding -> rounding.inequality
+                            else -> error("unsupported aggregate rounding derivation")
+                        } as SourceDerivation.Combination
                         add(buildJsonObject {
                             put("coefficients", coefficients(row.coefficients))
                             put("rhs", row.rhs.toString())
@@ -137,12 +144,15 @@ internal class NumericalAggregateSnapshot(private val stop: Cancellation) {
                             put("owners", buildJsonArray {
                                 (field(cut, "owners") as Set<Int>).sorted().forEach { add(JsonPrimitive(it)) }
                             })
-                            put("rounding", "IntegerRounding")
+                            put("rounding", rounding::class.simpleName)
                             put("terms", buildJsonArray {
                                 combination.terms.forEach { weighted -> add(buildJsonObject {
                                     put("weight", weighted.weight.toString())
                                     put("premise", (weighted.derivation as SourceDerivation.Premise).id)
                                 }) }
+                            })
+                            if (rounding is SourceDerivation.MixedIntegerRounding) put("bounds", buildJsonArray {
+                                rounding.bounds.forEach { add(JsonPrimitive((it as SourceDerivation.Premise).id)) }
                             })
                         })
                     }
