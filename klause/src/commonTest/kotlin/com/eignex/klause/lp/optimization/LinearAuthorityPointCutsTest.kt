@@ -154,15 +154,24 @@ class LinearAuthorityPointCutsTest {
 
     @Test
     fun `satisfied candidates should not open another source operation`() {
-        val integral = SourceProofContext(scope, setOf(x), mapOf(
-            "lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(-2)),
-                BigFraction.ofLong(-4))),
-        ), mapOf(x to BigFraction.ONE))
+        val integral = source.atScope(scope.copy(condition = SourceCondition(lower = mapOf(x to BigFraction.ONE))))
         val budget = SourceLpBudget()
 
         LinearAuthority(budget, retainLp = true).use { it.advanceWithPointCuts(integral, Cancellation.Never) }
 
         assertEquals(1, budget.operations)
+    }
+
+    @Test
+    fun `satisfied installed rows should remain in the retained mask`() {
+        val cut = LinearAuthorityCut(0, SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE),
+            SourceDerivation.Premise("installed"))
+
+        val selected = LinearAuthorityPointCuts(SourceLpBudget()).select(listOf(cut), listOf(x),
+            listOf(BigFraction.ZERO), setOf(0), listOf(BigFraction.ofLong(2).reciprocal()), setOf(0),
+            Cancellation.Never)
+
+        assertEquals(setOf(0), selected)
     }
 
     @Test
