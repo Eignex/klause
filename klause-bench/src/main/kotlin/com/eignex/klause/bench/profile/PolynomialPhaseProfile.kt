@@ -42,16 +42,20 @@ import kotlinx.serialization.json.Json
 internal object PolynomialPhaseProfile {
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.size in 1..7)
+        require(args.size in 1..9)
         val options = args.drop(1).associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.size == args.size - 1 && options.keys.all {
-            it in setOf("pipeline", "timeoutMs", "repeats", "prepared", "capture", "maximumWork", "refinement")
+            it in setOf("pipeline", "timeoutMs", "repeats", "prepared", "capture",
+                "maximumWork", "refinement", "feedback")
         })
         require(options["pipeline"] == null || options["pipeline"] in setOf("true", "both"))
         require(options["prepared"] == null || options["prepared"] == "true")
         require(options["prepared"] == null || options["pipeline"] == null)
         require(options["capture"] == null || options["capture"] in setOf("true", "both"))
         require(options["refinement"] == null || options["refinement"] in setOf("true", "both"))
+        require(options["feedback"] == null || options["feedback"] in setOf("true", "both"))
+        val feedback = options["feedback"] != null
+        require(!feedback || options["refinement"] == "true")
         val refine = options["refinement"] != null
         val capture = options["capture"] != null
         val maximumWork = options["maximumWork"]?.toLong()?.also { require(it >= 0) }
@@ -86,6 +90,7 @@ internal object PolynomialPhaseProfile {
             "diagnosticMaximumWork" to maximumWork.toString(),
             "failureCapture" to options["capture"].toString(),
             "cellRefinement" to options["refinement"].toString(),
+            "cellFeedback" to options["feedback"].toString(),
             "requestEncoding" to args[0].substringBefore('='),
             "sourceBytes" to if (cases.any { it.gzip64 != null }) "hash-pinned request or catalog" else "catalog",
             "representationLimits" to "default",
@@ -114,13 +119,14 @@ internal object PolynomialPhaseProfile {
             if (preparedMode) {
                 directory.resolve("prepared-trace.json").writeText(
                     Json.encodeToString(access.measure(text, maximumWork, timeoutMs,
-                        prepared = true, capture = capture, refinement = refine)),
+                        prepared = true, capture = capture, refinement = refine, feedback = feedback)),
                 )
             } else if (directMode) {
                 directory.resolve("gate.json").writeText(Json.encodeToString(access.gate(text, timeoutMs)))
                 directory.resolve("trace.json").writeText(
                     Json.encodeToString(access.measure(text, maximumWork, timeoutMs,
-                        capture = capture, fixedIntegers = source.fixedIntegers, refinement = refine)),
+                        capture = capture, fixedIntegers = source.fixedIntegers,
+                        refinement = refine, feedback = feedback)),
                 )
             }
             if (options["refinement"] == "both") {
@@ -128,10 +134,15 @@ internal object PolynomialPhaseProfile {
                     access.measure(text, maximumWork, timeoutMs, prepared = preparedMode, capture = capture,
                         fixedIntegers = source.fixedIntegers)))
             }
+            if (options["feedback"] == "both") {
+                directory.resolve("feedback-control-trace.json").writeText(Json.encodeToString(
+                    access.measure(text, maximumWork, timeoutMs, prepared = preparedMode, capture = capture,
+                        fixedIntegers = source.fixedIntegers, refinement = true)))
+            }
             if (options["capture"] == "both") {
                 directory.resolve("plain-trace.json").writeText(Json.encodeToString(
                     access.measure(text, maximumWork, timeoutMs, prepared = preparedMode,
-                        fixedIntegers = source.fixedIntegers, refinement = refine)))
+                        fixedIntegers = source.fixedIntegers, refinement = refine, feedback = feedback)))
             }
         }
     }
@@ -284,11 +295,13 @@ internal object PolynomialPhaseProfile {
             Int::class.javaPrimitiveType, paramsType, conditionType,
         )
         private val params = paramsType.getConstructor(Cancellation::class.java, Long::class.javaObjectType, limitsType,
-            Boolean::class.javaPrimitiveType)
+            Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType)
         private val condition = conditionType.getConstructor(Map::class.java, Map::class.java, Map::class.java)
         private val next = queryType.getMethod("next")
         private val stats = queryType.getMethod("getStats")
         private val progress = queryType.methods.singleOrNull { it.name == "getProgress" }
+        private val feedbackStats = queryType.getMethod("getCellFeedbackStats")
+        private val feedbackReuse = queryType.getMethod("getFirstCellFeedbackReuse")
         private val partialConflicts = progress?.returnType?.methods?.singleOrNull { it.name == "getPartialConflicts" }
         private val conflictObserver = queryType.methods.singleOrNull { it.name == "setPartialConflictObserver" }
         private val captureType = Class.forName(prefix + "PolynomialFailureCapture")
@@ -345,7 +358,9 @@ internal object PolynomialPhaseProfile {
             capture: Boolean = false,
             fixedIntegers: Map<String, String> = emptyMap(),
             refinement: Boolean = false,
+            feedback: Boolean = false,
         ): PhaseTrace {
+            require(!feedback || refinement)
             val clock = Cancellation.after(timeoutMs.milliseconds)
             var charges = 0L
             var stop: List<String>? = null
@@ -404,7 +419,7 @@ internal object PolynomialPhaseProfile {
             val fixed = (fixings.invoke(null, original, { check(!token()) }) as Map<Int, BigFraction>) + integerFixings
             val preparationCharges = charges
             val owner = query.newInstance(original, source.second, source.third,
-                params.newInstance(token, maximumWork, limitsType.getConstructor().newInstance(), refinement),
+                params.newInstance(token, maximumWork, limitsType.getConstructor().newInstance(), refinement, feedback),
                 condition.newInstance(emptyMap<Int, Boolean>(), fixed, fixed))
             val captured = if (capture) captureType.getConstructor().newInstance().also { setCapture.invoke(owner, it) }
                 else null
@@ -429,6 +444,7 @@ internal object PolynomialPhaseProfile {
             var calls = 0L
             var lastProjected = 0L
             var lastStage: Triple<Long, Long, Long>? = null
+            var firstFeedback: Map<String, String>? = null
             var result: Any?
             do {
                 result = next.invoke(owner)
@@ -436,6 +452,9 @@ internal object PolynomialPhaseProfile {
                 val snapshot = stats.invoke(owner)
                 val projected = snapshot.javaClass.getMethod("getProjectedPolynomials").invoke(snapshot) as Long
                 val observed = progress?.invoke(owner)
+                if (refinement && firstFeedback == null) {
+                    firstFeedback = feedbackReuse.invoke(owner)?.let(::feedbackTrace)
+                }
                 val stage = observed?.let {
                     Triple(it.javaClass.getMethod("getSnapshots").invoke(it) as Long,
                         it.javaClass.getMethod("getRegions").invoke(it) as Long,
@@ -468,6 +487,12 @@ internal object PolynomialPhaseProfile {
                         "RepairedCoordinates", "Declined", "Work")
                         .associateWith { value.javaClass.getMethod("get$it").invoke(value).toString() }
                 },
+                cellFeedback = feedbackStats.invoke(owner)?.let { value ->
+                    listOf("Admitted", "Lookups", "Uses", "Reuses", "CrossRegionUses", "Evicted",
+                        "SnapshotReplacements", "ScopeDeclines", "MetadataVisits")
+                        .associateWith { value.javaClass.getMethod("get$it").invoke(value).toString() }
+                },
+                firstCellFeedbackReuse = firstFeedback,
                 sourceCoordinates = names,
                 originalSourceCoordinates = originalNames,
                 coordinateNamespace = if (prepared) "prepared-polynomial-model" else "raw-polynomial-source",
@@ -524,6 +549,36 @@ internal object PolynomialPhaseProfile {
                 result["booleans"] = read(premises, "Bools").toString()
                 result["reductionIdentity"] = System.identityHashCode(read(scope, "Reduction")).toString()
             }
+            return result
+        }
+
+        private fun feedbackTrace(use: Any): Map<String, String> {
+            fun read(owner: Any, field: String): Any? = owner.javaClass.getMethod("get$field").invoke(owner)
+            val cell = requireNotNull(read(use, "Cell"))
+            val result = cellTrace(cell).toMutableMap()
+            var complete = true
+            for (field in listOf("Origin", "Current")) {
+                val scope = requireNotNull(read(use, field))
+                result["$field.sourceIdentity"] = System.identityHashCode(read(scope, "Source")).toString()
+                result["$field.snapshotIdentity"] = System.identityHashCode(read(scope, "Snapshot")).toString()
+                result["$field.reductionIdentity"] = System.identityHashCode(read(scope, "Reduction")).toString()
+                val premises = requireNotNull(read(scope, "Premises"))
+                result["$field.signedPremises"] = read(premises, "Atoms").toString()
+                result["$field.booleans"] = read(premises, "Bools").toString()
+                val condition = requireNotNull(read(scope, "Condition"))
+                result["$field.conditionIdentity"] = System.identityHashCode(condition).toString()
+                for (kind in listOf("Bools", "Lower", "Upper")) {
+                    val values = read(condition, kind) as Map<*, *>
+                    if (values.size > 64) complete = false
+                    result["$field.condition.$kind"] = values.entries.take(64).associate { (id, value) ->
+                        val wide = value is BigFraction && (value.num.magnitudeBitLength() > 4096 ||
+                            value.den.magnitudeBitLength() > 4096)
+                        if (wide) complete = false
+                        id.toString() to if (wide) "[wide coefficient]" else value.toString()
+                    }.toString()
+                }
+            }
+            result["scopePreviewComplete"] = complete.toString()
             return result
         }
 
@@ -593,6 +648,8 @@ internal data class PhaseTrace(
     val partialConflictPreviewComplete: Boolean? = null,
     val checkedCells: List<Map<String, String>>? = null,
     val cellRefinement: Map<String, String>? = null,
+    val cellFeedback: Map<String, String>? = null,
+    val firstCellFeedbackReuse: Map<String, String>? = null,
     val sourceCoordinates: Map<String, String>? = null,
     val originalSourceCoordinates: Map<String, String>? = null,
     val coordinateNamespace: String? = null,

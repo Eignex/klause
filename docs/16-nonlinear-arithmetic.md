@@ -310,6 +310,17 @@ retries and snapshot replacements, with eight retained cells, degree sixteen,
 admit at most 64 premises or coordinates. A private decline preserves CAD; an enclosing
 stop remains terminal. Invocation observers receive completed checked cells only.
 
+An internal regional feedback option consumes checked cells before repeating a
+unary predicate evaluation. A hit requires the active predicate and source identity;
+query facts also require their condition and snapshot, and regional facts require
+their signed premises and opaque reduction owner. The pool keeps at most eight
+references, drops facts after premise retraction and clears on snapshot replacement.
+Eligible immutable producer facts can rebuild it under the current scope. Admission,
+lookup and eviction poll and charge the caller; endpoint comparisons use its exact
+arithmetic. These numeric filters supply no Boolean clause and preserve the producer's
+candidate traversal, full witness checks and complete CAD fallback. The option is
+disabled by default.
+
 Optional query failure capture retains bounded exact observations of rejected probe
 points and CAD prefixes, their signed premises, numeric reconstruction fibres and
 condition/snapshot identity. Projection observations retain the active operands.

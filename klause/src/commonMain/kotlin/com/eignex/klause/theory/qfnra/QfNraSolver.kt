@@ -31,6 +31,7 @@ internal data class QfNraParams(
     val maximumWork: Long? = null,
     val polynomialLimits: PolynomialLimits = PolynomialLimits(),
     val cellRefinement: Boolean = false,
+    val cellFeedback: Boolean = false,
 ) {
     init { require(maximumWork == null || maximumWork >= 0) }
 }
@@ -103,10 +104,17 @@ internal class QfNraQuery(
             field = value
         }
     var checkedCellObserver: ((CheckedPolynomialCell) -> Unit)? = null
+    private val cellFeedback = if (params.cellRefinement && params.cellFeedback) {
+        PolynomialCellFeedback(formula, condition)
+    } else null
     private val cellRefinement = if (params.cellRefinement) {
-        PolynomialCellRefinement(formula, condition, work, params.polynomialLimits) { checkedCellObserver?.invoke(it) }
+        PolynomialCellRefinement(formula, condition, work, params.polynomialLimits, cellFeedback) {
+            checkedCellObserver?.invoke(it)
+        }
     } else null
     val cellStats: PolynomialCellStats? get() = cellRefinement?.stats
+    val cellFeedbackStats: PolynomialCellFeedbackStats? get() = cellFeedback?.stats
+    val firstCellFeedbackReuse: PolynomialCellFeedbackUse? get() = cellFeedback?.firstCrossRegionUse
     val checkedCells: List<CheckedPolynomialCell> get() = cellRefinement?.cells.orEmpty()
     var projectionObserver: ((Int, List<Polynomial>, Polynomial?) -> Unit)? = null
     var reducedRegionObserver: ((List<PolynomialAtom>) -> Unit)? = null
@@ -440,7 +448,7 @@ internal class QfNraQuery(
         arithmetic.step()
         yield(if (incomplete == null) QfNraResult.Unsatisfiable(work.snapshot())
             else QfNraResult.Unknown(QfNraReason.ResourceLimit, work.snapshot(), incomplete))
-    }.iterator()
+    }.iterator().also { cellFeedback?.replaceSnapshot(formulaReduction.formula, arithmetic) }
 
     fun next(): QfNraResult? {
         result?.let { return it }
