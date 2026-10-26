@@ -117,7 +117,7 @@ internal class RepairTrace(
         }
     }
 
-    fun recordBest(attempt: Attempt, cutoff: Double, sample: Sample, exact: BigFraction) {
+    fun recordBest(attempt: Attempt, cutoff: Double, sample: Sample, exact: BigFraction?) {
         require(sample.numBoolVars.toLong() + sample.numIntVars + sample.numRealVars <= maxCoordinates)
         attempt.bestObjectiveCutoff = cutoff
         attempt.exactBestObjective = exact
