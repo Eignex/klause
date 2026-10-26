@@ -237,7 +237,7 @@ internal object RepairTrajectory {
         }
     }
 
-    private fun sample(value: Sample) = buildJsonObject {
+    internal fun sample(value: Sample) = buildJsonObject {
         put("bools", JsonArray(value.bools.map(::JsonPrimitive)))
         put("ints", JsonArray((0 until value.numIntVars).map { JsonPrimitive(value.exactIntValue(it).toString()) }))
         put("approximateReals", JsonArray(value.reals.map(::JsonPrimitive)))

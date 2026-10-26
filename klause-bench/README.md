@@ -3116,6 +3116,38 @@ This retains the stronger existing remedy and selects resource, placement and
 four-input assignment barriers for bounded selector comparisons. These small
 capability controls establish no default-route admission or general speedup.
 
+[Selector comparison 8497](https://lab.eignex.com/jobs/8497), at `e8d10688c6`,
+uses those four explicit centers on Linux/amd64 under JFR, with seeds 7–22.
+All 320 CP repairs complete and pass native original-source checks. Semantic
+removal reaches objective zero in every trial. The effective freedoms contain
+three source inputs, or four for the larger assignment control.
+
+| Source | Semantic improvements | Adjacency improvements, matched trials |
+| --- | ---: | ---: |
+| Assignment three | 16/16 | 6/16 |
+| Resource three | 16/16 | 6/16 |
+| Placement three | 16/16 | 4/6 |
+| Assignment four | 16/16 | 6/16 |
+
+Random, WorstObjective and eligible count-matched samples find no improvements.
+On placement, ten Random and ten Adjacency requests include a root-fixed role
+and leave only two effective inputs; those unmatched trials are retained and
+find no improvement. Every other request matches the semantic source count.
+The assignment-three result is redundant with extended structured descent's
+already observed zero endpoint; it supplies no additional remedy there.
+
+Complete assignment/resource repairs spend one CP node; placement spends two
+to five. Median repair thread allocation is 179,656–223,008 bytes for semantic
+blocks versus 121,560–142,952 for Random. Semantic construction and closure
+spend 12/24/50–53/15 modeled visits in table order. Control visits cover closure
+only; physical selection measurements include their full existing acquisition.
+Semantic selection allocates median 1,760–2,216 bytes and takes 37–74 microseconds.
+Shared reflection/network/selector setup takes 11.4 ms on the first source and
+0.10–0.14 ms thereafter. These ordered instrumented captures retain construction
+and repair costs without establishing a speedup. The bounded opt-in mechanism
+admits complete improving freedoms; default-route family admission remains in
+[#3630](https://github.com/Eignex/klause/issues/3630).
+
 ### Prepared board-restart outcomes
 
 The coordinate-changing treatment in [#3447](https://github.com/Eignex/klause/pull/3447)
