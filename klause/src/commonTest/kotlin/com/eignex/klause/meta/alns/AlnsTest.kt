@@ -1201,6 +1201,33 @@ class AlnsTest {
         assertEquals(23L, cumulativeNodes)
     }
 
+    @Test
+    fun `retained repair observations should keep scoped closure separate from a completion`() {
+        val problem = selectProblem()
+        val incumbent = selectOptimum()
+        for (sample in listOf(null, incumbent)) {
+            var observed: MinimizeResult? = null
+            val retained = object : RepairSearch {
+                override fun begin(assumptions: Assumptions, decisionBudget: Long, cutoff: Double,
+                    cancellation: Cancellation) = Unit
+                override fun runSlice(cancellation: Cancellation, millis: Long, work: Long) =
+                    RepairSearchStep(sample, TerminationReason.SearchExhausted)
+            }
+            val context = RepairContext(NoFeasibleLs(problem), LocalSearchParams(), selectObjective,
+                Assumptions.None, incumbent, FreedVars(intArrayOf(0), IntArray(0)), repairSearch = retained,
+                recordRepairResult = { observed = it })
+
+            val repaired = BacktrackRepair().repair(context)
+
+            assertSame(sample, repaired)
+            if (sample == null) {
+                assertEquals(TerminationReason.SearchExhausted, assertIs<MinimizeResult.Unknown>(observed).reason)
+            } else {
+                assertEquals(TerminationReason.SearchExhausted, assertIs<MinimizeResult.BestFound>(observed).reason)
+            }
+        }
+    }
+
     // The production deep arm's flipsOverride replaces maxFlips rather than being capped by it.
     private val scaledRepairOperators: List<RepairOperator> = listOf(
         InnerLsRepair(label = "standard"),

@@ -1429,6 +1429,21 @@ their structured sources. Fixture expectations live beside
 [finite repair controls](smoke-corpus/finite-repair/README.md).
 `batch64=<base64 JSON array of argument arrays>` captures up to eight requests
 in numbered directories under one profile job.
+`ownerReplay=true` consumes those exact `controls=true` records after capture and
+compares LS, cold/retained CP and cold/retained mixed completion. Every owner uses
+the saved center, effective working freedoms, complement pins and strict exact
+center-objective cutoff; real snapshots without exact authority and CP cutoffs
+outside its exact binary64 contract are unavailable. No domain is invented and
+mixed admission retains all rows or declines the overlap. Each owner sequence has
+100,000 containing instructions and ten seconds, with two seconds per fragment;
+both mixed sequences share the same cumulative LP work/allocation/check limits.
+Looser cutoffs start a fresh retained epoch. Reports separate outcomes, scoped
+closure, source acceptance, CP nodes, LS moves, LP work, preparation, thread
+allocation and before/after counters. Instrumented CP clause flags count a lower
+bound on previously unused retained clauses becoming useful in unit/conflict
+propagation, split by permanent status; flags are never cleared, repeated uses of
+already marked clauses remain unknown, and observation work/time are charged and
+reported. These observations supply no global proof or throughput claim.
 Model keys, domains, objectives, source bytes and
 build identity remain alongside the walk. Inputs admit at most 64 MiB,
 4,096 Boolean/integer coordinates and 8,192 factors. Hint construction uses the production

@@ -18,6 +18,18 @@ import kotlin.test.assertNull
 
 class BacktrackSolverRepairTest {
     @Test
+    fun `repair should leave an unconsumed improving ray unavailable`() {
+        val model = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY)).bake()
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(-1.0))
+        BacktrackSolver(model).openRepair(objective, BacktrackParams()).use { repair ->
+            val step = repair.repairStep(Assumptions.None, 100L, -1.0, Cancellation.Never)
+
+            assertEquals(TerminationReason.Unsupported, step.reason)
+        }
+    }
+
+    @Test
     fun `repair should resume the same fragment after a cancelled slice`() {
         val objective = LinearObjective(boolWeights = longArrayOf(-1L, -2L))
         val solver = BacktrackSolver(Problem(2, 0, emptyArray(), emptyArray()).bake())

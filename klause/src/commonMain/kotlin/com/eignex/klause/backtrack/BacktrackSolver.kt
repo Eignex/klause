@@ -171,6 +171,7 @@ class BacktrackSolver internal constructor(
                     terminal = null
                     started = true
                 } catch (failure: Throwable) {
+                    closed = true
                     try {
                         handle.close()
                     } catch (closeFailure: Throwable) {
@@ -192,6 +193,7 @@ class BacktrackSolver internal constructor(
                     activeCancellation() -> TerminationReason.Cancelled
                     result is MinimizeResult.BestFound -> result.reason
                     result is MinimizeResult.Unknown -> result.reason
+                    result is MinimizeResult.Unbounded -> TerminationReason.Unsupported
                     result != null -> TerminationReason.SearchExhausted
                     else -> null
                 }

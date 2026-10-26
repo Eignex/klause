@@ -39,7 +39,7 @@ internal object RepairOwnerReplay {
 
     private data class Scope(
         val id: Int, val center: Sample, val freedBools: IntArray, val freedInts: IntArray,
-        val pins: Assumptions, val cutoff: BigFraction, val nativeCutoff: Double,
+        val pins: Assumptions, val cutoff: BigFraction, val nativeCutoff: Double, val selector: String,
     )
 
     private data class Outcome(
@@ -47,11 +47,13 @@ internal object RepairOwnerReplay {
         val preparationNs: Long = 0L, val bound: Any? = null,
     )
 
-    private data class ClauseUsage(val used: BooleanArray, val permanent: BooleanArray, val total: Int, val complete: Boolean)
+    private data class ClauseUsage(
+        val used: BooleanArray, val permanent: BooleanArray, val total: Int, val complete: Boolean,
+    )
 
     fun replay(
         controls: File, problem: BakedProblem, objective: LinearObjective, prepared: FinitePipelinePreparation,
-        source: BakedProblem, file: File, seed: Long, allowance: Long = 100_000L,
+        source: BakedProblem, inputs: IntArray, file: File, seed: Long, allowance: Long = 100_000L,
     ) {
         val scopeOwner = Class.forName("com.eignex.klause.meta.alns.RepairScope").getField("INSTANCE").get(null)
         val freedType = Class.forName("com.eignex.klause.meta.alns.FreedVars")
@@ -61,7 +63,8 @@ internal object RepairOwnerReplay {
         val entries = controlBytes.decodeToString().lines().filter(String::isNotBlank)
         if (problem.numRealVars != 0) {
             file.bufferedWriter().use { writer ->
-                for (id in entries.indices) for (owner in listOf("ls", "cp-cold", "cp-retained", "mixed-cold", "mixed-retained")) {
+                for (id in entries.indices) for (owner in listOf("ls", "cp-cold", "cp-retained",
+                    "mixed-cold", "mixed-retained")) {
                     writer.appendLine(buildJsonObject {
                         put("controlIndex", id)
                         put("owner", owner)
@@ -77,16 +80,20 @@ internal object RepairOwnerReplay {
             val entry = Json.parseToJsonElement(line).jsonObject
             val saved = entry.getValue("center").jsonObject
             val center = Sample(saved.getValue("bools").jsonArray.map { it.jsonPrimitive.content.toBooleanStrict() }
-                .toBooleanArray(), saved.getValue("ints").jsonArray.map { it.jsonPrimitive.content.toLong() }.toLongArray())
+                .toBooleanArray(), saved.getValue("ints").jsonArray.map { it.jsonPrimitive.content.toLong() }
+                .toLongArray())
             require(center.numBoolVars == problem.numBoolVars && center.numIntVars == problem.numIntVars)
             val cutoff = objective.evaluateExact(center)
             val bools = intArrayOf()
             val ints = entry.getValue("effectiveInts").jsonArray.map { it.jsonPrimitive.content.toInt() }.toIntArray()
+            require(ints.distinct().size == ints.size && ints.all { it in 0 until problem.numIntVars })
             val freed = freedType.getDeclaredConstructor(IntArray::class.java, IntArray::class.java)
                 .newInstance(bools, ints)
             val pins = call(scopeOwner, "pins", problem, center, freed) as Assumptions
-            check(checkSource(source, prepared.reconstruct(center), Cancellation.Never))
-            Scope(index, center, bools, ints, pins, cutoff, objective.evaluate(center))
+            check(checkSource(source, prepared.reconstruct(center), Cancellation.after(2000.milliseconds)))
+            Scope(index, center, bools, ints, pins, cutoff,
+                entry.getValue("centerObjective").jsonPrimitive.content.toDouble(),
+                entry.getValue("selector").jsonPrimitive.content)
         }
         val bean = ManagementFactory.getThreadMXBean() as ThreadMXBean
         val thread = Thread.currentThread().threadId()
@@ -96,6 +103,7 @@ internal object RepairOwnerReplay {
                 val lifetime = Cancellation.after(10_000.milliseconds)
                 var previousCutoff: BigFraction? = null
                 var retained: Any? = null
+                var transient: AutoCloseable? = null
                 var epoch = 0
                 var mixedWork = 0L
                 var mixedAllocation = 0L
@@ -141,6 +149,7 @@ internal object RepairOwnerReplay {
                                     BacktrackParams(nodeBudget = budget, randomSeed = seed, cancellation = dynamic))
                                 val preparation = System.nanoTime() - opened
                                 if (kind == "cp-retained") retained = native
+                                else transient = native as AutoCloseable
                                 val observationStart = System.nanoTime()
                                 usageBefore = clauseUsage(checkNotNull(native), stop)
                                 observationNs += System.nanoTime() - observationStart
@@ -159,6 +168,7 @@ internal object RepairOwnerReplay {
                                     512L * 1024 * 1024 - mixedAllocation, 256 - mixedOperations)
                                 val preparation = System.nanoTime() - opened
                                 if (kind == "mixed-retained") retained = native
+                                else transient = native as? AutoCloseable
                                 native?.let { numerical(it, scope, stop, budget, preparation) }
                                     ?: Outcome(null, TerminationReason.Unsupported, SolveStats.EMPTY, preparation)
                             }
@@ -172,12 +182,14 @@ internal object RepairOwnerReplay {
                                     "getOperations") as Int
                             }
                             (native as AutoCloseable).close()
+                            transient = null
                         }
                         val elapsed = System.nanoTime() - start
                         val allocation = bean.getThreadAllocatedBytes(thread) - allocationStart
                         val sample = outcome.sample
                         if (sample != null) {
-                            check(sample.numBoolVars == scope.center.numBoolVars && sample.numIntVars == scope.center.numIntVars)
+                            check(sample.numBoolVars == scope.center.numBoolVars &&
+                                sample.numIntVars == scope.center.numIntVars)
                             check((0 until sample.numBoolVars).all {
                                 it in scope.freedBools || sample.boolValue(it) == scope.center.boolValue(it)
                             })
@@ -186,13 +198,14 @@ internal object RepairOwnerReplay {
                             })
                         }
                         val checked = sample?.let { checkSource(source, prepared.reconstruct(it), stop) }
-                        val improving = sample != null && checked == true && objective.evaluateExact(sample) < scope.cutoff
+                        val improving = sample != null && checked == true &&
+                            objective.evaluateExact(sample) < scope.cutoff
                         val status = when {
                             improving -> "improvement"
                             checked == true -> "feasible-nonimprovement"
                             outcome.reason == TerminationReason.SearchExhausted -> "conditioned-closure"
                             outcome.reason == TerminationReason.BudgetExhausted -> "budget-exhaustion"
-                            outcome.reason == TerminationReason.Cancelled || outcome.reason == TerminationReason.Timeout ->
+                            outcome.reason in setOf(TerminationReason.Cancelled, TerminationReason.Timeout) ->
                                 "cancelled"
                             outcome.reason == null -> "pause"
                             else -> "unavailable"
@@ -200,6 +213,7 @@ internal object RepairOwnerReplay {
                         writer.appendLine(buildJsonObject {
                             put("centerId", scope.id)
                             put("owner", kind)
+                            put("selector", scope.selector)
                             put("epoch", epoch)
                             put("status", status)
                             put("reason", outcome.reason?.toString())
@@ -211,6 +225,12 @@ internal object RepairOwnerReplay {
                             put("capturedNativeCutoff", scope.nativeCutoff)
                             put("effectiveBools", JsonArray(scope.freedBools.map(::JsonPrimitive)))
                             put("effectiveInts", JsonArray(scope.freedInts.map(::JsonPrimitive)))
+                            put("scopeNamespace", "captured prepared finite slots")
+                            put("sourceInputChanges", sample?.let { candidate ->
+                                val from = prepared.reconstruct(scope.center)
+                                val to = prepared.reconstruct(candidate)
+                                inputs.count { from.exactIntValue(it) != to.exactIntValue(it) }
+                            })
                             put("complementBoolPins", buildJsonObject {
                                 for (id in 0 until scope.center.numBoolVars) if (id !in scope.freedBools)
                                     put(id.toString(), scope.center.boolValue(id))
@@ -240,7 +260,11 @@ internal object RepairOwnerReplay {
                         writer.flush()
                     }
                 } finally {
-                    (retained as? AutoCloseable)?.close()
+                    try {
+                        transient?.close()
+                    } finally {
+                        (retained as? AutoCloseable)?.close()
+                    }
                 }
             }
         }
@@ -260,6 +284,7 @@ internal object RepairOwnerReplay {
         return Outcome(result.assignment, when (result) {
             is MinimizeResult.BestFound -> result.reason
             is MinimizeResult.Unknown -> result.reason
+            is MinimizeResult.Unbounded -> TerminationReason.Unsupported
             else -> TerminationReason.SearchExhausted
         }, result.stats, preparation)
     }
