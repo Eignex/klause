@@ -77,7 +77,7 @@ internal class LinearAuthorityQuery private constructor(
             var activeMixedCuts = 0
             var cutVerificationWork = 0L
             val cuts = template?.cuts?.rows.orEmpty()
-            val active = cuts.indices.filter { cuts[it].owner !in inactive }
+            val active = cuts.indices.filter { id -> cuts[id].owners.none { it in inactive } }
             val checks = if (active.isEmpty()) emptyList() else {
                 SourceEvidenceVerifier(numeric.atScope(source.scope), maximumSteps = maximumCutProofSteps)
                     .verifyAll(active.map { id ->

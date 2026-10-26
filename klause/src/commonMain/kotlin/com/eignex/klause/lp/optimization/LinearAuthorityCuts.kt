@@ -22,7 +22,10 @@ internal class LinearAuthorityCut(
     val inequality: SourceInequality,
     val derivation: SourceDerivation,
     val mixed: Boolean = false,
-)
+    owners: Set<Int> = setOf(owner),
+) {
+    val owners: Set<Int> = owners.toSet()
+}
 
 internal class LinearAuthorityCuts private constructor(
     val rows: List<LinearAuthorityCut>,
