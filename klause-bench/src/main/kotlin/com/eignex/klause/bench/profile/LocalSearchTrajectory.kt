@@ -175,6 +175,9 @@ internal object LocalSearchTrajectory {
                 put("sourceIntegerSlots", JsonArray((0 until parsed.problem.numIntVars).map {
                     JsonPrimitive(if (it < problem.numIntVars) it else -1)
                 }))
+                put("sourceIntegerNames", buildJsonObject {
+                    for ((name, variable) in parsed.intVarNames) put(name, variable)
+                })
                 put("correspondenceAdmission", "slot-preserving load plus complete source round trip")
                 put("sourceVerdictClaim", false)
             }.toString())
@@ -302,10 +305,14 @@ internal object LocalSearchTrajectory {
                     }
                     if (!walk) {
                         val initial = checkNotNull(captured)
-                        val shadow = LocalSearchState(initial.model, Random(seed), initial.assumptions, initial.projection)
+                        val shadow = LocalSearchState(
+                            initial.model, Random(seed), initial.assumptions, initial.projection,
+                        )
                         val activeSweep = sweep?.takeIf { initial.invariants != null }
                         shadow.invariants = activeSweep?.network(problem.numIntVars, problem.numBoolVars)
-                        if (initial.weights.allocated) initial.weights.factorWeights.copyInto(shadow.weights.factorWeights)
+                        if (initial.weights.allocated) {
+                            initial.weights.factorWeights.copyInto(shadow.weights.factorWeights)
+                        }
                         views += TrajectoryView(
                             rewrite.toString(), shadow,
                             VarRemap(
@@ -357,12 +364,17 @@ internal object LocalSearchTrajectory {
                     }
                     for (value in values.distinct()) {
                         val move = Move.IntSet(variable, value)
-                        if (value != current && candidates.size < 32 && views.all { it.admits(move) }) candidates += move
+                        if (value != current && candidates.size < 32 && views.all { it.admits(move) }) {
+                            candidates += move
+                        }
                     }
                 }
                 writer.appendLine(buildJsonObject {
                     put("observation", label)
-                    put("candidatePolicy", "common admissible root endpoints and adjacent values; focus coordinate first")
+                    put(
+                        "candidatePolicy",
+                        "common admissible root endpoints and adjacent values; focus coordinate first",
+                    )
                     put("comparison", trajectoryPair(source, candidates, views[0], views[1]))
                 }.toString())
                 writer.flush()

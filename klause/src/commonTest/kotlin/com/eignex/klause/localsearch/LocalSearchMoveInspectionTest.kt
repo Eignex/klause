@@ -96,13 +96,17 @@ class LocalSearchMoveInspectionTest {
         ))
         fun trace(inspect: Boolean, slice: Long): List<Long> {
             val values = ArrayList<Long>()
-            val strategy = SourceDrivenStrategy(emptyList(), feasibleDescent = FeasibleDescent.SelfOwned, perturbation = { state ->
-                values += state.assignment.intValue(0)
-                if (inspect) state.inspectMove(Move.IntSet(0, 4))
-                val next = state.rng.nextInt(5).toLong()
-                values += next
-                Move.IntSet(0, next)
-            })
+            val strategy = SourceDrivenStrategy(
+                sources = emptyList(),
+                feasibleDescent = FeasibleDescent.SelfOwned,
+                perturbation = { state ->
+                    values += state.assignment.intValue(0)
+                    if (inspect) state.inspectMove(Move.IntSet(0, 4))
+                    val next = state.rng.nextInt(5).toLong()
+                    values += next
+                    Move.IntSet(0, next)
+                },
+            )
             val engine = LocalSearchEngine(
                 LocalSearchModel.open(problem), strategy = strategy, greedyRepairOnRestart = false,
             )
