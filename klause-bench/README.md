@@ -1649,7 +1649,7 @@ after descent stay separate from repair acceptance. These instrumented controls
 establish no independent witness check, global proof, basin classification or
 ordinary portfolio throughput.
 
-`numerical=true` adds exact relaxation-disagreement, producer-projected refutation
+`numerical=true` adds captured relaxation-point disagreement, producer-projected refutation
 support and numerical-acquisition-ablated random arms. These admit the unchanged
 integer frame only when its complete affine source context is available.
 `numerical-cuts=true|false` selects the acquisition's existing cut policy. Each
@@ -3844,6 +3844,62 @@ freedoms improve Latin at the matched four-input target. Retain bounded conflict
 ranking for opt-in comparisons; these results reject promoting it over the existing
 selectors or acquisition companions. They do not decide numerical feedback or
 establish broad finite-source performance.
+
+### Scoped finite numerical ranking
+
+[8644](https://lab.eignex.com/jobs/8644) and [8645](https://lab.eignex.com/jobs/8645),
+at `9084692daf`, recover the cut-disabled/enabled comparisons after preparation
+and upload failures. Four original linear sources use seeds 1/3/17, root or
+random-fragment acquisition, and effective counts 2/3/4/8 where admitted. Each
+trial shares five seconds and 2,000,000 containing units across acquisition,
+selection, cold CP repair and declared feasible descent. Native search and
+modeled source work remain separate cost components. Semantic packet shapes
+are absent from this linear cohort; the preceding CP study retains those controls.
+
+All 1,344 freedom counts match. The 444 acquired, 476 repaired and 1,344 descent
+points pass native original-source checks. All repairs survive the qualified
+descent, without cancellation or allowance overrun. All 48 original hashes match;
+both Mac/aarch64 captures retain identical JAR/runtime identities, mappings,
+settings, actual query pins and strict objective rows. These native checks and
+ordered JFR timings establish neither independent proof nor production throughput.
+
+At the two-/three-/four-input root targets, disagreement repairs all nine cycle
+trials against numerical-acquisition-ablated random's zero. Both acquisitions
+already supply objective zero, as does the cheaper CP prefix. Root ranking gains
+therefore add no incumbent beyond the independent acquisition companion.
+
+Fragment exchange at two inputs supplies no improving acquisition: refutation
+ranking repairs 1/3 against ablated random's 0/3 and adjacency's 2/3. Every arm's
+descent reaches zero there. Neither numerical ranking improves the matched
+three-/four-cycle targets. At eight inputs on the four-cycle, refutation ranking
+repairs 1/3 against ablated random's 0/3, with no acquisition gain; its zero
+objective survives descent. Adjacency repairs 3/3. Median containing work is
+36,750/36,570/2 and thread allocation 3.06/3.02/0.91 MB for
+refutation/ablated/adjacency. Captured supports name only one to three of the four
+required coordinated inputs; one conditioned refutation need not identify the
+complete improving freedom set.
+
+At two inputs on the root knapsack, disagreement repairs 3/3 against ablated
+random's 2/3, but objective removal also repairs 3/3. Numerical acquisition supplies
+no improving integer point, and every arm descends to objective two. The captured
+fractional coordinate near one third is retained as its exact binary rational;
+it receives no integer-witness credit. The declared-row relaxation optimum 4/3
+does not make that numerical point an exact feasible certificate.
+
+Each cut policy consumes 54 disagreement and 30 refutation rankings. The remaining
+refutation trials report `NoRefutation`; 30 disagreement trials report agreement
+with cuts disabled and no point with cuts enabled. All 672 paired selections and
+acquisition/repair/descent objectives match across cut policies. Enabled captures
+retain one installed, natively checked cut in each of 252 numerical trials;
+disabled captures retain none. Maximum charged source work is 36,906/6,273 and
+modeled allocation 97,584/69,364 bytes for disabled/enabled cuts. Those observed
+costs do not equate native search units with source work or establish a general
+cut-policy speedup.
+
+Retain the bounded opt-in rankings for comparisons. The recovered controls reject
+promoting either over existing selectors or independent acquisition: surviving
+gains remain narrower than the stronger controls and require additional numerical
+cost. They establish no broad finite-family advantage or basin classification.
 
 ### Prepared board-restart outcomes
 
