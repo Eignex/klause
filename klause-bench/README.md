@@ -3896,6 +3896,14 @@ modeled allocation 97,584/69,364 bytes for disabled/enabled cuts. Those observed
 costs do not equate native search units with source work or establish a general
 cut-policy speedup.
 
+[8652](https://lab.eignex.com/jobs/8652) and [8653](https://lab.eignex.com/jobs/8653),
+at integrated code `0a0d85b82c`, reproduce all 1,344 selections, acquired/repaired
+objectives, projected supports and descent outcomes. All counts, source checks,
+allowances and 48 source hashes pass again. Both use identical JARs; the
+Mac/aarch64 and Linux/amd64 runtime identities remain separate. This confirms
+integration with the merged producer and preserves the measured decision,
+without pooling repeated controls or comparing physical time across platforms.
+
 Retain the bounded opt-in rankings for comparisons. The recovered controls reject
 promoting either over existing selectors or independent acquisition: surviving
 gains remain narrower than the stronger controls and require additional numerical
