@@ -356,7 +356,8 @@ internal class Alns(
                     minDestroyFraction
                 }
                 val destroyed = destroyOperators[destroyIdx]
-                    .destroy(rng, inner.problem, incumbent, objective, destroyFraction)
+                    .destroy(rng, inner.problem, incumbent, objective, destroyFraction,
+                        params.assumptions, params.cancellation)
                 val freed = RepairScope.effective(destroyed, params.assumptions, literalSweep, params.cancellation)
                 val attempt = repairTrace?.begin(
                     "alns:$destroyIdx:$repairIdx", params.randomSeed, incumbent, incumbent,
