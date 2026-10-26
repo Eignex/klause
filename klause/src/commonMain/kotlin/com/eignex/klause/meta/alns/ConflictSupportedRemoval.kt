@@ -295,6 +295,7 @@ internal class ConflictSupportedRemoval(
         capped = false
         hasSupport = false
         center = null
+        cancellation = Cancellation.Never
         localIncumbent = null
         externalCutoff = Double.POSITIVE_INFINITY
         localCutoff = Double.POSITIVE_INFINITY
