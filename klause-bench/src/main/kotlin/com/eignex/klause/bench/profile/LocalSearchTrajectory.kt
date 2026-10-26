@@ -1,11 +1,8 @@
 package com.eignex.klause.bench.profile
 
-import com.eignex.klause.bench.catalog.Catalog
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
-import com.eignex.klause.bench.source.CorpusFetcher
-import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.scheduling.Diffn
@@ -81,36 +78,53 @@ internal object LocalSearchTrajectory {
     private fun capture(args: Array<String>, out: File) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val required = setOf("suite", "problem", "sha256", "recipe", "seed", "moves")
-        val optional = setOf("sliceMillis", "sliceWork", "greedy", "repairs", "controls", "center", "source64",
-            "ownerReplay", "ownerWork", "ownerFragmentWork", "ownerSelectors", "selectorsFromWalk")
+        val optional = setOf(
+            "sliceMillis", "sliceWork", "greedy", "repairs", "controls", "center", "source64", "channel", "presolve",
+            "ownerReplay", "ownerWork", "ownerFragmentWork", "ownerSelectors", "selectorsFromWalk",
+        )
         require(options.keys.containsAll(required) && options.keys.all {
             it in required || it in optional || it == "selectors"
         })
-        val bytes = options["source64"]?.let {
-            require(it.length <= 96 * 1024)
-            Base64.getDecoder().decode(it)
-        } ?: run {
-            val reference = Catalog.uncapped(options.getValue("suite")).problems
-                .single { it.name == options.getValue("problem") }
-            CorpusFiles.open(CorpusFetcher.resolve(reference.source)).use {
-                it.readNBytes(64 * 1024 * 1024 + 1)
-            }
-        }
-        require(bytes.size <= 64 * 1024 * 1024 && sha256(bytes) == options.getValue("sha256"))
+        require(options["presolve"] == null || options["presolve"] in setOf("default", "off"))
+        val bytes = trajectorySourceBytes(options.getValue("suite"), options.getValue("problem"),
+            options.getValue("sha256"), options["source64"])
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
         out.resolve("source.xml").writeBytes(bytes)
         out.resolve("request.txt").writeText(args.joinToString("\n"))
         val parsed = Xcsp3.parse(bytes.decodeToString())
-        require(parsed.problem.numBoolVars.toLong() + parsed.problem.numIntVars <= TRAJECTORY_COORDINATE_LIMIT)
-        require(parsed.problem.numFactors <= TRAJECTORY_FACTOR_LIMIT)
-        val objective = requireNotNull(parsed.objective).toLinearObjective()
+        if (parsed.problem.numBoolVars.toLong() + parsed.problem.numIntVars > TRAJECTORY_COORDINATE_LIMIT ||
+            parsed.problem.numFactors > TRAJECTORY_FACTOR_LIMIT
+        ) {
+            out.resolve("decline.json").writeText(buildJsonObject {
+                put("decline", "source-size")
+                put("sourceSha256", options.getValue("sha256"))
+                put("declaredSemantics", parsed.semantics.declared.toString())
+                put("effectiveSemantics", parsed.semantics.effective.toString())
+                put("settings", parsed.problem.settings.toString())
+                put("sourceBooleans", parsed.problem.numBoolVars)
+                put("sourceIntegers", parsed.problem.numIntVars)
+                put("sourceFactors", parsed.problem.numFactors)
+                put("coordinateLimit", TRAJECTORY_COORDINATE_LIMIT)
+                put("factorLimit", TRAJECTORY_FACTOR_LIMIT)
+                put("sourceVerdictClaim", false)
+            }.toString())
+            return
+        }
+        val objective = parsed.objective?.toLinearObjective()
         require(parsed.sense == ObjectiveSense.MINIMIZE)
+        val channel = options["channel"]?.let { ChannelView.valueOf(it) }
+        require(channel != null || objective != null)
+        val engine = if (channel == null) FiniteEngine.MIXED else FiniteEngine.LOCAL_SEARCH
+        val variants = if (channel == null) listOf(
+            ViewSpec("false", false, ChannelView.Maintained), ViewSpec("true", true, ChannelView.Maintained),
+        ) else listOf(ViewSpec("maintained", false, ChannelView.Maintained), ViewSpec(channel.name, false, channel))
         val seed = options.getValue("seed").toLong()
         val moves = options.getValue("moves").toLong().also { require(it in 1..1_000_000) }
         val sliceMillis = options["sliceMillis"]?.toLong()?.also { require(it > 0L) } ?: Long.MAX_VALUE
         val sliceWork = options["sliceWork"]?.toLong()?.also { require(it > 0L) } ?: Long.MAX_VALUE
         val repairGreedy = options["greedy"]?.toBooleanStrict() ?: true
         val repairCapture = options["repairs"]?.toBooleanStrict() ?: false
+        require(!repairCapture || objective != null)
         val exactControls = options["controls"]?.toBooleanStrict() ?: false
         val selectors = options["selectors"]?.toBooleanStrict() ?: false
         val ownerReplay = options["ownerReplay"]?.toBooleanStrict() ?: false
@@ -134,18 +148,30 @@ internal object LocalSearchTrajectory {
         }
         require(initial == null || parsed.definedVars.isEmpty())
         require(!selectorsFromWalk || initial == null)
+        require(!selectorsFromWalk || channel == null)
+        require(initial == null || channel == null)
+        val skipPresolve = initial != null || selectorsFromWalk || options["presolve"] == "off"
         val views = ArrayList<TrajectoryView>()
         val observations = ArrayList<Observation>()
         out.resolve("capture-policy.json").writeText(buildJsonObject {
             put("revision", Reports.readGitSha() ?: System.getenv("LAB_WORKTREE")?.let(::File)?.name
                 ?.takeIf { it.matches(Regex("[0-9a-f]{40}")) })
             put("sourceSha256", sha256(bytes))
+            put("sourceMode", if ("source64" in options) "embedded" else "catalog")
             put("declaredSemantics", parsed.semantics.declared.toString())
             put("effectiveSemantics", parsed.semantics.effective.toString())
             put("settings", parsed.problem.settings.toString())
             put("javaRuntime", System.getProperty("java.runtime.version"))
             put("os", System.getProperty("os.name"))
             put("architecture", System.getProperty("os.arch"))
+            put("channel", channel?.name)
+            put("preparationEngine", engine.name)
+            put("presolve", if (skipPresolve) "off" else "default")
+            put("objectiveTreatment", when {
+                objective == null -> "none"
+                channel == null -> "protected versus substituted"
+                else -> "protected in both views"
+            })
             put("pairedStateLimit", 12)
             put("candidatesPerPairLimit", 32)
             put("coordinateLimit", TRAJECTORY_COORDINATE_LIMIT)
@@ -154,33 +180,69 @@ internal object LocalSearchTrajectory {
             put("diagnosticWork", "separate private states; two full loads and at most 64 reversible probes per pair")
             put("sourceVerdictClaim", false)
         }.toString())
-        for (rewrite in if (initial == null && !selectorsFromWalk) listOf(false, true) else listOf(false)) {
+        for (variant in if (initial == null && !selectorsFromWalk) variants else variants.take(1)) {
+            val rewrite = variant.label
             val preparationStarted = System.nanoTime()
             val stop = Cancellation.after(60.seconds)
             val invocation = SourceSetup.prepare(SourceSetupRequest(
                 if (parsed.definedVars.isEmpty()) SourceAttachment(parsed.problem, parsed.definitionHints)
                 else SourceAttachment(parsed.problem, parsed.definedVars, emptyList(), parsed.definitionHints),
-                ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED, objective = objective, cancellation = stop,
+                if (objective == null) ExecutionOperation.SATISFY else ExecutionOperation.OPTIMIZE,
+                engine, objective = objective, cancellation = stop,
             ))
             val plan = requireNotNull(invocation.preparedPlan)
             val prepared = FinitePipeline.prepare(FinitePipelineRequest(
-                requireNotNull(plan.model), FiniteEngine.MIXED, objective,
+                requireNotNull(plan.model), engine, objective,
                 cancellation = stop, solveCancellation = stop, presolveBudget = PresolveBudget(1_375_000_000L),
-                presolveConfig = if (initial == null && !selectorsFromWalk) PresolveConfig.DEFAULT
-                    else PresolveConfig.NONE,
-                preparedPlan = plan, transformObjective = rewrite, randomSeed = seed,
+                presolveConfig = if (skipPresolve) PresolveConfig.NONE else PresolveConfig.DEFAULT,
+                preparedPlan = plan, transformObjective = variant.transformObjective, randomSeed = seed,
             ))
             check(!stop() && prepared.presolve?.infeasible != true)
-            val problem = prepared.problem as BakedProblem
-            val workingObjective = requireNotNull(prepared.objective)
+            val preparedProblem = prepared.problem as BakedProblem
+            val problem = if (variant.channel == ChannelView.InverseAssignment) {
+                val inverse = inverseAssignmentView(preparedProblem, stop)
+                if (inverse == null) {
+                    out.resolve("decline-$rewrite.txt").writeText(
+                        "unsupported-inverse-assignment\ncancelled=${stop()}\n",
+                    )
+                    continue
+                }
+                inverse.bake(stop)
+            } else preparedProblem
+            if (problem.numBoolVars.toLong() + problem.numIntVars > TRAJECTORY_COORDINATE_LIMIT ||
+                problem.numFactors > TRAJECTORY_FACTOR_LIMIT
+            ) {
+                out.resolve("decline-$rewrite.json").writeText(buildJsonObject {
+                    put("decline", "working-size")
+                    put("workingBooleans", problem.numBoolVars)
+                    put("workingIntegers", problem.numIntVars)
+                    put("workingFactors", problem.numFactors)
+                    put("coordinateLimit", TRAJECTORY_COORDINATE_LIMIT)
+                    put("factorLimit", TRAJECTORY_FACTOR_LIMIT)
+                    put("sourceVerdictClaim", false)
+                }.toString())
+                continue
+            }
+            val workingObjective = prepared.objective
             require(initial == null || (initial.numIntVars == problem.numIntVars &&
                 prepared.reconstruct(initial) == initial)) { "explicit center needs an unchanged coordinate frame" }
             val hints = heuristicHints(invocation, prepared, stop)
-            val sweep = hints?.let { getter(it, "getSweep") as DefinitionalSweep? }
+            val maintained = hints?.let { getter(it, "getSweep") as DefinitionalSweep? }
+            val sweep = variant.channel.sweep(maintained, stop)
+            val coordinates = trajectoryCoordinates(invocation, prepared, stop)
+            check(!stop())
             val gradient = hints?.let { getter(it, "getObjective") as IncrementalObjective? }
             out.resolve("model-$rewrite.json").writeText(buildJsonObject {
                 put("preparationNanos", System.nanoTime() - preparationStarted)
                 put("objective", workingObjective.toString())
+                put("workingBooleans", problem.numBoolVars)
+                put("workingIntegers", problem.numIntVars)
+                put("workingFactors", problem.numFactors)
+                put("channel", variant.channel.name)
+                put("maintainedDefinitions", maintained?.size ?: 0)
+                put("retainedDefinitions", sweep?.size ?: 0)
+                put("coordinateProjection", if (coordinates == null) "declined" else "retained production coordinates")
+                put("functionalObjectiveTreatment", if (channel == null) "view-specific" else "held fixed")
                 put("factors", buildJsonArray {
                     for (factor in problem.factors) add(buildJsonObject {
                         put("kind", factor::class.simpleName)
@@ -200,11 +262,15 @@ internal object LocalSearchTrajectory {
                 put("correspondenceAdmission", "slot-preserving load plus complete source round trip")
                 put("sourceVerdictClaim", false)
             }.toString())
-            if (selectors && !selectorsFromWalk) SemanticRepairComparison.capture(problem, workingObjective,
-                requireNotNull(initial),
-                sweep, sourceInputs, prepared, checkNotNull(sourceCheck), out, seed)
+            if (coordinates == null) {
+                out.resolve("decline-$rewrite.txt").writeText("unsupported-source-coordinate-projection\n")
+                continue
+            }
+            if (selectors && !selectorsFromWalk) SemanticRepairComparison.capture(problem,
+                checkNotNull(workingObjective), requireNotNull(initial), sweep, sourceInputs, prepared,
+                checkNotNull(sourceCheck), out, seed)
             if (ownerSelectors && !selectorsFromWalk) RepairOwnerReplay.replay(out.resolve("selectors.jsonl"),
-                problem, workingObjective,
+                problem, checkNotNull(workingObjective),
                 prepared, checkNotNull(sourceCheck), sourceInputs, out.resolve("owners-selectors.jsonl"), seed,
                 options["ownerWork"]?.toLong() ?: 200_000L,
                 options["ownerFragmentWork"]?.toLong() ?: 2_000L)
@@ -295,7 +361,18 @@ internal object LocalSearchTrajectory {
                         normalizeWeightsByClass = true, reportResiduals = true,
                         initialAssignment = initial,
                     )
-                    solver.resumable(workingObjective, params).use { run ->
+                    if (workingObjective == null) solver.resumableSolve(params).use { run ->
+                        val result = try {
+                            var observed = run.runSlice(stop, sliceMillis, sliceWork)
+                            while (observed == null && !stop()) observed = run.runSlice(stop, sliceMillis, sliceWork)
+                            observed
+                        } catch (_: Captured) {
+                            null
+                        }
+                        out.resolve("result-$label.txt").writeText(
+                            "picks=$picks\ncancelled=${stop()}\nresult=$result\nstats=${run.stats}\n",
+                        )
+                    } else solver.resumable(workingObjective, params).use { run ->
                         val allocation = ManagementFactory.getThreadMXBean() as ThreadMXBean
                         check(allocation.isThreadAllocatedMemorySupported)
                         allocation.isThreadAllocatedMemoryEnabled = true
@@ -340,15 +417,15 @@ internal object LocalSearchTrajectory {
                     }
                     if (trace != null) {
                         RepairTrajectory.write(trace, prepared, sourceInputs, out.resolve("repairs-$rewrite.jsonl"))
-                        if (exactControls) RepairTrajectory.controls(trace, problem, workingObjective,
+                        if (exactControls) RepairTrajectory.controls(trace, problem, checkNotNull(workingObjective),
                             out.resolve("controls-$rewrite.jsonl"), seed, prepared, checkNotNull(sourceCheck))
                         if (ownerReplay) RepairOwnerReplay.replay(out.resolve("controls-$rewrite.jsonl"),
-                            problem, workingObjective, prepared, checkNotNull(sourceCheck), sourceInputs,
+                            problem, checkNotNull(workingObjective), prepared, checkNotNull(sourceCheck), sourceInputs,
                             out.resolve("owners-$rewrite.jsonl"), seed,
                             options["ownerWork"]?.toLong() ?: 100_000L,
                             options["ownerFragmentWork"]?.toLong() ?: 2_000L)
                     }
-                    if (!walk) {
+                    if (!walk && captured != null) {
                         val initial = checkNotNull(captured)
                         val shadow = LocalSearchState(
                             initial.model, Random(seed), initial.assumptions, initial.projection,
@@ -360,10 +437,7 @@ internal object LocalSearchTrajectory {
                         }
                         views += TrajectoryView(
                             rewrite.toString(), shadow,
-                            VarRemap(
-                                IntArray(parsed.problem.numBoolVars) { if (it < problem.numBoolVars) it else -1 },
-                                IntArray(parsed.problem.numIntVars) { if (it < problem.numIntVars) it else -1 },
-                            ),
+                            coordinates,
                             initial.shaping.objective, prepared.reconstruct,
                             { activeSweep?.sweep(shadow.assignment, shadow.rootDomains) },
                             initial.seeding.ownerInt,
@@ -372,8 +446,13 @@ internal object LocalSearchTrajectory {
                             val boundary = if (position == problem.numBoolVars + problem.numIntVars) {
                                 "greedy-complete-$rewrite"
                             } else "greedy-before-$rewrite-$position"
+                            val focus = if (channel == null) slot else if (slot >= problem.numBoolVars) {
+                                (0 until coordinates.intCount).firstOrNull {
+                                    coordinates.int(it) == slot - problem.numBoolVars
+                                }?.plus(parsed.problem.numBoolVars) ?: -1
+                            } else -1
                             observations += Observation(
-                                boundary, prepared.reconstruct(initial.assignment.snapshot()), slot,
+                                boundary, prepared.reconstruct(initial.assignment.snapshot()), focus,
                             )
                         }
                     }
@@ -409,10 +488,10 @@ internal object LocalSearchTrajectory {
                     put("globalProofClaim", false)
                 }.toString())
                 if (unavailable == null) {
-                    SemanticRepairComparison.capture(problem, workingObjective, checkNotNull(center), sweep,
-                        sourceInputs, prepared, checkNotNull(sourceCheck), out, seed)
+                    SemanticRepairComparison.capture(problem, checkNotNull(workingObjective),
+                        checkNotNull(center), sweep, sourceInputs, prepared, checkNotNull(sourceCheck), out, seed)
                     if (ownerSelectors) RepairOwnerReplay.replay(out.resolve("selectors.jsonl"), problem,
-                        workingObjective, prepared, checkNotNull(sourceCheck), sourceInputs,
+                        checkNotNull(workingObjective), prepared, checkNotNull(sourceCheck), sourceInputs,
                         out.resolve("owners-selectors.jsonl"), seed,
                         options["ownerWork"]?.toLong() ?: 200_000L,
                         options["ownerFragmentWork"]?.toLong() ?: 2_000L)
@@ -423,20 +502,28 @@ internal object LocalSearchTrajectory {
             check(observations.size <= 12)
             if (views.size != 2) {
                 writer.appendLine(buildJsonObject {
-                    put("decline", "single-representation")
+                    put("decline", if (initial != null) "single-representation" else "two-initial-states-unavailable")
+                    put("capturedViews", views.size)
                     put("sourceVerdictClaim", false)
                 }.toString())
                 return@use
             }
+            val inputColumns = HashSet<Int>()
+            if (channel != null) views[0].state.invariants?.let { network ->
+                for (node in 0 until network.size) inputColumns.addAll(network.node(node).intInputs.asList())
+            }
+            val namedInputs = if (channel == null) emptyList() else parsed.intVarNames.values.filter {
+                views[0].coordinates.int(it) in inputColumns
+            }
             for ((label, source, focus) in observations) {
                 val candidates = ArrayList<Move>()
-                for (variable in 0 until source.numBoolVars) {
+                for (variable in 0 until (if (channel == null) source.numBoolVars else 0)) {
                     if (candidates.size == 32) break
                     val move = Move.BoolFlip(variable)
                     if (views.all { it.admits(move) }) candidates += move
                 }
                 val first = focus - parsed.problem.numBoolVars
-                val integerOrder = (listOf(first).filter { it in 0 until source.numIntVars } +
+                val integerOrder = (listOf(first).filter { it in 0 until source.numIntVars } + namedInputs +
                     (0 until source.numIntVars)).distinct()
                 for (variable in integerOrder) {
                     if (candidates.size == 32) break
@@ -460,11 +547,20 @@ internal object LocalSearchTrajectory {
                         }
                     }
                 }
+                if (channel != null) for (variable in 0 until source.numBoolVars) {
+                    if (candidates.size == 32) break
+                    val move = Move.BoolFlip(variable)
+                    if (views.all { it.admits(move) }) candidates += move
+                }
                 writer.appendLine(buildJsonObject {
                     put("observation", label)
                     put(
                         "candidatePolicy",
-                        "common admissible root endpoints and adjacent values; focus coordinate first",
+                        if (channel == null) {
+                            "common admissible root endpoints and adjacent values; focus coordinate first"
+                        } else {
+                            "named source definition inputs first; common admissible endpoints and neighbors"
+                        },
                     )
                     put("comparison", trajectoryPair(source, candidates, views[0], views[1]))
                 }.toString())
@@ -474,6 +570,8 @@ internal object LocalSearchTrajectory {
     }
 
     private object Captured : RuntimeException(null, null, false, false)
+
+    private data class ViewSpec(val label: String, val transformObjective: Boolean, val channel: ChannelView)
 
     private data class Observation(val label: String, val source: Sample, val focus: Int = -1)
 
@@ -509,6 +607,22 @@ internal object LocalSearchTrajectory {
     private fun getter(owner: Any, name: String): Any? = owner.javaClass.methods.single {
         it.name.substringBefore('$') == name && it.parameterCount == 0
     }.invoke(owner)
+
+    internal fun trajectoryCoordinates(
+        invocation: PreparedSourceInvocation,
+        prepared: FinitePipelinePreparation,
+        stop: Cancellation,
+    ): VarRemap? {
+        val mapping = getter(prepared, "getSourceMapping") ?: return null
+        val plan = getter(invocation, "getEnginePlan") ?: return null
+        val sourceMethods = Class.forName("com.eignex.klause.solver.pipeline.SourceHintMappingKt").methods
+        val planned = sourceMethods.single { it.name == "sourceCoordinates" }.invoke(null, plan, stop)
+            as VarRemap? ?: return null
+        val projected = Class.forName("com.eignex.klause.presolve.SourceMappingKt").methods.single {
+            it.name == "retainedCoordinates"
+        }.invoke(null, mapping, stop) as VarRemap? ?: return null
+        return sourceMethods.single { it.name == "followedBy" }.invoke(null, planned, projected, stop) as VarRemap?
+    }
 
     private fun heuristicHints(
         invocation: PreparedSourceInvocation,

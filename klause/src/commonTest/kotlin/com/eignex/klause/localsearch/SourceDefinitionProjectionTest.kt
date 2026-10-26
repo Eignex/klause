@@ -11,15 +11,99 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class SourceDefinitionProjectionTest {
+    @Test
+    fun `searched output inconsistency remains a source violation`() {
+        val program = parseFlatZinc("var bool: b; var 0..1: y; " +
+            "constraint bool2int(b, y) :: defines_var(y); solve satisfy;")
+        val sweep = assertNotNull(DefinitionalSweep.fromSource(program.problem, program.definitionHints))
+        val state = LocalSearchState(program.problem.bake(), Random(0))
+        state.invariants = sweep.searchingChannels(true, false, Cancellation.Never)
+            ?.network(program.problem.numIntVars, program.problem.numBoolVars)
+        state.assignment.setBool(program.boolVarsByName.getValue("b"), false)
+        state.assignment.setInt(program.intVarsByName.getValue("y"), 1)
+
+        state.recompute()
+
+        assertTrue(state.cost > 0L)
+    }
+
+    @Test
+    fun `searched predicates remain protected by source pins`() {
+        val program = parseFlatZinc("var 0..2: x; var bool: b; var 0..1: y; " +
+            "constraint int_eq_reif(x, 1, b) :: defines_var(b); " +
+            "constraint bool2int(b, y) :: defines_var(y); solve satisfy;")
+        val sweep = assertNotNull(DefinitionalSweep.fromSource(program.problem, program.definitionHints))
+        val view = assertNotNull(sweep.searchingChannels(false, true, Cancellation.Never))
+        val boolean = program.boolVarsByName.getValue("b")
+        val sink = MoveSink(Assumptions.None.withBool(boolean, false)).apply {
+            setInvariants(view.network(program.problem.numIntVars, program.problem.numBoolVars))
+        }
+
+        sink.addBoolFlip(boolean)
+
+        assertTrue(sink.list.isEmpty())
+    }
+
+    @Test
+    fun `searched predicates retain downstream value definitions`() {
+        val program = parseFlatZinc("var 0..2: x; var bool: b; var 0..1: y; " +
+            "constraint int_eq_reif(x, 1, b) :: defines_var(b); " +
+            "constraint bool2int(b, y) :: defines_var(y); solve satisfy;")
+        val sweep = assertNotNull(DefinitionalSweep.fromSource(program.problem, program.definitionHints))
+
+        val view = assertNotNull(sweep.searchingChannels(false, true, Cancellation.Never))
+        val network = view.network(program.problem.numIntVars, program.problem.numBoolVars)
+
+        assertFalse(network.isDefinedBool(program.boolVarsByName.getValue("b")))
+        assertTrue(network.isDefinedInt(program.intVarsByName.getValue("y")))
+    }
+
+    @Test
+    fun `searched values retain their predicate definition`() {
+        val program = parseFlatZinc("var 0..2: x; var bool: b; var 0..1: y; " +
+            "constraint int_eq_reif(x, 1, b) :: defines_var(b); " +
+            "constraint bool2int(b, y) :: defines_var(y); solve satisfy;")
+        val sweep = assertNotNull(DefinitionalSweep.fromSource(program.problem, program.definitionHints))
+
+        val view = assertNotNull(sweep.searchingChannels(true, false, Cancellation.Never))
+        val network = view.network(program.problem.numIntVars, program.problem.numBoolVars)
+
+        assertTrue(network.isDefinedBool(program.boolVarsByName.getValue("b")))
+        assertFalse(network.isDefinedInt(program.intVarsByName.getValue("y")))
+    }
+
+    @Test
+    fun `searching every channel can leave no maintained outputs`() {
+        val program = parseFlatZinc("var bool: b; var 0..1: y; " +
+            "constraint bool2int(b, y) :: defines_var(y); solve satisfy;")
+        val sweep = assertNotNull(DefinitionalSweep.fromSource(program.problem, program.definitionHints))
+
+        assertNull(sweep.searchingChannels(true, true, Cancellation.Never))
+    }
+
+    @Test
+    fun `cancelled channel filtering publishes no partial view`() {
+        val program = parseFlatZinc("var bool: b; var 0..1: y; " +
+            "constraint bool2int(b, y) :: defines_var(y); solve satisfy;")
+        val sweep = assertNotNull(DefinitionalSweep.fromSource(program.problem, program.definitionHints))
+
+        assertNull(sweep.searchingChannels(true, false, Cancellation { true }))
+    }
+
     @Test
     fun `a native objective view should be built from a plain source program`() {
         val source = "var -3..3: x; var 0..3: a; " +
