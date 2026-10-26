@@ -1687,6 +1687,20 @@ guidance remain distinct. This conditioned replay uses the exact checked center
 cutoff, with the native acquisition threshold retained separately in the selection
 record; it does not combine acquisition and repair into a policy comparison.
 
+[Conflict owner replay 8615](https://lab.eignex.com/jobs/8615), at `725db3a1ce`,
+consumes 160 actual scopes from source-root and sampled-fragment acquisition on
+the weighted Latin, assignment, resource and placement controls. All five owners
+share each center, effective freedoms, pins and exact cutoff. The records preserve
+148 matched source counts, twelve unmatched sets and nine actual consumptions of
+supported conflict guidance, alongside the acquisition-ablated controls. LS and
+both CP owners find the same 39 native source-accepted gains; the other 121 scopes
+retain feasible nonimprovements for LS and closed cutoffs for CP. No fragment
+overspends. Cold CP uses 140 nodes and 110.2 million cumulative thread bytes;
+retained CP uses 88 nodes and 292.9 million bytes, without newly useful retained
+clause flags. Mixed declines every global shape. Acquisition and descent costs
+remain in the original selection records, outside the owner allowance. These
+instrumented controls establish no composite policy or throughput advantage.
+
 [Semantic owner replay 8579](https://lab.eignex.com/jobs/8579), at `02d362ad1f`,
 consumes 640 actual selector scopes across three- and four-input assignment,
 resource and placement controls, with owner seeds 7 and 19. All five owners share
@@ -3290,6 +3304,15 @@ checks an exact affine real backing with source objective `0.1*y` and scale ten.
 All five owners find the checked gain from zero to `1/10` when the source integer
 is free; fixed-input queries admit no strict gain. These instrumented native
 checks grant no independent witness certification or unpinned proof authority.
+
+[Modglob owner pilot 8614](https://lab.eignex.com/jobs/8614), at `725db3a1ce`,
+captures three identical five-owner conditions without inventing finite domains.
+CP declines the exact non-binary cutoff. Retained mixed repair finds one checked
+source improvement where cold mixed retains nonimprovements, but atomic work
+materially exceeds the 5,000-equivalent fragments: the two LS attempts each spend
+about 74,000 equivalents and exhaust its containing allowance before the third
+condition; mixed fragments overspend by up to 17,781. These outcomes do not qualify
+an equal-work repair-quality comparison or an admission rule.
 
 [Scoped baseline 8448](https://lab.eignex.com/jobs/8448) runs `e805182280` on
 Linux/amd64 with the two hash-matched original modglob/rgn sources and refined
