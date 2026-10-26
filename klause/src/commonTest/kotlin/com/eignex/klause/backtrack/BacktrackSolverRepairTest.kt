@@ -8,6 +8,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -16,6 +17,60 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class BacktrackSolverRepairTest {
+    @Test
+    fun `repair should resume the same fragment after a cancelled slice`() {
+        val objective = LinearObjective(boolWeights = longArrayOf(-1L, -2L))
+        val solver = BacktrackSolver(Problem(2, 0, emptyArray(), emptyArray()).bake())
+        solver.openRepair(objective, BacktrackParams()).use { repair ->
+            repair.begin(Assumptions.None, 100L, 0.0, Cancellation.Never)
+
+            val paused = repair.runSlice(Cancellation { true }, Long.MAX_VALUE, 1L)
+            var completed = paused
+            repeat(32) {
+                if (completed.reason == null) completed = repair.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L)
+            }
+
+            assertNull(paused.reason)
+            assertEquals(TerminationReason.SearchExhausted, completed.reason)
+            assertEquals(-3.0, objective.evaluate(assertNotNull(completed.sample)))
+        }
+    }
+
+    @Test
+    fun `repair should keep lifetime cancellation terminal until another fragment begins`() {
+        val objective = LinearObjective(boolWeights = longArrayOf(-1L))
+        val solver = BacktrackSolver(Problem(1, 0, emptyArray(), emptyArray()).bake())
+        var cancelled = false
+        solver.openRepair(objective, BacktrackParams()).use { repair ->
+            repair.begin(Assumptions.None, 100L, 0.0, Cancellation { cancelled })
+            cancelled = true
+
+            val stopped = repair.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L)
+            cancelled = false
+            val retained = repair.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L)
+            val next = repair.repair(Assumptions.None, 100L, 0.0, Cancellation.Never)
+
+            assertEquals(TerminationReason.Cancelled, stopped.reason)
+            assertEquals(stopped, retained)
+            assertEquals(-1.0, objective.evaluate(assertNotNull(next)))
+        }
+    }
+
+    @Test
+    fun `repair should reset an expired slice before reseeding a sibling scope`() {
+        val objective = LinearObjective(boolWeights = longArrayOf(-1L, -2L))
+        val solver = BacktrackSolver(Problem(2, 0, emptyArray(), emptyArray()).bake())
+        solver.openRepair(objective, BacktrackParams()).use { repair ->
+            repair.begin(Assumptions(mapOf(0 to false), emptyMap()), 100L, 0.0, Cancellation.Never)
+            repair.runSlice(Cancellation.Never, Long.MAX_VALUE, 0L)
+
+            val next = repair.repair(Assumptions(mapOf(1 to false), emptyMap()), 100L, 0.0, Cancellation.Never)
+
+            assertEquals(true, assertNotNull(next).boolValue(0))
+            assertEquals(false, next.boolValue(1))
+        }
+    }
+
     @Test
     fun `repair should reject an increasing or NaN cutoff`() {
         val objective = LinearObjective(boolWeights = longArrayOf(-1L))

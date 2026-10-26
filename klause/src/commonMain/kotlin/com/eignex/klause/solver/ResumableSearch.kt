@@ -4,6 +4,7 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -173,6 +174,10 @@ interface ResumableSolver<P : SolverParams> : Solver<P> {
 internal interface RepairSearch : AutoCloseable {
     val stats: SolveStats get() = SolveStats.EMPTY
 
+    fun begin(assumptions: Assumptions, decisionBudget: Long, cutoff: Double, cancellation: Cancellation)
+
+    fun runSlice(cancellation: Cancellation, millis: Long, work: Long): RepairSearchStep
+
     /**
      * Solve the fragment pinned by [assumptions] under a [decisionBudget] (decisions), pruning against
      * [cutoff] and stopping when [cancellation] fires. The caller MUST keep [cutoff] monotone
@@ -180,10 +185,18 @@ internal interface RepairSearch : AutoCloseable {
      * monotone cutoff keeps every stale bound looser than the current one (never a wrong prune). Returns
      * the best strictly-better completion found, or null.
      */
-    fun repair(assumptions: Assumptions, decisionBudget: Long, cutoff: Double, cancellation: Cancellation): Sample?
+    fun repair(assumptions: Assumptions, decisionBudget: Long, cutoff: Double, cancellation: Cancellation): Sample? {
+        begin(assumptions, decisionBudget, cutoff, cancellation)
+        while (true) {
+            val step = runSlice(Cancellation.Never, Long.MAX_VALUE, -1L)
+            if (step.reason != null) return step.sample
+        }
+    }
 
     override fun close() {}
 }
+
+internal data class RepairSearchStep(val sample: Sample?, val reason: TerminationReason?)
 
 internal class SearchInitializationCancelled(val stats: SolveStats, val work: Long) :
     CancellationException("search initialization cancelled")
