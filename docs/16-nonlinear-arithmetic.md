@@ -286,6 +286,16 @@ decline advances to the complete family under the same remaining allowance. Regi
 projection and lifting counters record actual attempts across snapshot replacements.
 Only region coverage, projection and lifting are required for completeness.
 
+Optional query failure capture retains bounded exact observations of rejected probe
+points and CAD prefixes, their signed premises, numeric reconstruction fibres and
+condition/snapshot identity. Projection observations retain the active operands.
+Root, search and partial-sign cursors restore their own bounded operation/context
+records when resumed. Partial-sign observations retain full signed premises within
+the capture limits, including the first completed sign conflict.
+Capture polls and charges the containing allowance; incomplete copies and bounded
+repetition comparisons remain explicitly incomplete. These diagnostic records
+carry no exclusion or source-refutation authority.
+
 #### Objective-image traversal
 
 The image service adds an objective coordinate `t = f(source)` below all source

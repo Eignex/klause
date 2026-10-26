@@ -31,9 +31,10 @@ internal class PolynomialFormula private constructor(
     fun booleanRegions(
         arithmetic: PolynomialArithmetic,
         progress: PolynomialQueryProgress? = null,
+        onPartialCheck: ((Any, List<PolynomialAtom>) -> Unit)? = null,
         onConflict: ((List<PolynomialAtom>) -> Unit)? = null,
     ): Iterator<PolynomialBooleanRegion?> =
-        PolynomialBooleanRegions(nodes, root, atoms, arithmetic, progress, onConflict).prepare()
+        PolynomialBooleanRegions(nodes, root, atoms, arithmetic, progress, onConflict, onPartialCheck).prepare()
 
     fun withAtoms(replacements: List<PolynomialAtom>, arithmetic: PolynomialArithmetic): PolynomialFormula {
         require(replacements.size == atoms.size)

@@ -1,12 +1,67 @@
 package com.eignex.klause.bench.profile
 
+import java.io.ByteArrayOutputStream
+import java.util.Base64
+import java.util.zip.GZIPOutputStream
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 
 class PolynomialPhaseProfileTest {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `request encodings retain identical JSON bytes`(compressed: Boolean) {
+        val json = "[{\"suite\":\"control\",\"problem\":\"constant\"}]".encodeToByteArray()
+        val prefix = if (compressed) "requestz64=" else "request64="
+        val bytes = if (compressed) ByteArrayOutputStream().also { out ->
+            GZIPOutputStream(out).use { it.write(json) }
+        }.toByteArray() else json
+
+        val decoded = PolynomialPhaseProfile.requestBytes(prefix + Base64.getEncoder().encodeToString(bytes))
+
+        assertContentEquals(json, decoded)
+    }
+
+    @Test
+    fun `a retained source is decoded without catalog resolution`() {
+        val source = "(assert false)".encodeToByteArray()
+        val compressed = ByteArrayOutputStream()
+        GZIPOutputStream(compressed).use { it.write(source) }
+
+        val bytes = PolynomialPhaseProfile.capturedSource(Base64.getEncoder().encodeToString(compressed.toByteArray()))
+
+        assertContentEquals(source, bytes)
+    }
+
+    @Test
+    fun `retained source decompression respects the source byte limit`() {
+        val compressed = ByteArrayOutputStream()
+        GZIPOutputStream(compressed).use { it.write(ByteArray(1024 * 1024 + 1)) }
+
+        assertFailsWith<IllegalArgumentException> {
+            PolynomialPhaseProfile.capturedSource(Base64.getEncoder().encodeToString(compressed.toByteArray()))
+        }
+    }
+
+    @Test
+    fun `fixed integer completion retains its original coordinate map`() {
+        val source = "(declare-const i Int) (declare-const x Real) (assert (= (* x x) i))"
+
+        val trace = PolynomialPhaseProfile.PhaseAccess().measure(source, capture = true,
+            fixedIntegers = mapOf("i" to "2"))
+
+        assertEquals("Satisfiable", trace.result)
+        assertEquals("0", requireNotNull(trace.sourceCoordinates)["integer.i"])
+        assertEquals("2", requireNotNull(trace.failureCapture)["Scope"]?.get("condition.lower.0"))
+        assertEquals(trace.nativeWork, trace.chargeSum)
+    }
+
     @Test
     fun `pipeline dimensions distinguish declarations from product lowering coordinates`() {
         val source = "(declare-const x Real) (assert (= (* x x) 2))"
