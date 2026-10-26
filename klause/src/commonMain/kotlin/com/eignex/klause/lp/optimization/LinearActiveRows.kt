@@ -56,10 +56,12 @@ internal class LinearActiveRows(
         val resumed = pending?.takeIf { it.context.scope == branch.scope }
         val query = resumed ?: run {
             if (pending != null) invalidate()
-            val numeric = branch.activeNumericContext(cancellation) { work, allocation ->
+            val numeric = branch.activeNumericContext(cancellation,
+                maximumWork = budget.funding?.availableWork ?: 100_000L) { work, allocation ->
                 budget.observe(preparation = work)
                 budget.funding?.charge(0L, allocation)
-            } ?: return LinearActiveResult(captureDeclined = !cancellation())
+            } ?: return LinearActiveResult(paused = budget.funding?.paused == true,
+                captureDeclined = budget.funding?.paused != true && !cancellation())
             if (budget.funding?.paused == true) return LinearActiveResult(paused = true)
             val next = State(numeric.premises.mapValues { it.value.inequality }, condition.lower, condition.upper)
             if (next == state && finished) return LinearActiveResult(unchanged = true)
@@ -88,10 +90,13 @@ internal class LinearActiveRows(
             })
             val evidence = SourceEvidence(branch.scope, SourceClaim.Refutation, LinearActiveRefutation(proof))
             var work = 0L
+            val allowance = budget.funding?.availableWork ?: Long.MAX_VALUE
             val verdict = try {
                 SourceEvidenceVerifier(branch.withLinearAuthority()).verify(evidence, Cancellation {
-                    work++
-                    cancellation() || budget.funding?.paused == true
+                    if (work >= allowance) true else {
+                        work++
+                        cancellation()
+                    }
                 })
             } finally {
                 budget.observe(conflictCertification = work)
@@ -148,14 +153,21 @@ internal class LinearActiveRows(
 
 internal fun SourceProofContext.activeNumericContext(
     cancellation: Cancellation,
+    maximumWork: Long = 100_000L,
     onPreparation: (Long, Long) -> Unit = { _, _ -> },
 ): SourceProofContext? {
+    require(maximumWork >= 0L)
+    val allowance = minOf(100_000L, maximumWork)
     var work = 0L
     var allocation = 0L
     fun visit(size: Int = 1): Boolean {
-        work += size
         allocation += 128L * size
-        return work <= 100_000 && !cancellation()
+        if (size.toLong() > allowance - work) {
+            work = allowance
+            return false
+        }
+        work += size
+        return !cancellation()
     }
     fun scalar(value: BigFraction): Boolean {
         val numerator = value.num.magnitudeBitLength()

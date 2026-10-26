@@ -117,6 +117,22 @@ class LinearActiveRowsTest {
     }
 
     @Test
+    fun `partial preparation should pause within the remaining work grant`() {
+        val source = SourceProofContext(scope, setOf(real, bool), mapOf(
+            "conflict" to SourcePremise(SourceInequality(emptyMap(), BigFraction.MINUS_ONE)),
+        ), emptyMap())
+        val funding = SourceLpFunding(1L, 1024L).apply { grant(1L) }
+        val budget = SourceLpBudget(funding = funding)
+
+        val result = LinearActiveRows(source, budget).use { it.check(SourceCondition(), Cancellation.Never) }
+
+        assertTrue(result.paused)
+        assertNull(result.evidence)
+        assertEquals(1L, funding.spent)
+        assertEquals(0, budget.operations)
+    }
+
+    @Test
     fun `established Boolean terms should permit a refutation with unrelated open costs`() {
         val source = SourceProofContext(scope.copy(condition = SourceCondition(bools = mapOf(0 to true))),
             setOf(real, bool, open), mapOf(
