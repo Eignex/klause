@@ -51,13 +51,13 @@ import java.io.File
 import java.lang.management.ManagementFactory
 import java.util.Base64
 import kotlin.random.Random
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import kotlin.time.Duration.Companion.seconds
 
 internal object LocalSearchTrajectory {
     @JvmStatic
@@ -317,8 +317,11 @@ internal object LocalSearchTrajectory {
                             initial.seeding.ownerInt,
                         )
                         traceGreedy(initial, out.resolve("greedy-$rewrite.jsonl")) { position, slot ->
+                            val boundary = if (position == problem.numBoolVars + problem.numIntVars) {
+                                "greedy-complete-$rewrite"
+                            } else "greedy-before-$rewrite-$position"
                             observations += Observation(
-                                "greedy-before-$rewrite-$position", prepared.reconstruct(initial.assignment.snapshot()), slot,
+                                boundary, prepared.reconstruct(initial.assignment.snapshot()), slot,
                             )
                         }
                     }
