@@ -2,8 +2,8 @@ package com.eignex.klause.theory.qfnra
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
-import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
+import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
@@ -134,6 +134,7 @@ class PolynomialCellRefinementTest {
         }
         assertTrue(refinement.cells.isEmpty())
     }
+
     @Test
     fun `an optional degree decline preserves complete fallback`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (^ x 17) 1))")
@@ -174,6 +175,7 @@ class PolynomialCellRefinementTest {
         assertEquals(0L, result.stats.workSpent)
         assertTrue(query.checkedCells.isEmpty())
     }
+
     @Test
     fun `cancellation after a completed cell preserves only that completed certificate`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
@@ -189,6 +191,7 @@ class PolynomialCellRefinementTest {
         assertEquals(1, query.checkedCells.size)
         assertIs<PolynomialCellScope.Source>(query.checkedCells.single().scope)
     }
+
     @Test
     fun `statistics snapshots remain stable while the producer advances`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
@@ -202,5 +205,50 @@ class PolynomialCellRefinementTest {
 
         assertEquals(0L, before.work)
         assertTrue(refinement.stats.work > 0)
+    }
+
+    @Test
+    fun `a dense representation refusal publishes no checked cell`() {
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
+        val query = QfNraQuery(source.formula, 0, 1,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxDenseCoefficients = 2), cellRefinement = true),
+            PolynomialCondition())
+
+        var result: QfNraResult? = null
+        while (result == null) result = query.next()
+
+        assertEquals(QfNraReason.ResourceLimit, assertIs<QfNraResult.Unknown>(result).reason)
+        assertTrue(query.checkedCells.isEmpty())
+    }
+
+    @Test
+    fun `exhausting the cell allowance preserves fallback solving`() {
+        val declarations = (0..4).joinToString(" ") { "(declare-const x$it Real)" }
+        val predicates = (0..4).joinToString(" ") { "(> x$it 0)" }
+        val source = SmtLibPolynomial.parse("$declarations (assert (and $predicates))")
+        val query = QfNraQuery(source.formula, 0, 5, QfNraParams(cellRefinement = true), PolynomialCondition())
+
+        var result: QfNraResult? = null
+        while (result == null) result = query.next()
+
+        assertIs<QfNraResult.Satisfiable>(result)
+        assertEquals(8, query.checkedCells.size)
+    }
+
+    @Test
+    fun `conditioned retries retain the containing invocation work ceiling`() {
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
+        val service = PolynomialTheoryService(source.formula, 0, 1)
+        val required = service.invocation(QfNraParams(cellRefinement = true)).use {
+            assertIs<QfNraResult.Satisfiable>(it.check()).stats.workSpent
+        }
+        service.invocation(QfNraParams(maximumWork = required + 1, cellRefinement = true)).use { invocation ->
+            assertIs<QfNraResult.Satisfiable>(invocation.check())
+
+            val result = invocation.check(PolynomialCondition(lower = mapOf(0 to BigFraction.ZERO)))
+
+            assertEquals(QfNraReason.WorkLimit, assertIs<QfNraResult.Unknown>(result).reason)
+            assertEquals(required + 1, invocation.stats.workSpent)
+        }
     }
 }
