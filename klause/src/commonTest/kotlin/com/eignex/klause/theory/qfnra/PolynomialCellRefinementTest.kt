@@ -136,7 +136,7 @@ class PolynomialCellRefinementTest {
     }
     @Test
     fun `an optional degree decline preserves complete fallback`() {
-        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (^ x 17) 0))")
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (^ x 17) 1))")
         val query = QfNraQuery(source.formula, 0, 1, QfNraParams(cellRefinement = true), PolynomialCondition())
 
         var result: QfNraResult? = null

@@ -125,7 +125,7 @@ internal object PolynomialPhaseProfile {
             }
             if (options["refinement"] == "both") {
                 directory.resolve("control-trace.json").writeText(Json.encodeToString(
-                    access.measure(text, maximumWork, timeoutMs, prepared = preparedMode,
+                    access.measure(text, maximumWork, timeoutMs, prepared = preparedMode, capture = capture,
                         fixedIntegers = source.fixedIntegers)))
             }
             if (options["capture"] == "both") {
@@ -459,10 +459,13 @@ internal object PolynomialPhaseProfile {
                 partialConflictPremises = conflictPremises, partialConflictPreview = conflictPreview,
                 partialConflictPreviewComplete = conflictPreviewComplete,
                 checkedCells = if (refinement) {
-                    (queryType.getMethod("getCheckedCells").invoke(owner) as List<*>).map { cellTrace(requireNotNull(it)) }
+                    (queryType.getMethod("getCheckedCells").invoke(owner) as List<*>).map {
+                        cellTrace(requireNotNull(it))
+                    }
                 } else null,
                 cellRefinement = queryType.getMethod("getCellStats").invoke(owner)?.let { value ->
-                    listOf("Candidates", "CheckedCells", "RepeatedCandidates", "RepairedCoordinates", "Declined", "Work")
+                    listOf("Candidates", "CheckedCells", "RepeatedCandidates",
+                        "RepairedCoordinates", "Declined", "Work")
                         .associateWith { value.javaClass.getMethod("get$it").invoke(value).toString() }
                 },
                 sourceCoordinates = names,
