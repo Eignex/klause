@@ -42,9 +42,11 @@ internal object ChannelViewApplicability {
             directory.resolve("source.xml").writeBytes(bytes)
             val stop = Cancellation.after(30.seconds)
             val started = System.nanoTime()
+            println("source $index: ${input.getValue("problem").jsonPrimitive.content}, ${bytes.size} original bytes")
             val parsed = Xcsp3.parse(bytes.decodeToString(), recoveryCancellation = stop)
             val problem = parsed.problem
             val hints = parsed.definitionHints
+            println("source $index: ${problem.numIntVars} integers, ${problem.numBoolVars} Booleans, ${problem.numFactors} factors")
             val maintained = DefinitionalSweep.fromSource(problem, hints, stop)
             val network = maintained?.network(problem.numIntVars, problem.numBoolVars)
             directory.resolve("applicability.json").writeText(buildJsonObject {
@@ -80,6 +82,7 @@ internal object ChannelViewApplicability {
                 put("workingProjection", false)
                 put("sourceVerdictClaim", false)
             }.toString())
+            println("source $index: ${maintained?.size ?: 0} admitted source definitions, cancelled=${stop()}")
         }
     }
 }

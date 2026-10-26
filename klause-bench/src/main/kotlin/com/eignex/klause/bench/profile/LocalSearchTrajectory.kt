@@ -89,6 +89,7 @@ internal object LocalSearchTrajectory {
         require(parsed.sense == ObjectiveSense.MINIMIZE)
         val channel = options["channel"]?.let { ChannelView.valueOf(it) }
         require(channel != null || objective != null)
+        val engine = if (channel == null) FiniteEngine.MIXED else FiniteEngine.LOCAL_SEARCH
         val variants = if (channel == null) listOf(
             ViewSpec("false", false, ChannelView.Maintained), ViewSpec("true", true, ChannelView.Maintained),
         ) else listOf(ViewSpec("maintained", false, ChannelView.Maintained), ViewSpec(channel.name, false, channel))
@@ -128,6 +129,7 @@ internal object LocalSearchTrajectory {
             put("os", System.getProperty("os.name"))
             put("architecture", System.getProperty("os.arch"))
             put("channel", channel?.name)
+            put("preparationEngine", engine.name)
             put("objectiveTreatment", when {
                 objective == null -> "none"
                 channel == null -> "protected versus substituted"
@@ -149,11 +151,11 @@ internal object LocalSearchTrajectory {
                 if (parsed.definedVars.isEmpty()) SourceAttachment(parsed.problem, parsed.definitionHints)
                 else SourceAttachment(parsed.problem, parsed.definedVars, emptyList(), parsed.definitionHints),
                 if (objective == null) ExecutionOperation.SATISFY else ExecutionOperation.OPTIMIZE,
-                FiniteEngine.MIXED, objective = objective, cancellation = stop,
+                engine, objective = objective, cancellation = stop,
             ))
             val plan = requireNotNull(invocation.preparedPlan)
             val prepared = FinitePipeline.prepare(FinitePipelineRequest(
-                requireNotNull(plan.model), FiniteEngine.MIXED, objective,
+                requireNotNull(plan.model), engine, objective,
                 cancellation = stop, solveCancellation = stop, presolveBudget = PresolveBudget(1_375_000_000L),
                 presolveConfig = if (initial == null) PresolveConfig.DEFAULT else PresolveConfig.NONE,
                 preparedPlan = plan, transformObjective = variant.transformObjective, randomSeed = seed,
