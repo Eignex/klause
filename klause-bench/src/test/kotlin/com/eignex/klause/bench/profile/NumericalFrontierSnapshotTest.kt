@@ -65,6 +65,16 @@ class NumericalFrontierSnapshotTest {
     }
 
     @Test
+    fun `selection inspection should distinguish its stop from journal retention limits`() {
+        val snapshot = NumericalSelectionSnapshot(Cancellation { true })
+
+        val capture = snapshot.capture(snapshot.journal())
+
+        assertEquals("true", capture.getValue("inspectionStopped").jsonPrimitive.content)
+        assertEquals("false", capture.getValue("limited").jsonPrimitive.content)
+    }
+
+    @Test
     fun `a captured bound should retain its checked scope and original objective units`() {
         val snapshot = NumericalFrontierSnapshot(context, Cancellation.Never, BigFraction.ofLong(2))
 
