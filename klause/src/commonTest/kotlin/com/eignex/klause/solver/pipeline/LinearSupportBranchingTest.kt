@@ -42,6 +42,23 @@ class LinearSupportBranchingTest {
     }
 
     @Test
+    fun `equal support scores should retain source order rather than coordinate identifiers`() {
+        val funding = SourceLpFunding(1_000L, 10_000L).apply { grant(1_000L) }
+        val branching = LinearSupportBranching(funding)
+        val tiedPoint = linkedMapOf(y to BigFraction.ofLong(2).reciprocal(), x to BigFraction.ofLong(2).reciprocal())
+        val tiedRow = SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ONE), BigFraction.ONE)
+        val context = SourceProofContext(source.scope, source.coordinates,
+            mapOf("row" to SourcePremise(tiedRow)), emptyMap())
+        val tied = query.copy(context = context, numeric = context, point = tiedPoint,
+            cuts = listOf(cut.copy(inequality = tiedRow)))
+
+        val selected = branching.select(SourceNumericalFeedbackResult.Available(tied, null),
+            tiedPoint.toList(), Cancellation.Never)
+
+        assertEquals(y to tiedPoint.getValue(y), selected)
+    }
+
+    @Test
     fun `uninstalled inactive unchecked and slack cuts should preserve source order`() {
         val funding = SourceLpFunding(1_000L, 10_000L).apply { grant(1_000L) }
         val branching = LinearSupportBranching(funding)
