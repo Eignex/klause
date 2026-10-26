@@ -4,6 +4,8 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceInequality
+import com.eignex.klause.solver.evidence.SourceRoundingLimit
+import com.eignex.klause.solver.evidence.mixedIntegerRounding
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.Cancellation
@@ -158,6 +160,8 @@ internal object LinearAuthorityAggregateCuts {
         terms: List<LinearAuthorityAggregateTerm>, cancellation: Cancellation,
         observe: (String, Long) -> Unit = { _, _ -> },
         limits: LinearAuthorityAggregateLimits = LinearAuthorityAggregateLimits(),
+        allowMixed: Boolean = false,
+        continuousBounds: Map<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm> = emptyMap(),
     ): LinearAuthorityCut? {
         val meter = AggregateMeter(limits, cancellation, observe)
         observe("AggregateAttempts", 1L)
@@ -166,7 +170,7 @@ internal object LinearAuthorityAggregateCuts {
             if (terms.size !in 2..limits.rows) stopAggregate("RowLimit")
             meter.reserve(terms.size.toLong(), terms.size * 128L)
             val identityCharacters = terms.sumOf { it.premise.length.toLong() }
-            val proofBytes = identityCharacters * 2L + terms.size * (128L + (limits.scalarBits + 7L) / 4L)
+            var proofBytes = identityCharacters * 2L + terms.size * (128L + (limits.scalarBits + 7L) / 4L)
             if (proofBytes > limits.proofBytes) stopAggregate("ProofLimit")
             meter.reserve(identityCharacters, proofBytes)
             if (terms.any { it.owner < 0 || it.premise.isBlank() } ||
@@ -193,22 +197,24 @@ internal object LinearAuthorityAggregateCuts {
                 strict = strict || term.inequality.strict
             }
             val activity = coefficients.filterValues { !it.isZero }
-            if (activity.isEmpty()) {
+            val integerValues = activity.filterKeys { it.kind == SourceCoordinate.Kind.Integer }.values
+            if (integerValues.isEmpty()) {
                 observe("AggregateNoIntegerActivity", 1L)
                 return null
             }
-            if (activity.keys.any { it.kind != SourceCoordinate.Kind.Integer }) {
+            val mixed = activity.keys.any { it.kind == SourceCoordinate.Kind.Real }
+            if (mixed && !allowMixed) {
                 observe("AggregateContinuousResidual", 1L)
                 return null
             }
             var denominator = BIG_ONE
-            for (value in activity.values) {
+            for (value in integerValues) {
                 meter.arithmetic(BigFraction.of(denominator, BIG_ONE), value)
                 denominator = denominator / denominator.gcd(value.den) * value.den
                 meter.number(BigFraction.of(denominator, BIG_ONE))
             }
             var divisor = BIG_ZERO
-            for (value in activity.values) {
+            for (value in integerValues) {
                 meter.arithmetic(BigFraction.of(denominator, BIG_ONE), value)
                 val integral = value.num * (denominator / value.den)
                 meter.number(BigFraction.of(integral, BIG_ONE))
@@ -218,6 +224,50 @@ internal object LinearAuthorityAggregateCuts {
             val scale = meter.number(BigFraction.of(denominator, divisor))
             val normalized = activity.mapValues { (_, value) -> meter.multiply(value, scale) }
             val scaledRhs = meter.multiply(rhs, scale)
+            meter.reserve(terms.size.toLong() + normalized.size, terms.size * 128L + normalized.size * 64L)
+            val combination = SourceDerivation.Combination(terms.map {
+                SourceDerivation.Combination.Term(meter.multiply(it.weight, scale),
+                    SourceDerivation.Premise(it.premise))
+            })
+            if (mixed) {
+                val sides = normalized.filterKeys { it.kind == SourceCoordinate.Kind.Real }.map { (id, value) ->
+                    meter.reserve(1L)
+                    val preferred = id to (value > BigFraction.ZERO)
+                    val side = if (preferred in continuousBounds) preferred else id to (value < BigFraction.ZERO)
+                    val bound = continuousBounds[side] ?: stopAggregate("MissingBounds")
+                    val bytes = 128L + bound.premise.length * 2L + (limits.scalarBits + 7L) / 4L
+                    if (bytes > limits.proofBytes - proofBytes) stopAggregate("ProofLimit")
+                    proofBytes += bytes
+                    meter.reserve(bound.premise.length.toLong() + 1L, bytes)
+                    if (bound.owner < 0 || bound.premise.isBlank() || bound.weight != BigFraction.ONE ||
+                        bound.inequality.supportSize != 1) stopAggregate("BoundIdentity")
+                    val (coordinate, coefficient) = bound.inequality.coefficients.entries.single()
+                    if (coordinate != id || (coefficient > BigFraction.ZERO) != side.second) {
+                        stopAggregate("BoundIdentity")
+                    }
+                    meter.number(coefficient)
+                    meter.number(bound.inequality.rhs)
+                    bound
+                }
+                val conclusion = mixedIntegerRounding(SourceInequality(normalized, scaledRhs, strict),
+                    sides.map { it.inequality }, Cancellation { meter.reserve(1L); cancellation() }) { left, right ->
+                    meter.number(left)
+                    meter.number(right)
+                    meter.arithmetic(left, right)
+                }
+                if (conclusion == null) {
+                    observe("AggregateIntegralShiftedRhs", 1L)
+                    return null
+                }
+                for (value in conclusion.coefficients.values + conclusion.rhs) meter.number(value)
+                val proof = SourceDerivation.MixedIntegerRounding(combination,
+                    sides.map { SourceDerivation.Premise(it.premise) })
+                meter.reserve(1L)
+                observe("AggregateCandidates", 1L)
+                observe("AggregateMixedCandidates", 1L)
+                return LinearAuthorityCut(terms.first().owner, conclusion, proof, mixed = true,
+                    owners = (terms + sides).mapTo(linkedSetOf()) { it.owner })
+            }
             meter.reserve(1L + limits.scalarBits / 64L, 64L + limits.scalarBits / 4L)
             val rounded = meter.number(if (strict) {
                 BigFraction.of(scaledRhs.ceilInteger(), BIG_ONE) - BigFraction.ONE
@@ -226,17 +276,16 @@ internal object LinearAuthorityAggregateCuts {
                 observe("AggregateIntegralRhs", 1L)
                 return null
             }
-            meter.reserve(terms.size.toLong() + normalized.size, terms.size * 128L + normalized.size * 64L)
-            val proof = SourceDerivation.IntegerRounding(SourceDerivation.Combination(terms.map {
-                SourceDerivation.Combination.Term(meter.multiply(it.weight, scale),
-                    SourceDerivation.Premise(it.premise))
-            }))
+            val proof = SourceDerivation.IntegerRounding(combination)
             meter.reserve(1L)
             observe("AggregateCandidates", 1L)
             LinearAuthorityCut(terms.first().owner, SourceInequality(normalized, rounded), proof,
                 owners = terms.mapTo(linkedSetOf()) { it.owner })
         } catch (stop: AggregateStop) {
             observe("Aggregate${stop.reason}", 1L)
+            null
+        } catch (_: SourceRoundingLimit) {
+            observe("AggregateScalarLimit", 1L)
             null
         }
     }
