@@ -54,7 +54,9 @@ internal object RepairOwnerReplay {
     fun replay(
         controls: File, problem: BakedProblem, objective: LinearObjective, prepared: FinitePipelinePreparation,
         source: BakedProblem, inputs: IntArray, file: File, seed: Long, allowance: Long = 100_000L,
+        fragmentAllowance: Long = 2_000L,
     ) {
+        require(allowance > 0 && fragmentAllowance > 0)
         val scopeOwner = Class.forName("com.eignex.klause.meta.alns.RepairScope").getField("INSTANCE").get(null)
         val freedType = Class.forName("com.eignex.klause.meta.alns.FreedVars")
         require(controls.length() in 0..4L * 1024 * 1024)
@@ -123,7 +125,9 @@ internal object RepairOwnerReplay {
                 }
                 try {
                     for (scope in scopes) {
-                        val stop = lifetime or Cancellation.after(2000.milliseconds)
+                        val fragmentStart = budget.spent
+                        val funded = Cancellation { budget.spent - fragmentStart >= fragmentAllowance }
+                        val stop = lifetime or Cancellation.after(2000.milliseconds) or funded
                         activeStop = stop
                         activeCenter = scope.center
                         val looser = previousCutoff?.let { scope.cutoff > it } == true
@@ -146,7 +150,7 @@ internal object RepairOwnerReplay {
                                 "exact cutoff is not representable by the retained CP double contract"
                             else -> null
                         }
-                        val outcome = when {
+                        val nativeOutcome = when {
                             stop() -> Outcome(null, stopped(stop), before)
                             budget.exhausted() -> Outcome(null, TerminationReason.BudgetExhausted, before)
                             unavailable != null -> Outcome(null, TerminationReason.Unsupported, before)
@@ -181,6 +185,8 @@ internal object RepairOwnerReplay {
                                     ?: Outcome(null, TerminationReason.Unsupported, SolveStats.EMPTY, preparation)
                             }
                         }
+                        val outcome = if (funded()) nativeOutcome.copy(reason = TerminationReason.BudgetExhausted)
+                            else nativeOutcome
                         if (native != null && kind.endsWith("cold")) {
                             if (kind == "mixed-cold") {
                                 accountMixed(native)
@@ -201,7 +207,7 @@ internal object RepairOwnerReplay {
                                 it in scope.freedInts || sample.exactIntValue(it) == scope.center.exactIntValue(it)
                             })
                         }
-                        val checked = sample?.let { checkSource(source, prepared.reconstruct(it), stop) }
+                        val checked = sample?.let { checkSource(source, prepared.reconstruct(it), lifetime) }
                         val improving = sample != null && checked == true &&
                             objective.evaluateExact(sample) < scope.cutoff
                         val status = when {
@@ -221,6 +227,7 @@ internal object RepairOwnerReplay {
                             put("epoch", epoch)
                             put("status", status)
                             put("reason", outcome.reason?.toString())
+                            put("nativeReason", nativeOutcome.reason?.toString())
                             put("completion", outcome.reason?.toString() ?: if (sample != null) "point" else "paused")
                             put("unavailable", unavailable)
                             put("strictWorkingCutoff", scope.cutoff.toString())
@@ -253,6 +260,9 @@ internal object RepairOwnerReplay {
                             put("independentWitnessCheck", false)
                             put("containingAllowance", allowance)
                             put("containingSpent", budget.spent)
+                            put("fragmentAllowance", fragmentAllowance)
+                            put("fragmentSpent", budget.spent - fragmentStart)
+                            put("workCurrency", "NodeBudget decision equivalents; native counters are separate")
                             put("elapsedNs", elapsed)
                             put("threadBytes", allocation)
                             put("preparationNs", outcome.preparationNs)

@@ -1435,7 +1435,9 @@ the saved center, effective working freedoms, complement pins and strict exact
 center-objective cutoff; real snapshots without exact authority and CP cutoffs
 outside its exact binary64 contract are unavailable. No domain is invented and
 mixed admission retains all rows or declines the overlap. Each owner sequence has
-100,000 containing instructions and ten seconds, with two seconds per fragment;
+100,000 containing `NodeBudget` decision equivalents and ten seconds, with two
+seconds and 2,000 decision equivalents per fragment. `ownerWork` and
+`ownerFragmentWork` select the containing and per-fragment work allowances;
 both mixed sequences share the same cumulative LP work/allocation/check limits.
 Looser cutoffs start a fresh retained epoch. Reports separate outcomes, scoped
 closure, source acceptance, CP nodes, LS moves, LP work, preparation, thread
