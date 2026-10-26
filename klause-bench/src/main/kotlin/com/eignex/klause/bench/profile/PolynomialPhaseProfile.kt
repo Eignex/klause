@@ -10,8 +10,8 @@ import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRealProblem
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.localsearch.LocalSearchParams
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution

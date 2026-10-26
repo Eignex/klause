@@ -332,11 +332,12 @@ internal class QfNraQuery(
                         val required = equations.filter { arithmetic.step(); it in family }
                         val exclusions = nonzero.filter { arithmetic.step(); it in family }
                         failureCapture?.operation("projection", progress.searchSnapshot, progress.regions,
-                            work.spentWork, arithmetic, selected)
+                            work.spentWork, arithmetic, selected, zeroes = required, nonzero = exclusions,
+                            completeFamily = complete)
                         val pending = PolynomialProjection.prepare(selected, realCount, arithmetic,
                             required, order, nonzeroPolynomials = exclusions, onElimination = { variable, operands, root ->
                                 failureCapture?.operation("elimination", progress.searchSnapshot, progress.regions,
-                                    work.spentWork, arithmetic, operands, variable, root)
+                                    work.spentWork, arithmetic, operands, variable, root, completeFamily = complete)
                                 projectionObserver?.invoke(variable, operands, root)
                             },
                             onRootSection = {
@@ -356,7 +357,7 @@ internal class QfNraQuery(
                             Long.MAX_VALUE - work.projectedPolynomials)
                         yield(null)
                         failureCapture?.operation("lifting", progress.searchSnapshot, progress.regions,
-                            work.spentWork, arithmetic, selected)
+                            work.spentWork, arithmetic, selected, completeFamily = complete)
                         val assignment = searchCells(activeFormula, activeRegion, projection, boolCount,
                             arithmetic, algebraic, work, fixed, if (complete) null else family,
                             failureCapture, progress.searchSnapshot)

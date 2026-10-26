@@ -37,12 +37,16 @@ internal class PolynomialFailureCapture {
     }
 
     private fun capture(arithmetic: PolynomialArithmetic, block: FailureWriter.() -> Unit): Map<String, String> {
-        interruptedCapture = true
         val writer = FailureWriter(arithmetic) { if (completedCopySteps < Long.MAX_VALUE) completedCopySteps++ }
-        writer.block()
-        val result = writer.finish()
-        interruptedCapture = false
-        return result
+        var completed = false
+        try {
+            writer.block()
+            val result = writer.finish()
+            completed = true
+            return result
+        } finally {
+            if (!completed) interruptedCapture = true
+        }
     }
 
     fun context(
@@ -90,12 +94,16 @@ internal class PolynomialFailureCapture {
         operands: List<Polynomial> = emptyList(),
         variable: Int? = null,
         required: Polynomial? = null,
+        zeroes: List<Polynomial> = emptyList(),
+        nonzero: List<Polynomial> = emptyList(),
+        completeFamily: Boolean? = null,
     ) {
         operation = capture(arithmetic) {
             put("stage", stage)
             put("snapshot", snapshot.toString())
             put("region", region.toString())
             put("work", work.toString())
+            completeFamily?.let { put("completeFamily", it.toString()) }
             variable?.let { put("variable", it.toString()) }
             put("operandCount", operands.size.toString())
             for ((index, polynomial) in operands.withIndex()) {
@@ -103,6 +111,14 @@ internal class PolynomialFailureCapture {
                 polynomial("operand.$index", polynomial)
             }
             required?.let { polynomial("requiredZero", it) }
+            for ((index, polynomial) in zeroes.withIndex()) {
+                if (exhausted) break
+                polynomial("zero.$index", polynomial)
+            }
+            for ((index, polynomial) in nonzero.withIndex()) {
+                if (exhausted) break
+                polynomial("nonzero.$index", polynomial)
+            }
         }
     }
 

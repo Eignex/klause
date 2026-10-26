@@ -1,20 +1,20 @@
 package com.eignex.klause.theory.qfnra
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
+import com.eignex.klause.arithmetic.polynomial.Monomial
 import com.eignex.klause.arithmetic.polynomial.Polynomial
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
-import com.eignex.klause.arithmetic.polynomial.PolynomialTerm
-import com.eignex.klause.arithmetic.polynomial.Monomial
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
+import com.eignex.klause.arithmetic.polynomial.PolynomialTerm
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.simplex.exact.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import kotlin.test.assertFailsWith
 
 class PolynomialFailureCaptureTest {
     @Test
