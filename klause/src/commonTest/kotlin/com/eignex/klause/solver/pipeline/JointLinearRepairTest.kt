@@ -28,6 +28,26 @@ import kotlin.test.assertTrue
 
 class JointLinearRepairTest {
     @Test
+    fun `an unconsumed improving ray should not report conditioned exhaustion`() {
+        val model = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(-1.0))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap(), BigFraction.MINUS_ONE)
+        JointLinearRepair(model, source, objective, TheoryParams(), boundOrdered = true).use { repair ->
+            var attempt = repair.attempt(condition, Cancellation.Never)
+            repeat(64) {
+                if (attempt.result == ExactNeighborhoodResult.Paused) {
+                    attempt = repair.attempt(condition, Cancellation.Never)
+                }
+            }
+
+            assertEquals(ExactNeighborhoodResult.Undecided, attempt.result)
+            assertEquals(TerminationReason.Unsupported, attempt.reason)
+        }
+    }
+
+    @Test
     fun `attempt should distinguish a slice pause from lifetime budget exhaustion`() {
         val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
             factors = emptyArray())
