@@ -319,8 +319,10 @@ class LinearAuthorityAggregateCutsTest {
         val quarter = BigFraction.ofLong(4).reciprocal()
         val point = mapOf(x to quarter * BigFraction.ofLong(3), y to quarter * BigFraction.ofLong(3),
             real to quarter * BigFraction.ofLong(6))
-        val rows = listOf(LinearAuthorityAggregateTerm(0, "left", left), LinearAuthorityAggregateTerm(1, "right", right))
-        for (limits in listOf(LinearAuthorityAggregateLimits(work = 1), LinearAuthorityAggregateLimits(allocation = 1))) {
+        val rows = listOf(LinearAuthorityAggregateTerm(0, "left", left),
+            LinearAuthorityAggregateTerm(1, "right", right))
+        for (limits in listOf(LinearAuthorityAggregateLimits(work = 1),
+            LinearAuthorityAggregateLimits(allocation = 1))) {
             val result = LinearAuthorityAggregateCuts.inspectPairs(rows, emptySet(), point, Cancellation.Never,
                 limits = limits)
 
