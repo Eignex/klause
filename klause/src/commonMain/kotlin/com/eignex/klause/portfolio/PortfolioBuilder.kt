@@ -112,7 +112,7 @@ object PortfolioBuilder {
         }.toSet()
         val views = if (strategies.isEmpty()) null else sourceHints?.invoke(strategies)
         val selectedSweep = views?.sweep ?: definitionalSweep
-        val selectedObjective = views?.objective ?: lsObjective
+        val selectedObjective: IncrementalObjective? = null
         val count = maxOf(configs.size, scenario.cores)
         val deferCore = scenario.cores == 1 && scenario.engine == EngineMix.MIXED &&
             scenario.btPool == null && configs.any { it is BacktrackWorkerConfig }
