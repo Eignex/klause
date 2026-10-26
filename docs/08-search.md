@@ -56,8 +56,10 @@ An opt-in sparse source consultation checks fully established active rows before
 Boolean completion, using a zero objective. A source-checked contradiction closes
 the current coverage leaf through ordinary traversal. Unchanged active rows and
 numeric restrictions skip repeated numerical work; changed or retracted states
-invalidate pending queries. Feasible partial points supply no model or bound, so
-complete queries remain required. Preparation, numerical work and source checking
+invalidate pending queries. Completed no-conflict consultation keys can survive
+retraction and numerical-owner release; they retain no point or proof. Feasible
+partial points supply no model or bound, so complete queries remain required.
+Preparation, numerical work and source checking
 share the containing cumulative source LP allowances.
 
 A model policy can pause required completion with `SearchModelDisposition.Pause`.

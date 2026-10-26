@@ -68,6 +68,13 @@ class LinearActiveRowsTest {
             assertNull(first.evidence)
             assertTrue(second.unchanged)
             assertEquals(operations, budget.operations)
+            it.release()
+            it.retract()
+
+            val restored = it.check(SourceCondition(), Cancellation.Never)
+
+            assertTrue(restored.unchanged)
+            assertEquals(operations, budget.operations)
         }
     }
 
@@ -207,6 +214,19 @@ class LinearActiveRowsTest {
 
             assertEquals(expected, checked == SourceEvidenceCheck.Checked)
         }
+    }
+
+    @Test
+    fun `a feasible active row should not establish a bound on unresolved Boolean costs`() {
+        val source = SourceProofContext(scope, setOf(real, bool), mapOf(
+            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ), mapOf(bool to BigFraction.ONE))
+        val evidence = SourceEvidence(scope, SourceClaim.Bound(BigFraction.ZERO),
+            LinearActiveRefutation(SourceDerivation.Premise("lower")))
+
+        val checked = SourceEvidenceVerifier(source.withLinearAuthority()).verify(evidence)
+
+        assertIs<SourceEvidenceCheck.Rejected>(checked)
     }
 
     @Test

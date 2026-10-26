@@ -65,7 +65,9 @@ internal object MpsProofFrontier {
         val probe = options["probe"]?.toBooleanStrict() ?: false
         val historyEnabled = options["history"]?.toBooleanStrict() ?: false
         val frontierEnabled = options["frontier"]?.toBooleanStrict() ?: false
-        val activeRows = options["activeRows"]?.toBooleanStrict() ?: false
+        val activeOption = options["activeRows"] ?: "false"
+        require(activeOption in setOf("false", "true", "compare"))
+        val activeRows = activeOption == "true"
         val exact = options.getValue("exact").toBooleanStrict()
         val selected = Catalog.uncapped(options.getValue("suite")).problems
             .single { it.name == options.getValue("problem") }
@@ -100,6 +102,21 @@ internal object MpsProofFrontier {
         val linear = checkNotNull(field(prepared, "linearSource"))
         val view = checkNotNull(field(linear, "view"))
         val scale = field(view, "objectiveScale") as BigFraction
+        if (activeOption == "compare") {
+            require(!probe && !historyEnabled)
+            Reports.writeJson(out.resolve("active-source.json").path, buildJsonObject {
+                put("suite", options.getValue("suite"))
+                put("problem", selected.name)
+                put("originalSourceSha256", sha256(bytes))
+                put("sourceSemantics", original.semantics.toString())
+                put("exactRequested", exact)
+                put("objectiveScale", scale.toString())
+                put("claimsCoverTolerance", field(linear, "claimsCoverTolerance") as Boolean)
+            })
+            NumericalActiveRowsControls.compare(out, selected.name, context, params, frontierEnabled,
+                sourceKind = "original-mps-native-authority")
+            return
+        }
         val system = NumericalFrontierSnapshot.system(context)
         Reports.writeJson(out.resolve("native-system.json").path, system)
         val invocation = NumericalFrontierSnapshot.open(context, params, historyEnabled, frontierEnabled, activeRows)

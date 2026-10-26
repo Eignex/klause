@@ -166,7 +166,7 @@ internal class LinearAuthorityTraversal(
     }
 
     override fun retract(decisionLevel: Int) {
-        activeRows?.invalidate()
+        activeRows?.retract()
         while (path.last().first > decisionLevel) path.removeAt(path.lastIndex)
     }
 
@@ -197,7 +197,7 @@ internal class LinearAuthorityTraversal(
             }
             return SearchNodeDisposition.Expand
         }
-        activeRows?.close()
+        activeRows?.release()
         if (inheritBounds && current.result == null && current.split == null && closeInheritedBound()) {
             return SearchNodeDisposition.Prune
         }

@@ -4003,6 +4003,9 @@ alternate arm order, preserving the exact source JSON/hash, objective units, ful
 owner lifecycle time, decisions, complete checks and separate work counters. These
 controls establish native scope behavior and cost; they are neither ordinary MPS
 performance measurements nor independent proof checks.
+For an original MPS request, `activeRows=compare` applies the same paired lifecycle
+comparison to one shared prepared source context. Original bytes/hash, effective
+semantics, objective scale and tolerance coverage accompany the native results.
 Optional `frontier=true` selects bound-ordered traversal and retained sparse
 guidance. Wider contexts use the sparse preparation policy rather than the small
 exact-primal admission; unresolved alternatives retain the same capture checks.
