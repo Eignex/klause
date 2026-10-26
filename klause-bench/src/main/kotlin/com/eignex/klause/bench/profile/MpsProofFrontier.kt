@@ -54,7 +54,8 @@ internal object MpsProofFrontier {
         }
         require(Runtime.getRuntime().availableProcessors() == 1)
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
-        val supported = setOf("suite", "problem", "sha256", "exact", "probe", "history", "frontier", "cuts")
+        val supported = setOf("suite", "problem", "sha256", "exact", "probe", "history", "frontier", "cuts",
+            "selection", "replay")
         require(options.keys.containsAll(setOf("suite", "problem", "sha256", "exact")) &&
             (options.keys - supported).isEmpty())
         val probe = options["probe"]?.toBooleanStrict() ?: false
@@ -96,6 +97,8 @@ internal object MpsProofFrontier {
         val system = NumericalFrontierSnapshot.system(context)
         Reports.writeJson(out.resolve("native-system.json").path, system)
         val invocation = NumericalFrontierSnapshot.open(context, params, historyEnabled, frontierEnabled)
+        val selection = NumericalSelectionSnapshot(Cancellation.after(30.seconds))
+        val journal = if (options["selection"]?.toBooleanStrict() == true) selection.attach(invocation) else null
         val history = ArrayList<JsonObject>()
         out.resolve("incumbents.jsonl").writeText("")
         out.resolve("bounds.jsonl").writeText("")
@@ -144,6 +147,15 @@ internal object MpsProofFrontier {
             val snapshot = NumericalFrontierSnapshot(context, captureStop, scale)
             val frontier = snapshot.capture(invocation)
             Reports.writeJson(out.resolve("cuts.json").path, snapshot.cuts(invocation))
+            if (journal != null) {
+                Reports.writeJson(out.resolve("selection.json").path, selection.capture(journal))
+                if (options["replay"]?.toBooleanStrict() == true) {
+                    out.resolve("selection-replays.jsonl").writeText("")
+                    NumericalSelectionSnapshot(Cancellation.after(10.seconds)).replay(journal) {
+                        out.resolve("selection-replays.jsonl").appendText(it.toString() + "\n")
+                    }
+                }
+            }
             val terminal = field(result, "terminal") as SourceEvidence?
             val work = stats(invocation).smt.sourceLp
             Reports.writeJson(out.resolve("frontier.json").path, buildJsonObject {

@@ -27,13 +27,16 @@ internal class LinearAuthorityQuery private constructor(
     val cuts: Boolean,
     val activeCuts: Int,
     val activeMixedCuts: Int,
+    val cutMask: Set<Int>?,
+    val checkedCuts: Set<Int>,
 ) {
     val context: SourceProofContext = source.withLinearAuthority()
     val closureRows: List<ExactRationalInequality> = rows.map {
         ExactRationalInequality(it.columns, it.coefficients, it.rhs)
     }
 
-    fun matches(other: SourceProofContext, cuts: Boolean = false): Boolean = this.cuts == cuts && (source === other ||
+    fun matches(other: SourceProofContext, cuts: Boolean = false, cutMask: Set<Int>? = null): Boolean =
+        this.cuts == cuts && this.cutMask == cutMask && (source === other ||
         (source.scope == other.scope &&
             source.coordinates == other.coordinates &&
             source.premises == other.premises &&
@@ -46,6 +49,7 @@ internal class LinearAuthorityQuery private constructor(
             source: SourceProofContext, template: LinearAuthorityTemplate?, cancellation: Cancellation,
             maximumCutProofSteps: Int = 100_000,
             onCutWork: (Long) -> Unit = {},
+            cutMask: Set<Int>? = null,
         ): LinearAuthorityQuery? {
             val coordinates = template?.coordinates ?: source.numericCoordinates()
             val numeric = template?.numeric ?: source.numericContext()
@@ -88,7 +92,7 @@ internal class LinearAuthorityQuery private constructor(
                 .mapTo(HashSet()) { active[it] }
             for ((id, cut) in cuts.withIndex()) {
                 if (cancellation()) return null
-                if (id in accepted) {
+                if (id in accepted && (cutMask == null || id in cutMask)) {
                     activeCuts++
                     if (cut.mixed) activeMixedCuts++
                 } else inactive += cited.size
@@ -107,7 +111,8 @@ internal class LinearAuthorityQuery private constructor(
                 else BigFraction.MINUS_ONE
             val costs = coordinates.map { sign * (numeric.objective[it] ?: BigFraction.ZERO) }
             return LinearAuthorityQuery(source, coordinates, cited, rows, inactive, unconditional && inactive.isEmpty(),
-                costs, numeric.objectiveConstant * sign, sign, template?.cuts != null, activeCuts, activeMixedCuts)
+                costs, numeric.objectiveConstant * sign, sign, template?.cuts != null, activeCuts, activeMixedCuts,
+                cutMask?.toSet(), accepted.toSet())
         }
     }
 }

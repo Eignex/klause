@@ -678,3 +678,18 @@ diagnostics.
 ---
 
 Previous: [16. Nonlinear arithmetic](16-nonlinear-arithmetic.md) · [Contents](README.md) · Next: [18. Exact arithmetic](18-exact-arithmetic.md)
+
+Internal numerical selection observations retain completed query scopes, exact
+relaxation coordinates before primal recovery, cited rows and the generating cut
+mask. Candidate violations use those coordinates, including satisfied installed
+cuts. An explicit empty mask prepares and checks candidates without inserting
+them. Changing a mask revokes the query's admission and cursor through the ordinary
+active-row compatibility checks. Source guards and integer pins are checked for
+every query; candidate scoring supplies no proof authority.
+
+The optional observer has separate record, entry, modeled byte and cancellation
+allowances. It retains immutable source values and derivations, never a numerical
+owner or live workspace. Incomplete capture and unavailable points remain unknown.
+Observing performs no solve. Explicit replay creates a fresh owner with separate
+cumulative work, allocation, operation and cancellation allowances; it rechecks
+source derivations and cannot publish deductions into the original traversal.

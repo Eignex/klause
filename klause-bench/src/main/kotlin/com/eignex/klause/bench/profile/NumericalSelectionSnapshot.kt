@@ -1,0 +1,174 @@
+package com.eignex.klause.bench.profile
+
+import com.eignex.klause.bench.profile.NumericalFrontierSnapshot.Companion.coefficients
+import com.eignex.klause.bench.profile.NumericalFrontierSnapshot.Companion.field
+import com.eignex.klause.bench.profile.NumericalFrontierSnapshot.Companion.scope
+import com.eignex.klause.bench.profile.NumericalFrontierSnapshot.Companion.system
+import com.eignex.klause.lp.optimization.LinearPinnedObjective
+import com.eignex.klause.lp.optimization.LinearPinnedRefutation
+import com.eignex.klause.lp.optimization.LinearAuthoritySemantics
+import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.evidence.SourceClaim
+import com.eignex.klause.solver.evidence.SourceCoordinate
+import com.eignex.klause.solver.evidence.SourceDerivation
+import com.eignex.klause.solver.evidence.SourceEvidence
+import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
+import com.eignex.klause.solver.evidence.SourceInequality
+import com.eignex.klause.solver.evidence.SourceProofContext
+import com.eignex.klause.solver.evidence.SourceScope
+import com.eignex.klause.util.Cancellation
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+
+internal class NumericalSelectionSnapshot(private val stop: Cancellation) {
+    fun attach(invocation: Any): Any {
+        val type = Class.forName("com.eignex.klause.lp.optimization.LinearAuthorityCapture")
+        val journal = type.getDeclaredConstructor(Int::class.javaPrimitiveType, Long::class.javaPrimitiveType,
+            Long::class.javaPrimitiveType, Cancellation::class.java).newInstance(64, 1_000_000L, 16_777_216L, stop)
+        val authority = checkNotNull(field(checkNotNull(field(invocation, "component")), "authority"))
+        authority.javaClass.getDeclaredField("capture").apply { isAccessible = true }.set(authority, journal)
+        return journal
+    }
+
+    fun capture(journal: Any): JsonObject = buildJsonObject {
+        put("maximumRecords", 64)
+        put("maximumEntries", 1_000_000L)
+        put("maximumModeledBytes", 16_777_216L)
+        put("attempted", field(journal, "attempted") as Long)
+        put("entries", field(journal, "entries") as Long)
+        put("modeledBytes", field(journal, "bytes") as Long)
+        put("limited", field(journal, "limited") as Boolean)
+        put("independentProofCheck", false)
+        put("records", buildJsonArray { records(journal).forEach { if (!stop()) add(query(it)) } })
+    }
+
+    fun replay(journal: Any, emit: (JsonObject) -> Unit) {
+        val type = Class.forName("com.eignex.klause.lp.optimization.LinearAuthorityReplay")
+        val instance = type.getField("INSTANCE").get(null)
+        val run = type.declaredMethods.single { it.name == "run" }
+        for (record in records(journal).take(4)) {
+            if (stop()) return
+            if (field(record, "point") == null) continue
+            val all = rows(record).indices.toSet()
+            for ((name, mask) in listOf("disabled" to emptySet(), "all" to all)) {
+                if (stop()) return
+                val replay = run.invoke(instance, record, mask, 20_000_000L, 67_108_864L, stop)
+                emit(buildJsonObject {
+                    put("originalQuery", field(record, "id") as Int)
+                    put("mask", name)
+                    put("diagnosticOnly", true)
+                    put("maximumWork", 20_000_000L)
+                    put("maximumAllocation", 67_108_864L)
+                    put("maximumOperations", 1)
+                    put("operations", field(replay, "operations") as Int)
+                    put("work", field(replay, "work") as Long)
+                    put("allocation", field(replay, "allocation") as Long)
+                    put("stopped", field(replay, "stopped") as Boolean)
+                    field(replay, "query")?.let { put("query", query(it)) }
+                })
+            }
+        }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun records(journal: Any): List<Any> = field(journal, "retained") as List<Any>
+
+    @Suppress("UNCHECKED_CAST")
+    private fun rows(record: Any): List<Any> = field(record, "cuts") as List<Any>
+
+    @Suppress("UNCHECKED_CAST")
+    private fun query(record: Any): JsonObject {
+        val context = field(record, "context") as SourceProofContext
+        val numeric = field(record, "numeric") as SourceProofContext
+        return buildJsonObject {
+            put("id", field(record, "id") as Int)
+            put("state", field(record, "state") as String)
+            put("scope", scope(context.scope))
+            put("system", system(context))
+            put("numericSystem", system(numeric))
+            field(record, "parent")?.let { put("parent", scope(it as SourceScope)) }
+            put("incumbent", (field(record, "incumbent") as BigFraction?)?.toString())
+            val point = field(record, "point") as Map<SourceCoordinate, BigFraction>?
+            point?.let { put("point", coefficients(it)) }
+            put("inactiveRows", buildJsonArray {
+                (field(record, "inactive") as Set<Int>).sorted().forEach { add(JsonPrimitive(it)) }
+            })
+            put("rows", buildJsonArray {
+                (field(record, "cited") as List<Pair<SourceInequality, SourceDerivation>>).forEach {
+                    add(buildJsonObject {
+                        put("coefficients", coefficients(it.first.coefficients))
+                        put("rhs", it.first.rhs.toString())
+                        put("strict", it.first.strict)
+                        put("derivation", proof(it.second))
+                    })
+                }
+            })
+            put("eligibility", buildJsonObject {
+                (field(record, "eligibility") as Map<String, Long>).forEach { (key, value) -> put(key, value) }
+            })
+            put("cuts", buildJsonArray {
+                rows(record).forEach { cut -> add(buildJsonObject {
+                    val row = field(cut, "inequality") as SourceInequality
+                    val derivation = field(cut, "derivation") as SourceDerivation
+                    put("id", field(cut, "id") as Int)
+                    put("owner", field(cut, "owner") as Int)
+                    put("installed", field(cut, "installed") as Boolean)
+                    put("ownerActive", field(cut, "ownerActive") as Boolean)
+                    put("checkedAtQuery", field(cut, "checked") as Boolean)
+                    put("violation", (field(cut, "violation") as BigFraction?)?.toString())
+                    put("coefficients", coefficients(row.coefficients))
+                    put("rhs", row.rhs.toString())
+                    put("strict", row.strict)
+                    put("derivation", proof(derivation))
+                    put("freshNativeCheck", SourceEvidenceVerifier(numeric).verify(SourceEvidence(numeric.scope,
+                        SourceClaim.Consequence(row), derivation), stop).toString())
+                }) }
+            })
+            for (name in listOf("bound", "refutation", "siblingBound")) {
+                (field(record, name) as SourceEvidence?)?.let { evidence -> put(name, buildJsonObject {
+                    put("scope", scope(evidence.scope))
+                    put("claim", evidence.claim::class.simpleName)
+                    (evidence.claim as? SourceClaim.Bound)?.let { put("value", it.value.toString()) }
+                    put("derivation", proof(evidence.derivation))
+                    val originalScope = SourceProofContext(evidence.scope, context.coordinates, context.premises,
+                        context.objective, context.objectiveConstant, LinearAuthoritySemantics(context))
+                    put("freshNativeCheck", SourceEvidenceVerifier(originalScope)
+                        .verify(evidence, stop).toString())
+                }) }
+            }
+        }
+    }
+
+    private fun proof(value: SourceDerivation, depth: Int = 0): JsonObject {
+        require(depth < 64 && !stop())
+        return buildJsonObject {
+            put("kind", value::class.simpleName)
+            when (value) {
+                is SourceDerivation.Premise -> put("id", value.id)
+                is SourceDerivation.Assumption -> {
+                    put("coordinateKind", value.coordinate.kind.name)
+                    put("coordinate", value.coordinate.id)
+                    put("upper", value.upper)
+                }
+                is SourceDerivation.Combination -> put("terms", JsonArray(value.terms.map { term ->
+                    buildJsonObject {
+                        put("weight", term.weight.toString())
+                        put("derivation", proof(term.derivation, depth + 1))
+                    }
+                }))
+                is SourceDerivation.IntegerRounding -> put("row", proof(value.inequality, depth + 1))
+                is SourceDerivation.MixedIntegerRounding -> {
+                    put("row", proof(value.inequality, depth + 1))
+                    put("bounds", JsonArray(value.bounds.map { proof(it, depth + 1) }))
+                }
+                is LinearPinnedObjective -> put("bound", proof(value.bound, depth + 1))
+                is LinearPinnedRefutation -> put("conflict", proof(value.conflict, depth + 1))
+                else -> error("unsupported captured numerical derivation")
+            }
+        }
+    }
+}
