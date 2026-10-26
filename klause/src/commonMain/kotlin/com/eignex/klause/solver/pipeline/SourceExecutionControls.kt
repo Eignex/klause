@@ -181,6 +181,8 @@ internal fun bindSourceExecutionControls(
             reader.defaulted(ExecutionOption.niaCandidates, defaults.maximumCandidates) ?: Long.MAX_VALUE,
             reader.defaulted(ExecutionOption.niaMoves, defaults.maximumMoves) ?: Long.MAX_VALUE,
             budget,
+            reader.defaulted(ExecutionOption.niaCellRefinement, defaults.cellRefinement),
+            reader.defaulted(ExecutionOption.niaCellReuse, defaults.reuseSourceCells),
         )
     } else {
         null

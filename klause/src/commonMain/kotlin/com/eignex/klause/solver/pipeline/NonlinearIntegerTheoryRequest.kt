@@ -17,6 +17,7 @@ import com.eignex.klause.solver.result.RunStats
 import com.eignex.klause.solver.result.SearchStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.theory.qfnia.NonlinearIntegerCellStats
 import com.eignex.klause.theory.qfnia.NonlinearIntegerCursor
 import com.eignex.klause.theory.qfnia.NonlinearIntegerParams
 import com.eignex.klause.theory.qfnia.NonlinearIntegerStrategy
@@ -58,9 +59,14 @@ data class NonlinearIntegerTheoryParams(
     val maximumMoves: Long = 256,
     /** Containing decision/move allowance, shared across every strategy. */
     val nodeBudget: NodeBudget? = null,
+    /** Enable bounded checked univariate cell production in polynomial completions. */
+    val cellRefinement: Boolean = false,
+    /** Filter fixed integer tuples using checked mandatory cells of the original source. */
+    val reuseSourceCells: Boolean = false,
 ) {
     init {
         require(maximumCandidates >= 0 && maximumMoves >= 0)
+        require(!reuseSourceCells || cellRefinement) { "integer cell reuse requires cell refinement" }
     }
 }
 
@@ -113,6 +119,12 @@ internal class NonlinearIntegerInvocation(
         private set
     private var searchStats = SolveStats.EMPTY
     val nativeStats: QfNraStats get() = native
+    private var completedCells = NonlinearIntegerCellStats()
+    private var retainedCells = NonlinearIntegerCellStats()
+    private var completedChecks = 0L
+    private var retainedChecks = 0L
+    internal val cellStats: NonlinearIntegerCellStats get() = completedCells + retainedCells
+    internal val completionChecks: Long get() = completedChecks + retainedChecks
     private val external = polynomial.timeout or polynomial.cancellation
     private val stop = external or Cancellation {
         polynomial.maximumWork?.let { native.workSpent >= it } == true || resource != null ||
@@ -208,6 +220,7 @@ internal class NonlinearIntegerInvocation(
                 native.dyadicPreExtractionDeclines,
             ),
             resource,
+            integerCells = cellReuseStats(params, listOf(this)),
         )
     }
 
@@ -255,22 +268,21 @@ internal class NonlinearIntegerInvocation(
         private val cursor = NonlinearIntegerCursor(
             source,
             NonlinearIntegerParams(
-            arithmetic = QfNraParams(
-                stop, polynomial.maximumWork,
-                PolynomialLimits(
-                polynomial.maximumDenseCoefficients,
-                polynomial.maximumMatrixCells,
-            )
+                arithmetic = QfNraParams(
+                    stop, polynomial.maximumWork,
+                    PolynomialLimits(polynomial.maximumDenseCoefficients, polynomial.maximumMatrixCells),
+                    cellRefinement = params.cellRefinement,
+                ),
+                maximumCandidates = minOf(
+                    params.maximumCandidates,
+                    polynomial.strategy.backtrack.maxDecisions,
+                    polynomial.strategy.backtrack.maxInstructions ?: Long.MAX_VALUE,
+                ),
+                strategy = NonlinearIntegerStrategy.SEARCH,
+                seed = slot.seed,
+                reuseSourceCells = params.reuseSourceCells,
             ),
-            maximumCandidates = minOf(
-                params.maximumCandidates,
-                polynomial.strategy.backtrack.maxDecisions,
-                polynomial.strategy.backtrack.maxInstructions ?: Long.MAX_VALUE,
-            ),
-            strategy = NonlinearIntegerStrategy.SEARCH,
-            seed = slot.seed,
-        ),
-            pins
+            pins,
         )
         private val slice: SliceBudget = SliceBudget({
             sum(cursor.stats.candidates, cursor.stats.polynomial.workSpent)
@@ -289,6 +301,8 @@ internal class NonlinearIntegerInvocation(
             val cap = minOf(offered, nodeBudget?.allowance?.decisionsLeft() ?: Long.MAX_VALUE)
             val checked = cursor.runSlice(segment, cap)
             native = cursor.stats.polynomial
+            retainedCells = cursor.stats.cells
+            retainedChecks = cursor.stats.checks
             searchStats = searchStats.copy(search = SearchStats(nodes = SumResult(cursor.stats.candidates.toDouble())))
             var charged = cursor.stats.candidates - before
             while (charged > 0) {
@@ -370,27 +384,28 @@ internal class NonlinearIntegerInvocation(
         val execution = solveNonlinearIntegers(
             source,
             NonlinearIntegerParams(
-            arithmetic = QfNraParams(
-                stop or cancellation, remaining,
-                PolynomialLimits(
-                polynomial.maximumDenseCoefficients,
-                polynomial.maximumMatrixCells,
-            )
-            ),
-            maximumCandidates = cap,
-            strategy = if (heuristic && source.integerCoordinates.count {
-                    condition.lower[it] == null || condition.lower[it] != condition.upper[it]
-                } > 1
-            ) {
+                arithmetic = QfNraParams(
+                    stop or cancellation, remaining,
+                    PolynomialLimits(polynomial.maximumDenseCoefficients, polynomial.maximumMatrixCells),
+                    cellRefinement = params.cellRefinement,
+                ),
+                maximumCandidates = cap,
+                strategy = if (heuristic && source.integerCoordinates.count {
+                        condition.lower[it] == null || condition.lower[it] != condition.upper[it]
+                    } > 1
+                ) {
                     NonlinearIntegerStrategy.LOCAL_SEARCH
                 } else {
                     NonlinearIntegerStrategy.SEARCH
                 },
-            seed = polynomial.strategy.backtrack.randomSeed ?: 1L,
-        ),
-            condition
+                seed = polynomial.strategy.backtrack.randomSeed ?: 1L,
+                reuseSourceCells = params.reuseSourceCells,
+            ),
+            condition,
         )
         val observed = execution.stats.polynomial
+        completedCells += execution.stats.cells
+        completedChecks += execution.stats.checks
         native = QfNraStats(
             sum(native.projectedPolynomials, observed.projectedPolynomials),
             sum(native.liftedCells, observed.liftedCells),

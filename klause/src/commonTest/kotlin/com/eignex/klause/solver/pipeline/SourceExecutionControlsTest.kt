@@ -276,6 +276,22 @@ class SourceExecutionControlsTest {
     }
 
     @Test
+    fun `nonlinear cell controls should retain independent producer and consumer switches`() {
+        for (reuse in listOf(false, true)) {
+            val options = ExecutionOptions.parse(listOf("nia-cell-refinement=true", "nia-cell-reuse=$reuse"))
+            val invocation = SourceSetup.prepare(SourceSetupRequest(
+                SmtLib.parse("(declare-const x Int) (assert (= (* x x) 2))").source,
+                ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+            ))
+
+            val params = assertNotNull(SourceExecutionRequest(invocation, options).nonlinearInteger)
+
+            assertTrue(params.cellRefinement)
+            assertEquals(reuse, params.reuseSourceCells)
+        }
+    }
+
+    @Test
     fun `polynomial finite workers should share one generic node allowance`() {
         val options = ExecutionOptions.parse(listOf("node-limit=7"))
 

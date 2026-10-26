@@ -86,6 +86,7 @@ internal class NonlinearIntegerPortfolio(
             is SolveResult.Unknown -> OpenTheoryResult.Unknown(if (polynomial.timeout()) TerminationReason.Timeout
                 else if (polynomial.cancellation()) TerminationReason.Cancelled else result.reason, result.stats)
         }
-        return PolynomialTheoryExecution(published, scope.polynomialStats, workers.firstNotNullOfOrNull { it.resource })
+        return PolynomialTheoryExecution(published, scope.polynomialStats, workers.firstNotNullOfOrNull { it.resource },
+            integerCells = cellReuseStats(params, workers))
     }
 }

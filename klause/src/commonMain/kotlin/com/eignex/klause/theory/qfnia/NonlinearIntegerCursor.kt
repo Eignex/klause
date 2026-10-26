@@ -41,8 +41,10 @@ internal class NonlinearIntegerCursor(
     private var terminal: QfNraResult? = null
     private val work = NonlinearIntegerWork(params.arithmetic)
     private val arithmetic = PolynomialArithmetic(work, params.arithmetic.polynomialLimits)
+    private val cells = NonlinearIntegerCells(problem.formula, problem.integerCoordinates, arithmetic)
     private val invocation = PolynomialTheoryService(problem.formula, problem.boolCount, problem.numericCount)
         .invocation(params.arithmetic.copy(cancellation = work, maximumWork = null))
+        .also { if (params.arithmetic.cellRefinement) it.checkedCellObserver = cells::retain }
     private val random = Random(params.seed)
     private val coordinates = problem.integerCoordinates
     private var current = List(coordinates.size) { BIG_ZERO }
@@ -57,7 +59,7 @@ internal class NonlinearIntegerCursor(
     private var representationDecline: QfNraResult.Unknown? = null
 
     val stats: NonlinearIntegerStats get() =
-        NonlinearIntegerStats(candidates, moves, repairs, invocation.queries, polynomialStats())
+        NonlinearIntegerStats(candidates, moves, repairs, invocation.queries, polynomialStats(), cells.stats)
     val isDone: Boolean get() = terminal != null
 
     fun runSlice(
@@ -136,6 +138,8 @@ internal class NonlinearIntegerCursor(
     override fun close() {
         if (closed) return
         invocation.close()
+        invocation.checkedCellObserver = null
+        cells.clear()
         visited.clear()
         hints = emptyList()
         enumeration = emptyList()
@@ -154,6 +158,7 @@ internal class NonlinearIntegerCursor(
                 condition.lower[id]?.let { value < it } == true || condition.upper[id]?.let { value > it } == true
             }
         ) return null
+        if (params.reuseSourceCells && cells.excludes(current, AlgebraicArithmetic(arithmetic))) return null
         val fixed = coordinates.indices.associate { coordinates[it] to BigFraction.of(current[it], BIG_ONE) }
         return when (val result = completion(fixed)) {
             is QfNraResult.Satisfiable -> {

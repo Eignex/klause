@@ -122,7 +122,7 @@ has its own work currency, separate from `node-limit`:
 |---|---|---|
 | Open linear | `open-work-limit`, `open-branching`, `open-hint-flips`, `open-hint-min-splits` | [Linear arithmetic](15-linear-arithmetic.md) |
 | Polynomial real | `nra-work-limit`, `nra-dense-coefficients`, `nra-matrix-cells` | [Polynomial completion](16-nonlinear-arithmetic.md#polynomial-real-arithmetic) |
-| Nonlinear integer | `nia-candidates`, `nia-moves`, plus the polynomial limits | [Integer candidates](16-nonlinear-arithmetic.md#nonlinear-integer-arithmetic) |
+| Nonlinear integer | `nia-candidates`, `nia-moves`, `nia-cell-refinement`, `nia-cell-reuse`, plus the polynomial limits | [Integer candidates](16-nonlinear-arithmetic.md#nonlinear-integer-arithmetic) |
 | Quadratic optimization | the polynomial limits; open integers also use `nia-*` | [Quadratic execution](16-nonlinear-arithmetic.md#quadratic-strategy-execution) |
 | Transcendental | `nra-*` limits and shared exact-satisfaction controls | [Function checks](16-nonlinear-arithmetic.md#transcendental-real-arithmetic) |
 
@@ -133,6 +133,16 @@ apply. Exhausted candidates or work yield UNKNOWN; LS and ALNS keep checked incu
 and neighborhood exhaustion supplies no global claim.
 
 ### Statistics
+
+For controlled nonlinear integer comparisons, `nia-cell-refinement=true` enables
+checked univariate production and `nia-cell-reuse=true` filters fixed tuples with
+source-scoped cells. Both default to false; reuse requires the producer. With the
+producer enabled, statistics include `niaCellProducer`, `niaCellReuse`,
+`niaCellObserved`, `niaCellRetained`, `niaCellDeclined`, `niaExcludedTuples`,
+`niaRepeatedSupports` and `niaCompletionChecks`. Excluded tuples were unvisited and
+inside the current numeric window; each avoids one fixed completion. Completion
+checks also include initial relaxations and real repair queries. Counts sum across
+private cursors and do not establish cross-cursor support identity.
 
 Complete-search value guidance reports `valueSupportOrders`, `valueProbeOrders`,
 `valueProbes`, `valueProbeRefutations`, `valueProbeWork` and `valueProbeCappedOrders`

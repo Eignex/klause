@@ -157,6 +157,12 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** Nonlinear integer heuristic moves; null means unlimited. */
         val niaMoves: ExecutionOption<Long?> = ExecutionOption("nia-moves", ValueKind.ALLOWANCE)
 
+        /** Bounded checked univariate producer for nonlinear integer completions. */
+        val niaCellRefinement: ExecutionOption<Boolean> = ExecutionOption("nia-cell-refinement", ValueKind.BOOLEAN)
+
+        /** Reuse source-scoped cells to filter unvisited fixed integer tuples. */
+        val niaCellReuse: ExecutionOption<Boolean> = ExecutionOption("nia-cell-reuse", ValueKind.BOOLEAN)
+
         /** Native heuristic proposal cap. */
         val maxFlips: ExecutionOption<Long> = ExecutionOption("max-flips", ValueKind.LONG)
 
@@ -380,6 +386,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 presolveProbePerVar, presolveProbeTotal,
                 nodeLimit, openWorkLimit, sourceLpWorkLimit, sourceLpAllocationLimit, sourceLpOperations, sourceCuts,
                 nraWorkLimit, nraDenseCoefficients, nraMatrixCells, niaCandidates, niaMoves,
+                niaCellRefinement, niaCellReuse,
                 maxFlips, maxInstructions, alnsIterations, sharedRestart, openBranching,
                 openHintFlips, openHintMinSplits,
                 maxDecisions, luby, adaptiveRestart, emaRestart, modeSwitchingRestart,
