@@ -50,6 +50,15 @@ Repair handles are a separate internal contract. Their cutoff must be monotone
 non-increasing because retained objective-bound clauses survive fragment reseeding;
 session push/pop always starts a fresh search.
 
+A retained repair starts an explicit fragment and advances it in slices. Its
+best improving sample and stop reason are independent: a missing reason means a
+pause, `SearchExhausted` closes only the current pins and cutoff, and cancellation,
+budget exhaustion or unavailable completion prove no closure. A slice cancellation
+can resume; the fragment's lifetime cancellation remains terminal until another
+fragment starts. Starting a sibling retires the old trail and slice while retaining
+compatible learned clauses and LP state. Closing releases both, and terminal
+observations remain readable.
+
 ## Counting and sampling
 
 Counting builds an isolated conditioned model: integer domains carry the scope's

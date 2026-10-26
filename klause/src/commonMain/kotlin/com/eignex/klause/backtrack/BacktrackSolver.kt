@@ -135,6 +135,7 @@ class BacktrackSolver internal constructor(
         val handleCancellation = object : Cancellation {
             override fun isCancelled(): Boolean = activeCancellation()
             override fun deadline(): ComparableTimeMark? = activeCancellation.deadline()
+            override fun workMeter() = activeCancellation.workMeter()
         }
         val handle = ResumableMinimize(
             this,
@@ -149,6 +150,7 @@ class BacktrackSolver internal constructor(
             private var best: Sample? = null
             private var terminal: RepairSearchStep? = null
             override val stats: SolveStats get() = handle.stats
+            override val work: Long get() = handle.work
 
             override fun begin(
                 assumptions: Assumptions,
