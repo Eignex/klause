@@ -246,8 +246,10 @@ object LocalSearchCatalog {
     }
 
     /** Every arm label across both kinds (COP is the superset), for validation and error messages. */
-    fun labels(): List<String> = catalog.labels(copOrder) + listOf("maintained", "values", "predicates", "channels", "inverse")
-        .flatMap { mode -> listOf("cbls/fixed", "cbls-implicit/fixed").map { "experiment-channel/$mode/$it" } }
+    fun labels(): List<String> = catalog.labels(copOrder) +
+        listOf("maintained", "values", "predicates", "channels", "inverse").flatMap { mode ->
+            listOf("cbls/fixed", "cbls-implicit/fixed").map { "experiment-channel/$mode/$it" }
+        }
 
     /** Every arm label for [kind], in credit order — for enumerating the pool by name. */
     fun labels(kind: Kind): List<String> = catalog.labels(rankedArms(kind))
