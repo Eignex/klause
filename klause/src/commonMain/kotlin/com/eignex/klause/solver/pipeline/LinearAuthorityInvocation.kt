@@ -97,7 +97,8 @@ internal class LinearAuthorityInvocation(
         { incumbent?.let { sample -> value?.let { sample to it } } }, useBranchHistory, borrowedAuthority,
         useGuidance = boundOrdered || guidance || supportBranching || onNumericalFeedback != null,
         inheritBounds = boundOrdered, useCuts = cuts,
-        useActiveRows = activeRows, useSupportBranching = supportBranching,
+        useActiveRows = activeRows, useRefutationReuse = params.sourceRefutationReuse,
+        useSupportBranching = supportBranching,
         onNumericalFeedback = onNumericalFeedback)
     private val session = SearchComponentSet(listOf(component)).session(params.maxLeaves, stop).also {
         it.bindOpenTheoryWork(state.work)

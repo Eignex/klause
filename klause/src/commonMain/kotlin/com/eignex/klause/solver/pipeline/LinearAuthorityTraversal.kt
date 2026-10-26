@@ -47,6 +47,7 @@ internal class LinearAuthorityTraversal(
     private val inheritBounds: Boolean = false,
     private val useCuts: Boolean = true,
     useActiveRows: Boolean = false,
+    useRefutationReuse: Boolean = false,
     useSupportBranching: Boolean = false,
     private val onNumericalFeedback: ((SourceNumericalFeedbackResult) -> Unit)? = null,
 ) : SearchBrancher, SearchBranchProposal, SearchNodePolicy, AutoCloseable {
@@ -68,6 +69,7 @@ internal class LinearAuthorityTraversal(
     }, retainLp = true)
     private val initialCutObservations = authority.cutObservations()
     private val activeRows = if (useActiveRows) LinearActiveRows(source, budget) else null
+    private val refutations = if (useRefutationReuse) LinearRefutationReuse(source, budget, cancellation) else null
     private val feedback = if (useSupportBranching || onNumericalFeedback != null) {
         SourceNumericalFeedback(requireNotNull(budget.funding), cancellation).also { it.attach(authority) }
     } else null
@@ -82,6 +84,7 @@ internal class LinearAuthorityTraversal(
     override fun close() {
         activeRows?.close()
         feedback?.detach(authority)
+        refutations?.clear()
         if (ownsAuthority) authority.close()
     }
     private val root = CoverageNode(source.scope.condition)
@@ -111,7 +114,7 @@ internal class LinearAuthorityTraversal(
         "numericalFeedbackUnavailable" to it.unavailable) } ?: emptyMap()) +
         (supportBranching?.let { mapOf("numericalSupportConsultations" to it.consultations,
             "numericalSupportSelections" to it.selections, "numericalSupportFallbacks" to it.fallbacks) }
-            ?: emptyMap())
+            ?: emptyMap()) + refutations?.observations().orEmpty()
 
     private fun observe(stage: String) {
         observations[stage] = (observations[stage] ?: 0L) + 1L
@@ -252,6 +255,17 @@ internal class LinearAuthorityTraversal(
                 else -> SearchNodeDisposition.Indeterminate
             }
         }
+        if (!current.pending && current.split == null) {
+            refutations?.find(current.condition)?.let { evidence ->
+                current.result = LinearAuthorityResult(evidence = evidence)
+                pending--
+                observe("numericalClosedLeaves")
+                observe("numericalAvoidedQueries")
+                return SearchNodeDisposition.Prune
+            }
+        }
+        if (cancellation()) return SearchNodeDisposition.Indeterminate
+        if (pause()) return SearchNodeDisposition.Pause
         if (!current.pending && !context.consumeCheck()) return SearchNodeDisposition.Indeterminate
         val branch = if (queriedNode === current) checkNotNull(queriedSource) else
             source.atScope(source.scope.copy(condition = current.condition)).also {
@@ -276,6 +290,7 @@ internal class LinearAuthorityTraversal(
         val numericalFeedback = feedback?.consume(branch)?.also { onNumericalFeedback?.invoke(it) }
         current.result = if (result.primalStages.isEmpty()) result else result.copy(primalStages = emptyMap())
         observe("numericalChecks")
+        result.evidence?.takeIf { it.claim == SourceClaim.Refutation }?.let { refutations?.retain(it) }
         if (result.coordinateConflict) observe("numericalCoordinateConflicts")
         if (result.lpConflict) observe("numericalLpConflicts")
         if (result.bound != null) {

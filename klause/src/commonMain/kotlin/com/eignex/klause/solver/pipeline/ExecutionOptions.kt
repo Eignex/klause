@@ -131,7 +131,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** Cumulative source LP work, including preparation, numerical advances and certificates. */
         val sourceLpWorkLimit: ExecutionOption<Long?> = ExecutionOption("source-lp-work-limit", ValueKind.ALLOWANCE)
 
-        /** Cumulative sparse preparation and modeled retained coverage allocation in bytes. */
+        /** Cumulative source preparation, proof replay and modeled retained coverage allocation in bytes. */
         val sourceLpAllocationLimit: ExecutionOption<Long?> =
             ExecutionOption("source-lp-allocation-limit", ValueKind.ALLOWANCE)
 
@@ -140,6 +140,10 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
 
         /** Checked numerical source-row separation control. */
         val sourceCuts: ExecutionOption<Boolean> = ExecutionOption("source-cuts", ValueKind.BOOLEAN)
+
+        /** Invocation-local checked numerical refutation reuse control. */
+        val sourceRefutationReuse: ExecutionOption<Boolean> =
+            ExecutionOption("source-refutation-reuse", ValueKind.BOOLEAN)
 
         /** Native polynomial or function arithmetic work; null means unlimited. */
         val nraWorkLimit: ExecutionOption<Long?> = ExecutionOption("nra-work-limit", ValueKind.ALLOWANCE)
@@ -385,6 +389,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 dryRunPresolve, affinePivotOrder, presolveAbortFraction, presolveMaxRounds,
                 presolveProbePerVar, presolveProbeTotal,
                 nodeLimit, openWorkLimit, sourceLpWorkLimit, sourceLpAllocationLimit, sourceLpOperations, sourceCuts,
+                sourceRefutationReuse,
                 nraWorkLimit, nraDenseCoefficients, nraMatrixCells, niaCandidates, niaMoves,
                 niaCellRefinement, niaCellReuse,
                 maxFlips, maxInstructions, alnsIterations, sharedRestart, openBranching,
