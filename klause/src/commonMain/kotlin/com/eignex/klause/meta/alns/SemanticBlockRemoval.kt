@@ -222,6 +222,7 @@ internal class SemanticBlockRemoval(
                 for (index in factor.starts.indices) {
                     work.charge()
                     if (factor.starts[index] in inputs ||
+                        factor.capacityVar in inputs ||
                         factor.durationVars.getOrNull(index)?.let { it in inputs } == true ||
                         factor.resourceVars.getOrNull(index)?.let { it in inputs } == true ||
                         factor.presents.getOrNull(index)?.let { Lit.variable(it) in boolInputs } == true
