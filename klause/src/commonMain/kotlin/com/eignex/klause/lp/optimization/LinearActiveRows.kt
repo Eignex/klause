@@ -16,6 +16,7 @@ import com.eignex.klause.solver.evidence.SourcePremise
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.integerPinBounds
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.magnitudeBitLength
 
 internal class LinearActiveRefutation(val conflict: SourceDerivation) : SourceDerivation.Extension
 
@@ -134,33 +135,60 @@ internal fun SourceProofContext.activeNumericContext(
         allocation += 128L * size
         return work <= 100_000 && !cancellation()
     }
+    fun scalar(value: BigFraction): Boolean {
+        val numerator = value.num.magnitudeBitLength()
+        val denominator = value.den.magnitudeBitLength()
+        allocation += 64L + (numerator.toLong() + denominator + 7L) / 8L
+        return numerator <= 4096 && denominator <= 4096
+    }
     try {
         val condition = scope.condition
+        val booleans = condition.bools
+        val lower = condition.lower
+        val upper = condition.upper
         val rows = linkedMapOf<String, SourcePremise>()
-        val coordinates = coordinates
-        if (!visit(coordinates.size + condition.bools.size + condition.lower.size + condition.upper.size)) return null
+        val coordinates = this.coordinates
+        if (!visit(coordinates.size + booleans.size + lower.size + upper.size)) return null
+        for (bound in lower.values + upper.values) {
+            if (!visit() || !scalar(bound)) return null
+        }
+        val premises = this.premises
+        if (!visit(premises.size)) return null
         for ((id, premise) in premises) {
             if (!visit(1 + premise.guards.size + premise.integerPins.size)) return null
-            if (premise.guards.any { (bool, value) -> condition.bools[bool] != value }) continue
+            if (premise.guards.any { (bool, value) -> booleans[bool] != value }) continue
+            if (!scalar(premise.inequality.rhs) || !premise.integerPins.values.all(::scalar)) return null
             val coefficients = linkedMapOf<SourceCoordinate, BigFraction>()
             var offset = BigFraction.ZERO
             var established = true
             for ((coordinate, coefficient) in premise.inequality.coefficients) {
-                if (!visit()) return null
+                if (!visit() || !scalar(coefficient)) return null
                 if (coordinate.kind == SourceCoordinate.Kind.Boolean) {
-                    val value = condition.bools[coordinate.id]
-                    if (value == null) established = false else if (value) offset += coefficient
+                    val value = booleans[coordinate.id]
+                    if (value == null) established = false else if (value) {
+                        offset += coefficient
+                        if (!scalar(offset)) return null
+                    }
                 } else coefficients[coordinate] = coefficient
             }
-            if (established) rows[id] = SourcePremise(SourceInequality(coefficients,
-                premise.inequality.rhs - offset, premise.inequality.strict), premise.guards, premise.integerPins)
+            if (established) {
+                val rhs = premise.inequality.rhs - offset
+                if (!scalar(rhs)) return null
+                rows[id] = SourcePremise(SourceInequality(coefficients, rhs, premise.inequality.strict),
+                    premise.guards, premise.integerPins)
+            }
         }
         val numeric = SourceProofContext(scope, coordinates, rows, emptyMap(), semantics = semantics)
         val bounds = numeric.integerPinBounds(condition, cancellation) ?: return null
-        val active = rows.filterValues { premise ->
-            premise.integerPins.isEmpty() || bounds.status(premise.integerPins) == IntegerPinStatus.Established
+        val active = linkedMapOf<String, SourcePremise>()
+        for ((id, premise) in rows) {
+            if (!visit()) return null
+            if (premise.integerPins.isEmpty() || bounds.status(premise.integerPins) == IntegerPinStatus.Established) {
+                active[id] = premise
+            }
         }
-        return if (cancellation()) null else SourceProofContext(scope, coordinates, active, emptyMap(), semantics = semantics)
+        return if (cancellation()) null else
+            SourceProofContext(scope, coordinates, active, emptyMap(), semantics = semantics)
     } finally {
         onPreparation(work, allocation)
     }

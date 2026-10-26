@@ -3874,6 +3874,12 @@ Boolean completion. It is a feasibility-only opt-in under the same cumulative
 source LP limits; partial checks, unchanged-state skips, pauses and checked
 conflicts have separate `numericalPartial` counters. Partial points give neither
 incumbents nor objective bounds. Complete-check counts remain separate.
+`activeControls=true` instead runs seven self-authored native exact-affine controls
+with delayed and active-row consultations. One warmup and three measured rounds
+alternate arm order, preserving the exact source JSON/hash, objective units, full
+owner lifecycle time, decisions, complete checks and separate work counters. These
+controls establish native scope behavior and cost; they are neither ordinary MPS
+performance measurements nor independent proof checks.
 Optional `frontier=true` selects bound-ordered traversal and retained sparse
 guidance. Wider contexts use the sparse preparation policy rather than the small
 exact-primal admission; unresolved alternatives retain the same capture checks.

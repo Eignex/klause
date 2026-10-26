@@ -2,8 +2,8 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lp.SourceLpBudget
-import com.eignex.klause.lp.optimization.LinearApproach
 import com.eignex.klause.lp.optimization.LinearActiveRows
+import com.eignex.klause.lp.optimization.LinearApproach
 import com.eignex.klause.lp.optimization.LinearAuthority
 import com.eignex.klause.lp.optimization.LinearAuthorityCapture
 import com.eignex.klause.lp.optimization.LinearAuthorityResult

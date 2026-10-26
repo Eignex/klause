@@ -53,6 +53,10 @@ internal object MpsProofFrontier {
             return
         }
         require(Runtime.getRuntime().availableProcessors() == 1)
+        if (args.contentEquals(arrayOf("activeControls=true"))) {
+            NumericalActiveRowsControls.run(out)
+            return
+        }
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val supported = setOf("suite", "problem", "sha256", "exact", "probe", "history", "frontier", "cuts",
             "selection", "replay", "operations", "activeRows")

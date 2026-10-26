@@ -629,6 +629,16 @@ Admission applies the existing dimension, entry and scalar limits to the working
 matrix, objective and selected sides; every published claim still checks against
 the complete source context.
 
+The internal active-row consultation uses a zero objective and a separately
+checked partial-scope refutation. Source scanning admits at most 100,000 visits
+and 4,096-bit input and Boolean-substitution rationals; incomplete capture declines.
+Boolean substitution precedes independent integer-pin admission. Sparse closure
+conflicts use the existing exact certificate lift; small strict systems can use
+the exact strict-feasibility operation. Preparation, modeled allocation and
+verification debit the traversal's cumulative source allowance. Retraction revokes
+pending numerical work, and feasible partial systems leave complete checking in
+charge of witnesses and optimization.
+
 `OpenTheoryPipeline.optimizeLinear` runs a complete affine context in the shared
 search session. A branch optimum becomes global only after every required Boolean
 and integer alternative has a checked bound or refutation; an improving source ray
