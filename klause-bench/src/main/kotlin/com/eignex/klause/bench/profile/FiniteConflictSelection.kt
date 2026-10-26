@@ -12,6 +12,14 @@ import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.formats.xcsp3.Xcsp3
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.localsearch.DefinitionalSweep
+import com.eignex.klause.localsearch.CostShaping
+import com.eignex.klause.localsearch.LocalSearchParams
+import com.eignex.klause.localsearch.LocalSearchSolver
+import com.eignex.klause.localsearch.acceptance.AcceptanceRule
+import com.eignex.klause.localsearch.movesource.ConfiguredSource
+import com.eignex.klause.localsearch.movesource.ObjectiveSeed
+import com.eignex.klause.localsearch.strategy.FeasibleDescent
+import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
@@ -25,6 +33,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.pipeline.FinitePipelinePreparation
 import com.eignex.klause.util.Cancellation
 import com.sun.management.ThreadMXBean
 import java.io.File
@@ -41,6 +50,9 @@ import kotlinx.serialization.json.put
 internal object FiniteConflictSelection {
     private const val DECISIONS = 2000L
     private const val ACQUISITION_DECISIONS = 128L
+    private const val REPAIR_DECISIONS = 1000L
+    private const val DESCENT_MOVES = 128L
+    private const val DESCENT_RULE = "first source-coordinate greedy descent endpoint; seeded ties; no greedy init"
 
     @JvmStatic
     fun main(args: Array<String>) {
@@ -205,13 +217,31 @@ internal object FiniteConflictSelection {
                                 as Assumptions
                         }
                         val selectionNanos = System.nanoTime() - selectionStarted
-                        val remaining = (DECISIONS - allowance.spent).coerceAtLeast(0L)
+                        val remaining = minOf(REPAIR_DECISIONS, (DECISIONS - allowance.spent).coerceAtLeast(0L))
                         val result = if (matched && remaining > 0L && !stop()) {
                             BacktrackSolver(problem).minimize(objective, base.copy(
                                 assumptions = checkNotNull(pins), maxDecisions = remaining))
                         } else null
                         val repairSourceAccepted = result?.assignment?.let { checkSource(it, stop) }
                         check(repairSourceAccepted != false || stop())
+                        val improved = repairSourceAccepted == true && result?.assignment?.let {
+                            objective.evaluateExact(it) < objective.evaluateExact(center)
+                        } == true
+                        val exhausted = result != null && reason(result) == TerminationReason.SearchExhausted
+                        val descent = if (matched && !stop() && !allowance.exhausted()) {
+                            descend(problem, objective, result?.assignment ?: center, seed, sweep, stop, allowance,
+                                file.resolveSibling("descent-$arm-k$requestedCount.jsonl"))
+                        } else null
+                        val descentAccepted = descent?.let { checkSource(it.sample, stop) }
+                        check(descentAccepted != false || stop())
+                        val outcome = when {
+                            !matched -> "effective-count-mismatch"
+                            improved -> "checked-improvement"
+                            exhausted -> "no-improving-completion-under-pins-and-cutoff"
+                            stop() -> "cancelled"
+                            result == null -> "allowance-spent-before-repair"
+                            else -> "unfinished"
+                        }
                         val weights = guidanceType.methods.single { it.name == "weights" }
                             .invoke(guidance) as IntArray
                         writer.appendLine(buildJsonObject {
@@ -235,6 +265,8 @@ internal object FiniteConflictSelection {
                             put("captureAndSelectionVisits", get(guidance, "Visits") as Long)
                             put("supportWeightsBoolThenInt", JsonArray(weights.map(::JsonPrimitive)))
                             put("originScope", "same model, no assumptions, strict objective cutoff per attribution")
+                            put("branchPremisesAvailable", false)
+                            put("logicalConflictClaim", false)
                             put("initialQueryCutoff", get(guidance, "OriginCutoff") as Double?)
                             val attributions = guidanceType.methods.single { it.name == "attributions" }
                                 .invoke(guidance) as List<*>
@@ -266,7 +298,9 @@ internal object FiniteConflictSelection {
                             put("selectionAttempts", selectionAttempts)
                             put("remainingRepairDecisions", remaining)
                             put("repairNodes", result?.stats?.search?.nodes?.sum ?: 0.0)
-                            put("containingDecisions", DECISIONS)
+                            put("containingWork", DECISIONS)
+                            put("maxRepairDecisions", REPAIR_DECISIONS)
+                            put("maxDescentMoves", DESCENT_MOVES)
                             put("containingSeconds", 5)
                             put("totalWork", allowance.spent)
                             put("elapsedNanos", System.nanoTime() - started)
@@ -274,19 +308,29 @@ internal object FiniteConflictSelection {
                             put("cancelled", stop())
                             put("repairResult", result?.let { it::class.simpleName })
                             put("repairReason", reason(result)?.name)
-                            put("completedLocalExhaustion", result != null &&
-                                reason(result) == TerminationReason.SearchExhausted)
-                            put("strictImprovement", result?.assignment?.let {
-                                repairSourceAccepted == true &&
-                                    objective.evaluateExact(it) < objective.evaluateExact(center)
-                            } ?: false)
+                            put("repairOutcome", outcome)
+                            put("completedLocalExhaustion", exhausted)
+                            put("strictImprovement", improved)
                             result?.assignment?.let {
                                 put("repaired", sample(it))
                                 put("repairedObjective", objective.evaluateExact(it).toString())
                                 put("nativeSourceAccepted", repairSourceAccepted)
                             }
                             put("globalProofClaim", false)
-                            put("descentEndpointClassified", false)
+                            put("declaredDescentRule", DESCENT_RULE)
+                            put("descentEndpoint", descent?.endpoint)
+                            put("descentEndpointClassified", descent?.endpoint in
+                                setOf("PolicyLocalOptimum", "FeasibleStall"))
+                            put("basinClassified", false)
+                            descent?.let {
+                                put("afterDescent", sample(it.sample))
+                                put("afterDescentObjective", objective.evaluateExact(it.sample).toString())
+                                put("descentNativeSourceAccepted", descentAccepted)
+                                put("descentMoves", it.moves)
+                                put("repairToDescentInputChanges", (result?.assignment ?: center)
+                                    .hammingDistanceTo(it.sample))
+                                put("centerToDescentInputChanges", center.hammingDistanceTo(it.sample))
+                            }
                         }.toString())
                         writer.flush()
                     } finally {
@@ -311,6 +355,49 @@ internal object FiniteConflictSelection {
         is MinimizeResult.Unknown -> result.reason
         is MinimizeResult.Optimal, is MinimizeResult.Infeasible -> TerminationReason.SearchExhausted
         else -> null
+    }
+
+    private class Descent(val sample: Sample, val endpoint: String, val moves: Double)
+
+    private fun descend(
+        problem: BakedProblem,
+        objective: LinearObjective,
+        initial: Sample,
+        seed: Long,
+        sweep: DefinitionalSweep?,
+        stop: Cancellation,
+        allowance: NodeBudget,
+        file: File,
+    ): Descent {
+        val strategy = SourceDrivenStrategy(sources = listOf(ConfiguredSource(ObjectiveSeed())),
+            acceptance = AcceptanceRule.GreedyDescent, feasibleDescent = FeasibleDescent.SelfOwned)
+        val solver = LocalSearchSolver(problem, strategy = strategy, greedyRepairOnRestart = false,
+            definitionalSweep = sweep, seedImplicitOnRestart = false)
+        val trace = RepairTrajectory.attach(solver, DESCENT_RULE)
+        fun endpoint(): Pair<String, Sample>? {
+            for (entry in get(trace, "Attempts") as List<*>) {
+                val attempt = checkNotNull(entry)
+                val kind = get(attempt, "Endpoint").toString()
+                if (kind !in setOf("PolicyLocalOptimum", "FeasibleStall")) continue
+                val frame = (get(attempt, "Frames") as List<*>).lastOrNull() ?: continue
+                return kind to (get(checkNotNull(frame), "Sample") as Sample)
+            }
+            return null
+        }
+        val token = stop or Cancellation { endpoint() != null }
+        val params = LocalSearchParams(randomSeed = seed, initialAssignment = initial,
+            maxFlips = DESCENT_MOVES, maxInstructions = DESCENT_MOVES, nodeBudget = allowance,
+            cancellation = token, costShaping = CostShaping.Linear(lambda = 1.0))
+        var best = initial
+        var moves = 0.0
+        solver.resumable(objective, params).use { run ->
+            run.runSlice(token, Long.MAX_VALUE) { best = it.sample }?.assignment?.let { best = it }
+            moves = run.stats.ls.moves.sum
+        }
+        RepairTrajectory.write(trace, FinitePipelinePreparation(problem, objective, { it }, null),
+            IntArray(problem.numIntVars) { it }, file)
+        val completed = endpoint()
+        return Descent(completed?.second ?: best, completed?.first ?: "Censored", moves)
     }
 
     @Suppress("UNCHECKED_CAST")

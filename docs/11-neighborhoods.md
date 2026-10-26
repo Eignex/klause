@@ -315,6 +315,7 @@ objective or center, a new repair, cancellation and close retire the snapshot.
 Missing callbacks and captured empty supports are distinct outcomes. Both use the
 ordinary random removal fallback. Capture admits at most 32 conflicts and 4,096
 coordinates; oversized supports decline as a whole.
+Attributions identify activity inputs without a premise-complete branch refutation.
 
 ### Handles and exclusive ownership
 

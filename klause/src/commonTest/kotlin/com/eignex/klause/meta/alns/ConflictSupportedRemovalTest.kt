@@ -29,6 +29,28 @@ class ConflictSupportedRemovalTest {
     private val objective = LinearObjective(intCoefficients = longArrayOf(1, 1))
 
     @Test
+    fun `observing objective cutoffs should preserve supplier evaluation and the final witness`() {
+        var plainCalls = 0
+        var observedCalls = 0
+        val base = BacktrackParams(randomSeed = 3, maxDecisions = 32)
+        val guidance = ConflictSupportedRemoval(problem, objective)
+        guidance.begin(center, Assumptions.None, 2.0, Cancellation.Never)
+
+        val control = BacktrackSolver(problem).minimize(objective, base.copy(
+            objectiveBoundSupplier = { plainCalls++; 2.0 },
+        ))
+        val observed = BacktrackSolver(problem).minimize(objective, guidance.observe(base.copy(
+            objectiveBoundSupplier = { observedCalls++; 2.0 },
+        )))
+        guidance.end()
+
+        assertTrue(plainCalls > 0)
+        assertEquals(plainCalls, observedCalls)
+        assertEquals(control.assignment, observed.assignment)
+        assertEquals(control.stats.search.nodes, observed.stats.search.nodes)
+    }
+
+    @Test
     fun `a cutoff at the pinned root should leave conflict guidance unavailable`() {
         val source = Problem(0, 2, Array(2) { IntDomain(0, 1) }, listOf(
             Linear(longArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0L),
