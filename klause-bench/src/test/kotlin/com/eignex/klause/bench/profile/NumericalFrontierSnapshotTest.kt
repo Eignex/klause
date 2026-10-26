@@ -15,6 +15,7 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
+import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -39,6 +40,18 @@ class NumericalFrontierSnapshotTest {
         SourceClaim.Bound(SourceValue.Rational(half)),
         SourceDerivation.Combination(listOf(SourceDerivation.Combination.Term(half, SourceDerivation.Premise("half")))),
     )
+
+    @Test
+    fun `feedback inspection should use the funded runtime journal limits`() {
+        val snapshot = NumericalSelectionSnapshot(Cancellation.Never)
+        val invocation = NumericalFrontierSnapshot.open(context, TheoryParams(sourceSupportBranching = true),
+            frontier = true) as AutoCloseable
+
+        val capture = invocation.use { snapshot.capture(snapshot.attach(invocation)) }
+
+        assertEquals("250000", capture.getValue("maximumEntries").jsonPrimitive.content)
+        assertEquals("8388608", capture.getValue("maximumModeledBytes").jsonPrimitive.content)
+    }
 
     @Test
     fun `selection capture should expose empty journal limits`() {
