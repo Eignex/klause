@@ -19,6 +19,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertSame
+import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 
@@ -72,11 +73,7 @@ class GlobalScoringViewsTest {
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `ground table and diagram grades agree for every small assignment and primitive probe`(repeated: Boolean) {
-        val xs = if (repeated) intArrayOf(0, 1, 0) else intArrayOf(0, 1, 2)
-        val table = Table(xs, longArrayOf(0, 1, 0, 1, 0, 2, 2, 1, 2, 0, 1, 0))
-        val diagram = assertIs<Mdd>(GlobalScoringViews.alternate(table).factor)
-        val roundTrip = assertIs<Table>(GlobalScoringViews.alternate(diagram).factor)
-        val states = listOf(table, diagram, roundTrip).map(::state)
+        val states = groundControls.getValue(repeated)
         for (a in 0L..2L) for (b in 0L..2L) for (c in 0L..2L) {
             for (state in states) {
                 state.assignment.setInt(0, a)
@@ -170,4 +167,23 @@ class GlobalScoringViewsTest {
 
     private fun state(factor: Factor): LocalSearchState = LocalSearchState(LocalSearchModel.open(
         Problem(0, 3, Array(3) { IntDomain(0, 7) }, arrayOf(factor))), Random(7))
+
+    companion object {
+        private lateinit var groundControls: Map<Boolean, List<LocalSearchState>>
+
+        @JvmStatic
+        @BeforeAll
+        fun prepareControls() {
+            groundControls = listOf(false, true).associateWith { repeated ->
+                val xs = if (repeated) intArrayOf(0, 1, 0) else intArrayOf(0, 1, 2)
+                val table = Table(xs, longArrayOf(0, 1, 0, 1, 0, 2, 2, 1, 2, 0, 1, 0))
+                val diagram = assertIs<Mdd>(GlobalScoringViews.alternate(table).factor)
+                val roundTrip = assertIs<Table>(GlobalScoringViews.alternate(diagram).factor)
+                listOf(table, diagram, roundTrip).map { factor ->
+                    LocalSearchState(LocalSearchModel.open(Problem(0, 3, Array(3) { IntDomain(0, 2) }, arrayOf(factor))),
+                        Random(7))
+                }
+            }
+        }
+    }
 }
