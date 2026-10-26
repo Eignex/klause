@@ -4096,3 +4096,36 @@ allocation from 4,352 to 11,741 bytes. Boolean-term work grows from 8,659 to 8,7
 and allocation from 9,728 to 18,937 bytes despite avoided decisions. These ledger
 units are not machine instructions or physical memory. The capability remains an
 internal opt-in; automatic early checking is disabled.
+
+[Merged-capture qualification 8480](https://lab.eignex.com/jobs/8480), at
+`a2e618f54b` on the merged numerical journal, preserves all 56 native terminal
+checks and the decisions/complete-query outcomes above. Direct consultation of
+41 retained delayed states produces 30 freshly checked refutations, with no points,
+objective bounds, retention limits or inspection stops. Actual active-query
+records retain their admitted zero-objective numeric subset and original scope.
+Measured traversal rounds disable the observer. The inactive control still costs
+6,525 funded units versus 4,219 and 11,741 modeled bytes versus 4,352; useful early
+conflicts do not justify indiscriminate consultation.
+
+Original-source [rgn 8482](https://lab.eignex.com/jobs/8482) and
+[p0033 8483](https://lab.eignex.com/jobs/8483) complete sixteen ten-second paired
+runs on shared prepared contexts with default and exact source policies,
+respectively. No partial query executes: MPS lowering declares integer and real
+coordinates, including binary columns and indicators. Both p0033 arms retain
+native incumbent 3095; neither rgn arm finds one. Available native bounds recheck.
+Different wall-cutoff frontiers give unmatched check/work counts, so these runs
+establish no numerical throughput or fixed-work parity claim. The gr4x6 acquisition
+in [8484](https://lab.eignex.com/jobs/8484) stops before solving because its worker
+lacks `unzip`; it supplies no mechanism or applicability result.
+
+Fixed 32-operation controls [rgn 8500](https://lab.eignex.com/jobs/8500),
+[p0033 8501](https://lab.eignex.com/jobs/8501) and
+[flugpl 8502](https://lab.eignex.com/jobs/8502) at the same revision preserve exact
+accounting across both arms and every repeat. Complete checks are 63, 57 and 45;
+funded work is 7,675,009, 456,528 and 635,153; modeled allocation is 496,940,
+108,460 and 72,340 bytes, respectively. All available native bounds recheck, no
+run stops, and no partial query executes. These zero-Boolean original sources
+support unchanged complete-check accounting, with no partial-policy benefit or
+throughput claim. Useful captured conflicts qualify the bounded internal consumer;
+inactive-state cost and original-source applicability keep automatic activation
+disabled.
