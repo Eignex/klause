@@ -73,7 +73,9 @@ internal object LocalSearchTrajectory {
     private fun capture(args: Array<String>, out: File) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val required = setOf("suite", "problem", "sha256", "recipe", "seed", "moves")
-        val optional = setOf("sliceMillis", "sliceWork", "greedy", "repairs", "controls", "center", "source64", "channel")
+        val optional = setOf(
+            "sliceMillis", "sliceWork", "greedy", "repairs", "controls", "center", "source64", "channel",
+        )
         require(options.keys.containsAll(required) && options.keys.all {
             it in required || it in optional
         })
