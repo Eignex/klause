@@ -4767,8 +4767,11 @@ policy promotion; changed wall-cutoff frontiers establish no throughput benefit.
 On seed 1's shared worker, whole-CLI peak RSS changes from 159,332 to 168,504
 KiB under default policy and 161,792 to 165,592 KiB under exact policy. External
 wall times change from 8.36 to 10.00 s and 8.49 to 9.80 s, respectively.
-These pairs are not independent timing repetitions. Four resource receipts fail
-artifact retrieval with HTTP 502; missing physical measurements remain unknown.
+Seed 3's RSS changes from 155,156 to 172,628 KiB under default policy and
+160,780 to 165,432 KiB under exact policy; wall times change from 8.55 to 10.39 s
+and 8.67 to 10.09 s. These pairs are not independent timing repetitions.
+All 23 artifacts missing from the original HTTP 502 fetch, including four resource
+receipts, are recovered at their recorded byte sizes; the missing-file manifest is retained.
 
 [Fixed-operation capture 8589](https://lab.eignex.com/jobs/8589), at `dd4ac66bbc`,
 retains 32 states before the 8 MiB journal limit, with 26 changed choices.
