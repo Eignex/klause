@@ -5307,6 +5307,7 @@ Each selected replay funds both its base query and at most one separation query
 from the same 20M work/64 MiB allocation envelope, with two source operations;
 the other arms keep one operation. Both generating masks and the strongest checked
 completed bound are retained. A fresh selected arm starts with an empty pool.
+Replay uses the first four distinct source scopes with captured points.
 
 Selection retains at most 64 source cut IDs per compatible template and considers
 at most 8,192 support entries, 65,536 scoring work and 1 MiB modeled allocation per
@@ -5319,6 +5320,9 @@ source derivation; no score admits or validates a cut. Pending separation retain
 its completed base bound, and a declined round keeps the base split. Checked base
 incumbents and terminals bypass extra separation. These are bounded policy controls,
 not default-admission or throughput claims.
+
+The selection work counter is part of preparation work, and selection allocation
+is part of funded allocation; these counters must not be added to their totals.
 
 #### Source numerical decision feedback
 
