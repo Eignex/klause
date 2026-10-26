@@ -332,6 +332,12 @@ descendant. Recomputation after external assignment writes clears every evaluati
 and network replacement discards both caches. Reentrant use throws before mutating
 the workspace.
 
+`LocalSearchState.inspectMove` exposes the ordinary reversible probe for explicit
+diagnostic consumers. It captures the candidate assignment, maintained outputs,
+factor grades and objective delta, then restores the committed state and activity.
+It consumes no random values; assignment and degree copies are charged to the
+caller. Inspection supplies neither source validation nor proof authority.
+
 Boolean-only clause models close native proposals under clause implications before
 ranking: forced literals propagate to a fixpoint, then a newly broken longer clause
 gets a replacement supporter ranked by break score, objective delta and literal

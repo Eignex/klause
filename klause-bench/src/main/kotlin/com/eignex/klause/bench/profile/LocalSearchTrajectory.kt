@@ -8,11 +8,13 @@ import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.formats.xcsp3.Xcsp3
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.localsearch.CostShaping
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.localsearch.acceptance.AcceptanceRule
 import com.eignex.klause.localsearch.movesource.ConfiguredSource
@@ -48,6 +50,7 @@ import com.sun.management.ThreadMXBean
 import java.io.File
 import java.lang.management.ManagementFactory
 import java.util.Base64
+import kotlin.random.Random
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
@@ -110,6 +113,22 @@ internal object LocalSearchTrajectory {
             Sample(booleanArrayOf(), it)
         }
         require(initial == null || parsed.definedVars.isEmpty())
+        val views = ArrayList<TrajectoryView>()
+        val observations = ArrayList<Observation>()
+        out.resolve("capture-policy.json").writeText(buildJsonObject {
+            put("sourceSha256", sha256(bytes))
+            put("declaredSemantics", parsed.semantics.declared.toString())
+            put("effectiveSemantics", parsed.semantics.effective.toString())
+            put("settings", parsed.problem.settings.toString())
+            put("javaRuntime", System.getProperty("java.runtime.version"))
+            put("os", System.getProperty("os.name"))
+            put("architecture", System.getProperty("os.arch"))
+            put("pairedStateLimit", 12)
+            put("candidatesPerPairLimit", 32)
+            put("pairing", "complete source-coordinate round trip; primitive common destinations")
+            put("diagnosticWork", "separate private states; two full loads and at most 64 reversible probes per pair")
+            put("sourceVerdictClaim", false)
+        }.toString())
         for (rewrite in if (initial == null) listOf(false, true) else listOf(false)) {
             val stop = Cancellation.after(60.seconds)
             val invocation = SourceSetup.prepare(SourceSetupRequest(
@@ -141,6 +160,13 @@ internal object LocalSearchTrajectory {
                     })
                 })
                 put("domains", JsonArray(problem.rootIntDomains().map { JsonPrimitive(it.toString()) }))
+                put("sourceBooleanSlots", JsonArray((0 until parsed.problem.numBoolVars).map {
+                    JsonPrimitive(if (it < problem.numBoolVars) it else -1)
+                }))
+                put("sourceIntegerSlots", JsonArray((0 until parsed.problem.numIntVars).map {
+                    JsonPrimitive(if (it < problem.numIntVars) it else -1)
+                }))
+                put("correspondenceAdmission", "slot-preserving load plus complete source round trip")
                 put("sourceVerdictClaim", false)
             }.toString())
             var baseline: List<Any?>? = null
@@ -162,17 +188,14 @@ internal object LocalSearchTrajectory {
                                 put("pick", pick)
                                 put("step", state.step)
                                 put("cost", state.cost)
-                                put("randomState", buildJsonObject {
-                                    for (field in state.rng.javaClass.declaredFields) {
-                                        if (field.type != Int::class.javaPrimitiveType) continue
-                                        field.isAccessible = true
-                                        put(field.name, field.getInt(state.rng))
-                                    }
-                                })
+                                put("randomState", trajectoryRandomBoundary(state))
                                 put("workingIntegers", JsonArray((0 until problem.numIntVars).map {
                                     JsonPrimitive(state.assignment.intValue(it))
                                 }))
-                                put("weights", JsonArray(state.weights.factorWeights.map(::JsonPrimitive)))
+                                put("weightsAllocated", state.weights.allocated)
+                                if (state.weights.allocated) {
+                                    put("weights", JsonArray(state.weights.factorWeights.map(::JsonPrimitive)))
+                                }
                                 if (pick == 0L) {
                                     put("unreadIntegers", buildJsonArray {
                                         for (variable in 0 until problem.numIntVars) {
@@ -198,6 +221,7 @@ internal object LocalSearchTrajectory {
                             writer.flush()
                             if (!walk) {
                                 captured = state
+                                observations += Observation("initial-$rewrite", sample)
                                 throw Captured
                             }
                         }
@@ -267,15 +291,62 @@ internal object LocalSearchTrajectory {
                         if (exactControls) RepairTrajectory.controls(trace, problem, workingObjective,
                             out.resolve("controls-$rewrite.jsonl"), seed, prepared, checkNotNull(sourceCheck))
                     }
-                    if (!walk) traceGreedy(checkNotNull(captured), out.resolve("greedy-$rewrite.jsonl"))
+                    if (!walk) {
+                        val initial = checkNotNull(captured)
+                        val shadow = LocalSearchState(initial.model, Random(seed), initial.assumptions, initial.projection)
+                        shadow.invariants = sweep?.network(problem.numIntVars, problem.numBoolVars)
+                        if (initial.weights.allocated) initial.weights.factorWeights.copyInto(shadow.weights.factorWeights)
+                        views += TrajectoryView(
+                            rewrite.toString(), shadow,
+                            VarRemap(
+                                IntArray(parsed.problem.numBoolVars) { if (it < problem.numBoolVars) it else -1 },
+                                IntArray(parsed.problem.numIntVars) { if (it < problem.numIntVars) it else -1 },
+                            ),
+                            gradient ?: workingObjective, prepared.reconstruct,
+                            { sweep?.sweep(shadow.assignment, shadow.rootDomains) },
+                        )
+                        traceGreedy(initial, out.resolve("greedy-$rewrite.jsonl")) { position, slot ->
+                            observations += Observation(
+                                "greedy-before-$rewrite-$position", prepared.reconstruct(initial.assignment.snapshot()), slot,
+                            )
+                        }
+                    }
                 }
+            }
+        }
+        out.resolve("paired.jsonl").bufferedWriter().use { writer ->
+            check(observations.size <= 12)
+            for ((label, source, focus) in observations) {
+                val candidates = ArrayList<Move>()
+                for (variable in 0 until source.numBoolVars) {
+                    if (candidates.size == 32) break
+                    candidates += Move.BoolFlip(variable)
+                }
+                val first = focus - parsed.problem.numBoolVars
+                val integerOrder = (listOf(first).filter { it in 0 until source.numIntVars } +
+                    (0 until source.numIntVars)).distinct()
+                for (variable in integerOrder) {
+                    if (candidates.size == 32) break
+                    val domain = requireNotNull(parsed.problem.intDomainOrNull(variable))
+                    val current = source.intValue(variable)
+                    for (value in listOf(domain.min, domain.max).distinct()) {
+                        if (value != current && candidates.size < 32) candidates += Move.IntSet(variable, value)
+                    }
+                }
+                writer.appendLine(buildJsonObject {
+                    put("observation", label)
+                    put("comparison", trajectoryPair(source, candidates, views[0], views[1]))
+                }.toString())
+                writer.flush()
             }
         }
     }
 
     private object Captured : RuntimeException(null, null, false, false)
 
-    private fun traceGreedy(state: LocalSearchState, file: File) {
+    private data class Observation(val label: String, val source: Sample, val focus: Int = -1)
+
+    private fun traceGreedy(state: LocalSearchState, file: File, capture: (Int, Int) -> Unit) {
         val initializer = GreedyInit()
         val pass = checkNotNull(initializer.javaClass.methods.single {
             it.name.substringBefore('$') == "pass" && it.parameterCount == 1
@@ -285,6 +356,7 @@ internal object LocalSearchTrajectory {
         file.bufferedWriter().use { writer ->
             val observe = {
                 val slot = order[position++]
+                if (position - 1 in setOf(0, 49, 68, order.lastIndex)) capture(position - 1, slot)
                 writer.appendLine(buildJsonObject {
                     put("position", position - 1)
                     put("slot", slot)
@@ -292,19 +364,14 @@ internal object LocalSearchTrajectory {
                     put("integers", JsonArray((0 until state.problem.numIntVars).map {
                         JsonPrimitive(state.assignment.intValue(it))
                     }))
-                    put("randomState", buildJsonObject {
-                        for (field in state.rng.javaClass.declaredFields) {
-                            if (field.type != Int::class.javaPrimitiveType) continue
-                            field.isAccessible = true
-                            put(field.name, field.getInt(state.rng))
-                        }
-                    })
+                    put("randomState", trajectoryRandomBoundary(state))
                 }.toString())
                 writer.flush()
                 false
             }
             val completed = pass.javaClass.methods.single { it.name == "advance" }.invoke(pass, observe)
             check(completed == true && position == order.size)
+            capture(order.size, -1)
         }
     }
 
