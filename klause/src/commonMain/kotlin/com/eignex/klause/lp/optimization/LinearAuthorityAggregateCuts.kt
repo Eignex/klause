@@ -10,7 +10,6 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.abs
 import com.eignex.klause.util.div
 import com.eignex.klause.util.gcd
-import com.eignex.klause.util.isZero
 import com.eignex.klause.util.magnitudeBitLength
 import com.eignex.klause.util.times
 
