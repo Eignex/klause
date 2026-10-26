@@ -286,6 +286,27 @@ decline advances to the complete family under the same remaining allowance. Regi
 projection and lifting counters record actual attempts across snapshot replacements.
 Only region coverage, projection and lifting are required for completeness.
 
+An internal optional univariate refinement precedes root reduction and partial-family
+lifting. Mandatory predicates seed a bounded coordinate candidate; a violated unary
+predicate isolates all of its roots before certifying the containing section or
+sector as forbidden. The next candidate lies outside retained cells and within the
+query window. A seed checks the entire normalized formula; regional repairs alter
+only unfixed coordinates absent from the selected projection family. Reconstruction
+and full source checking retain witness authority, while complete CAD remains the
+fallback. Optional failure supplies no refutation.
+
+Checked cells retain exact algebraic endpoints, openness and their numeric predicate.
+Source support requires a mandatory predicate of the unconditioned immutable source.
+Other cells retain the query condition and snapshot; regional cells additionally keep
+signed source premises and an opaque affine-reduction owner. Such cells cannot cross
+owners without checked source reconstruction. Integer point coverage does not imply
+coverage of a real repair window. The internal option is disabled by default.
+Its query-wide allowance is 16,384 charged units across preparation, candidate checks,
+retries and snapshot replacements, with eight retained cells, degree sixteen,
+64 terms per predicate and 4,096-bit input coefficients. Regional support and seeds
+admit at most 64 premises or coordinates. A private decline preserves CAD; an enclosing
+stop remains terminal. Invocation observers receive completed checked cells only.
+
 Optional query failure capture retains bounded exact observations of rejected probe
 points and CAD prefixes, their signed premises, numeric reconstruction fibres and
 condition/snapshot identity. Projection observations retain the active operands.
