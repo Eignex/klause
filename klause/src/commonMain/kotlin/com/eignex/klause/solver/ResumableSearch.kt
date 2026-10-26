@@ -173,6 +173,7 @@ interface ResumableSolver<P : SolverParams> : Solver<P> {
  */
 internal interface RepairSearch : AutoCloseable {
     val stats: SolveStats get() = SolveStats.EMPTY
+    val work: Long get() = stats.search.nodes.sum.toLong()
 
     fun begin(assumptions: Assumptions, decisionBudget: Long, cutoff: Double, cancellation: Cancellation)
 
