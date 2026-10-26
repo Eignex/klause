@@ -23,16 +23,21 @@ internal class TrajectoryView(
     owners: IntArray? = state.seeding.ownerInt,
 ) {
     private val capturedOwners = owners?.copyOf()
+
     init {
         require(state.problem.numRealVars == 0)
         require(state.problem.numBoolVars + state.problem.numIntVars <= 1024)
         require(state.problem.numFactors <= 4096)
+        require(capturedOwners == null || capturedOwners.size == state.problem.numIntVars)
         require((0 until coordinates.boolCount).all { coordinates.bool(it) in -1 until state.problem.numBoolVars })
         require((0 until coordinates.intCount).all { coordinates.int(it) in -1 until state.problem.numIntVars })
+        state.moveSink.setOwners(capturedOwners)
     }
 
     fun load(source: Sample): String? {
-        if (source.numBoolVars != coordinates.boolCount || source.numIntVars != coordinates.intCount) {
+        if (source.numRealVars != 0 || source.numBoolVars != coordinates.boolCount ||
+            source.numIntVars != coordinates.intCount
+        ) {
             return "source-dimensions"
         }
         for (id in 0 until state.problem.numBoolVars) state.assignment.setBool(id, false)
@@ -157,7 +162,8 @@ internal fun trajectorySource(sample: Sample): JsonObject = buildJsonObject {
 }
 
 internal fun sameSource(left: Sample, right: Sample): Boolean =
-    left.numBoolVars == right.numBoolVars && left.numIntVars == right.numIntVars &&
+    left.numRealVars == 0 && right.numRealVars == 0 &&
+        left.numBoolVars == right.numBoolVars && left.numIntVars == right.numIntVars &&
         (0 until left.numBoolVars).all { left.boolValue(it) == right.boolValue(it) } &&
         (0 until left.numIntVars).all { left.intValue(it) == right.intValue(it) }
 

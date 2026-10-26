@@ -69,6 +69,19 @@ class LocalSearchTrajectoryCaptureTest {
     }
 
     @Test
+    fun `captured implicit owners reject foreign primitive candidates`() {
+        val original = view(1, 1)
+        val owned = TrajectoryView(
+            "owned", original.state, original.coordinates, owners = intArrayOf(0, -1),
+        )
+        assertNull(owned.load(Sample(booleanArrayOf(), longArrayOf(0, 2))))
+
+        val candidate = owned.probe(Move.IntSet(0, 1))
+
+        assertEquals("candidate-filter", candidate.getValue("decline").jsonPrimitive.content)
+    }
+
+    @Test
     fun `random boundary measures underlying draws without advancing the stream`() {
         val state = view(1, 1).state
         val before = trajectoryRandomBoundary(state)
