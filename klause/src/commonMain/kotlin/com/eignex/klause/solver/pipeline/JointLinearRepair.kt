@@ -29,6 +29,13 @@ import com.eignex.klause.util.WorkMeter
 import kotlin.math.round
 import kotlin.time.TimeSource
 
+internal data class JointRepairAttempt(
+    val result: ExactNeighborhoodResult,
+    val reason: TerminationReason? = null,
+    val feasiblePoint: Sample? = null,
+    val bound: SourceEvidence? = null,
+)
+
 internal class JointLinearRepair(
     private val model: Problem,
     private val source: SourceProofContext,
@@ -192,10 +199,17 @@ internal class JointLinearRepair(
         return value
     }
 
-    override fun check(condition: ExactNeighborhoodCondition, cancellation: Cancellation): ExactNeighborhoodResult {
+    override fun check(condition: ExactNeighborhoodCondition, cancellation: Cancellation): ExactNeighborhoodResult =
+        attempt(condition, cancellation).result
+
+    fun attempt(condition: ExactNeighborhoodCondition, cancellation: Cancellation): JointRepairAttempt {
         check(!closed)
-        if (stop() || exhausted) return ExactNeighborhoodResult.Undecided
-        if (cancellation()) return ExactNeighborhoodResult.Paused
+        if (stop() || exhausted) return JointRepairAttempt(ExactNeighborhoodResult.Undecided, when {
+            params.timeout() -> TerminationReason.Timeout
+            stop() -> TerminationReason.Cancelled
+            else -> TerminationReason.BudgetExhausted
+        })
+        if (cancellation()) return JointRepairAttempt(ExactNeighborhoodResult.Paused)
         if (pending != condition) {
             retire()
             var bounds = source.scope.condition
@@ -232,15 +246,18 @@ internal class JointLinearRepair(
                 mark.elapsedNow().inWholeNanoseconds
             if (publicationLifetime == null && cancellation() && !stop()) {
                 observe("jointRepairPublicationPauses")
-                return ExactNeighborhoodResult.Paused
+                return JointRepairAttempt(ExactNeighborhoodResult.Paused, feasiblePoint = sample,
+                    bound = snapshot.bound)
             }
             retire()
             if (checked == SourceEvidenceCheck.Checked) {
                 anchor = sample
                 observe("jointRepairCheckedIncumbents")
-                return ExactNeighborhoodResult.Witness(sample)
+                return JointRepairAttempt(ExactNeighborhoodResult.Witness(sample),
+                    feasiblePoint = sample, bound = snapshot.bound)
             }
-            return ExactNeighborhoodResult.Undecided
+            return JointRepairAttempt(ExactNeighborhoodResult.Undecided, TerminationReason.Unsupported,
+                bound = snapshot.bound)
         }
         if (condition.cutoff != null) {
             val bound = ((snapshot.bound?.claim as? SourceClaim.Bound)?.value as? SourceValue.Rational)?.value
@@ -248,16 +265,19 @@ internal class JointLinearRepair(
             if (minimized != null && minimized >= condition.cutoff) {
                 observe("jointRepairCutoffClosures")
                 retire()
-                return ExactNeighborhoodResult.Refuted
+                return JointRepairAttempt(ExactNeighborhoodResult.Refuted, TerminationReason.SearchExhausted,
+                    snapshot.incumbent, snapshot.bound)
             }
         }
         if (result == null) {
             observe("jointRepairPauses")
-            return ExactNeighborhoodResult.Paused
+            return JointRepairAttempt(ExactNeighborhoodResult.Paused, feasiblePoint = snapshot.incumbent,
+                bound = snapshot.bound)
         }
         retire()
-        return if (result.terminal?.claim == SourceClaim.Refutation) ExactNeighborhoodResult.Refuted
-            else ExactNeighborhoodResult.Undecided
+        return JointRepairAttempt(
+            if (result.terminal?.claim == SourceClaim.Refutation) ExactNeighborhoodResult.Refuted
+            else ExactNeighborhoodResult.Undecided, result.reason, result.incumbent, result.bound)
     }
 
     private fun retire() {

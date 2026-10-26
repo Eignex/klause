@@ -2490,6 +2490,21 @@ source units, the working objective scale, exact completion work, allocation and
 a fresh `checkMpsWitness` result. Run it through a bounded lab profile job; native
 source checks do not constitute independent witness or proof validation.
 
+Optional `repairSets` replays arrays of original integer column names through
+`JointLinearRepair` instead of fixed-pin refinement. Each set frees precisely those
+integers, pins the full discrete complement to the source-checked saved center and
+keeps every source row and the full continuous residual. The special set
+`"comparison-disagreement"` frees the integer differences from a separately
+source-checked `comparisonWitness`; it is a diagnostic control, not an admitted
+selector. No finite domain is added. `repairMillis`, `repairOperations` and
+`repairWork` bound each cold attempt, defaulting to 1,000 ms, 256 LP operations
+and 1 billion cumulative source LP work units. Requests admit at most 128 sets.
+Reports retain exact complement pins, the strict minimized working cutoff,
+conditioned bounds, pause/terminal reasons, checked candidate objectives, native
+work, wall time and thread allocation separately. A conditioned closure can retain
+a feasible nonimproving point and never establishes a source refutation or source
+optimum. The capture is instrumented and makes no whole-CLI speedup claim.
+
 [Fixed-pin replay 8339](https://lab.eignex.com/jobs/8339), at `b738c5d89a` on
 Mac/aarch64, retains four witnesses from [8302](https://lab.eignex.com/jobs/8302).
 With unchanged discrete pins, the residual modglob point improves from

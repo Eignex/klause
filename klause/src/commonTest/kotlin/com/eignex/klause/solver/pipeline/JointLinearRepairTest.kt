@@ -27,6 +27,51 @@ import kotlin.test.assertTrue
 
 class JointLinearRepairTest {
     @Test
+    fun `attempt should distinguish a slice pause from lifetime budget exhaustion`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
+            factors = emptyArray())
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
+        JointLinearRepair(model, source, objective, TheoryParams(sourceLpWorkLimit = 0)).use { repair ->
+            val result = repair.attempt(condition, Cancellation.Never)
+
+            assertEquals(ExactNeighborhoodResult.Undecided, result.result)
+            assertEquals(TerminationReason.BudgetExhausted, result.reason)
+        }
+        JointLinearRepair(model, source, objective, TheoryParams()).use { repair ->
+            val result = repair.attempt(condition, Cancellation { true })
+
+            assertEquals(ExactNeighborhoodResult.Paused, result.result)
+            assertEquals(null, result.reason)
+            assertEquals(0L, repair.stats.smt.completeSearchStages?.get("jointRepairCandidates") ?: 0L)
+        }
+    }
+
+    @Test
+    fun `attempt should expose a nonimproving feasible center alongside its scoped cutoff closure`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
+            factors = emptyArray())
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val center = com.eignex.klause.solver.Sample(BooleanArray(0), longArrayOf(1))
+        val condition = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ONE),
+            mapOf(0 to BigFraction.ONE), BigFraction.ONE)
+        JointLinearRepair(model, source, objective, TheoryParams(), boundOrdered = true,
+            external = { center }).use { repair ->
+            var attempt = repair.attempt(condition, Cancellation.Never)
+            repeat(64) {
+                if (attempt.result == ExactNeighborhoodResult.Paused) attempt = repair.attempt(condition, Cancellation.Never)
+            }
+
+            assertEquals(ExactNeighborhoodResult.Refuted, attempt.result)
+            assertEquals(TerminationReason.SearchExhausted, attempt.reason)
+            assertEquals(1L, assertNotNull(attempt.feasiblePoint).intValue(0))
+            assertIs<SourceClaim.Bound>(assertNotNull(attempt.bound).claim)
+        }
+    }
+
+    @Test
     fun `a publication lifetime should retain a checked point after its query slice expires`() {
         val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(2), null, null),
             factors = arrayOf(

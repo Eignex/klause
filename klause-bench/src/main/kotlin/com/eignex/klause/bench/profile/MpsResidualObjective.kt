@@ -95,6 +95,10 @@ internal object MpsResidualObjective {
                 if (Term.isInt(column)) Term.intVar(column) else Term.realVar(column)) to values[id]
         }
         val point = coordinates.map { mapped[it] ?: (checkNotNull(original.objective) * scale) }
+        if ("repairSets" in request) {
+            MpsRepairReplay.inspect(request, source, numerical, context, columns, mapped, scale, out)
+            return
+        }
         val queryType = Class.forName("com.eignex.klause.lp.optimization.LinearAuthorityQuery")
         val companion = queryType.getField("Companion").get(null)
         val query = checkNotNull(call(companion, "prepare", context, null, stop, 100_000, { _: Long -> }))
@@ -172,7 +176,7 @@ internal object MpsResidualObjective {
         println(result)
     }
 
-    private fun rational(text: String): BigFraction {
+    fun rational(text: String): BigFraction {
         val parts = text.split('/')
         if (parts.size == 2) return BigFraction.of(parts[0].toBigInteger(), parts[1].toBigInteger())
         val value = BigDecimal(text)
