@@ -4063,3 +4063,30 @@ the exact point, scope, bound and modeled work in both fresh repetitions of all
 eight `rgn` parent/mask pairs. All 16 bounds and 640 candidate derivations pass
 fresh native checks; no replay reaches its allowance. The original source hash
 and Linux/amd64 platform match 8431.
+#### Active rows before Boolean completion
+
+[8424](https://lab.eignex.com/jobs/8424) and
+[8437](https://lab.eignex.com/jobs/8437) compare seven self-authored native exact
+contexts at `568f18115b` and `ce420b9e2e`. One warmup and three measured rounds
+alternate arm order on Linux/amd64, P1/seed 3, with unchanged source LP allowances.
+All 112 terminal claims recheck natively. Job receipts and installed-byte hashes
+bind the gitless distributions; these are neither independent proof checks nor
+ordinary CLI throughput measurements.
+
+Closed, strict and independently pinned integer contradictions use zero Boolean
+alternatives and one partial conflict, versus fourteen alternatives and eight
+complete queries with delayed checking. The initially established guard avoids
+six alternatives and four complete queries. Unresolved guard and Boolean-term
+controls retain the checked optimum of 3 while alternatives fall fourteen to
+eight and complete queries eight to four. Inactive guards preserve all required
+complete checks. Partial points establish no witness or objective bound.
+
+Keeping completed no-conflict keys across numerical-owner release reduces partial
+queries from two to one on the inactive control, three to two on the unresolved
+guard and four to three on the Boolean-term control, preserving every native
+outcome. This retains neither points nor derivations. Costs still oppose blanket
+activation: inactive-guard funded work grows from 4,219 to 6,525 units and modeled
+allocation from 4,352 to 11,741 bytes. Boolean-term work grows from 8,659 to 8,755
+and allocation from 9,728 to 18,937 bytes despite avoided decisions. These ledger
+units are not machine instructions or physical memory. The capability remains an
+internal opt-in; automatic early checking is disabled.
