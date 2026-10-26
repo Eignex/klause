@@ -335,7 +335,8 @@ internal class QfNraQuery(
                             work.spentWork, arithmetic, selected, zeroes = required, nonzero = exclusions,
                             completeFamily = complete)
                         val pending = PolynomialProjection.prepare(selected, realCount, arithmetic,
-                            required, order, nonzeroPolynomials = exclusions, onElimination = { variable, operands, root ->
+                            required, order, nonzeroPolynomials = exclusions,
+                            onElimination = { variable, operands, root ->
                                 failureCapture?.operation("elimination", progress.searchSnapshot, progress.regions,
                                     work.spentWork, arithmetic, operands, variable, root, completeFamily = complete)
                                 projectionObserver?.invoke(variable, operands, root)

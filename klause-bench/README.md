@@ -825,7 +825,7 @@ performance gain. Field/method incompatibility fails the diagnostic explicitly.
 
 `com.eignex.klause.bench.profile.PolynomialPhaseProfile` follows a direct polynomial
 query through its containing stop. Its `request64=<base64>` argument encodes up to
-18 `{suite, problem, sha256}` catalog identities, with at most 48 KiB of encoded
+18 `{suite, problem, sha256}` catalog identities, with at most 96 KiB of encoded
 request and 1 MiB per original source. It requires the frozen original hash before
 parsing and retains those bytes. Submit it as a Lab profile job without host or
 machine placement overrides. The Lab's documented `profile.runTimeoutSec` covers
@@ -833,6 +833,14 @@ active setup, compilation, execution and cleanup; `base.timeout` supplies the
 separate command allowance.
 The measured child uses one active processor, Serial GC and a 3 GiB heap, retaining
 its command, streams, actual exit, installed CLI/harness/runtime hashes and options.
+
+A request entry may carry `gzip64`, a gzip-compressed Base64 copy of its frozen
+source. This bypasses catalog retrieval and verifies the same required original
+SHA-256 before parsing. Decoding retains the 1 MiB source limit and the whole
+request retains its 96 KiB limit. Use bytes from a separately identified source
+record; supplied suite/problem labels alone do not establish catalog provenance.
+The settings distinguish supplied bytes from catalog retrieval. This input changes
+no query, condition, preparation or ordinary CLI semantics.
 
 Each direct query uses default polynomial representation limits, unlimited native
 work and a 60-second containing deadline. Optional `timeoutMs=<positive milliseconds>`

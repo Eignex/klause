@@ -34,8 +34,14 @@ internal class PolynomialFailureCapture {
     fun refused(resource: String, arithmetic: PolynomialArithmetic) {
         if (firstRefusal == null) firstRefusal = capture(arithmetic) {
             put("resource", resource)
-            for ((key, value) in operation) { if (exhausted) break; put("operation.$key", value) }
-            for ((key, value) in context) { if (exhausted) break; put("context.$key", value) }
+            for ((key, value) in operation) {
+                if (exhausted) break
+                put("operation.$key", value)
+            }
+            for ((key, value) in context) {
+                if (exhausted) break
+                put("context.$key", value)
+            }
         }
     }
 
@@ -84,9 +90,18 @@ internal class PolynomialFailureCapture {
         arithmetic: PolynomialArithmetic,
     ) {
         scope = capture(arithmetic) {
-            for ((id, truth) in condition.bools) { if (exhausted) break; put("condition.bool.$id", truth.toString()) }
-            for ((id, value) in condition.lower) { if (exhausted) break; fraction("condition.lower.$id", value) }
-            for ((id, value) in condition.upper) { if (exhausted) break; fraction("condition.upper.$id", value) }
+            for ((id, truth) in condition.bools) {
+                if (exhausted) break
+                put("condition.bool.$id", truth.toString())
+            }
+            for ((id, value) in condition.lower) {
+                if (exhausted) break
+                fraction("condition.lower.$id", value)
+            }
+            for ((id, value) in condition.upper) {
+                if (exhausted) break
+                fraction("condition.upper.$id", value)
+            }
             atoms("normalized", formula.atoms)
         }
     }
@@ -152,10 +167,19 @@ internal class PolynomialFailureCapture {
                 polynomial("failedPolynomial", formula.atoms[it].polynomial)
             }
             region?.let {
-                for ((id, truth) in it.atoms) { if (exhausted) break; put("premise.$id", truth.toString()) }
-                for ((id, truth) in it.bools) { if (exhausted) break; put("boolean.$id", truth.toString()) }
+                for ((id, truth) in it.atoms) {
+                    if (exhausted) break
+                    put("premise.$id", truth.toString())
+                }
+                for ((id, truth) in it.bools) {
+                    if (exhausted) break
+                    put("boolean.$id", truth.toString())
+                }
             }
-            for ((id, value) in point) { if (exhausted) break; scalar("point.$id", value) }
+            for ((id, value) in point) {
+                if (exhausted) break
+                scalar("point.$id", value)
+            }
         }
         if (key["complete"] != "true") repetitionComplete = false
         if (firstFailure != null && (region == null || firstCadFailure != null)) {
@@ -167,10 +191,21 @@ internal class PolynomialFailureCapture {
         val record = capture(arithmetic) {
             put("work", work.toString())
             put("rejection", if (region == null) "Boolean formula false" else "regional atom impossible at prefix")
-            signs?.let { for (id in it.indices) { if (exhausted) break; put("sign.$id", it[id].toString()) } }
+            signs?.let {
+                for (id in it.indices) {
+                    if (exhausted) break
+                    put("sign.$id", it[id].toString())
+                }
+            }
             region?.let {
-                for ((id, truth) in it.atoms) { if (exhausted) break; put("premise.$id", truth.toString()) }
-                for ((id, truth) in it.bools) { if (exhausted) break; put("boolean.$id", truth.toString()) }
+                for ((id, truth) in it.atoms) {
+                    if (exhausted) break
+                    put("premise.$id", truth.toString())
+                }
+                for ((id, truth) in it.bools) {
+                    if (exhausted) break
+                    put("boolean.$id", truth.toString())
+                }
             }
             atoms("active", formula.atoms)
         }
@@ -189,7 +224,10 @@ internal class FailureWriter(
     private val arithmetic: PolynomialArithmetic,
     private val copied: () -> Unit = {},
 ) {
-    private fun step() { arithmetic.step(); copied() }
+    private fun step() {
+        arithmetic.step()
+        copied()
+    }
     private val values = LinkedHashMap<String, String>()
     private var remaining = 16_384
     private var complete = true
@@ -251,7 +289,9 @@ internal class FailureWriter(
         put("$key.root", value.rootIndex.toString())
         fraction("$key.lower", value.lowerBound)
         fraction("$key.upper", value.upperBound)
-        for ((index, coefficient) in value.definingCoefficients.withIndex()) fraction("$key.coefficient.$index", coefficient)
+        for ((index, coefficient) in value.definingCoefficients.withIndex()) {
+            fraction("$key.coefficient.$index", coefficient)
+        }
     }
 
     fun finish(): Map<String, String> = values.toMap() + ("complete" to complete.toString())

@@ -32,6 +32,7 @@ import com.eignex.klause.util.parseBigInt
 import java.io.File
 import java.lang.management.ManagementFactory
 import java.util.Base64
+import java.util.zip.GZIPInputStream
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.serialization.Serializable
@@ -61,10 +62,11 @@ internal object PolynomialPhaseProfile {
         val timeoutMs = options["timeoutMs"]?.toLong() ?: 60_000L
         require(timeoutMs > 0)
         val encoded = args[0].substringAfter('=')
-        require(encoded.length <= 48 * 1024)
+        require(encoded.length <= 96 * 1024)
         val request = Base64.getDecoder().decode(encoded)
         val cases = Json.decodeFromString<List<PhaseSource>>(request.decodeToString())
-        require(cases.size in 1..18 && cases.map { Triple(it.suite, it.problem, it.fixedIntegers) }.distinct().size == cases.size)
+        require(cases.size in 1..18 &&
+            cases.map { Triple(it.suite, it.problem, it.fixedIntegers) }.distinct().size == cases.size)
         require(!preparedMode || cases.all { it.fixedIntegers.isEmpty() })
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         if (System.getenv("KLAUSE_POLYNOMIAL_PHASE_CHILD") != "1") {
@@ -83,6 +85,7 @@ internal object PolynomialPhaseProfile {
             "maximumWork" to maximumWork.toString(),
             "diagnosticMaximumWork" to maximumWork.toString(),
             "failureCapture" to options["capture"].toString(),
+            "sourceBytes" to if (cases.any { it.gzip64 != null }) "hash-pinned request or catalog" else "catalog",
             "representationLimits" to "default",
             "route" to if (preparedMode) "unconditioned prepared polynomial service; no CP root pins or publication"
                 else if (pipelineMode && directMode) "paired direct query and default MIXED pipeline/P1/seed3"
@@ -92,8 +95,10 @@ internal object PolynomialPhaseProfile {
         val access = PhaseAccess()
         for ((index, source) in cases.withIndex()) {
             require(source.sha256.matches(Regex("[0-9a-f]{64}")))
-            val reference = Catalog.uncapped(source.suite).problems.single { it.name == source.problem }
-            val bytes = CorpusFiles.open(CorpusFetcher.resolve(reference.source)).use { it.readNBytes(1024 * 1024 + 1) }
+            val bytes = source.gzip64?.let(::capturedSource) ?: run {
+                val reference = Catalog.uncapped(source.suite).problems.single { it.name == source.problem }
+                CorpusFiles.open(CorpusFetcher.resolve(reference.source)).use { it.readNBytes(1024 * 1024 + 1) }
+            }
             require(bytes.size <= 1024 * 1024 && sha256(bytes) == source.sha256)
             val directory = out.resolve(index.toString()).apply { mkdirs() }
             directory.resolve("source.smt2").writeBytes(bytes)
@@ -106,7 +111,8 @@ internal object PolynomialPhaseProfile {
             }
             if (preparedMode) {
                 directory.resolve("prepared-trace.json").writeText(
-                    Json.encodeToString(access.measure(text, maximumWork, timeoutMs, prepared = true, capture = capture)),
+                    Json.encodeToString(access.measure(text, maximumWork, timeoutMs,
+                        prepared = true, capture = capture)),
                 )
             } else if (directMode) {
                 directory.resolve("gate.json").writeText(Json.encodeToString(access.gate(text, timeoutMs)))
@@ -121,6 +127,14 @@ internal object PolynomialPhaseProfile {
                         fixedIntegers = source.fixedIntegers)))
             }
         }
+    }
+
+    internal fun capturedSource(gzip64: String): ByteArray {
+        require(gzip64.length <= 48 * 1024)
+        val compressed = Base64.getDecoder().decode(gzip64)
+        val bytes = GZIPInputStream(compressed.inputStream()).use { it.readNBytes(1024 * 1024 + 1) }
+        require(bytes.size <= 1024 * 1024)
+        return bytes
     }
 
     internal fun pipeline(text: String, timeoutMs: Long = 60_000L): PipelinePhaseTrace {
@@ -420,13 +434,15 @@ internal object PolynomialPhaseProfile {
                 partialConflictPreviewComplete = conflictPreviewComplete,
                 sourceCoordinates = names,
                 failureCapture = captured?.let { value ->
-                    listOf("Scope", "Context", "Operation", "FirstFailure", "FirstCadFailure", "FirstRefusal").associateWith { field ->
+                    listOf("Scope", "Context", "Operation", "FirstFailure", "FirstCadFailure", "FirstRefusal")
+                        .associateWith { field ->
                         @Suppress("UNCHECKED_CAST")
                         (captureType.getMethod("get$field").invoke(value) as? Map<String, String>).orEmpty()
                     }
                 },
                 failureObservations = captured?.let { value ->
-                    listOf("Failures", "RepeatedFirstFailure", "RepetitionComplete", "InterruptedCapture", "CompletedCopySteps")
+                    listOf("Failures", "RepeatedFirstFailure", "RepetitionComplete",
+                        "InterruptedCapture", "CompletedCopySteps")
                         .associateWith { captureType.getMethod("get$it").invoke(value).toString() }
                 })
         }
@@ -458,6 +474,7 @@ private data class PhaseSource(
     val problem: String,
     val sha256: String,
     val fixedIntegers: Map<String, String> = emptyMap(),
+    val gzip64: String? = null,
 )
 
 @Serializable

@@ -1,12 +1,38 @@
 package com.eignex.klause.bench.profile
 
+import java.io.ByteArrayOutputStream
+import java.util.Base64
+import java.util.zip.GZIPOutputStream
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PolynomialPhaseProfileTest {
+    @Test
+    fun `a retained source is decoded without catalog resolution`() {
+        val source = "(assert false)".encodeToByteArray()
+        val compressed = ByteArrayOutputStream()
+        GZIPOutputStream(compressed).use { it.write(source) }
+
+        val bytes = PolynomialPhaseProfile.capturedSource(Base64.getEncoder().encodeToString(compressed.toByteArray()))
+
+        assertContentEquals(source, bytes)
+    }
+
+    @Test
+    fun `retained source decompression respects the source byte limit`() {
+        val compressed = ByteArrayOutputStream()
+        GZIPOutputStream(compressed).use { it.write(ByteArray(1024 * 1024 + 1)) }
+
+        assertFailsWith<IllegalArgumentException> {
+            PolynomialPhaseProfile.capturedSource(Base64.getEncoder().encodeToString(compressed.toByteArray()))
+        }
+    }
+
     @Test
     fun `fixed integer completion retains its original coordinate map`() {
         val source = "(declare-const i Int) (declare-const x Real) (assert (= (* x x) i))"
