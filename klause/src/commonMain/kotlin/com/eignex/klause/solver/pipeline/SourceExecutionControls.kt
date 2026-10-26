@@ -48,8 +48,7 @@ internal fun bindSourceExecutionControls(
     val stop = cancellation or timeout or invocation.cancellation
     val companions = invocation.requestsFiniteNumericalCompanions
     val finiteOptions = options.withoutPresolve().without("node-limit", "dry-run-presolve").let {
-        if (companions) it.without("source-lp-work-limit", "source-lp-allocation-limit", "source-lp-operations",
-            "source-support-branching") else it
+        if (companions) it.without("source-lp-work-limit", "source-lp-allocation-limit", "source-lp-operations") else it
     }
         .overriddenBy(ExecutionOptions(ExecutionOption.seed(seed)))
     val finite: (FiniteSolveShape) -> FiniteSolveRequest = { shape ->
@@ -84,7 +83,6 @@ internal fun bindSourceExecutionControls(
             sourceLpAllocationLimit = reader.defaulted(ExecutionOption.sourceLpAllocationLimit,
                 defaults.sourceLpAllocationLimit) ?: Long.MAX_VALUE,
             sourceLpOperations = reader[ExecutionOption.sourceLpOperations] ?: defaults.sourceLpOperations,
-            sourceSupportBranching = reader[ExecutionOption.sourceSupportBranching] ?: defaults.sourceSupportBranching,
         ) else defaults
         return SourceExecutionControls(
             theory,
@@ -130,7 +128,6 @@ internal fun bindSourceExecutionControls(
                 defaults.sourceLpAllocationLimit) ?: Long.MAX_VALUE,
             sourceLpOperations = reader[ExecutionOption.sourceLpOperations] ?: defaults.sourceLpOperations,
             sourceCuts = reader[ExecutionOption.sourceCuts] ?: defaults.sourceCuts,
-            sourceSupportBranching = reader[ExecutionOption.sourceSupportBranching] ?: defaults.sourceSupportBranching,
             maxDecisions = decisions,
             sharedRestart = reader[ExecutionOption.sharedRestart],
             maxLearnedClauses = reader[ExecutionOption.maxLearned],
@@ -231,7 +228,7 @@ private fun FiniteSolveRequest.withSourceControls(
             engine,
             executionOptions.withoutPresolve().without("node-limit", "dry-run-presolve").let {
                 if (numericalCompanions) it.without("source-lp-work-limit", "source-lp-allocation-limit",
-                    "source-lp-operations", "source-support-branching") else it
+                    "source-lp-operations") else it
             }.overriddenBy(options),
         ),
         randomSeed = seed, defaultArms = policy.arms(engine, cores, defaultArms),

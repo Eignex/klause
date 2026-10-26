@@ -4732,7 +4732,7 @@ and Linux/amd64 platform match 8431.
 
 #### Source numerical decision feedback
 
-`source-support-branching=true` enables a bounded decision consumer of the
+`MpsProofFrontier supportBranching=true` enables an internal decision consumer of the
 same-parent journal. Installed checked cuts close to their LP-point boundary
 rank fractional integer coordinates by support size and fractional distance.
 The p0033 capture 8433 retains three nearly tight rounding rows at its root;
@@ -4744,7 +4744,9 @@ checked bound/refutation records and unavailable states to repair consumers.
 Cutoff attribution requires the actual strict objective premise.
 Collection and scoring debit the containing source funding. Qualification must
 separate consumed choices, checked outcomes, total work, modeled allocation and
-whole-process memory; the option is disabled by default.
+whole-process memory. Ordinary execution exposes no support-ordering option.
+The frozen `codex/source-feedback-qualification` revision retains the experimental
+CLI control used by the ordinary comparisons; its existence does not admit the policy.
 
 [Pilot 8586](https://lab.eignex.com/jobs/8586), at `3fb3878bb6`, completes 48
 ten-second P1 cases on four frozen MPS sources, seeds 1/3 and default/exact
