@@ -45,28 +45,28 @@ internal object LinearAuthorityAggregateCuts {
         observe("AggregateAttempts", 1L)
         return try {
             meter.reserve(1L)
-            if (terms.size !in 2..limits.rows) throw AggregateStop("RowLimit")
+            if (terms.size !in 2..limits.rows) stopAggregate("RowLimit")
             meter.reserve(terms.size.toLong(), terms.size * 128L)
             val identityCharacters = terms.sumOf { it.premise.length.toLong() }
             val proofBytes = identityCharacters * 2L + terms.size * (128L + (limits.scalarBits + 7L) / 4L)
-            if (proofBytes > limits.proofBytes) throw AggregateStop("ProofLimit")
+            if (proofBytes > limits.proofBytes) stopAggregate("ProofLimit")
             meter.reserve(identityCharacters, proofBytes)
             if (terms.any { it.owner < 0 || it.premise.isBlank() } ||
                 terms.map { it.owner }.distinct().size != terms.size ||
-                terms.map { it.premise }.distinct().size != terms.size) throw AggregateStop("SourceIdentity")
+                terms.map { it.premise }.distinct().size != terms.size) stopAggregate("SourceIdentity")
             val coefficients = linkedMapOf<SourceCoordinate, BigFraction>()
             var rhs = BigFraction.ZERO
             var strict = false
             for (term in terms) {
                 val weight = meter.number(term.weight)
-                if (weight <= BigFraction.ZERO) throw AggregateStop("NonpositiveWeight")
-                if (term.inequality.supportSize > limits.support) throw AggregateStop("SupportLimit")
+                if (weight <= BigFraction.ZERO) stopAggregate("NonpositiveWeight")
+                if (term.inequality.supportSize > limits.support) stopAggregate("SupportLimit")
                 val row = term.inequality.coefficients
                 meter.reserve(row.size.toLong(), row.size * 64L)
                 for ((id, value) in row) {
-                    if (id.kind == SourceCoordinate.Kind.Boolean) throw AggregateStop("BooleanActivity")
+                    if (id.kind == SourceCoordinate.Kind.Boolean) stopAggregate("BooleanActivity")
                     if (id !in coefficients && coefficients.size >= limits.support) {
-                        throw AggregateStop("SupportLimit")
+                        stopAggregate("SupportLimit")
                     }
                     val product = meter.multiply(weight, meter.number(value))
                     coefficients[id] = meter.add(coefficients[id] ?: BigFraction.ZERO, product)
@@ -133,9 +133,13 @@ private class AggregateMeter(
     private var allocation = 0L
 
     fun reserve(units: Long, bytes: Long = 0L) {
-        if (cancellation()) throw AggregateStop("Stopped")
-        if (units > limits.work - work) throw AggregateStop("WorkLimit")
-        if (bytes > limits.allocation - allocation) throw AggregateStop("AllocationLimit")
+        val reason = when {
+            cancellation() -> "Stopped"
+            units > limits.work - work -> "WorkLimit"
+            bytes > limits.allocation - allocation -> "AllocationLimit"
+            else -> null
+        }
+        if (reason != null) throw AggregateStop(reason)
         work += units
         allocation += bytes
         observe("AggregateWork", units)
@@ -170,3 +174,5 @@ private class AggregateMeter(
 }
 
 private class AggregateStop(val reason: String) : RuntimeException()
+
+private fun stopAggregate(reason: String): Nothing = throw AggregateStop(reason)
