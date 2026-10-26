@@ -6,6 +6,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.objective.LinearObjective
@@ -95,7 +96,7 @@ class LocalSearchMoveInspectionTest {
         ))
         fun trace(inspect: Boolean, slice: Long): List<Long> {
             val values = ArrayList<Long>()
-            val strategy = SourceDrivenStrategy(emptyList(), perturbation = { state ->
+            val strategy = SourceDrivenStrategy(emptyList(), feasibleDescent = FeasibleDescent.SelfOwned, perturbation = { state ->
                 values += state.assignment.intValue(0)
                 if (inspect) state.inspectMove(Move.IntSet(0, 4))
                 val next = state.rng.nextInt(5).toLong()
