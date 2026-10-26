@@ -105,7 +105,7 @@ internal class QfNraQuery(
         }
     var checkedCellObserver: ((CheckedPolynomialCell) -> Unit)? = null
     private val cellFeedback = if (params.cellRefinement && params.cellFeedback) {
-        PolynomialCellFeedback(formula, condition)
+        PolynomialCellFeedback(formula, condition, parent = work, limits = params.polynomialLimits)
     } else null
     private val cellRefinement = if (params.cellRefinement) {
         PolynomialCellRefinement(formula, condition, work, params.polynomialLimits, cellFeedback) {
@@ -331,6 +331,15 @@ internal class QfNraQuery(
                 if (reduction.inconsistent) continue
                 failureCapture?.context(formulaReduction, arithmetic, region, reduction)
                 val cellRegion = cellRefinement?.region(reducedFormula, region, reduction)
+                val feedbackScope = cellFeedback?.candidateScope(reducedFormula, region, cellRegion?.scope, arithmetic)
+                val numericFeedback: ((PolynomialAtom, Map<Int, AlgebraicReal>) -> Boolean)? =
+                    feedbackScope?.let { scope ->
+                        { atom, point ->
+                            cellFeedback?.candidateRejection(atom, scope, point) {
+                                cellRefinement?.cells.orEmpty()
+                            } != null
+                        }
+                    }
                 reducedRegionObserver?.invoke(reduction.atoms)
                 val activeFormula = if (reduction.changed) {
                     PolynomialFormula.conjunction(reduction.atoms, arithmetic)
@@ -413,7 +422,7 @@ internal class QfNraQuery(
                             work.spentWork, arithmetic, selected, completeFamily = complete)
                         val assignment = searchCells(activeFormula, activeRegion, projection, boolCount,
                             arithmetic, algebraic, work, fixed, if (complete) null else family,
-                            failureCapture, progress.searchSnapshot, cellRegion)
+                            failureCapture, progress.searchSnapshot, cellRegion, numericFeedback)
                         if (assignment != null) {
                             val regionChecked = if (!reduction.changed) assignment else {
                                 val point = reduction.reconstruct(assignment, arithmetic, algebraic)
@@ -1741,6 +1750,7 @@ private fun searchCells(
     capture: PolynomialFailureCapture? = null,
     snapshot: Long = 0,
     refinement: PolynomialCellRefinement.PolynomialCellRegion? = null,
+    feedback: ((PolynomialAtom, Map<Int, AlgebraicReal>) -> Boolean)? = null,
 ): QfNraAssignment? {
     val coordinates = HashMap<Int, AlgebraicReal>()
     if (projection.variableCount == 0) {
@@ -1781,7 +1791,7 @@ private fun searchCells(
         ) coordinate = refinement.repair(frame.variable, coordinate) ?: coordinate
         coordinates[frame.variable] = coordinate
         if (work.liftedCells < Long.MAX_VALUE) work.liftedCells++
-        val rejected = rejectedRegionAtom(formula, region, coordinates, arithmetic, algebraic, atomLevels)
+        val rejected = rejectedRegionAtom(formula, region, coordinates, arithmetic, algebraic, atomLevels, feedback)
         if (rejected != null) {
             capture?.rejected(formula, region, coordinates, rejected, snapshot, work.spentWork, arithmetic)
             // Unprojected coordinates have one fixed sector sample throughout this family's CAD.
@@ -1883,6 +1893,7 @@ private fun rejectedRegionAtom(
     arithmetic: PolynomialArithmetic,
     algebraic: AlgebraicArithmetic,
     atomLevels: Map<Int, Int>? = null,
+    feedback: ((PolynomialAtom, Map<Int, AlgebraicReal>) -> Boolean)? = null,
 ): Int? {
     for ((index, required) in region.atoms) {
         arithmetic.step()
@@ -1900,6 +1911,7 @@ private fun rejectedRegionAtom(
             }
             continue
         }
+        if (required && feedback?.invoke(atom, coordinates) == true) return index
         val sign = algebraic.signAt(atom.polynomial, coordinates)
         if (atom.holds(sign) != required) return index
     }

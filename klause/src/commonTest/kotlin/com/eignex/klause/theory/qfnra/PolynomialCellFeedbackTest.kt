@@ -4,6 +4,7 @@ import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
+import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.simplex.exact.BigFraction
@@ -18,6 +19,118 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PolynomialCellFeedbackTest {
+    @Test
+    fun `numeric comparison refusal leaves the hint unavailable`() {
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
+        val parent = QfNraWork(QfNraParams())
+        val arithmetic = PolynomialArithmetic(parent)
+        val algebraic = AlgebraicArithmetic(arithmetic)
+        val snapshot = PolynomialFormula.normalize(source.formula, arithmetic)
+        val support = PolynomialCellScope.Source.prepare(source.formula, arithmetic)
+        val predicate = support.predicates.single()
+        val zero = algebraic.rational(BigFraction.ZERO)
+        val cell = assertNotNull(CheckedPolynomialCell.rejected(predicate, support, zero, arithmetic, algebraic))
+        val value = algebraic.roots(RationalPolynomial(listOf(BigFraction.ofLong(-3), BigFraction.ZERO,
+            BigFraction.ofLong(2)))).last()
+        assertTrue(cell.contains(value, algebraic))
+        val feedback = PolynomialCellFeedback(source.formula, PolynomialCondition(), parent = parent,
+            limits = PolynomialLimits(maxDenseCoefficients = 1))
+        val scope = assertNotNull(feedback.candidateScope(snapshot,
+            PolynomialBooleanRegion(mapOf(0 to true), emptyMap()), null, arithmetic))
+
+        val rejected = feedback.candidateRejection(predicate, scope, mapOf(0 to value)) { listOf(cell) }
+
+        assertNull(rejected)
+        assertEquals(1L, feedback.stats.candidateDeclines)
+    }
+
+    @Test
+    fun `numeric checking can consume a cell after the producer allowance is exhausted`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (assert (and (= (* x x) 2) (= (* x x) 3)))",
+        )
+        val parent = QfNraWork(QfNraParams())
+        val arithmetic = PolynomialArithmetic(parent)
+        val algebraic = AlgebraicArithmetic(arithmetic)
+        val snapshot = PolynomialFormula.normalize(source.formula, arithmetic)
+        val condition = PolynomialCondition()
+        val feedback = PolynomialCellFeedback(source.formula, condition, parent = parent)
+        val refinement = PolynomialCellRefinement(source.formula, condition, parent, PolynomialLimits(), feedback) {}
+        refinement.prepare(snapshot)
+        while (refinement.stats.work < 16_384) refinement.witness(1, emptyMap()) { _, _, _ -> null }
+        val producerWork = refinement.stats.work
+        val scope = assertNotNull(feedback.candidateScope(snapshot,
+            PolynomialBooleanRegion(mapOf(0 to true, 1 to true), emptyMap()), null, arithmetic))
+        val predicate = refinement.cells.first().predicate
+        val point = mapOf(0 to algebraic.rational(BigFraction.ZERO))
+        val before = parent.spentWork
+
+        val rejected = feedback.candidateRejection(predicate, scope, point) { refinement.cells }
+
+        assertNotNull(rejected)
+        assertEquals(producerWork, refinement.stats.work)
+        assertTrue(parent.spentWork > before)
+        assertEquals(1L, feedback.stats.candidateUses)
+    }
+
+    @Test
+    fun `numeric lookup allowance survives snapshot replacement without being replenished`() {
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
+        val parent = QfNraWork(QfNraParams())
+        val arithmetic = PolynomialArithmetic(parent)
+        val algebraic = AlgebraicArithmetic(arithmetic)
+        val snapshot = PolynomialFormula.normalize(source.formula, arithmetic)
+        val support = PolynomialCellScope.Source.prepare(source.formula, arithmetic)
+        val predicate = support.predicates.single()
+        val zero = algebraic.rational(BigFraction.ZERO)
+        val cell = assertNotNull(CheckedPolynomialCell.rejected(predicate, support, zero, arithmetic, algebraic))
+        val condition = PolynomialCondition()
+        val feedback = PolynomialCellFeedback(source.formula, condition, parent = parent,
+            maximumCandidateWork = 128)
+        val premises = PolynomialBooleanRegion(mapOf(0 to true), emptyMap())
+        val scope = assertNotNull(feedback.candidateScope(snapshot, premises, null, arithmetic))
+        while (feedback.stats.candidateDeclines == 0L) {
+            feedback.candidateRejection(predicate, scope, mapOf(0 to zero)) { listOf(cell) }
+        }
+        val spent = feedback.stats.candidateWork
+        val replacement = PolynomialFormula.normalize(source.formula, arithmetic)
+
+        feedback.replaceSnapshot(replacement, arithmetic)
+
+        assertEquals(spent, feedback.stats.candidateWork)
+        assertNull(feedback.candidateScope(replacement, premises, null, arithmetic))
+        val current = PolynomialCellScope.Region(source.formula, condition, replacement, premises, Any())
+        assertNull(feedback.candidateRejection(predicate, current, mapOf(0 to zero)) { listOf(cell) })
+        assertEquals(spent, feedback.stats.candidateWork)
+    }
+
+    @Test
+    fun `a parent stop during numeric lookup remains terminal`() {
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
+        var stopped = false
+        val parent = QfNraWork(QfNraParams(cancellation = Cancellation { stopped }))
+        val arithmetic = PolynomialArithmetic(parent)
+        val algebraic = AlgebraicArithmetic(arithmetic)
+        val snapshot = PolynomialFormula.normalize(source.formula, arithmetic)
+        val support = PolynomialCellScope.Source.prepare(source.formula, arithmetic)
+        val predicate = support.predicates.single()
+        val zero = algebraic.rational(BigFraction.ZERO)
+        val cell = assertNotNull(CheckedPolynomialCell.rejected(predicate, support, zero, arithmetic, algebraic))
+        val feedback = PolynomialCellFeedback(source.formula, PolynomialCondition(), parent = parent)
+        val scope = assertNotNull(feedback.candidateScope(snapshot,
+            PolynomialBooleanRegion(mapOf(0 to true), emptyMap()), null, arithmetic))
+        stopped = true
+
+        assertFailsWith<PolynomialInterrupted> {
+            feedback.candidateRejection(predicate, scope, mapOf(0 to zero)) { listOf(cell) }
+        }
+
+        stopped = false
+        assertFailsWith<PolynomialInterrupted> {
+            feedback.candidateRejection(predicate, scope, mapOf(0 to zero)) { listOf(cell) }
+        }
+    }
+
     @Test
     fun `a regional reuse trace retains its rejected numeric candidate`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")

@@ -504,7 +504,8 @@ internal object PolynomialPhaseProfile {
                 },
                 cellFeedback = feedbackStats.invoke(owner)?.let { value ->
                     listOf("Admitted", "Lookups", "Uses", "Reuses", "CrossRegionUses", "Evicted",
-                        "SnapshotReplacements", "ScopeDeclines", "MetadataVisits")
+                        "SnapshotReplacements", "ScopeDeclines", "MetadataVisits",
+                        "CandidateUses", "CandidateWork", "CandidateDeclines")
                         .associateWith { value.javaClass.getMethod("get$it").invoke(value).toString() }
                 },
                 firstCellFeedbackReuse = firstFeedback,
