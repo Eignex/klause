@@ -80,7 +80,10 @@ internal object ObjectiveViewComparison {
     private fun capture(args: Array<String>, out: File) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val required = setOf("suite", "problem", "sha256")
-        val optional = setOf("source64", "sourceGzip64", "recipe", "seed", "moves", "timeoutMillis", "screen", "greedy")
+        val optional = setOf(
+            "source64", "sourceGzip64", "recipe", "seed", "moves", "timeoutMillis", "screen", "greedy",
+            "preparationEngine",
+        )
         require(options.keys.containsAll(required) && options.keys.all { it in required || it in optional })
         val bytes = trajectorySourceBytes(
             options.getValue("suite"), options.getValue("problem"), options.getValue("sha256"),
@@ -124,9 +127,15 @@ internal object ObjectiveViewComparison {
         val timeout = (options["timeoutMillis"]?.toLong() ?: 10000L).also { require(it in 100..60000) }
         val recipe = options["recipe"] ?: "cbls-plateau/ils-basin"
         val greedy = options["greedy"]?.toBooleanStrict() ?: true
+        val preparationEngine = when (options["preparationEngine"] ?: "mixed") {
+            "mixed" -> FiniteEngine.MIXED
+            "ls" -> FiniteEngine.LOCAL_SEARCH
+            else -> error("preparationEngine must be mixed or ls")
+        }
         out.resolve("policy.json").writeText(buildJsonObject {
             put("revision", Reports.readGitSha() ?: System.getenv("LAB_WORKTREE")?.let { File(it).name })
             put("recipe", recipe)
+            put("preparationEngine", preparationEngine.id)
             put("seed", seed)
             put("moves", moves)
             put("timeoutMillisIncludingPreparation", timeout)
@@ -144,7 +153,7 @@ internal object ObjectiveViewComparison {
         val boundaries = ArrayList<Boundary>()
         for (view in View.entries) {
             val directory = out.resolve(view.name.lowercase()).apply { mkdirs() }
-            val prepared = prepare(source, view, seed, timeout, directory) ?: continue
+            val prepared = prepare(source, view, preparationEngine, seed, timeout, directory) ?: continue
             directory.resolve("model.json").writeText(buildJsonObject {
                 put("preparationNanos", prepared.nanos)
                 put("preparationAllocatedBytes", prepared.allocatedBytes)
@@ -201,7 +210,14 @@ internal object ObjectiveViewComparison {
         }
     }
 
-    private fun prepare(source: Xcsp3Problem, view: View, seed: Long, timeout: Long, out: File): Prepared? {
+    private fun prepare(
+        source: Xcsp3Problem,
+        view: View,
+        engine: FiniteEngine,
+        seed: Long,
+        timeout: Long,
+        out: File,
+    ): Prepared? {
         val started = System.nanoTime()
         val allocation = allocationCounter()
         val before = allocation.getThreadAllocatedBytes(Thread.currentThread().threadId())
@@ -210,7 +226,7 @@ internal object ObjectiveViewComparison {
         val invocation = SourceSetup.prepare(SourceSetupRequest(
             if (source.definedVars.isEmpty()) SourceAttachment(source.problem, source.definitionHints)
             else SourceAttachment(source.problem, source.definedVars, emptyList(), source.definitionHints),
-            ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED, objective = objective, cancellation = stop,
+            ExecutionOperation.OPTIMIZE, engine, objective = objective, cancellation = stop,
         ))
         val plan = invocation.preparedPlan
         if (plan == null || stop()) {
@@ -218,7 +234,7 @@ internal object ObjectiveViewComparison {
             return null
         }
         val prepared = FinitePipeline.prepare(FinitePipelineRequest(
-            requireNotNull(plan.model), FiniteEngine.MIXED, objective,
+            requireNotNull(plan.model), engine, objective,
             cancellation = stop, solveCancellation = stop, presolveBudget = PresolveBudget(1_375_000_000L),
             preparedPlan = plan, transformObjective = view == View.SUBSTITUTED, randomSeed = seed,
         ))
