@@ -113,12 +113,14 @@ internal class LinearRefutationReuse(
     private fun shape(): Pair<Long, Long>? {
         sourceShape?.let { return it }
         if (sourceWidthDeclined) return null
-        if (!spend(1L, 256L + 48L * (source.coordinateCount + source.premiseCount))) return null
+        val metadataEntries = source.coordinateCount.toLong() + source.premiseCount
+        if (!spend(1L + source.premiseCount, 256L + 48L * metadataEntries)) return null
         var units = 1L + source.coordinateCount
         var bytes = 256L + 48L * source.coordinateCount
         for (premise in source.premises.values) {
-            val entries = 1L + premise.inequality.supportSize + premise.guards.size + premise.integerPins.size
-            if (!spend(entries)) return null
+            val entries = 1L + premise.inequality.supportSize + premise.guardCount + premise.integerPinCount
+            val rowBytes = 128L + 96L * entries
+            if (!spend(entries - 1L, rowBytes)) return null
             if (!(premise.inequality.coefficients.values + premise.inequality.rhs +
                     premise.integerPins.values).all(::admitted)) {
                 sourceWidthDeclined = true
@@ -126,7 +128,7 @@ internal class LinearRefutationReuse(
                 return null
             }
             units += entries
-            bytes += 128L + 96L * entries
+            bytes += rowBytes
         }
         if (!(source.objective.values + source.objectiveConstant).all(::admitted)) {
             sourceWidthDeclined = true
