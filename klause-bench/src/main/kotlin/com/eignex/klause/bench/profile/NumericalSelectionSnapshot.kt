@@ -144,7 +144,10 @@ internal class NumericalSelectionSnapshot(private val stop: Cancellation) {
     }
 
     private fun proof(value: SourceDerivation, depth: Int = 0): JsonObject {
-        require(depth < 64 && !stop())
+        if (depth >= 64 || stop()) return buildJsonObject {
+            put("kind", "Unavailable")
+            put("reason", "inspection allowance")
+        }
         return buildJsonObject {
             put("kind", value::class.simpleName)
             when (value) {
