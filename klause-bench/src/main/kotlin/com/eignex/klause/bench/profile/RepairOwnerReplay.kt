@@ -47,6 +47,8 @@ internal object RepairOwnerReplay {
         val preparationNs: Long = 0L, val bound: Any? = null,
     )
 
+    private data class ClauseUsage(val used: BooleanArray, val permanent: BooleanArray, val total: Int, val complete: Boolean)
+
     fun replay(
         controls: File, problem: BakedProblem, objective: LinearObjective, prepared: FinitePipelinePreparation,
         source: BakedProblem, file: File, seed: Long, allowance: Long = 100_000L,
@@ -120,13 +122,17 @@ internal object RepairOwnerReplay {
                         val allocationStart = bean.getThreadAllocatedBytes(thread)
                         val start = System.nanoTime()
                         var native: Any? = null
+                        var usageBefore: ClauseUsage? = null
+                        var usageAfter: ClauseUsage? = null
+                        var observationNs = 0L
                         val unavailable = when {
                             kind.startsWith("cp") && BigFraction.ofDouble(scope.cutoff.toDouble()) != scope.cutoff ->
                                 "exact cutoff is not representable by the retained CP double contract"
                             else -> null
                         }
                         val outcome = when {
-                            stop() || budget.exhausted() -> Outcome(null, TerminationReason.BudgetExhausted, before)
+                            stop() -> Outcome(null, stopped(stop), before)
+                            budget.exhausted() -> Outcome(null, TerminationReason.BudgetExhausted, before)
                             unavailable != null -> Outcome(null, TerminationReason.Unsupported, before)
                             kind == "ls" -> local(problem, objective, scope, stop, budget, seed)
                             kind.startsWith("cp") -> {
@@ -135,7 +141,16 @@ internal object RepairOwnerReplay {
                                     BacktrackParams(nodeBudget = budget, randomSeed = seed, cancellation = dynamic))
                                 val preparation = System.nanoTime() - opened
                                 if (kind == "cp-retained") retained = native
-                                complete(checkNotNull(native), scope, stop, preparation)
+                                val observationStart = System.nanoTime()
+                                usageBefore = clauseUsage(checkNotNull(native), stop)
+                                observationNs += System.nanoTime() - observationStart
+                                val completed = complete(checkNotNull(native), scope, stop, preparation)
+                                val afterStart = System.nanoTime()
+                                usageAfter = clauseUsage(checkNotNull(native), stop)
+                                observationNs += System.nanoTime() - afterStart
+                                call(budget, "spendMoves", ((usageBefore?.used?.size ?: 0) +
+                                    (usageAfter?.used?.size ?: 0)).toLong())
+                                completed
                             }
                             else -> {
                                 val opened = System.nanoTime()
@@ -188,6 +203,7 @@ internal object RepairOwnerReplay {
                             put("epoch", epoch)
                             put("status", status)
                             put("reason", outcome.reason?.toString())
+                            put("completion", outcome.reason?.toString() ?: if (sample != null) "point" else "paused")
                             put("unavailable", unavailable)
                             put("strictWorkingCutoff", scope.cutoff.toString())
                             put("cutoffRule", "strict improvement on the checked control center")
@@ -216,6 +232,8 @@ internal object RepairOwnerReplay {
                             put("elapsedNs", elapsed)
                             put("threadBytes", allocation)
                             put("preparationNs", outcome.preparationNs)
+                            put("reuseObservationNs", observationNs)
+                            put("retainedClauseUses", reuse(usageBefore, usageAfter))
                             put("statsBefore", NumericalResidualProfile.json(before))
                             put("statsAfter", NumericalResidualProfile.json(outcome.stats))
                         }.toString())
@@ -247,15 +265,17 @@ internal object RepairOwnerReplay {
     }
 
     private fun complete(owner: Any, scope: Scope, stop: Cancellation, preparation: Long): Outcome {
+        val start = System.nanoTime()
         call(owner, "begin", scope.pins, Long.MAX_VALUE, scope.cutoff.toDouble(), stop)
+        val prepared = preparation + System.nanoTime() - start
         var result: Any
         do {
             result = checkNotNull(call(owner, "runSlice", Cancellation.Never, 10L, 64L))
         } while (call(result, "getReason") == null && !stop())
         val reason = call(result, "getReason") as TerminationReason?
-            ?: if (stop()) TerminationReason.Cancelled else null
+            ?: if (stop()) stopped(stop) else null
         return Outcome(call(result, "getSample") as Sample?, reason,
-            call(owner, "getStats") as SolveStats, preparation)
+            call(owner, "getStats") as SolveStats, prepared)
     }
 
     private fun mixed(problem: BakedProblem, objective: LinearObjective, stop: Cancellation, budget: NodeBudget,
@@ -290,7 +310,7 @@ internal object RepairOwnerReplay {
         } while (result.javaClass.simpleName == "Paused" && !stop() && !budget.exhausted())
         val reason = when {
             result.javaClass.simpleName == "Refuted" -> TerminationReason.SearchExhausted
-            stop() -> TerminationReason.Cancelled
+            stop() -> stopped(stop)
             budget.exhausted() -> TerminationReason.BudgetExhausted
             else -> call(attempt, "getReason") as TerminationReason?
         }
@@ -316,6 +336,49 @@ internal object RepairOwnerReplay {
             ?: JsonNull)
         put("approximateReals", JsonArray(value.reals.map(::JsonPrimitive)))
     }
+
+    private fun clauseUsage(owner: Any, stop: Cancellation): ClauseUsage {
+        val field = owner.javaClass.declaredFields.single {
+            it.type.name == "com.eignex.klause.backtrack.ResumableMinimize"
+        }.apply { isAccessible = true }
+        val handle = field.get(owner)
+        val session = handle.javaClass.getDeclaredMethod("getSession").apply { isAccessible = true }.invoke(handle)
+        val total = call(session, "getLearnedClauseCount") as Int
+        val used = ArrayList<Boolean>()
+        val permanent = ArrayList<Boolean>()
+        for (index in 0 until minOf(total, 4096)) {
+            if (stop()) break
+            used += call(session, "learnedClauseUsedSinceReduction", index) as Boolean
+            permanent += call(session, "learnedClausePermanent", index) as Boolean
+        }
+        return ClauseUsage(used.toBooleanArray(), permanent.toBooleanArray(), total, used.size == total)
+    }
+
+    private fun reuse(before: ClauseUsage?, after: ClauseUsage?) = buildJsonObject {
+        val compatible = before != null && after != null && after.total >= before.total &&
+            after.used.size >= before.used.size && before.permanent.indices.all {
+                before.permanent[it] == after.permanent[it]
+            }
+        put("available", compatible)
+        put("completePrefix", before?.complete == true && after?.complete == true)
+        put("maximumClauses", 4096)
+        put("flagsCleared", false)
+        put("databaseReductionEnabled", false)
+        put("alreadyUsedClausesHaveUnknownRepeatUse", true)
+        if (compatible) {
+            val earlier = checkNotNull(before)
+            val later = checkNotNull(after)
+            put("newlyUsedRetainedNogoods", earlier.used.indices.count {
+                !earlier.used[it] && later.used[it] && !earlier.permanent[it]
+            })
+            put("newlyUsedRetainedPermanentClauses", earlier.used.indices.count {
+                !earlier.used[it] && later.used[it] && earlier.permanent[it]
+            })
+        }
+    }
+
+    private fun stopped(stop: Cancellation): TerminationReason =
+        if (stop.deadline()?.hasPassedNow() == true) TerminationReason.Timeout else TerminationReason.Cancelled
 
     private fun call(owner: Any, name: String, vararg args: Any?): Any? =
         NumericalResidualProfile.call(owner, name, *args)
