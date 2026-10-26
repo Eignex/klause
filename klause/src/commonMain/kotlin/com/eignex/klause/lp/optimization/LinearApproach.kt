@@ -65,7 +65,8 @@ class LinearAuthoritySemantics(private val source: SourceProofContext) : SourceS
         claim: SourceClaim, derivation: SourceDerivation.Extension, scope: SourceScope, cancellation: Cancellation,
     ): SourceEvidenceCheck {
         if (derivation is LinearActiveRefutation) {
-            if (!compatible(scope) || (claim != SourceClaim.Refutation && claim !is SourceClaim.Bound)) {
+            if (!compatible(scope) || (claim != SourceClaim.Refutation && claim !is SourceClaim.Bound) ||
+                (claim is SourceClaim.Bound && scope.objective == null)) {
                 return SourceEvidenceCheck.Rejected("active rows establish only a scoped contradiction")
             }
             val numeric = source.atScope(scope).activeNumericContext(cancellation)

@@ -3874,6 +3874,7 @@ Boolean completion. It is a feasibility-only opt-in under the same cumulative
 source LP limits; partial checks, unchanged-state skips, pauses and checked
 conflicts have separate `numericalPartial` counters. Partial points give neither
 incumbents nor objective bounds. Complete-check counts remain separate.
+Incomplete active-row captures retain unknown applicability.
 `activeControls=true` instead runs seven self-authored native exact-affine controls
 with delayed and active-row consultations. One warmup and three measured rounds
 alternate arm order, preserving the exact source JSON/hash, objective units, full

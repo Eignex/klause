@@ -183,6 +183,7 @@ internal class LinearAuthorityTraversal(
             val partial = activeRows?.check(current.condition, cancellation, context::consumeCheck)
                 ?: return SearchNodeDisposition.Expand
             if (partial.attempted) observe("numericalPartialChecks")
+            if (partial.captureDeclined) observe("numericalPartialIncompleteCaptures")
             if (partial.unchanged) observe("numericalPartialUnchangedStates")
             if (partial.paused) {
                 observe("numericalPartialPauses")

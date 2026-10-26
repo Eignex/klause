@@ -230,6 +230,19 @@ class LinearActiveRowsTest {
     }
 
     @Test
+    fun `a refutation should not invent an objective for a bound claim`() {
+        val source = SourceProofContext(scope.copy(objective = null), setOf(bool), mapOf(
+            "conflict" to SourcePremise(SourceInequality(emptyMap(), BigFraction.MINUS_ONE)),
+        ), emptyMap())
+        val evidence = SourceEvidence(source.scope, SourceClaim.Bound(BigFraction.ZERO),
+            LinearActiveRefutation(SourceDerivation.Premise("conflict")))
+
+        val checked = SourceEvidenceVerifier(source.withLinearAuthority()).verify(evidence)
+
+        assertIs<SourceEvidenceCheck.Rejected>(checked)
+    }
+
+    @Test
     fun `active projection should discard unresolved objective coefficients`() {
         val source = SourceProofContext(scope, setOf(real, bool), emptyMap(), mapOf(bool to BigFraction.ONE))
 
