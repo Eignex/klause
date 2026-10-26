@@ -5347,6 +5347,17 @@ ordinary solve speedups or grounds for default promotion.
 all 24 replay operation counts, masks, exact bounds, work and modeled allocation
 after integration with active-row capture. All available replay bounds recheck.
 
+[Integration p0033 8639](https://lab.eignex.com/jobs/8639), at `94d416a07f`,
+checks composition with the funded numerical-feedback journal on Linux/amd64.
+Its four distinct source scopes produce 24 replay bounds and 128 cut derivations
+that pass fresh native checks. Both repetitions reproduce points, masks, exact
+bounds and modeled costs without reaching an allowance. Selected separation
+preserves every all-cut bound with two operations and higher work and allocation
+than the one-operation all-cut queries. The 32-operation capture retains 27
+certified bounds, nine closed leaves and 19 pending leaves, spending 458,587 funded
+work and 333,968 modeled bytes. These diagnostic results do not replace ordinary
+held-out qualification.
+
 #### Source numerical decision feedback
 
 `MpsProofFrontier supportBranching=true` enables an internal decision consumer of the
