@@ -59,19 +59,25 @@ internal object RepairOwnerReplay {
         controls: File, problem: BakedProblem, objective: LinearObjective, prepared: FinitePipelinePreparation,
         source: BakedProblem, inputs: IntArray, file: File, seed: Long, allowance: Long = 100_000L,
         fragmentAllowance: Long = 2_000L,
+        sourceCheck: ((Sample, Cancellation) -> Boolean)? = null, mixedContext: SourceProofContext? = null,
     ) {
         require(allowance > 0 && fragmentAllowance > 0)
         val bean = ManagementFactory.getThreadMXBean() as ThreadMXBean
         val thread = Thread.currentThread().threadId()
         val setupStarted = System.nanoTime()
         val setupAllocation = bean.getThreadAllocatedBytes(thread)
+        fun accepted(sample: Sample, stop: Cancellation) =
+            sourceCheck?.invoke(sample, stop) ?: checkSource(source, prepared.reconstruct(sample), stop)
         val scopeOwner = Class.forName("com.eignex.klause.meta.alns.RepairScope").getField("INSTANCE").get(null)
         val freedType = Class.forName("com.eignex.klause.meta.alns.FreedVars")
         require(controls.length() in 0..4L * 1024 * 1024)
         val controlBytes = controls.readBytes()
         val controlHash = sha256(controlBytes)
         val entries = controlBytes.decodeToString().lines().filter(String::isNotBlank)
-        if (problem.numRealVars != 0) {
+        if (problem.numRealVars != 0 && entries.any {
+            (Json.parseToJsonElement(it).jsonObject.getValue("center").jsonObject["exactReals"] as? JsonArray)
+                ?.size != problem.numRealVars
+        }) {
             file.bufferedWriter().use { writer ->
                 for (id in entries.indices) for (owner in listOf("ls", "cp-cold", "cp-retained",
                     "mixed-cold", "mixed-retained")) {
@@ -89,9 +95,12 @@ internal object RepairOwnerReplay {
         val scopes = entries.mapIndexed { index, line ->
             val entry = Json.parseToJsonElement(line).jsonObject
             val saved = entry.getValue("center").jsonObject
+            val reals = saved["exactReals"]?.jsonArray?.map { MpsResidualObjective.rational(it.jsonPrimitive.content) }
+                ?: emptyList()
+            require(reals.size == problem.numRealVars)
             val center = Sample(saved.getValue("bools").jsonArray.map { it.jsonPrimitive.content.toBooleanStrict() }
                 .toBooleanArray(), saved.getValue("ints").jsonArray.map { it.jsonPrimitive.content.toLong() }
-                .toLongArray())
+                .toLongArray(), reals.map { it.toDouble() }.toDoubleArray(), exactReals = reals)
             require(center.numBoolVars == problem.numBoolVars && center.numIntVars == problem.numIntVars)
             val cutoff = objective.evaluateExact(center)
             val bools = intArrayOf()
@@ -100,7 +109,7 @@ internal object RepairOwnerReplay {
             val freed = freedType.getDeclaredConstructor(IntArray::class.java, IntArray::class.java)
                 .newInstance(bools, ints)
             val pins = call(scopeOwner, "pins", problem, center, freed) as Assumptions
-            check(checkSource(source, prepared.reconstruct(center), Cancellation.after(2000.milliseconds)))
+            check(accepted(center, Cancellation.after(2000.milliseconds)))
             Scope(index, center, bools, ints, pins, cutoff,
                 entry.getValue("centerObjective").jsonPrimitive.content.toDouble(),
                 entry.getValue("selector").jsonPrimitive.content)
@@ -192,7 +201,7 @@ internal object RepairOwnerReplay {
                                 val opened = System.nanoTime()
                                 native = retained ?: mixed(problem, objective, dynamic, budget,
                                     { activeCenter }, 1_000_000_000L - mixedWork,
-                                    512L * 1024 * 1024 - mixedAllocation, 256 - mixedOperations)
+                                    512L * 1024 * 1024 - mixedAllocation, 256 - mixedOperations, mixedContext)
                                 val preparation = System.nanoTime() - opened
                                 if (kind == "mixed-retained") retained = native
                                 else transient = native as? AutoCloseable
@@ -224,7 +233,9 @@ internal object RepairOwnerReplay {
                         }
                         val verificationStarted = System.nanoTime()
                         val verificationAllocation = bean.getThreadAllocatedBytes(thread)
-                        val checked = sample?.let { checkSource(source, prepared.reconstruct(it), lifetime) }
+                        val realAuthority = sample == null || problem.numRealVars == 0 ||
+                            sample.exactReals?.size == problem.numRealVars
+                        val checked = sample?.takeIf { realAuthority }?.let { accepted(it, lifetime) }
                         val verificationNs = System.nanoTime() - verificationStarted
                         val verificationBytes = bean.getThreadAllocatedBytes(thread) - verificationAllocation
                         val improving = sample != null && checked == true &&
@@ -232,6 +243,8 @@ internal object RepairOwnerReplay {
                         val status = when {
                             improving -> "improvement"
                             checked == true -> "feasible-nonimprovement"
+                            !realAuthority -> "unavailable"
+                            sample != null && checked == false && !lifetime() -> "source-rejected"
                             outcome.reason == TerminationReason.SearchExhausted -> "conditioned-closure"
                             outcome.reason == TerminationReason.BudgetExhausted -> "budget-exhaustion"
                             outcome.reason in setOf(TerminationReason.Cancelled, TerminationReason.Timeout) ->
@@ -351,12 +364,15 @@ internal object RepairOwnerReplay {
 
     private fun mixed(problem: BakedProblem, objective: LinearObjective, stop: Cancellation, budget: NodeBudget,
         center: () -> Sample?, work: Long, allocation: Long, operations: Int,
+        originalContext: SourceProofContext?,
     ): Any? {
-        val type = Class.forName(PIPELINE + "FiniteNumericalCompanions").getField("Companion").get(null)
         val limits = TheoryParams(cancellation = stop, nodeBudget = budget, sourceLpWorkLimit = work.coerceAtLeast(0),
             sourceLpAllocationLimit = allocation.coerceAtLeast(0), sourceLpOperations = operations.coerceAtLeast(0))
-        val companion = call(type, "prepare", problem, objective, limits, stop) ?: return null
-        val context = NumericalFrontierSnapshot.field(companion, "context") as SourceProofContext
+        val context = originalContext ?: run {
+            val type = Class.forName(PIPELINE + "FiniteNumericalCompanions").getField("Companion").get(null)
+            val companion = call(type, "prepare", problem, objective, limits, stop) ?: return null
+            NumericalFrontierSnapshot.field(companion, "context") as SourceProofContext
+        }
         val policy = Class.forName("com.eignex.klause.lp.SparseSourceLpPolicy").getConstructor().newInstance()
         return Class.forName(PIPELINE + "JointLinearRepair").constructors.single { it.parameterCount == 8 }
             .newInstance(problem, context, objective, limits, policy, true, center, stop)
@@ -402,7 +418,7 @@ internal object RepairOwnerReplay {
         return checked is Verification.Accepted
     }
 
-    private fun sample(value: Sample) = buildJsonObject {
+    fun sample(value: Sample) = buildJsonObject {
         put("bools", JsonArray(value.bools.map(::JsonPrimitive)))
         put("ints", JsonArray((0 until value.numIntVars).map { JsonPrimitive(value.exactIntValue(it).toString()) }))
         put("exactReals", value.exactReals?.let {
