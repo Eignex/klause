@@ -390,6 +390,22 @@ internal object LocalSearchTrajectory {
         it.name.substringBefore('$') == name && it.parameterCount == 0
     }.invoke(owner)
 
+    internal fun trajectoryCoordinates(
+        invocation: PreparedSourceInvocation,
+        prepared: FinitePipelinePreparation,
+        stop: Cancellation,
+    ): VarRemap? {
+        val mapping = getter(prepared, "getSourceMapping") ?: return null
+        val plan = getter(invocation, "getEnginePlan") ?: return null
+        val sourceMethods = Class.forName("com.eignex.klause.solver.pipeline.SourceHintMappingKt").methods
+        val planned = sourceMethods.single { it.name == "sourceCoordinates" }.invoke(null, plan, stop)
+            as VarRemap? ?: return null
+        val projected = Class.forName("com.eignex.klause.presolve.SourceMappingKt").methods.single {
+            it.name == "retainedCoordinates"
+        }.invoke(null, mapping, stop) as VarRemap? ?: return null
+        return sourceMethods.single { it.name == "followedBy" }.invoke(null, planned, projected, stop) as VarRemap?
+    }
+
     internal fun heuristicHints(
         invocation: PreparedSourceInvocation,
         prepared: FinitePipelinePreparation,
