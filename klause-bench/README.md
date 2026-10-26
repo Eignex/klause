@@ -274,7 +274,10 @@ XZ, bzip2 and gzip members use `unxz`, `bunzip2` and `gunzip`.
 
 CNF, WCNF, OPB, WBO, XML, SMT-LIB and MPS collections can use `.zst`; MiniZinc
 source/data and cloned collections stay plain. zstd-jni handles stored frames in
-the bench JVM; decompression is inside measured solve time. Hashes use decompressed bytes.
+the bench JVM. `select files=true` replaces selected compressed members with their
+original plain bytes for CLI and checker consumers, and refreshes collection sizes.
+This decoding belongs to selection preparation; ordinary cases use the prepared
+plain inputs. Hashes use decompressed bytes.
 Compression writes beside the original, verifies SHA-256, then replaces it;
 interrupted migration can resume.
 

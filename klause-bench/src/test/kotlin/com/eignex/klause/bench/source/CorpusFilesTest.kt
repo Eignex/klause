@@ -12,6 +12,22 @@ import kotlin.test.assertTrue
 
 class CorpusFilesTest {
     @Test
+    fun `unpacking replaces compressed storage with original source bytes`() {
+        val root = Files.createTempDirectory("corpusfiles").toFile()
+        try {
+            val body = "p cnf 2 1\n1 -2 0\n"
+            val packed = CorpusFiles.compress(File(root, "inst.cnf").apply { writeText(body) })
+
+            val plain = CorpusFiles.unpack(packed)
+
+            assertEquals(body, plain.readText())
+            assertFalse(packed.exists())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun `a truncated compressed instance fails instead of returning partial source`() {
         val root = Files.createTempDirectory("corpusfiles").toFile()
         try {
