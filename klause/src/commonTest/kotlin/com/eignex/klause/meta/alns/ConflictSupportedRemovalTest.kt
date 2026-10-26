@@ -52,15 +52,19 @@ class ConflictSupportedRemovalTest {
 
     @Test
     fun `a cutoff at the pinned root should leave conflict guidance unavailable`() {
-        val source = Problem(0, 2, Array(2) { IntDomain(0, 1) }, listOf(
+        val source = Problem(
+            0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(
             Linear(longArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0L),
-        )).bake()
+        )
+        ).bake()
         val incumbent = Sample(BooleanArray(0), longArrayOf(1, 1))
         val pins = Assumptions.None.withInt(0, 1)
         val guidance = ConflictSupportedRemoval(source, objective)
         guidance.begin(incumbent, pins, 2.0, Cancellation.Never)
         val params = guidance.observe(BacktrackParams(randomSeed = 3, maxDecisions = 16)).copy(
-            assumptions = pins, objectiveBoundSupplier = { 2.0 },
+            assumptions = pins,
+            objectiveBoundSupplier = { 2.0 },
         )
 
         val result = BacktrackSolver(source).minimize(objective, params)
@@ -97,9 +101,13 @@ class ConflictSupportedRemovalTest {
         val guidance = ConflictSupportedRemoval(problem, objective)
         val observer = guidance.observe(BacktrackParams()).variableSelector.fresh()
         guidance.begin(center, Assumptions.None, 0.0, Cancellation.Never)
-        observer.onConflict(VarRef.Bool(0), PropagationResult.Unsat(
-            conflictBools = intArrayOf(1), conflictInts = intArrayOf(0),
-        ))
+        observer.onConflict(
+            VarRef.Bool(0),
+            PropagationResult.Unsat(
+            conflictBools = intArrayOf(1),
+            conflictInts = intArrayOf(0),
+        )
+        )
 
         val freed = guidance.destroy(Random(3), problem, center, objective, 0.5)
 
@@ -162,10 +170,13 @@ class ConflictSupportedRemovalTest {
             guidance.begin(center, Assumptions.None, -1.0, Cancellation.Never)
             observer.onConflict(null, BranchingConflict(intArrayOf(1)))
 
-            guidance.destroy(Random(3),
+            guidance.destroy(
+                Random(3),
                 if (change == "model") Problem(2, 2, Array(2) { IntDomain(0, 1) }, emptyList()).bake() else problem,
                 if (change == "center") Sample(BooleanArray(2), LongArray(2)) else center,
-                if (change == "objective") objective.copy() else objective, 0.5)
+                if (change == "objective") objective.copy() else objective,
+                0.5,
+            )
 
             assertEquals(ConflictGuidanceStatus.Incompatible, guidance.status)
             assertNull(guidance.originPins)
@@ -235,7 +246,9 @@ class ConflictSupportedRemovalTest {
             guidance.begin(center, Assumptions.None, 0.0, Cancellation { stopped })
             observer.onConflict(null, BranchingConflict(intArrayOf(1)))
 
-            if (close) guidance.close() else {
+            if (close) {
+                guidance.close()
+            } else {
                 stopped = true
                 observer.onConflict(null, BranchingConflict(intArrayOf(0)))
             }

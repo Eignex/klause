@@ -14,7 +14,14 @@ import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
 
 internal enum class ConflictGuidanceStatus {
-    Unavailable, EmptySupport, Supported, Incompatible, Unsupported, Limited, Cancelled, Closed,
+    Unavailable,
+    EmptySupport,
+    Supported,
+    Incompatible,
+    Unsupported,
+    Limited,
+    Cancelled,
+    Closed,
 }
 
 internal class ScopedConflictAttribution(
@@ -31,7 +38,8 @@ internal class ConflictSupportedRemoval(
     private val callerAssumptions: Assumptions = Assumptions.None,
     private val maxCoordinates: Int = 4096,
     private val maxConflicts: Int = 32,
-) : DestroyOperator, AutoCloseable {
+) : DestroyOperator,
+    AutoCloseable {
     private var center: Sample? = null
     private var scores = IntArray(0)
     private var seen = IntArray(0)
@@ -72,17 +80,22 @@ internal class ConflictSupportedRemoval(
     fun observe(params: BacktrackParams): BacktrackParams {
         require(params.assumptions == callerAssumptions)
         val supplier = params.objectiveBoundSupplier
-        return params.copy(variableSelector = observing(params.variableSelector),
+        return params.copy(
+            variableSelector = observing(params.variableSelector),
             objectiveBoundSupplier = supplier?.let {
                 {
                     val cutoff = it()
                     if (observing) {
-                        if (cutoff.isNaN() || cutoff > externalCutoff) discard(ConflictGuidanceStatus.Incompatible)
-                        else externalCutoff = cutoff
+                        if (cutoff.isNaN() || cutoff > externalCutoff) {
+                            discard(ConflictGuidanceStatus.Incompatible)
+                        } else {
+                            externalCutoff = cutoff
+                        }
                     }
                     cutoff
                 }
-            })
+            },
+        )
     }
 
     fun recording(repair: BacktrackRepair): RepairOperator = RepairOperator { context ->
@@ -203,8 +216,14 @@ internal class ConflictSupportedRemoval(
                 hasSupport = true
             }
         }
-        captured.add(ScopedConflictAttribution(bools.copyOf(), ints.copyOf(), minOf(externalCutoff, localCutoff),
-            localIncumbent))
+        captured.add(
+            ScopedConflictAttribution(
+            bools.copyOf(),
+            ints.copyOf(),
+            minOf(externalCutoff, localCutoff),
+            localIncumbent,
+        )
+        )
         visits += bools.size + ints.size
         status = if (hasSupport) ConflictGuidanceStatus.Supported else ConflictGuidanceStatus.EmptySupport
     }
@@ -217,9 +236,13 @@ internal class ConflictSupportedRemoval(
         fraction: Double,
     ): FreedVars {
         if (closed) status = ConflictGuidanceStatus.Closed
-        if (!closed && (problem !== model || objective !== this.objective ||
-                (center != null && incumbent !== center))
-        ) discard(ConflictGuidanceStatus.Incompatible)
+        if (!closed && (
+            problem !== model || objective !== this.objective ||
+                (center != null && incumbent !== center)
+        )
+        ) {
+            discard(ConflictGuidanceStatus.Incompatible)
+        }
         if (status != ConflictGuidanceStatus.Supported) {
             return DestroyOperator.Random.destroy(rng, problem, incumbent, objective, fraction)
         }
