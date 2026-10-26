@@ -1444,7 +1444,7 @@ their structured sources. Fixture expectations live beside
 in numbered directories under one profile job.
 Model keys, domains, objectives, source bytes and
 build identity remain alongside the walk. Inputs admit at most 64 MiB,
-4,096 Boolean/integer coordinates and 8,192 factors. Hint construction uses the production
+8,192 Boolean/integer coordinates and 8,192 factors. Hint construction uses the production
 mapping through reflection and fails on an internal shape mismatch. Paired loading
 uses the same retained-coordinate projection, leaving reconstructed columns to
 the existing source reconstruction. Size and unsupported projection refusals remain

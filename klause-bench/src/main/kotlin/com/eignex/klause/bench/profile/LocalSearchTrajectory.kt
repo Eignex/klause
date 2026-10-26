@@ -193,6 +193,20 @@ internal object LocalSearchTrajectory {
                 }
                 inverse.bake(stop)
             } else preparedProblem
+            if (problem.numBoolVars.toLong() + problem.numIntVars > TRAJECTORY_COORDINATE_LIMIT ||
+                problem.numFactors > TRAJECTORY_FACTOR_LIMIT
+            ) {
+                out.resolve("decline-$rewrite.json").writeText(buildJsonObject {
+                    put("decline", "working-size")
+                    put("workingBooleans", problem.numBoolVars)
+                    put("workingIntegers", problem.numIntVars)
+                    put("workingFactors", problem.numFactors)
+                    put("coordinateLimit", TRAJECTORY_COORDINATE_LIMIT)
+                    put("factorLimit", TRAJECTORY_FACTOR_LIMIT)
+                    put("sourceVerdictClaim", false)
+                }.toString())
+                continue
+            }
             val workingObjective = prepared.objective
             require(initial == null || (initial.numIntVars == problem.numIntVars &&
                 prepared.reconstruct(initial) == initial)) { "explicit center needs an unchanged coordinate frame" }
@@ -205,6 +219,9 @@ internal object LocalSearchTrajectory {
             out.resolve("model-$rewrite.json").writeText(buildJsonObject {
                 put("preparationNanos", System.nanoTime() - preparationStarted)
                 put("objective", workingObjective.toString())
+                put("workingBooleans", problem.numBoolVars)
+                put("workingIntegers", problem.numIntVars)
+                put("workingFactors", problem.numFactors)
                 put("channel", variant.channel.name)
                 put("maintainedDefinitions", maintained?.size ?: 0)
                 put("retainedDefinitions", sweep?.size ?: 0)
