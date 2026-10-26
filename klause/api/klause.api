@@ -4951,6 +4951,14 @@ public final class com/eignex/klause/localsearch/LocalSearchModel$Companion {
 	public static synthetic fun open$default (Lcom/eignex/klause/localsearch/LocalSearchModel$Companion;Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/PreparedFactorProjections;[Lcom/eignex/klause/ir/IntDomain;ILjava/lang/Object;)Lcom/eignex/klause/localsearch/LocalSearchModel;
 }
 
+public final class com/eignex/klause/localsearch/LocalSearchMoveInspection {
+	public final fun getAssignment ()Lcom/eignex/klause/solver/Sample;
+	public final fun getFactorDegrees ()[I
+	public final fun getNetDelta ()J
+	public final fun getObjectiveDelta ()D
+	public final fun getWeightedNetDelta ()D
+}
+
 public final class com/eignex/klause/localsearch/LocalSearchParams : com/eignex/klause/solver/SolverParams {
 	public fun <init> ()V
 	public fun <init> (JLjava/lang/Long;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/util/Cancellation;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/localsearch/CostShaping;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/incumbent/IncumbentExchange;IZZZ)V
@@ -5141,6 +5149,8 @@ public final class com/eignex/klause/localsearch/LocalSearchState {
 	public final fun getViolationSoftCap ()I
 	public final fun getWeights ()Lcom/eignex/klause/localsearch/FactorWeightBook;
 	public final fun greedyPickByShapedBreak (Ljava/util/List;)Lcom/eignex/klause/localsearch/Move;
+	public final fun inspectMove (Lcom/eignex/klause/localsearch/Move;Lcom/eignex/klause/solver/objective/Objective;)Lcom/eignex/klause/localsearch/LocalSearchMoveInspection;
+	public static synthetic fun inspectMove$default (Lcom/eignex/klause/localsearch/LocalSearchState;Lcom/eignex/klause/localsearch/Move;Lcom/eignex/klause/solver/objective/Objective;ILjava/lang/Object;)Lcom/eignex/klause/localsearch/LocalSearchMoveInspection;
 	public final fun makeScore (Lcom/eignex/klause/localsearch/Move;)I
 	public final fun netDelta (Lcom/eignex/klause/localsearch/Move;)J
 	public final fun objectiveDelta (Lcom/eignex/klause/solver/objective/Objective;Lcom/eignex/klause/localsearch/Move;)Ljava/lang/Double;
