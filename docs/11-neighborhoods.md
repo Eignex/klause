@@ -229,6 +229,11 @@ adjacency entries; its index admits at most
 pinned to the current center, while the continuous residual remains free under
 every source row.
 
+The source plan identifies eligible discrete inputs separately from integer
+backings of original real columns. Backings participate in connectivity as bridges,
+remain free in every residual and consume no discrete seed or freedom quota.
+Canonical integer declarations without a separate source mapping remain eligible.
+
 Each candidate runs the shared numerical traversal with a borrowed source LP
 authority. Candidate coverage and compatible LP state survive slice boundaries;
 changed pins retire candidate coverage before opening another query. Search and LP

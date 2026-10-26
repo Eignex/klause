@@ -90,8 +90,8 @@ internal object MpsRepairReplay {
             val policy = Class.forName("com.eignex.klause.lp.SparseSourceLpPolicy").getConstructor().newInstance()
             val allocationStart = bean.getThreadAllocatedBytes(thread)
             val start = System.nanoTime()
-            val owner = ownerType.constructors.single { it.parameterCount == 8 }.newInstance(
-                model, context, objective, params, policy, true, { center }, stop,
+            val owner = ownerType.constructors.single { it.parameterCount == 9 }.newInstance(
+                model, context, objective, params, policy, true, { center }, stop, sourceIntegers.toIntArray(),
             )
             var pauses = 0L
             var attempt: Any
@@ -181,8 +181,9 @@ internal object MpsRepairReplay {
         val thread = Thread.currentThread().threadId()
         val allocation = bean.getThreadAllocatedBytes(thread)
         val start = System.nanoTime()
-        val owner = type.constructors.single { it.parameterCount == 8 }.newInstance(
-            model, context, objective, params, policy, true, { center }, stop)
+        val inputs = columns.indices.filter { source.variables[it].integer }.map { Term.intVar(columns[it]) }.toIntArray()
+        val owner = type.constructors.single { it.parameterCount == 9 }.newInstance(
+            model, context, objective, params, policy, true, { center }, stop, inputs)
         val result = linkedMapOf<Int, List<String>>()
         val working = linkedMapOf<Int, List<String>>()
         var prepared = false

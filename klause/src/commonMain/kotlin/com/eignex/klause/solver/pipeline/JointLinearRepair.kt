@@ -45,7 +45,9 @@ internal class JointLinearRepair(
     private val boundOrdered: Boolean = false,
     private val external: () -> Sample? = { null },
     private val publicationLifetime: Cancellation? = null,
+    sourceIntegers: IntArray? = null,
 ) : ExactNeighborhoodCompletion, AutoCloseable {
+    private val sourceIntegers = sourceIntegers?.copyOf()
     private val stop = params.timeout or params.cancellation
     private val state = OpenTheorySolveState(params)
     private val funding = SourceLpFunding(params.sourceLpWorkLimit, params.sourceLpAllocationLimit)
@@ -147,7 +149,8 @@ internal class JointLinearRepair(
                     token.charge(units)
                 }
             }
-            selection = JointRepairNeighborhood.prepare(source, model.numIntVars, model.numRealVars, construction)
+            selection = JointRepairNeighborhood.prepare(source, model.numIntVars, model.numRealVars, construction,
+                sourceIntegers)
             if (selection == null) {
                 declined = !stop() && !cancellation()
                 return false
