@@ -1601,6 +1601,46 @@ unit-weight scheduling normalization. The scheduling failures in
 [8164](https://lab.eignex.com/jobs/8164) are errors and supply no UNKNOWN verdict
 or search evidence.
 
+### Global and extensional scoring comparisons
+
+`bench.profile.GlobalScoringComparison` consumes the paired source-state capture
+with `sets=global-scoring-core-v1,global-scoring-holdout-v1`, optional `seeds`,
+`moves`, `millis` and `captures`. Defaults are seeds 3/7/11,
+2,000 moves, 2 s per walk and three observations per walk, using `cbls/fixed`.
+The core and whole-family holdout sets freeze membership independently.
+Alternatively, supply one original source with `suite`, `problem`, decoded-source
+`sha256` and `source64`, omitting `sets`. This uses the shared trajectory source
+loader: standard Base64 without line breaks, at most 96 KiB encoded, with exact
+decoded hashing before parsing. Embedded mode retains the supplied identity and
+bytes without rechecking catalog membership. It records `sourceMode=embedded`,
+the original XML, request and build/runtime provenance.
+
+The pairwise treatment sums equal present, non-excepted position pairs within
+each admitted `AllDifferent`, retaining repeated coordinates, canonical factor
+weights, native payload maintenance and native proposals. It admits at most 64
+positions and 64 excepted values per factor. Greedy initialization and implicit
+seeding are disabled in both walks. This compares one shared weight per source
+factor; it does not give separate learned weights to individual disequalities.
+Other globals, including affine `Distinct`, retain their canonical scores.
+
+Ground tables become tries using only their explicit rows. MDDs become tables
+using only accepted paths: at most 64 columns, 65,536 input/output words, 1,024
+accepted paths and 262,144 construction visits. Short tables, nondeterministic
+weighted diagrams, overflowing path sums and oversized relations decline without
+publishing partial views. Deterministic weighted paths include their summed cost
+as a relation column; aliases remain repeated columns. These factor substitutions
+are private grading probes and do not change propagation or run alternate walks.
+
+The diagnostic bounds native extensional payload estimates before opening states,
+captures at most eight alternate relations per source, and limits captured
+grade/coordinate cells to 8,388,608. Every decline remains in the output.
+Original source hashes, effective semantics, build/runtime identities, paired
+grades and primitive deltas, RNG boundaries, canonical residuals, endpoints,
+preparation, native work and available thread allocations accompany the capture.
+Fixture captures cover collision ranking, optional/excepted aliases and weighted
+cost grading. Captured points have no independent witness or proof authority;
+instrumented walk timings do not establish ordinary solver throughput.
+
 ### Cargo objective-coordinate trajectories
 
 `LocalSearchTrajectory` accepts `suite`, `problem`, decoded-source `sha256`,
