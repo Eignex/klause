@@ -10,6 +10,7 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 
 class SearchRunTest {
@@ -33,6 +34,7 @@ class SearchRunTest {
         val completed = run.next()
 
         assertEquals(SearchRunEvent.Exhausted, completed)
+        assertNull(session.executionControls.stopCause)
     }
 
     @Test

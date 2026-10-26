@@ -565,6 +565,7 @@ class SearchRun internal constructor(
         pendingCancellation = false
         retryingAssertion = false
         started = false
+        session.beginTraversal()
         cancellationPoller.reset()
         params.restart.beginRun()
     }
