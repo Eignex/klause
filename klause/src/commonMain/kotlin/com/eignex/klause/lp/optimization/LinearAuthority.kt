@@ -277,7 +277,8 @@ internal class LinearAuthority(
                     cutPreparationWork += work
                     budget.observe(preparation = work)
                 }?.let { prepared ->
-                    if (!cuts) prepared else prepared.withAdditional(additionalCuts, cancellation) { work, allocation ->
+                    if (!cuts) prepared else prepared.withAdditional(additionalCuts,
+                        Cancellation { cancellation() || budget.funding?.paused == true }) { work, allocation ->
                         cutPreparationWork += work
                         budget.observe(preparation = work)
                         budget.funding?.charge(0L, allocation)
