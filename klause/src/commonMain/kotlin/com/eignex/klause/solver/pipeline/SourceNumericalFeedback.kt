@@ -77,6 +77,7 @@ internal sealed interface SourceNumericalFeedbackResult {
             this.cutoff == cutoff && scope == source.scope &&
                 (cutoff == null || cutoff.enforcedBy(source)) &&
                 query.context.coordinates == source.coordinates && query.context.premises == source.premises &&
+                query.context.affineObjectiveAvailable == source.affineObjectiveAvailable &&
                 query.context.objective == source.objective &&
                 query.context.objectiveConstant == source.objectiveConstant &&
                 query.context.semantics == source.semantics &&
