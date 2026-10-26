@@ -303,6 +303,9 @@ predicate outputs searched while retaining the other nodes in dependency order.
 Removing a definition adds no inverse and relaxes no source relation. An inconsistent
 searched output has a maintained counterpart only when the complete source assignment
 survives reconstruction unchanged.
+Native inverse-assignment role views retain both source arrays, their domains and
+index offsets, and transpose the sides read by the existing repair and swap kernel.
+Aliased arrays and competing native channels decline this view.
 
 ### Definitions and repairs
 
