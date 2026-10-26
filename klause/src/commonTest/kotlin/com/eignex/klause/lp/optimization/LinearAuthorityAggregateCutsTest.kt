@@ -16,9 +16,11 @@ import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.shl
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -245,5 +247,118 @@ class LinearAuthorityAggregateCutsTest {
         assertNull(repeated)
         assertTrue(spent >= 20L)
         assertEquals(spent, funding.spent)
+    }
+
+    @Test
+    fun `pair inspection should expose a checked missing inference at a row feasible point`() {
+        val quarter = BigFraction.ofLong(4).reciprocal()
+        val point = mapOf(x to quarter * BigFraction.ofLong(3), y to quarter * BigFraction.ofLong(3),
+            real to quarter * BigFraction.ofLong(6))
+        val source = SourceProofContext(scope, setOf(x, y, real), mapOf(
+            "left" to SourcePremise(left), "right" to SourcePremise(right)))
+
+        val result = LinearAuthorityAggregateCuts.inspectPairs(listOf(
+            LinearAuthorityAggregateTerm(0, "left", left), LinearAuthorityAggregateTerm(1, "right", right),
+        ), emptySet(), point, Cancellation.Never)
+
+        assertTrue(result.complete)
+        assertEquals(true, result.activeSourceRowsSatisfied)
+        assertEquals(BigFraction.ZERO, result.maximumSourceResidual)
+        assertEquals(listOf(BigFraction.ofLong(2).reciprocal()), result.violations)
+        val cut = result.candidates.single()
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
+    fun `pair inspection should include a continuous only cancellation row`() {
+        val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val mixed = SourceInequality(mapOf(x to BigFraction.ofLong(2), real to BigFraction.ONE,
+            residual to BigFraction.ONE), BigFraction.ofLong(3))
+        val continuous = SourceInequality(mapOf(real to BigFraction.MINUS_ONE, residual to BigFraction.MINUS_ONE),
+            BigFraction.ZERO)
+        val point = mapOf(x to BigFraction.ofLong(3) * BigFraction.ofLong(2).reciprocal(),
+            real to BigFraction.ZERO, residual to BigFraction.ZERO)
+
+        val result = LinearAuthorityAggregateCuts.inspectPairs(listOf(
+            LinearAuthorityAggregateTerm(0, "mixed", mixed),
+            LinearAuthorityAggregateTerm(1, "continuous", continuous),
+        ), emptySet(), point, Cancellation.Never)
+
+        assertTrue(result.complete)
+        assertEquals(true, result.activeSourceRowsSatisfied)
+        assertEquals(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE),
+            result.candidates.single().inequality)
+    }
+
+    @Test
+    fun `pair inspection should distinguish source residuals from aggregate violations`() {
+        val result = LinearAuthorityAggregateCuts.inspectPairs(listOf(
+            LinearAuthorityAggregateTerm(0, "left", left), LinearAuthorityAggregateTerm(1, "right", right),
+        ), emptySet(), mapOf(x to BigFraction.ONE, y to BigFraction.ONE, real to BigFraction.ZERO), Cancellation.Never)
+
+        assertTrue(result.complete)
+        assertEquals(false, result.activeSourceRowsSatisfied)
+        assertEquals(BigFraction.ofLong(2), result.maximumSourceResidual)
+        assertEquals(listOf(BigFraction.ONE), result.violations)
+    }
+
+    @Test
+    fun `pair inspection should not combine inactive source rows`() {
+        val result = LinearAuthorityAggregateCuts.inspectPairs(listOf(
+            LinearAuthorityAggregateTerm(0, "left", left), LinearAuthorityAggregateTerm(1, "right", right),
+        ), setOf(1), mapOf(x to BigFraction.ONE, y to BigFraction.ONE, real to BigFraction.ZERO), Cancellation.Never)
+
+        assertTrue(result.complete)
+        assertTrue(result.candidates.isEmpty())
+        assertEquals(true, result.activeSourceRowsSatisfied)
+    }
+
+    @Test
+    fun `limited pair inspection should withhold complete scan claims`() {
+        val quarter = BigFraction.ofLong(4).reciprocal()
+        val point = mapOf(x to quarter * BigFraction.ofLong(3), y to quarter * BigFraction.ofLong(3),
+            real to quarter * BigFraction.ofLong(6))
+        val rows = listOf(LinearAuthorityAggregateTerm(0, "left", left), LinearAuthorityAggregateTerm(1, "right", right))
+        for (limits in listOf(LinearAuthorityAggregateLimits(work = 1), LinearAuthorityAggregateLimits(allocation = 1))) {
+            val result = LinearAuthorityAggregateCuts.inspectPairs(rows, emptySet(), point, Cancellation.Never,
+                limits = limits)
+
+            assertFalse(result.complete)
+            assertTrue(result.candidates.isEmpty())
+        }
+    }
+
+    @Test
+    fun `pair inspection should retain unknown efficacy when a point coordinate is missing`() {
+        val result = LinearAuthorityAggregateCuts.inspectPairs(listOf(
+            LinearAuthorityAggregateTerm(0, "left", left), LinearAuthorityAggregateTerm(1, "right", right),
+        ), emptySet(), mapOf(x to BigFraction.ONE, real to BigFraction.ZERO), Cancellation.Never)
+
+        assertFalse(result.complete)
+        assertTrue(result.candidates.isEmpty())
+        assertNull(result.activeSourceRowsSatisfied)
+    }
+
+    @Test
+    fun `pair inspection should charge nested aggregation once to the containing meter`() {
+        var charged = 0L
+        var observed = 0L
+        val meter = WorkMeter { charged += it }
+        val token = object : Cancellation {
+            override fun isCancelled(): Boolean = false
+            override fun workMeter(): WorkMeter = meter
+        }
+        val quarter = BigFraction.ofLong(4).reciprocal()
+        val point = mapOf(x to quarter * BigFraction.ofLong(3), y to quarter * BigFraction.ofLong(3),
+            real to quarter * BigFraction.ofLong(6))
+
+        val result = LinearAuthorityAggregateCuts.inspectPairs(listOf(
+            LinearAuthorityAggregateTerm(0, "left", left), LinearAuthorityAggregateTerm(1, "right", right),
+        ), emptySet(), point, token, { stage, count -> if (stage == "AggregateWork") observed += count })
+
+        assertTrue(result.complete)
+        assertTrue(charged > 0L)
+        assertEquals(observed, charged)
     }
 }

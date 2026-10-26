@@ -18,7 +18,7 @@ internal data class LinearAuthorityAggregateTerm(
     val owner: Int,
     val premise: String,
     val inequality: SourceInequality,
-    val weight: BigFraction,
+    val weight: BigFraction = BigFraction.ONE,
 )
 
 internal data class LinearAuthorityAggregateLimits(
@@ -35,7 +35,124 @@ internal data class LinearAuthorityAggregateLimits(
     }
 }
 
+internal data class LinearAuthorityAggregateProbeResult(
+    val candidates: List<LinearAuthorityCut>,
+    val violations: List<BigFraction>,
+    val activeSourceRowsSatisfied: Boolean?,
+    val maximumSourceResidual: BigFraction?,
+    val complete: Boolean,
+)
+
 internal object LinearAuthorityAggregateCuts {
+    private class ProbeRow(val term: LinearAuthorityAggregateTerm, val coefficients: Map<SourceCoordinate, BigFraction>) {
+        val realCount = coefficients.keys.count { it.kind == SourceCoordinate.Kind.Real }
+        val hasInteger = coefficients.keys.any { it.kind == SourceCoordinate.Kind.Integer }
+    }
+
+    fun inspectPairs(
+        rows: List<LinearAuthorityAggregateTerm>, inactive: Set<Int>,
+        point: Map<SourceCoordinate, BigFraction>, cancellation: Cancellation,
+        observe: (String, Long) -> Unit = { _, _ -> },
+        limits: LinearAuthorityAggregateLimits = LinearAuthorityAggregateLimits(),
+        maximumCandidates: Int = 64,
+    ): LinearAuthorityAggregateProbeResult {
+        require(maximumCandidates >= 0)
+        val meter = AggregateMeter(limits, cancellation, observe)
+        val candidates = ArrayList<LinearAuthorityCut>()
+        val violations = ArrayList<BigFraction>()
+        var pointKnown = true
+        var pointSatisfied = true
+        var maximumResidual: BigFraction? = null
+        var sourceScanComplete = false
+        var candidatesKnown = true
+        var complete = false
+        fun residual(row: SourceInequality, coefficients: Map<SourceCoordinate, BigFraction>): BigFraction? {
+            var activity = BigFraction.ZERO
+            for ((id, value) in coefficients) {
+                val coordinate = point[id] ?: return null
+                activity = meter.add(activity, meter.multiply(meter.number(value), meter.number(coordinate)))
+            }
+            return meter.add(activity, meter.number(row.rhs).negated())
+        }
+        try {
+            if (point.isEmpty()) stopAggregate("PointUnavailable")
+            meter.reserve(rows.size.toLong(), rows.size * 64L)
+            val continuous = ArrayList<ProbeRow>()
+            for (term in rows) {
+                meter.reserve(1L)
+                if (term.owner in inactive) continue
+                if (term.weight != BigFraction.ONE) stopAggregate("ProbeSourceWeight")
+                val row = term.inequality
+                if (row.supportSize > limits.support) stopAggregate("SupportLimit")
+                meter.reserve(row.supportSize.toLong(), row.supportSize * 64L)
+                val coefficients = row.coefficients
+                val value = residual(row, coefficients)
+                if (value == null) pointKnown = false else {
+                    maximumResidual = maximumResidual?.let { if (it > value) it else value } ?: value
+                    if (value > BigFraction.ZERO || (row.strict && value.isZero)) pointSatisfied = false
+                }
+                observe("AggregateProbeSourceRows", 1L)
+                if (coefficients.keys.any { it.kind == SourceCoordinate.Kind.Real } &&
+                    coefficients.keys.none { it.kind == SourceCoordinate.Kind.Boolean }) {
+                    continuous += ProbeRow(term, coefficients)
+                }
+            }
+            sourceScanComplete = true
+            val charge: (String, Long) -> Unit = { stage, count ->
+                when (stage) {
+                    "AggregateWork" -> meter.reserve(count)
+                    "AggregateAllocation" -> meter.reserve(0L, count)
+                    else -> observe(stage, count)
+                }
+            }
+            // Nested charges reach the containing work meter through charge.
+            val derivedStop = object : Cancellation {
+                override fun isCancelled(): Boolean = cancellation()
+                override fun deadline() = cancellation.deadline()
+            }
+            for (left in continuous.indices) {
+                for (right in left + 1 until continuous.size) {
+                    meter.reserve(1L)
+                    observe("AggregateProbePairs", 1L)
+                    val a = continuous[left]
+                    val b = continuous[right]
+                    if ((!a.hasInteger && !b.hasInteger) || a.realCount != b.realCount) continue
+                    val pivot = a.coefficients.entries.firstOrNull { (id, value) ->
+                        meter.reserve(1L)
+                        val other = b.coefficients[id]
+                        id.kind == SourceCoordinate.Kind.Real && other != null &&
+                            (value > BigFraction.ZERO) != (other > BigFraction.ZERO)
+                    } ?: continue
+                    meter.reserve(1L, 256L)
+                    val other = b.coefficients.getValue(pivot.key)
+                    val aWeight = if (other > BigFraction.ZERO) other else other.negated()
+                    val bWeight = if (pivot.value > BigFraction.ZERO) pivot.value else pivot.value.negated()
+                    val cut = derive(listOf(a.term.copy(weight = aWeight), b.term.copy(weight = bWeight)),
+                        derivedStop, charge, limits) ?: continue
+                    val violation = residual(cut.inequality, cut.inequality.coefficients)
+                    if (violation == null) {
+                        candidatesKnown = false
+                        observe("AggregateProbePointUnavailable", 1L)
+                        continue
+                    }
+                    if (violation <= BigFraction.ZERO) continue
+                    observe("AggregateProbePositiveViolations", 1L)
+                    if (candidates.size >= maximumCandidates) stopAggregate("ProbeRetentionLimit")
+                    meter.reserve(1L + cut.inequality.supportSize, 128L + cut.inequality.supportSize * 64L)
+                    candidates += cut
+                    violations += violation
+                }
+            }
+            meter.reserve(1L)
+            complete = candidatesKnown
+        } catch (stop: AggregateStop) {
+            observe("AggregateProbe${stop.reason}", 1L)
+        }
+        return LinearAuthorityAggregateProbeResult(candidates.toList(), violations.toList(),
+            if (!pointSatisfied) false else if (pointKnown && sourceScanComplete) true else null,
+            maximumResidual, complete)
+    }
+
     fun derive(
         terms: List<LinearAuthorityAggregateTerm>, cancellation: Cancellation,
         observe: (String, Long) -> Unit = { _, _ -> },
