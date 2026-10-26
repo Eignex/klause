@@ -145,6 +145,22 @@ class ConflictSupportedRemovalTest {
     }
 
     @Test
+    fun `wide incumbent cutoffs should retain the finite engine enclosing bound`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(9_007_199_254_740_992L, 9_007_199_254_740_993L)),
+            emptyList()).bake()
+        val wideObjective = LinearObjective(intCoefficients = longArrayOf(1))
+        val incumbent = Sample(booleanArrayOf(), longArrayOf(9_007_199_254_740_993L))
+        val guidance = ConflictSupportedRemoval(source, wideObjective)
+        val observer = guidance.observe(BacktrackParams()).variableSelector.fresh()
+        guidance.begin(incumbent, Assumptions.None, Double.POSITIVE_INFINITY, Cancellation.Never)
+        observer.onSolution(incumbent)
+
+        observer.onConflict(null, BranchingConflict(ints = intArrayOf(0)))
+
+        assertEquals(9_007_199_254_740_994.0, guidance.attributions().single().cutoff)
+    }
+
+    @Test
     fun `missing and empty attribution should retain distinct outcomes with random fallback`() {
         for (empty in listOf(false, true)) {
             val guidance = ConflictSupportedRemoval(problem, objective)
