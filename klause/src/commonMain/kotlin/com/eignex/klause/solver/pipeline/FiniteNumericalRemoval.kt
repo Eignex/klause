@@ -1,9 +1,13 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.localsearch.InvariantNetwork
 import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.meta.alns.DestroyOperator
 import com.eignex.klause.meta.alns.FreedVars
+import com.eignex.klause.meta.alns.RepairBlockClosure
+import com.eignex.klause.meta.alns.RepairBlockInterrupted
+import com.eignex.klause.meta.alns.RepairBlockWork
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.simplex.exact.BigFraction
@@ -14,6 +18,7 @@ import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.sourceCondition
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.magnitudeBitLength
 import kotlin.random.Random
 
@@ -24,10 +29,11 @@ internal class FiniteNumericalRemoval(
     private val funding: SourceLpFunding,
     val signal: Signal,
     private val callerPins: Assumptions = Assumptions.None,
+    private val definitions: InvariantNetwork? = null,
 ) : DestroyOperator, AutoCloseable {
     enum class Signal { Disagreement, Refutation }
     enum class Status { Unavailable, NoPoint, Agreement, EmptySupport, Supported, Incompatible,
-        Unsupported, Limited, Cancelled, Funding, Closed }
+        Unsupported, Limited, Cancelled, Funding, ClosureDeclined, Closed }
 
     private var center: Sample? = null
     private var scores = intArrayOf()
@@ -211,46 +217,74 @@ internal class FiniteNumericalRemoval(
     override fun destroy(rng: Random, problem: BakedProblem, incumbent: Sample, objective: LinearObjective,
         fraction: Double, assumptions: Assumptions, cancellation: Cancellation,
     ): FreedVars {
-        if (!closed && assumptions != callerPins) retire(Status.Incompatible)
-        if (!closed && cancellation()) {
-            retire(Status.Cancelled)
+        if (!closed && assumptions != callerPins) {
+            retire(Status.Incompatible)
             return FreedVars(intArrayOf(), intArrayOf())
         }
-        return destroy(rng, problem, incumbent, objective, fraction)
+        return select(rng, problem, incumbent, objective, fraction, cancellation)
     }
 
     override fun destroy(rng: Random, problem: BakedProblem, incumbent: Sample, objective: LinearObjective,
         fraction: Double,
+    ): FreedVars = select(rng, problem, incumbent, objective, fraction, Cancellation.Never)
+
+    private fun select(rng: Random, problem: BakedProblem, incumbent: Sample, objective: LinearObjective,
+        fraction: Double, cancellation: Cancellation,
     ): FreedVars {
         if (closed) status = Status.Closed
-        if (blocked()) return FreedVars(intArrayOf(), intArrayOf())
+        if (blocked(cancellation)) return FreedVars(intArrayOf(), intArrayOf())
         if (!closed && (problem !== model || objective !== this.objective ||
                 (center != null && center !== incumbent))) retire(Status.Incompatible)
         if (status != Status.Supported) {
-            return DestroyOperator.Random.destroy(rng, problem, incumbent, objective, fraction)
+            return closeSelection(problem,
+                DestroyOperator.Random.destroy(rng, problem, incumbent, objective, fraction), cancellation)
         }
         funding.charge(scores.size.toLong(), scores.size * 16L)
-        if (blocked()) return FreedVars(intArrayOf(), intArrayOf())
+        if (blocked(cancellation)) return FreedVars(intArrayOf(), intArrayOf())
         val order = scores.indices.shuffled(rng)
         val count = (fraction * scores.size).toInt().coerceIn(1, scores.size)
         val selected = ArrayList<Int>(count)
         for (weight in 1 downTo 0) {
             for (index in order) {
                 funding.charge(1)
-                if (blocked()) return FreedVars(intArrayOf(), intArrayOf())
+                if (blocked(cancellation)) return FreedVars(intArrayOf(), intArrayOf())
                 if (!frozen(index) && scores[index] == weight) selected += index
                 if (selected.size == count) break
             }
             if (selected.size == count) break
         }
-        return FreedVars(selected.filter { it < model.numBoolVars }.toIntArray(),
-            selected.filter { it >= model.numBoolVars }.map { it - model.numBoolVars }.toIntArray())
+        return closeSelection(problem, FreedVars(selected.filter { it < model.numBoolVars }.toIntArray(),
+            selected.filter { it >= model.numBoolVars }.map { it - model.numBoolVars }.toIntArray()), cancellation)
     }
 
-    private fun blocked(): Boolean {
+    private fun closeSelection(problem: BakedProblem, requested: FreedVars, cancellation: Cancellation): FreedVars {
+        if (definitions == null) return requested
+        if (problem !== model) return FreedVars(intArrayOf(), intArrayOf())
+        funding.charge(1, (model.numBoolVars.toLong() + model.numIntVars) * 96L)
+        if (blocked(cancellation)) return FreedVars(intArrayOf(), intArrayOf())
+        val meter = WorkMeter { funding.charge(it) }
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = token() || cancellation() || funding.paused
+            override fun workMeter(): WorkMeter = meter
+        }
+        val work = RepairBlockWork(stop, 65_536)
+        return try {
+            val closedBlock = RepairBlockClosure.close(model, requested, definitions, callerPins,
+                4096, 4096, work)
+            if (blocked(cancellation)) FreedVars(intArrayOf(), intArrayOf()) else closedBlock.freed
+        } catch (_: RepairBlockInterrupted) {
+            if (!blocked(cancellation)) {
+                retire(Status.ClosureDeclined)
+                unavailableReason = work.decline?.name
+            }
+            FreedVars(intArrayOf(), intArrayOf())
+        }
+    }
+
+    private fun blocked(cancellation: Cancellation = Cancellation.Never): Boolean {
         if (closed) return false
         val reason = when {
-            token() -> Status.Cancelled
+            token() || cancellation() -> Status.Cancelled
             funding.paused -> Status.Funding
             else -> return false
         }
