@@ -1411,7 +1411,7 @@ their structured sources. Fixture expectations live beside
 in numbered directories under one profile job.
 Model keys, domains, objectives, source bytes and
 build identity remain alongside the walk. Inputs admit at most 64 MiB,
-1,024 Boolean/integer coordinates and 4,096 factors. Hint construction uses the production
+4,096 Boolean/integer coordinates and 8,192 factors. Hint construction uses the production
 mapping through reflection and fails on an internal shape mismatch. Each arm has
 a sixty-second outer deadline; cancellation is recorded. These instrumented walks
 isolate local trajectories; they establish neither default portfolio equivalence,
@@ -1631,6 +1631,8 @@ hard deltas and the selected objective delta; destination equality is reported
 separately. Pins, definitions, domains and implicit owners can reject a candidate.
 Candidate selection scans source slots, prioritizing the current greedy coordinate,
 and keeps common admissible root endpoints and adjacent values without random draws.
+An explicit-center repair capture keeps its single protected representation and
+reports the paired comparison unavailable.
 These bounded diagnostics are additional work, separate from free-walk budgets
 and timing; they grant no source witness or proof authority.
 

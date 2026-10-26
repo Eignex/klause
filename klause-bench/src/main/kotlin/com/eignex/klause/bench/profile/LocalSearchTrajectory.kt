@@ -76,8 +76,9 @@ internal object LocalSearchTrajectory {
     private fun capture(args: Array<String>, out: File) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val required = setOf("suite", "problem", "sha256", "recipe", "seed", "moves")
+        val optional = setOf("sliceMillis", "sliceWork", "greedy", "repairs", "controls", "center", "source64")
         require(options.keys.containsAll(required) && options.keys.all {
-            it in required || it in setOf("sliceMillis", "sliceWork", "greedy", "repairs", "controls", "center", "source64")
+            it in required || it in optional
         })
         val bytes = options["source64"]?.let {
             require(it.length <= 96 * 1024)
@@ -339,6 +340,13 @@ internal object LocalSearchTrajectory {
         }
         out.resolve("paired.jsonl").bufferedWriter().use { writer ->
             check(observations.size <= 12)
+            if (views.size != 2) {
+                writer.appendLine(buildJsonObject {
+                    put("decline", "single-representation")
+                    put("sourceVerdictClaim", false)
+                }.toString())
+                return@use
+            }
             for ((label, source, focus) in observations) {
                 val candidates = ArrayList<Move>()
                 for (variable in 0 until source.numBoolVars) {
