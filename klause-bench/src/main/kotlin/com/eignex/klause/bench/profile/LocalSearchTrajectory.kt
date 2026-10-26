@@ -77,7 +77,8 @@ internal object LocalSearchTrajectory {
     private fun capture(args: Array<String>, out: File) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val required = setOf("suite", "problem", "sha256", "recipe", "seed", "moves")
-        val optional = setOf("sliceMillis", "sliceWork", "greedy", "repairs", "controls", "center", "source64", "selectors")
+        val optional = setOf("sliceMillis", "sliceWork", "greedy", "repairs", "controls", "center", "source64",
+            "selectors")
         require(options.keys.containsAll(required) && options.keys.all {
             it in required || it in optional
         })
@@ -165,8 +166,6 @@ internal object LocalSearchTrajectory {
             val hints = heuristicHints(invocation, prepared, stop)
             val sweep = hints?.let { getter(it, "getSweep") as DefinitionalSweep? }
             val gradient = hints?.let { getter(it, "getObjective") as IncrementalObjective? }
-            if (selectors) SemanticRepairComparison.capture(problem, workingObjective, requireNotNull(initial),
-                sweep, sourceInputs, prepared, checkNotNull(sourceCheck), out, seed)
             out.resolve("model-$rewrite.json").writeText(buildJsonObject {
                 put("preparationNanos", System.nanoTime() - preparationStarted)
                 put("objective", workingObjective.toString())
@@ -189,6 +188,8 @@ internal object LocalSearchTrajectory {
                 put("correspondenceAdmission", "slot-preserving load plus complete source round trip")
                 put("sourceVerdictClaim", false)
             }.toString())
+            if (selectors) SemanticRepairComparison.capture(problem, workingObjective, requireNotNull(initial),
+                sweep, sourceInputs, prepared, checkNotNull(sourceCheck), out, seed)
             var baseline: List<Any?>? = null
             for (mode in if (repairCapture) listOf("initial", "walk", "repair") else listOf("initial", "walk")) {
                 val walk = mode != "initial"
