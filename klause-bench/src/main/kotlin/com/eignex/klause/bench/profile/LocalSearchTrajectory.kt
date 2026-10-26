@@ -511,7 +511,8 @@ internal object LocalSearchTrajectory {
                         val selections = directory.resolve("selections.jsonl")
                         FiniteConflictSelection.compare(problem, repairObjective, checkedCenter, seed, sweep,
                             selections, acquisitionMode = mode) { sample, token ->
-                            FiniteConflictSelection.checkSource(sourceModel, prepared.reconstruct(sample), token)
+                            FiniteConflictSelection.checkSource(sourceModel,
+                                prepared.reconstruct(sample), token)
                         }
                         RepairOwnerReplay.replay(selections, problem, repairObjective, prepared, sourceModel,
                             sourceInputs, directory.resolve("owners.jsonl"), seed,
