@@ -1,6 +1,11 @@
 package com.eignex.klause.bench.profile
 
-import com.eignex.klause.formats.flatzinc.parseFlatZinc
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.ir.DefinitionHint
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchModel
@@ -19,14 +24,15 @@ import kotlinx.serialization.json.jsonPrimitive
 class ChannelTrajectoryTest {
     @Test
     fun `searched channel moves report a changed source destination`() {
-        val program = parseFlatZinc("var bool: b; var 0..1: y; " +
-            "constraint bool2int(b, y) :: defines_var(y); solve satisfy;")
-        val sweep = assertNotNull(DefinitionalSweep.fromSource(program.problem, program.definitionHints))
-        val left = LocalSearchState(LocalSearchModel.open(program.problem), Random(0))
-        val right = LocalSearchState(LocalSearchModel.open(program.problem), Random(0))
-        left.invariants = sweep.network(program.problem.numIntVars, program.problem.numBoolVars)
+        val problem = Problem(1, 1, arrayOf(IntDomain(0, 1)),
+            arrayOf(ReifiedLinear(0, longArrayOf(1), intArrayOf(0), LinearOp.EQ, 1)))
+        val sweep = assertNotNull(DefinitionalSweep.fromSource(problem,
+            listOf(DefinitionHint.BooleanValue(0, Lit.make(0, true)))))
+        val left = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        val right = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        left.invariants = sweep.network(problem.numIntVars, problem.numBoolVars)
         right.invariants = ChannelView.SearchedValues.sweep(sweep, Cancellation.Never)
-            ?.network(program.problem.numIntVars, program.problem.numBoolVars)
+            ?.network(problem.numIntVars, problem.numBoolVars)
         val coordinates = VarRemap(intArrayOf(0), intArrayOf(0))
         val maintained = TrajectoryView("maintained", left, coordinates,
             synchronize = { sweep.sweep(left.assignment, left.rootDomains) })
@@ -41,14 +47,16 @@ class ChannelTrajectoryTest {
 
     @Test
     fun `an inconsistent searched predicate is not silently extended into a paired state`() {
-        val program = parseFlatZinc("var -1..2: x; var bool: b; " +
-            "constraint int_le_reif(x, 0, b) :: defines_var(b); solve satisfy;")
-        val sweep = assertNotNull(DefinitionalSweep.fromSource(program.problem, program.definitionHints))
-        val left = LocalSearchState(LocalSearchModel.open(program.problem), Random(0))
-        val right = LocalSearchState(LocalSearchModel.open(program.problem), Random(0))
-        left.invariants = sweep.network(program.problem.numIntVars, program.problem.numBoolVars)
+        val problem = Problem(1, 1, arrayOf(IntDomain(-1, 2)),
+            arrayOf(ReifiedLinear(0, longArrayOf(1), intArrayOf(0), LinearOp.LE, 0)))
+        val sweep = assertNotNull(DefinitionalSweep.fromSource(problem, listOf(DefinitionHint.Comparison(
+            0, longArrayOf(1), arrayOf(DefinitionHint.Operand.Variable(0)), 0, LinearOp.LE,
+        ))))
+        val left = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        val right = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        left.invariants = sweep.network(problem.numIntVars, problem.numBoolVars)
         right.invariants = ChannelView.SearchedPredicates.sweep(sweep, Cancellation.Never)
-            ?.network(program.problem.numIntVars, program.problem.numBoolVars)
+            ?.network(problem.numIntVars, problem.numBoolVars)
         val coordinates = VarRemap(intArrayOf(0), intArrayOf(0))
         val maintained = TrajectoryView("maintained", left, coordinates,
             synchronize = { sweep.sweep(left.assignment, left.rootDomains) })

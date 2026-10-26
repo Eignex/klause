@@ -737,7 +737,7 @@ class DefinitionalSweep internal constructor(
                 node is ElementResultDefinition || node is SweepNode.ElementDef
             val predicateChannel = node is CapturedBooleanDefinition || node is UnaryPredicateDefinition ||
                 node is SweepNode.CmpReif || node is SweepNode.SetInReif
-            if (!(values && valueChannel || predicates && predicateChannel)) retained += node
+            if (!((values && valueChannel) || (predicates && predicateChannel))) retained += node
         }
         return if (cancellation() || retained.isEmpty()) null else DefinitionalSweep(retained)
     }
