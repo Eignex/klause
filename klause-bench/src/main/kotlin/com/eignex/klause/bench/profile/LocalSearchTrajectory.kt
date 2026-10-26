@@ -145,16 +145,9 @@ internal object LocalSearchTrajectory {
             val rewrite = variant.label
             val preparationStarted = System.nanoTime()
             val stop = Cancellation.after(60.seconds)
-            val sourceProblem = if (variant.channel == ChannelView.InverseAssignment) {
-                inverseAssignmentView(parsed.problem, stop)
-            } else parsed.problem
-            if (sourceProblem == null) {
-                out.resolve("decline-$rewrite.txt").writeText("unsupported-inverse-assignment\ncancelled=${stop()}\n")
-                continue
-            }
             val invocation = SourceSetup.prepare(SourceSetupRequest(
-                if (parsed.definedVars.isEmpty()) SourceAttachment(sourceProblem, parsed.definitionHints)
-                else SourceAttachment(sourceProblem, parsed.definedVars, emptyList(), parsed.definitionHints),
+                if (parsed.definedVars.isEmpty()) SourceAttachment(parsed.problem, parsed.definitionHints)
+                else SourceAttachment(parsed.problem, parsed.definedVars, emptyList(), parsed.definitionHints),
                 if (objective == null) ExecutionOperation.SATISFY else ExecutionOperation.OPTIMIZE,
                 FiniteEngine.MIXED, objective = objective, cancellation = stop,
             ))
@@ -166,7 +159,15 @@ internal object LocalSearchTrajectory {
                 preparedPlan = plan, transformObjective = variant.transformObjective, randomSeed = seed,
             ))
             check(!stop() && prepared.presolve?.infeasible != true)
-            val problem = prepared.problem as BakedProblem
+            val preparedProblem = prepared.problem as BakedProblem
+            val problem = if (variant.channel == ChannelView.InverseAssignment) {
+                val inverse = inverseAssignmentView(preparedProblem, stop)
+                if (inverse == null) {
+                    out.resolve("decline-$rewrite.txt").writeText("unsupported-inverse-assignment\ncancelled=${stop()}\n")
+                    continue
+                }
+                inverse.bake(stop)
+            } else preparedProblem
             val workingObjective = prepared.objective
             require(initial == null || (initial.numIntVars == problem.numIntVars &&
                 prepared.reconstruct(initial) == initial)) { "explicit center needs an unchanged coordinate frame" }
