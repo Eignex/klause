@@ -8,6 +8,7 @@ import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceEvidence
+import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourceProofContext
@@ -114,6 +115,9 @@ internal class NumericalAggregateSnapshot(private val stop: Cancellation) {
                 put("observations", buildJsonObject { observations.forEach { (key, value) -> put(key, value) } })
                 put("proofWork", proofWork)
                 put("proofModeledAllocation", proofAllocation)
+                put("proofChecksComplete", checks.none { it is SourceEvidenceCheck.Unavailable })
+                put("acceptedCandidates", checks.count { it == SourceEvidenceCheck.Checked })
+                put("rejectedCandidates", checks.count { it is SourceEvidenceCheck.Rejected })
                 put("cumulativeWork", work)
                 put("cumulativeModeledAllocation", allocation)
                 put("candidates", buildJsonArray {
