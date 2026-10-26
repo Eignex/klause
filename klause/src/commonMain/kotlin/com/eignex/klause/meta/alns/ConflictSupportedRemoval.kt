@@ -28,6 +28,7 @@ internal class ConflictSupportedRemoval(
     private var center: Sample? = null
     private var scores = IntArray(0)
     private var observing = false
+    private var hasSupport = false
     private var observed = 0
     private var closed = false
     private var cancellation: Cancellation = Cancellation.Never
@@ -44,6 +45,11 @@ internal class ConflictSupportedRemoval(
         private set
     var capped = false
         private set
+
+    fun weights(): IntArray {
+        visits += scores.size
+        return scores.copyOf()
+    }
 
     init {
         require(maxCoordinates > 0 && maxConflicts > 0)
@@ -87,7 +93,9 @@ internal class ConflictSupportedRemoval(
         originPins = pins
         originCutoff = cutoff
         scores = IntArray(count.toInt())
+        visits += count
         observed = 0
+        hasSupport = false
         capped = false
         observing = true
     }
@@ -133,7 +141,10 @@ internal class ConflictSupportedRemoval(
                 discard(ConflictGuidanceStatus.Incompatible)
                 return
             }
-            if (!callerAssumptions.isFrozenBool(b)) scores[b]++
+            if (!callerAssumptions.isFrozenBool(b)) {
+                scores[b]++
+                hasSupport = true
+            }
         }
         for (i in ints) {
             visits++
@@ -141,10 +152,12 @@ internal class ConflictSupportedRemoval(
                 discard(ConflictGuidanceStatus.Incompatible)
                 return
             }
-            if (!callerAssumptions.isFrozenInt(i)) scores[model.numBoolVars + i]++
+            if (!callerAssumptions.isFrozenInt(i)) {
+                scores[model.numBoolVars + i]++
+                hasSupport = true
+            }
         }
-        visits += scores.size
-        status = if (scores.any { it > 0 }) ConflictGuidanceStatus.Supported else ConflictGuidanceStatus.EmptySupport
+        status = if (hasSupport) ConflictGuidanceStatus.Supported else ConflictGuidanceStatus.EmptySupport
     }
 
     override fun destroy(
