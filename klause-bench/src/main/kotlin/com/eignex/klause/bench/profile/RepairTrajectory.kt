@@ -46,12 +46,17 @@ internal object RepairTrajectory {
                 writer.appendLine(buildJsonObject {
                     put("id", get(entry, "Id") as Int)
                     put("owner", get(entry, "Owner").toString())
-                    put("freedScopeAvailable", get(entry, "Owner").toString().startsWith("alns:"))
+                    put("freedScopeAvailable", get(entry, "ScopeComplete") as Boolean)
                     put("seed", get(entry, "Seed") as Long?)
                     put("descentRule", get(trace, "DescentRule").toString())
                     put("endpoint", get(entry, "Endpoint").toString())
                     put("repairVerdict", get(entry, "RepairVerdict") as String?)
                     put("repairReason", get(entry, "RepairReason")?.toString())
+                    put("bestObjectiveCutoff", get(entry, "BestObjectiveCutoff") as Double?)
+                    put("exactBestObjective", get(entry, "ExactBestObjective")?.toString())
+                    (get(entry, "BestSample") as Sample?)?.let {
+                        put("sourceBest", sample(prepared.reconstruct(it)))
+                    }
                     put("basinClassified", false)
                     for (scope in listOf("RequestedBools", "RequestedInts", "EffectiveBools", "EffectiveInts")) {
                         put(scope.replaceFirstChar { it.lowercase() },
@@ -115,7 +120,8 @@ internal object RepairTrajectory {
                         is Diffn -> "placement-block"
                         else -> return@mapNotNull null
                     }
-                    val variables = factor.intVars.distinct().filterNot { problem.rootIntDomain(it).isFixed }.toIntArray()
+                    val variables = factor.intVars.distinct()
+                        .filterNot { problem.rootIntDomain(it).isFixed }.toIntArray()
                     if (variables.size !in 2..6) null else label to variables
                 }.take(4).toList()
                 val candidates = mutableListOf<Pair<String, IntArray>>()
