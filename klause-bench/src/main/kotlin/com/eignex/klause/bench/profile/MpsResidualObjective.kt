@@ -57,7 +57,7 @@ internal object MpsResidualObjective {
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun inspect(request: JsonObject, out: File) {
+    fun inspect(request: JsonObject, out: File) {
         fun option(key: String) = request.getValue(key).jsonPrimitive.content
         val bytes = request["sourceGzip64"]?.jsonPrimitive?.content?.let { encoded ->
             GZIPInputStream(ByteArrayInputStream(Base64.getDecoder().decode(encoded))).use {
