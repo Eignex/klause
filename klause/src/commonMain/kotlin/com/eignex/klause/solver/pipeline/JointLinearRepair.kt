@@ -107,7 +107,7 @@ internal class JointLinearRepair(
     }
 
     fun search(
-        adaptive: Boolean, seed: Long = params.randomSeed, sourceInputPass: Boolean = false,
+        adaptive: Boolean, seed: Long = params.randomSeed, sourceInputPass: Boolean = sourceIntegers != null,
     ): ExactNeighborhood {
         var focusedCutoff: BigFraction? = null
         var focusedRemaining = 0
