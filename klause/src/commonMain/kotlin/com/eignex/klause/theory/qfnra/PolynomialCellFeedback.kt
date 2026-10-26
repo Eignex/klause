@@ -7,8 +7,10 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.ir.PolynomialRealFormula
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.magnitudeBitLength
 
 internal data class PolynomialCellFeedbackStats(
     val admitted: Long,
@@ -29,7 +31,7 @@ internal class PolynomialCellFeedbackUse(
     val cell: CheckedPolynomialCell,
     val origin: PolynomialCellScope.Region,
     val current: PolynomialCellScope.Region,
-    val value: AlgebraicReal,
+    val value: AlgebraicReal?,
 )
 
 internal class PolynomialCellFeedback(
@@ -174,20 +176,25 @@ internal class PolynomialCellFeedback(
             if (!samePredicate(cell.predicate, required, arithmetic)) continue
             // Active predicates keep source-coordinate cells away from reconstructed placeholder slots.
             if (!cell.contains(value, algebraic)) continue
+            val current = scope as? PolynomialCellScope.Region
+            val origin = entry.firstRegion
+            val crossing = origin != null && current != null && origin.reduction !== current.reduction
+            val captured = if (current != null &&
+                (firstRegionUse == null || (crossing && firstCrossRegionUse == null))) {
+                traceValue(value, arithmetic)
+            } else null
             step(arithmetic)
             uses++
             if (entry.uses > 0) reuses++
             entry.uses++
-            val current = scope as? PolynomialCellScope.Region
-            val origin = entry.firstRegion
             if (current != null && origin == null) entry.firstRegion = current
             if (current != null && firstRegionUse == null) {
-                firstRegionUse = PolynomialCellFeedbackUse(cell, origin ?: current, current, value)
+                firstRegionUse = PolynomialCellFeedbackUse(cell, origin ?: current, current, captured)
             }
             if (origin != null && current != null && origin.reduction !== current.reduction) {
                 crossRegionUses++
                 if (firstCrossRegionUse == null) {
-                    firstCrossRegionUse = PolynomialCellFeedbackUse(cell, origin, current, value)
+                    firstCrossRegionUse = PolynomialCellFeedbackUse(cell, origin, current, captured)
                 }
             }
             return cell
@@ -287,6 +294,21 @@ internal class PolynomialCellFeedback(
         arithmetic.step()
     }
 
+    private fun traceValue(value: AlgebraicReal, arithmetic: PolynomialArithmetic): AlgebraicReal? {
+        step(arithmetic)
+        val polynomial = value.definingPolynomial
+        if (polynomial.degree > MAX_TRACE_DEGREE) return null
+        fun bounded(fraction: BigFraction): Boolean {
+            step(arithmetic)
+            return fraction.num.magnitudeBitLength() <= MAX_TRACE_BITS &&
+                fraction.den.magnitudeBitLength() <= MAX_TRACE_BITS
+        }
+        for (coefficient in polynomial.coefficients) if (!bounded(coefficient)) return null
+        if (!bounded(value.lowerBound) || !bounded(value.upperBound)) return null
+        // Image provenance can retain a larger candidate graph than this scalar representation.
+        return AlgebraicReal(polynomial, value.rootIndex, value.interval)
+    }
+
     private class Entry(
         val cell: CheckedPolynomialCell,
         origin: PolynomialCellScope?,
@@ -299,3 +321,5 @@ internal class PolynomialCellFeedback(
 private const val MAX_FEEDBACK_CELLS = 8
 private const val MAX_FEEDBACK_PREMISES = 64
 private const val MAX_CANDIDATE_WORK = 8192L
+private const val MAX_TRACE_DEGREE = 16
+private const val MAX_TRACE_BITS = 4096
