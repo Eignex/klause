@@ -894,14 +894,18 @@ native work and component duration separately; neither establishes CLI speedup.
 Capture keeps the first rejected probe and first rejected CAD prefix, exact
 normalized/active predicates, signed regional premises, condition bounds, numeric
 reverse fibres, source coordinate names, snapshot identity and the latest operation
-with its projection operands. Algebraic coordinates retain defining rational
+with its projection operands. The first representation refusal keeps its own
+operation/support record across later attempts. Algebraic coordinates retain defining rational
 coefficients, root index and isolating endpoints. Each record part permits 512
 entries and 16,384 key/value characters; a polynomial permits 128 terms, each
 monomial 64 coordinates, and coefficients 4,096 bits. Incomplete parts say
 `complete=false`; an interrupted copy sets `InterruptedCapture`. Repetition compares
 at most 256 exact representations, with `RepetitionComplete=false` beyond that;
 it does not decide equality of independently represented algebraic numbers.
-Copies poll and charge the containing query. No observation authorizes exclusion.
+Copies poll and charge the containing query. `CompletedCopySteps` counts completed
+serialization steps, excluding other observation costs; interruption can charge a
+final uncompleted step. Paired native totals retain all costs and any changed search
+trajectory. No observation authorizes exclusion.
 
 Request entries may include `fixedIntegers={"name":"integer"}` to measure a raw
 fixed-integer real completion. Every original integer declaration requires a fixing;

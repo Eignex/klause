@@ -18,6 +18,25 @@ import kotlin.test.assertTrue
 
 class PolynomialFailureCaptureTest {
     @Test
+    fun `the first refusal retains its operands after later operations`() {
+        val work = QfNraWork(QfNraParams())
+        val arithmetic = PolynomialArithmetic(work)
+        val capture = PolynomialFailureCapture()
+        capture.operation("elimination", 1, 2, work.spentWork, arithmetic, listOf(Polynomial.ONE), 0)
+        val before = work.spentWork
+
+        capture.refused("MATRIX_CELLS", arithmetic)
+        capture.operation("lifting", 1, 3, work.spentWork, arithmetic)
+        capture.refused("DENSE_COEFFICIENTS", arithmetic)
+
+        val refusal = assertNotNull(capture.firstRefusal)
+        assertEquals("MATRIX_CELLS", refusal["resource"])
+        assertEquals("elimination", refusal["operation.stage"])
+        assertEquals("1", refusal["operation.operand.0.0.coefficient"])
+        assertTrue(work.spentWork > before)
+    }
+
+    @Test
     fun `wide operands mark the capture incomplete`() {
         val polynomial = Polynomial.of((0..128).map {
             PolynomialTerm(Monomial.of(mapOf(0 to it)), BigFraction.ONE)

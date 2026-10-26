@@ -31,9 +31,12 @@ internal class PolynomialFailureCapture {
     var interruptedCapture: Boolean = false
         private set
 
-    fun refused(resource: String) {
-        if (firstRefusal == null) firstRefusal = operation.mapKeys { "operation.${it.key}" } +
-            context.mapKeys { "context.${it.key}" } + ("resource" to resource)
+    fun refused(resource: String, arithmetic: PolynomialArithmetic) {
+        if (firstRefusal == null) firstRefusal = capture(arithmetic) {
+            put("resource", resource)
+            for ((key, value) in operation) { if (exhausted) break; put("operation.$key", value) }
+            for ((key, value) in context) { if (exhausted) break; put("context.$key", value) }
+        }
     }
 
     private fun capture(arithmetic: PolynomialArithmetic, block: FailureWriter.() -> Unit): Map<String, String> {
@@ -56,6 +59,9 @@ internal class PolynomialFailureCapture {
         reduction: PolynomialAffineReduction? = null,
     ) {
         context = capture(arithmetic) {
+            put("root.requiresOriginalCheck", root.requiresOriginalCheck.toString())
+            put("root.eliminatedCoordinates", root.eliminatedCount.toString())
+            reduction?.let { put("region.eliminatedCoordinates", it.eliminatedCount.toString()) }
             root.captureReconstruction(this)
             region?.let {
                 for ((id, truth) in it.atoms) {
@@ -151,6 +157,7 @@ internal class PolynomialFailureCapture {
             }
             for ((id, value) in point) { if (exhausted) break; scalar("point.$id", value) }
         }
+        if (key["complete"] != "true") repetitionComplete = false
         if (firstFailure != null && (region == null || firstCadFailure != null)) {
             if (key["complete"] == "true" && key == firstKey && repeatedFirstFailure < Long.MAX_VALUE) {
                 repeatedFirstFailure++
@@ -168,7 +175,8 @@ internal class PolynomialFailureCapture {
             atoms("active", formula.atoms)
         }
         val captured = record + key.mapKeys { "candidate.${it.key}" } +
-            operation.mapKeys { "operation.${it.key}" } + context.mapKeys { "context.${it.key}" }
+            operation.mapKeys { "operation.${it.key}" } + context.mapKeys { "context.${it.key}" } +
+            ("complete" to listOf(scope, context, operation, key, record).all { it["complete"] == "true" }.toString())
         if (firstFailure == null) {
             firstKey = key
             firstFailure = captured

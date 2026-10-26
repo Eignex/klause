@@ -375,7 +375,7 @@ internal class QfNraQuery(
                             return@sequence
                         }
                     } catch (stop: PolynomialResourceLimit) {
-                        failureCapture?.refused(stop.resource.name)
+                        failureCapture?.refused(stop.resource.name, arithmetic)
                         if (complete) throw stop
                         // A larger required family can admit a section that avoids the refused projection.
                         finishProjection = true
@@ -384,7 +384,7 @@ internal class QfNraQuery(
                     yield(null)
                 } while (!complete)
             } catch (stop: PolynomialResourceLimit) {
-                failureCapture?.refused(stop.resource.name)
+                failureCapture?.refused(stop.resource.name, arithmetic)
                 // An incomplete region can be skipped for SAT search, but withholds source exhaustion.
                 if (incomplete == null) incomplete = stop.resource
                 val refusals = checkNotNull(work.booleanTheoryResourceRefusals)
