@@ -298,6 +298,12 @@ materialized cones that agrees with the canonical objective at every feasible
 assignment. Source factors stay enforced, and hints grant no feasibility or proof
 authority.
 
+Experimental channel views can leave admitted Boolean-value, Element-value or
+predicate outputs searched while retaining the other nodes in dependency order.
+Removing a definition adds no inverse and relaxes no source relation. An inconsistent
+searched output has a maintained counterpart only when the complete source assignment
+survives reconstruction unchanged.
+
 ### Definitions and repairs
 
 A maintained definition is a one-way node: when its inputs move, the network

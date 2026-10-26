@@ -725,6 +725,23 @@ class DefinitionalSweep internal constructor(
     /** Number of swept definitions. */
     val size: Int get() = nodes.size
 
+    internal fun searchingChannels(
+        values: Boolean,
+        predicates: Boolean,
+        cancellation: Cancellation,
+    ): DefinitionalSweep? {
+        val retained = ArrayList<SweepNode>(nodes.size)
+        for (node in nodes) {
+            if (cancellation.definitionStopped()) return null
+            val valueChannel = node is LiteralIntDefinition || node is SweepNode.Bool2Int ||
+                node is ElementResultDefinition || node is SweepNode.ElementDef
+            val predicateChannel = node is CapturedBooleanDefinition || node is UnaryPredicateDefinition ||
+                node is SweepNode.CmpReif || node is SweepNode.SetInReif
+            if (!(values && valueChannel || predicates && predicateChannel)) retained += node
+        }
+        return if (cancellation() || retained.isEmpty()) null else DefinitionalSweep(retained)
+    }
+
     /** Build the per-move invariant index over these nodes. */
     fun network(numIntVars: Int, numBoolVars: Int): InvariantNetwork = InvariantNetwork(nodes, numIntVars, numBoolVars)
 
