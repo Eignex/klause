@@ -142,7 +142,7 @@ internal object ObjectiveViewComparison {
         val boundaries = ArrayList<Boundary>()
         for (view in View.entries) {
             val directory = out.resolve(view.name.lowercase()).apply { mkdirs() }
-            val prepared = prepare(source, view, seed, timeout)
+            val prepared = prepare(source, view, seed, timeout, directory) ?: continue
             directory.resolve("model.json").writeText(buildJsonObject {
                 put("preparationNanos", prepared.nanos)
                 put("preparationAllocatedBytes", prepared.allocatedBytes)
@@ -199,7 +199,7 @@ internal object ObjectiveViewComparison {
         }
     }
 
-    private fun prepare(source: Xcsp3Problem, view: View, seed: Long, timeout: Long): Prepared {
+    private fun prepare(source: Xcsp3Problem, view: View, seed: Long, timeout: Long, out: File): Prepared? {
         val started = System.nanoTime()
         val allocation = allocationCounter()
         val before = allocation.getThreadAllocatedBytes(Thread.currentThread().threadId())
@@ -210,13 +210,24 @@ internal object ObjectiveViewComparison {
             else SourceAttachment(source.problem, source.definedVars, emptyList(), source.definitionHints),
             ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED, objective = objective, cancellation = stop,
         ))
-        val plan = requireNotNull(invocation.preparedPlan)
+        val plan = invocation.preparedPlan
+        if (plan == null || stop()) {
+            out.resolve("decline.json").writeText("{\"decline\":\"source-preparation-unavailable\"}")
+            return null
+        }
         val prepared = FinitePipeline.prepare(FinitePipelineRequest(
             requireNotNull(plan.model), FiniteEngine.MIXED, objective,
             cancellation = stop, solveCancellation = stop, presolveBudget = PresolveBudget(1_375_000_000L),
             preparedPlan = plan, transformObjective = view == View.SUBSTITUTED, randomSeed = seed,
         ))
-        check(!stop() && prepared.presolve?.infeasible != true)
+        if (stop() || prepared.presolve?.infeasible == true) {
+            out.resolve("decline.json").writeText(buildJsonObject {
+                put("decline", if (stop()) "preparation-time-budget" else "native-presolve-terminal")
+                put("elapsedNanos", System.nanoTime() - started)
+                put("sourceVerdictClaim", false)
+            }.toString())
+            return null
+        }
         val hints = LocalSearchTrajectory.heuristicHints(invocation, prepared, stop)
         val sweep = hints?.let { LocalSearchTrajectory.getter(it, "getSweep") as DefinitionalSweep? }
         val gradient = hints?.let { LocalSearchTrajectory.getter(it, "getObjective") as IncrementalObjective? }
