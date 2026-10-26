@@ -238,6 +238,7 @@ internal class ConflictSupportedRemoval(
         fraction: Double,
     ): FreedVars {
         if (closed) status = ConflictGuidanceStatus.Closed
+        if (!closed && cancellation()) discard(ConflictGuidanceStatus.Cancelled)
         if (!closed && (
                 problem !== model || objective !== this.objective ||
                     (center != null && incumbent !== center)

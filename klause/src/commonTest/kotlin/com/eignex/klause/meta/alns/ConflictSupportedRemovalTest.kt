@@ -274,6 +274,23 @@ class ConflictSupportedRemovalTest {
     }
 
     @Test
+    fun `cancellation after acquisition should retire guidance before selection`() {
+        var stopped = false
+        val guidance = ConflictSupportedRemoval(problem, objective)
+        val observer = guidance.observe(BacktrackParams()).variableSelector.fresh()
+        guidance.begin(center, Assumptions.None, 0.0, Cancellation { stopped })
+        observer.onConflict(null, BranchingConflict(intArrayOf(1)))
+        guidance.end()
+        stopped = true
+
+        val freed = guidance.destroy(Random(17), problem, center, objective, 0.5)
+
+        assertEquals(ConflictGuidanceStatus.Cancelled, guidance.status)
+        assertEquals(DestroyOperator.Random.destroy(Random(17), problem, center, objective, 0.5), freed)
+        assertNull(guidance.originPins)
+    }
+
+    @Test
     fun `close and cancellation should release conditioned capture`() {
         for (close in listOf(false, true)) {
             var stopped = false
