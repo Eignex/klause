@@ -330,6 +330,32 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
+    fun `a pair retention limit should not establish the absence of violated cuts`() {
+        val quarter = BigFraction.ofLong(4).reciprocal()
+        val point = mapOf(x to quarter * BigFraction.ofLong(3), y to quarter * BigFraction.ofLong(3),
+            real to quarter * BigFraction.ofLong(6))
+
+        val result = LinearAuthorityAggregateCuts.inspectPairs(listOf(
+            LinearAuthorityAggregateTerm(0, "left", left), LinearAuthorityAggregateTerm(1, "right", right),
+        ), emptySet(), point, Cancellation.Never, maximumCandidates = 0)
+
+        assertFalse(result.complete)
+        assertTrue(result.candidates.isEmpty())
+        assertEquals(true, result.activeSourceRowsSatisfied)
+    }
+
+    @Test
+    fun `pair inspection should complete when the aggregate is satisfied at the point`() {
+        val result = LinearAuthorityAggregateCuts.inspectPairs(listOf(
+            LinearAuthorityAggregateTerm(0, "left", left), LinearAuthorityAggregateTerm(1, "right", right),
+        ), emptySet(), mapOf(x to BigFraction.ONE, y to BigFraction.ZERO, real to BigFraction.ONE), Cancellation.Never)
+
+        assertTrue(result.complete)
+        assertTrue(result.candidates.isEmpty())
+        assertEquals(true, result.activeSourceRowsSatisfied)
+    }
+
+    @Test
     fun `pair inspection should retain unknown efficacy when a point coordinate is missing`() {
         val result = LinearAuthorityAggregateCuts.inspectPairs(listOf(
             LinearAuthorityAggregateTerm(0, "left", left), LinearAuthorityAggregateTerm(1, "right", right),
