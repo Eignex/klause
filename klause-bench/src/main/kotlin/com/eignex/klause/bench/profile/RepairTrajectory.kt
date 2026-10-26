@@ -97,6 +97,7 @@ internal object RepairTrajectory {
                 val frame = (get(entry, "Frames") as List<*>).lastOrNull() ?: continue
                 val center = get(frame, "Sample") as Sample
                 if (get(frame, "Cost") != 0L || centers++ >= 4 || stop()) break
+                checkSource(source, prepared.reconstruct(center))
                 val blocks = problem.factors.filterIsInstance<AllDifferent>().filter {
                     it.presents.isEmpty() && it.exceptSet.isEmpty() && it.intVars.size in 2..6
                 }.take(4)
@@ -152,6 +153,28 @@ internal object RepairTrajectory {
             put("maxDecisionsPerRepair", 10_000)
             put("cancelled", stop())
             put("wholeSourceExhaustionClaim", false)
+        }.toString())
+    }
+
+    fun writeResult(file: File, result: MinimizeResult, prepared: FinitePipelinePreparation,
+        source: BakedProblem, picks: Long, runNanos: Long, allocatedBytes: Long,
+    ) {
+        file.writeText(buildJsonObject {
+            put("objective", result.objectiveValue)
+            put("picks", picks)
+            put("moves", result.stats.ls.moves.sum)
+            put("restarts", result.stats.search.restarts.sum)
+            put("stalls", result.stats.ls.stalls.sum)
+            put("runElapsedNanos", runNanos)
+            put("runThreadAllocatedBytes", allocatedBytes)
+            put("checker", "native finiteWitnessVerifier/composedFixpoint")
+            put("independentWitnessCheck", false)
+            result.assignment?.let {
+                val reconstructed = prepared.reconstruct(it)
+                put("working", sample(it))
+                put("source", sample(reconstructed))
+                put("nativeSourceAccepted", checkSource(source, reconstructed))
+            }
         }.toString())
     }
 

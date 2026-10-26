@@ -44,7 +44,9 @@ import com.eignex.klause.solver.pipeline.SourceAttachment
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.util.Cancellation
+import com.sun.management.ThreadMXBean
 import java.io.File
+import java.lang.management.ManagementFactory
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -210,6 +212,10 @@ internal object LocalSearchTrajectory {
                         initialAssignment = initial,
                     )
                     solver.resumable(workingObjective, params).use { run ->
+                        val allocation = ManagementFactory.getThreadMXBean() as ThreadMXBean
+                        val thread = Thread.currentThread().threadId()
+                        val beforeBytes = allocation.getThreadAllocatedBytes(thread)
+                        val started = System.nanoTime()
                         val result = try {
                             var observed = run.runSlice(stop, sliceMillis, sliceWork) {}
                             while (observed == null && !stop()) {
@@ -218,6 +224,12 @@ internal object LocalSearchTrajectory {
                             observed
                         } catch (_: Captured) {
                             null
+                        }
+                        val runNanos = System.nanoTime() - started
+                        val runBytes = allocation.getThreadAllocatedBytes(thread) - beforeBytes
+                        if (walk && result != null && sourceCheck != null) {
+                            RepairTrajectory.writeResult(out.resolve("witness-$label.json"), result, prepared,
+                                sourceCheck, picks, runNanos, runBytes)
                         }
                         out.resolve("result-$label.txt").writeText(
                             "picks=$picks\ncancelled=${stop()}\nresult=$result\nstats=${run.stats}\n",
@@ -228,7 +240,7 @@ internal object LocalSearchTrajectory {
                             }
                             val stats = run.stats.ls
                             val signature = listOf(result.assignment, result.objectiveValue, picks, stats.moves.sum,
-                                stats.restarts.sum, stats.stalls.sum, stats.boardRestartChanges.sum,
+                                run.stats.search.restarts.sum, stats.stalls.sum, stats.boardRestartChanges.sum,
                                 stats.boardRestartDeclines.sum)
                             if (mode == "walk") baseline = signature
                             if (mode == "repair") {
