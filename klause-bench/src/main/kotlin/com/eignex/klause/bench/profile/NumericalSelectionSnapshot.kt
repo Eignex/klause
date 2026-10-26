@@ -170,6 +170,9 @@ internal class NumericalSelectionSnapshot(private val stop: Cancellation) {
                     val derivation = field(cut, "derivation") as SourceDerivation
                     put("id", field(cut, "id") as Int)
                     put("owner", field(cut, "owner") as Int)
+                    put("owners", buildJsonArray {
+                        (field(cut, "owners") as Set<Int>).sorted().forEach { add(JsonPrimitive(it)) }
+                    })
                     put("installed", field(cut, "installed") as Boolean)
                     put("ownerActive", field(cut, "ownerActive") as Boolean)
                     put("checkedAtQuery", field(cut, "checked") as Boolean)

@@ -63,15 +63,26 @@ internal object LinearAuthorityReplay {
         maximumWork: Long,
         maximumAllocation: Long,
         stop: Cancellation,
+    ): LinearAuthorityReplayResult = runWithCandidates(query, mask, emptyList(), true,
+        maximumWork, maximumAllocation, stop)
+
+    fun runWithCandidates(
+        query: LinearAuthorityCapturedQuery,
+        mask: Set<Int>?,
+        additional: List<LinearAuthorityCut>,
+        cuts: Boolean,
+        maximumWork: Long,
+        maximumAllocation: Long,
+        stop: Cancellation,
     ): LinearAuthorityReplayResult {
         val funding = SourceLpFunding(maximumWork, maximumAllocation).apply { grant(maximumWork) }
         val budget = SourceLpBudget(maxOperations = 1, funding = funding)
         val capture = LinearAuthorityCapture(1, 1_000_000L, 16_777_216L, stop)
-        LinearAuthority(budget, retainLp = true).use { authority ->
+        LinearAuthority(budget, retainLp = true, additionalCuts = additional).use { authority ->
             authority.capture = capture
             var result: LinearAuthorityResult
             do {
-                result = authority.advance(query.context, stop, cuts = true, cutMask = mask)
+                result = authority.advance(query.context, stop, cuts = cuts, cutMask = mask)
             } while (result.paused && !stop() && !funding.exhausted)
         }
         return LinearAuthorityReplayResult(capture.records.singleOrNull(), budget.operations,

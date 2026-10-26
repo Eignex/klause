@@ -40,7 +40,10 @@ internal class LinearAuthority(
     onLpShape: (LinearAuthorityLpShape) -> Unit = {},
     private val retainLp: Boolean = false,
     guidancePolicy: SparseSourceLpPolicy = SparseSourceLpPolicy(),
+    additionalCuts: List<LinearAuthorityCut> = emptyList(),
 ) : AutoCloseable {
+    init { require(additionalCuts.size <= 64) }
+    private val additionalCuts = additionalCuts.toList()
     private val lp = LinearAuthorityLp(budget, onLpShape, retainLp, guidancePolicy)
     val funding: SourceLpFunding? get() = budget.funding
     val preparations: Long get() = lp.preparations
@@ -273,6 +276,12 @@ internal class LinearAuthority(
                 ?: LinearAuthorityTemplate.prepare(source, cancellation, cuts) { work ->
                     cutPreparationWork += work
                     budget.observe(preparation = work)
+                }?.let { prepared ->
+                    if (!cuts) prepared else prepared.withAdditional(additionalCuts, cancellation) { work, allocation ->
+                        cutPreparationWork += work
+                        budget.observe(preparation = work)
+                        budget.funding?.charge(0L, allocation)
+                    }
                 }?.also {
                     template = it
                     retainedCutPeak = maxOf(retainedCutPeak, it.cuts?.rows?.size?.toLong() ?: 0L)
