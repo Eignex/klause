@@ -33,15 +33,16 @@ internal class NumericalSelectionSnapshot(private val stop: Cancellation) {
     }
 
     fun attach(invocation: Any): Any {
-        val journal = journal()
+        val feedback = field(checkNotNull(field(invocation, "component")), "feedback")
+        val journal = feedback?.let { checkNotNull(field(it, "journal")) } ?: journal()
         invocation.javaClass.getDeclaredMethod("captureTo", journal.javaClass).invoke(invocation, journal)
         return journal
     }
 
     fun capture(journal: Any): JsonObject = buildJsonObject {
-        put("maximumRecords", 64)
-        put("maximumEntries", 1_000_000L)
-        put("maximumModeledBytes", 16_777_216L)
+        put("maximumRecords", field(journal, "maximumRecords") as Int)
+        put("maximumEntries", field(journal, "maximumEntries") as Long)
+        put("maximumModeledBytes", field(journal, "maximumBytes") as Long)
         put("attempted", field(journal, "attempted") as Long)
         put("retainedRecords", records(journal).size)
         put("entries", field(journal, "entries") as Long)

@@ -101,7 +101,8 @@ class SourceNumericalFeedbackTest {
             feedback.acquire(authority, source)
         }
 
-        assertEquals(SourceNumericalFeedbackResult.Unavailable(SourceNumericalFeedbackResult.Reason.Cancelled),
+        assertEquals(SourceNumericalFeedbackResult.Unavailable(source, null,
+            SourceNumericalFeedbackResult.Reason.Cancelled),
             result)
     }
 
