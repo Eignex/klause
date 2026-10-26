@@ -213,8 +213,10 @@ class LinearAuthorityPointCutsTest {
     fun `a paused separation round should retain its completed base bound`() {
         val funding = SourceLpFunding(1_000_000L, 4_000_000L).apply { grant(1_000_000L) }
         var blocked = false
+        var operations = 0L
         val budget = SourceLpBudget(funding = funding, onWork = {
-            if (!blocked && it.operations.toLong() == 2L) {
+            operations += it.operations
+            if (!blocked && operations == 2L) {
                 blocked = true
                 funding.grant(0L)
             }
