@@ -306,6 +306,13 @@ premises, semantics, objective and exact query restrictions. A cutoff attributio
 requires its actual strict objective premise; an acquisition without that premise
 cannot claim a cutoff-conditioned conflict. Cancellation, missing queries,
 retention and funding exhaustion remain explicit unavailable outcomes.
+Acquisition returns the existing authority result alongside feedback, preserving
+recovered incumbents for separate source checking and acquisition credit. A funded
+cutoff helper constructs a query-local strict objective row in source units.
+Bounded refutation-support projection visits captured premise and assumption
+references and retains the complete Boolean substitution and query cutoff. An
+unsupported projection declines; it performs neither proof replay nor scope
+reduction. Its coordinate set supplies ranking only.
 
 The opt-in `source-support-branching` consumer orders integer splits by near-tight,
 installed checked cut supports, preferring smaller supports and greater fractional
