@@ -238,10 +238,16 @@ object LocalSearchCatalog {
     private val catalog = ArmCatalog(LocalSearchArm.entries, LocalSearchArm::label, ::make)
 
     /** A fresh recipe for the arm named [label] (the single string boundary). */
-    fun byLabel(label: String): LocalSearchRecipe = catalog.byLabel(label)
+    fun byLabel(label: String): LocalSearchRecipe {
+        if (!label.startsWith("experiment-channel/")) return catalog.byLabel(label)
+        val base = catalog.byLabel(label.removePrefix("experiment-channel/").substringAfter('/'))
+        return LocalSearchRecipe(label, base.strategy, base.optimizeStrategy, base.perMoveInvariants,
+            base.seedImplicitOnRestart)
+    }
 
     /** Every arm label across both kinds (COP is the superset), for validation and error messages. */
-    fun labels(): List<String> = catalog.labels(copOrder)
+    fun labels(): List<String> = catalog.labels(copOrder) + listOf("maintained", "values", "predicates", "channels", "inverse")
+        .flatMap { mode -> listOf("cbls/fixed", "cbls-implicit/fixed").map { "experiment-channel/$mode/$it" } }
 
     /** Every arm label for [kind], in credit order — for enumerating the pool by name. */
     fun labels(kind: Kind): List<String> = catalog.labels(rankedArms(kind))

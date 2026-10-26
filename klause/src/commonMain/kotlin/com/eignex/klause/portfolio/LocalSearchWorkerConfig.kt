@@ -7,9 +7,11 @@ import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSession
 import com.eignex.klause.localsearch.LocalSearchSolver
+import com.eignex.klause.localsearch.inverseAssignmentView
 import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.ModelIdentity
@@ -108,6 +110,20 @@ internal class LocalSearchWorkerConfig private constructor(
         }
         val evidenceModel = ModelIdentity.of(problem, objective)
         val matchedPools = pools?.takeIf { it.identity?.matches(evidenceModel) != false }
+        val channel = if (recipe.label.startsWith("experiment-channel/")) {
+            recipe.label.removePrefix("experiment-channel/").substringBefore('/')
+        } else "maintained"
+        val channelProblem = if (channel == "inverse") {
+            requireNotNull(inverseAssignmentView(problem, problem.cancellation)) {
+                "unsupported bounded inverse assignment view"
+            }.bake(problem.cancellation)
+        } else problem
+        val channelSweep = when (channel) {
+            "values" -> definitionalSweep?.searchingChannels(true, false, problem.cancellation)
+            "predicates" -> definitionalSweep?.searchingChannels(false, true, problem.cancellation)
+            "channels" -> definitionalSweep?.searchingChannels(true, true, problem.cancellation)
+            else -> definitionalSweep
+        }
         // On a COP, every arm optimizes. A recipe that drives objective descent itself (CBLS, SA) needs
         // nothing; a violation-native one (probSAT / WalkSAT / feasibility-jump) gets an `objective ≤
         // incumbent` ratchet overlaid on its problem and the shared bound to tighten — so no arm bails at
@@ -115,16 +131,16 @@ internal class LocalSearchWorkerConfig private constructor(
         val (effectiveProblem, boundHandle) = if (objective != null &&
             recipe.feasibleDescent == FeasibleDescent.RatchetAsConstraint
         ) {
-            objectiveBoundOverlay(problem, objective) ?: (problem to null)
+            objectiveBoundOverlay(channelProblem, objective) ?: (channelProblem to null)
         } else {
-            problem to null
+            channelProblem to null
         }
         val session = LocalSearchSolver(
             effectiveProblem,
             strategy = recipe.strategy,
             optimizeStrategy = recipe.optimizeStrategy,
-            definitionalSweep = definitionalSweep,
-            perMoveInvariants = definitionalSweep != null && recipe.perMoveInvariants,
+            definitionalSweep = channelSweep,
+            perMoveInvariants = channelSweep != null && recipe.perMoveInvariants,
             seedImplicitOnRestart = recipe.seedImplicitOnRestart,
             // Floating scores guide candidates; the residual LP retains the configured source guarantee.
             completion = if (problem.numRealVars > 0) LeafRealCompletion(problem, objective, toleranceCheck) else null,
@@ -132,7 +148,9 @@ internal class LocalSearchWorkerConfig private constructor(
             objectiveBound = boundHandle
             if (effectiveProblem === problem) {
                 matchedPools?.localSearchProjection?.let { engine.projection = it }
-                matchedPools?.localSearchInvariants?.let { engine.invariantNetwork = it }
+                if (channelSweep === definitionalSweep) {
+                    matchedPools?.localSearchInvariants?.let { engine.invariantNetwork = it }
+                }
             }
         }.session()
         val workerLabel = "ls/$label"
