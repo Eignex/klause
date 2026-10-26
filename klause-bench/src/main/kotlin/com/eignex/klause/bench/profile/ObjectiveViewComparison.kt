@@ -51,6 +51,7 @@ internal object ObjectiveViewComparison {
 
     private data class Prepared(
         val pipeline: FinitePipelinePreparation,
+        val coordinates: VarRemap?,
         val sweep: DefinitionalSweep?,
         val gradient: IncrementalObjective?,
         val nanos: Long,
@@ -157,6 +158,10 @@ internal object ObjectiveViewComparison {
                     })
                 })
             }.toString())
+            if (prepared.coordinates == null) {
+                directory.resolve("decline.json").writeText("{\"decline\":\"source-coordinate-map\"}")
+                continue
+            }
             if (view == View.FUNCTIONAL &&
                 (prepared.gradient == null || !LocalSearchCatalog.byLabel(recipe).perMoveInvariants)
             ) {
@@ -215,7 +220,8 @@ internal object ObjectiveViewComparison {
         val hints = LocalSearchTrajectory.heuristicHints(invocation, prepared, stop)
         val sweep = hints?.let { LocalSearchTrajectory.getter(it, "getSweep") as DefinitionalSweep? }
         val gradient = hints?.let { LocalSearchTrajectory.getter(it, "getObjective") as IncrementalObjective? }
-        return Prepared(prepared, sweep, gradient, System.nanoTime() - started,
+        val coordinates = LocalSearchTrajectory.trajectoryCoordinates(invocation, prepared, stop)
+        return Prepared(prepared, coordinates, sweep, gradient, System.nanoTime() - started,
             allocation.getThreadAllocatedBytes(Thread.currentThread().threadId()) - before)
     }
 
@@ -341,10 +347,7 @@ internal object ObjectiveViewComparison {
         initialWeights?.copyInto(shadow.weights.factorWeights)
         return TrajectoryView(
             view.name.lowercase(), shadow,
-            VarRemap(
-                IntArray(source.problem.numBoolVars) { if (it < problem.numBoolVars) it else -1 },
-                IntArray(source.problem.numIntVars) { if (it < problem.numIntVars) it else -1 },
-            ),
+            requireNotNull(prepared.coordinates),
             captured.shaping.objective, prepared.pipeline.reconstruct,
             { activeSweep?.sweep(shadow.assignment, shadow.rootDomains) }, captured.seeding.ownerInt,
         )
