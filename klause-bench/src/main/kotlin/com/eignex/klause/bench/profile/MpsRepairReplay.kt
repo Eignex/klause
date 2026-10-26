@@ -11,6 +11,7 @@ import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.TheoryParams
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.fitsLong
 import com.eignex.klause.util.toLongExact
@@ -107,13 +108,13 @@ internal object MpsRepairReplay {
             val candidate = call(attempt, "getFeasiblePoint") as Sample?
             val values = candidate?.let { next -> columns.map { column ->
                 if (Term.isInt(column)) BigFraction.of(next.exactIntValue(Term.intVar(column)),
-                    BigFraction.ONE.numerator) else checkNotNull(next.exactReals)[Term.realVar(column)]
+                    BIG_ONE) else checkNotNull(next.exactReals)[Term.realVar(column)]
             } }
             val verified = values?.let { source.checkMpsWitness(it) }
             if (candidate != null) {
                 check(verified != null)
                 check(pins.all { (id, value) -> BigFraction.of(candidate.exactIntValue(id),
-                    BigFraction.ONE.numerator) == value })
+                    BIG_ONE) == value })
                 if (result.javaClass.simpleName == "Witness") check(objective.evaluateExact(candidate) < cutoff)
             }
             val reason = call(attempt, "getReason")?.toString() ?: if (stop()) "Timeout" else null
@@ -163,12 +164,12 @@ internal object MpsRepairReplay {
     private fun sample(model: Problem, mapped: Map<SourceCoordinate, BigFraction>, objective: BigFraction): Sample {
         require(model.numBoolVars == 0)
         val integers = List(model.numIntVars) { mapped.getValue(SourceCoordinate(SourceCoordinate.Kind.Integer, it)) }
-        require(integers.all { it.denominator == BigFraction.ONE.denominator })
+        require(integers.all { it.den == BIG_ONE })
         val reals = List(model.numRealVars) { mapped[SourceCoordinate(SourceCoordinate.Kind.Real, it)] ?: objective }
-        val finite = if (integers.all { it.numerator.fitsLong() })
-            LongArray(integers.size) { integers[it].numerator.toLongExact() } else LongArray(0)
+        val finite = if (integers.all { it.num.fitsLong() })
+            LongArray(integers.size) { integers[it].num.toLongExact() } else LongArray(0)
         return Sample(BooleanArray(0), finite,
-            reals.map { it.toDouble() }.toDoubleArray(), exactReals = reals, exactInts = integers.map { it.numerator })
+            reals.map { it.toDouble() }.toDoubleArray(), exactReals = reals, exactInts = integers.map { it.num })
     }
 
     private fun coordinate(column: Int) = SourceCoordinate(
