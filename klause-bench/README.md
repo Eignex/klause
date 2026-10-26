@@ -2489,6 +2489,9 @@ and the saved `witness` line. It records the original and refined objective in
 source units, the working objective scale, exact completion work, allocation and
 a fresh `checkMpsWitness` result. Run it through a bounded lab profile job; native
 source checks do not constitute independent witness or proof validation.
+Optional `sourceGzip64` supplies gzip/base64 original MPS bytes from a retained
+capture instead of catalog resolution. Decompression retains the same 16 MiB
+source limit and mandatory `sha256` check; the report saves the uncompressed source.
 
 Optional `repairSets` replays arrays of original integer column names through
 `JointLinearRepair` instead of fixed-pin refinement. Each set frees precisely those
