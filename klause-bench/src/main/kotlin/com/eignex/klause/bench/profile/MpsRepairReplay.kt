@@ -116,7 +116,7 @@ internal object MpsRepairReplay {
             } }
             val verified = values?.let { source.checkMpsWitness(it) }
             if (candidate != null) {
-                check(verified != null)
+                checkNotNull(verified)
                 check(pins.all { (id, value) -> BigFraction.of(candidate.exactIntValue(id),
                     BIG_ONE) == value })
                 if (result.javaClass.simpleName == "Witness") check(objective.evaluateExact(candidate) < cutoff)
@@ -140,8 +140,12 @@ internal object MpsRepairReplay {
                 put("sourceScope", NumericalResidualProfile.json(context.scope))
                 put("requestedFreed", JsonArray(freedNames.map(::JsonPrimitive)))
                 put("effectiveFreedIntegers", JsonArray(freed.sorted().map(::JsonPrimitive)))
-                put("freeSourceRealIntegerBackings", JsonArray(realBackings.map { JsonPrimitive(source.variables[it].name) }))
-                put("complementPins", buildJsonObject { pins.forEach { (id, value) -> put(id.toString(), value.toString()) } })
+                put("freeSourceRealIntegerBackings", JsonArray(realBackings.map {
+                    JsonPrimitive(source.variables[it].name)
+                }))
+                put("complementPins", buildJsonObject {
+                    pins.forEach { (id, value) -> put(id.toString(), value.toString()) }
+                })
                 put("strictWorkingCutoff", cutoff.toString())
                 put("sourceCenterObjective", checked.objective.toString())
                 put("sourceCandidateObjective", verified?.objective?.toString())

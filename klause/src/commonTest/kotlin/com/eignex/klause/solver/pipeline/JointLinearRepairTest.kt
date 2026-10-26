@@ -62,7 +62,9 @@ class JointLinearRepairTest {
             external = { center }).use { repair ->
             var attempt = repair.attempt(condition, Cancellation.Never)
             repeat(64) {
-                if (attempt.result == ExactNeighborhoodResult.Paused) attempt = repair.attempt(condition, Cancellation.Never)
+                if (attempt.result == ExactNeighborhoodResult.Paused) {
+                    attempt = repair.attempt(condition, Cancellation.Never)
+                }
             }
 
             assertEquals(ExactNeighborhoodResult.Refuted, attempt.result)
