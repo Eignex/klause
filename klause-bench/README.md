@@ -268,6 +268,9 @@ configured by `-Dklause.bench.corpus.maxGb=N` or `KLAUSE_BENCH_CORPUS_MAX_GB=N`;
 before/after fetch. This JVM's used collections stay pinned; parallel bench processes
 sharing a cache should prefetch or disable eviction, as the lab does. Metadata avoids
 full tree scans; `.trash` renames make interrupted deletion resumable.
+ZIP collections extract through the JDK with entry checksum and destination checks;
+failed ZIP fetches remove partial collections. Individually compressed members still
+require their system decompressor (`unxz`, `bunzip2`, `gunzip` or `unlzma`).
 
 CNF, WCNF, OPB, WBO, XML, SMT-LIB and MPS collections can use `.zst`; MiniZinc
 source/data and cloned collections stay plain. `zstd` must be on `PATH` and
