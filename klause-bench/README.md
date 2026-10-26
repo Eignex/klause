@@ -4008,8 +4008,8 @@ values and visited-row eligibility limits. Missing values are unknown.
 operations so observation-on/off controls can stop before the wall deadline.
 
 Optional `replay=true` separately replays at most four retained point states with
-empty and all-candidate masks, twice per mask, flushing `selection-replays.jsonl`. Each replay has
-one source operation, 20M cumulative work and 64 MiB modeled allocation under a
+empty and all-candidate masks, twice per mask, flushing `selection-replays.jsonl`.
+Each replay has one source operation, 20M cumulative work and 64 MiB modeled allocation under a
 shared ten-second diagnostic deadline. Replay creates fresh owners; its work and
 native checks are separate from traversal accounting and independent witness
 validation. The capture's existing original bytes, hash, native-system identity,
@@ -4040,3 +4040,9 @@ violation at the uncut point and empty/all masks give identical checked bounds.
 These states support point-based selection experiments while preserving useful
 rounding controls. Native derivation checks are separate from independent witness
 or exported-proof validation; the diagnostic establishes no source verdict.
+
+[Repeated replay 8445](https://lab.eignex.com/jobs/8445), at `7f5c1aec09`, reproduces
+the exact point, scope, bound and modeled work in both fresh repetitions of all
+eight `rgn` parent/mask pairs. All 16 bounds and 640 candidate derivations pass
+fresh native checks; no replay reaches its allowance. The original source hash
+and Linux/amd64 platform match 8431.
