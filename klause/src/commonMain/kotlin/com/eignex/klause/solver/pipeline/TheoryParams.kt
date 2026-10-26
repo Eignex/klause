@@ -105,6 +105,8 @@ data class TheoryParams(
     val sourceCuts: Boolean = true,
     /** Select checked source cuts at completed numerical frontier points. */
     val sourcePointCuts: Boolean = false,
+    /** Enable bounded source-bound aggregation for numerical frontier traversal. */
+    val sourceAggregateCuts: Boolean = false,
 ) {
     init {
         require(sourceLpWorkLimit >= 0 && sourceLpAllocationLimit >= 0 && sourceLpOperations >= 0)
