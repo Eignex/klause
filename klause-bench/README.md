@@ -2512,6 +2512,10 @@ freed set with its actual source LP guidance before replaying it at the saved
 center. Root guidance/index/selection work is recorded separately in
 `selection.json` and is excluded from each cold repair allowance; these captures
 compare repair capability at fixed freedoms, not total selector throughput.
+Original real columns with proved integer backings remain free in every replay
+residual. The selection capture distinguishes those working integer coordinates
+from the effective original integer freedoms; they never become complement pins
+solely because lowering gave them integer storage.
 
 [Fixed-pin replay 8339](https://lab.eignex.com/jobs/8339), at `b738c5d89a` on
 Mac/aarch64, retains four witnesses from [8302](https://lab.eignex.com/jobs/8302).
