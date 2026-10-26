@@ -48,7 +48,8 @@ internal fun bindSourceExecutionControls(
     val stop = cancellation or timeout or invocation.cancellation
     val companions = invocation.requestsFiniteNumericalCompanions
     val finiteOptions = options.withoutPresolve().without("node-limit", "dry-run-presolve").let {
-        if (companions) it.without("source-lp-work-limit", "source-lp-allocation-limit", "source-lp-operations") else it
+        if (companions) it.without("source-lp-work-limit", "source-lp-allocation-limit", "source-lp-operations",
+            "source-refutation-reuse") else it
     }
         .overriddenBy(ExecutionOptions(ExecutionOption.seed(seed)))
     val finite: (FiniteSolveShape) -> FiniteSolveRequest = { shape ->
@@ -83,6 +84,7 @@ internal fun bindSourceExecutionControls(
             sourceLpAllocationLimit = reader.defaulted(ExecutionOption.sourceLpAllocationLimit,
                 defaults.sourceLpAllocationLimit) ?: Long.MAX_VALUE,
             sourceLpOperations = reader[ExecutionOption.sourceLpOperations] ?: defaults.sourceLpOperations,
+            sourceRefutationReuse = reader[ExecutionOption.sourceRefutationReuse] ?: defaults.sourceRefutationReuse,
         ) else defaults
         return SourceExecutionControls(
             theory,
