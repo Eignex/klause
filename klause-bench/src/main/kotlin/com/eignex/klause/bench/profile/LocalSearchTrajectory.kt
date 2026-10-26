@@ -87,7 +87,7 @@ internal object LocalSearchTrajectory {
         require(parsed.problem.numFactors <= TRAJECTORY_FACTOR_LIMIT)
         val objective = parsed.objective?.toLinearObjective()
         require(parsed.sense == ObjectiveSense.MINIMIZE)
-        val channel = options["channel"]?.let(ChannelView::valueOf)
+        val channel = options["channel"]?.let { ChannelView.valueOf(it) }
         require(channel != null || objective != null)
         val variants = if (channel == null) listOf(
             ViewSpec("false", false, ChannelView.Maintained), ViewSpec("true", true, ChannelView.Maintained),
