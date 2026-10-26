@@ -59,7 +59,7 @@ internal object MpsProofFrontier {
         }
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val supported = setOf("suite", "problem", "sha256", "exact", "probe", "history", "frontier", "cuts",
-            "selection", "replay", "operations", "activeRows", "supportBranching", "pointCuts")
+            "selection", "replay", "operations", "activeRows", "supportBranching", "pointCuts", "aggregate-probe")
         require(options.keys.containsAll(setOf("suite", "problem", "sha256", "exact")) &&
             (options.keys - supported).isEmpty())
         val probe = options["probe"]?.toBooleanStrict() ?: false
@@ -68,6 +68,7 @@ internal object MpsProofFrontier {
         val activeOption = options["activeRows"] ?: "false"
         require(activeOption in setOf("false", "true", "compare"))
         val activeRows = activeOption == "true"
+        val aggregateProbe = options["aggregate-probe"]?.toBooleanStrict() ?: false
         val exact = options.getValue("exact").toBooleanStrict()
         val selected = Catalog.uncapped(options.getValue("suite")).problems
             .single { it.name == options.getValue("problem") }
@@ -124,7 +125,9 @@ internal object MpsProofFrontier {
         val invocation = NumericalFrontierSnapshot.open(context, params, historyEnabled, frontierEnabled, activeRows,
             supportBranching)
         val selection = NumericalSelectionSnapshot(Cancellation.after(30.seconds))
-        val journal = if (options["selection"]?.toBooleanStrict() == true) selection.attach(invocation) else null
+        val journal = if (options["selection"]?.toBooleanStrict() == true || aggregateProbe) {
+            selection.attach(invocation)
+        } else null
         val history = ArrayList<JsonObject>()
         out.resolve("incumbents.jsonl").writeText("")
         out.resolve("bounds.jsonl").writeText("")
@@ -181,6 +184,14 @@ internal object MpsProofFrontier {
                         out.resolve("selection-replays.jsonl").appendText(it.toString() + "\n")
                     }
                 }
+                if (aggregateProbe) {
+                    Reports.writeJson(out.resolve("aggregate-parents.json").path,
+                        NumericalSelectionSnapshot(Cancellation.after(20.seconds)).capture(journal))
+                    out.resolve("aggregate-pairs.jsonl").writeText("")
+                    NumericalAggregateSnapshot(Cancellation.after(20.seconds)).inspect(journal) {
+                        out.resolve("aggregate-pairs.jsonl").appendText(it.toString() + "\n")
+                    }
+                }
             }
             val terminal = field(result, "terminal") as SourceEvidence?
             val work = stats(invocation).smt.sourceLp
@@ -208,6 +219,7 @@ internal object MpsProofFrontier {
                 put("sourceCuts", params.sourceCuts)
                 put("supportBranching", supportBranching)
                 put("pointCuts", params.sourcePointCuts)
+                put("aggregateProbe", aggregateProbe)
                 put("sourceLpOperationAllowance", params.sourceLpOperations)
                 put("activeRows", activeRows)
                 put("wholeCliTimingClaim", false)

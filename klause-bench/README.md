@@ -5419,6 +5419,21 @@ Replay prepares a fresh basis; a retained warm-start child can therefore have a
 different point or certified bound. Repeated fresh replays test determinism for
 one exact query and mask. The original captured point remains the scoring state.
 
+`aggregate-probe=true` attaches the same journal and writes its parent records to
+`aggregate-parents.json` through the maintained serializer. `aggregate-pairs.jsonl`
+examines pairs of active source rows that can cancel all continuous activity,
+including a continuous-only cancelling row, before checked integer rounding.
+It retains exact weights, owner indices, positive violations and fresh native
+checks separately from the input source-row residuals. This bounded family excludes
+mixed residual rounding and aggregates of three or more rows.
+Inspection has 20M cumulative work, 64 MiB modeled allocation, 256-bit retained
+scalars, 128-coordinate combined support, 16 KiB proof references and at most 64
+positive candidates per parent. Native proof verification shares 100,000 steps per
+parent. Parent serialization and pair inspection each have a separate 20-second
+diagnostic deadline and issue no LP queries. Complete pair scans, unavailable
+points, stopped proof checks and retention limits retain distinct observations;
+zero candidates in an incomplete report establish no applicability result.
+
 [Observation-on 8431](https://lab.eignex.com/jobs/8431) and
 [observation-off 8432](https://lab.eignex.com/jobs/8432), at `06e1a59e3b`, use the
 same original `rgn` hash as 8265, one Linux/amd64 host, matching installed bytes,
