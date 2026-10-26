@@ -115,11 +115,12 @@ internal class FiniteNumericalTrial(
             val type = Class.forName("com.eignex.klause.solver.pipeline.FiniteNumericalRemoval")
             val kind = Class.forName("com.eignex.klause.solver.pipeline.FiniteNumericalRemoval\$Signal")
             selector = type.getDeclaredConstructor(BakedProblem::class.java, LinearObjective::class.java,
-                SourceProofContext::class.java, fundingType, kind, Assumptions::class.java)
+                SourceProofContext::class.java, fundingType, kind, Assumptions::class.java,
+                Class.forName("com.eignex.klause.localsearch.InvariantNetwork"))
                 .newInstance(problem, objective, source, funding,
                     kind.enumConstants.single {
                         it.toString() == if (arm == "numerical-refutation") "Refutation" else "Disagreement"
-                    }, Assumptions.None)
+                    }, Assumptions.None, null)
             type.methods.single { it.name == "accept" }
                 .invoke(selector, center, pins, prepared, cutoff, captured, support, stop)
         }
