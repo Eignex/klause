@@ -3869,6 +3869,11 @@ Optional `history=true` enables the internal directional-gain prototype for that
 capture. It requires two nonnegative finite gain observations per direction,
 normalized by movement, before ranking a coordinate. Missing, unusable or all-zero
 estimates retain source order. The production default uses source order.
+Optional `activeRows=true` consults fully established active source rows before
+Boolean completion. It is a feasibility-only opt-in under the same cumulative
+source LP limits; partial checks, unchanged-state skips, pauses and checked
+conflicts have separate `numericalPartial` counters. Partial points give neither
+incumbents nor objective bounds. Complete-check counts remain separate.
 Optional `frontier=true` selects bound-ordered traversal and retained sparse
 guidance. Wider contexts use the sparse preparation policy rather than the small
 exact-primal admission; unresolved alternatives retain the same capture checks.

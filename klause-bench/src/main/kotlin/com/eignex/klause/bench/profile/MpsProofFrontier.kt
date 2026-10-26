@@ -55,12 +55,13 @@ internal object MpsProofFrontier {
         require(Runtime.getRuntime().availableProcessors() == 1)
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val supported = setOf("suite", "problem", "sha256", "exact", "probe", "history", "frontier", "cuts",
-            "selection", "replay", "operations")
+            "selection", "replay", "operations", "activeRows")
         require(options.keys.containsAll(setOf("suite", "problem", "sha256", "exact")) &&
             (options.keys - supported).isEmpty())
         val probe = options["probe"]?.toBooleanStrict() ?: false
         val historyEnabled = options["history"]?.toBooleanStrict() ?: false
         val frontierEnabled = options["frontier"]?.toBooleanStrict() ?: false
+        val activeRows = options["activeRows"]?.toBooleanStrict() ?: false
         val exact = options.getValue("exact").toBooleanStrict()
         val selected = Catalog.uncapped(options.getValue("suite")).problems
             .single { it.name == options.getValue("problem") }
@@ -97,7 +98,7 @@ internal object MpsProofFrontier {
         val scale = field(view, "objectiveScale") as BigFraction
         val system = NumericalFrontierSnapshot.system(context)
         Reports.writeJson(out.resolve("native-system.json").path, system)
-        val invocation = NumericalFrontierSnapshot.open(context, params, historyEnabled, frontierEnabled)
+        val invocation = NumericalFrontierSnapshot.open(context, params, historyEnabled, frontierEnabled, activeRows)
         val selection = NumericalSelectionSnapshot(Cancellation.after(30.seconds))
         val journal = if (options["selection"]?.toBooleanStrict() == true) selection.attach(invocation) else null
         val history = ArrayList<JsonObject>()
@@ -182,6 +183,7 @@ internal object MpsProofFrontier {
                 put("boundOrdered", frontierEnabled)
                 put("sourceCuts", params.sourceCuts)
                 put("sourceLpOperationAllowance", params.sourceLpOperations)
+                put("activeRows", activeRows)
                 put("wholeCliTimingClaim", false)
                 put("sourceVerdictClaim", false)
                 put("independentWitnessCheck", false)

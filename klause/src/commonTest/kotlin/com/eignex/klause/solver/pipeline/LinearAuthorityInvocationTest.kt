@@ -38,6 +38,27 @@ class LinearAuthorityInvocationTest {
     )
 
     @Test
+    fun `opt in active rows should close a contradiction before any Boolean decision`() {
+        val source = SourceProofContext(scope, setOf(real, bool), mapOf(
+            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.MINUS_ONE)),
+        ), mapOf(bool to BigFraction.ONE))
+
+        val result = LinearAuthorityInvocation(source, TheoryParams(), activeRows = true).use {
+            it.run { _, _ -> }
+        }
+
+        val terminal = assertNotNull(result.terminal)
+        assertEquals(SourceClaim.Refutation, terminal.claim)
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
+        val stages = assertNotNull(result.stats.smt.completeSearchStages)
+        assertEquals(1L, stages["numericalPartialConflicts"])
+        assertNull(stages["numericalChecks"])
+        assertNull(result.incumbent)
+    }
+
+    @Test
     fun `retained frontier should consume checked mixed source cuts`() {
         val source = SourceProofContext(scope, setOf(integer, real), mapOf(
             "mixed" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ofLong(-2),

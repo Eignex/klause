@@ -52,6 +52,14 @@ coverage tree. Global bounds combine every remaining alternative, including
 unvisited siblings and refuted regions; a region without a bound or refutation
 withholds a global bound. Queue rank alone supplies no proof authority.
 
+An opt-in sparse source consultation checks fully established active rows before
+Boolean completion, using a zero objective. A source-checked contradiction closes
+the current coverage leaf through ordinary traversal. Unchanged active rows and
+numeric restrictions skip repeated numerical work; changed or retracted states
+invalidate pending queries. Feasible partial points supply no model or bound, so
+complete queries remain required. Preparation, numerical work and source checking
+share the containing cumulative source LP allowances.
+
 A model policy can pause required completion with `SearchModelDisposition.Pause`.
 The run retains the assembled model and its decision trail, and retries that policy
 before node pruning, branching or complete checks. Pausing neither blocks the model
