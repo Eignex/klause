@@ -1,7 +1,7 @@
 import java.io.FileOutputStream
 
 plugins {
-    id("com.eignex.jvm") version "1.3.4"
+    id("com.eignex.jvm") version "1.3.5"
     kotlin("plugin.serialization")
     application
 }

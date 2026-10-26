@@ -54,6 +54,6 @@ class JsonSchemaTest {
             }
         """.trimIndent()
 
-        assertFailsWith<IllegalArgumentException> { compile(text) }
+        assertFailsWith<FormatException> { compile(text) }
     }
 }

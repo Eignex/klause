@@ -1,5 +1,5 @@
 plugins {
-    id("com.eignex.kmp") version "1.3.4"
+    id("com.eignex.kmp") version "1.3.5"
     kotlin("plugin.serialization")
 }
 

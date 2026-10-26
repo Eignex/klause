@@ -14158,6 +14158,7 @@ public final class com/eignex/klause/solver/result/PresolveSizeStats {
 }
 
 public final class com/eignex/klause/solver/result/PresolveStats {
+	public fun <init> ()V
 	public synthetic fun <init> (Ljava/util/List;IZLcom/eignex/klause/solver/result/LpHarvestReport;Lcom/eignex/klause/solver/result/LpStats;JLcom/eignex/klause/solver/result/PresolveEffortStats;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public synthetic fun <init> (Ljava/util/List;IZLcom/eignex/klause/solver/result/LpHarvestReport;Lcom/eignex/klause/solver/result/LpStats;JLcom/eignex/klause/solver/result/PresolveEffortStats;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/util/List;
