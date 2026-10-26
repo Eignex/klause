@@ -43,6 +43,19 @@ class RepairTraceTest {
     }
 
     @Test
+    fun `a full capture should decline further snapshots`() {
+        val trace = RepairTrace("strict source order", 1, 2)
+        val sample = Sample(booleanArrayOf(), longArrayOf(0, 1))
+        trace.begin("control", 7, sample, sample)
+
+        assertNull(trace.begin("control", 7, sample, sample))
+
+        assertEquals(1, trace.attempts.size)
+        assertEquals(2L, trace.coordinateReads)
+        assertEquals(1L, trace.declined)
+    }
+
+    @Test
     fun `observed restart phases should preserve witnesses work and random draws`() {
         val problem = Problem(0, 3, Array(3) { IntDomain(0, 2) },
             arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2))))
@@ -94,5 +107,33 @@ class RepairTraceTest {
 
         assertEquals(RepairEndpoint.Censored, pending.endpoint)
         assertTrue(pending.frames.none { it.stage == "repaired" })
+    }
+
+    @Test
+    fun `resuming a pending repair should retain its earlier phases`() {
+        val problem = Problem(0, 32, Array(32) { IntDomain(0, if (it < 2) 1 else 0) },
+            arrayOf<Factor>(AllDifferent(intArrayOf(0, 1))))
+        val policy = IteratedLocalSearchRestart(initialPerturbationStrength = 1)
+        val strategy = SourceDrivenStrategy(sources = emptyList(), acceptance = AcceptanceRule.GreedyDescent,
+            feasibleDescent = FeasibleDescent.SelfOwned)
+        val trace = RepairTrace("empty strict move pool; seed 7")
+        val engine = LocalSearchEngine(LocalSearchModel.open(problem), strategy = strategy, restartPolicy = policy)
+        engine.repairTrace = trace
+        var polls = 0
+
+        engine.resumable(LinearObjective(), LocalSearchParams(maxFlips = 1, randomSeed = 7,
+            initialAssignment = Sample(booleanArrayOf(), LongArray(32) { if (it == 1) 1L else 0L }))).use { handle ->
+            assertNull(handle.runSlice(Cancellation { policy.incumbents.isNotEmpty() && ++polls >= 3 },
+                Long.MAX_VALUE, -1) {})
+            val pending = trace.attempts.last()
+            val phases = pending.frames.toList()
+
+            assertNotNull(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {})
+
+            assertEquals(phases, pending.frames.take(phases.size))
+            assertEquals(listOf("before", "perturbed", "prepared", "repaired", "endpoint"),
+                pending.frames.map { it.stage })
+            assertEquals(RepairEndpoint.Censored, pending.endpoint)
+        }
     }
 }

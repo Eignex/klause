@@ -3,6 +3,8 @@ package com.eignex.klause.meta.alns
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.factor.scheduling.Cumulative
+import com.eignex.klause.factor.scheduling.Diffn
 import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -53,19 +55,23 @@ class RepairScopeTest {
 
     @Test
     fun `exact pinned controls should distinguish individual freedoms from an exchange`() {
-        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
-            arrayOf<Factor>(AllDifferent(intArrayOf(0, 1)))).bake()
-        val center = Sample(booleanArrayOf(), longArrayOf(1, 0))
-        val objective = LinearObjective(intCoefficients = longArrayOf(1, 0))
-        for ((requested, expected) in listOf(intArrayOf(0) to 1.0, intArrayOf(1) to 1.0,
-            intArrayOf(0, 1) to 0.0)) {
-            val freed = assertNotNull(RepairScope.effective(FreedVars(intArrayOf(), requested),
-                Assumptions.None, null, Cancellation.Never))
-            val params = BacktrackParams(assumptions = RepairScope.pins(problem, center, freed), maxDecisions = 100)
+        val center = Sample(booleanArrayOf(), longArrayOf(1, 0, 0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 0, 0))
+        for (factor in listOf<Factor>(AllDifferent(intArrayOf(0, 1)),
+            Cumulative(intArrayOf(0, 1), longArrayOf(1, 1), longArrayOf(1, 1), 1),
+            Diffn(intArrayOf(0, 1), intArrayOf(2, 2), longArrayOf(1, 1), longArrayOf(1, 1)))) {
+            val problem = Problem(0, 3, arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 0)),
+                arrayOf(factor)).bake()
+            for ((requested, expected) in listOf(intArrayOf(0) to 1.0, intArrayOf(1) to 1.0,
+                intArrayOf(0, 1) to 0.0)) {
+                val freed = assertNotNull(RepairScope.effective(FreedVars(intArrayOf(), requested),
+                    Assumptions.None, null, Cancellation.Never))
+                val params = BacktrackParams(assumptions = RepairScope.pins(problem, center, freed), maxDecisions = 100)
 
-            val result = assertIs<MinimizeResult.Optimal>(BacktrackSolver(problem).minimize(objective, params))
+                val result = assertIs<MinimizeResult.Optimal>(BacktrackSolver(problem).minimize(objective, params))
 
-            assertEquals(expected, result.objective)
+                assertEquals(expected, result.objective)
+            }
         }
     }
 }

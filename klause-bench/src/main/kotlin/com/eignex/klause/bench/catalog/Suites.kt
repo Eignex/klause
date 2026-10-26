@@ -738,6 +738,9 @@ internal object Suites {
         vendored("graph-coloring-tiny", Category.CSP, Expected.Sat, relPath = "xcsp3/graph-coloring-tiny.xml")
         vendored("assignment-exchange", Category.OPTIMIZATION, Expected.Unknown,
             relPath = "finite-repair/assignment-exchange.xml")
+        for (name in listOf("resource-exchange", "placement-exchange")) {
+            vendored(name, Category.OPTIMIZATION, Expected.Unknown, relPath = "finite-repair/$name.xml")
+        }
         for (name in listOf("overlap-tables-unsat", "overlap-mdd-unsat", "overlap-mdd-sat")) {
             vendored(name, Category.CSP, if (name.endsWith("unsat")) Expected.Unsat else Expected.Sat,
                 relPath = "extensional-overlap/$name.xml")

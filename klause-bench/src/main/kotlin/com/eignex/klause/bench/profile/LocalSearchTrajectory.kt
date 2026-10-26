@@ -47,6 +47,8 @@ import com.eignex.klause.util.Cancellation
 import com.sun.management.ThreadMXBean
 import java.io.File
 import java.lang.management.ManagementFactory
+import java.util.Base64
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -57,6 +59,18 @@ import kotlin.time.Duration.Companion.seconds
 internal object LocalSearchTrajectory {
     @JvmStatic
     fun main(args: Array<String>) {
+        val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
+        if (args.size == 1 && args[0].startsWith("batch64=")) {
+            val requests = Json.decodeFromString<List<List<String>>>(
+                Base64.getDecoder().decode(args[0].substringAfter('=')).decodeToString())
+            require(requests.size in 1..8)
+            for ((index, request) in requests.withIndex()) {
+                capture(request.toTypedArray(), out.resolve("$index").apply { mkdirs() })
+            }
+        } else capture(args, out)
+    }
+
+    private fun capture(args: Array<String>, out: File) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val required = setOf("suite", "problem", "sha256", "recipe", "seed", "moves")
         require(options.keys.containsAll(required) && options.keys.all {
@@ -68,7 +82,6 @@ internal object LocalSearchTrajectory {
             it.readNBytes(64 * 1024 * 1024 + 1)
         }
         require(bytes.size <= 64 * 1024 * 1024 && sha256(bytes) == options.getValue("sha256"))
-        val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
         out.resolve("source.xml").writeBytes(bytes)
         out.resolve("request.txt").writeText(args.joinToString("\n"))
@@ -213,6 +226,8 @@ internal object LocalSearchTrajectory {
                     )
                     solver.resumable(workingObjective, params).use { run ->
                         val allocation = ManagementFactory.getThreadMXBean() as ThreadMXBean
+                        check(allocation.isThreadAllocatedMemorySupported)
+                        allocation.isThreadAllocatedMemoryEnabled = true
                         val thread = Thread.currentThread().threadId()
                         val beforeBytes = allocation.getThreadAllocatedBytes(thread)
                         val started = System.nanoTime()
@@ -235,9 +250,6 @@ internal object LocalSearchTrajectory {
                             "picks=$picks\ncancelled=${stop()}\nresult=$result\nstats=${run.stats}\n",
                         )
                         if (walk && result != null && !stop()) {
-                            if (sourceCheck != null && result.assignment != null) {
-                                RepairTrajectory.checkSource(sourceCheck, prepared.reconstruct(checkNotNull(result.assignment)))
-                            }
                             val stats = run.stats.ls
                             val signature = listOf(result.assignment, result.objectiveValue, picks, stats.moves.sum,
                                 run.stats.search.restarts.sum, stats.stalls.sum, stats.boardRestartChanges.sum,
