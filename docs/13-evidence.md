@@ -18,6 +18,9 @@ the scope before considering the derivation. Imports must name the same revision
 semantics and objective, may assume only restrictions implied by the importing
 scope, and are rechecked against the same premises. A conditioned refutation cannot
 refute a weaker parent invocation.
+An imported refutation can discharge an objective bound only within that compatible
+scope and after its contradiction is freshly checked. It supplies no witness or
+attainment; an optimum still needs both a source witness and complete bound coverage.
 
 Opt-in numerical refutation reuse belongs to one immutable traversal invocation.
 Its source rows, semantics and objective remain bound to that opening. A proof's

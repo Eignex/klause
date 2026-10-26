@@ -175,7 +175,7 @@ sealed interface SourceDerivation {
         /** Coverage for values at or above the threshold plus one. */
         val above: SourceDerivation,
     ) : SourceDerivation
-    /** Recheck an imported claim and all its premises under a compatible scope. */
+    /** Recheck a compatible imported claim; a refutation can discharge an objective bound. */
     data class Import(
         /** Imported claim and complete cited derivation. */
         val evidence: SourceEvidence,
