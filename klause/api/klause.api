@@ -11616,6 +11616,7 @@ public final class com/eignex/klause/solver/pipeline/ExecutionOption$Companion {
 	public final fun getSmoothFactor ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getSmoothProb ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getSolutionPhasing ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getSourceAggregateCuts ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getSourceCuts ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getSourceLpAllocationLimit ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getSourceLpOperations ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
@@ -13011,6 +13012,7 @@ public final class com/eignex/klause/solver/pipeline/TheoryParams {
 	public final fun getOpenWorkLimit ()J
 	public final fun getRandomSeed ()J
 	public final fun getSharedRestart ()Ljava/lang/Long;
+	public final fun getSourceAggregateCuts ()Z
 	public final fun getSourceCuts ()Z
 	public final fun getSourceLpAllocationLimit ()J
 	public final fun getSourceLpOperations ()I
