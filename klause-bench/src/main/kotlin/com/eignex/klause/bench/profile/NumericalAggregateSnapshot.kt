@@ -209,6 +209,9 @@ internal class NumericalAggregateSnapshot(private val stop: Cancellation, privat
                 put("work", field(result, "work") as Long)
                 put("modeledAllocation", field(result, "allocation") as Long)
                 put("stopped", field(result, "stopped") as Boolean)
+                put("observations", buildJsonObject {
+                    (field(result, "observations") as Map<String, Long>).forEach { (name, count) -> put(name, count) }
+                })
                 put("independentProofCheck", false)
                 field(result, "query")?.let { query ->
                     put("state", field(query, "state") as String)

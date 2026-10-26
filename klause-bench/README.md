@@ -5515,6 +5515,16 @@ separation uses 420,964/262,364 and certifies about 48.8. All 45 aggregate-arm
 candidates pass native admission. This motivates a bounded cached source-bound
 projection family; it does not establish whole-frontier throughput.
 
+[Cached-family replay 8590](https://lab.eignex.com/jobs/8590), at `8e8f150523`,
+repeats those three arms and adds template-owned opposite-bound projection.
+It retains 64 aggregate proposals and admits all 104 individual/aggregate cuts.
+The freshly checked bound is
+`641788481763964810311511928787631/11711468953074583855880403419136`
+(about 54.8). Its 1,760,975 work and 2,454,257 modeled allocation bytes include
+projection preparation and LP certification. This is a useful retained subset;
+the proposal cap leaves the rest of the source-projection family unexamined.
+It does not establish a universal candidate ceiling or whole-frontier benefit.
+
 [Infrastructure control 8481](https://lab.eignex.com/jobs/8481) pairs
 `133546fd6f` and `2161236173` with aggregation disabled, across `gr4x6`, `p0033`,
 `rgn` and `pp08aCUTS`, seeds 1 and 3, default and exact policies, and individual,

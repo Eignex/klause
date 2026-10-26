@@ -13,6 +13,7 @@ internal data class LinearAuthorityReplayResult(
     val stopped: Boolean,
     val strongestBound: SourceEvidence? = query?.bound,
     val queries: List<LinearAuthorityCapturedQuery> = listOfNotNull(query),
+    val observations: Map<String, Long> = emptyMap(),
 )
 
 internal object LinearAuthorityReplay {
@@ -89,14 +90,16 @@ internal object LinearAuthorityReplay {
         val funding = SourceLpFunding(maximumWork, maximumAllocation).apply { grant(maximumWork) }
         val budget = SourceLpBudget(maxOperations = 1, funding = funding)
         val capture = LinearAuthorityCapture(1, 1_000_000L, 16_777_216L, stop)
-        LinearAuthority(budget, retainLp = true, additionalCuts = additional, aggregateCuts = aggregate).use { authority ->
+        val observations = LinearAuthority(budget, retainLp = true, additionalCuts = additional,
+            aggregateCuts = aggregate).use { authority ->
             authority.capture = capture
             var result: LinearAuthorityResult
             do {
                 result = authority.advance(query.context, stop, cuts = cuts, cutMask = mask)
             } while (result.paused && !stop() && !funding.exhausted)
+            authority.cutObservations()
         }
         return LinearAuthorityReplayResult(capture.records.singleOrNull(), budget.operations,
-            funding.spent, funding.allocated, stop() || funding.exhausted)
+            funding.spent, funding.allocated, stop() || funding.exhausted, observations = observations)
     }
 }
