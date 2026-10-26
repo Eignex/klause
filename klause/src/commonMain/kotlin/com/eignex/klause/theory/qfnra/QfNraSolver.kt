@@ -96,6 +96,11 @@ internal class QfNraQuery(
     private val work = QfNraWork(params)
     private val arithmetic = PolynomialArithmetic(work, params.polynomialLimits)
     var failureCapture: PolynomialFailureCapture? = null
+        set(value) {
+            check(work.spentWork == 0L && result == null) { "attach failure capture before query entry" }
+            if (value !== field) value?.attach()
+            field = value
+        }
     var projectionObserver: ((Int, List<Polynomial>, Polynomial?) -> Unit)? = null
     var reducedRegionObserver: ((List<PolynomialAtom>) -> Unit)? = null
     var partialConflictObserver: ((List<PolynomialAtom>) -> Unit)? = null
@@ -125,12 +130,16 @@ internal class QfNraQuery(
             }
             var reduction = checkNotNull(preparingFormula.next())
             progress.committed(reduction, work.spentWork)
+            failureCapture?.context(reduction, arithmetic)
+            var rootCapture = failureCapture?.cursorState()
+            var searchCapture: PolynomialFailureCursorState? = null
             var searched = reduction
             var searching: Iterator<QfNraResult?>? = null
             var startedSearch = false
             var declined: QfNraResult.Unknown? = null
             while (true) {
                 if (!reduction.finished && (searching == null || progress.rootWork < progress.searchWork)) {
+                    rootCapture?.let { failureCapture?.restoreCursor(it) }
                     failureCapture?.operation("root-reduction", progress.snapshots, progress.regions,
                         work.spentWork, arithmetic)
                     val before = work.spentWork
@@ -141,6 +150,7 @@ internal class QfNraQuery(
                     }
                     if (stage != null) {
                         progress.committed(stage, work.spentWork)
+                        failureCapture?.context(stage, arithmetic)
                         reduction = stage
                         if (stage.inconsistent) {
                             arithmetic.step()
@@ -151,6 +161,7 @@ internal class QfNraQuery(
                             (stage.finished && stage.formula !== searched.formula)
                         ) {
                             searching = search(normalized, stage, fixed, algebraic)
+                            searchCapture = null
                             searched = stage
                             declined = null
                             progress.started(stage)
@@ -158,13 +169,16 @@ internal class QfNraQuery(
                             startedSearch = true
                         }
                     }
+                    rootCapture = failureCapture?.cursorState()
                 } else if (searching != null) {
+                    searchCapture?.let { failureCapture?.restoreCursor(it) }
                     val before = work.spentWork
                     val completed = try {
                         searching.next()
                     } catch (stop: PolynomialResourceLimit) {
                         QfNraResult.Unknown(QfNraReason.ResourceLimit, work.snapshot(), stop.resource)
                     } finally {
+                        searchCapture = failureCapture?.cursorState()
                         progress.searchWork += work.spentWork - before
                     }
                     if (completed is QfNraResult.Unknown) {
@@ -172,6 +186,7 @@ internal class QfNraQuery(
                         searching = null
                         if (reduction.formula !== searched.formula) {
                             searching = search(normalized, reduction, fixed, algebraic)
+                            searchCapture = null
                             searched = reduction
                             declined = null
                             progress.started(reduction)
@@ -244,7 +259,14 @@ internal class QfNraQuery(
         work.booleanTheoryAtoms = work.booleanTheoryAtoms ?: 0
         work.booleanTheoryConstantRefutations = work.booleanTheoryConstantRefutations ?: 0
         work.booleanTheoryResourceRefusals = work.booleanTheoryResourceRefusals ?: 0
-        val regions = reducedFormula.booleanRegions(arithmetic, progress) { partialConflictObserver?.invoke(it) }
+        val regions = reducedFormula.booleanRegions(arithmetic, progress,
+            onPartialCheck = failureCapture?.let { capture -> { owner, premises ->
+                capture.signCheck(owner, premises, progress.searchSnapshot, work.spentWork, arithmetic)
+            } },
+            onConflict = {
+                failureCapture?.signConflict(it, progress.searchSnapshot, work.spentWork, arithmetic)
+                partialConflictObserver?.invoke(it)
+            })
         var incomplete: PolynomialResource? = null
         while (true) {
             failureCapture?.operation("boolean-region", progress.searchSnapshot, progress.regions,
@@ -266,6 +288,7 @@ internal class QfNraQuery(
                     work.booleanTheoryConstantRefutations = constants + minOf(1L, Long.MAX_VALUE - constants)
                     continue
                 }
+                failureCapture?.context(formulaReduction, arithmetic, region)
                 failureCapture?.operation("regional-reduction", progress.searchSnapshot, progress.regions,
                     work.spentWork, arithmetic)
                 val reducing = PolynomialAffineReduction.prepare(reducedFormula, region, realCount, arithmetic) {

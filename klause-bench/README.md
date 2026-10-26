@@ -831,6 +831,10 @@ parsing and retains those bytes. Submit it as a Lab profile job without host or
 machine placement overrides. The Lab's documented `profile.runTimeoutSec` covers
 active setup, compilation, execution and cleanup; `base.timeout` supplies the
 separate command allowance.
+`requestz64` accepts the same JSON after gzip compression and Base64 encoding, with
+the same 96 KiB encoded ceiling and a 1 MiB expanded JSON ceiling. `request.json`
+retains expanded bytes and settings name the encoding; source hashes and query
+semantics are identical across the two envelopes.
 The measured child uses one active processor, Serial GC and a 3 GiB heap, retaining
 its command, streams, actual exit, installed CLI/harness/runtime hashes and options.
 
@@ -899,7 +903,8 @@ and exact witness. `maximumWork=N` sets one containing native allowance per quer
 Captured work includes observation and can reach that allowance sooner. Compare
 native work and component duration separately; neither establishes CLI speedup.
 
-Capture keeps the first rejected probe and first rejected CAD prefix, exact
+Capture keeps the first rejected probe, first rejected CAD prefix and first
+completed sign conflict, exact
 normalized/active predicates, signed regional premises, condition bounds, numeric
 reverse fibres, source coordinate names, snapshot identity and the latest operation
 with its projection operands. The first representation refusal keeps its own
@@ -910,7 +915,10 @@ monomial 64 coordinates, and coefficients 4,096 bits. Incomplete parts say
 `complete=false`; an interrupted copy sets `InterruptedCapture`. Repetition compares
 at most 256 exact representations, with `RepetitionComplete=false` beyond that;
 it does not decide equality of independently represented algebraic numbers.
-Copies poll and charge the containing query. `CompletedCopySteps` counts completed
+Each capture attaches before query entry and belongs to one query. Interleaved
+root/search cursors and suspended partial-sign checks restore their
+own operation and support records before resuming arithmetic. Copies poll and
+charge the containing query. `CompletedCopySteps` counts completed
 serialization steps, excluding other observation costs; interruption can charge a
 final uncompleted step. Paired native totals retain all costs and any changed search
 trajectory. No observation authorizes exclusion.

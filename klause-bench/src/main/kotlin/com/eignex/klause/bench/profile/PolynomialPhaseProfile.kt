@@ -42,7 +42,7 @@ import kotlinx.serialization.json.Json
 internal object PolynomialPhaseProfile {
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.size in 1..6 && args[0].startsWith("request64="))
+        require(args.size in 1..6)
         val options = args.drop(1).associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.size == args.size - 1 && options.keys.all {
             it in setOf("pipeline", "timeoutMs", "repeats", "prepared", "capture", "maximumWork")
@@ -61,9 +61,7 @@ internal object PolynomialPhaseProfile {
         require(repeats in 1..9 && (repeats == 1 || !directMode))
         val timeoutMs = options["timeoutMs"]?.toLong() ?: 60_000L
         require(timeoutMs > 0)
-        val encoded = args[0].substringAfter('=')
-        require(encoded.length <= 96 * 1024)
-        val request = Base64.getDecoder().decode(encoded)
+        val request = requestBytes(args[0])
         val cases = Json.decodeFromString<List<PhaseSource>>(request.decodeToString())
         require(cases.size in 1..18 &&
             cases.map { Triple(it.suite, it.problem, it.fixedIntegers) }.distinct().size == cases.size)
@@ -85,6 +83,7 @@ internal object PolynomialPhaseProfile {
             "maximumWork" to maximumWork.toString(),
             "diagnosticMaximumWork" to maximumWork.toString(),
             "failureCapture" to options["capture"].toString(),
+            "requestEncoding" to args[0].substringBefore('='),
             "sourceBytes" to if (cases.any { it.gzip64 != null }) "hash-pinned request or catalog" else "catalog",
             "representationLimits" to "default",
             "route" to if (preparedMode) "unconditioned prepared polynomial service; no CP root pins or publication"
@@ -131,7 +130,18 @@ internal object PolynomialPhaseProfile {
 
     internal fun capturedSource(gzip64: String): ByteArray {
         require(gzip64.length <= 48 * 1024)
-        val compressed = Base64.getDecoder().decode(gzip64)
+        return gunzip(Base64.getDecoder().decode(gzip64))
+    }
+
+    internal fun requestBytes(argument: String): ByteArray {
+        require(argument.startsWith("request64=") || argument.startsWith("requestz64="))
+        val encoded = argument.substringAfter('=')
+        require(encoded.length <= 96 * 1024)
+        val bytes = Base64.getDecoder().decode(encoded)
+        return if (argument.startsWith("requestz64=")) gunzip(bytes) else bytes
+    }
+
+    private fun gunzip(compressed: ByteArray): ByteArray {
         val bytes = GZIPInputStream(compressed.inputStream()).use { it.readNBytes(1024 * 1024 + 1) }
         require(bytes.size <= 1024 * 1024)
         return bytes
@@ -434,7 +444,8 @@ internal object PolynomialPhaseProfile {
                 partialConflictPreviewComplete = conflictPreviewComplete,
                 sourceCoordinates = names,
                 failureCapture = captured?.let { value ->
-                    listOf("Scope", "Context", "Operation", "FirstFailure", "FirstCadFailure", "FirstRefusal")
+                    listOf("Scope", "Context", "Operation", "FirstFailure", "FirstCadFailure",
+                        "FirstRefusal", "FirstSignConflict")
                         .associateWith { field ->
                         @Suppress("UNCHECKED_CAST")
                         (captureType.getMethod("get$field").invoke(value) as? Map<String, String>).orEmpty()

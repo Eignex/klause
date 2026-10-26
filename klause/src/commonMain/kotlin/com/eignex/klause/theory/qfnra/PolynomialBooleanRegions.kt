@@ -16,6 +16,7 @@ internal class PolynomialBooleanRegions(
     private val arithmetic: PolynomialArithmetic,
     private val progress: PolynomialQueryProgress? = null,
     private val onConflict: ((List<PolynomialAtom>) -> Unit)? = null,
+    private val onPartialCheck: ((Any, List<PolynomialAtom>) -> Unit)? = null,
 ) {
     private val state = PolynomialBooleanPropagation(nodes, root, arithmetic,
         skipConfirmedParents = true, trackWitnesses = true)
@@ -171,9 +172,11 @@ internal class PolynomialBooleanRegions(
                 if (retained != null) it.partialExtensions++
                 it.partialInputAtoms += added.size
             }
+            val checkOwner = onPartialCheck?.let { Any() }
             val checking = propagation.prepare(added)
             var conflict: Boolean? = null
             while (conflict == null) {
+                checkOwner?.let { onPartialCheck?.invoke(it, required) }
                 conflict = checking.next()
                 if (conflict == null) yield(null)
             }

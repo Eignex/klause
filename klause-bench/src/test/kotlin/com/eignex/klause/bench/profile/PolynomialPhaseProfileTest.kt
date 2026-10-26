@@ -10,8 +10,24 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 
 class PolynomialPhaseProfileTest {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `request encodings retain identical JSON bytes`(compressed: Boolean) {
+        val json = "[{\"suite\":\"control\",\"problem\":\"constant\"}]".encodeToByteArray()
+        val prefix = if (compressed) "requestz64=" else "request64="
+        val bytes = if (compressed) ByteArrayOutputStream().also { out ->
+            GZIPOutputStream(out).use { it.write(json) }
+        }.toByteArray() else json
+
+        val decoded = PolynomialPhaseProfile.requestBytes(prefix + Base64.getEncoder().encodeToString(bytes))
+
+        assertContentEquals(json, decoded)
+    }
+
     @Test
     fun `a retained source is decoded without catalog resolution`() {
         val source = "(assert false)".encodeToByteArray()

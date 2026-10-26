@@ -7,8 +7,10 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialTerm
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
+import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -17,6 +19,67 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class PolynomialFailureCaptureTest {
+    @Test
+    fun `a failure capture cannot be shared across query scopes`() {
+        val source = PolynomialRealFormula.Constant(false)
+        val first = QfNraQuery(source, 0, 0, QfNraParams(), PolynomialCondition())
+        val second = QfNraQuery(source, 0, 0, QfNraParams(), PolynomialCondition())
+        val capture = PolynomialFailureCapture()
+        first.failureCapture = capture
+
+        assertFailsWith<IllegalStateException> { second.failureCapture = capture }
+    }
+
+    @Test
+    fun `a resumed search stop retains its own operation after interleaved root work`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val graphs = (0 until 6).joinToString(" ") { "(= x$it (+ (* x${it + 1} x${it + 1}) 1))" }
+        val source = SmtLibPolynomial.parse("$declarations (assert (and $graphs (= (* x6 x6) 2)))")
+        val capture = PolynomialFailureCapture()
+        var stopped = false
+        val query = QfNraQuery(source.formula, source.boolCount, source.realCount,
+            QfNraParams(Cancellation { stopped }, maximumWork = 500_000), PolynomialCondition())
+        query.failureCapture = capture
+
+        var result: QfNraResult? = null
+        while (result == null) {
+            val progress = query.progress
+            if (progress.searchSnapshot > 0 && progress.rootFinishedWork == null &&
+                progress.rootWork >= progress.searchWork && capture.operation["stage"] == "root-reduction"
+            ) stopped = true
+            result = query.next()
+        }
+
+        assertTrue(stopped)
+        assertEquals(QfNraReason.Interrupted, assertIs<QfNraResult.Unknown>(result).reason)
+        assertTrue(capture.operation["stage"] != "root-reduction")
+    }
+
+    @Test
+    fun `sign conflict capture keeps complete signed premises`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (declare-const y Real) (declare-const gate Bool) " +
+                "(assert (or gate (and (not (<= x 0)) (> y 0) (not (>= (* x y) 0)))))",
+        )
+        val arithmetic = PolynomialArithmetic()
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+        val capture = PolynomialFailureCapture()
+        capture.scope(formula, PolynomialCondition(), arithmetic)
+        capture.context(checkNotNull(PolynomialFormulaReduction.stages(formula, 2, arithmetic).next()), arithmetic)
+
+        formula.booleanRegions(arithmetic,
+            onPartialCheck = { owner, premises -> capture.signCheck(owner, premises, 7, 0, arithmetic) },
+            onConflict = { capture.signConflict(it, 7, 0, arithmetic) })
+            .asSequence().filterNotNull().toList()
+
+        val conflict = assertNotNull(capture.firstSignConflict)
+        assertEquals("7", conflict["snapshot"])
+        assertEquals("3", conflict["signedPremises.count"])
+        assertEquals(mapOf("GT" to 2, "LT" to 1), (0..2)
+            .map { conflict.getValue("signedPremises.$it.relation") }.groupingBy { it }.eachCount())
+        assertEquals("true", conflict["complete"])
+    }
+
     @Test
     fun `the first refusal retains its operands after later operations`() {
         val work = QfNraWork(QfNraParams())

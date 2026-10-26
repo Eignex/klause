@@ -6,7 +6,10 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.magnitudeBitLength
 
+internal class PolynomialFailureCursorState(val operation: Map<String, String>, val context: Map<String, String>)
+
 internal class PolynomialFailureCapture {
+    private var attached = false
     var scope: Map<String, String> = emptyMap()
         private set
     var operation: Map<String, String> = emptyMap()
@@ -19,11 +22,15 @@ internal class PolynomialFailureCapture {
         private set
     var firstRefusal: Map<String, String>? = null
         private set
+    var firstSignConflict: Map<String, String>? = null
+        private set
     var failures: Long = 0
         private set
     var repeatedFirstFailure: Long = 0
         private set
     private var firstKey: Map<String, String>? = null
+    private var signOwner: Any? = null
+    private var signCursor: PolynomialFailureCursorState? = null
     var repetitionComplete: Boolean = true
         private set
     var completedCopySteps: Long = 0
@@ -31,17 +38,65 @@ internal class PolynomialFailureCapture {
     var interruptedCapture: Boolean = false
         private set
 
+    fun attach() {
+        check(!attached) { "failure capture belongs to one query" }
+        attached = true
+    }
+
+    fun cursorState(): PolynomialFailureCursorState = PolynomialFailureCursorState(operation, context)
+
+    fun restoreCursor(state: PolynomialFailureCursorState) {
+        operation = state.operation
+        context = state.context
+    }
+
+    fun signCheck(
+        owner: Any,
+        premises: List<PolynomialAtom>,
+        snapshot: Long,
+        work: Long,
+        arithmetic: PolynomialArithmetic,
+    ) {
+        if (signOwner === owner) {
+            signCursor?.let(::restoreCursor)
+            return
+        }
+        operation = capture(arithmetic) {
+            put("stage", "partial-sign")
+            put("snapshot", snapshot.toString())
+            put("work", work.toString())
+            atoms("signedPremises", premises)
+        }
+        signOwner = owner
+        signCursor = cursorState()
+    }
+
+    fun signConflict(premises: List<PolynomialAtom>, snapshot: Long, work: Long, arithmetic: PolynomialArithmetic) {
+        if (firstSignConflict != null) return
+        val copied = capture(arithmetic) {
+            put("snapshot", snapshot.toString())
+            put("work", work.toString())
+            atoms("signedPremises", premises)
+        }
+        firstSignConflict = copied + ("complete" to
+            listOf(scope, context, operation, copied).all { it["complete"] == "true" }.toString())
+    }
+
     fun refused(resource: String, arithmetic: PolynomialArithmetic) {
-        if (firstRefusal == null) firstRefusal = capture(arithmetic) {
-            put("resource", resource)
-            for ((key, value) in operation) {
-                if (exhausted) break
-                put("operation.$key", value)
+        if (firstRefusal == null) {
+            val copied = capture(arithmetic) {
+                put("resource", resource)
+                for ((key, value) in operation) {
+                    if (exhausted) break
+                    put("operation.$key", value)
+                }
+                for ((key, value) in context) {
+                    if (exhausted) break
+                    put("context.$key", value)
+                }
             }
-            for ((key, value) in context) {
-                if (exhausted) break
-                put("context.$key", value)
-            }
+            firstRefusal = copied + ("complete" to
+                listOf(scope, context, operation, copied).all { it["complete"] == "true" }.toString())
         }
     }
 
