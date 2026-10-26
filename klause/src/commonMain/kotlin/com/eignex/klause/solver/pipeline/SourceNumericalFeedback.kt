@@ -38,7 +38,11 @@ internal sealed interface SourceNumericalFeedbackResult {
                 query.context.semantics == source.semantics
     }
 
-    data class Unavailable(val reason: Reason) : SourceNumericalFeedbackResult
+    data class Unavailable(
+        val source: SourceProofContext,
+        val cutoff: SourceNumericalCutoff?,
+        val reason: Reason,
+    ) : SourceNumericalFeedbackResult
 
     enum class Reason { Cancelled, Funding, Retention, Paused, MissingQuery, Incompatible }
 }
@@ -97,7 +101,8 @@ internal class SourceNumericalFeedback(
         consumed = journal.attempted
         fun missing(reason: SourceNumericalFeedbackResult.Reason): SourceNumericalFeedbackResult {
             unavailable++
-            return SourceNumericalFeedbackResult.Unavailable(reason)
+            funding.charge(1L, 64L)
+            return SourceNumericalFeedbackResult.Unavailable(source, cutoff, reason)
         }
         if (cancellation()) return missing(SourceNumericalFeedbackResult.Reason.Cancelled)
         if (funding.exhausted) return missing(SourceNumericalFeedbackResult.Reason.Funding)
