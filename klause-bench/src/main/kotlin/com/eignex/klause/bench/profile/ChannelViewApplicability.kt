@@ -52,8 +52,11 @@ internal object ChannelViewApplicability {
             val network = maintained?.network(problem.numIntVars, problem.numBoolVars)
             directory.resolve("applicability.json").writeText(buildJsonObject {
                 put("input", input)
+                put("revision", Reports.readGitSha())
                 put("sourceMode", if ("source$index" in embedded) "embedded" else "catalog")
-                put("effectiveSemantics", parsed.semantics.toString())
+                put("declaredSemantics", parsed.semantics.declared.toString())
+                put("effectiveSemantics", parsed.semantics.effective.toString())
+                put("definitionPolicy", "typed source hints only; inferred native definitions excluded")
                 put("settings", problem.settings.toString())
                 put("javaRuntime", System.getProperty("java.runtime.version"))
                 put("os", System.getProperty("os.name"))
