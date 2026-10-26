@@ -336,14 +336,16 @@ internal object ObjectiveViewComparison {
                         put("moves", run.stats.ls.moves.sum)
                         put("restarts", run.stats.search.restarts.sum)
                         put("elapsedNanos", System.nanoTime() - started)
-                        put("allocatedBytes", allocation.getThreadAllocatedBytes(Thread.currentThread().threadId()) - before)
+                        put("allocatedBytes",
+                            allocation.getThreadAllocatedBytes(Thread.currentThread().threadId()) - before)
                         put("modelPreparationNanos", prepared.nanos)
                         put("modelPreparationAllocatedBytes", prepared.allocatedBytes)
                         put("sourceVerdictClaim", false)
                         put("cliRoutingEquivalence", false)
                         observed?.assignment?.let { point ->
                             put("source", trajectorySource(prepared.pipeline.reconstruct(point)))
-                            put("objective", sourceObjective.evaluateExact(prepared.pipeline.reconstruct(point)).toString())
+                            put("objective",
+                                sourceObjective.evaluateExact(prepared.pipeline.reconstruct(point)).toString())
                         }
                     }.toString())
                     out.resolve("$label-stats.txt").writeText(run.stats.toString())
