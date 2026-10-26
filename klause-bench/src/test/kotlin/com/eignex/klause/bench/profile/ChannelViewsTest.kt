@@ -2,6 +2,7 @@ package com.eignex.klause.bench.profile
 
 import com.eignex.klause.factor.global.Inverse
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep
@@ -81,8 +82,8 @@ class ChannelViewsTest {
     @Test
     fun `aliased and competing inverse channels decline without a partial view`() {
         val cases = listOf(
-            arrayOf(Inverse(intArrayOf(0, 1), intArrayOf(0, 1))),
-            arrayOf(Inverse(intArrayOf(0, 1), intArrayOf(2, 3)),
+            arrayOf<Factor>(Inverse(intArrayOf(0, 1), intArrayOf(0, 1))),
+            arrayOf<Factor>(Inverse(intArrayOf(0, 1), intArrayOf(2, 3)),
                 Inverse(intArrayOf(2, 3), intArrayOf(4, 5))),
         )
         for (factors in cases) {
