@@ -55,6 +55,7 @@ internal object PolynomialPhaseProfile {
         val preparedMode = options["prepared"] == "true"
         val pipelineMode = options["pipeline"] != null
         val directMode = options["pipeline"] != "true"
+        require(!capture || directMode)
         val repeats = options["repeats"]?.toInt() ?: 1
         require(repeats in 1..9 && (repeats == 1 || !directMode))
         val timeoutMs = options["timeoutMs"]?.toLong() ?: 60_000L
@@ -63,7 +64,8 @@ internal object PolynomialPhaseProfile {
         require(encoded.length <= 48 * 1024)
         val request = Base64.getDecoder().decode(encoded)
         val cases = Json.decodeFromString<List<PhaseSource>>(request.decodeToString())
-        require(cases.size in 1..18 && cases.map { it.suite to it.problem }.distinct().size == cases.size)
+        require(cases.size in 1..18 && cases.map { Triple(it.suite, it.problem, it.fixedIntegers) }.distinct().size == cases.size)
+        require(!preparedMode || cases.all { it.fixedIntegers.isEmpty() })
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         if (System.getenv("KLAUSE_POLYNOMIAL_PHASE_CHILD") != "1") {
             launch(args, out)
@@ -424,7 +426,7 @@ internal object PolynomialPhaseProfile {
                     }
                 },
                 failureObservations = captured?.let { value ->
-                    listOf("Failures", "RepeatedFirstFailure", "RepetitionComplete", "InterruptedCapture")
+                    listOf("Failures", "RepeatedFirstFailure", "RepetitionComplete", "InterruptedCapture", "CompletedCopySteps")
                         .associateWith { captureType.getMethod("get$it").invoke(value).toString() }
                 })
         }

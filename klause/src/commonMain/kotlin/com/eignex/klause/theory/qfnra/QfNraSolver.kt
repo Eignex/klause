@@ -868,7 +868,17 @@ internal class WitnessProbe(
         val context = retentionGuides
         return checkLineSample(
             formula, point, boolCount, arithmetic, algebraic,
-            if (context == null) null else { captured, signs -> retainRejectedPoint(captured, signs, context) },
+            if (context == null && failureCapture == null) null else { captured, signs ->
+                if (context != null) retainRejectedPoint(captured, signs, context)
+                failureCapture?.let { capture ->
+                    val coordinates = (0 until captured.coordinateCount).associateWith {
+                        arithmetic.step()
+                        captured.coordinate(it)
+                    }
+                    capture.rejected(formula, null, coordinates, null, captureSnapshot,
+                        work?.spentWork ?: 0, arithmetic, signs)
+                }
+            },
         )
     }
 
