@@ -23,10 +23,14 @@ import com.sun.management.ThreadMXBean
 import java.io.File
 import java.lang.management.ManagementFactory
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.math.ceil
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -43,26 +47,41 @@ internal object RepairOwnerReplay {
         val preparationNs: Long = 0L, val bound: Any? = null,
     )
 
-    @Suppress("UNCHECKED_CAST")
     fun replay(
-        trace: Any, problem: BakedProblem, objective: LinearObjective, prepared: FinitePipelinePreparation,
+        controls: File, problem: BakedProblem, objective: LinearObjective, prepared: FinitePipelinePreparation,
         source: BakedProblem, file: File, seed: Long, allowance: Long = 100_000L,
     ) {
         val scopeOwner = Class.forName("com.eignex.klause.meta.alns.RepairScope").getField("INSTANCE").get(null)
         val freedType = Class.forName("com.eignex.klause.meta.alns.FreedVars")
-        val scopes = (call(trace, "getAttempts") as List<*>).mapNotNull { entry ->
-            val attempt = checkNotNull(entry)
-            if (!call(attempt, "getOwner").toString().startsWith("alns:")) return@mapNotNull null
-            val center = call(attempt, "getCenter") as Sample? ?: return@mapNotNull null
-            val cutoff = call(attempt, "getExactBestObjective") as BigFraction? ?: return@mapNotNull null
-            val bools = call(attempt, "getEffectiveBools") as IntArray
-            val ints = call(attempt, "getEffectiveInts") as IntArray
+        val entries = controls.readLines().filter(String::isNotBlank)
+        if (problem.numRealVars != 0) {
+            file.bufferedWriter().use { writer ->
+                for (id in entries.indices) for (owner in listOf("ls", "cp-cold", "cp-retained", "mixed-cold", "mixed-retained")) {
+                    writer.appendLine(buildJsonObject {
+                        put("controlIndex", id)
+                        put("owner", owner)
+                        put("status", "unavailable")
+                        put("reason", "finite control has no authoritative exact real snapshot")
+                        put("globalProofClaim", false)
+                    }.toString())
+                }
+            }
+            return
+        }
+        val scopes = entries.mapIndexed { index, line ->
+            val entry = Json.parseToJsonElement(line).jsonObject
+            val saved = entry.getValue("center").jsonObject
+            val center = Sample(saved.getValue("bools").jsonArray.map { it.jsonPrimitive.content.toBooleanStrict() }
+                .toBooleanArray(), saved.getValue("ints").jsonArray.map { it.jsonPrimitive.content.toLong() }.toLongArray())
+            require(center.numBoolVars == problem.numBoolVars && center.numIntVars == problem.numIntVars)
+            val cutoff = objective.evaluateExact(center)
+            val bools = intArrayOf()
+            val ints = entry.getValue("effectiveInts").jsonArray.map { it.jsonPrimitive.content.toInt() }.toIntArray()
             val freed = freedType.getDeclaredConstructor(IntArray::class.java, IntArray::class.java)
                 .newInstance(bools, ints)
             val pins = call(scopeOwner, "pins", problem, center, freed) as Assumptions
             check(checkSource(source, prepared.reconstruct(center), Cancellation.Never))
-            Scope(call(attempt, "getId") as Int, center, bools, ints, pins, cutoff,
-                call(attempt, "getBestObjectiveCutoff") as Double)
+            Scope(index, center, bools, ints, pins, cutoff, objective.evaluate(center))
         }
         val bean = ManagementFactory.getThreadMXBean() as ThreadMXBean
         val thread = Thread.currentThread().threadId()
@@ -159,6 +178,8 @@ internal object RepairOwnerReplay {
                             put("reason", outcome.reason?.toString())
                             put("unavailable", unavailable)
                             put("strictWorkingCutoff", scope.cutoff.toString())
+                            put("cutoffRule", "strict improvement on the checked control center")
+                            put("controlFileSha256", com.eignex.klause.bench.metric.sha256(controls.readBytes()))
                             put("capturedNativeCutoff", scope.nativeCutoff)
                             put("effectiveBools", JsonArray(scope.freedBools.map(::JsonPrimitive)))
                             put("effectiveInts", JsonArray(scope.freedInts.map(::JsonPrimitive)))
