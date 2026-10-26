@@ -3281,6 +3281,40 @@ and repair costs without establishing a speedup. The bounded opt-in mechanism
 admits complete improving freedoms; default-route family admission remains in
 [#3630](https://github.com/Eignex/klause/issues/3630).
 
+### Scoped finite conflict ranking
+
+[8465](https://lab.eignex.com/jobs/8465), at `2c304f8a10`, compares root CP
+attributions on assignment, resource, placement and weighted Latin controls with
+seeds 1/3/17 and effective freedom counts 2/4/8 where admitted. Its 135 repairs
+match counts. Acquisition improves all 27 guided trials, reaching the controls'
+known optima; those points cannot be credited to ranking. Placement ranking
+improves 6/6 repairs against acquisition-ablated random's 1/6 and objective
+removal's 6/6. Assignment/resource callbacks are unavailable. Latin ranking and
+ablated random improve 0/9 against objective removal's 3/9. Its 45 linear-shaped
+Latin descents are censored and receive no endpoint classification.
+
+[8498](https://lab.eignex.com/jobs/8498), at `fe34f18ae9`, adds count-matched
+random-fragment acquisition and explicit feasible greedy acceptance in descent.
+All 135 root selections, attributions and acquisition/repair outcomes reproduce
+8465. Across both origins, all 270 effective counts match; 56 acquired points,
+99 repaired points and 270 descent points pass native original-source checks.
+Every descent reaches a qualified coordinate-policy endpoint, without a basin
+claim. Each trial shares 2,000 native work units and five seconds across
+acquisition, selection, repair and descent; no trial exhausts either allowance.
+
+Fragment placement consumes attributions in 2/6 trials and improves 3/6 repairs
+against ablated random's 1/6, adjacency's 4/6 and objective removal's 6/6.
+Acquisition finds no improving placement point. Guided/ablated native work totals
+are 9/7 and thread allocations 6.00/5.88 MB. All three guided improvements survive
+the declared descent. Fragment assignment/resource guidance remains unavailable.
+Latin consumes guidance in 1/9 trials but repairs improve 0/9; its acquisition
+finds objective 47, which the selected repair loses, while objective removal
+improves 3/9. This qualifies bounded CP attribution consumption, not replacement
+of existing selectors or independent acquisition. Defaults remain unchanged.
+Both Linux/amd64 captures retain original hashes, identity mappings, settings,
+cutoffs/pins and JAR/runtime identities. Ordered JFR-instrumented timings establish
+no throughput claim; native checks establish no independent witness or proof claim.
+
 ### Prepared board-restart outcomes
 
 The coordinate-changing treatment in [#3447](https://github.com/Eignex/klause/pull/3447)
