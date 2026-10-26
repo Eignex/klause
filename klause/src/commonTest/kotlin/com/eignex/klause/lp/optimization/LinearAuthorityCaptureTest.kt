@@ -15,6 +15,8 @@ import com.eignex.klause.solver.evidence.SourcePremise
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
+import com.eignex.klause.solver.pipeline.LinearAuthorityInvocation
+import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -94,6 +96,28 @@ class LinearAuthorityCaptureTest {
     }
 
     @Test
+    fun `observer should preserve exhaustive frontier traversal and sibling proof accounting`() {
+        val capture = LinearAuthorityCapture(16, 100_000L, 4_000_000L, Cancellation.Never)
+        val params = TheoryParams(sourceCuts = false)
+        val baseline = LinearAuthorityInvocation(source, params, boundOrdered = true).use {
+            it.run { _, _ -> }
+        }
+        val treatment = LinearAuthorityInvocation(source, params, boundOrdered = true).use {
+            it.captureTo(capture)
+            it.run { _, _ -> }
+        }
+
+        assertEquals(baseline.value, treatment.value)
+        assertEquals(baseline.terminal?.claim, treatment.terminal?.claim)
+        assertEquals(baseline.stats.smt.completeSearchStages, treatment.stats.smt.completeSearchStages)
+        assertEquals(baseline.stats.openTheory.openTheoryChecks, treatment.stats.openTheory.openTheoryChecks)
+        assertEquals(baseline.stats.smt.sourceLp.operations, treatment.stats.smt.sourceLp.operations)
+        assertEquals(baseline.stats.smt.sourceLp.floatWork, treatment.stats.smt.sourceLp.floatWork)
+        assertTrue(capture.records.any { it.parentQuery != null })
+        assertTrue(capture.records.any { it.refutation != null })
+    }
+
+    @Test
     fun `guarded strict records should preserve activation across sibling retraction`() {
         val y = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
         val guarded = SourceProofContext(scope, setOf(x, y), mapOf(
@@ -112,6 +136,7 @@ class LinearAuthorityCaptureTest {
         }
 
         assertEquals(listOf(true, false, true), capture.records.map { it.cuts.single().checked })
+        assertEquals(listOf(enabled.scope, guarded.scope, enabled.scope), capture.records.map { it.numeric.scope })
         assertTrue(capture.records.first().cited.first().first.strict)
         val cut = capture.records.first().cuts.single()
         assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(enabled).verify(SourceEvidence(

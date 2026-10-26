@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.optimization
 
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCoordinate
@@ -8,6 +9,7 @@ import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceScope
+import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.magnitudeBitLength
 
@@ -38,6 +40,8 @@ internal data class LinearAuthorityCapturedQuery(
     val parent: SourceScope? = null,
     val siblingBound: SourceEvidence? = null,
     val incumbent: BigFraction? = null,
+    val parentQuery: Int? = null,
+    val boundDisposition: String = "unknown",
 )
 
 // Source values and derivations are immutable; numerical owners, queries and their buffers never escape.
@@ -150,11 +154,11 @@ internal class LinearAuthorityCapture(
                     if (coefficient.num.magnitudeBitLength() + value.num.magnitudeBitLength() > 4096 ||
                         coefficient.den.magnitudeBitLength() + value.den.magnitudeBitLength() > 4096) return
                     val product = coefficient * value
-                    if (!scalar(product) || activity.num.magnitudeBitLength() + product.den.magnitudeBitLength() > 4096 ||
-                        activity.den.magnitudeBitLength() + product.num.magnitudeBitLength() > 4096) return
+                    if (!scalar(product) || !canAdd(activity, product)) return
                     activity += product
                     if (!scalar(activity)) return
                 }
+                if (!canAdd(activity, cut.inequality.rhs)) return
                 violation = activity - cut.inequality.rhs
                 if (!scalar(violation)) return
             }
@@ -166,7 +170,8 @@ internal class LinearAuthorityCapture(
         for (evidence in listOfNotNull(result.bound, refutation)) {
             if (!proof(evidence.derivation)) return
         }
-        retained += LinearAuthorityCapturedQuery(retained.size, source, numeric, query?.coordinates.orEmpty().toList(),
+        retained += LinearAuthorityCapturedQuery(retained.size, source, numeric.atScope(source.scope),
+            query?.coordinates.orEmpty().toList(),
             cited.toList(), query?.inactive.orEmpty().toSet(), point?.toMap(), candidates.toList(),
             template?.cuts?.observations.orEmpty().toMap(), result.bound, refutation, when {
                 open -> "open-booleans"
@@ -182,6 +187,20 @@ internal class LinearAuthorityCapture(
         val record = retained.lastOrNull()?.takeIf { it.context.scope == scope } ?: return
         if (sibling != null && !proof(sibling.derivation)) return
         if (incumbent != null && !scalar(incumbent)) return
-        retained[retained.lastIndex] = record.copy(parent = parent, siblingBound = sibling, incumbent = incumbent)
+        val value = ((record.bound?.claim as? SourceClaim.Bound)?.value as? SourceValue.Rational)?.value
+        val disposition = when {
+            value == null -> "bound-unavailable"
+            incumbent == null -> "incumbent-absent"
+            if (scope.objective?.sense == ObjectiveSense.MINIMIZE) value >= incumbent else value <= incumbent ->
+                "incumbent-dominating"
+            else -> "weak-bound"
+        }
+        retained[retained.lastIndex] = record.copy(parent = parent, siblingBound = sibling, incumbent = incumbent,
+            parentQuery = retained.lastOrNull { it.context.scope == parent }?.id, boundDisposition = disposition)
     }
+
+    private fun canAdd(left: BigFraction, right: BigFraction): Boolean =
+        left.num.magnitudeBitLength() + right.den.magnitudeBitLength() < 4096 &&
+            left.den.magnitudeBitLength() + right.num.magnitudeBitLength() < 4096 &&
+            left.den.magnitudeBitLength() + right.den.magnitudeBitLength() < 4096
 }

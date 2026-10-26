@@ -14,6 +14,7 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
+import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -38,6 +39,24 @@ class NumericalFrontierSnapshotTest {
         SourceClaim.Bound(SourceValue.Rational(half)),
         SourceDerivation.Combination(listOf(SourceDerivation.Combination.Term(half, SourceDerivation.Premise("half")))),
     )
+
+    @Test
+    fun `selection capture should expose an attached empty journal without numerical work`() {
+        val invocation = NumericalFrontierSnapshot.open(context, TheoryParams(), frontier = true)
+        try {
+            val snapshot = NumericalSelectionSnapshot(Cancellation.Never)
+            val journal = snapshot.attach(invocation)
+
+            val capture = snapshot.capture(journal)
+
+            assertEquals("false", capture.getValue("limited").jsonPrimitive.content)
+            assertEquals("0", capture.getValue("attempted").jsonPrimitive.content)
+            assertEquals(0, capture.getValue("records").jsonArray.size)
+            assertEquals(0, NumericalFrontierSnapshot.stats(invocation).smt.sourceLp.operations)
+        } finally {
+            (invocation as AutoCloseable).close()
+        }
+    }
 
     @Test
     fun `a captured bound should retain its checked scope and original objective units`() {
