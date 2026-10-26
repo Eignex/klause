@@ -48,6 +48,7 @@ internal class ConflictSupportedRemoval(
     private var hasSupport = false
     private var observed = 0
     private var closed = false
+    private var supportsInvocation = true
     private var cancellation: Cancellation = Cancellation.Never
     private var externalCutoff = Double.POSITIVE_INFINITY
     private var localCutoff = Double.POSITIVE_INFINITY
@@ -80,6 +81,13 @@ internal class ConflictSupportedRemoval(
 
     fun observe(params: BacktrackParams): BacktrackParams {
         require(params.assumptions == callerAssumptions)
+        if (closed) return params
+        // Pooled starting witnesses can tighten the cutoff without a selector callback.
+        supportsInvocation = params.pooledIncumbents == null
+        if (!supportsInvocation) {
+            discard(ConflictGuidanceStatus.Unsupported)
+            return params
+        }
         val supplier = params.objectiveBoundSupplier
         return params.copy(
             variableSelector = observing(params.variableSelector),
@@ -117,6 +125,10 @@ internal class ConflictSupportedRemoval(
     fun begin(incumbent: Sample, pins: Assumptions, cutoff: Double, token: Cancellation) {
         check(!closed)
         discard(ConflictGuidanceStatus.Unavailable)
+        if (!supportsInvocation) {
+            status = ConflictGuidanceStatus.Unsupported
+            return
+        }
         cancellation = token
         val count = model.numBoolVars.toLong() + model.numIntVars
         if (model.numRealVars != 0) {

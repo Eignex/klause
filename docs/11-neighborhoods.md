@@ -311,11 +311,13 @@ baked model, retaining the originating complement pins and each attribution's
 objective cutoff, including local incumbent tightenings. A hint
 can rank a later freedom at the same center; it cannot assert a clause, prune a repair
 or establish that changing a supported input admits improvement. A changed model,
-objective or center, a new repair, cancellation and close retire the snapshot.
+objective, caller pins or center, a new repair, cancellation and close retire the snapshot.
 Missing callbacks and captured empty supports are distinct outcomes. Both use the
 ordinary random removal fallback. Capture admits at most 32 conflicts and 4,096
 coordinates; oversized supports decline as a whole.
 Attributions identify activity inputs without a premise-complete branch refutation.
+Invocations with pooled starting witnesses decline capture because their initial
+cutoff tightening need not notify the variable selector.
 
 ### Handles and exclusive ownership
 
