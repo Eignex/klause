@@ -30,7 +30,7 @@ internal data class QfNraParams(
     val cancellation: Cancellation = Cancellation.Never,
     val maximumWork: Long? = null,
     val polynomialLimits: PolynomialLimits = PolynomialLimits(),
-    val cellRefinement: Boolean = false,
+    val cellRefinement: Boolean = true,
 ) {
     init { require(maximumWork == null || maximumWork >= 0) }
 }
