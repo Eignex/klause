@@ -168,6 +168,9 @@ internal object MpsRepairReplay {
                 source.variables.indices.joinToString(" ") { "${source.variables[it].name}=${next[it]}" } + "\n") }
             println("mixed repair $index: $status")
         }
+        if (request["ownerReplay"]?.jsonPrimitive?.content?.toBooleanStrict() == true) {
+            MpsRepairOwners.inspect(request, source, model, context, objective, center, columns, out)
+        }
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -248,7 +251,7 @@ internal object MpsRepairReplay {
         return result
     }
 
-    private fun sample(model: Problem, mapped: Map<SourceCoordinate, BigFraction>, objective: BigFraction): Sample {
+    fun sample(model: Problem, mapped: Map<SourceCoordinate, BigFraction>, objective: BigFraction): Sample {
         require(model.numBoolVars == 0)
         val integers = List(model.numIntVars) { mapped.getValue(SourceCoordinate(SourceCoordinate.Kind.Integer, it)) }
         require(integers.all { it.den == BIG_ONE })

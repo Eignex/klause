@@ -2814,6 +2814,18 @@ residual. The selection capture distinguishes those working integer coordinates
 from the effective original integer freedoms; they never become complement pins
 solely because lowering gave them integer storage.
 
+With `repairSets`, optional `ownerReplay=true` reuses the captured source freedoms
+for the same five-owner comparison as the finite trajectory diagnostic. This
+overlap requires closed original integer declarations and closed working integer
+bounds, at most 4,096 integer/real coordinates, and an exact checked center.
+Original real backings join every free residual and consume no source integer
+freedom. Missing bounds decline this finite overlap explicitly, retaining the
+mixed cold reports; they establish no whole-family inapplicability. Mixed owners
+use the original authority rows; finite-owner closures refer only to their
+conditioned working model. Every accepted point passes `checkMpsWitness` on the
+original columns. Real snapshots without exact values and nonrepresentable CP
+cutoffs remain unavailable; finite domains are never invented by this replay.
+
 [Scoped baseline 8448](https://lab.eignex.com/jobs/8448) runs `e805182280` on
 Linux/amd64 with the two hash-matched original modglob/rgn sources and refined
 centers from 8339. Runtime and dependency hashes, debug settings and 3 GiB Serial-GC
