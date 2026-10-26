@@ -294,7 +294,8 @@ internal object LocalSearchTrajectory {
                     if (!walk) {
                         val initial = checkNotNull(captured)
                         val shadow = LocalSearchState(initial.model, Random(seed), initial.assumptions, initial.projection)
-                        shadow.invariants = sweep?.network(problem.numIntVars, problem.numBoolVars)
+                        val activeSweep = sweep?.takeIf { initial.invariants != null }
+                        shadow.invariants = activeSweep?.network(problem.numIntVars, problem.numBoolVars)
                         if (initial.weights.allocated) initial.weights.factorWeights.copyInto(shadow.weights.factorWeights)
                         views += TrajectoryView(
                             rewrite.toString(), shadow,
@@ -302,8 +303,8 @@ internal object LocalSearchTrajectory {
                                 IntArray(parsed.problem.numBoolVars) { if (it < problem.numBoolVars) it else -1 },
                                 IntArray(parsed.problem.numIntVars) { if (it < problem.numIntVars) it else -1 },
                             ),
-                            gradient ?: workingObjective, prepared.reconstruct,
-                            { sweep?.sweep(shadow.assignment, shadow.rootDomains) },
+                            initial.shaping.objective, prepared.reconstruct,
+                            { activeSweep?.sweep(shadow.assignment, shadow.rootDomains) },
                         )
                         traceGreedy(initial, out.resolve("greedy-$rewrite.jsonl")) { position, slot ->
                             observations += Observation(
