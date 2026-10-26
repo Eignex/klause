@@ -2,9 +2,9 @@ package com.eignex.klause.solver.pipeline
 
 /** Invocation-wide observations of checked integer cell reuse, summed across private cursors. */
 data class NonlinearIntegerCellReuseStats(
-    /** Whether polynomial completions produced checked univariate cells. */
+    /** Whether checked univariate cell production was enabled for the invocation. */
     val producerEnabled: Boolean,
-    /** Whether unvisited integer tuples were tested against retained source cells. */
+    /** Whether source-cell filtering was enabled for fixed integer tuples. */
     val reuseEnabled: Boolean,
     /** Completed typed cells delivered to integer cursors. */
     val observed: Long,
