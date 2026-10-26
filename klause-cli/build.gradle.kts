@@ -1,7 +1,7 @@
 plugins {
     // kbuild CLI conventions: KMP + lint + kover, JVM dist + native executables,
     // and the `releaseAssets` packaging task.
-    id("com.eignex.cli") version "1.3.4"
+    id("com.eignex.cli") version "1.3.5"
 }
 
 // Build identity, mirrored by the MiniZinc solver configuration checked below. These feed the
