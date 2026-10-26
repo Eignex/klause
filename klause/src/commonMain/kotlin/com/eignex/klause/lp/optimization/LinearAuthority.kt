@@ -269,7 +269,7 @@ internal class LinearAuthority(
         }
         val solved = guide?.result ?: lp.solve(closureRows, costs, constant, cancellation, inactive)
             ?: return LinearAuthorityResult(paused = budget.funding?.paused == true)
-        if (capture?.accepting == true && capturedPoint == null) {
+        if (capture?.accepting == true && capturedPoint == null && capturedQuery === prepared) {
             val point = guide?.point ?: solved.result.exactPrimal?.take(coordinates.size)
             if (point != null && point.size == coordinates.size) {
                 capturedPoint = capture?.point(coordinates, point)
