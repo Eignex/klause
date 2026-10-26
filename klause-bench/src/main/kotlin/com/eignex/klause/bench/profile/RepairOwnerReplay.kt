@@ -358,8 +358,8 @@ internal object RepairOwnerReplay {
         val companion = call(type, "prepare", problem, objective, limits, stop) ?: return null
         val context = NumericalFrontierSnapshot.field(companion, "context") as SourceProofContext
         val policy = Class.forName("com.eignex.klause.lp.SparseSourceLpPolicy").getConstructor().newInstance()
-        return Class.forName(PIPELINE + "JointLinearRepair").constructors.single { it.parameterCount == 8 }
-            .newInstance(problem, context, objective, limits, policy, true, center, stop)
+        return Class.forName(PIPELINE + "JointLinearRepair").constructors.single { it.parameterCount == 9 }
+            .newInstance(problem, context, objective, limits, policy, true, center, stop, null)
     }
 
     private fun numerical(owner: Any, scope: Scope, stop: Cancellation, budget: NodeBudget,
