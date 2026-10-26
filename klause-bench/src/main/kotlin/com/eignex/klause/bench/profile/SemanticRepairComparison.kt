@@ -27,8 +27,9 @@ import kotlin.time.Duration.Companion.seconds
 internal object SemanticRepairComparison {
     fun capture(problem: BakedProblem, objective: LinearObjective, center: Sample, sweep: DefinitionalSweep?,
         inputs: IntArray, prepared: FinitePipelinePreparation, source: BakedProblem, out: File, seed: Long,
+        evaluateRepairs: Boolean = true,
     ) {
-        require(problem.numBoolVars == 0 && prepared.reconstruct(center) == center)
+        require(prepared.reconstruct(center) == center)
         RepairTrajectory.checkSource(source, center)
         val stop = Cancellation.after(15.seconds)
         val allocation = ManagementFactory.getThreadMXBean() as ThreadMXBean
@@ -100,7 +101,7 @@ internal object SemanticRepairComparison {
                     val requested = if (arm == "semantic") getter(selector, "LastRequested") else raw
                     val repairBytes = allocation.getThreadAllocatedBytes(thread)
                     val repairStarted = System.nanoTime()
-                    val result = if (variables.isEmpty() && bools.isEmpty()) null else {
+                    val result = if (!evaluateRepairs || (variables.isEmpty() && bools.isEmpty())) null else {
                         val assumptions = pins.invoke(scope, problem, center, selected) as Assumptions
                         BacktrackSolver(problem).minimize(objective, BacktrackParams(assumptions = assumptions,
                             maxDecisions = 10_000, cancellation = stop, randomSeed = seed + repetition))
@@ -125,6 +126,7 @@ internal object SemanticRepairComparison {
                         put("selectionThreadAllocatedBytes", selectionBytes)
                         put("repairElapsedNanos", repairNanos)
                         put("repairThreadAllocatedBytes", repairAllocated)
+                        put("producerRepairEvaluated", result != null)
                         put("requestedInts", JsonArray(((requested?.let { getter(it, "Ints") }) as IntArray?
                             ?: intArrayOf()).map(::JsonPrimitive)))
                         put("effectiveInts", JsonArray(variables.map(::JsonPrimitive)))
@@ -160,6 +162,7 @@ internal object SemanticRepairComparison {
             put("setupThreadAllocatedBytes", setupAllocated)
             put("setupIncludes", "definition network, selector, reflection bindings")
             put("maxDecisionsPerRepair", 10_000)
+            put("producerRepairsEnabled", evaluateRepairs)
             put("containingSeconds", 15)
             put("maxInputs", 32)
             put("maxVariables", 4096)

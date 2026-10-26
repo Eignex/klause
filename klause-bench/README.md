@@ -1636,8 +1636,11 @@ closure, source acceptance, CP nodes, LS moves, LP work, preparation, thread
 allocation and before/after counters. Instrumented CP clause flags count a lower
 bound on previously unused retained clauses becoming useful in unit/conflict
 propagation, split by permanent status; flags are never cleared, repeated uses of
-already marked clauses remain unknown, and observation work/time are charged and
-reported. These observations supply no global proof or throughput claim.
+already marked clauses remain unknown. Diagnostic flag visits and their time and
+thread allocation are reported separately from native decision work; elapsed time
+and wall-time limits include the observations. A completed native cutoff closure
+retains its completion classification when a cooperative allowance also runs out.
+These observations supply no global proof or throughput claim.
 Common control loading and source-center checking are recorded separately in
 `owners-*-preparation.json`; per-candidate original-source verification time and
 allocation are separate from each owner's native interval.
@@ -1670,15 +1673,25 @@ remain unavailable rather than becoming completed fully pinned repairs. Cold
 fragments start from the specified owner seed; retained fragments keep RNG and
 activity state. These comparisons do not attribute all node differences to clauses
 or charge selection costs as owner repair work.
+Owner replay captures selector sets without a duplicate producer-side CP solve;
+`producerRepairEvaluated` distinguishes this capture from selector-only comparisons
+that also evaluate their own repairs.
 `selectorsFromWalk=true` acquires the center from the bounded walk's actual checked
 incumbent, with presolve and objective rewriting disabled. It requires `selectors=true`
 and omits an explicit `center`. Selection and owner replay start after both walk
 captures, preserving their fixed-work observation comparison. `selector-center.json`
 binds the source hash, recipe, immutable working center, native checked witness file
 and separate acquisition time/allocation. A missing incumbent, changed coordinate
-frame, Boolean working frame or unsupported relation remains unavailable. Completed
+frame or unsupported relation remains unavailable. Boolean and integer namespaces
+both require the saved source-plan mapping and complete source round trip. Completed
 descent events stay in `repairs-false.jsonl`; an acquired incumbent alone supplies no
 completed-descent claim. These declines concern this diagnostic's supported overlap.
+With `selectorsFromWalk=true`, `ownerConflicts=true` also consumes the merged
+conflict selector at that same checked center in both source-root and
+sampled-fragment acquisition modes. Each mode saves its original acquisition,
+selection and descent records beside a separate hash-bound owner replay. The
+common repair cutoff belongs to the checked center; acquisition outcomes and costs
+remain separate and confer no additional pins or proof authority.
 The merged `FiniteConflictSelection` diagnostic accepts `ownerReplay=true` to
 replay its actual conflict-supported, baseline and acquisition-ablated scopes
 under the same contract. Acquisition costs remain in the hash-bound
@@ -1716,6 +1729,36 @@ bytes, without newly useful retained clause flags. LS uses 1,024,000 moves and
 those owner measurements. These tiny controls support neither a repair-quality
 advantage nor a retained throughput or ordinary admission claim; the strong outer
 walk recipe is separate from the replay's default LS owner.
+
+[Initial family capture 8624](https://lab.eignex.com/jobs/8624), at `284cafd9b6`,
+retains eight native source-checked walk centers and 329 matched owner scopes from
+the six centers its diagnostic admits. CarpetCutting's 48 Boolean auxiliaries
+trigger the integer-only capture guard; this is a harness limitation, not an owner
+inapplicability result. Producer-side CP solves consume the selection deadline on
+ClockTriplet before all selector arms are captured. Clause-flag scans also charge
+the native work allowance and relabel 68 completed retained-CP queries as budget
+stops. Those records retain `nativeReason=SearchExhausted`; they earn no retained
+quality or cost conclusion. The capture requires Boolean-frame support and
+separate diagnostic accounting before qualifying these families' repair owners.
+
+[Ordinary family holdouts 8616](https://lab.eignex.com/jobs/8616), at `725db3a1ce`,
+complete 48 cases on three original XCSP3 COP sources and the three exchange
+controls, with 30 seconds, P1 and seeds 7/19. Every final witness passes the
+independent XCSP3 SolutionChecker against its original source hash. Objectives
+below retain both seeds in order:
+
+| Source | Default | CP | Curated LS | Retained-CP ALNS |
+| --- | ---: | ---: | ---: | ---: |
+| ClockTriplet-15-20_c22 | 161 / 161 | 162 / 162 | 161 / 161 | 163 / 164 |
+| RCPSP-j120-01-01_c22 | 112 / 111 | 110 / 111 | 547 / 500 | 662 / 638 |
+| CarpetCutting-test01_c23 | 638 / 640 | 627 / 643 | 622 / 718 | 630 / 641 |
+
+All engines reach zero on the exchange controls. Default and CP report twelve
+native optimum labels there; the independent checker certifies witnesses, not
+proofs. No original holdout receives an optimum label. The whole-engine results
+retain the scheduling losses and seed variation; they support no unconditional
+owner replacement. They measure ordinary execution separately from identical-scope
+repair and do not establish a retained throughput advantage.
 
 Model keys, domains, objectives, source bytes and
 build identity remain alongside the walk. Inputs admit at most 64 MiB,
@@ -3305,14 +3348,23 @@ All five owners find the checked gain from zero to `1/10` when the source intege
 is free; fixed-input queries admit no strict gain. These instrumented native
 checks grant no independent witness certification or unpinned proof authority.
 
-[Modglob owner pilot 8614](https://lab.eignex.com/jobs/8614), at `725db3a1ce`,
+[Modglob owner replay 8628](https://lab.eignex.com/jobs/8628), at `725db3a1ce`,
 captures three identical five-owner conditions without inventing finite domains.
-CP declines the exact non-binary cutoff. Retained mixed repair finds one checked
-source improvement where cold mixed retains nonimprovements, but atomic work
-materially exceeds the 5,000-equivalent fragments: the two LS attempts each spend
-about 74,000 equivalents and exhaust its containing allowance before the third
-condition; mixed fragments overspend by up to 17,781. These outcomes do not qualify
-an equal-work repair-quality comparison or an admission rule.
+The containing allowance is one million decision equivalents and each fragment
+has 200,000 equivalents/two seconds, with unchanged native LP funding. No fragment
+or containing allowance overspends. Both mixed owners find the same two checked
+gains to 33.52M and close only the fixed-input cutoff. CP declines the exact
+non-binary cutoff; LS returns no point at the fragment cancellation boundaries.
+Cold mixed uses 53,933,567 funded LP work units and three preparations versus
+31,535,079 and one retained preparation. Cumulative thread allocation is 552.7
+versus 506.5 million bytes. These ordered instrumented observations establish
+neither a repair-quality nor a throughput advantage.
+
+The small-fragment [pilot 8614](https://lab.eignex.com/jobs/8614) gives retained
+mixed repair one gain against cold nonimprovements, but materially overspends its
+5,000-equivalent fragments: LS spends about 74,000 equivalents per attempt and
+mixed overspends by up to 17,781. That pilot earns no equal-work admission credit;
+its repair-quality difference is absent with the adequate quantum in 8628.
 
 [Scoped baseline 8448](https://lab.eignex.com/jobs/8448) runs `e805182280` on
 Linux/amd64 with the two hash-matched original modglob/rgn sources and refined
