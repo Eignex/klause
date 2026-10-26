@@ -1434,12 +1434,41 @@ outside source readers requires a separate coordinate channel.
 
 ### Local-search trajectories
 
+`bench.profile.ChannelViewApplicability` accepts `request64=BASE64_JSON` containing
+one to eight `{suite, problem, sha256}` records for XCSP3 sources. It reports the
+source hint kinds, admitted source definition nodes, retained nodes when value or
+predicate channels become searched, and bounded native inverse-role applicability.
+Each source has a thirty-second allowance; cancellation and original bytes remain
+with the report. This source-only screen does not stand in for mapped working-model
+applicability or paired-state grading. Inverse-role experiments transpose only
+disjoint native `Inverse` factors, at most sixteen relations of at most 64 entries,
+retaining every other factor, source domain and implied-factor role.
+Optional `source0=BASE64` through `source7=BASE64` supply the corresponding original
+source bytes directly, at most 96 KiB encoded each, checked against the requested hashes.
+
 `bench.profile.LocalSearchTrajectory` takes `suite=ID problem=NAME sha256=HEX
 recipe=LABEL seed=N moves=N` for a hash-pinned minimizing XCSP3 source. It compares
 protected and substituted objective coordinates through mixed-route preparation,
 then runs the selected local-search recipe alone with a fixed allowance counting
 moves and restarts, and no shared incumbents. The seed is the worker seed,
 including its portfolio index.
+Optional `channel=SearchedValues|SearchedPredicates|SearchedChannels|InverseAssignment`
+compares the maintained view with one bounded channel treatment. Both arms retain
+objective coordinates and the same functional objective view. Value treatments
+leave Boolean-value and Element outputs searched; predicate treatments leave
+comparison and membership outputs searched. Other admitted definitions remain
+maintained. Inverse assignment transposes the roles of admitted native `Inverse`
+factors and reuses their repairs and swaps; it changes proposals while retaining
+both source arrays. Channel comparisons use local-search-route preparation and
+also admit satisfaction sources.
+No general inverse or deterministic extension of an inconsistent channel is supplied.
+Channel probes prioritize named source integer inputs to the maintained definition
+network before other admissible primitives, within the same 32-candidate bound.
+Optional `presolve=off` holds both views before presolve, distinguishing channel
+ownership from representation changes that erase or reconstruct its coordinates.
+The default preserves production preparation; explicit centers also disable presolve.
+Optional `source64=BASE64` supplies at most 96 KiB of base64-encoded original bytes
+without catalog extraction; the source mode and bytes are retained with the capture.
 Optional `sliceMillis=N sliceWork=N` repeatedly resumes the same handle under
 those cooperative allowances; omitted allowances are unbounded. Timed slices
 depend on capture overhead and host speed and do not reproduce portfolio allocation.
@@ -1572,8 +1601,11 @@ walk recipe is separate from the replay's default LS owner.
 
 Model keys, domains, objectives, source bytes and
 build identity remain alongside the walk. Inputs admit at most 64 MiB,
-4,096 Boolean/integer coordinates and 8,192 factors. Hint construction uses the production
-mapping through reflection and fails on an internal shape mismatch. Each arm has
+8,192 Boolean/integer coordinates and 8,192 factors. Hint construction uses the production
+mapping through reflection and fails on an internal shape mismatch. Paired loading
+uses the same retained-coordinate projection, leaving reconstructed columns to
+the existing source reconstruction. Size and unsupported projection refusals remain
+explicit diagnostic declines. Each arm has
 a sixty-second outer deadline; cancellation is recorded. These instrumented walks
 isolate local trajectories; they establish neither default portfolio equivalence,
 throughput, native proof nor independently checked source feasibility.
@@ -1935,6 +1967,109 @@ grading loses checked coverage and adds none against the native and ordinary
 controls at this allowance. This supplies no runtime admission prerequisite for
 #3620 or #3621. Other weighted grades, fragments and budgets remain untested.
 
+### Maintained and searched channel viewpoints
+
+The bounded channel views retain every relation, source domain and pin. Objective
+coordinates are protected and the full functional objective view is fixed across
+maintained, searched-value and searched-predicate treatments. Native inverse-role
+views transpose disjoint bijections and reuse the existing repairs and swaps.
+These capabilities are exposed through diagnostic consumers.
+
+[8527](https://lab.eignex.com/jobs/8527) loads twelve ProgressiveParty states through
+the production retained-coordinate projection and compares 384 common destinations
+with equal raw and weighted deltas. Its empty working definition network makes it
+a no-op control. [8542](https://lab.eignex.com/jobs/8542) holds the initial
+MisteryShopper named assignment and RNG boundary fixed with plain CBLS and no greedy
+initializer; all 384 common primitive destinations have equal deltas. Implicit
+ownership in [8490](https://lab.eignex.com/jobs/8490) admits no primitive candidates,
+so that empty sample establishes no grading equivalence.
+
+Warehouse [8553](https://lab.eignex.com/jobs/8553) and
+[8554](https://lab.eignex.com/jobs/8554) qualify the 8,192-coordinate bound on a
+6,641-coordinate source. Default preparation leaves 3,280 maintained definitions;
+the presolve-off value treatment retains 3,240 of 6,520. Each capture admits six
+paired states and rejects six searched-origin states by the complete source round
+trip. All 192 candidate destinations differ in lowered auxiliaries while their
+named source decisions agree. Their grades cannot isolate a common-destination
+effect. Reserved NurseRostering-01 captures
+[8571](https://lab.eignex.com/jobs/8571) and
+[8572](https://lab.eignex.com/jobs/8572) similarly have six paired states, six
+round-trip rejections, 191 changed complete destinations and one common destination
+with equal raw, weighted and objective deltas. Named decisions agree at all 192
+destinations. The walks sample 238 distinct named assignments with maintained
+channels versus 239 predicate and 241 value assignments, with no intersection.
+Their initial assignments differ despite an equal RNG boundary, so this divergence
+does not isolate grading. Paired diagnostics cost 315 and 226 ms respectively,
+separate from ordinary solve timings.
+
+The frozen ordinary matrices [8574](https://lab.eignex.com/jobs/8574) and
+[8575](https://lab.eignex.com/jobs/8575) run `9cf410f7e8`, P1, seeds 3/17/41,
+10,000 or one billion search-work units, and a ten-second deadline in both cases.
+Each budget starts a separate CLI process. The discovery cohort is ProgressiveParty,
+Warehouse and MisteryShopper; whole reserved families are NurseRostering-01/02 and
+two CoveringArray sources. Original hashes, build/runtime fingerprints, resource
+receipts and final source checks accompany every case. The ownership matrix has
+216 Linux/amd64 and 54 Mac/aarch64 cases; each problem/seed group keeps all eighteen
+treatments on one host and build. The inverse matrix is entirely Linux/amd64.
+Infrastructure retries preserve accepted cases and supply no solver verdicts.
+
+All 270 ownership cases complete without application errors; all 71 published
+points and claimed costs pass the independent XCSP3 checker. Both channel
+treatments add no checked feasibility on ProgressiveParty or MisteryShopper. Mixed
+solves all three ProgressiveParty seeds at either budget; plain CBLS solves two
+work-capped and all three high-work cases. The reserved NurseRostering family has
+zero checked points from every LS treatment at either budget, while mixed checks
+all twelve cases.
+
+Warehouse-40-80-00 objectives, minimized and ordered by seeds 3/17/41, are:
+
+| View | 10,000 units | One billion units |
+| --- | --- | --- |
+| Mixed, default | 36716 / 36810 / 43959 | 19024 / 15160 / 12564 |
+| Plain CBLS, default | 33540 / 34185 / 34553 | 33398 / 34115 / 34500 |
+| Implicit, default | 33440 / 35851 / 34553 | 33406 / 34093 / 34406 |
+| Maintained, default | 33397 / 34801 / 34543 | 33349 / 34114 / 34552 |
+| Searched values, default | 37235 / 37464 / 38520 | 35811 / 37417 / 36908 |
+| Searched predicates, default | 31004 / 33762 / 32854 | 34035 / 32744 / 32833 |
+| Maintained, presolve off | 34032 / 33112 / 35754 | 34032 / 34086 / 34571 |
+| Searched values, presolve off | unknown / unknown / unknown | unknown / unknown / unknown |
+| Searched predicates, presolve off | 32051 / 31430 / 35865 | 33297 / 32297 / 32181 |
+
+Default predicate searching improves checked Warehouse quality in all three
+work-capped seeds, including against the unchanged controls. It performs 8,000
+moves in 6.29–6.47 s of whole-CLI time; maintained performs 5,208–5,344 moves and
+reaches the deadline at 10.29 s. Presolve work is 34.48–34.49 million units, and
+peak RSS ranges overlap: 145,772–147,024 KiB maintained versus 146,372–148,876 KiB
+predicate. The nominal work cap therefore does not imply equal executed work or
+include all preparation. At the high-work deadline, mixed has the best quality in
+every seed. Value searching worsens every default Warehouse objective and loses
+all six presolve-off witnesses. Initialization and changed moves remain part of
+these end-to-end results.
+
+The 126 inverse cases publish 33 independently valid points, all on
+CoveringArray-3-04-2-08. Both plain orientations solve every seed at either budget,
+but inverse requires 2,341/4,871/2,785 search units versus 720/3,621/678 maintained,
+with 15,262,301 presolve units each. Whole-CLI peak RSS ranges overlap
+(103.6–112.3 MiB maintained, 103.1–111.2 MiB inverse). Each plain orientation
+publishes three distinct source instantiations, with no overlap; this endpoint
+diversity does not establish separated attraction basins. Both implicit
+orientations solve zero work-capped and all three high-work cases, with work
+varying in both directions. Neither orientation solves MisteryShopper. The larger
+CoveringArray source has unequal channel arrays and no supported native bijection;
+all twelve inverse cases explicitly decline. One MisteryShopper inverse work-capped
+case also declines before search statistics and is excluded from work comparisons.
+Native first-feasibility times describe discovery; the independent checks certify
+each final published point and its claimed cost.
+
+Retain searched predicates as a bounded experimental option for the demonstrated
+Warehouse work-capped gain. Reject searched values and inverse roles as uniform
+replacements at these allowances. The reserved scheduling result and the stronger
+mixed deadline control leave automatic admission unqualified. Combined-channel
+captures establish correspondence capability; their ordinary solve quality is
+untested. Coordinated repair comparisons require the ownership-aware compound
+correspondence recorded in [#3612](https://github.com/Eignex/klause/issues/3612).
+
+
 ### Cargo objective-coordinate trajectories
 
 `LocalSearchTrajectory` accepts `suite`, `problem`, decoded-source `sha256`,
@@ -1942,7 +2077,7 @@ controls at this allowance. This supplies no runtime admission prerequisite for
 `sliceWork`. Optional `source64` supplies at most 96 KiB of base64-encoded original
 bytes instead of resolving the catalog archive; the required decoded-source hash
 still binds the input. It compares protected and substituted minimizing XCSP3 objectives.
-The source is limited to 64 MiB, 4096 finite coordinates and 8192 factors; each
+The source is limited to 64 MiB, 8192 finite coordinates and 8192 factors; each
 walk has at most one million moves and a shared sixty-second preparation/walk
 deadline per representation. `provenance.json`, `request.txt`, unchanged
 `source.xml`, `capture-policy.json` and both model descriptions bind the input,
@@ -1963,8 +2098,8 @@ objective, channel and global comparisons. Explicit `VarRemap` tables describe
 source-coordinate correspondence. Every load must reconstruct every source
 Boolean and integer unchanged after definition synchronization; inconsistent
 eliminated or maintained outputs report `source-round-trip`, rather than a
-repaired counterpart. Open/reals and non-slot-preserving transformations require
-another correspondence and are outside this runner. At most twelve source states
+repaired counterpart. Open or real-valued sources and transformations without a
+retained-coordinate projection are outside this runner. At most twelve source states
 each perform two full loads and 32 candidate pairs. Each accepted primitive runs
 one ordinary reversible `inspectMove` probe, capturing factor grades, raw/weighted
 hard deltas and the selected objective delta; destination equality is reported

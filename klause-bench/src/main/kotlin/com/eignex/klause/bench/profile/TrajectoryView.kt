@@ -13,7 +13,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-internal const val TRAJECTORY_COORDINATE_LIMIT = 4096
+internal const val TRAJECTORY_COORDINATE_LIMIT = 8192
 internal const val TRAJECTORY_FACTOR_LIMIT = 8192
 
 internal class TrajectoryView(
