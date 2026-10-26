@@ -1387,6 +1387,25 @@ retaining the initial assignment and RNG integer fields without extra random dra
 That run stops at the observer before candidate generation; its retained state then
 traces the production greedy pass one coordinate at a time through reflection.
 The diagnostic stop supplies no solver verdict or worker-failure evidence.
+`repairs=true` adds an observed repetition of the same fixed-work walk and checks
+its final witness, objective, pick count and non-timing work/restart/stall counters
+against the unobserved repetition. At most 32 repair/descent attempts retain their
+center and each phase's working and reconstructed source assignment. Distance
+counts named source inputs excluding frontend-declared definitions; auxiliary
+changes and approximate real displacement remain separate. Censored endpoints
+receive no basin classification. The declared recipe and worker seed bind the
+descent rule, without claiming exhaustive coverage of its sampled moves.
+`controls=true` compares individual freedoms, complete small AllDifferent scopes
+and four size-matched samples at up to four feasible endpoints, using ordinary
+CP minimization with the complement pinned. Each repair has 10,000 decisions and
+the control scan shares ten seconds; unfinished scans grant no exhaustion claim.
+The capture reports native original-source checks separately from independent
+witness checking and carries no unpinned proof claim. `center=v0,v1,...` admits
+only an unchanged finite coordinate frame without declared definitions, disables
+presolve and uses the protected objective. `recipe=source-coordinate-descent`
+selects the strict objective-coordinate control; ordinary catalog recipes retain
+their structured sources. Fixture expectations live beside
+[finite repair controls](smoke-corpus/finite-repair/README.md).
 Model keys, domains, objectives, source bytes and
 build identity remain alongside the walk. Inputs admit at most 64 MiB,
 1,024 Boolean/integer coordinates and 4,096 factors. Hint construction uses the production

@@ -304,6 +304,15 @@ Projections and immutable indexes can be shared; run progress cannot.
 
 ### Residual diagnostics
 
+An internal bounded repair trace records immutable centers, restart policy output,
+prepared and repaired assignments, and the following walk's endpoint. A declared
+descent rule and seed accompany each capture. Policy local-optimum announcements,
+feasible stalls, interrupted descents and unresolved repairs remain distinct;
+none grants global proof authority. Pending restart phases survive slices and close
+as censored observations. ALNS records requested and effective scopes through the
+same definition closure and caller-pin filtering used to build its repair pins.
+Capture has separate coordinate accounting and consumes no search random draws.
+
 Optional residual reporting records, at each strict cost improvement, the
 maintained violation degrees per factor kind and up to eight representative
 factors, identified in the lowered local-search model. Workers keep the observation

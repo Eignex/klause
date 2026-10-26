@@ -16,6 +16,8 @@ import com.eignex.klause.localsearch.AcceptanceCriterion
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
+import com.eignex.klause.localsearch.RepairEndpoint
+import com.eignex.klause.localsearch.RepairTrace
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.DeducedRestrictions
@@ -82,6 +84,8 @@ class AlnsTest {
                     flipsPerIteration = 8,
                 )
                 val params = LocalSearchParams(initialAssignment = seed.takeUnless { shared }, maxInstructions = 8)
+                val trace = RepairTrace("ALNS repair return; no descent classification")
+                alns.repairTrace = trace
 
                 val result = if (retained) {
                     alns.resumable(selectObjective, params).use {
@@ -96,6 +100,11 @@ class AlnsTest {
                 assertEquals(0L, result.stats.alns.bootstrapCpNodes)
                 assertEquals(0L, result.stats.alns.bootstrapLsMoves)
                 assertEquals(8L, result.stats.alns.outerAllowance)
+                val attempt = trace.attempts.single()
+                assertEquals(seed, attempt.center)
+                assertEquals(RepairEndpoint.Repaired, attempt.endpoint)
+                assertEquals(improved, attempt.frames.last().sample)
+                assertTrue(attempt.effectiveBools.contentEquals(attempt.requestedBools))
             }
         }
     }
