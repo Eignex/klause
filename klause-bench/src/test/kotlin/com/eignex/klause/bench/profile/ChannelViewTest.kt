@@ -15,7 +15,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 
-class ChannelViewsTest {
+class ChannelViewTest {
     @Test
     fun `searched channel factories use the admitted definition network`() {
         val program = parseFlatZinc("var bool: b; var 0..1: y; " +

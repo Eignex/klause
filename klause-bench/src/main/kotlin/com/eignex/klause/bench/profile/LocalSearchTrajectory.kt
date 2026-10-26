@@ -165,7 +165,9 @@ internal object LocalSearchTrajectory {
             val problem = if (variant.channel == ChannelView.InverseAssignment) {
                 val inverse = inverseAssignmentView(preparedProblem, stop)
                 if (inverse == null) {
-                    out.resolve("decline-$rewrite.txt").writeText("unsupported-inverse-assignment\ncancelled=${stop()}\n")
+                    out.resolve("decline-$rewrite.txt").writeText(
+                        "unsupported-inverse-assignment\ncancelled=${stop()}\n",
+                    )
                     continue
                 }
                 inverse.bake(stop)
@@ -184,7 +186,7 @@ internal object LocalSearchTrajectory {
                 put("channel", variant.channel.name)
                 put("maintainedDefinitions", maintained?.size ?: 0)
                 put("retainedDefinitions", sweep?.size ?: 0)
-                put("functionalObjectiveTreatment", "same source functional objective; channel filtering changes ownership")
+                put("functionalObjectiveTreatment", if (channel == null) "view-specific" else "held fixed")
                 put("factors", buildJsonArray {
                     for (factor in problem.factors) add(buildJsonObject {
                         put("kind", factor::class.simpleName)

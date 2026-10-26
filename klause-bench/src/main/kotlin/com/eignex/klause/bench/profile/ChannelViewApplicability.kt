@@ -46,7 +46,8 @@ internal object ChannelViewApplicability {
             val parsed = Xcsp3.parse(bytes.decodeToString(), recoveryCancellation = stop)
             val problem = parsed.problem
             val hints = parsed.definitionHints
-            println("source $index: ${problem.numIntVars} integers, ${problem.numBoolVars} Booleans, ${problem.numFactors} factors")
+            println("source $index: ${problem.numIntVars} integers, ${problem.numBoolVars} Booleans, " +
+                "${problem.numFactors} factors")
             val maintained = DefinitionalSweep.fromSource(problem, hints, stop)
             val network = maintained?.network(problem.numIntVars, problem.numBoolVars)
             directory.resolve("applicability.json").writeText(buildJsonObject {
