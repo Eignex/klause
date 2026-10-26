@@ -161,7 +161,7 @@ internal class QfNraQuery(
                             (stage.finished && stage.formula !== searched.formula)
                         ) {
                             searching = search(normalized, stage, fixed, algebraic)
-                            searchCapture = null
+                            searchCapture = PolynomialFailureCursorState(emptyMap(), emptyMap())
                             searched = stage
                             declined = null
                             progress.started(stage)
@@ -186,7 +186,7 @@ internal class QfNraQuery(
                         searching = null
                         if (reduction.formula !== searched.formula) {
                             searching = search(normalized, reduction, fixed, algebraic)
-                            searchCapture = null
+                            searchCapture = PolynomialFailureCursorState(emptyMap(), emptyMap())
                             searched = reduction
                             declined = null
                             progress.started(reduction)

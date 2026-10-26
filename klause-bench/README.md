@@ -898,8 +898,9 @@ pair phase attribution with source-matched ordinary CLI records.
 
 `capture=true` retains bounded exact nonlinear failure observations in direct or
 prepared traces. `capture=both` also runs the same query without capture and writes
-`plain-trace.json`; completed deterministic controls must preserve their outcome
-and exact witness. `maximumWork=N` sets one containing native allowance per query.
+`plain-trace.json`; completed deterministic controls compare outcomes. The unique
+irrational-root unit control also compares exact witnesses. Charged observation can
+change work-based cursor arbitration and optional-probe trajectories. `maximumWork=N` sets one containing native allowance per query.
 Captured work includes observation and can reach that allowance sooner. Compare
 native work and component duration separately; neither establishes CLI speedup.
 
@@ -928,7 +929,10 @@ Request entries may include `fixedIntegers={"name":"integer"}` to measure a raw
 fixed-integer real completion. Every original integer declaration requires a fixing;
 decimal integer strings permit at most 256 digits. These conditions retain their
 original coordinate map and lower/upper equality pins. Prepared traces use their
-own model coordinate names. Ordinary `pipeline=true|both` runs retain their separate
+own model coordinate namespace. `originalSourceCoordinates` retains original names
+when available; `coordinateMapping` explicitly reports that original-to-prepared
+correspondence is unavailable. Prepared slot identifiers cannot be interpreted as
+original source slots. Ordinary `pipeline=true|both` runs retain their separate
 source-admission/publication scope and supply no capture of those worker queries.
 
 Add `pipeline=true` after the request argument to observe source admission and the same
@@ -2999,6 +3003,44 @@ cannot parse. Native UNSAT has no independent certificate. Heldout Boolean UNSAT
 work falls 73,705→71,744 units; corresponding SAT work rises 76,978→77,278. Boolean
 equivalence refutation rises 76,620→77,539. These charged-work observations and
 single regression samples establish no uniform runtime speedup.
+
+### Scoped nonlinear failure classification
+
+[8494](https://lab.eignex.com/jobs/8494) retains twelve raw queries and
+[8495](https://lab.eignex.com/jobs/8495) nine unconditioned prepared queries at
+`01d160c40e`, with source hashes frozen from the original 7906/7919 records,
+Boolean scaling controls and three fixed-integer completions. Each observed/plain
+pair has the same ten-second query allowance, P1, Serial GC, 3 GiB heap and default
+representation limits. All 21 outcome pairs match: sixteen complete and five stop.
+The recorded caller charge equals native work in every query. Capture is intrusive:
+completed serialization costs range from 248 to 2,783,778 steps, and changed
+work arbitration makes total native differences distinct from copying costs.
+Timed work prefixes establish no speedup.
+
+Prepared Economics first rejects `x11 = 0` against `-x11 < 0` in a partial family;
+its full scoped record is complete. Raw sorting first rejects `x96 = 0` against
+`x96 > 0`, with two repeated first representations among 180 rejections; its
+candidate is complete but the overall source/context record is truncated. The
+fixed-power completion rejects zero against `4*x1^2 - 8 = 0` and repeats once.
+Prepared kissing rejects a prefix against a four-variable sphere equation; seven
+first representations repeat, with incomplete support and repetition coverage.
+Lasso constructs no rejected sample before root-reduction/raw or partial-sign/prepared
+termination. These observations select bounded exact univariate predicate cells
+for the refinement experiment: certified roots and strict endpoints can repair
+free-coordinate samples, with complete CAD retained. They justify neither arbitrary
+multivariate tangents nor lifting diagnostic text into checked exclusions.
+Prepared source correspondence remains unavailable.
+
+[8443](https://lab.eignex.com/jobs/8443) compares the sign/interleaving control
+`1074186d94` with capture-disabled `cdf817e972` on all 68 frozen 7919 identities,
+seed 3, P1, ten-second ordinary CLI budgets and source validation. All source hashes
+and paired feasibility/proof/objective/exit outcomes match. Each arm retains 39 SAT,
+26 native UNSAT, one UNKNOWN and two unchanged source-admission failures. Of the SAT
+witnesses, 16 pass Dolmen 0.10 and 21 pass the Z3 5.1.0 algebraic fallback; one
+power-syntax check is unknown and one DIMACS witness is unchecked. Native UNSAT
+claims have no independent certificates. Hash-bound requests, original bytes,
+traces, runtime/build identities and checker receipts stay outside Git in the Lab
+records and the retained nonlinear-refinement campaign.
 
 ### Polynomial Boolean bookkeeping
 

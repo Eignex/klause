@@ -350,9 +350,14 @@ internal object PolynomialPhaseProfile {
                 override fun workMeter(): WorkMeter = meter
             }
             var names: Map<String, String> = emptyMap()
+            var originalNames: Map<String, String>? = null
             var integerFixings: Map<Int, BigFraction> = emptyMap()
             val source = if (prepared) {
                 val parsed = SmtLib.parse(text, cancellation = token)
+                originalNames = (parsed.source.originalSource as? PolynomialRealProblem)?.let { original ->
+                    original.realVarNames.mapKeys { "real.${it.key}" }.mapValues { it.value.toString() } +
+                        original.boolVarNames.mapKeys { "bool.${it.key}" }.mapValues { it.value.toString() }
+                }
                 val invocation = SourceSetup.prepare(SourceSetupRequest(
                     parsed.source, ExecutionOperation.SATISFY, FiniteEngine.MIXED, cancellation = token,
                 ))
@@ -381,6 +386,7 @@ internal object PolynomialPhaseProfile {
                         val mapping = sourceType.getMethod(getter).invoke(parsed) as Map<String, Int>
                         mapping.map { (name, id) -> "$kind.$name" to id.toString() }
                     }.toMap()
+                originalNames = names
                 Triple(formula.invoke(parsed), boolCount.invoke(parsed) as Int, realCount.invoke(parsed) as Int)
             }
             val original = source.first
@@ -443,6 +449,10 @@ internal object PolynomialPhaseProfile {
                 partialConflictPremises = conflictPremises, partialConflictPreview = conflictPreview,
                 partialConflictPreviewComplete = conflictPreviewComplete,
                 sourceCoordinates = names,
+                originalSourceCoordinates = originalNames,
+                coordinateNamespace = if (prepared) "prepared-polynomial-model" else "raw-polynomial-source",
+                coordinateMapping = if (prepared) "original-to-prepared correspondence unavailable"
+                    else "named original declarations; lowering-only slots unnamed",
                 failureCapture = captured?.let { value ->
                     listOf("Scope", "Context", "Operation", "FirstFailure", "FirstCadFailure",
                         "FirstRefusal", "FirstSignConflict")
@@ -523,6 +533,9 @@ internal data class PhaseTrace(
     val partialConflictPreview: List<String>? = null,
     val partialConflictPreviewComplete: Boolean? = null,
     val sourceCoordinates: Map<String, String>? = null,
+    val originalSourceCoordinates: Map<String, String>? = null,
+    val coordinateNamespace: String? = null,
+    val coordinateMapping: String? = null,
     val failureCapture: Map<String, Map<String, String>>? = null,
     val failureObservations: Map<String, String>? = null,
 )

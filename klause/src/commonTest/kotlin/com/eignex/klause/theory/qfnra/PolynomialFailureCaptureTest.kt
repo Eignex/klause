@@ -31,7 +31,7 @@ class PolynomialFailureCaptureTest {
     }
 
     @Test
-    fun `a resumed search stop retains its own operation after interleaved root work`() {
+    fun `a search entry stop clears interleaved root metadata`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         val optional = (1..12).joinToString(" ") { "(<= (^ (+ x2 $it) 8) 1)" }
         val source = SmtLibPolynomial.parse(
