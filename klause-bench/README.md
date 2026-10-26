@@ -1385,7 +1385,7 @@ applicability or paired-state grading. Inverse-role experiments transpose only
 disjoint native `Inverse` factors, at most sixteen relations of at most 64 entries,
 retaining every other factor, source domain and implied-factor role.
 Optional `source0=BASE64` through `source7=BASE64` supply the corresponding original
-source bytes directly, at most 64 KiB each, checked against the requested hashes.
+source bytes directly, at most 96 KiB encoded each, checked against the requested hashes.
 
 `bench.profile.LocalSearchTrajectory` takes `suite=ID problem=NAME sha256=HEX
 recipe=LABEL seed=N moves=N` for a hash-pinned minimizing XCSP3 source. It compares
@@ -1402,7 +1402,7 @@ maintained. Inverse assignment transposes the roles of admitted native `Inverse`
 factors and reuses their repairs and swaps; it changes proposals while retaining
 both source arrays. These channel comparisons also admit satisfaction sources.
 No general inverse or deterministic extension of an inconsistent channel is supplied.
-Optional `source64=BASE64` supplies at most 64 KiB of hash-checked original bytes
+Optional `source64=BASE64` supplies at most 96 KiB of base64-encoded original bytes
 without catalog extraction; the source mode and bytes are retained with the capture.
 Optional `sliceMillis=N sliceWork=N` repeatedly resumes the same handle under
 those cooperative allowances; omitted allowances are unbounded. Timed slices

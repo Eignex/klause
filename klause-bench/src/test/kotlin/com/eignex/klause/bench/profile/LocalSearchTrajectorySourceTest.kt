@@ -30,7 +30,7 @@ class LocalSearchTrajectorySourceTest {
     @Test
     fun `oversized embedded sources decline before loading a catalog`() {
         assertFailsWith<IllegalArgumentException> {
-            trajectorySourceBytes("unavailable", "control", "0".repeat(64), "A".repeat(88 * 1024 + 1))
+            trajectorySourceBytes("unavailable", "control", "0".repeat(64), "A".repeat(96 * 1024 + 1))
         }
     }
 }
