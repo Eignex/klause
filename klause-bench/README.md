@@ -1468,6 +1468,17 @@ gain nor independent witness certification, a global proof or ordinary admission
 The pilots 8479/8489 expose segment-end LS charging and do not qualify per-fragment
 owner costs; native instruction caps enforce the work boundary in 8518.
 
+`ownerSelectors=true` with `selectors=true` replays the merged semantic selector's
+actual effective freedoms at its declared center through the same owners. The
+selector's bounded construction/selection costs stay in the hash-bound
+`selectors.jsonl`; owner replay measures conditioned capability separately, with
+200,000 containing decision equivalents by default so all eighty selected scopes
+can receive their 2,000-equivalent fragment allowance. Declined empty selections
+remain unavailable rather than becoming completed fully pinned repairs. Cold
+fragments start from the specified owner seed; retained fragments keep RNG and
+activity state. These comparisons do not attribute all node differences to clauses
+or charge selection costs as owner repair work.
+
 Model keys, domains, objectives, source bytes and
 build identity remain alongside the walk. Inputs admit at most 64 MiB,
 4,096 Boolean/integer coordinates and 8,192 factors. Hint construction uses the production
