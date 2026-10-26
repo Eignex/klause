@@ -326,7 +326,9 @@ after candidate production declines. This read-only path has a separate cumulati
 fresh regional owner that admits only eligible Source/query facts. It preserves atom
 order and independent-family bookkeeping; private resource or allowance declines run
 the original atom check, while an enclosing stop remains terminal. Both paths share
-the bounded view. The option is disabled by default.
+the bounded view. Reuse diagnostics retain at most two scalar snapshots of degree
+sixteen with 4,096-bit coefficients and bounds, without optional image provenance.
+Larger points are marked incomplete. The option is disabled by default.
 
 Optional query failure capture retains bounded exact observations of rejected probe
 points and CAD prefixes, their signed premises, numeric reconstruction fibres and

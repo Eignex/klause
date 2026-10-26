@@ -5326,6 +5326,9 @@ An absent trace establishes no cross-region reuse, even when lookup counts are n
 `firstCellFeedbackUse` also records reuse within one regional owner. Both traces keep
 the actual rejected numeric candidate's defining coefficients, root and isolating
 bounds, with an explicit completeness flag for bounded rendering.
+Retained trace scalars admit degree sixteen and 4,096-bit coefficients and isolating
+bounds, with optional image provenance removed. Larger values keep the scoped cell
+metadata and mark the numeric preview incomplete, without retaining their candidate graph.
 `queryElapsedNs` and `queryThreadAllocatedBytes` cover query construction through its
 terminal return, including reflection and in-loop diagnostic rendering. They exclude
 source parsing/preparation and final trace serialization. Thread allocation is absent

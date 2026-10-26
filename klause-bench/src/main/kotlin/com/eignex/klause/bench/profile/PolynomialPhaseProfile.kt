@@ -598,7 +598,10 @@ internal object PolynomialPhaseProfile {
                 }
             }
             result["scopePreviewComplete"] = complete.toString()
-            val candidate = requireNotNull(read(use, "Value"))
+            val candidate = read(use, "Value") ?: run {
+                result["candidatePreviewComplete"] = "false"
+                return result
+            }
             val coefficients = read(candidate, "DefiningCoefficients") as List<*>
             var candidateComplete = coefficients.size <= 17
             fun fraction(value: BigFraction): String = if (value.num.magnitudeBitLength() > 4096 ||

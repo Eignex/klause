@@ -9,6 +9,7 @@ import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.shl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -19,6 +20,27 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PolynomialCellFeedbackTest {
+    @Test
+    fun `wide rejected candidates leave an incomplete numeric trace`() {
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
+        val arithmetic = PolynomialArithmetic()
+        val algebraic = AlgebraicArithmetic(arithmetic)
+        val snapshot = PolynomialFormula.normalize(source.formula, arithmetic)
+        val condition = PolynomialCondition()
+        val support = PolynomialCellScope.Source.prepare(source.formula, arithmetic)
+        val predicate = support.predicates.single()
+        val zero = algebraic.rational(BigFraction.ZERO)
+        val cell = assertNotNull(CheckedPolynomialCell.rejected(predicate, support, zero, arithmetic, algebraic))
+        val tiny = algebraic.rational(BigFraction.of(BigFraction.ONE.num, BigFraction.ONE.num shl 4097))
+        val scope = PolynomialCellScope.Region(source.formula, condition, snapshot,
+            PolynomialBooleanRegion(mapOf(0 to true), emptyMap()), Any())
+        val feedback = PolynomialCellFeedback(source.formula, condition)
+
+        assertNotNull(feedback.rejection(0, predicate, scope, tiny, listOf(cell), arithmetic, algebraic))
+
+        assertNull(assertNotNull(feedback.firstRegionUse).value)
+    }
+
     @Test
     fun `importing a bank fact does not invent a producing regional owner`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
@@ -166,15 +188,20 @@ class PolynomialCellFeedbackTest {
         val predicate = support.predicates.single()
         val zero = algebraic.rational(BigFraction.ZERO)
         val cell = assertNotNull(CheckedPolynomialCell.rejected(predicate, support, zero, arithmetic, algebraic))
+        val candidate = algebraic.multiply(assertNotNull(cell.upper),
+            algebraic.rational(BigFraction.ofLong(2).reciprocal()))
+        assertNotNull(candidate.image)
         val scope = PolynomialCellScope.Region(source.formula, condition, snapshot,
             PolynomialBooleanRegion(mapOf(0 to true), emptyMap()), Any())
         val feedback = PolynomialCellFeedback(source.formula, condition)
 
-        assertNotNull(feedback.rejection(0, predicate, scope, zero, listOf(cell), arithmetic, algebraic))
+        assertNotNull(feedback.rejection(0, predicate, scope, candidate, listOf(cell), arithmetic, algebraic))
 
         val trace = assertNotNull(feedback.firstRegionUse)
         assertTrue(trace.current === scope)
-        assertEquals(0, algebraic.compare(zero, trace.value))
+        val captured = assertNotNull(trace.value)
+        assertEquals(0, algebraic.compare(candidate, captured))
+        assertNull(captured.image)
         assertNull(feedback.firstCrossRegionUse)
     }
 
