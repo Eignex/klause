@@ -274,6 +274,35 @@ class ConflictSupportedRemovalTest {
     }
 
     @Test
+    fun `changed caller pins should retire guidance at scoped selection`() {
+        val guidance = ConflictSupportedRemoval(problem, objective)
+        val observer = guidance.observe(BacktrackParams()).variableSelector.fresh()
+        guidance.begin(center, Assumptions.None, 0.0, Cancellation.Never)
+        observer.onConflict(null, BranchingConflict(intArrayOf(1)))
+        guidance.end()
+
+        guidance.destroy(Random(3), problem, center, objective, 0.5,
+            Assumptions.None.withBool(0, false), Cancellation.Never)
+
+        assertEquals(ConflictGuidanceStatus.Incompatible, guidance.status)
+        assertNull(guidance.originPins)
+    }
+
+    @Test
+    fun `scoped selection cancellation should retire acquired guidance`() {
+        val guidance = ConflictSupportedRemoval(problem, objective)
+        val observer = guidance.observe(BacktrackParams()).variableSelector.fresh()
+        guidance.begin(center, Assumptions.None, 0.0, Cancellation.Never)
+        observer.onConflict(null, BranchingConflict(intArrayOf(1)))
+        guidance.end()
+
+        guidance.destroy(Random(3), problem, center, objective, 0.5, Assumptions.None, Cancellation { true })
+
+        assertEquals(ConflictGuidanceStatus.Cancelled, guidance.status)
+        assertNull(guidance.originPins)
+    }
+
+    @Test
     fun `cancellation after acquisition should retire guidance before selection`() {
         var stopped = false
         val guidance = ConflictSupportedRemoval(problem, objective)

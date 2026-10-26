@@ -236,6 +236,20 @@ internal class ConflictSupportedRemoval(
         incumbent: Sample,
         objective: LinearObjective,
         fraction: Double,
+        assumptions: Assumptions,
+        cancellation: Cancellation,
+    ): FreedVars {
+        if (!closed && assumptions != callerAssumptions) discard(ConflictGuidanceStatus.Incompatible)
+        if (!closed && cancellation()) discard(ConflictGuidanceStatus.Cancelled)
+        return destroy(rng, problem, incumbent, objective, fraction)
+    }
+
+    override fun destroy(
+        rng: Random,
+        problem: BakedProblem,
+        incumbent: Sample,
+        objective: LinearObjective,
+        fraction: Double,
     ): FreedVars {
         if (closed) status = ConflictGuidanceStatus.Closed
         if (!closed && cancellation()) discard(ConflictGuidanceStatus.Cancelled)
