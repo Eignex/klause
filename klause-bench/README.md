@@ -2434,6 +2434,35 @@ residual. The selection capture distinguishes those working integer coordinates
 from the effective original integer freedoms; they never become complement pins
 solely because lowering gave them integer storage.
 
+[Scoped baseline 8448](https://lab.eignex.com/jobs/8448) runs `e805182280` on
+Linux/amd64 with the two hash-matched original modglob/rgn sources and refined
+centers from 8339. Runtime and dependency hashes, debug settings and 3 GiB Serial-GC
+options are retained. Each cold repair has five seconds, 256 LP operations and
+1 billion cumulative native LP work units; root guidance and selection are separate.
+All 20 attempts complete their capture and retain a native original-source-checked
+point. No independent witness or proof check is claimed.
+
+Modglob has 98 declared integers and two original real columns with proved integer
+backings. The existing first four pair selections spend one coordinate on a
+backing, leaving one original integer freedom per replay. With the full real
+residual free, x223 and x255 each admit a strict improvement from 35.15M; x255
+reaches about 33.52M in three LP checks, 20,132,800 funded work and 58,331,844
+modeled allocation bytes. Its instrumented wall time is 0.60 seconds and thread
+allocation 224,641,008 bytes. The other two single-input controls close only their
+conditioned cutoffs. Every 30-input broad set and the 55-input finite-disagreement
+control reaches its five-second limit without improvement; their incomplete
+searches establish no neighborhood exhaustion. Broad attempts allocate 5.29–9.79 GB
+cumulatively on the measured thread, distinct from modeled retained allocation or
+peak RSS. Larger freedom counts supply no quality or throughput advantage here.
+
+Rgn retains its 82.2 center throughout. The fixed control and three pair controls
+close their conditioned cutoffs; the remaining pair, four 32-input controls and
+four-input disagreement control return unavailable completion with unresolved
+alternatives. These are neither local infeasibility nor source exhaustion.
+The capture selects source-role-preserving proposal diagnosis, without changing
+production admission, proving a basin, or replacing the stronger 20.78M finite
+modglob controls. Nominal conditioned bounds establish no tolerance-source optimum.
+
 [Fixed-pin replay 8339](https://lab.eignex.com/jobs/8339), at `b738c5d89a` on
 Mac/aarch64, retains four witnesses from [8302](https://lab.eignex.com/jobs/8302).
 With unchanged discrete pins, the residual modglob point improves from
