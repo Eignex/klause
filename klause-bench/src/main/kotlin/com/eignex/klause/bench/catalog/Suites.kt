@@ -734,6 +734,8 @@ internal object Suites {
         license = "internal"
         vendored("magic-series-tiny", Category.CSP, Expected.Sat, relPath = "xcsp3/magic-series-tiny.xml")
         vendored("sum-opt-tiny", Category.OPTIMIZATION, Expected.Unknown, relPath = "xcsp3/sum-opt-tiny.xml")
+        vendored("evidence-latin4", Category.OPTIMIZATION, Expected.Unknown,
+            relPath = "finite-repair-evidence/latin4.xml")
         vendored("magic-square-3", Category.CSP, Expected.Sat, relPath = "xcsp3/magic-square-3.xml")
         vendored("graph-coloring-tiny", Category.CSP, Expected.Sat, relPath = "xcsp3/graph-coloring-tiny.xml")
         vendored("assignment-exchange", Category.OPTIMIZATION, Expected.Unknown,
