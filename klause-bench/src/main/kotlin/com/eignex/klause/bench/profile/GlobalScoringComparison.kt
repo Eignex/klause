@@ -57,9 +57,9 @@ internal object GlobalScoringComparison {
         require(options.keys.all {
             it in setOf("sets", "seeds", "moves", "millis", "captures", "suite", "problem", "sha256", "source64")
         })
+        val single = options.keys.any { it in setOf("suite", "problem", "sha256", "source64") }
         val embedded = options["source64"] != null
-        require(if (embedded) "sets" !in options && options.keys.containsAll(setOf("suite", "problem", "sha256"))
-            else options.keys.none { it in setOf("suite", "problem", "sha256") })
+        require(!single || ("sets" !in options && options.keys.containsAll(setOf("suite", "problem", "sha256"))))
         val seeds = (options["seeds"] ?: "3,7,11").split(',').map(String::toLong)
         require(seeds.size in 1..32)
         val moves = (options["moves"] ?: "2000").toLong().also { require(it in 1..1_000_000) }
@@ -70,12 +70,12 @@ internal object GlobalScoringComparison {
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
         out.resolve("request.txt").writeText(args.joinToString("\n"))
         fixtures(out)
-        val entries = if (embedded) listOf(SetEntry(options.getValue("suite"), options.getValue("problem")))
+        val entries = if (single) listOf(SetEntry(options.getValue("suite"), options.getValue("problem")))
             else ProblemSets.load(options.getValue("sets").split(','))
         require(entries.size <= 32)
         for ((index, entry) in entries.withIndex()) {
             val dir = out.resolve(index.toString()).apply { mkdirs() }
-            val bytes = if (embedded) {
+            val bytes = if (single) {
                 trajectorySourceBytes(entry.suite, entry.problem, options.getValue("sha256"), options["source64"])
             } else {
                 val reference = Catalog.uncapped(entry.suite).problems.single { it.name == entry.problem }
@@ -303,7 +303,9 @@ internal object GlobalScoringComparison {
         return solver.resumableSolve(params).use { run ->
             var result = run.runSlice(stop, Long.MAX_VALUE, Long.MAX_VALUE)
             while (result == null && !stop()) result = run.runSlice(stop, Long.MAX_VALUE, Long.MAX_VALUE)
-            val endpoint = (result as? SolveResult.Sat)?.assignment ?: observed?.assignment?.snapshot()
+            val interrupted = stop()
+            val endpoint = (result as? SolveResult.Sat)?.assignment
+                ?: observed?.takeIf { result != null && !interrupted }?.assignment?.snapshot()
             buildJsonObject {
                 put("alternate", alternate)
                 put("seed", seed)
@@ -314,13 +316,14 @@ internal object GlobalScoringComparison {
                 put("preparationNs", preparationNs)
                 put("totalNs", System.nanoTime() - started)
                 put("threadAllocatedBytes", allocationSince(allocated))
-                put("cancelled", stop())
+                put("cancelled", interrupted)
                 put("picks", picks)
                 put("moves", run.stats.ls.moves.sum)
                 put("nativeVerdict", result?.let { it::class.simpleName })
                 put("independentWitnessCheck", false)
                 put("sourceVerdictClaim", false)
                 if (endpoint != null) put("endpoint", paired(endpoint, emptyList(), left, right))
+                else put("endpointDecline", "unfinished-or-interrupted-walk")
                 put("stats", run.stats.toString())
             }
         }

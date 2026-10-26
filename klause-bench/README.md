@@ -1757,6 +1757,9 @@ loader: standard Base64 without line breaks, at most 96 KiB encoded, with exact
 decoded hashing before parsing. Embedded mode retains the supplied identity and
 bytes without rechecking catalog membership. It records `sourceMode=embedded`,
 the original XML, request and build/runtime provenance.
+Omitting `source64` with the same identity/hash arguments resolves one catalog
+source instead. Interrupted walks retain their completed observations and
+decline an endpoint while a selected operation may remain private.
 
 The pairwise treatment sums equal present, non-excepted position pairs within
 each admitted `AllDifferent`, retaining repeated coordinates, canonical factor
