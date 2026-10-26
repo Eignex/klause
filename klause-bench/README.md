@@ -1620,17 +1620,43 @@ Each view runs alone; preparation counts against its time allowance. Up to six
 initial/post-greedy source boundaries supply at most 32 common admissible primitive
 moves per view pair, with functional input coordinates sampled first. Complete
 source round trips and identical reconstructed destinations determine correspondence;
-equal seeds or recipes do not establish proposal equivalence. Retained linear and
-functional objectives share a maintained definition network, providing a grading
-control while exposing any changed objective hotspot proposal coordinates.
+equal seeds or recipes do not establish proposal equivalence. When a definition
+network maintains every objective cone, retained linear and functional objectives
+provide a grading control while exposing changed objective hotspot coordinates.
+Private pairings use each view's captured initial class weights; native walk
+histories remain separate.
 Preparation and thread allocations, native incumbent source-expression values,
 RNG boundaries, raw/weighted/objective deltas and model keys remain separate.
+Censored walks retain their last observed native incumbent separately from a terminal verdict.
 Private initialization/probe diagnostics run outside the walk allowance. Walk time
 includes passive recording overhead; ordinary CLI lab runs with source validation
 supply independent witness checks and whole-process resource measurements.
+Reserved CLI cohorts use `reference=any` on their problem selections to retain
+members without qualifying reference results. Native first-feasibility timestamps
+and independently checked final endpoints remain distinct observations.
 Both runners accept `source64` or `sourceGzip64` containing the original source,
 bounded to 96 KiB encoded and 64 MiB inflated, with the original hash mandatory.
 The objective runner also accepts the same bounded `batch64` request form.
+
+The frozen worker-seed 3/7 captures at `12be285415` and `356449b93a` retain
+[mixed preparation](https://lab.eignex.com/jobs/8531),
+[local-search preparation](https://lab.eignex.com/jobs/8581), and
+[reserved scheduling](https://lab.eignex.com/jobs/8593) controls. Together with the
+bounded Warehouse and other reserved-source captures, 2,176 paired candidate
+observations have matching complete source destinations and equal raw, weighted
+and objective deltas. These sampled controls establish no grading diversity.
+Prepared functional objectives are available on GBACP-UD04 and
+TestScheduling-t020m10r03-1: integer hotspot sets change from 216 terms to 139 leaves
+and from one output to 20 leaves respectively, while native endpoints and costs
+differ. TestScheduling's functional walks allocate 1.66–1.78 GB on the calling
+thread versus 0.22–0.29 GB for retained linear walks; these ordered, instrumented
+captures measure neither whole-process memory nor a general speedup.
+CarpetCutting points decline the complete round trip. Warehouse-60-120-01 and
+NurseRostering-10 exceed the capture limits; size-selected Warehouse-40-80-00 fits
+and supplies equal-grade retained/substituted controls. Those refusals give no
+family-wide eligibility conclusion. The [frozen Cargo default control](https://lab.eignex.com/jobs/8576)
+returns UNKNOWN in all three 30-second Linux runs; it emits no checked witness.
+Native profile endpoints supply no independent source-witness or portfolio evidence.
 
 
 ### Finite conflict selection
