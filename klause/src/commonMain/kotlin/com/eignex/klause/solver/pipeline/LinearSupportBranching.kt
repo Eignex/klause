@@ -29,11 +29,14 @@ internal class LinearSupportBranching(private val funding: SourceLpFunding) {
         val query = (feedback as? SourceNumericalFeedbackResult.Available)?.query ?: return fallback()
         val point = query.point ?: return fallback()
         if (cancellation() || funding.paused) return fallback()
-        funding.charge(fractional.size.toLong(), fractional.size * 48L)
-        val candidates = fractional.toMap()
+        funding.charge(fractional.size.toLong(), fractional.size * 128L)
+        val candidates = fractional.withIndex().associate { (index, candidate) ->
+            candidate.first to (index to candidate.second)
+        }
         var selected: Pair<SourceCoordinate, BigFraction>? = null
         var supportSize = Int.MAX_VALUE
         var selectedFraction = -1.0
+        var selectedIndex = Int.MAX_VALUE
         for (cut in query.cuts) {
             if (cancellation() || funding.paused) return fallback()
             funding.charge(1L + cut.inequality.supportSize)
@@ -44,7 +47,8 @@ internal class LinearSupportBranching(private val funding: SourceLpFunding) {
             val size = cut.inequality.supportSize
             if (size > supportSize) continue
             for (coordinate in cut.inequality.coefficients.keys) {
-                val value = candidates[coordinate] ?: continue
+                val indexed = candidates[coordinate] ?: continue
+                val value = indexed.second
                 if (point[coordinate] != value) continue
                 val projected = value.toDouble()
                 if (!projected.isFinite()) continue
@@ -52,11 +56,12 @@ internal class LinearSupportBranching(private val funding: SourceLpFunding) {
                 val distance = min(fraction, 1.0 - fraction)
                 if (distance <= 0.0) continue
                 if (size < supportSize || distance > selectedFraction ||
-                    (distance == selectedFraction && coordinate.id < checkNotNull(selected).first.id)
+                    (distance == selectedFraction && indexed.first < selectedIndex)
                 ) {
                     selected = coordinate to value
                     supportSize = size
                     selectedFraction = distance
+                    selectedIndex = indexed.first
                 }
             }
         }
