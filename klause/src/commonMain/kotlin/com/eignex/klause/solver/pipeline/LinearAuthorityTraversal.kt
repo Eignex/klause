@@ -166,7 +166,11 @@ internal class LinearAuthorityTraversal(
         if (source.coordinates.any {
                 it.kind == SourceCoordinate.Kind.Boolean && context.boolValue(it.id) == null
             }
-        ) return SearchNodeDisposition.Expand
+        ) {
+            authority.capture?.record(source.atScope(source.scope.copy(condition = current.condition)),
+                null, null, null, LinearAuthorityResult())
+            return SearchNodeDisposition.Expand
+        }
         if (inheritBounds && current.result == null && current.split == null && closeInheritedBound()) {
             return SearchNodeDisposition.Prune
         }
@@ -208,6 +212,11 @@ internal class LinearAuthorityTraversal(
             return SearchNodeDisposition.Pause
         }
         current.pending = false
+        val parent = path.getOrNull(path.lastIndex - 1)?.second
+        val parentSplit = parent?.split
+        val sibling = parentSplit?.let { if (current === it.below) it.above else it.below }
+        authority.capture?.link(branch.scope, parent?.let { source.scope.copy(condition = it.condition) },
+            sibling?.let { it.coveredBound ?: it.result?.bound }, incumbent()?.second)
         current.result = if (result.primalStages.isEmpty()) result else result.copy(primalStages = emptyMap())
         observe("numericalChecks")
         if (result.coordinateConflict) observe("numericalCoordinateConflicts")

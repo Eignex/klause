@@ -46,6 +46,10 @@ internal class LinearAuthority(
     val reuses: Long get() = lp.reuses
     private var template: LinearAuthorityTemplate? = null
     private var query: LinearAuthorityQuery? = null
+    var capture: LinearAuthorityCapture? = null
+    private var capturedPoint: Map<SourceCoordinate, BigFraction>? = null
+    private var capturedQuery: LinearAuthorityQuery? = null
+    private var capturedTemplate: LinearAuthorityTemplate? = null
     private var cutPreparationWork = 0L
     private var cutVerificationWork = 0L
     private var retainedCutPeak = 0L
@@ -77,6 +81,9 @@ internal class LinearAuthority(
     override fun close() {
         template = null
         query = null
+        capturedQuery = null
+        capturedTemplate = null
+        capturedPoint = null
         primalAttempt = null
         lp.close()
     }
@@ -98,22 +105,32 @@ internal class LinearAuthority(
                 result.incumbent == null && budget.funding?.paused == true))
     }
 
-    fun advance(source: SourceProofContext, cancellation: Cancellation, cuts: Boolean = false): LinearAuthorityResult {
+    fun advance(
+        source: SourceProofContext, cancellation: Cancellation, cuts: Boolean = false, cutMask: Set<Int>? = null,
+    ): LinearAuthorityResult {
         relaxedPoint = emptyMap()
+        capturedPoint = null
+        capturedQuery = null
+        capturedTemplate = null
         primalStages.clear()
         if (cancellation()) {
             lp.close()
             return LinearAuthorityResult()
         }
         if (budget.funding?.paused == true) return LinearAuthorityResult(paused = true)
-        val result = checkSource(source, cancellation, guidance = true, cuts = cuts)
+        val result = checkSource(source, cancellation, guidance = true, cuts = cuts, cutMask = cutMask)
         if (cancellation()) {
             lp.close()
             return LinearAuthorityResult(incumbent = result.incumbent, primalStages = primalStages.toMap())
         }
-        return result.copy(relaxedPoint = relaxedPoint, primalStages = primalStages.toMap(),
+        val completed = result.copy(relaxedPoint = relaxedPoint, primalStages = primalStages.toMap(),
             paused = result.paused || (result.evidence == null && result.split == null &&
                 result.incumbent == null && budget.funding?.paused == true))
+        capture?.record(source, capturedQuery, capturedTemplate, capturedPoint, completed)
+        capturedQuery = null
+        capturedTemplate = null
+        capturedPoint = null
+        return completed
     }
 
     private var relaxedPoint: Map<SourceCoordinate, Double> = emptyMap()
@@ -143,7 +160,7 @@ internal class LinearAuthority(
     }
 
     private fun prepareQuery(
-        source: SourceProofContext, cancellation: Cancellation, cuts: Boolean,
+        source: SourceProofContext, cancellation: Cancellation, cuts: Boolean, cutMask: Set<Int>?,
     ): LinearAuthorityQuery? {
         if (!source.affineObjectiveAvailable || !source.linearCoordinatesSupported()) return null
         if ((source.scope.condition.lower.keys + source.scope.condition.upper.keys).any {
@@ -184,10 +201,10 @@ internal class LinearAuthority(
                     }
                 } ?: return null
         } else null
-        return LinearAuthorityQuery.prepare(source, prepared, cancellation) { work ->
+        return LinearAuthorityQuery.prepare(source, prepared, cancellation, onCutWork = { work ->
             cutVerificationWork += work
             budget.observe(boundCertification = work)
-        }?.also {
+        }, cutMask = cutMask)?.also {
             activeCutPeak = maxOf(activeCutPeak, it.activeCuts.toLong())
             activeMixedCutPeak = maxOf(activeMixedCutPeak, it.activeMixedCuts.toLong())
         }
@@ -195,11 +212,16 @@ internal class LinearAuthority(
 
     private fun checkSource(
         source: SourceProofContext, cancellation: Cancellation, guidance: Boolean = false, cuts: Boolean = false,
+        cutMask: Set<Int>? = null,
     ): LinearAuthorityResult {
-        val cached = if (retainLp || guidance) query?.takeIf { it.matches(source, cuts) } else null
-        val prepared = cached ?: prepareQuery(source, cancellation, cuts)?.also {
+        val cached = if (retainLp || guidance) query?.takeIf { it.matches(source, cuts, cutMask) } else null
+        val prepared = cached ?: prepareQuery(source, cancellation, cuts, cutMask)?.also {
             if (retainLp || guidance) query = it
         } ?: return LinearAuthorityResult()
+        if (capture?.accepting == true && capturedQuery == null) {
+            capturedQuery = prepared
+            capturedTemplate = template
+        }
         val coordinates = prepared.coordinates
         val context = prepared.context
         val cited = prepared.cited
@@ -247,6 +269,12 @@ internal class LinearAuthority(
         }
         val solved = guide?.result ?: lp.solve(closureRows, costs, constant, cancellation, inactive)
             ?: return LinearAuthorityResult(paused = budget.funding?.paused == true)
+        if (capture?.accepting == true && capturedPoint == null) {
+            val point = guide?.point ?: solved.result.exactPrimal?.take(coordinates.size)
+            if (point != null && point.size == coordinates.size) {
+                capturedPoint = coordinates.indices.associate { coordinates[it] to point[it] }
+            }
+        }
         val closure = solved.result
         if (closure.verdict == LpVerdict.INFEASIBLE) {
             val evidence = refutation(solved)
@@ -349,7 +377,7 @@ internal class LinearAuthority(
                 split = fractions.first().floorSplit(), fractional = fractions)
             if (budget.admitsDimensions(costs.size, guide.workingRows.toLong())) {
                 observePrimal("PrimalExactFallback")
-                val exact = checkSource(source, cancellation, cuts = cuts)
+                val exact = checkSource(source, cancellation, cuts = cuts, cutMask = cutMask)
                 return exact.copy(bound = exact.bound ?: bound, incumbent = exact.incumbent ?: candidate)
             }
             if (candidate == null) observePrimal("PrimalExactDimension")

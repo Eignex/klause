@@ -3937,3 +3937,22 @@ nodes and 357 LP reuses. The first mixed derivation scales its original row by
 from `50000000/230000001` to `25000000/107499989`. Original bytes, exact rows,
 weights, bound citations and scopes remain in the capture. This instrumented
 inspection supplies neither an independent proof check nor a whole-CLI timing claim.
+
+`MpsProofFrontier selection=true` retains up to 64 completed same-parent query
+records in `selection.json`, within one million modeled entries, 16 MiB modeled
+retention and a separate 30-second observation/inspection allowance. Records keep
+exact points before primal recovery, original and Boolean-substituted source
+systems, generating inactive-row masks, installed candidate status and signed
+exact violations (`activity - rhs`). Positive violation identifies a cut excluding
+the point; a satisfied installed cut remains a candidate. Records also retain
+checked bounds/refutations, parent scopes, available sibling bounds, incumbent
+values and visited-row eligibility limits. Missing values are unknown.
+
+Optional `replay=true` separately replays at most four retained point states with
+empty and all-candidate masks, flushing `selection-replays.jsonl`. Each replay has
+one source operation, 20M cumulative work and 64 MiB modeled allocation under a
+shared ten-second diagnostic deadline. Replay creates fresh owners; its work and
+native checks are separate from traversal accounting and independent witness
+validation. The capture's existing original bytes, hash, native-system identity,
+objective scale, revision, settings and platform bind both files. Neither diagnostic
+establishes whole-CLI timing or a source verdict.
