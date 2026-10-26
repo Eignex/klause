@@ -66,6 +66,7 @@ internal class LinearAuthorityCapture(
         bytes < maximumBytes && !stop()
     var attempted: Long = 0L
         private set
+    private var recordedAttempt = 0L
 
     private fun spend(count: Long, allocation: Long): Boolean {
         if (stop() || count > maximumEntries - entries || allocation > maximumBytes - bytes) {
@@ -163,7 +164,7 @@ internal class LinearAuthorityCapture(
                 if (!scalar(violation)) return
             }
             candidates += LinearAuthorityCapturedCut(id, cut.owner, cut.inequality, cut.derivation,
-                query != null && numeric.premises.size + id !in query.inactive,
+                query != null && id in query.installedCuts,
                 query != null && cut.owner !in query.inactive, query != null && id in query.checkedCuts, violation)
         }
         val refutation = result.evidence?.takeIf { it.claim == SourceClaim.Refutation }
@@ -181,9 +182,11 @@ internal class LinearAuthorityCapture(
                 result.bound == null -> "bound-unavailable"
                 else -> "completed"
             })
+        recordedAttempt = attempted
     }
 
     fun link(scope: SourceScope, parent: SourceScope?, sibling: SourceEvidence?, incumbent: BigFraction?) {
+        if (recordedAttempt != attempted) return
         val record = retained.lastOrNull()?.takeIf { it.context.scope == scope } ?: return
         if (sibling != null && !proof(sibling.derivation)) return
         if (incumbent != null && !scalar(incumbent)) return

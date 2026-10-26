@@ -6,7 +6,7 @@ import com.eignex.klause.bench.profile.NumericalFrontierSnapshot.Companion.scope
 import com.eignex.klause.bench.profile.NumericalFrontierSnapshot.Companion.system
 import com.eignex.klause.lp.optimization.LinearPinnedObjective
 import com.eignex.klause.lp.optimization.LinearPinnedRefutation
-import com.eignex.klause.lp.optimization.LinearAuthoritySemantics
+import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCoordinate
@@ -26,11 +26,15 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 internal class NumericalSelectionSnapshot(private val stop: Cancellation) {
-    fun attach(invocation: Any): Any {
+    fun journal(): Any {
         val type = Class.forName("com.eignex.klause.lp.optimization.LinearAuthorityCapture")
-        val journal = type.getDeclaredConstructor(Int::class.javaPrimitiveType, Long::class.javaPrimitiveType,
+        return type.getDeclaredConstructor(Int::class.javaPrimitiveType, Long::class.javaPrimitiveType,
             Long::class.javaPrimitiveType, Cancellation::class.java).newInstance(64, 1_000_000L, 16_777_216L, stop)
-        invocation.javaClass.getDeclaredMethod("captureTo", type).invoke(invocation, journal)
+    }
+
+    fun attach(invocation: Any): Any {
+        val journal = journal()
+        invocation.javaClass.getDeclaredMethod("captureTo", journal.javaClass).invoke(invocation, journal)
         return journal
     }
 
@@ -131,20 +135,23 @@ internal class NumericalSelectionSnapshot(private val stop: Cancellation) {
                 }) }
             })
             for (name in listOf("bound", "refutation", "siblingBound")) {
-                (field(record, name) as SourceEvidence?)?.let { evidence -> put(name, buildJsonObject {
-                    put("scope", scope(evidence.scope))
-                    put("claim", evidence.claim::class.simpleName)
-                    (evidence.claim as? SourceClaim.Bound)?.let {
-                        put("value", (it.value as SourceValue.Rational).value.toString())
-                    }
-                    put("derivation", proof(evidence.derivation))
-                    val originalScope = SourceProofContext(evidence.scope, context.coordinates, context.premises,
-                        context.objective, context.objectiveConstant, LinearAuthoritySemantics(context))
-                    put("freshNativeCheck", SourceEvidenceVerifier(originalScope)
-                        .verify(evidence, stop).toString())
-                }) }
+                (field(record, name) as SourceEvidence?)?.let { put(name, evidence(context, it)) }
             }
         }
+    }
+
+    fun evidence(context: SourceProofContext, evidence: SourceEvidence): JsonObject = buildJsonObject {
+        require(context.scope.revision == evidence.scope.revision && context.scope.objective == evidence.scope.objective)
+        put("scope", scope(evidence.scope))
+        put("claim", evidence.claim::class.simpleName)
+        (evidence.claim as? SourceClaim.Bound)?.let {
+            put("value", (it.value as SourceValue.Rational).value.toString())
+        }
+        put("derivation", proof(evidence.derivation))
+        val originalScope = SourceProofContext(evidence.scope, context.coordinates, context.premises,
+            context.objective, context.objectiveConstant, semantics = context.semantics)
+        put("freshNativeCheck", SourceEvidenceVerifier(originalScope.withLinearAuthority())
+            .verify(evidence, stop).toString())
     }
 
     private fun proof(value: SourceDerivation, depth: Int = 0): JsonObject {

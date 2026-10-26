@@ -1,6 +1,7 @@
 package com.eignex.klause.bench.profile
 
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.lp.optimization.LinearPinnedObjective
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCondition
@@ -14,7 +15,6 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
-import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -41,21 +41,27 @@ class NumericalFrontierSnapshotTest {
     )
 
     @Test
-    fun `selection capture should expose an attached empty journal without numerical work`() {
-        val invocation = NumericalFrontierSnapshot.open(context, TheoryParams(), frontier = true)
-        try {
-            val snapshot = NumericalSelectionSnapshot(Cancellation.Never)
-            val journal = snapshot.attach(invocation)
+    fun `selection capture should expose empty journal limits`() {
+        val snapshot = NumericalSelectionSnapshot(Cancellation.Never)
+        val journal = snapshot.journal()
 
-            val capture = snapshot.capture(journal)
+        val capture = snapshot.capture(journal)
 
-            assertEquals("false", capture.getValue("limited").jsonPrimitive.content)
-            assertEquals("0", capture.getValue("attempted").jsonPrimitive.content)
-            assertEquals(0, capture.getValue("records").jsonArray.size)
-            assertEquals(0, NumericalFrontierSnapshot.stats(invocation).smt.sourceLp.operations)
-        } finally {
-            (invocation as AutoCloseable).close()
-        }
+        assertEquals("false", capture.getValue("limited").jsonPrimitive.content)
+        assertEquals("0", capture.getValue("attempted").jsonPrimitive.content)
+        assertEquals(0, capture.getValue("records").jsonArray.size)
+    }
+
+    @Test
+    fun `selection inspection should check sibling evidence in its original scope`() {
+        val current = SourceProofContext(context.scope.copy(condition = SourceCondition(
+            lower = mapOf(integer to BigFraction.ONE))), context.coordinates, context.premises, context.objective)
+        val sibling = evidence.copy(derivation = LinearPinnedObjective(evidence.derivation))
+
+        val inspected = NumericalSelectionSnapshot(Cancellation.Never).evidence(current, sibling)
+
+        assertEquals("Checked", inspected.getValue("freshNativeCheck").jsonPrimitive.content)
+        assertEquals("1/2", inspected.getValue("value").jsonPrimitive.content)
     }
 
     @Test

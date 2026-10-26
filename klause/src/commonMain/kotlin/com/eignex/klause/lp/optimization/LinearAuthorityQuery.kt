@@ -29,6 +29,7 @@ internal class LinearAuthorityQuery private constructor(
     val activeMixedCuts: Int,
     val cutMask: Set<Int>?,
     val checkedCuts: Set<Int>,
+    val installedCuts: Set<Int>,
 ) {
     val context: SourceProofContext = source.withLinearAuthority()
     val closureRows: List<ExactRationalInequality> = rows.map {
@@ -112,7 +113,7 @@ internal class LinearAuthorityQuery private constructor(
             val costs = coordinates.map { sign * (numeric.objective[it] ?: BigFraction.ZERO) }
             return LinearAuthorityQuery(source, coordinates, cited, rows, inactive, unconditional && inactive.isEmpty(),
                 costs, numeric.objectiveConstant * sign, sign, template?.cuts != null, activeCuts, activeMixedCuts,
-                cutMask?.toSet(), accepted.toSet())
+                cutMask?.toSet(), accepted.toSet(), accepted.filterTo(HashSet()) { cutMask == null || it in cutMask })
         }
     }
 }

@@ -4004,6 +4004,8 @@ exact violations (`activity - rhs`). Positive violation identifies a cut excludi
 the point; a satisfied installed cut remains a candidate. Records also retain
 checked bounds/refutations, parent scopes, available sibling bounds, incumbent
 values and visited-row eligibility limits. Missing values are unknown.
+`operations=N` optionally caps the diagnostic traversal at 1–256 source LP
+operations so observation-on/off controls can stop before the wall deadline.
 
 Optional `replay=true` separately replays at most four retained point states with
 empty and all-candidate masks, flushing `selection-replays.jsonl`. Each replay has
