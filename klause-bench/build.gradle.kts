@@ -1,7 +1,7 @@
 import java.io.FileOutputStream
 
 plugins {
-    id("com.eignex.jvm") version "1.3.3"
+    id("com.eignex.jvm") version "1.3.4"
     kotlin("plugin.serialization")
     application
 }
@@ -18,7 +18,7 @@ tasks.withType<org.jetbrains.dokka.gradle.tasks.DokkaGenerateTask>().configureEa
 
 dependencies {
     implementation(project(":klause"))
-    implementation("org.jetbrains.kotlin:kotlin-compiler-embeddable:2.4.10")
+    implementation("org.jetbrains.kotlin:kotlin-compiler-embeddable:2.4.21")
     testImplementation("org.junit.jupiter:junit-jupiter")
     // SolveStats exposes kumulant summary types (SumResult/MaxResult); needed to read them.
     implementation("com.eignex:kumulant:0.3.4-20261013.194059-67")
