@@ -20,6 +20,30 @@ import kotlin.test.assertTrue
 
 class PolynomialCellFeedbackTest {
     @Test
+    fun `importing a bank fact does not invent a producing regional owner`() {
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
+        val arithmetic = PolynomialArithmetic()
+        val algebraic = AlgebraicArithmetic(arithmetic)
+        val snapshot = PolynomialFormula.normalize(source.formula, arithmetic)
+        val condition = PolynomialCondition()
+        val support = PolynomialCellScope.Source.prepare(source.formula, arithmetic)
+        val predicate = support.predicates.single()
+        val zero = algebraic.rational(BigFraction.ZERO)
+        val cell = assertNotNull(CheckedPolynomialCell.rejected(predicate, support, zero, arithmetic, algebraic))
+        val premises = PolynomialBooleanRegion(mapOf(0 to true), emptyMap())
+        val first = PolynomialCellScope.Region(source.formula, condition, snapshot, premises, Any())
+        val second = PolynomialCellScope.Region(source.formula, condition, snapshot, premises, Any())
+        val feedback = PolynomialCellFeedback(source.formula, condition)
+        assertNull(feedback.rejection(0, predicate, first, assertNotNull(cell.upper),
+            listOf(cell), arithmetic, algebraic))
+
+        assertNotNull(feedback.rejection(0, predicate, second, zero, emptyList(), arithmetic, algebraic))
+
+        assertNull(feedback.firstCrossRegionUse)
+        assertTrue(assertNotNull(feedback.firstRegionUse).origin === second)
+    }
+
+    @Test
     fun `numeric comparison refusal leaves the hint unavailable`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
         val parent = QfNraWork(QfNraParams())

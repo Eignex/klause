@@ -334,10 +334,9 @@ internal class QfNraQuery(
                 val feedbackScope = cellFeedback?.candidateScope(reducedFormula, region, cellRegion?.scope, arithmetic)
                 val numericFeedback: ((PolynomialAtom, Map<Int, AlgebraicReal>) -> Boolean)? =
                     feedbackScope?.let { scope ->
-                        { atom, point ->
-                            cellFeedback?.candidateRejection(atom, scope, point) {
-                                cellRefinement?.cells.orEmpty()
-                            } != null
+                        val available = { cellRefinement?.cells.orEmpty() }
+                        return@let { atom, point ->
+                            cellFeedback?.candidateRejection(atom, scope, point, available) != null
                         }
                     }
                 reducedRegionObserver?.invoke(reduction.atoms)
