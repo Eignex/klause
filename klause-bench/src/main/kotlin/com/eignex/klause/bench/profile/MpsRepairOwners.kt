@@ -2,6 +2,7 @@ package com.eignex.klause.bench.profile
 
 import com.eignex.klause.formats.mps.checkMpsWitness
 import com.eignex.klause.ir.LinearSourceProblem
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
 import com.eignex.klause.propagation.bake
@@ -71,18 +72,19 @@ internal object MpsRepairOwners {
             }
         }
         val prepared = FinitePipelinePreparation(baked, objective, { it }, null)
-        val verify: (Sample, Cancellation) -> Boolean = { sample, token ->
+        val verify: (Sample, Cancellation) -> RepairOwnerReplay.PointCheck = { sample, token ->
             val point = columns.map { column ->
                 if (Term.isInt(column)) BigFraction.of(sample.exactIntValue(Term.intVar(column)), BIG_ONE)
                 else checkNotNull(sample.exactReals)[Term.realVar(column)]
             }
-            source.checkMpsWitness(point, token) != null
+            val checked = source.checkMpsWitness(point, token)
+            RepairOwnerReplay.PointCheck(checked != null, checked?.objective)
         }
         RepairOwnerReplay.replay(controls, baked, objective, prepared, baked, inputs,
             out.resolve("owners.jsonl"), request["seed"]?.jsonPrimitive?.content?.toLong() ?: 1L,
             request["ownerWork"]?.jsonPrimitive?.content?.toLong() ?: 100_000L,
             request["ownerFragmentWork"]?.jsonPrimitive?.content?.toLong() ?: 2_000L,
-            verify, context)
+            verify, context, source.objective?.sense == ObjectiveSense.MAXIMIZE)
         out.resolve("owner-overlap.json").writeText(buildJsonObject {
             put("status", "captured")
             put("sourceSha256", request.getValue("sha256").jsonPrimitive.content)
