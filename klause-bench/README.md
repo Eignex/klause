@@ -1537,6 +1537,15 @@ remain unavailable rather than becoming completed fully pinned repairs. Cold
 fragments start from the specified owner seed; retained fragments keep RNG and
 activity state. These comparisons do not attribute all node differences to clauses
 or charge selection costs as owner repair work.
+`selectorsFromWalk=true` acquires the center from the bounded walk's actual checked
+incumbent, with presolve and objective rewriting disabled. It requires `selectors=true`
+and omits an explicit `center`. Selection and owner replay start after both walk
+captures, preserving their fixed-work observation comparison. `selector-center.json`
+binds the source hash, recipe, immutable working center, native checked witness file
+and separate acquisition time/allocation. A missing incumbent, changed coordinate
+frame, Boolean working frame or unsupported relation remains unavailable. Completed
+descent events stay in `repairs-false.jsonl`; an acquired incumbent alone supplies no
+completed-descent claim. These declines concern this diagnostic's supported overlap.
 The merged `FiniteConflictSelection` diagnostic accepts `ownerReplay=true` to
 replay its actual conflict-supported, baseline and acquisition-ablated scopes
 under the same contract. Acquisition costs remain in the hash-bound
