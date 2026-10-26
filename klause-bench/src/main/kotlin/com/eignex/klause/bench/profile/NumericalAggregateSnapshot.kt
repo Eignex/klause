@@ -82,14 +82,16 @@ internal class NumericalAggregateSnapshot(private val stop: Cancellation) {
                 SourceEvidence(numeric.scope, SourceClaim.Consequence(field(cut, "inequality") as SourceInequality),
                     field(cut, "derivation") as SourceDerivation)
             }
-            val proofAllocation = cuts.size * 65_536L + premises.size * 64L
+            val proofAllocation = cuts.size * (131_072L + premises.size * 64L)
             allocation += proofAllocation
             var proofWork = 0L
-            val checks = SourceEvidenceVerifier(numeric).verifyAll(evidence, Cancellation {
+            val proofStop = Cancellation {
                 proofWork++
                 work++
-                active()
-            })
+                active() || proofWork >= 100_000L
+            }
+            val verifier = SourceEvidenceVerifier(numeric)
+            val checks = evidence.map { verifier.verify(it, proofStop) }
             examined++
             emit(buildJsonObject {
                 put("originalQuery", field(record, "id") as Int)
@@ -102,6 +104,7 @@ internal class NumericalAggregateSnapshot(private val stop: Cancellation) {
                 put("maximumScalarBits", 256)
                 put("maximumProofBytes", 16_384L)
                 put("maximumCandidates", 64)
+                put("maximumProofSteps", 100_000L)
                 put("complete", field(result, "complete") as Boolean)
                 put("activeSourceRowsSatisfied", field(result, "activeSourceRowsSatisfied") as Boolean?)
                 put("maximumSourceResidual", (field(result, "maximumSourceResidual") as BigFraction?)?.toString())
