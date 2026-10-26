@@ -1634,6 +1634,28 @@ and keeps common admissible root endpoints and adjacent values without random dr
 These bounded diagnostics are additional work, separate from free-walk budgets
 and timing; they grant no source witness or proof authority.
 
+[Paired qualification 8435](https://lab.eignex.com/jobs/8435), at `1b8ca8cd5b`,
+uses the frozen Cargo source hash, worker seed 6, plateau recipe and 30,000 moves on
+Linux/amd64 with JDK `25.0.4.1+1-LTS`. Six substituted-origin boundaries load into
+both representations. Of 192 candidate pairs, 188 reach identical complete source
+destinations: their raw and objective deltas agree, while 115 weighted deltas differ
+under the representations' class-normalized initial weights. Four moves on source
+coordinate 109 have different reconstructed destinations and are not grading controls.
+All six protected-origin boundaries lack a complete substituted counterpart; the
+diagnostic reports that boundary rather than repairing objective aliases silently.
+The 384 explicit native probes preserve their committed snapshots and RNG boundaries.
+Each paired boundary costs 2.7–27.5 ms under instrumentation, separately from the walks.
+
+The greedy trace retains 43439 versus 46194 at coordinate 109 after entry 49, with
+the same random draw boundary. Entry 68 then consumes zero versus sixteen underlying
+draws at inactive slot 315. These native observations preserve the historical
+before-RNG distinction without treating unmatched infeasible assignments as paired
+states. They establish capture capability, not complementary basins, a speedup or
+independent source-witness validation. [8422](https://lab.eignex.com/jobs/8422)
+exposes the rejected original-domain endpoint sampler; [8416](https://lab.eignex.com/jobs/8416)
+fails before parsing because its worker lacks the catalog archive tool and supplies
+no trajectory evidence.
+
 [Confirmation 8203](https://lab.eignex.com/jobs/8203) retains the frozen original
 Cargo-09-1s-18_c24 source at default mixed/P1/30 seconds on Mac/aarch64. Seed 3
 finds three independently accepted final witnesses at `f59091a21acf` and none at

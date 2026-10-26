@@ -3,7 +3,7 @@ package com.eignex.klause.localsearch
 import com.eignex.klause.solver.Sample
 
 /** Owned diagnostic values from one restored [LocalSearchState.inspectMove] probe. */
-class LocalSearchMoveInspection(
+class LocalSearchMoveInspection internal constructor(
     /** Candidate assignment, including maintained outputs. */
     val assignment: Sample,
     /** Candidate factor grades in the state's factor order. */

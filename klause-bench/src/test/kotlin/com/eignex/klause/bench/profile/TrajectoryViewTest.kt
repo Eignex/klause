@@ -19,7 +19,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-class LocalSearchTrajectoryCaptureTest {
+class TrajectoryViewTest {
     @Test
     fun `paired candidate grades distinguish equivalent residual scales`() {
         val source = Sample(booleanArrayOf(), longArrayOf(0, 2))

@@ -121,7 +121,9 @@ internal class TrajectoryView(
         put("workingIntegers", JsonArray((0 until state.problem.numIntVars).map {
             JsonPrimitive(state.assignment.intValue(it))
         }))
-        put("sourceBooleanSlots", JsonArray((0 until coordinates.boolCount).map { JsonPrimitive(coordinates.bool(it)) }))
+        put("sourceBooleanSlots", JsonArray((0 until coordinates.boolCount).map {
+            JsonPrimitive(coordinates.bool(it))
+        }))
         put("sourceIntegerSlots", JsonArray((0 until coordinates.intCount).map { JsonPrimitive(coordinates.int(it)) }))
         put("cost", state.cost)
         put("degrees", JsonArray(state.factorDegree.map(::JsonPrimitive)))
