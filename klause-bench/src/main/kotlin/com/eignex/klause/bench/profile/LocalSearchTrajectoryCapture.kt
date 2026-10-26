@@ -20,7 +20,9 @@ internal class TrajectoryView(
     val objective: Objective? = null,
     val reconstruct: (Sample) -> Sample = { it },
     val synchronize: () -> Unit = {},
+    owners: IntArray? = state.seeding.ownerInt,
 ) {
+    private val capturedOwners = owners?.copyOf()
     init {
         require(state.problem.numRealVars == 0)
         require(state.problem.numBoolVars + state.problem.numIntVars <= 1024)
@@ -64,7 +66,7 @@ internal class TrajectoryView(
         } ?: return buildJsonObject { put("decline", "unmapped-primitive") }
         val sink = MoveSink(state.assumptions).apply {
             setInvariants(state.invariants)
-            setOwners(state.seeding.ownerInt)
+            setOwners(capturedOwners)
         }
         when (move) {
             is Move.BoolFlip -> sink.addBoolFlip(move.varId)
