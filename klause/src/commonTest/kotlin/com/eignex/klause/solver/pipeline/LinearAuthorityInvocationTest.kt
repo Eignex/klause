@@ -77,19 +77,30 @@ class LinearAuthorityInvocationTest {
         ), mapOf(real to BigFraction.ONE))
         val params = TheoryParams(sourceCuts = false)
 
-        val baseline = LinearAuthorityInvocation(source, params, boundOrdered = true).use { it.run { _, _ -> } }
-        val reused = LinearAuthorityInvocation(source, params.copy(sourceRefutationReuse = true),
-            boundOrdered = true).use { it.run { _, _ -> } }
+        for (recordFeedback in listOf(false, true)) {
+            var baselineFeedback = 0
+            var reusedFeedback = 0
+            val baselineObserver: (SourceNumericalFeedbackResult) -> Unit = { baselineFeedback++ }
+            val reusedObserver: (SourceNumericalFeedbackResult) -> Unit = { reusedFeedback++ }
 
-        assertEquals(SourceClaim.Refutation, assertNotNull(baseline.terminal).claim)
-        val terminal = assertNotNull(reused.terminal)
-        assertEquals(SourceClaim.Refutation, terminal.claim)
-        assertEquals(SourceEvidenceCheck.Checked,
-            SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
-        val stages = assertNotNull(reused.stats.smt.completeSearchStages)
-        assertTrue(stages.getValue("numericalAvoidedQueries") > 0L)
-        assertTrue(reused.stats.smt.sourceLp.operations < baseline.stats.smt.sourceLp.operations)
-        assertEquals(0L, stages["numericalPendingLeaves"])
+            val baseline = LinearAuthorityInvocation(source, params, boundOrdered = true,
+                onNumericalFeedback = baselineObserver.takeIf { recordFeedback }).use { it.run { _, _ -> } }
+            val reused = LinearAuthorityInvocation(source, params.copy(sourceRefutationReuse = true),
+                boundOrdered = true, onNumericalFeedback = reusedObserver.takeIf { recordFeedback }).use {
+                it.run { _, _ -> }
+            }
+
+            assertEquals(SourceClaim.Refutation, assertNotNull(baseline.terminal).claim)
+            val terminal = assertNotNull(reused.terminal)
+            assertEquals(SourceClaim.Refutation, terminal.claim)
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
+            val stages = assertNotNull(reused.stats.smt.completeSearchStages)
+            assertTrue(stages.getValue("numericalAvoidedQueries") > 0L)
+            assertTrue(reused.stats.smt.sourceLp.operations < baseline.stats.smt.sourceLp.operations)
+            assertEquals(0L, stages["numericalPendingLeaves"])
+            if (recordFeedback) assertTrue(reusedFeedback < baselineFeedback)
+        }
     }
 
     @Test
