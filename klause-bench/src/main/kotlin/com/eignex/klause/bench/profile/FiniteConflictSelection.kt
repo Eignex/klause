@@ -210,7 +210,7 @@ internal object FiniteConflictSelection {
         allocation.isThreadAllocatedMemoryEnabled = true
         val thread = Thread.currentThread().threadId()
         file.bufferedWriter().use { writer ->
-            for (requestedCount in listOf(2, 4, 8).filter { it <= eligible.size }) {
+            for (requestedCount in listOf(2, 3, 4, 8).filter { it <= eligible.size }) {
                 val arms = listOf("random", "objective", "adjacency", "conflict", "acquisition-ablated") +
                     if (semanticKind == null) emptyList() else listOf("semantic")
                 for (arm in arms) {

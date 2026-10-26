@@ -1498,7 +1498,8 @@ are neither truncated nor retried to meet the target. Construction and closure
 consume the same containing deadline, with visit and allocation costs retained.
 
 Random, objective and adjacency removal compare with CP-conflict-supported removal
-at the same center and requested count. A separate acquisition-ablated random arm
+at the same center and requested count, using 2/3/4/8 movable inputs where admitted.
+A separate acquisition-ablated random arm
 pays for the same 128-decision CP prefix as the guided arm. Acquisition, a repair
 of at most 1,000 decisions and a descent of at most 128 moves share one 2,000-unit
 native search allowance and a five-second deadline; capture, selection and source
