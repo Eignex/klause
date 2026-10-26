@@ -87,7 +87,7 @@ internal object FiniteConflictSelection {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val required = setOf("suite", "problem", "sha256", "center", "seed")
         require(options.keys.containsAll(required) && options.keys.all {
-            it in required || it in setOf("acquisition", "semantic")
+            it in required || it in setOf("acquisition", "semantic", "numerical", "numerical-cuts")
         })
         val reference = Catalog.uncapped(options.getValue("suite")).problems
             .single { it.name == options.getValue("problem") }
@@ -138,6 +138,9 @@ internal object FiniteConflictSelection {
             out.resolve("selections.jsonl"),
             options["acquisition"] ?: "source-root",
             options["semantic"],
+            options["numerical"]?.toBooleanStrict() ?: false,
+            options["numerical-cuts"]?.toBooleanStrict() ?: false,
+            parsed.sense,
         ) { sample, stop -> checkSource(problem, sample, stop) }
     }
 
@@ -150,10 +153,14 @@ internal object FiniteConflictSelection {
         file: File,
         acquisitionMode: String = "source-root",
         semanticKind: String? = null,
+        numerical: Boolean = false,
+        numericalCuts: Boolean = false,
+        sourceSense: ObjectiveSense = ObjectiveSense.MINIMIZE,
         checkSource: (Sample, Cancellation) -> Boolean,
     ) {
         require(acquisitionMode in setOf("source-root", "sampled-fragment"))
         require(semanticKind == null || semanticKind in setOf("Assignment", "Resource", "Placement"))
+        require(!numerical || problem.numBoolVars == 0)
         require(problem.numRealVars == 0 && problem.numBoolVars.toLong() + problem.numIntVars <= 1024)
         require(checkSource(center, Cancellation.after(5.seconds)))
         val destroy = Class.forName("com.eignex.klause.meta.alns.DestroyOperator")
@@ -212,10 +219,17 @@ internal object FiniteConflictSelection {
         file.bufferedWriter().use { writer ->
             for (requestedCount in listOf(2, 3, 4, 8).filter { it <= eligible.size }) {
                 val arms = listOf("random", "objective", "adjacency", "conflict", "acquisition-ablated") +
-                    if (semanticKind == null) emptyList() else listOf("semantic")
+                    (if (semanticKind == null) emptyList() else listOf("semantic")) +
+                    (if (numerical) listOf("numerical-disagreement", "numerical-refutation", "numerical-ablated")
+                        else emptyList())
                 for (arm in arms) {
-                    val stop = Cancellation.after(5.seconds)
-                    val allowance = NodeBudget(DECISIONS)
+                    val deadline = Cancellation.after(5.seconds)
+                    val containingWork = if (numerical) 2_000_000L else DECISIONS
+                    val allowance = NodeBudget(containingWork)
+                    var numericalTrial: FiniteNumericalTrial? = null
+                    val stop = deadline or Cancellation {
+                        allowance.spent + (numericalTrial?.work ?: 0L) >= containingWork
+                    }
                     val started = System.nanoTime()
                     val startedBytes = allocation.getThreadAllocatedBytes(thread)
                     val guidance = guidanceType.getDeclaredConstructor(
@@ -230,7 +244,7 @@ internal object FiniteConflictSelection {
                             randomSeed = seed,
                             cancellation = stop,
                             objectiveBoundSupplier = { objective.evaluate(center) },
-                            maxDecisions = DECISIONS,
+                            maxDecisions = containingWork,
                             nodeBudget = allowance,
                         )
                         val observe = guidanceType.methods.single { it.name == "observe" }
@@ -241,7 +255,8 @@ internal object FiniteConflictSelection {
                         var acquisitionSourceAccepted: Boolean? = null
                         var acquisitionResult: MinimizeResult? = null
                         var acquisitionImproved = false
-                        val usesAcquisition = arm == "conflict" || arm == "acquisition-ablated"
+                        val numericalArm = arm.startsWith("numerical-")
+                        val usesAcquisition = arm == "conflict" || arm == "acquisition-ablated" || numericalArm
                         val originSelection = if (usesAcquisition && acquisitionMode == "sampled-fragment") {
                             val randomOperator = companion.javaClass.methods.single { it.name == "getRandom" }
                                 .invoke(companion)
@@ -253,7 +268,25 @@ internal object FiniteConflictSelection {
                         val originMatched = acquisitionMode == "source-root" ||
                             originSelection?.matches(requestedCount) == true
                         val acquisitionPerformed = usesAcquisition && originMatched && !stop()
-                        if (acquisitionPerformed) {
+                        if (acquisitionPerformed && numericalArm) {
+                            val trial = FiniteNumericalTrial(problem, objective, sourceSense, containingWork, deadline)
+                            numericalTrial = trial
+                            try {
+                                trial.acquire(center, checkNotNull(originPins), arm, numericalCuts) { sample, _ ->
+                                    checkSource(sample, deadline)
+                                }
+                            } finally {
+                                trial.finishAcquisition()
+                            }
+                            acquisitionSample = trial.recovered
+                            acquisitionWork = trial.work
+                            acquisitionImproved = acquisitionSample?.let {
+                                acquisitionSourceAccepted = checkSource(it, deadline)
+                                check(acquisitionSourceAccepted == true || deadline())
+                                acquisitionSourceAccepted == true &&
+                                    objective.evaluateExact(it) < objective.evaluateExact(center)
+                            } ?: false
+                        } else if (acquisitionPerformed) {
                             val pinsForAcquisition = checkNotNull(originPins)
                             guidanceType.methods.single { it.name == "begin" }
                                 .invoke(guidance, center, pinsForAcquisition, objective.evaluate(center), stop)
@@ -266,8 +299,8 @@ internal object FiniteConflictSelection {
                             acquisitionWork = allowance.spent
                             acquisitionSample = result.assignment
                             acquisitionImproved = acquisitionSample?.let {
-                                acquisitionSourceAccepted = checkSource(it, stop)
-                                check(acquisitionSourceAccepted == true || stop())
+                                acquisitionSourceAccepted = checkSource(it, deadline)
+                                check(acquisitionSourceAccepted == true || deadline())
                                 acquisitionSourceAccepted == true &&
                                     objective.evaluateExact(it) < objective.evaluateExact(center)
                             } ?: false
@@ -276,6 +309,9 @@ internal object FiniteConflictSelection {
                         val selectionStarted = System.nanoTime()
                         val operator = when (arm) {
                             "conflict" -> guidance
+
+                            "numerical-disagreement", "numerical-refutation" -> numericalTrial?.selector
+                                ?: companion.javaClass.methods.single { it.name == "getRandom" }.invoke(companion)
 
                             "semantic" -> {
                                 val type = Class.forName("com.eignex.klause.meta.alns.SemanticBlockRemoval")
@@ -304,7 +340,8 @@ internal object FiniteConflictSelection {
                         val pins = selected.pins
                         val selectionAttempts = selected.attempts
                         val selectionNanos = System.nanoTime() - selectionStarted
-                        val remaining = minOf(REPAIR_DECISIONS, (DECISIONS - allowance.spent).coerceAtLeast(0L))
+                        val remaining = minOf(REPAIR_DECISIONS,
+                            (containingWork - allowance.spent - (numericalTrial?.work ?: 0L)).coerceAtLeast(0L))
                         val result = if (matched && remaining > 0L && !stop()) {
                             BacktrackSolver(problem).minimize(
                                 objective,
@@ -317,8 +354,8 @@ internal object FiniteConflictSelection {
                             null
                         }
                         val repaired = result?.assignment
-                        val repairSourceAccepted = repaired?.let { checkSource(it, stop) }
-                        check(repairSourceAccepted != false || stop())
+                        val repairSourceAccepted = repaired?.let { checkSource(it, deadline) }
+                        check(repairSourceAccepted != false || deadline())
                         val improved = repaired?.let { candidate ->
                             repairSourceAccepted == true &&
                                 objective.evaluateExact(candidate) < objective.evaluateExact(center)
@@ -338,8 +375,8 @@ internal object FiniteConflictSelection {
                         } else {
                             null
                         }
-                        val descentAccepted = descent?.let { checkSource(it.sample, stop) }
-                        check(descentAccepted != false || stop())
+                        val descentAccepted = descent?.let { checkSource(it.sample, deadline) }
+                        check(descentAccepted != false || deadline())
                         val outcome = when {
                             !matched -> "effective-count-mismatch"
                             improved -> "checked-improvement"
@@ -350,6 +387,7 @@ internal object FiniteConflictSelection {
                         }
                         val weights = guidanceType.methods.single { it.name == "weights" }
                             .invoke(guidance) as IntArray
+                        val numericalCapture = numericalTrial?.capture()
                         writer.appendLine(
                             buildJsonObject {
                                 put("selector", arm)
@@ -357,6 +395,8 @@ internal object FiniteConflictSelection {
                                 put("seed", seed)
                                 put("acquisitionMode", acquisitionMode)
                                 put("acquisitionPerformed", acquisitionPerformed)
+                                put("acquisitionOwner",
+                                    if (numericalArm) "source-numerical-cold" else "finite-cp-prefix")
                                 put("originEffectiveCountMatched", if (usesAcquisition) originMatched else null)
                                 put("originSelectorSeed", seed + 1)
                                 put("originSelectionAttempts", originSelection?.attempts ?: 0)
@@ -385,6 +425,8 @@ internal object FiniteConflictSelection {
                                     arm == "conflict" &&
                                         get(guidance, "Status").toString() == "Supported",
                                 )
+                                put("numericalGuidanceConsumed", numericalCapture?.get("guidanceStatus") ==
+                                    JsonPrimitive("Supported") && arm != "numerical-ablated")
                                 put("capturedConflicts", get(guidance, "Conflicts") as Int)
                                 put("captureCapped", get(guidance, "Capped") as Boolean)
                                 put("captureAndSelectionVisits", get(guidance, "Visits") as Long)
@@ -425,7 +467,8 @@ internal object FiniteConflictSelection {
                                 put("acquisitionNodes", acquisitionNodes)
                                 put("acquisitionWork", acquisitionWork)
                                 put("acquisitionImproved", acquisitionImproved)
-                                put("acquisitionResult", acquisitionResult?.let { it::class.simpleName })
+                                put("acquisitionResult", acquisitionResult?.let { it::class.simpleName }
+                                    ?: numericalTrial?.outcome)
                                 put("acquisitionReason", reason(acquisitionResult)?.name)
                                 acquisitionSample?.let {
                                     put("acquired", sample(it))
@@ -443,11 +486,15 @@ internal object FiniteConflictSelection {
                                 }
                                 put("remainingRepairDecisions", remaining)
                                 put("repairNodes", result?.stats?.search?.nodes?.sum ?: 0.0)
-                                put("containingWork", DECISIONS)
+                                put("containingWork", containingWork)
                                 put("maxRepairDecisions", REPAIR_DECISIONS)
                                 put("maxDescentMoves", DESCENT_MOVES)
                                 put("containingSeconds", 5)
-                                put("totalWork", allowance.spent)
+                                put("nativeWork", allowance.spent)
+                                put("sourceWork", numericalTrial?.work ?: 0L)
+                                put("totalWork", allowance.spent + (numericalTrial?.work ?: 0L))
+                                put("numericalCuts", if (numericalArm) numericalCuts else null)
+                                numericalCapture?.let { put("numerical", it) }
                                 put("elapsedNanos", System.nanoTime() - started)
                                 put("allocatedBytes", allocation.getThreadAllocatedBytes(thread) - startedBytes)
                                 put("cancelled", stop())
@@ -486,6 +533,7 @@ internal object FiniteConflictSelection {
                         )
                         writer.flush()
                     } finally {
+                        numericalTrial?.close()
                         (guidance as AutoCloseable).close()
                     }
                 }
