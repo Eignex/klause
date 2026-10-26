@@ -1,5 +1,7 @@
 package com.eignex.klause.lp.optimization
 
+import com.eignex.klause.lp.SourceLpBudget
+import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCondition
@@ -219,5 +221,29 @@ class LinearAuthorityAggregateCutsTest {
         assertNull(cut)
         assertEquals(1L, observations["AggregateStopped"])
         assertTrue(assertNotNull(observations["AggregateWork"]) > 0L)
+    }
+
+    @Test
+    fun `aggregation should stop under cumulative source funding without renewing it`() {
+        val funding = SourceLpFunding(20L, 1_048_576L).apply { grant(20L) }
+        val budget = SourceLpBudget(funding = funding)
+        val terms = listOf(
+            LinearAuthorityAggregateTerm(0, "left", left, BigFraction.ONE),
+            LinearAuthorityAggregateTerm(1, "right", right, BigFraction.ONE),
+        )
+        val stop = Cancellation { funding.paused }
+        val observe: (String, Long) -> Unit = { stage, count ->
+            if (stage == "AggregateWork") budget.observe(preparation = count)
+            if (stage == "AggregateAllocation") funding.charge(0L, count)
+        }
+        val first = LinearAuthorityAggregateCuts.derive(terms, stop, observe)
+        val spent = funding.spent
+
+        val repeated = LinearAuthorityAggregateCuts.derive(terms, stop, observe)
+
+        assertNull(first)
+        assertNull(repeated)
+        assertTrue(spent >= 20L)
+        assertEquals(spent, funding.spent)
     }
 }
