@@ -14,8 +14,8 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
-import com.eignex.klause.propagation.baked
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.baked
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.CandidateVerifier
@@ -23,9 +23,9 @@ import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.util.Cancellation
+import com.sun.management.ThreadMXBean
 import java.io.File
 import java.lang.management.ManagementFactory
-import com.sun.management.ThreadMXBean
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.JsonArray
@@ -64,7 +64,7 @@ internal object FiniteConflictSelection {
         val center = Sample(booleanArrayOf(), options.getValue("center").split(',').map(String::toLong).toLongArray())
         require(center.numIntVars == problem.numIntVars)
         compare(problem, objective, center, options.getValue("seed").toLong(), null,
-            out.resolve("selections.jsonl")) { checkSource(problem, it) }
+            out.resolve("selections.jsonl")) { sample, stop -> checkSource(problem, sample, stop) }
     }
 
     fun compare(
@@ -74,10 +74,10 @@ internal object FiniteConflictSelection {
         seed: Long,
         sweep: DefinitionalSweep?,
         file: File,
-        checkSource: (Sample) -> Boolean,
+        checkSource: (Sample, Cancellation) -> Boolean,
     ) {
         require(problem.numRealVars == 0 && problem.numBoolVars.toLong() + problem.numIntVars <= 1024)
-        require(checkSource(center))
+        require(checkSource(center, Cancellation.after(5.seconds)))
         val destroy = Class.forName("com.eignex.klause.meta.alns.DestroyOperator")
         val companion = destroy.getField("Companion").get(null)
         val destroyMethod = destroy.methods.single { it.name == "destroy" }
@@ -112,6 +112,7 @@ internal object FiniteConflictSelection {
                         var acquisitionNodes = 0L
                         var acquisitionWork = 0L
                         var acquisitionSample: Sample? = null
+                        var acquisitionSourceAccepted: Boolean? = null
                         var acquisitionImproved = false
                         if (arm == "conflict" || arm == "acquisition-ablated") {
                             guidanceType.methods.single { it.name == "begin" }
@@ -124,7 +125,8 @@ internal object FiniteConflictSelection {
                             acquisitionWork = allowance.spent
                             acquisitionSample = result.assignment
                             acquisitionImproved = acquisitionSample?.let {
-                                check(checkSource(it))
+                                acquisitionSourceAccepted = checkSource(it, stop)
+                                check(acquisitionSourceAccepted == true || stop())
                                 objective.evaluateExact(it) < objective.evaluateExact(center)
                             } ?: false
                         }
@@ -201,7 +203,7 @@ internal object FiniteConflictSelection {
                             acquisitionSample?.let {
                                 put("acquired", sample(it))
                                 put("acquiredObjective", objective.evaluateExact(it).toString())
-                                put("acquiredNativeSourceAccepted", true)
+                                put("acquiredNativeSourceAccepted", acquisitionSourceAccepted)
                             }
                             put("acquisitionNanos", acquisitionNanos)
                             put("selectionNanos", selectionNanos)
@@ -221,7 +223,7 @@ internal object FiniteConflictSelection {
                             result?.assignment?.let {
                                 put("repaired", sample(it))
                                 put("repairedObjective", objective.evaluateExact(it).toString())
-                                put("nativeSourceAccepted", checkSource(it))
+                                put("nativeSourceAccepted", checkSource(it, stop))
                             }
                             put("globalProofClaim", false)
                             put("descentEndpointClassified", false)
@@ -245,10 +247,10 @@ internal object FiniteConflictSelection {
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun checkSource(problem: BakedProblem, sample: Sample): Boolean {
+    private fun checkSource(problem: BakedProblem, sample: Sample, stop: Cancellation): Boolean {
         val verifier = Class.forName("com.eignex.klause.solver.validation.FiniteWitnessVerificationKt")
             .methods.single { it.name == "finiteWitnessVerifier" && it.parameterCount == 5 }
-            .invoke(null, problem, null, Assumptions.None, Cancellation.Never, null) as CandidateVerifier<Sample, Double?>
+            .invoke(null, problem, null, Assumptions.None, stop, null) as CandidateVerifier<Sample, Double?>
         return verifier.verify(Candidate(sample, null)) is Verification.Accepted
     }
 }

@@ -2,15 +2,15 @@ package com.eignex.klause.meta.alns
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.ir.IntDomain
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.search.BranchingConflict
@@ -21,6 +21,7 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class ConflictSupportedRemovalTest {
     private val problem = Problem(2, 2, Array(2) { IntDomain(0, 1) }, emptyList()).bake()
@@ -104,17 +105,38 @@ class ConflictSupportedRemovalTest {
     }
 
     @Test
-    fun `a different center should retire conditioned attribution`() {
-        val guidance = ConflictSupportedRemoval(problem, objective)
+    fun `a different scope should retire conditioned attribution`() {
+        for (change in listOf("center", "model", "objective")) {
+            val guidance = ConflictSupportedRemoval(problem, objective)
+            val observer = guidance.observe(BacktrackParams()).variableSelector.fresh()
+            guidance.begin(center, Assumptions.None, -1.0, Cancellation.Never)
+            observer.onConflict(null, BranchingConflict(intArrayOf(1)))
+
+            guidance.destroy(Random(3),
+                if (change == "model") Problem(2, 2, Array(2) { IntDomain(0, 1) }, emptyList()).bake() else problem,
+                if (change == "center") Sample(BooleanArray(2), LongArray(2)) else center,
+                if (change == "objective") objective.copy() else objective, 0.5)
+
+            assertEquals(ConflictGuidanceStatus.Incompatible, guidance.status)
+            assertNull(guidance.originPins)
+            assertNull(guidance.originCutoff)
+        }
+    }
+
+    @Test
+    fun `the conflict prefix cap should preserve only admitted support`() {
+        val guidance = ConflictSupportedRemoval(problem, objective, maxConflicts = 1)
         val observer = guidance.observe(BacktrackParams()).variableSelector.fresh()
-        guidance.begin(center, Assumptions.None, -1.0, Cancellation.Never)
+        guidance.begin(center, Assumptions.None, 0.0, Cancellation.Never)
         observer.onConflict(null, BranchingConflict(intArrayOf(1)))
 
-        guidance.destroy(Random(3), problem, Sample(BooleanArray(2), LongArray(2)), objective, 0.5)
+        observer.onConflict(null, BranchingConflict(ints = intArrayOf(0)))
+        val freed = guidance.destroy(Random(3), problem, center, objective, 0.25)
 
-        assertEquals(ConflictGuidanceStatus.Incompatible, guidance.status)
-        assertNull(guidance.originPins)
-        assertNull(guidance.originCutoff)
+        assertContentEquals(intArrayOf(1), freed.bools)
+        assertContentEquals(intArrayOf(), freed.ints)
+        assertEquals(1, guidance.conflicts)
+        assertTrue(guidance.capped)
     }
 
     @Test
