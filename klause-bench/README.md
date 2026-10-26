@@ -1400,7 +1400,8 @@ leave Boolean-value and Element outputs searched; predicate treatments leave
 comparison and membership outputs searched. Other admitted definitions remain
 maintained. Inverse assignment transposes the roles of admitted native `Inverse`
 factors and reuses their repairs and swaps; it changes proposals while retaining
-both source arrays. These channel comparisons also admit satisfaction sources.
+both source arrays. Channel comparisons use local-search-route preparation and
+also admit satisfaction sources.
 No general inverse or deterministic extension of an inconsistent channel is supplied.
 Optional `source64=BASE64` supplies at most 96 KiB of base64-encoded original bytes
 without catalog extraction; the source mode and bytes are retained with the capture.
