@@ -189,4 +189,18 @@ class PolynomialCellRefinementTest {
         assertEquals(1, query.checkedCells.size)
         assertIs<PolynomialCellScope.Source>(query.checkedCells.single().scope)
     }
+    @Test
+    fun `statistics snapshots remain stable while the producer advances`() {
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
+        val work = QfNraWork(QfNraParams())
+        val refinement = PolynomialCellRefinement(source.formula, PolynomialCondition(), work,
+            PolynomialLimits()) {}
+        val before = refinement.stats
+        val normalized = PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+
+        refinement.prepare(normalized)
+
+        assertEquals(0L, before.work)
+        assertTrue(refinement.stats.work > 0)
+    }
 }
