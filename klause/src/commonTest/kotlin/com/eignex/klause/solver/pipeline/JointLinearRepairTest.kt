@@ -288,19 +288,22 @@ class JointLinearRepairTest {
             ), numRealVars = 1, realLower = doubleArrayOf(0.75), realUpper = doubleArrayOf(2.0))
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
-        val repair = JointLinearRepair(model, source, objective, TheoryParams(maxFlips = 2))
+        for (inputPass in listOf(false, true)) {
+            val repair = JointLinearRepair(model, source, objective, TheoryParams(maxFlips = 2),
+                sourceIntegers = intArrayOf(0))
 
-        val result = repair.use {
-            it.search(adaptive = false).use { search ->
-                while (!search.advance(Cancellation.Never, 1_000_000)) Unit
-                search.minimizeResult(TerminationReason.BudgetExhausted)
+            val result = repair.use {
+                it.search(adaptive = false, sourceInputPass = inputPass).use { search ->
+                    while (!search.advance(Cancellation.Never, 1_000_000)) Unit
+                    search.minimizeResult(TerminationReason.BudgetExhausted)
+                }
             }
-        }
 
-        assertIs<MinimizeResult.BestFound>(result)
-        assertEquals(1L, assertNotNull(result.assignment).intValue(0))
-        assertEquals(1.0, result.stats.ls.completionsRefuted.sum)
-        assertEquals(1L, result.stats.smt.completeSearchStages?.get("jointRepairCutoffClosures"))
+            assertIs<MinimizeResult.BestFound>(result)
+            assertEquals(1L, assertNotNull(result.assignment).intValue(0))
+            assertEquals(1.0, result.stats.ls.completionsRefuted.sum)
+            assertEquals(1L, result.stats.smt.completeSearchStages?.get("jointRepairCutoffClosures"))
+        }
     }
 
     @Test
