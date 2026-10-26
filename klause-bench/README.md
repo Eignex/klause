@@ -1395,7 +1395,8 @@ counts named source inputs excluding frontend-declared definitions; auxiliary
 changes and approximate real displacement remain separate. Censored endpoints
 receive no basin classification. The declared recipe and worker seed bind the
 descent rule, without claiming exhaustive coverage of its sampled moves.
-`controls=true` compares individual freedoms, complete small AllDifferent scopes
+`controls=true` compares individual freedoms, complete small mandatory
+AllDifferent, Cumulative and Diffn scopes
 and four size-matched samples at up to four feasible endpoints, using ordinary
 CP minimization with the complement pinned. Each repair has 10,000 decisions and
 the control scan shares ten seconds; unfinished scans grant no exhaustion claim.
@@ -1406,6 +1407,8 @@ presolve and uses the protected objective. `recipe=source-coordinate-descent`
 selects the strict objective-coordinate control; ordinary catalog recipes retain
 their structured sources. Fixture expectations live beside
 [finite repair controls](smoke-corpus/finite-repair/README.md).
+`batch64=<base64 JSON array of argument arrays>` captures up to eight requests
+in numbered directories under one profile job.
 Model keys, domains, objectives, source bytes and
 build identity remain alongside the walk. Inputs admit at most 64 MiB,
 1,024 Boolean/integer coordinates and 4,096 factors. Hint construction uses the production

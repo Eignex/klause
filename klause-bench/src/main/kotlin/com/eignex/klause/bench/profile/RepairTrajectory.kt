@@ -3,6 +3,8 @@ package com.eignex.klause.bench.profile
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.factor.scheduling.Cumulative
+import com.eignex.klause.factor.scheduling.Diffn
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
@@ -90,30 +92,45 @@ internal object RepairTrajectory {
         val stop = Cancellation.after(10.seconds)
         val random = Random(seed)
         var centers = 0
+        var planned = 0
+        var attempted = 0
+        var completedControls = 0
         file.bufferedWriter().use { writer ->
             for (attempt in get(trace, "Attempts") as List<*>) {
                 val entry = checkNotNull(attempt)
                 if (get(entry, "Endpoint").toString() !in setOf("PolicyLocalOptimum", "FeasibleStall")) continue
                 val frame = (get(entry, "Frames") as List<*>).lastOrNull() ?: continue
                 val center = get(frame, "Sample") as Sample
-                if (get(frame, "Cost") != 0L || centers++ >= 4 || stop()) break
+                if (get(frame, "Cost") != 0L) continue
+                if (centers >= 4 || stop()) break
+                centers++
                 checkSource(source, prepared.reconstruct(center))
-                val blocks = problem.factors.filterIsInstance<AllDifferent>().filter {
-                    it.presents.isEmpty() && it.exceptSet.isEmpty() && it.intVars.size in 2..6
-                }.take(4)
+                val blocks = problem.factors.asSequence().mapNotNull { factor ->
+                    val label = when (factor) {
+                        is AllDifferent -> if (factor.presents.isEmpty() && factor.exceptSet.isEmpty())
+                            "assignment-block" else return@mapNotNull null
+                        is Cumulative -> if (factor.presents.isEmpty()) "resource-block" else return@mapNotNull null
+                        is Diffn -> "placement-block"
+                        else -> return@mapNotNull null
+                    }
+                    val variables = factor.intVars.distinct().filterNot { problem.rootIntDomain(it).isFixed }.toIntArray()
+                    if (variables.size !in 2..6) null else label to variables
+                }.take(4).toList()
                 val candidates = mutableListOf<Pair<String, IntArray>>()
-                for (block in blocks) {
-                    val variables = block.intVars.distinct().toIntArray()
+                for ((label, variables) in blocks) {
                     for (variable in variables) candidates.add("individual" to intArrayOf(variable))
-                    candidates.add("assignment-block" to variables)
+                    candidates.add(label to variables)
                     val eligible = (0 until problem.numIntVars).filter { !problem.rootIntDomain(it).isFixed }
                     repeat(4) {
                         if (eligible.size >= variables.size) candidates.add("size-matched-sample" to
                             eligible.shuffled(random).take(variables.size).toIntArray())
                     }
                 }
-                for ((label, variables) in candidates) {
+                planned += candidates.size
+                for ((candidateIndex, candidate) in candidates.withIndex()) {
                     if (stop()) break
+                    val (label, variables) = candidate
+                    attempted++
                     val freed = freedType.getDeclaredConstructor(IntArray::class.java, IntArray::class.java)
                         .newInstance(intArrayOf(), variables)
                     val assumptions = pins.invoke(scope, problem, center, freed) as Assumptions
@@ -122,8 +139,11 @@ internal object RepairTrajectory {
                         assumptions = assumptions, maxDecisions = 10_000, cancellation = stop, randomSeed = seed))
                     val elapsed = System.nanoTime() - started
                     val completed = result is MinimizeResult.Optimal || result is MinimizeResult.Infeasible
+                    if (completed) completedControls++
                     writer.appendLine(buildJsonObject {
                         put("centerId", get(entry, "Id") as Int)
+                        put("candidateIndex", candidateIndex)
+                        put("candidateCount", candidates.size)
                         put("selector", label)
                         put("requestedInts", JsonArray(variables.map(::JsonPrimitive)))
                         put("effectiveInts", JsonArray(variables.map(::JsonPrimitive)))
@@ -149,9 +169,15 @@ internal object RepairTrajectory {
         file.resolveSibling("${file.nameWithoutExtension}-limits.json").writeText(buildJsonObject {
             put("maxCenters", 4)
             put("maxBlocksPerCenter", 4)
-            put("maxAssignmentBlockCoordinates", 6)
+            put("maxRelationBlockCoordinates", 6)
+            put("optionalRelationBlocks", "declined")
             put("maxDecisionsPerRepair", 10_000)
             put("cancelled", stop())
+            put("centersVisited", centers)
+            put("plannedControls", planned)
+            put("attemptedControls", attempted)
+            put("completedControls", completedControls)
+            put("boundedScanCompleted", !stop() && attempted == planned)
             put("wholeSourceExhaustionClaim", false)
         }.toString())
     }
@@ -182,7 +208,8 @@ internal object RepairTrajectory {
     fun checkSource(problem: BakedProblem, sample: Sample): Boolean {
         val verifier = Class.forName("com.eignex.klause.solver.validation.FiniteWitnessVerificationKt")
             .methods.single { it.name == "finiteWitnessVerifier" && it.parameterCount == 5 }
-            .invoke(null, problem, null, Assumptions.None, Cancellation.Never, null) as CandidateVerifier<Sample, Double?>
+            .invoke(null, problem, null, Assumptions.None, Cancellation.after(2.seconds), null)
+            as CandidateVerifier<Sample, Double?>
         return (verifier.verify(Candidate(sample, null)) is Verification.Accepted).also {
             check(it) { "captured final point failed original-source checking" }
         }

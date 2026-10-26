@@ -1,0 +1,16 @@
+<instance format="XCSP3" type="COP">
+  <variables>
+    <array id="x" size="[6]"> 0..1 </array>
+  </variables>
+  <constraints>
+    <cumulative>
+      <origins> x[0] x[1] </origins>
+      <lengths> 1 1 </lengths>
+      <heights> 1 1 </heights>
+      <condition> (le,1) </condition>
+    </cumulative>
+  </constraints>
+  <objectives>
+    <minimize> x[0] </minimize>
+  </objectives>
+</instance>
