@@ -223,6 +223,11 @@ class SearchSession(
         executionControls.reportStop(SearchStopCause.DecisionAllowance)
     }
 
+    internal fun beginTraversal() {
+        decisionsExhausted = false
+        executionControls.beginTraversal()
+    }
+
     private var controlsAttached = false
     private var initializationStarted = false
 
@@ -747,8 +752,7 @@ class SearchSession(
         require(minimumDecisionLevel == 0 || modelContinuation == SearchModelContinuation.Chronological) {
             "scoped runs require chronological model continuation"
         }
-        decisionsExhausted = false
-        executionControls.beginTraversal()
+        beginTraversal()
         val listener = booleanBranching as? SearchUnassignListener
         observeUnassignments(
             if (atoms != null && listener != null) {
