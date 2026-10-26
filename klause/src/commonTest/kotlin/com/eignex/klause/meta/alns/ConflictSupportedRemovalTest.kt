@@ -36,12 +36,26 @@ class ConflictSupportedRemovalTest {
         val guidance = ConflictSupportedRemoval(problem, objective)
         guidance.begin(center, Assumptions.None, 2.0, Cancellation.Never)
 
-        val control = BacktrackSolver(problem).minimize(objective, base.copy(
-            objectiveBoundSupplier = { plainCalls++; 2.0 },
-        ))
-        val observed = BacktrackSolver(problem).minimize(objective, guidance.observe(base.copy(
-            objectiveBoundSupplier = { observedCalls++; 2.0 },
-        )))
+        val control = BacktrackSolver(problem).minimize(
+            objective,
+            base.copy(
+            objectiveBoundSupplier = {
+                plainCalls++;
+                2.0
+            },
+        )
+        )
+        val observed = BacktrackSolver(problem).minimize(
+            objective,
+            guidance.observe(
+                base.copy(
+            objectiveBoundSupplier = {
+                observedCalls++;
+                2.0
+            },
+        )
+            )
+        )
         guidance.end()
 
         assertTrue(plainCalls > 0)
@@ -53,10 +67,12 @@ class ConflictSupportedRemovalTest {
     @Test
     fun `a cutoff at the pinned root should leave conflict guidance unavailable`() {
         val source = Problem(
-            0, 2, Array(2) { IntDomain(0, 1) },
+            0,
+            2,
+            Array(2) { IntDomain(0, 1) },
             listOf(
-            Linear(longArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0L),
-        )
+                Linear(longArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0L),
+            ),
         ).bake()
         val incumbent = Sample(BooleanArray(0), longArrayOf(1, 1))
         val pins = Assumptions.None.withInt(0, 1)
@@ -104,9 +120,9 @@ class ConflictSupportedRemovalTest {
         observer.onConflict(
             VarRef.Bool(0),
             PropagationResult.Unsat(
-            conflictBools = intArrayOf(1),
-            conflictInts = intArrayOf(0),
-        )
+                conflictBools = intArrayOf(1),
+                conflictInts = intArrayOf(0),
+            ),
         )
 
         val freed = guidance.destroy(Random(3), problem, center, objective, 0.5)
@@ -146,8 +162,12 @@ class ConflictSupportedRemovalTest {
 
     @Test
     fun `wide incumbent cutoffs should retain the finite engine enclosing bound`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(9_007_199_254_740_992L, 9_007_199_254_740_993L)),
-            emptyList()).bake()
+        val source = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(9_007_199_254_740_992L, 9_007_199_254_740_993L)),
+            emptyList(),
+        ).bake()
         val wideObjective = LinearObjective(intCoefficients = longArrayOf(1))
         val incumbent = Sample(booleanArrayOf(), longArrayOf(9_007_199_254_740_993L))
         val guidance = ConflictSupportedRemoval(source, wideObjective)

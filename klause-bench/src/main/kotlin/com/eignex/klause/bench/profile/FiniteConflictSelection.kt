@@ -52,7 +52,18 @@ internal object FiniteConflictSelection {
     private const val ACQUISITION_DECISIONS = 128L
     private const val REPAIR_DECISIONS = 1000L
     private const val DESCENT_MOVES = 128L
-    private const val DESCENT_RULE = "first source-coordinate greedy descent endpoint; seeded ties; no greedy init"
+    private const val DESCENT_RULE = "first feasible source-coordinate descent; linear shaping 1; seeded ties"
+
+    private class Selection(
+        val requestedBools: IntArray,
+        val requestedInts: IntArray,
+        val bools: IntArray,
+        val ints: IntArray,
+        val pins: Assumptions?,
+        val attempts: Int,
+    ) {
+        fun matches(count: Int): Boolean = pins != null && bools.size + ints.size == count
+    }
 
     @JvmStatic
     fun main(args: Array<String>) {
@@ -72,7 +83,8 @@ internal object FiniteConflictSelection {
 
     private fun capture(args: Array<String>, out: File) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
-        require(options.keys == setOf("suite", "problem", "sha256", "center", "seed"))
+        val required = setOf("suite", "problem", "sha256", "center", "seed")
+        require(options.keys.containsAll(required) && options.keys.all { it in required || it == "acquisition" })
         val reference = Catalog.uncapped(options.getValue("suite")).problems
             .single { it.name == options.getValue("problem") }
         val bytes = CorpusFiles.open(CorpusFetcher.resolve(reference.source)).use {
@@ -96,22 +108,22 @@ internal object FiniteConflictSelection {
         require(center.numIntVars == problem.numIntVars)
         out.resolve("model.json").writeText(
             buildJsonObject {
-            put("sourceSha256", sha256(bytes))
-            put("sourceCoordinateMapping", "identity")
-            put("nativeChecker", "finiteWitnessVerifier with original lowered source and no assumptions")
-            put("independentChecker", "none")
-            put("semantics", problem.semantics.toString())
-            put("settings", problem.settings.toString())
-            put("sourceSense", parsed.sense.name)
-            put("minimizingObjective", objective.toString())
-            put("rootDomains", JsonArray(problem.rootIntDomains().map { JsonPrimitive(it.toString()) }))
-            put(
-                "namedInputs",
-                buildJsonObject {
-                for ((name, coordinate) in parsed.intVarNames) put(name, coordinate)
-            }
-            )
-        }.toString()
+                put("sourceSha256", sha256(bytes))
+                put("sourceCoordinateMapping", "identity")
+                put("nativeChecker", "finiteWitnessVerifier with original lowered source and no assumptions")
+                put("independentChecker", "none")
+                put("semantics", problem.semantics.toString())
+                put("settings", problem.settings.toString())
+                put("sourceSense", parsed.sense.name)
+                put("minimizingObjective", objective.toString())
+                put("rootDomains", JsonArray(problem.rootIntDomains().map { JsonPrimitive(it.toString()) }))
+                put(
+                    "namedInputs",
+                    buildJsonObject {
+                        for ((name, coordinate) in parsed.intVarNames) put(name, coordinate)
+                    },
+                )
+            }.toString(),
         )
         compare(
             problem,
@@ -120,6 +132,7 @@ internal object FiniteConflictSelection {
             options.getValue("seed").toLong(),
             null,
             out.resolve("selections.jsonl"),
+            options["acquisition"] ?: "source-root",
         ) { sample, stop -> checkSource(problem, sample, stop) }
     }
 
@@ -130,8 +143,10 @@ internal object FiniteConflictSelection {
         seed: Long,
         sweep: DefinitionalSweep?,
         file: File,
+        acquisitionMode: String = "source-root",
         checkSource: (Sample, Cancellation) -> Boolean,
     ) {
+        require(acquisitionMode in setOf("source-root", "sampled-fragment"))
         require(problem.numRealVars == 0 && problem.numBoolVars.toLong() + problem.numIntVars <= 1024)
         require(checkSource(center, Cancellation.after(5.seconds)))
         val destroy = Class.forName("com.eignex.klause.meta.alns.DestroyOperator")
@@ -147,6 +162,35 @@ internal object FiniteConflictSelection {
             } else {
                 !problem.rootIntDomain(coordinate - problem.numBoolVars).isFixed
             }
+        }
+        fun select(operator: Any, drawSeed: Long, count: Int, stop: Cancellation): Selection {
+            val total = problem.numBoolVars + problem.numIntVars
+            fun coordinates(value: Any): List<Int> = (get(value, "Bools") as IntArray).toList() +
+                (get(value, "Ints") as IntArray).map { problem.numBoolVars + it }
+            var rawCount = count
+            var attempts = 0
+            var raw: Any
+            do {
+                attempts++
+                raw = checkNotNull(destroyMethod.invoke(operator, Random(drawSeed), problem, center, objective,
+                    (rawCount + 0.25) / total))
+                rawCount++
+            } while (coordinates(raw).count { it in eligible } < count && rawCount <= total && !stop())
+            val selected = coordinates(raw).filter { it in eligible }
+            val requestedBools = selected.filter { it < problem.numBoolVars }.toIntArray()
+            val requestedInts = selected.filter { it >= problem.numBoolVars }
+                .map { it - problem.numBoolVars }.toIntArray()
+            val requested = freedType.getDeclaredConstructor(IntArray::class.java, IntArray::class.java)
+                .newInstance(requestedBools, requestedInts)
+            val effective = scope.javaClass.methods.single { it.name == "effective" }
+                .invoke(scope, requested, Assumptions.None, sweep, stop)
+            val bools = effective?.let { get(it, "Bools") as IntArray } ?: intArrayOf()
+            val ints = effective?.let { get(it, "Ints") as IntArray } ?: intArrayOf()
+            val pins = effective?.let { scopeVars ->
+                scope.javaClass.methods.single { it.name == "pins" }.invoke(scope, problem, center, scopeVars)
+                    as Assumptions
+            }
+            return Selection(requestedBools, requestedInts, bools, ints, pins, attempts)
         }
         val allocation = ManagementFactory.getThreadMXBean() as ThreadMXBean
         check(allocation.isThreadAllocatedMemorySupported)
@@ -182,11 +226,24 @@ internal object FiniteConflictSelection {
                         var acquisitionSourceAccepted: Boolean? = null
                         var acquisitionResult: MinimizeResult? = null
                         var acquisitionImproved = false
-                        if (arm == "conflict" || arm == "acquisition-ablated") {
+                        val usesAcquisition = arm == "conflict" || arm == "acquisition-ablated"
+                        val originSelection = if (usesAcquisition && acquisitionMode == "sampled-fragment") {
+                            val randomOperator = companion.javaClass.methods.single { it.name == "getRandom" }
+                                .invoke(companion)
+                            select(randomOperator, seed + 1, requestedCount, stop)
+                        } else null
+                        val originPins = if (acquisitionMode == "source-root") {
+                            Assumptions.None
+                        } else originSelection?.pins
+                        val originMatched = acquisitionMode == "source-root" ||
+                            originSelection?.matches(requestedCount) == true
+                        val acquisitionPerformed = usesAcquisition && originMatched && !stop()
+                        if (acquisitionPerformed) {
+                            val pinsForAcquisition = checkNotNull(originPins)
                             guidanceType.methods.single { it.name == "begin" }
-                                .invoke(guidance, center, Assumptions.None, objective.evaluate(center), stop)
+                                .invoke(guidance, center, pinsForAcquisition, objective.evaluate(center), stop)
                             val acquiring = (observe.invoke(guidance, base) as BacktrackParams)
-                                .copy(maxDecisions = ACQUISITION_DECISIONS)
+                                .copy(maxDecisions = ACQUISITION_DECISIONS, assumptions = pinsForAcquisition)
                             val result = BacktrackSolver(problem).minimize(objective, acquiring)
                             acquisitionResult = result
                             guidanceType.methods.single { it.name == "end" }.invoke(guidance)
@@ -213,76 +270,49 @@ internal object FiniteConflictSelection {
                             else -> companion.javaClass.methods.single { it.name == "getRandom" }.invoke(companion)
                         }
                         val selectionStarted = System.nanoTime()
-                        var selectionAttempts = 1
-                        val total = problem.numBoolVars + problem.numIntVars
-                        var raw = checkNotNull(
-                            destroyMethod.invoke(
-                            operator,
-                            Random(seed),
-                            problem,
-                            center,
-                            objective,
-                            (requestedCount + 0.25) / total,
-                        )
-                        )
-                        fun coordinates(value: Any): List<Int> = (get(value, "Bools") as IntArray).toList() +
-                            (get(value, "Ints") as IntArray).map { problem.numBoolVars + it }
-                        var rawCount = requestedCount
-                        while (coordinates(raw).count { it in eligible } < requestedCount && rawCount < total &&
-                            !stop()
-                        ) {
-                            rawCount++
-                            selectionAttempts++
-                            raw = checkNotNull(
-                                destroyMethod.invoke(
-                                operator,
-                                Random(seed),
-                                problem,
-                                center,
-                                objective,
-                                (rawCount + 0.25) / total,
-                            )
-                            )
-                        }
-                        val selected = coordinates(raw).filter { it in eligible }
-                        val requestedBools = selected.filter { it < problem.numBoolVars }.toIntArray()
-                        val requestedInts = selected.filter { it >= problem.numBoolVars }
-                            .map { it - problem.numBoolVars }.toIntArray()
-                        val requested = freedType.getDeclaredConstructor(IntArray::class.java, IntArray::class.java)
-                            .newInstance(requestedBools, requestedInts)
-                        val effective = scope.javaClass.methods.single { it.name == "effective" }
-                            .invoke(scope, requested, Assumptions.None, sweep, stop)
-                        val bools = effective?.let { get(it, "Bools") as IntArray } ?: intArrayOf()
-                        val ints = effective?.let { get(it, "Ints") as IntArray } ?: intArrayOf()
-                        val matched = effective != null && bools.size + ints.size == requestedCount
-                        val pins = effective?.let { scopeVars ->
-                            scope.javaClass.methods.single { it.name == "pins" }
-                                .invoke(scope, problem, center, scopeVars)
-                                as Assumptions
-                        }
+                        val selected = select(operator, seed, requestedCount, stop)
+                        val requestedBools = selected.requestedBools
+                        val requestedInts = selected.requestedInts
+                        val bools = selected.bools
+                        val ints = selected.ints
+                        val matched = selected.matches(requestedCount)
+                        val pins = selected.pins
+                        val selectionAttempts = selected.attempts
                         val selectionNanos = System.nanoTime() - selectionStarted
                         val remaining = minOf(REPAIR_DECISIONS, (DECISIONS - allowance.spent).coerceAtLeast(0L))
                         val result = if (matched && remaining > 0L && !stop()) {
                             BacktrackSolver(problem).minimize(
                                 objective,
                                 base.copy(
-                                assumptions = checkNotNull(pins),
-                                maxDecisions = remaining,
-                            )
+                                    assumptions = checkNotNull(pins),
+                                    maxDecisions = remaining,
+                                ),
                             )
                         } else {
                             null
                         }
-                        val repairSourceAccepted = result?.assignment?.let { checkSource(it, stop) }
+                        val repaired = result?.assignment
+                        val repairSourceAccepted = repaired?.let { checkSource(it, stop) }
                         check(repairSourceAccepted != false || stop())
-                        val improved = repairSourceAccepted == true && result?.assignment?.let {
-                            objective.evaluateExact(it) < objective.evaluateExact(center)
-                        } == true
+                        val improved = repaired?.let { candidate ->
+                            repairSourceAccepted == true &&
+                                objective.evaluateExact(candidate) < objective.evaluateExact(center)
+                        } ?: false
                         val exhausted = result != null && reason(result) == TerminationReason.SearchExhausted
                         val descent = if (matched && !stop() && !allowance.exhausted()) {
-                            descend(problem, objective, result?.assignment ?: center, seed, sweep, stop, allowance,
-                                file.resolveSibling("descent-$arm-k$requestedCount.jsonl"))
-                        } else null
+                            descend(
+                                problem,
+                                objective,
+                                repaired ?: center,
+                                seed,
+                                sweep,
+                                stop,
+                                allowance,
+                                file.resolveSibling("descent-$arm-k$requestedCount.jsonl"),
+                            )
+                        } else {
+                            null
+                        }
                         val descentAccepted = descent?.let { checkSource(it.sample, stop) }
                         check(descentAccepted != false || stop())
                         val outcome = when {
@@ -297,101 +327,130 @@ internal object FiniteConflictSelection {
                             .invoke(guidance) as IntArray
                         writer.appendLine(
                             buildJsonObject {
-                            put("selector", arm)
-                            put("repairOwner", "finite-cp-cold")
-                            put("seed", seed)
-                            put("sourceCoordinateMapping", "identity")
-                            put("center", sample(center))
-                            put("centerObjective", objective.evaluateExact(center).toString())
-                            put("requestedCount", requestedCount)
-                            put("effectiveCountMatched", matched)
-                            put("requestedBools", JsonArray(requestedBools.map(::JsonPrimitive)))
-                            put("requestedInts", JsonArray(requestedInts.map(::JsonPrimitive)))
-                            put("effectiveBools", JsonArray(bools.map(::JsonPrimitive)))
-                            put("effectiveInts", JsonArray(ints.map(::JsonPrimitive)))
-                            put("guidanceStatus", get(guidance, "Status").toString())
-                            put(
-                                "guidanceConsumed",
-                                arm == "conflict" &&
-                                    get(guidance, "Status").toString() == "Supported",
-                            )
-                            put("capturedConflicts", get(guidance, "Conflicts") as Int)
-                            put("captureCapped", get(guidance, "Capped") as Boolean)
-                            put("captureAndSelectionVisits", get(guidance, "Visits") as Long)
-                            put("supportWeightsBoolThenInt", JsonArray(weights.map(::JsonPrimitive)))
-                            put("originScope", "same model, no assumptions, strict objective cutoff per attribution")
-                            put("branchPremisesAvailable", false)
-                            put("logicalConflictClaim", false)
-                            put("initialQueryCutoff", get(guidance, "OriginCutoff") as Double?)
-                            val attributions = guidanceType.methods.single { it.name == "attributions" }
-                                .invoke(guidance) as List<*>
-                            put(
-                                "scopedAttributions",
-                                JsonArray(
-                                    attributions.map { entry ->
-                                        val attribution = checkNotNull(entry)
-                                        buildJsonObject {
-                                            put("bools", JsonArray(
-                                                (get(attribution, "Bools") as IntArray).map(::JsonPrimitive)))
-                                            put("ints", JsonArray(
-                                                (get(attribution, "Ints") as IntArray).map(::JsonPrimitive)))
-                                            put("cutoff", get(attribution, "Cutoff") as Double)
-                                            (get(attribution, "LocalIncumbent") as Sample?)?.let {
-                                                put("localIncumbentObjective", objective.evaluateExact(it).toString())
+                                put("selector", arm)
+                                put("repairOwner", "finite-cp-cold")
+                                put("seed", seed)
+                                put("acquisitionMode", acquisitionMode)
+                                put("acquisitionPerformed", acquisitionPerformed)
+                                put("originEffectiveCountMatched", if (usesAcquisition) originMatched else null)
+                                put("originSelectorSeed", seed + 1)
+                                put("originSelectionAttempts", originSelection?.attempts ?: 0)
+                                put(
+                                    "originPinnedBools",
+                                    JsonArray(originPins?.boolKeys?.map(::JsonPrimitive).orEmpty()),
+                                )
+                                put("originPinnedBoolValues", JsonArray(
+                                    originPins?.boolValues?.map(::JsonPrimitive).orEmpty()))
+                                put("originPinnedInts", JsonArray(originPins?.intKeys?.map(::JsonPrimitive).orEmpty()))
+                                put("originPinnedIntValues", JsonArray(
+                                    originPins?.intValues?.map(::JsonPrimitive).orEmpty()))
+                                put("sourceCoordinateMapping", "identity")
+                                put("center", sample(center))
+                                put("centerObjective", objective.evaluateExact(center).toString())
+                                put("requestedCount", requestedCount)
+                                put("effectiveCountMatched", matched)
+                                put("requestedBools", JsonArray(requestedBools.map(::JsonPrimitive)))
+                                put("requestedInts", JsonArray(requestedInts.map(::JsonPrimitive)))
+                                put("effectiveBools", JsonArray(bools.map(::JsonPrimitive)))
+                                put("effectiveInts", JsonArray(ints.map(::JsonPrimitive)))
+                                put("guidanceStatus", get(guidance, "Status").toString())
+                                put(
+                                    "guidanceConsumed",
+                                    arm == "conflict" &&
+                                        get(guidance, "Status").toString() == "Supported",
+                                )
+                                put("capturedConflicts", get(guidance, "Conflicts") as Int)
+                                put("captureCapped", get(guidance, "Capped") as Boolean)
+                                put("captureAndSelectionVisits", get(guidance, "Visits") as Long)
+                                put("supportWeightsBoolThenInt", JsonArray(weights.map(::JsonPrimitive)))
+                                put("originScope", "same model/caller scope; recorded query pins and cutoff")
+                                put("branchPremisesAvailable", false)
+                                put("logicalConflictClaim", false)
+                                put("initialQueryCutoff", get(guidance, "OriginCutoff") as Double?)
+                                val attributions = guidanceType.methods.single { it.name == "attributions" }
+                                    .invoke(guidance) as List<*>
+                                put(
+                                    "scopedAttributions",
+                                    JsonArray(
+                                        attributions.map { entry ->
+                                            val attribution = checkNotNull(entry)
+                                            buildJsonObject {
+                                                put(
+                                                    "bools",
+                                                    JsonArray(
+                                                    (get(attribution, "Bools") as IntArray).map(::JsonPrimitive),
+                                                )
+                                                )
+                                                put(
+                                                    "ints",
+                                                    JsonArray(
+                                                    (get(attribution, "Ints") as IntArray).map(::JsonPrimitive),
+                                                )
+                                                )
+                                                put("cutoff", get(attribution, "Cutoff") as Double)
+                                                (get(attribution, "LocalIncumbent") as Sample?)?.let { incumbent ->
+                                                    val value = objective.evaluateExact(incumbent).toString()
+                                                    put("localIncumbentObjective", value)
+                                                }
                                             }
-                                        }
-                                    },
-                                ),
-                            )
-                            put("acquisitionNodes", acquisitionNodes)
-                            put("acquisitionWork", acquisitionWork)
-                            put("acquisitionImproved", acquisitionImproved)
-                            put("acquisitionResult", acquisitionResult?.let { it::class.simpleName })
-                            put("acquisitionReason", reason(acquisitionResult)?.name)
-                            acquisitionSample?.let {
-                                put("acquired", sample(it))
-                                put("acquiredObjective", objective.evaluateExact(it).toString())
-                                put("acquiredNativeSourceAccepted", acquisitionSourceAccepted)
-                            }
-                            put("acquisitionNanos", acquisitionNanos)
-                            put("selectionNanos", selectionNanos)
-                            put("selectionAttempts", selectionAttempts)
-                            put("remainingRepairDecisions", remaining)
-                            put("repairNodes", result?.stats?.search?.nodes?.sum ?: 0.0)
-                            put("containingWork", DECISIONS)
-                            put("maxRepairDecisions", REPAIR_DECISIONS)
-                            put("maxDescentMoves", DESCENT_MOVES)
-                            put("containingSeconds", 5)
-                            put("totalWork", allowance.spent)
-                            put("elapsedNanos", System.nanoTime() - started)
-                            put("allocatedBytes", allocation.getThreadAllocatedBytes(thread) - startedBytes)
-                            put("cancelled", stop())
-                            put("repairResult", result?.let { it::class.simpleName })
-                            put("repairReason", reason(result)?.name)
-                            put("repairOutcome", outcome)
-                            put("completedLocalExhaustion", exhausted)
-                            put("strictImprovement", improved)
-                            result?.assignment?.let {
-                                put("repaired", sample(it))
-                                put("repairedObjective", objective.evaluateExact(it).toString())
-                                put("nativeSourceAccepted", repairSourceAccepted)
-                            }
-                            put("globalProofClaim", false)
-                            put("declaredDescentRule", DESCENT_RULE)
-                            put("descentEndpoint", descent?.endpoint)
-                            put("descentEndpointClassified", descent?.endpoint in
-                                setOf("PolicyLocalOptimum", "FeasibleStall"))
-                            put("basinClassified", false)
-                            descent?.let {
-                                put("afterDescent", sample(it.sample))
-                                put("afterDescentObjective", objective.evaluateExact(it.sample).toString())
-                                put("descentNativeSourceAccepted", descentAccepted)
-                                put("descentMoves", it.moves)
-                                put("repairToDescentInputChanges", (result?.assignment ?: center)
-                                    .hammingDistanceTo(it.sample))
-                                put("centerToDescentInputChanges", center.hammingDistanceTo(it.sample))
-                            }
-                        }.toString()
+                                        },
+                                    ),
+                                )
+                                put("acquisitionNodes", acquisitionNodes)
+                                put("acquisitionWork", acquisitionWork)
+                                put("acquisitionImproved", acquisitionImproved)
+                                put("acquisitionResult", acquisitionResult?.let { it::class.simpleName })
+                                put("acquisitionReason", reason(acquisitionResult)?.name)
+                                acquisitionSample?.let {
+                                    put("acquired", sample(it))
+                                    put("acquiredObjective", objective.evaluateExact(it).toString())
+                                    put("acquiredNativeSourceAccepted", acquisitionSourceAccepted)
+                                }
+                                put("acquisitionNanos", acquisitionNanos)
+                                put("selectionNanos", selectionNanos)
+                                put("selectionAttempts", selectionAttempts)
+                                put("remainingRepairDecisions", remaining)
+                                put("repairNodes", result?.stats?.search?.nodes?.sum ?: 0.0)
+                                put("containingWork", DECISIONS)
+                                put("maxRepairDecisions", REPAIR_DECISIONS)
+                                put("maxDescentMoves", DESCENT_MOVES)
+                                put("containingSeconds", 5)
+                                put("totalWork", allowance.spent)
+                                put("elapsedNanos", System.nanoTime() - started)
+                                put("allocatedBytes", allocation.getThreadAllocatedBytes(thread) - startedBytes)
+                                put("cancelled", stop())
+                                put("repairResult", result?.let { it::class.simpleName })
+                                put("repairReason", reason(result)?.name)
+                                put("repairOutcome", outcome)
+                                put("completedLocalExhaustion", exhausted)
+                                put("strictImprovement", improved)
+                                repaired?.let {
+                                    put("repaired", sample(it))
+                                    put("repairedObjective", objective.evaluateExact(it).toString())
+                                    put("nativeSourceAccepted", repairSourceAccepted)
+                                }
+                                put("globalProofClaim", false)
+                                put("declaredDescentRule", DESCENT_RULE)
+                                put("descentEndpoint", descent?.endpoint)
+                                put(
+                                    "descentEndpointClassified",
+                                    descent?.endpoint in
+                                        setOf("PolicyLocalOptimum", "FeasibleStall"),
+                                )
+                                put("basinClassified", false)
+                                descent?.let {
+                                    put("afterDescent", sample(it.sample))
+                                    put("afterDescentObjective", objective.evaluateExact(it.sample).toString())
+                                    put("descentNativeSourceAccepted", descentAccepted)
+                                    put("descentMoves", it.moves)
+                                    put(
+                                        "repairToDescentInputChanges",
+                                        (repaired ?: center)
+                                            .hammingDistanceTo(it.sample),
+                                    )
+                                    put("centerToDescentInputChanges", center.hammingDistanceTo(it.sample))
+                                }
+                            }.toString(),
                         )
                         writer.flush()
                     } finally {
@@ -430,10 +489,19 @@ internal object FiniteConflictSelection {
         allowance: NodeBudget,
         file: File,
     ): Descent {
-        val strategy = SourceDrivenStrategy(sources = listOf(ConfiguredSource(ObjectiveSeed())),
-            acceptance = AcceptanceRule.GreedyDescent, feasibleDescent = FeasibleDescent.SelfOwned)
-        val solver = LocalSearchSolver(problem, strategy = strategy, greedyRepairOnRestart = false,
-            definitionalSweep = sweep, seedImplicitOnRestart = false)
+        val strategy = SourceDrivenStrategy(
+            sources = listOf(ConfiguredSource(ObjectiveSeed())),
+            acceptance = AcceptanceRule.GreedyDescent,
+            feasibleAcceptance = AcceptanceRule.GreedyDescent,
+            feasibleDescent = FeasibleDescent.SelfOwned,
+        )
+        val solver = LocalSearchSolver(
+            problem,
+            strategy = strategy,
+            greedyRepairOnRestart = false,
+            definitionalSweep = sweep,
+            seedImplicitOnRestart = false,
+        )
         val trace = RepairTrajectory.attach(solver, DESCENT_RULE)
         fun endpoint(): Pair<String, Sample>? {
             for (entry in get(trace, "Attempts") as List<*>) {
@@ -446,17 +514,27 @@ internal object FiniteConflictSelection {
             return null
         }
         val token = stop or Cancellation { endpoint() != null }
-        val params = LocalSearchParams(randomSeed = seed, initialAssignment = initial,
-            maxFlips = DESCENT_MOVES, maxInstructions = DESCENT_MOVES, nodeBudget = allowance,
-            cancellation = token, costShaping = CostShaping.Linear(lambda = 1.0))
+        val params = LocalSearchParams(
+            randomSeed = seed,
+            initialAssignment = initial,
+            maxFlips = DESCENT_MOVES,
+            maxInstructions = DESCENT_MOVES,
+            nodeBudget = allowance,
+            cancellation = token,
+            costShaping = CostShaping.Linear(lambda = 1.0),
+        )
         var best = initial
         var moves = 0.0
         solver.resumable(objective, params).use { run ->
             run.runSlice(token, Long.MAX_VALUE) { best = it.sample }?.assignment?.let { best = it }
             moves = run.stats.ls.moves.sum
         }
-        RepairTrajectory.write(trace, FinitePipelinePreparation(problem, objective, { it }, null),
-            IntArray(problem.numIntVars) { it }, file)
+        RepairTrajectory.write(
+            trace,
+            FinitePipelinePreparation(problem, objective, { it }, null),
+            IntArray(problem.numIntVars) { it },
+            file,
+        )
         val completed = endpoint()
         return Descent(completed?.second ?: best, completed?.first ?: "Censored", moves)
     }
