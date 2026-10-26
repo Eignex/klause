@@ -47,6 +47,8 @@ internal class LinearAuthorityTraversal(
     private val inheritBounds: Boolean = false,
     private val useCuts: Boolean = true,
     useActiveRows: Boolean = false,
+    useSupportBranching: Boolean = false,
+    private val onNumericalFeedback: ((SourceNumericalFeedbackResult) -> Unit)? = null,
 ) : SearchBrancher, SearchBranchProposal, SearchNodePolicy, AutoCloseable {
     override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
 
@@ -66,13 +68,20 @@ internal class LinearAuthorityTraversal(
     }, retainLp = true)
     private val initialCutObservations = authority.cutObservations()
     private val activeRows = if (useActiveRows) LinearActiveRows(source, budget) else null
+    private val feedback = if (useSupportBranching || onNumericalFeedback != null) {
+        SourceNumericalFeedback(requireNotNull(budget.funding), cancellation).also { it.attach(authority) }
+    } else null
+    private val supportBranching = if (useSupportBranching) LinearSupportBranching(requireNotNull(budget.funding))
+        else null
 
     fun captureTo(journal: LinearAuthorityCapture) {
         authority.capture = journal
+        feedback?.attach(authority)
     }
 
     override fun close() {
         activeRows?.close()
+        feedback?.detach(authority)
         if (ownsAuthority) authority.close()
     }
     private val root = CoverageNode(source.scope.condition)
@@ -98,7 +107,11 @@ internal class LinearAuthorityTraversal(
         "numericalRetainedNodes" to retained,
         "numericalLpPreparations" to authority.preparations,
         "numericalLpReuses" to authority.reuses,
-    )
+    ) + (feedback?.let { mapOf("numericalFeedbackCollections" to it.collections,
+        "numericalFeedbackUnavailable" to it.unavailable) } ?: emptyMap()) +
+        (supportBranching?.let { mapOf("numericalSupportConsultations" to it.consultations,
+            "numericalSupportSelections" to it.selections, "numericalSupportFallbacks" to it.fallbacks) }
+            ?: emptyMap())
 
     private fun observe(stage: String) {
         observations[stage] = (observations[stage] ?: 0L) + 1L
@@ -191,7 +204,14 @@ internal class LinearAuthorityTraversal(
             authority.capture?.record(source.atScope(source.scope.copy(condition = current.condition)),
                 null, null, null, LinearAuthorityResult())
             val partial = activeRows?.check(current.condition, cancellation, context::consumeCheck, authority.capture)
-                ?: return SearchNodeDisposition.Expand
+            if (partial == null) {
+                feedback?.consume(source.atScope(source.scope.copy(condition = current.condition)))?.let {
+                    onNumericalFeedback?.invoke(it)
+                }
+                return SearchNodeDisposition.Expand
+            }
+            feedback?.consume(source.atScope(source.scope.copy(condition = current.condition)),
+                paused = partial.paused)?.let { onNumericalFeedback?.invoke(it) }
             if (partial.attempted) observe("numericalPartialChecks")
             if (partial.captureDeclined) observe("numericalPartialIncompleteCaptures")
             if (partial.unchanged) observe("numericalPartialUnchangedStates")
@@ -246,12 +266,14 @@ internal class LinearAuthorityTraversal(
             observations[key] = if ("Max" in stage) maxOf(previous, count) else previous + count
         }
         if (result.paused) {
+            feedback?.consume(branch, paused = true)?.let { onNumericalFeedback?.invoke(it) }
             current.pending = true
             observe("numericalLpPauses")
             return SearchNodeDisposition.Pause
         }
         current.pending = false
         linkCapture(branch.scope)
+        val numericalFeedback = feedback?.consume(branch)?.also { onNumericalFeedback?.invoke(it) }
         current.result = if (result.primalStages.isEmpty()) result else result.copy(primalStages = emptyMap())
         observe("numericalChecks")
         if (result.coordinateConflict) observe("numericalCoordinateConflicts")
@@ -295,7 +317,9 @@ internal class LinearAuthorityTraversal(
         }
         if (current.coveredBound != null) return SearchNodeDisposition.Prune
         result.split?.let { (coordinate, threshold) ->
-            val candidate = if (useBranchHistory) branchHistory.select(result.fractional, cancellation)
+            val candidate = if (supportBranching != null && numericalFeedback != null)
+                supportBranching.select(numericalFeedback, result.fractional, cancellation)
+                else if (useBranchHistory) branchHistory.select(result.fractional, cancellation)
                 else result.fractional.firstOrNull()
             val selected = candidate?.floorSplit() ?: (coordinate to threshold)
             if (selected != result.split) observe("numericalHistorySelections")
