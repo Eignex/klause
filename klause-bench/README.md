@@ -2966,6 +2966,27 @@ retraction, numeric alternatives, negative premises, support ties, leaf order an
 interruption. These controls isolate Boolean bookkeeping; whole-source quality and hard-source
 throughput remain unmeasured.
 
+### Nonlinear integer completion controls
+
+[8425](https://lab.eignex.com/jobs/8425) runs all twelve `nonlinear-integer-v1`
+sources at `1c297c2502`, ordinary defaults, P1, seed 3, ten seconds and debug
+disabled on Linux/amd64. All original hashes match the fixture manifest. Six
+sources select nonlinear-integer execution, five finite CP and one polynomial-real
+execution. Nine SAT results include seven models accepted by Dolmen 0.10 and two
+power-syntax cases the checker cannot admit. The two native UNSAT claims have no
+independent proof certificate; `open-no-integer-root` returns UNKNOWN at fixed-work
+exhaustion.
+
+That UNKNOWN records 768 nodes, 517,381 native units, twelve projected polynomials
+and twelve lifted cells. Its whole-CLI external-time receipt records 3.77 seconds
+and peak RSS of 124,248 KiB; allocation was not collected. Its neighborhood counters
+report 178 completions, four refuted and 174 undecided. These single-arm records
+supply routing and cost controls. Aggregate counters do not identify per-cursor
+failed completions, repeated proof support or newly excluded tuples. In particular,
+`open-integer-product` records both backtracking and local-search segments despite
+its final zero-node aggregate. Guarded exclusion reuse needs a checked source
+explanation and a comparison with visited-tuple filtering under the same producer.
+
 ### State ownership
 
 Retain concrete buffer owners, separate indexed vector roles and one cursor/cleanup
