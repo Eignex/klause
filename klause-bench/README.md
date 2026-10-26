@@ -1478,6 +1478,13 @@ remain unavailable rather than becoming completed fully pinned repairs. Cold
 fragments start from the specified owner seed; retained fragments keep RNG and
 activity state. These comparisons do not attribute all node differences to clauses
 or charge selection costs as owner repair work.
+The merged `FiniteConflictSelection` diagnostic accepts `ownerReplay=true` to
+replay its actual conflict-supported, baseline and acquisition-ablated scopes
+under the same contract. Acquisition costs remain in the hash-bound
+`selections.jsonl`; unmatched source counts, missing scopes and unavailable
+guidance remain distinct. This conditioned replay uses the exact checked center
+cutoff, with the native acquisition threshold retained separately in the selection
+record; it does not combine acquisition and repair into a policy comparison.
 
 Model keys, domains, objectives, source bytes and
 build identity remain alongside the walk. Inputs admit at most 64 MiB,
@@ -2637,6 +2644,29 @@ use the original authority rows; finite-owner closures refer only to their
 conditioned working model. Every accepted point passes `checkMpsWitness` on the
 original columns. Real snapshots without exact values and nonrepresentable CP
 cutoffs remain unavailable; finite domains are never invented by this replay.
+Reports distinguish completed conditioned optimization from a closed initial
+strict cutoff: an improving point can accompany the former, while only a
+nonimproving working query establishes the latter. Both the working and checked
+original-source objective predicates must hold before reporting an MPS gain.
+
+[MPS owner replay 8580](https://lab.eignex.com/jobs/8580), at `02d362ad1f`,
+qualifies thirteen matched conditions on original p0033 and rgn hashes. From
+p0033's checked 3302 point, both CP owners improve five of ten scopes, LS four and
+each mixed owner one; every reported gain also improves the checked original
+objective. Cold CP uses 12,770 nodes; retained uses 9,642 and observes at least 31
+previously unused retained nogoods becoming useful. The retained sequence reaches
+its fragment allowance once; later completed fragments retain their proper stop
+reason after reset. Allocation and observation overspend remain separate costs,
+and node differences include retained RNG/activity as well as explanations.
+Rgn's three exact non-binary cutoffs remain unavailable to CP; LS exhausts its
+allowance and both mixed owners retain feasible nonimprovements. No domain is
+invented and no original row is omitted from mixed completion.
+
+[Maximization control 8585](https://lab.eignex.com/jobs/8585), at `cca43a8fe8`,
+checks an exact affine real backing with source objective `0.1*y` and scale ten.
+All five owners find the checked gain from zero to `1/10` when the source integer
+is free; fixed-input queries admit no strict gain. These instrumented native
+checks grant no independent witness certification or unpinned proof authority.
 
 [Scoped baseline 8448](https://lab.eignex.com/jobs/8448) runs `e805182280` on
 Linux/amd64 with the two hash-matched original modglob/rgn sources and refined

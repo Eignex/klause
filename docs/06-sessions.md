@@ -52,7 +52,7 @@ session push/pop always starts a fresh search.
 
 A retained repair starts an explicit fragment and advances it in slices. Its
 best improving sample and stop reason are independent: a missing reason means a
-pause, `SearchExhausted` closes only the current pins and cutoff, and cancellation,
+pause, `SearchExhausted` completes the conditioned optimization, and cancellation,
 budget exhaustion or unavailable completion prove no closure. A slice cancellation
 can resume; the fragment's lifetime cancellation remains terminal until another
 fragment starts. Starting a sibling retires the old trail and slice while retaining
@@ -60,6 +60,8 @@ compatible learned clauses and LP state. Closing releases both, and terminal
 observations remain readable.
 The traversal reset clears the preceding fragment's stopped-budget marker without
 renewing the containing allowance.
+A completed fragment closes its requested strict cutoff only when no improving
+working point was found; a better point and completed optimization remain distinct.
 
 ALNS records retained repair observations as a best found point or an unknown
 result with that scoped stop reason. The observation carries no unpinned
