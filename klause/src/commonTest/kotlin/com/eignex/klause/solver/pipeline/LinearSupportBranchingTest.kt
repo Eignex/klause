@@ -1,0 +1,57 @@
+package com.eignex.klause.solver.pipeline
+
+import com.eignex.klause.lp.SourceLpFunding
+import com.eignex.klause.lp.optimization.LinearAuthorityCapturedCut
+import com.eignex.klause.lp.optimization.LinearAuthorityCapturedQuery
+import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.evidence.SourceCoordinate
+import com.eignex.klause.solver.evidence.SourceDerivation
+import com.eignex.klause.solver.evidence.SourceInequality
+import com.eignex.klause.solver.evidence.SourcePremise
+import com.eignex.klause.solver.evidence.SourceProofContext
+import com.eignex.klause.solver.evidence.SourceRevision
+import com.eignex.klause.solver.evidence.SourceScope
+import com.eignex.klause.util.Cancellation
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+
+class LinearSupportBranchingTest {
+    private val x = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+    private val y = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
+    private val point = linkedMapOf(x to BigFraction.ofLong(4).reciprocal(), y to BigFraction.ofLong(2).reciprocal())
+    private val row = SourceInequality(mapOf(x to BigFraction.ofLong(2), y to BigFraction.ONE), BigFraction.ONE)
+    private val source = SourceProofContext(SourceScope(SourceRevision("branch", "exact-affine")),
+        setOf(x, y), mapOf("row" to SourcePremise(row)), emptyMap())
+    private val cut = LinearAuthorityCapturedCut(0, 0, row, SourceDerivation.Premise("row"),
+        installed = true, ownerActive = true, checked = true, violation = BigFraction.ZERO)
+    private val query = LinearAuthorityCapturedQuery(0, source, source, listOf(x, y), emptyList(), emptySet(),
+        point, listOf(cut), emptyMap(), null, null, "bound-unavailable")
+
+    @Test
+    fun `tight cut support should rank the more fractional integer coordinate`() {
+        val funding = SourceLpFunding(1_000L, 10_000L).apply { grant(1_000L) }
+        val branching = LinearSupportBranching(funding)
+
+        val selected = branching.select(SourceNumericalFeedbackResult.Available(query, null),
+            point.toList(), Cancellation.Never)
+
+        assertEquals(y to point.getValue(y), selected)
+        assertEquals(1L, branching.selections)
+        assertTrue(funding.spent > 0L)
+    }
+
+    @Test
+    fun `uninstalled inactive unchecked and slack cuts should preserve source order`() {
+        val funding = SourceLpFunding(1_000L, 10_000L).apply { grant(1_000L) }
+        val branching = LinearSupportBranching(funding)
+
+        for (ignored in listOf(cut.copy(installed = false), cut.copy(ownerActive = false),
+            cut.copy(checked = false), cut.copy(violation = BigFraction.MINUS_ONE))) {
+            val selected = branching.select(SourceNumericalFeedbackResult.Available(query.copy(cuts = listOf(ignored)),
+                null), point.toList(), Cancellation.Never)
+
+            assertEquals(x to point.getValue(x), selected)
+        }
+    }
+}

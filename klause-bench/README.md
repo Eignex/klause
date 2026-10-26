@@ -4651,6 +4651,23 @@ the exact point, scope, bound and modeled work in both fresh repetitions of all
 eight `rgn` parent/mask pairs. All 16 bounds and 640 candidate derivations pass
 fresh native checks; no replay reaches its allowance. The original source hash
 and Linux/amd64 platform match 8431.
+
+#### Source numerical decision feedback
+
+`source-support-branching=true` enables a bounded decision consumer of the
+same-parent journal. Installed checked cuts close to their LP-point boundary
+rank fractional integer coordinates by support size and fractional distance.
+The p0033 capture 8433 retains three nearly tight rounding rows at its root;
+these exact-valued coordinates are pre-recovery guidance with numerical residuals.
+This motivates a comparison of checked coverage and cumulative work against
+source order, without reactivating gain history, probing or refutation priority.
+The runtime adapter exposes actual query scopes, cut masks, points, source rows,
+checked bound/refutation records and unavailable states to repair consumers.
+Cutoff attribution requires the actual strict objective premise.
+Collection and scoring debit the containing source funding. Qualification must
+separate consumed choices, checked outcomes, total work, modeled allocation and
+whole-process memory; the option is disabled by default.
+
 #### Active rows before Boolean completion
 
 [8424](https://lab.eignex.com/jobs/8424) and

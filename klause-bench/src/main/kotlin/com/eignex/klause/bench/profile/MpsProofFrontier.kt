@@ -59,7 +59,7 @@ internal object MpsProofFrontier {
         }
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val supported = setOf("suite", "problem", "sha256", "exact", "probe", "history", "frontier", "cuts",
-            "selection", "replay", "operations", "activeRows")
+            "selection", "replay", "operations", "activeRows", "supportBranching")
         require(options.keys.containsAll(setOf("suite", "problem", "sha256", "exact")) &&
             (options.keys - supported).isEmpty())
         val probe = options["probe"]?.toBooleanStrict() ?: false
@@ -92,6 +92,7 @@ internal object MpsProofFrontier {
         val request = field(execution, "request") as NumericalLinearRequest
         val solveStop = preparationStop or Cancellation.after(10.seconds)
         val params = TheoryParams(timeout = solveStop, cancellation = solveStop, randomSeed = 3L,
+            sourceSupportBranching = options["supportBranching"]?.toBooleanStrict() ?: false,
             sourceCuts = options["cuts"]?.toBooleanStrict() ?: true,
             sourceLpOperations = options["operations"]?.toInt()?.also { require(it in 1..256) } ?: Int.MAX_VALUE)
         val authority = request.javaClass.declaredMethods.single {

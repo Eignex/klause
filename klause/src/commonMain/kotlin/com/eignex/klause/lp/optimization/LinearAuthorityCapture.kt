@@ -56,6 +56,7 @@ internal class LinearAuthorityCapture(
     }
     private val retained = ArrayList<LinearAuthorityCapturedQuery>()
     val records: List<LinearAuthorityCapturedQuery> get() = retained.toList()
+    val lastRecord: LinearAuthorityCapturedQuery? get() = retained.lastOrNull()
     var entries: Long = 0L
         private set
     var bytes: Long = 0L

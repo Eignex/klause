@@ -292,6 +292,9 @@ for both children and their captured condition maps. Resuming cannot renew eithe
 separation in numerical frontier traversal. `source-lp-operations` supplies an independent
 operation ceiling for controlled comparisons. Other source LP clients retain their
 operation-based admission policy.
+Optional numerical decision feedback debits journal collection, retention and
+support scoring to the same cumulative source funding. Exhausted feedback retains
+source-order branching and every complementary alternative.
 
 Each retained sparse query takes its finite numerical lifetime from the caller's
 remaining cumulative work, with a proportional pivot allowance. Slice grants limit
