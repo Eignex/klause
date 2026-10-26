@@ -256,7 +256,11 @@ internal class JointLinearRepair(
                 return JointRepairAttempt(ExactNeighborhoodResult.Witness(sample),
                     feasiblePoint = sample, bound = snapshot.bound)
             }
-            return JointRepairAttempt(ExactNeighborhoodResult.Undecided, TerminationReason.Unsupported,
+            return JointRepairAttempt(ExactNeighborhoodResult.Undecided, when {
+                params.timeout() -> TerminationReason.Timeout
+                stop() -> TerminationReason.Cancelled
+                else -> TerminationReason.Unsupported
+            },
                 bound = snapshot.bound)
         }
         if (condition.cutoff != null) {

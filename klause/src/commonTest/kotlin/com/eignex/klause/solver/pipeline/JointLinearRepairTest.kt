@@ -8,6 +8,7 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.SparseSourceLpPolicy
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceDerivation
@@ -54,7 +55,7 @@ class JointLinearRepairTest {
             factors = emptyArray())
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
-        val center = com.eignex.klause.solver.Sample(BooleanArray(0), longArrayOf(1))
+        val center = Sample(BooleanArray(0), longArrayOf(1))
         val condition = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ONE),
             mapOf(0 to BigFraction.ONE), BigFraction.ONE)
         JointLinearRepair(model, source, objective, TheoryParams(), boundOrdered = true,
