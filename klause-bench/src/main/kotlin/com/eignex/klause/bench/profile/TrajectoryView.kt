@@ -13,6 +13,9 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
+internal const val TRAJECTORY_COORDINATE_LIMIT = 4096
+internal const val TRAJECTORY_FACTOR_LIMIT = 8192
+
 internal class TrajectoryView(
     val label: String,
     val state: LocalSearchState,
@@ -26,8 +29,8 @@ internal class TrajectoryView(
 
     init {
         require(state.problem.numRealVars == 0)
-        require(state.problem.numBoolVars + state.problem.numIntVars <= 1024)
-        require(state.problem.numFactors <= 4096)
+        require(state.problem.numBoolVars + state.problem.numIntVars <= TRAJECTORY_COORDINATE_LIMIT)
+        require(state.problem.numFactors <= TRAJECTORY_FACTOR_LIMIT)
         require(capturedOwners == null || capturedOwners.size == state.problem.numIntVars)
         require((0 until coordinates.boolCount).all { coordinates.bool(it) in -1 until state.problem.numBoolVars })
         require((0 until coordinates.intCount).all { coordinates.int(it) in -1 until state.problem.numIntVars })

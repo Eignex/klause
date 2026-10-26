@@ -1602,7 +1602,7 @@ or search evidence.
 `sliceWork`. Optional `source64` supplies at most 96 KiB of base64-encoded original
 bytes instead of resolving the catalog archive; the required decoded-source hash
 still binds the input. It compares protected and substituted minimizing XCSP3 objectives.
-The source is limited to 64 MiB, 1024 finite coordinates and 4096 factors; each
+The source is limited to 64 MiB, 4096 finite coordinates and 8192 factors; each
 walk has at most one million moves and a shared sixty-second preparation/walk
 deadline per representation. `provenance.json`, `request.txt`, unchanged
 `source.xml`, `capture-policy.json` and both model descriptions bind the input,
