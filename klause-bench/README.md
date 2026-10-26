@@ -1597,6 +1597,39 @@ or search evidence.
 
 ### Cargo objective-coordinate trajectories
 
+`LocalSearchTrajectory` accepts `suite`, `problem`, decoded-source `sha256`,
+`recipe`, worker `seed` and `moves`, with optional `greedy`, `sliceMillis` and
+`sliceWork`. It compares protected and substituted minimizing XCSP3 objectives.
+The source is limited to 64 MiB, 1024 finite coordinates and 4096 factors; each
+walk has at most one million moves and a shared sixty-second preparation/walk
+deadline per representation. `provenance.json`, `request.txt`, unchanged
+`source.xml`, `capture-policy.json` and both model descriptions bind the input,
+installed distribution/runtime, effective semantics, settings and slot maps.
+Ordinary solve records remain authoritative for worker seeds, initialization,
+restarts and scheduler allocations.
+
+Passive walk samples copy committed state without candidate probes or random
+draws, and never force lazy weight allocation. RNG boundaries retain the concrete
+JVM implementation and integer fields. Kotlin XorWow's Weyl addend additionally
+identifies underlying 32-bit draws modulo `2^32`; other implementations report
+the counter unsupported. Equal seeds and move counts do not isolate randomness.
+Greedy entries describe the state before the named shuffled coordinate; paired
+captures include initialization, entries 0/49/68/final and the completed pass.
+
+`paired.jsonl` uses private `TrajectoryView` states and `trajectoryPair` for the
+objective, channel and global comparisons. Explicit `VarRemap` tables describe
+source-coordinate correspondence. Every load must reconstruct every source
+Boolean and integer unchanged after definition synchronization; inconsistent
+eliminated or maintained outputs report `source-round-trip`, rather than a
+repaired counterpart. Open/reals and non-slot-preserving transformations require
+another correspondence and are outside this runner. At most twelve source states
+each perform two full loads and 32 candidate pairs. Each accepted primitive runs
+one ordinary reversible `inspectMove` probe, capturing factor grades, raw/weighted
+hard deltas and the selected objective delta; destination equality is reported
+separately. Pins, definitions, domains and implicit owners can reject a candidate.
+These bounded diagnostics are additional work, separate from free-walk budgets
+and timing; they grant no source witness or proof authority.
+
 [Confirmation 8203](https://lab.eignex.com/jobs/8203) retains the frozen original
 Cargo-09-1s-18_c24 source at default mixed/P1/30 seconds on Mac/aarch64. Seed 3
 finds three independently accepted final witnesses at `f59091a21acf` and none at
