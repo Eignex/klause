@@ -1486,6 +1486,10 @@ and 4,096 factors. The source bytes, request and build identity accompany the re
 A `batch64` JSON array of argument arrays compares several pinned controls in one
 lab profile. The [weighted Latin control](smoke-corpus/finite-repair-evidence/README.md)
 has an exact feasible center and lower-bound witness.
+`acquisition=source-root|sampled-fragment` selects a full-source prefix or a
+count-matched random repair prefix under explicit complement pins. The fragment
+draw uses `seed + 1`; final selector ties use `seed`. Both acquisition arms retain
+their actual origin pins and share the same prefix.
 
 Random, objective and adjacency removal compare with CP-conflict-supported removal
 at the same center and requested count. A separate acquisition-ablated random arm
@@ -1498,7 +1502,8 @@ Records retain captured support weights, unavailable/empty outcomes, acquisition
 points, repaired objectives, native original-source checks, work, allocation and
 separate acquisition/selection clocks. The shared repair trace records the first
 qualified source-coordinate greedy descent endpoint with the declared tie seed;
-censored descents remain unclassified. Source input distance and checked objective
+candidates use explicit feasible greedy acceptance, and censored descents remain
+unclassified. Source input distance and checked objective
 after descent stay separate from repair acceptance. These instrumented controls
 establish no independent witness check, global proof, basin classification or
 ordinary portfolio throughput.

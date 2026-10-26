@@ -220,11 +220,11 @@ internal class ConflictSupportedRemoval(
         }
         captured.add(
             ScopedConflictAttribution(
-            bools.copyOf(),
-            ints.copyOf(),
-            minOf(externalCutoff, localCutoff),
-            localIncumbent,
-        )
+                bools.copyOf(),
+                ints.copyOf(),
+                minOf(externalCutoff, localCutoff),
+                localIncumbent,
+            ),
         )
         visits += bools.size + ints.size
         status = if (hasSupport) ConflictGuidanceStatus.Supported else ConflictGuidanceStatus.EmptySupport
@@ -239,9 +239,9 @@ internal class ConflictSupportedRemoval(
     ): FreedVars {
         if (closed) status = ConflictGuidanceStatus.Closed
         if (!closed && (
-            problem !== model || objective !== this.objective ||
-                (center != null && incumbent !== center)
-        )
+                problem !== model || objective !== this.objective ||
+                    (center != null && incumbent !== center)
+                )
         ) {
             discard(ConflictGuidanceStatus.Incompatible)
         }
