@@ -1,0 +1,21 @@
+<instance format="XCSP3" type="COP">
+  <variables>
+    <array id="x" size="[4][4]"> 0..3 </array>
+  </variables>
+  <constraints>
+    <allDifferent> x[0][] </allDifferent>
+    <allDifferent> x[1][] </allDifferent>
+    <allDifferent> x[2][] </allDifferent>
+    <allDifferent> x[3][] </allDifferent>
+    <allDifferent> x[][0] </allDifferent>
+    <allDifferent> x[][1] </allDifferent>
+    <allDifferent> x[][2] </allDifferent>
+    <allDifferent> x[][3] </allDifferent>
+  </constraints>
+  <objectives>
+    <minimize type="sum">
+      <list> x[][] </list>
+      <coeffs> 8 1 1 1 1 4 1 1 1 1 2 1 1 1 1 1 </coeffs>
+    </minimize>
+  </objectives>
+</instance>
