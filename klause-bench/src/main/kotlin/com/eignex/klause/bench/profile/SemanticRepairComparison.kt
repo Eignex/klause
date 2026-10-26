@@ -55,7 +55,7 @@ internal object SemanticRepairComparison {
         val companion = operator.getField("Companion").get(null)
         val oldDestroy = operator.methods.single { it.name == "destroy" && it.parameterCount == 7 }
         val baselines = listOf("Random", "WorstObjective", "AdjacencyRelated").associateWith {
-            getter(companion, it)!!
+            checkNotNull(getter(companion, it))
         }
         val freedType = Class.forName("com.eignex.klause.meta.alns.FreedVars")
         val freedConstructor = freedType.getDeclaredConstructor(IntArray::class.java, IntArray::class.java)
@@ -113,6 +113,7 @@ internal object SemanticRepairComparison {
                         put("seed", seed + repetition)
                         put("selector", arm)
                         put("kind", kind)
+                        put("center", RepairTrajectory.sample(center))
                         put("nominalSourceTarget", target)
                         put("effectiveSourceInputs", sourceCount)
                         put("sourceCountMatched", sourceCount == target)
@@ -127,6 +128,7 @@ internal object SemanticRepairComparison {
                         put("requestedInts", JsonArray(((requested?.let { getter(it, "Ints") }) as IntArray?
                             ?: intArrayOf()).map(::JsonPrimitive)))
                         put("effectiveInts", JsonArray(variables.map(::JsonPrimitive)))
+                        put("effectiveBools", JsonArray(bools.map(::JsonPrimitive)))
                         put("centerObjective", objective.evaluate(center))
                         put("result", result?.let { it::class.simpleName })
                         put("reason", when (result) {
