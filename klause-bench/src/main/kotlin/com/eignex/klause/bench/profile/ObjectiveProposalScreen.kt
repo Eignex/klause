@@ -10,6 +10,7 @@ import com.eignex.klause.util.Cancellation
 import java.io.File
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -21,13 +22,13 @@ internal fun captureObjectiveProposals(
     sourceObjective: LinearObjective,
     sourceModel: BakedProblem,
     out: File,
-) {
+): Boolean {
     val bytes = trajectoryThreadBytes()
     val started = System.nanoTime()
     val decline = view.load(source)
     if (decline != null || canonical == null) {
         out.writeText(buildJsonObject { put("decline", decline ?: "canonical-objective") }.toString())
-        return
+        return false
     }
     val state = view.state
     val boundary = trajectoryRandomBoundary(state)
@@ -36,8 +37,12 @@ internal fun captureObjectiveProposals(
     ObjectiveSeed().generate(state, raw)
     ObjectiveSeed().generate(state, sink)
     val stop = Cancellation.after(10.seconds)
-    val probes = sink.list.distinct().take(32).map { move ->
-        if (stop()) return@map buildJsonObject { put("decline", "probe-time-budget") }
+    val candidates = sink.list.distinct()
+    val probes = ArrayList<JsonObject>()
+    var visited = 0
+    var disagreements = 0
+    for (move in candidates) {
+        if (stop()) break
         val inspection = state.inspectMove(move, canonical)
         val point = view.reconstruct(inspection.assignment)
         val agreement = functional?.let {
@@ -45,7 +50,9 @@ internal fun captureObjectiveProposals(
                 it.name == "objectiveProposalValuesAgree"
             }.invoke(null, state, it, move) as Boolean
         }
-        buildJsonObject {
+        visited++
+        if (agreement != true) disagreements++
+        if (probes.size < 32) probes += buildJsonObject {
             put("move", move.toString())
             put("source", trajectorySource(point))
             put("canonicalValue", canonical.evaluateExact(inspection.assignment).toString())
@@ -57,12 +64,18 @@ internal fun captureObjectiveProposals(
             put("independentWitnessCheck", false)
         }
     }
+    val complete = visited == candidates.size && disagreements == 0 && functional != null
     check(boundary == trajectoryRandomBoundary(state))
     out.writeText(buildJsonObject {
         put("source", trajectorySource(source))
         put("unfilteredTemplates", raw.list.size)
         put("ordinarySinkMoves", sink.list.size)
         put("distinctOrdinarySinkMoves", sink.list.distinct().size)
+        put("completeCandidateValuesChecked", visited)
+        put("candidateValueDisagreements", disagreements)
+        put("candidateValueQualification", complete)
+        if (!complete) put("decline", if (disagreements > 0) "candidate-value-disagreement"
+            else "incomplete-candidate-value-scan")
         put("filterAccounting", "templates precede pins, definitions and owners; channel expansion can add moves")
         put("candidates", JsonArray(probes))
         put("candidateLimit", 32)
@@ -72,4 +85,5 @@ internal fun captureObjectiveProposals(
         put("proposalEquivalenceClaim", false)
         put("globalEquivalenceFromSamples", false)
     }.toString())
+    return complete
 }

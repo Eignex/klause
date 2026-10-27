@@ -172,7 +172,7 @@ internal object LocalSearchTrajectory {
             put("revision", Reports.readGitSha() ?: System.getenv("LAB_WORKTREE")?.let(::File)?.name
                 ?.takeIf { it.matches(Regex("[0-9a-f]{40}")) })
             put("sourceSha256", sha256(bytes))
-            put("sourceMode", if ("source64" in options) "embedded" else "catalog")
+            put("sourceMode", if ("source64" in options || "sourceGzip64" in options) "embedded" else "catalog")
             put("declaredSemantics", parsed.semantics.declared.toString())
             put("effectiveSemantics", parsed.semantics.effective.toString())
             put("settings", parsed.problem.settings.toString())
@@ -275,15 +275,15 @@ internal object LocalSearchTrajectory {
                 })
                 put("domains", JsonArray(problem.rootIntDomains().map { JsonPrimitive(it.toString()) }))
                 put("sourceBooleanSlots", JsonArray((0 until parsed.problem.numBoolVars).map {
-                    JsonPrimitive(if (it < problem.numBoolVars) it else -1)
+                    JsonPrimitive(coordinates?.bool(it) ?: -1)
                 }))
                 put("sourceIntegerSlots", JsonArray((0 until parsed.problem.numIntVars).map {
-                    JsonPrimitive(if (it < problem.numIntVars) it else -1)
+                    JsonPrimitive(coordinates?.int(it) ?: -1)
                 }))
                 put("sourceIntegerNames", buildJsonObject {
                     for ((name, variable) in parsed.intVarNames) put(name, variable)
                 })
-                put("correspondenceAdmission", "slot-preserving load plus complete source round trip")
+                put("correspondenceAdmission", "prepared coordinate map plus complete source round trip")
                 put("sourceVerdictClaim", false)
             }.toString())
             if (coordinates == null) {
@@ -401,6 +401,10 @@ internal object LocalSearchTrajectory {
                     val recipe = trajectoryRecipe(options.getValue("recipe")).withSources {
                         listOf(ConfiguredSource(recorder)) + it
                     }
+                    if (workingInitial != null && recipe.seedImplicitOnRestart) {
+                        out.resolve("decline-$label.txt").writeText("center-implicit-ownership-unsupported\n")
+                        return@use
+                    }
                     val solver = LocalSearchSolver(
                         problem, strategy = recipe.strategy, optimizeStrategy = recipe.optimizeStrategy,
                         greedyRepairOnRestart = walk && repairGreedy,
@@ -424,7 +428,7 @@ internal object LocalSearchTrajectory {
                             null
                         }
                         out.resolve("result-$label.txt").writeText(
-                            "picks=$picks\ncancelled=${stop()}\nresult=$result\nstats=${run.stats}\n",
+                            "picks=$picks\ncancelled=${walkStop()}\nresult=$result\nstats=${run.stats}\n",
                         )
                     } else solver.resumable(workingObjective, params).use { run ->
                         val allocation = ManagementFactory.getThreadMXBean() as ThreadMXBean
