@@ -3782,6 +3782,40 @@ for these captured freedoms: the catalog's definition sweep, structured scoring 
 implicit ownership add cost without consistent gains over default LS, whose own gains
 depend on the owner seed. This is not a general LS-versus-CP ranking.
 
+Recipe `cbls-implicit-unused/fixed` adds the opt-in `unused-values` owner source to
+the implicit catalog arm. The AllDifferent seed globals behind 8764's partial-owner
+rows are closed permutations: ClockTriplet's 20 inputs over `1..20` and
+assignment-cycle's three inputs over `{0,1,2}`. Every freed coordinate's domain holds
+only occupied values, so those fragments are locked by the constraint itself;
+RCPSP and CarpetCutting seed Cumulative or NoOverlap instead.
+[8809](https://lab.eignex.com/jobs/8809), [8810](https://lab.eignex.com/jobs/8810),
+[8811](https://lab.eignex.com/jobs/8811) and [8821](https://lab.eignex.com/jobs/8821)
+replay identical scopes at `5a017677b6`. On the `assignment-unused` slack control,
+across owner seeds 101–104, the swap-only owner finds none of 16 gains. The unused
+owner finds all 16, like default LS and both CP owners. On closed assignment-exchange
+and ClockTriplet, both owners' rows, tallies and endpoints are identical.
+Assignment-cycle's walk was censored, so it supplied no center.
+On AircraftLanding airland01, CP improves 7 of 40 captured scopes per mode. The
+swap-only owner improves none, and the unused owner improves 6 by moving landing times
+to unoccupied values; one row frees a single seed coordinate. CP reaches the same
+point on three of them and a deeper one on the other three, and improves one scope the
+unused owner misses. All six post-repair descents stop at checked policy-local
+endpoints; both acquisition modes capture the same scopes. KMedian pmed01's scopes are all closed by CP. On pmed02 no owner gains, and
+the unused owner's element-heavy scoring costs about ten times the time per move, so
+its 10-second containing allowance ends after 12 of 80 selector rows. The conflict
+selector's 1,024-coordinate limit stops 8811 at pmed02.
+
+The fixed-work single-arm solve [8825](https://lab.eignex.com/jobs/8825), at
+`9e5809eae7`, uses 100,000 equivalents, 20 seconds and seeds 1–3. All 450 checked
+witnesses are valid. Against the swap-only implicit arm, the source wins 44 of 45
+KMedian runs (mean −1536) while running time-bound at a tenth of the work. It ties
+59 of 66 closed-permutation runs with two wins and five losses; CyclicBandwidth's
+104-input scope exceeds the scan share and draws random offsets. Implicit
+AircraftLanding stays infeasible in 38 of 39 runs, against all 39 without it. Unowned `cbls/fixed` stays as strong
+on KMedian (22 wins, 23 losses) and dominates AircraftLanding and ClockTriplet. The
+source therefore restores value-set mobility without qualifying a catalog change, and
+remains opt-in.
+
 [Merged-proposal MPS comparison 8697](https://lab.eignex.com/jobs/8697), at
 `c6f1b10a5a`, consumes four actual source-role guided pairs from the checked modglob
 35.1471M center. Each frees x201 with one of x251/x223/x221/x255; original real
