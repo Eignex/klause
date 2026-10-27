@@ -187,10 +187,11 @@ internal class LinearAuthorityTraversal(
         val child = when (decision) {
             is SearchDecision.Bool -> {
                 val id = Lit.variable(decision.literal)
-                if (source.coordinates.none { it.kind == SourceCoordinate.Kind.Boolean && it.id == id }) {
-                    return ComponentResult.Consistent
+                if (useRefutationPropagation) {
+                    if (source.coordinates.none { it.kind == SourceCoordinate.Kind.Boolean && it.id == id } ||
+                        current.condition.bools[id] == Lit.isPositive(decision.literal)
+                    ) return ComponentResult.Consistent
                 }
-                if (current.condition.bools[id] == Lit.isPositive(decision.literal)) return ComponentResult.Consistent
                 val split = current.split ?: CoverageSplit.Boolean(id, current.condition).also {
                     current.split = it
                     splitCreated()
@@ -242,10 +243,18 @@ internal class LinearAuthorityTraversal(
                 source.coordinates.any { it.kind == SourceCoordinate.Kind.Boolean && context.boolValue(it.id) == null }
             ) break
             val exclusion = refutations?.unit(node.condition) ?: break
-            val atom = integerAtom(context, exclusion.coordinate, exclusion.threshold) ?: break
+            val atom = integerAtom(context, exclusion.coordinate, exclusion.threshold)
+            if (atom == null) {
+                observe("numericalRefutationUnitNameDeclines")
+                break
+            }
             val survivor = if (exclusion.upper) atom.negative else atom.positive
             if (context.boolValue(survivor.literal ushr 1) != null) break
-            val explanation = unitExplanation(context, survivor) ?: break
+            val explanation = unitExplanation(context, survivor)
+            if (explanation == null) {
+                observe("numericalRefutationUnitExplanationDeclines")
+                break
+            }
             val split = CoverageSplit.Integer(exclusion.coordinate, exclusion.threshold, node.condition)
             val rejected = if (exclusion.upper) split.below else split.above
             rejected.result = LinearAuthorityResult(evidence = exclusion.evidence)
