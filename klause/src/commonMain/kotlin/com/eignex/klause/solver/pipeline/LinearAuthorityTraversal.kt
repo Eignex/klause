@@ -288,6 +288,7 @@ internal class LinearAuthorityTraversal(
         context: SearchContext, coordinate: SourceCoordinate, threshold: BigFraction,
     ): SearchTheoryAtom? {
         if (cancellation() || budget.funding?.paused == true) return null
+        // Registration is atomic; a spent grant pauses before the next node can query the source.
         budget.observe(conflictCertification = 1L)
         budget.funding?.charge(0L, 384L)
         if (cancellation()) return null
