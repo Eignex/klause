@@ -1,0 +1,3 @@
+smtlib-qfnra-prepared-support-v1/degree-2-pairs-1-sat
+smtlib-qfnra-prepared-support-v1/degree-8-pairs-1-sat
+smtlib-qfnra-prepared-support-v1/strict-alternative
