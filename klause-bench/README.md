@@ -119,6 +119,14 @@ retain 33 real source coordinates. The [fixture notes](smoke-corpus/qfnra-partia
 and [manifest](smoke-corpus/qfnra-partial-conflicts-v1/manifest.json) define their
 scope, mathematical expectations and pinned source bytes.
 
+`qfnra-coupled-v1` fixes twelve connected-section controls, selected through
+`smtlib-qfnra-coupled-v1`: inconsistent product cycles, SAT neighbours and guarded
+alternatives, shifted and repeated roots, strict/weak boundaries and an uncovered
+singular fibre. Its [fixture notes](smoke-corpus/qfnra-coupled-v1/README.md) and
+manifest retain the original hashes. `qfnra-prepared-support-v1` separately fixes
+the three SAT sources from job 8750, with [unchanged bytes](smoke-corpus/qfnra-prepared-support-v1/README.md)
+and a matching `smtlib-qfnra-prepared-support-v1` suite.
+
 `qfnra-source-canonical-v1` selects two canonical negative-constant variants under
 `smtlib-qfnra-source-canonical-v1`: `degeneracy/degree-drop` and
 `degeneracy/equal-degree-common-root`. Their [manifest](smoke-corpus/qfnra-source-canonical-v1/manifest.json)
@@ -4407,6 +4415,59 @@ rises by 8,820 units in 14 pairs and falls in none, the largest being 7,674 on t
 irrational shared-embedding UNSAT control. No ordinary source exposes the targeted
 support, so the option stays disabled by default; the activation build is not
 published.
+
+### Prepared supports and connected conjunctions
+
+The five-arm matrix separates sign-only, single-predicate, preparation-only,
+joint-only and composed checking. [Direct controls 8785](https://lab.eignex.com/jobs/8785)
+at `1133442d74` cover twelve frozen cycle, shifted-root, repeated-root, strict,
+weak, singular and SAT-alternative sources. All terminal outcomes match their
+authored expectations. The inconsistent three-edge cycle consumes a six-premise
+joint exclusion twice, including one reuse across its unrelated Boolean pair.
+No individual predicate supplies that conflict. Regions, projected polynomials
+and lifted cells fall from 2/52/324 to zero; native work is 3,817 against 77,034 in
+the [literal merged single-predicate control 8818](https://lab.eignex.com/jobs/8818)
+at `d9f127f275`. Sign-only work is 75,528. The same-head single control adds
+37 bookkeeping units. Feasible conjunctions retain CAD and add work.
+
+[Prepared branch comparison 8813](https://lab.eignex.com/jobs/8813), at `ee13e6cb6b`,
+transports the frozen degree-two source's explicit `gate=false` condition through
+its captured plan. [Direct comparison 8812](https://lab.eignex.com/jobs/8812) learns
+the original three-premise conflict in 4,389 units. The prepared view joins three
+opposite weak-row pairs into equalities and completes total graph substitutions.
+Its consumed nine-premise explanation retains all six rows and three product
+definitions, with 3,380 units of private support work inside the native totals:
+
+| Prepared numeric branch | Sign-only | Single | Preparation | Joint | Composed |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Native work | 434,299 | 437,130 | 14,353 | 25,519 | 14,353 |
+| Regions | 2 | 2 | 0 | 1 | 0 |
+| Projected polynomials | 28 | 28 | 0 | 5 | 0 |
+| Lifted cells | 179 | 179 | 0 | 2 | 0 |
+
+Prepared parsing, source setup and condition transport add 769 separately reported
+units in every arm. The mapped `gate=true` alternative stays SAT, with no learned
+exclusion. [Graph capture 8816](https://lab.eignex.com/jobs/8816) explains the
+unconditioned zero-support observation: its free branch takes `gate=true` and
+assigns only one weak row from each conditional comparison. Those assignments
+provide no equality covers. Capture retains the numeric condition, exact graph
+and reconstruction fibres; its extra observation work supplies no cost comparison.
+Prepared slot numbers provide no original-real correspondence.
+
+[Whole-family holdouts 8801](https://lab.eignex.com/jobs/8801), at `814aa38899`,
+retain all seventeen outcomes and expose no support. Composed/single/sign-only
+work is 94,975/94,871/94,792 units. The twelve
+[coupled and singular holdouts 8802](https://lab.eignex.com/jobs/8802) preserve the
+existing individual conflicts and every authored outcome; three sign-only controls
+reach their deadlines. Feasible and uncovered cases add 17–67 units over single
+checking, including 64 on the singular algebraic zero. They supply no additional
+prepared or joint conflict.
+
+Direct, merged-baseline and mapped-branch profiles run on Mac/aarch64; the two
+holdout jobs and graph capture run on Linux/amd64, Java 25.0.4.1. All native charge
+sums balance. Ordered instrumented component timings and allocation records include
+their actual cold starts and establish no whole-CLI throughput claim. Numeric
+exclusions remain native scoped proofs, without independent certification.
 
 ### Polynomial Boolean bookkeeping
 
