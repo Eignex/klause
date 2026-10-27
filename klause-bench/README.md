@@ -6858,6 +6858,32 @@ the solve thread's elapsed time and allocated bytes. `solveSeconds=<n>` replaces
 ten-second deadline, which includes preparation, with one that starts at the solve, so an
 `operations=<n>` cap rather than the wall clock ends the query stream.
 
+Requested projections use 8763's 20 hash-matched sources with fixed query streams
+(`operations=192 solveSeconds=90`) before the ordinary ten-second frontier. Arms are
+compared only within one job. [8814](https://lab.eignex.com/jobs/8814) (`3ac95ae9dc`,
+Linux/amd64) gives identical splits, closed leaves, checks and support selections under
+full and requested delivery wherever funding lasts. Exact cut arithmetic falls by 8–26% on
+lseu, p0033, pp08aCUTS and rgn, while the other sources evaluate no cut. Funded
+allocation falls only 1–4%, and full and requested latest delivery both exhaust 512 MiB
+funding on fixnet6, khb05250 and p0282, full also on modglob. The no-feedback control
+[8826](https://lab.eignex.com/jobs/8826) funds 0.3–2.5 MB against 25–540 MB with
+feedback, so delivery construction, not cut arithmetic, carries 8763's cost.
+[8829](https://lab.eignex.com/jobs/8829) charges requested records only for what they
+allocate and saves just 3–8%. Once the archive filled its byte allowance, every later
+query still started as an archive copy, overflowed and was delivered whole.
+
+With the archive closed at its first overflow, [8833](https://lab.eignex.com/jobs/8833)
+(`5d0a368f97`, Mac/aarch64) has no funding exhaustion: every source except misc07
+completes its stream, and full and requested delivery make identical decisions.
+Requested funded allocation is 1.1–9.4 times the prefix arm (9–11 MB), full 1.3–21
+times, and requested is 43–87% of full. Solve-thread allocation stays within 5% between
+the two latest arms. In the ordinary [8834](https://lab.eignex.com/jobs/8834) run on the
+same revision and host, requested allocation is 41–64% of full, and gt2 exhausts funding
+only under full. Flugpl reaches SearchExhausted at 1201500 in every arm, and pp08aCUTS
+exhausts work in every arm. P0033 still loses the source-order incumbent 3089 under both
+feedback arms. No witness or proof is independently checked, support ordering remains
+an internal comparison, and a callback without a request keeps the full record.
+
 [Delivery comparison 8737](https://lab.eignex.com/jobs/8737), at `2a3f3b564c` on
 Mac/aarch64, runs source order, prefix and latest delivery on 21 exact ten-second
 frontier sources (p0033 development, the rest held out). Latest delivery reaches
