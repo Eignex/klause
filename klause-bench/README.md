@@ -4482,6 +4482,54 @@ promoting either over existing selectors or independent acquisition: surviving
 gains remain narrower than the stronger controls and require additional numerical
 cost. They establish no broad finite-family advantage or basin classification.
 
+#### Source-row seed completion
+
+[8781](https://lab.eignex.com/jobs/8781), at `3e242c1a40`, repeats the cut-disabled
+8644 requests with both completed arms and adds the held-out
+[transport](smoke-corpus/finite-repair-evidence/README.md) family: 30 requests and
+1,080 trials on Mac/aarch64, with one JAR/runtime identity and all 30 source hashes
+matching. All 403 acquired, 388 repaired and 1,047 descent points pass native
+original-source checks. No improvement is lost in descent, and no trial is
+cancelled or overruns its allowance.
+
+Fragment refutation completion consumes 24 packets and improves 23. No consumed
+trial's acquisition improves, so the gains belong to the completed freedom. At each
+control's exact packet size, the improvements are:
+
+| Source | Inputs | Completed | Raw refutation | Adjacency | Ablated, random, objective |
+|---|---:|---:|---:|---:|---:|
+| Exchange | 2 | 3/3 | 1/3 | 2/3 | 0/3 |
+| Three-cycle | 3 | 3/3 | 0/3 | 1/3 | 0/3 |
+| Four-cycle | 4 | 3/3 | 0/3 | 1/3 | 0/3 |
+| Transport, held out | 4 | 2/3 | 0/3 | 0/3 | 0/3 |
+
+Supports naming one to three of the four-cycle inputs complete to the whole chain.
+Every proper subset of the 21 improving chain and transport packets, each missing one
+member, exhausts without improvement, so the full freedom was required at those
+centers. The non-improving transport packet closes a zero-cost cycle. Transport
+supports name all nine inputs; completion supplies the cycle structure, not a missing
+coordinate. Its 27 unrepairable packets stop at a column row whose remaining
+compensators were already planned in the opposite direction. Knapsack packets
+improve, but so do their proper subsets: row slack needs no coordinated freedom.
+
+Paired with raw refutation over 108 request counts, completion has 18 wins and no
+losses. Its 15 declines are requests smaller than every packet, and raw ranking
+improved none of them. Completion adds no LP operation. Median extra modeled source
+work is 68, 105, 142 and 1,371 units on exchange, three-cycle, four-cycle and
+transport. Both numerical arms spend a median containing total near 36,000 units,
+against adjacency's one native unit.
+Disagreement completion matches raw disagreement in every trial: root points already
+disagree on whole chains, and 90 of 108 sets are identical. Root refutation is
+unavailable because acquisition reaches each optimum, so completion adds no incumbent
+beyond that companion. Semantic blocks do not apply to these linear shapes.
+
+Retain completion as a bounded opt-in consumer of refutation supports. These
+self-authored controls establish a consumed coordinated freedom, not a default,
+throughput, basin or broad-family claim. Adjacency remains far cheaper where it
+succeeds. [8780](https://lab.eignex.com/jobs/8780) stopped at the first numerical arm
+on a stale reflective constructor lookup, and the 8742 submission named an
+unresolvable abbreviated ref. Neither supplied a comparison.
+
 ### Prepared board-restart outcomes
 
 The coordinate-changing treatment in [#3447](https://github.com/Eignex/klause/pull/3447)
