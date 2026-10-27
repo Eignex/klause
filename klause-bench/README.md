@@ -4300,6 +4300,69 @@ rational-window and wide-integer neighbors retain their scope and boundary contr
 Avoided completions establish guarded reuse beyond visited tuples, while the mixed
 costs and unchanged observed quality retain the disabled defaults.
 
+[8732](https://lab.eignex.com/jobs/8732) compares nearest integer-cell complement
+proposals with filtering alone and ordinary defaults over the same twelve original
+and seventeen cell controls. The eight square/power core cases and nine whole-family
+holdouts retain their frozen membership. All 174 cases use seeds 3/7, P1, ten seconds
+and debug disabled on Mac/aarch64. All 58 source/seed triples match original manifest
+hashes, host, runtime, non-solver dependencies and the 3 GiB Serial-GC options.
+Activation builds `b24e966420` and `c3bd7f671b` share the `52d0038215` implementation
+and producer; only the steering default differs. The third arm keeps ordinary
+defaults. Production producer, filtering and steering defaults remain disabled.
+
+Every triple retains its reported SAT/UNSAT/UNKNOWN outcome. Of 84 reported models,
+72 pass Dolmen 0.10 or Z3 5.1.0 source checking; twelve checks on the power-chain and
+conditional-product sources remain UNKNOWN with `E:unbound-id`. Native refutations
+have no independent proof certificate. Cancelled [8725](https://lab.eignex.com/jobs/8725)
+retains a setup error: finite routes reject nonlinear-only CLI flags. The activation
+builds preserve ordinary routing; infrastructure retries reuse the full selection.
+
+The policy jointly projects ordinary proposals into the caller window and the
+retained-cell complement. Allowed tuples count distinct in-window tuples reaching
+fixed completion within each private cursor. On the held-out cubic SAT neighbor,
+each seed reports one changed proposal and earlier checked witness access with
+fewer completion queries. Repeated
+support hits before that witness fall from 3/24 to zero. These are useful proposal
+transitions with unchanged candidate caps and full original-source checks.
+
+| Cubic seed | Allowed tuples, filter / steer | Completion checks, filter / steer | Native work, filter / steer | CLI wall seconds, filter / steer | Peak RSS KiB, filter / steer |
+|---|---|---|---|---|---|
+| 3 | 2 / 2 | 11 / 8 | 69094 / 31062 | 0.58 / 0.57 | 141664 / 126160 |
+| 7 | 14 / 1 | 34 / 4 | 602170 / 29581 | 1.19 / 0.56 | 206208 / 126048 |
+
+Ordinary cubic defaults spend 33393/550748 native units, 0.46/1.13 CLI seconds and
+125904/214304 KiB. The seed-3 default remains faster in physical wall time despite
+the steering arm's lower native work. External-time receipts measure the entire
+uninstrumented CLI JVM; allocation was not collected.
+
+The square controls expose the cost of leaving a known forbidden hull: more allowed
+tuples can mean more failed completions. Both square-8 seeds retain UNKNOWN.
+
+| Square-8 seed | Allowed tuples, filter / steer | Completion checks, filter / steer | Native work, filter / steer | CLI wall seconds, filter / steer | Peak RSS KiB, filter / steer |
+|---|---|---|---|---|---|
+| 3 | 118 / 916 | 927 / 1725 | 996087 / 1793974 | 0.86 / 1.27 | 235520 / 221696 |
+| 7 | 160 / 959 | 1067 / 1866 | 1131326 / 1934238 | 1.17 / 1.45 | 230864 / 214016 |
+
+Square-8 ordinary defaults spend 1674203/1777577 native units. Square-2, square-4
+and degree-four powers also spend more work under steering. On
+`open-no-integer-root`, allowed tuples and completion checks stay at 566/745 and
+562/741 while work rises from 623464/626984 to 644806/648322. Changed proposals alone
+establish no improvement on that source.
+
+The mixed singular-real holdout remains UNKNOWN. Allowed tuples rise from 599/560
+to 726/746, checks from 1590/1607 to 1717/1793 and work from 2062041/2114584 to
+2169998/2255906. Peak RSS changes from 233424/219728 to 227120/229824 KiB; CLI wall
+time changes from 1.44/2.05 to 1.67/1.80 seconds. The degree-seventeen control has no
+cells or changed proposals; its ten-second stops and varying completion prefixes
+supply no steering gain. Repeated-root and wide-integer neighbors retain checked
+witnesses without entering selection; Boolean, rational-window and endpoint
+controls retain their scope outcomes. Fast cursor controls separately cover caller
+conditions, exact signed/wide endpoints, cancellation, slicing, charging and disposal.
+
+The checked cubic gain supports the bounded optional mechanism. Additional failed
+completions and mixed costs retain the disabled defaults and provide no general
+throughput or memory improvement claim. Proposal exhaustion supplies no source proof.
+
 ### State ownership
 
 Retain concrete buffer owners, separate indexed vector roles and one cursor/cleanup
