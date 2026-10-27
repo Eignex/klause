@@ -1652,9 +1652,20 @@ the definition-free controls. Selector/closure visits, physical selection and
 repair allocations/times, and shared setup cost remain separate. Ordered cold
 captures establish capability and costs, without a throughput claim.
 The capture reports native original-source checks separately from independent
-witness checking and carries no unpinned proof claim. `center=v0,v1,...` admits
-only an unchanged finite coordinate frame without declared definitions, disables
-presolve and uses the protected objective. `recipe=source-coordinate-descent`
+witness checking and carries no unpinned proof claim. `center=v0,v1,...` supplies
+an integer-only source center; `center64=BASE64_JSON` carries the complete
+`{bools:[...],ints:[...]}` source assignment, bounded to 512 KiB encoded. Explicit
+centers disable presolve and use the protected objective. The shared center
+projection follows both namespaces through the prepared map, refuses conflicting
+aliases, unmapped searched coordinates, domain/pin mismatches and changed complete
+source round trips after definition reconciliation. Native source and working
+feasibility checks precede the warm start. The first observed state must retain
+that source center; random initialization and greedy replacement are bypassed.
+Channel arms replay the same supplied center with fresh weights, tabu,
+configuration and worker RNG. `timeoutMillis=100..60000` contains preparation and
+each walk; `moves` retains the ordinary containing move/restart cap. Mapping and
+checking cost and deadline censoring stay explicit.
+`recipe=source-coordinate-descent`
 selects the strict objective-coordinate control; ordinary catalog recipes retain
 their structured sources. Fixture expectations live beside
 [finite repair controls](smoke-corpus/finite-repair/README.md).
@@ -1860,6 +1871,18 @@ and independently checked final endpoints remain distinct observations.
 Both runners accept `source64` or `sourceGzip64` containing the original source,
 bounded to 96 KiB encoded and 64 MiB inflated, with the original hash mandatory.
 The objective runner also accepts the same bounded `batch64` request form.
+It accepts the shared `center64` projection for common-center replay and
+`geometry=true` adds four canonical-grading arms: term/leaf hotspots crossed with
+adjacent/geometric leaf steps. Unsupported or incompletely maintained cones
+decline. The ordinary sink retains pins, definitions and ownership; no source
+relation or feasible objective order changes. `proposals.json` separates raw
+templates from sink-emitted moves (channel expansion can add moves), and retains
+up to 32 complete candidate destinations, exact canonical/source values and native
+source checks. Complete candidate value agreement and the structural cone check
+remain distinct from global equivalence inferred from sampled grades. Walk counts,
+native incumbents, time and allocation remain the efficacy observations; proposal
+counts alone establish no improvement. Private proposal screening runs outside
+the walk allowance.
 
 The frozen worker-seed 3/7 captures at `12be285415` and `356449b93a` retain
 [mixed preparation](https://lab.eignex.com/jobs/8531),

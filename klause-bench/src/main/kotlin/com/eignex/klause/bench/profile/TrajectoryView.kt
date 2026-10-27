@@ -37,33 +37,8 @@ internal class TrajectoryView(
         state.moveSink.setOwners(capturedOwners)
     }
 
-    fun load(source: Sample): String? {
-        if (source.numRealVars != 0 || source.numBoolVars != coordinates.boolCount ||
-            source.numIntVars != coordinates.intCount
-        ) {
-            return "source-dimensions"
-        }
-        for (id in 0 until state.problem.numBoolVars) state.assignment.setBool(id, false)
-        for (id in state.rootDomains.indices) state.assignment.setInt(id, state.rootDomains[id].min)
-        for (id in 0 until coordinates.boolCount) {
-            val target = coordinates.bool(id)
-            if (target >= 0) state.assignment.setBool(target, source.boolValue(id))
-        }
-        for (id in 0 until coordinates.intCount) {
-            val target = coordinates.int(id)
-            if (target < 0) continue
-            val value = source.intValue(id)
-            if (value !in state.rootDomains[target]) return "target-domain"
-            state.assignment.setInt(target, value)
-        }
-        synchronize()
-        state.recompute()
-        var pinMismatch = false
-        state.assumptions.forEachBool { id, value -> if (state.assignment.boolValue(id) != value) pinMismatch = true }
-        state.assumptions.forEachInt { id, value -> if (state.assignment.intValue(id) != value) pinMismatch = true }
-        if (pinMismatch) return "target-pin"
-        return if (sameSource(source, reconstruct(state.assignment.snapshot()))) null else "source-round-trip"
-    }
+    fun load(source: Sample): String? =
+        loadSourceCenter(source, state, coordinates, reconstruct, synchronize)
 
     private fun projectedMove(sourceMove: Move): Move? = when (sourceMove) {
         is Move.BoolFlip -> coordinates.bool(sourceMove.varId).takeIf { it >= 0 }?.let { Move.BoolFlip(it) }
@@ -75,10 +50,7 @@ internal class TrajectoryView(
     fun admits(sourceMove: Move): Boolean = projectedMove(sourceMove)?.let { candidateDecline(it) == null } == true
 
     private fun candidateDecline(move: Move): String? {
-        val sink = MoveSink(state.assumptions).apply {
-            setInvariants(state.invariants)
-            setOwners(capturedOwners)
-        }
+        val sink = proposalSink()
         when (move) {
             is Move.BoolFlip -> sink.addBoolFlip(move.varId)
             is Move.IntSet -> {
@@ -90,6 +62,11 @@ internal class TrajectoryView(
             else -> error("primitive expected")
         }
         return if (sink.list.isEmpty()) "candidate-filter" else null
+    }
+
+    fun proposalSink(): MoveSink = MoveSink(state.assumptions).apply {
+        setInvariants(state.invariants)
+        setOwners(capturedOwners)
     }
 
     fun probe(sourceMove: Move): JsonObject {

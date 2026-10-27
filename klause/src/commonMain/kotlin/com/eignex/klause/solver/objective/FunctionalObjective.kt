@@ -226,6 +226,9 @@ internal class FunctionalObjective internal constructor(
     internal fun evaluateExact(assignment: Assignment): BigInt =
         objValue({ id -> assignment.intValue(id) }, { id -> assignment.boolValue(id) })
 
+    internal fun evaluateExact(sample: Sample): BigInt =
+        objValue({ id -> sample.intValue(id) }, { id -> sample.boolValue(id) })
+
     override fun deltaIfApplied(assignment: Assignment, move: Move): Double {
         val moved = MutableIntLongMap()
         val flipped = IntHashSet()
