@@ -2531,6 +2531,58 @@ captures establish correspondence capability; their ordinary solve quality is
 untested. Coordinated repair comparisons require the ownership-aware compound
 correspondence recorded in [#3612](https://github.com/Eignex/klause/issues/3612).
 
+The complete-source [center acquisition](https://lab.eignex.com/jobs/8765) at
+`96cfcb5ebb` uses `cbls-plateau/ils-basin`, seeds 3/7, 5,000 containing moves/restarts,
+five seconds including per-view preparation/mapping, and presolve off. Each
+Warehouse-40-80-00 request supplies its first cost-zero policy-local-optimum endpoint,
+with all 3,200 Boolean and 3,441 integer source coordinates. ProgressiveParty and
+NurseRostering supply only positive-cost restart/censored endpoints in both seeds;
+all four whole-family holdout requests remain unavailable. No replacement center
+or longer acquisition is used. Acquisition runs on Mac/aarch64; it supplies centers,
+not common-center efficacy or timing comparisons.
+
+The [five-second replay](https://lab.eignex.com/jobs/8770) and
+[ten-second replay](https://lab.eignex.com/jobs/8771) at `edb8146dd6` run on
+Linux/amd64 with a 2 GiB heap, SerialGC and one active processor. Both views accept
+the same complete source frames through fresh prepared maps and definition networks,
+retain their first observed source point, and start with fresh weights, tabu,
+configuration and worker RNG. Original source and runtime/distribution hashes remain
+in the captures. Exact minimized objectives use seed order 3/7:
+
+| Allowance | Maintained | Searched predicates |
+| --- | --- | --- |
+| Saved center | 39348 / 38039 | 39348 / 38039 |
+| 5,000 moves, five seconds | 37551 / 27692 | 24156 / 28597 |
+| 20,000 moves, ten seconds | 28587 / 19867 | 12012 / 14116 |
+| 1,000 moves, twenty seconds | 36399 / 34613 | 34253 / 34085 |
+
+The five-second maintained walks execute only 543/3,430 moves versus 5,000/5,000
+predicate moves; ten-second work is 3,794/7,121 versus 18,493/20,000. All maintained
+walks and the 18,493-move predicate walk are clock-censored. Every one of these
+eight endpoints passes native original-source checking and improves its saved
+center. Named source-input changes are 21/83 versus 87/69 at five seconds and
+70/93 versus 94/94 at ten seconds; Boolean auxiliary changes remain separate.
+These are source transitions, without independent XCSP3 certification or an
+exclusive basin claim: the fresh maintained controls also improve the centers.
+At five seconds predicates lose seed 7 despite executing more moves. Observed
+maintained repetitions are also censored, at 35073/27514; completed predicate
+repetitions reproduce 24156/28597. Censored repetitions grant no fixed-work parity.
+
+The [matched-work follow-up](https://lab.eignex.com/jobs/8773) holds the same
+centers, source hashes, seeds, recipe, fresh-state policy and runtime at 1,000
+containing moves/restarts with twenty seconds. All four walks complete uncensored
+and pass native source checking. Maintained/predicate named input changes are
+29/28 versus 44/26, and all paired complete destinations differ. Predicate quality
+is better in both seeds at equal work; this supports a bounded common-center
+transition result without attributing equal grades to different destinations.
+Maintained walks take 4.31/2.13 seconds and 950/888 MB of calling-thread allocation;
+predicates take 2.41/1.58 seconds and 919/903 MB. Per-view preparation/mapping costs
+1.13/0.34 seconds versus 0.42/0.28 seconds and consumes the containing deadline.
+Private initialization/probes and post-run native checks remain in full-process
+costs. Ordered instrumented captures, the five-second seed-7 loss, allocation
+variation and missing holdout centers leave throughput and default admission
+unqualified. They do not overturn the uniform value/inverse rejection.
+
 
 ### Cargo objective-coordinate trajectories
 
