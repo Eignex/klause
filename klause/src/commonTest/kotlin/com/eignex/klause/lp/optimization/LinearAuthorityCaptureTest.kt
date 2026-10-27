@@ -281,7 +281,7 @@ class LinearAuthorityCaptureTest {
             val narrow = LinearAuthorityCapture(0, 0L, 0L, Cancellation.Never).apply {
                 deliver(10_000L, 1_000_000L, request)
             }
-            for (mask in listOf(emptySet(), null)) {
+            for (mask in listOf<Set<Int>?>(emptySet(), null)) {
                 val (expected, actual) = listOf(full, narrow).map { capture ->
                     LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
                         authority.capture = capture
