@@ -13,8 +13,8 @@ import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceProofContext
-import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.magnitudeBitLength
 
 internal class LinearRefutationReuse(
