@@ -120,7 +120,9 @@ class FactorCodecs(codecs: List<FactorCodec<*, *>>) {
         return codec.encode(factor)
     }
 
-    internal fun factor(payload: Any): Factor = checkNotNull(byPayload[payload::class]).decode(payload)
+    internal fun codecFor(payload: Any): FactorCodec<*, *> = checkNotNull(byPayload[payload::class])
+
+    internal fun factor(payload: Any): Factor = codecFor(payload).decode(payload)
 
     // Unknown keys fail before structural decoding, so the error names the missing codec.
     internal fun requireKnownKey(element: JsonElement, path: String) {

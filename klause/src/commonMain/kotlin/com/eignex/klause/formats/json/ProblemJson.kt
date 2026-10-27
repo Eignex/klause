@@ -112,7 +112,8 @@ class ProblemJson(
 
     private fun toProblem(document: ProblemDocument<Any>): Problem {
         val factors = Array(document.factors.size) { index ->
-            withPath("$.factors[$index]") { codecs.factor(document.factors[index]) }
+            val payload = document.factors[index]
+            withPath("$.factors[$index].${codecs.codecFor(payload).key}") { codecs.factor(payload) }
         }
         val implied = document.implied?.let { indices ->
             BooleanArray(factors.size).also { mask ->
