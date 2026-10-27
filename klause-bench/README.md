@@ -2078,65 +2078,8 @@ establishes a general speed or memory improvement.
 These checked GBACP transitions and bounded consumption qualify an explicit
 research consumer using one prepared model. Root-start discovery and checked-center
 improvement remain separate observations. The TestScheduling losses, absent
-holdout capabilities and stronger ordinary proofs preserve default routing.
-
-### Held-out objective-guidance admission
-
-The admission protocol was frozen at `d9f127f275` before any outcome. It selects 16
-xcsp3-cop minimization families unexposed to the representation studies, by objective
-text alone: functional expressions (CyclicBandwidth, Filters, LargeScaleScheduling,
-LowAutocorrelation, NursingWorkload, SREFLP, ButtonsScissors, PSP2) or sums over
-declared auxiliaries (CVRP, KMedian, VRP, TSPTW1, TSPTW2, PSP1, MultiAgentPathFinding,
-IHTC). Each family contributes the first two members ordered by `sha256("3621:<name>")`.
-GBACP-UD04, TestScheduling-t020m10r03-1, Warehouse-40-80-00 and Cargo-09-1s-18 are
-reported controls. [8824](https://lab.eignex.com/jobs/8824) runs `f638e5004d`, default
-mixed, P1, 30 seconds, source validation and seeds 3/7/11. Arms are ordinary default,
-single `functional`/`canonical`/`geometric` guidance with
-`arm=cbls-plateau/ils-basin`, the `functional,geometric` composition and the
-`functional,functional` seed control. Every guidance arm replaces the curated LS pool,
-as the explicit-pool contract requires.
-
-All 648 cases run on Linux/amd64, with the six arms of each problem/seed group on one
-host, and every source hash matches the frozen draw. The 263 points all pass the
-independent XCSP3 checker; 372 cases return UNKNOWN. Thirteen
-LargeScaleScheduling-03200 cases, ordinary ones included, are killed at about 80
-seconds without a record ([#3722](https://github.com/Eignex/klause/issues/3722)). No
-holdout arm loses a native proof; TestScheduling proves 1876 in every case. Ordinary
-Cargo returns no point, as in [8576](https://lab.eignex.com/jobs/8576); only the
-composition reaches one, 49497 at seed 3.
-
-Live-cone qualification succeeds on ButtonsScissors, CyclicBandwidth, Filters, IHTC,
-LowAutocorrelation, MultiAgentPathFinding and NursingWorkload, and declines on the
-other holdout families. ButtonsScissors, MultiAgentPathFinding and NursingWorkload,
-like PSP1 and both TSPTW families, have no point in any arm. A declining slot runs
-canonical guidance, so a decline is not neutral against `functional,functional`.
-Net wins minus losses over member/seed pairs, where a checked point beats none, for
-the qualified families with points and GBACP:
-
-| Family | Composition vs ordinary | Composition vs seed control | Geometric vs functional | Functional vs ordinary |
-| --- | --- | --- | --- | --- |
-| CyclicBandwidth | +1 | +2 | +2 | -1 |
-| Filters | 0 | +3 | +2 | -3 |
-| IHTC | +3 | +2 | -1 | +3 |
-| LowAutocorrelation | +1 | +1 | +3 | -2 |
-| GBACP (control) | -1 | +3 | +1 | -1 |
-
-The geometric slot supplies the final checked incumbent in all three LowAutocorrelation
-and GBACP composition runs and two IHTC runs, mostly after a functional-slot first
-witness. These are improvement-phase transitions, so retirement at the first witness
-would discard them. On qualified families, composition median whole-process CPU
-ratios are 0.998–1.000 against both controls at the deadline, and peak RSS ratios
-against ordinary are 0.97–1.08.
-
-The frozen rule rejects default admission. The composition beats both ordinary and seed
-controls in three qualified families and loses in none, at matched cost, but loses five
-checked holdout points against ordinary: all three SREFLP-sko049-1 seeds, CVRP-A-n38-k5
-seed 11 and VRP_LC-09-05-10-s1 seed 11. The explicit functional control loses the same
-SREFLP points, so the loss comes from replacing the curated pool on models where the
-view declines. Objective guidance remains an explicit research option and functional
-guidance the ordinary default. A qualifying rule would leave the curated pool intact
-where cones decline, fall back to functional guidance, and need families this cohort
-has not exposed.
+holdout capabilities and stronger ordinary proofs preserve default routing; the
+[held-out admission](#held-out-objective-guidance-admission) rejects a default.
 
 The frozen worker-seed 3/7 captures at `12be285415` and `356449b93a` retain
 [mixed preparation](https://lab.eignex.com/jobs/8531),
@@ -2242,6 +2185,63 @@ claim. The evidence supports no wider admission, Cargo adjustment or new
 neighborhood, and the diagnostic CLI treatment used by the study is not a
 production selector.
 
+### Held-out objective-guidance admission
+
+The admission protocol was frozen at `d9f127f275` before any outcome. It selects 16
+xcsp3-cop minimization families unexposed to the representation studies, by objective
+text alone: functional expressions (CyclicBandwidth, Filters, LargeScaleScheduling,
+LowAutocorrelation, NursingWorkload, SREFLP, ButtonsScissors, PSP2) or sums over
+declared auxiliaries (CVRP, KMedian, VRP, TSPTW1, TSPTW2, PSP1, MultiAgentPathFinding,
+IHTC). Each family contributes the first two members ordered by `sha256("3621:<name>")`.
+GBACP-UD04, TestScheduling-t020m10r03-1, Warehouse-40-80-00 and Cargo-09-1s-18 are
+reported controls. [8824](https://lab.eignex.com/jobs/8824) runs `f638e5004d`, default
+mixed, P1, 30 seconds, source validation and seeds 3/7/11. Arms are ordinary default,
+single `functional`/`canonical`/`geometric` guidance with
+`arm=cbls-plateau/ils-basin`, the `functional,geometric` composition and the
+`functional,functional` seed control. Every guidance arm replaces the curated LS pool,
+as the explicit-pool contract requires.
+
+All 648 cases run on Linux/amd64, with the six arms of each problem/seed group on one
+host, and every source hash matches the frozen draw. The 263 points all pass the
+independent XCSP3 checker; 372 cases return UNKNOWN. Thirteen
+LargeScaleScheduling-03200 cases, ordinary ones included, are killed at about 80
+seconds without a record ([#3722](https://github.com/Eignex/klause/issues/3722)). No
+holdout arm loses a native proof; TestScheduling proves 1876 in every case. Ordinary
+Cargo returns no point, as in [8576](https://lab.eignex.com/jobs/8576); only the
+composition reaches one, 49497 at seed 3.
+
+Live-cone qualification succeeds on ButtonsScissors, CyclicBandwidth, Filters, IHTC,
+LowAutocorrelation, MultiAgentPathFinding and NursingWorkload, and declines on the
+other holdout families. ButtonsScissors, MultiAgentPathFinding and NursingWorkload,
+like PSP1 and both TSPTW families, have no point in any arm. A declining slot runs
+canonical guidance, so a decline is not neutral against `functional,functional`.
+Net wins minus losses over member/seed pairs, where a checked point beats none, for
+the qualified families with points and GBACP:
+
+| Family | Composition vs ordinary | Composition vs seed control | Geometric vs functional | Functional vs ordinary |
+| --- | --- | --- | --- | --- |
+| CyclicBandwidth | +1 | +2 | +2 | -1 |
+| Filters | 0 | +3 | +2 | -3 |
+| IHTC | +3 | +2 | -1 | +3 |
+| LowAutocorrelation | +1 | +1 | +3 | -2 |
+| GBACP (control) | -1 | +3 | +1 | -1 |
+
+The geometric slot supplies the final checked incumbent in all three LowAutocorrelation
+and GBACP composition runs and two IHTC runs, mostly after a functional-slot first
+witness. These are improvement-phase transitions, so retirement at the first witness
+would discard them. On qualified families, composition median whole-process CPU
+ratios are 0.998–1.000 against both controls at the deadline, and peak RSS ratios
+against ordinary are 0.97–1.08.
+
+The frozen rule rejects default admission. The composition beats both ordinary and seed
+controls in three qualified families and loses in none, at matched cost, but loses five
+checked holdout points against ordinary: all three SREFLP-sko049-1 seeds, CVRP-A-n38-k5
+seed 11 and VRP_LC-09-05-10-s1 seed 11. The explicit functional control loses the same
+SREFLP points, so the loss comes from replacing the curated pool on models where the
+view declines. Objective guidance remains an explicit research option and functional
+guidance the ordinary default. A qualifying rule would leave the curated pool intact
+where cones decline, fall back to functional guidance, and need families this cohort
+has not exposed.
 
 ### Finite conflict selection
 
