@@ -161,13 +161,22 @@ internal object ObjectiveViewComparison {
             put("probeTiming", "outside walk allowance")
             put("walkTiming", "instrumented; parsing common and excluded")
             put("proposalEquivalenceClaim", false)
+            put("proposalGeometryControls", options["geometry"] == "true")
+            put("initialization", if ("center64" in options) "checked source warm start" else "ordinary recipe")
             put("sourceVerdictClaim", false)
         }.toString())
         val suppliedCenter = options["center64"]?.let {
             require(it.length <= 524288)
             sourceCenter(Base64.getDecoder().decode(it).decodeToString())
         }
+        val commonBytes = trajectoryThreadBytes()
+        val commonStarted = System.nanoTime()
         val sourceCheck = source.problem.bake()
+        out.resolve("source-check-preparation.json").writeText(buildJsonObject {
+            put("elapsedNanos", System.nanoTime() - commonStarted)
+            put("allocatedBytes", trajectoryThreadBytes() - commonBytes)
+            put("scope", "common original source checker; outside native walk allowance")
+        }.toString())
         val geometry = options["geometry"]?.toBooleanStrict() ?: false
         if (suppliedCenter != null && LocalSearchCatalog.byLabel(recipe).seedImplicitOnRestart) {
             out.resolve("decline.json").writeText("{\"decline\":\"center-implicit-ownership-unsupported\"}")
@@ -177,7 +186,8 @@ internal object ObjectiveViewComparison {
         val boundaries = ArrayList<Boundary>()
         for (view in View.entries.filter { geometry || !it.geometry }) {
             val directory = out.resolve(view.name.lowercase()).apply { mkdirs() }
-            val prepared = prepare(source, view, preparationEngine, seed, timeout, directory, suppliedCenter != null) ?: continue
+            val prepared = prepare(source, view, preparationEngine, seed, timeout, directory,
+                suppliedCenter != null) ?: continue
             directory.resolve("model.json").writeText(buildJsonObject {
                 put("preparationNanos", prepared.nanos)
                 put("preparationAllocatedBytes", prepared.allocatedBytes)
@@ -186,6 +196,12 @@ internal object ObjectiveViewComparison {
                 put("sweepPresent", prepared.sweep != null)
                 put("transformObjective", view == View.SUBSTITUTED)
                 put("functionalGrading", view == View.FUNCTIONAL)
+                put("hotspots", if (view.geometry) {
+                    if (view.leafHotspots) "cone leaves" else "canonical terms"
+                } else "grading objective")
+                put("seedSteps", if (view.geometry) {
+                    if (view.geometricSteps) "geometric leaves" else "adjacent leaves"
+                } else "grading objective")
                 put("factors", buildJsonArray {
                     for (factor in prepared.pipeline.problem.factors) add(buildJsonObject {
                         put("kind", factor::class.simpleName)
@@ -220,6 +236,7 @@ internal object ObjectiveViewComparison {
                     put("mappingAndNativeCheckNanos", centerNanos)
                     put("mappingAndNativeCheckBytes", trajectoryThreadBytes() - centerBytes)
                     put("nativeSourceAccepted", projection?.first != null)
+                    put("initialization", "checked source warm start; generic greedy bypassed")
                     put("independentWitnessCheck", false)
                 }.toString())
                 if (projection?.first == null) continue
