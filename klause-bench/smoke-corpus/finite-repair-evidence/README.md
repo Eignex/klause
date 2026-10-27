@@ -29,3 +29,10 @@ two, attained by `1,0,0,1,0,0,0,0`. One selected input cannot supply weight five
 `x0=0`, `x3=1/3`, `x6=1`. This point is relaxation guidance, not an integer
 source witness. Numerical cuts can change the working relaxation; the retained
 cut mask and exact point determine each observation.
+
+`linear-transport` is a self-authored 3×3 transportation source under the same
+Apache-2.0 license, with integer inputs `0..2`, every row and column summing to
+two, and costs `4 1 3 / 2 4 1 / 1 3 4`. The center `1,1,0,0,1,1,1,0,1` (row-major)
+has objective 15. The optimum 6 is unique at `x01=x12=x20=2`, since each row's
+cheapest cell is distinct. Every change that keeps all sums is a bipartite cycle,
+so any improving completion changes at least four inputs and no three suffice.
