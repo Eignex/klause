@@ -281,7 +281,8 @@ internal class LinearRefutationReuse(
         val size = condition.bools.size + condition.lower.size + condition.upper.size
         if (size > 4096 || !spend(1L + size, 128L * size)) return null
         val literals = ArrayList<Int>()
-        for ((id, value) in condition.bools) if (opening.bools[id] != value) {
+        val openingBools = opening.bools
+        for ((id, value) in condition.bools) if (openingBools[id] != value) {
             literals += (id shl 1) or if (value) 1 else 0
         }
         for ((upper, bounds) in listOf(false to condition.lower, true to condition.upper)) {
@@ -300,13 +301,21 @@ internal class LinearRefutationReuse(
     }
 
     private fun condition(clause: IntArray): SourceCondition {
-        var result = source.scope.condition
+        val opening = source.scope.condition
+        val bools = opening.bools.toMutableMap()
+        val lower = opening.lower.toMutableMap()
+        val upper = opening.upper.toMutableMap()
         for (literal in clause) {
             val bound = predicates[literal xor 1]
-            result = if (bound != null) result.bound(bound.coordinate, bound.value, bound.upper)
-                else result.pin(literal ushr 1, literal and 1 != 0)
+            if (bound == null) bools[literal ushr 1] = literal and 1 != 0 else {
+                val bounds = if (bound.upper) upper else lower
+                val previous = bounds[bound.coordinate]
+                if (previous == null || if (bound.upper) bound.value < previous else bound.value > previous) {
+                    bounds[bound.coordinate] = bound.value
+                }
+            }
         }
-        return result
+        return SourceCondition(bools, lower, upper)
     }
 
     private fun resolve(added: Entry) {

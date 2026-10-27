@@ -110,6 +110,19 @@ class LinearRefutationReuseTest {
     private val evidence = SourceEvidence(restricted, SourceClaim.Refutation, proof)
 
     @Test
+    fun `an unnamed real predicate should retain cache reuse without admitting resolution`() {
+        val reuse = LinearRefutationReuse(source, SourceLpBudget(), Cancellation.Never, resolve = true)
+        reuse.retain(evidence)
+
+        val reused = assertNotNull(reuse.find(restricted.condition))
+
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.withLinearAuthority().atScope(reused.scope)).verify(reused))
+        assertEquals(1L, reuse.observations()["numericalRefutationReuseResolutionNameDeclines"])
+        assertNull(reuse.observations()["numericalRefutationReuseResolutionProofs"])
+    }
+
+    @Test
     fun `one missing integer side should imply its exact complement before a full match`() {
         val left = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         val right = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)

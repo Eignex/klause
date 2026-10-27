@@ -12,31 +12,52 @@ import com.eignex.klause.solver.search.SourceBoundPredicate
 internal fun linearRefutationSupport(
     opening: SourceCondition,
     assertions: List<SearchDecision>, support: SourceCondition, conclusion: RegisteredTheoryDecision,
+    visit: () -> Boolean = { true },
 ): List<SearchDecision>? {
+    if (!visit()) return null
     val selected = linkedSetOf<SearchDecision>()
+    val bools = opening.bools
+    val lower = opening.lower
+    val upper = opening.upper
     for ((id, value) in support.bools) {
-        if (opening.bools[id] == value) continue
-        selected += assertions.firstOrNull {
-            it is SearchDecision.Bool && it.literal == Lit.make(id, value)
-        } ?: return null
+        if (!visit()) return null
+        if (bools[id] == value) continue
+        var found: SearchDecision? = null
+        for (decision in assertions) {
+            if (!visit()) return null
+            if (decision is SearchDecision.Bool && decision.literal == Lit.make(id, value)) {
+                found = decision
+                break
+            }
+        }
+        selected += found ?: return null
     }
     val excluded = (conclusion.payload as? SourceBoundPredicate)?.sourceBound ?: return null
     val excludedCoordinate = (excluded.terms.singleOrNull()?.source as? SearchIntValue)?.variable ?: return null
-    for ((upper, bounds) in listOf(false to support.lower, true to support.upper)) {
+    for ((isUpper, bounds) in listOf(false to support.lower, true to support.upper)) {
         for ((coordinate, value) in bounds) {
+            if (!visit()) return null
             if (coordinate.kind == SourceCoordinate.Kind.Integer && coordinate.id == excludedCoordinate &&
-                upper != excluded.upper) continue
-            if (opening.implies(SourceCondition().bound(coordinate, value, upper))) continue
-            selected += assertions.lastOrNull { decision ->
+                isUpper != excluded.upper) continue
+            val rootBound = (if (isUpper) upper else lower)[coordinate]
+            if (rootBound != null && if (isUpper) rootBound <= value else rootBound >= value) continue
+            var found: SearchDecision? = null
+            for (index in assertions.indices.reversed()) {
+                if (!visit()) return null
+                val decision = assertions[index]
                 val registered = (decision as? SearchDecision.Theory)?.decision as? RegisteredTheoryDecision
                 val atom = (registered?.payload as? SourceBoundPredicate)?.sourceBound
                 val term = atom?.terms?.singleOrNull()
-                coordinate.kind == SourceCoordinate.Kind.Integer && atom != null && !atom.strict &&
+                if (coordinate.kind == SourceCoordinate.Kind.Integer && atom != null && !atom.strict &&
                     term?.source == SearchIntValue(coordinate.id) && term.coefficient == BigFraction.ONE &&
-                    atom.upper == upper && if (upper) atom.threshold <= value else atom.threshold >= value
-            } ?: return null
+                    atom.upper == isUpper && if (isUpper) atom.threshold <= value else atom.threshold >= value
+                ) {
+                    found = decision
+                    break
+                }
+            }
+            selected += found ?: return null
         }
     }
     return selected.toList()
 }
-

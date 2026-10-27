@@ -288,8 +288,13 @@ internal class LinearAuthorityTraversal(
         budget.funding?.charge(0L, 256L + 64L * path.size)
         if (cancellation() || budget.funding?.paused == true) return null
         val assertions = path.drop(1).map { it.second.assertion ?: return null }
-        val selected = if (useRefutationResolution) linearRefutationSupport(source.scope.condition, assertions, support ?: return null, conclusion)
-            ?: return null else assertions
+        val selected = if (useRefutationResolution) {
+            linearRefutationSupport(source.scope.condition, assertions, support ?: return null, conclusion) {
+                budget.observe(conflictCertification = 1L)
+                budget.funding?.charge(0L, 128L)
+                !cancellation() && budget.funding?.paused != true
+            } ?: return null
+        } else assertions
         val premises = selected.map { SearchAtomPremise.Asserted(it) }
         if (selected.size < assertions.size) observe("numericalRefutationSupportReasons")
         return context.explainAtoms(SearchAtomPremise.All(premises), SearchDecision.Theory(conclusion))
