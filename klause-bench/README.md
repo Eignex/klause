@@ -5362,7 +5362,8 @@ bytes. Shared-companion outcome changes with zero changed choices supply no
 support-ordering credit. Ordinary execution closes all four enigma native proofs;
 none of its numerical or companion controls closes one.
 
-Of 70 reported witnesses, 56 pass independent solchecker checks. Fourteen modglob
+The 187 published points retain native exact/tolerance source qualifications.
+Of 70 final witnesses, 56 pass independent solchecker checks. Fourteen modglob
 points remain unsupported because their exact rational objective has no finite
 decimal representation; native source checks remain separate. Native proofs have
 no independent proof check. The Klause, CLI and Koblas JARs match across
