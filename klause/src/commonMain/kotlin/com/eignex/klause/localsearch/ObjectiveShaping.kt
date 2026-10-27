@@ -31,6 +31,10 @@ class ObjectiveShaping {
     internal var proposalHotspots: Objective? = null
     internal var proposalSeeds: FunctionalObjective? = null
     internal var adjacentProposalSteps: Boolean = false
+    internal var boundedProposalLeaves: Boolean = false
+    internal var proposalLeafCursor: Int = 0
+    internal var geometricProposalCandidates: Long = 0L
+    internal var geometricProposalRequested: Boolean = false
 
     private var objIntVarsCache: IntArray? = null
     private var objIntVarsFor: Objective? = null

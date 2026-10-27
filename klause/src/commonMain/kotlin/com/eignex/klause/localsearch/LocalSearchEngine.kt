@@ -549,7 +549,9 @@ internal class LocalSearchEngine(
         // would score an incumbent better than its own assignment. Even with them, presolve may have
         // eliminated a definition the view reads, so the view only guides moves: every incumbent is valued
         // by the linear objective, the one the portfolio checks it against.
-        val gradient = params.lsObjective?.takeIf { perMoveInvariants && definitionalSweep != null }
+        val gradient = params.lsObjective?.takeIf {
+            params.objectiveGuidance == ObjectiveGuidance.Functional && perMoveInvariants && definitionalSweep != null
+        }
         runMinimizeStream(gradient ?: objective, objective, params, eff, warm, sink, checkpoint, onFinished, timing)
     }.withActiveLocalSearchTime(timing)
 
@@ -1224,6 +1226,11 @@ internal class LocalSearchEngine(
         state.shaping.objective = objective
         state.shaping.shapingLambda = (params.costShaping as? CostShaping.Linear)?.lambda ?: 0.0
         state.shaping.feasibilityGated = params.costShaping.feasibilityGated
+        if (params.objectiveGuidance == ObjectiveGuidance.Geometric) {
+            timing.inPhase("preparation") {
+                prepareSteps(prepareObjectiveProposals(state, params.lsObjective), params, checkpoint)
+            }
+        }
         // Warm-start from a caller-supplied (arity-compatible) assignment instead of a random
         // restart; null by default. See [LocalSearchParams.initialAssignment].
         val seeded = seedInitial(state, params, checkpoint, reconcile = true)

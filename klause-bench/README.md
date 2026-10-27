@@ -1945,6 +1945,18 @@ five-second/5,000-move controls remain part of the comparison.
 Follow-up compression retains all JSONL bytes, reducing 121.6 MB to 4.1 MB after
 capture at a separate 1.56-second cost; it changes no walk allowance.
 
+Retained-worker comparisons select `param.objective-guidance=canonical`,
+`functional` or `geometric`. With `param.arm=cbls-plateau/ils-basin`,
+`param.arms=2` and `param.objective-guidance=functional,geometric`, two private
+retained slots share the containing budget. Compare against `functional,functional`
+at the same total budget to preserve ordinary slot seed offsets and restart
+diversity. `lsGeometricProposalRuns`, `lsGeometricProposalDeclines` and
+`lsGeometricProposalCandidates` distinguish qualified consumption from canonical
+fallback; candidate offers alone establish no useful transition. `param.ls-phase-times=true`
+retains active preparation and search cost. Use lab resource measurements and
+source validation for whole-process cost and independent final-witness checks;
+native source checks and heuristic terminals supply no proof authority.
+
 The frozen worker-seed 3/7 captures at `12be285415` and `356449b93a` retain
 [mixed preparation](https://lab.eignex.com/jobs/8531),
 [local-search preparation](https://lab.eignex.com/jobs/8581), and

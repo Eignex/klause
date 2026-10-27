@@ -108,6 +108,8 @@ data class LocalSearchParams(
     val reportResiduals: Boolean = false,
     /** Record active preparation, seeding, selection and application time. Disabled by default. */
     val reportPhaseTimes: Boolean = false,
+    /** Objective guidance; unsupported geometric cones retain canonical scoring and proposals. */
+    val objectiveGuidance: ObjectiveGuidance = ObjectiveGuidance.Functional,
 ) : SolverParams {
     override fun withAssumptions(assumptions: Assumptions): LocalSearchParams =
         if (assumptions.isEmpty) this else copy(assumptions = merge(this.assumptions, assumptions))

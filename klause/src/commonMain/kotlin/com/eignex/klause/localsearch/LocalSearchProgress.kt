@@ -55,6 +55,10 @@ internal class LocalSearchProgress(
         publishResidual()
         checkpoint?.shouldPause(moves)
         live.ls.recordWork(moves = moves, restarts = restarts, stalls = stalls)
+        if (state.shaping.geometricProposalRequested) {
+            live.ls.recordGeometricProposals(state.shaping.boundedProposalLeaves,
+                state.shaping.geometricProposalCandidates)
+        }
         charge(moves)
         captureWarm()
         live.ls.recordIncumbent(

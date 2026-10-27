@@ -45,6 +45,10 @@ class ObjectiveSeed : MoveSource {
             }
 
             is FunctionalObjective -> {
+                if (state.shaping.boundedProposalLeaves) {
+                    generateLeafBatch(state, sink, obj)
+                    return
+                }
                 for (v in obj.boolLeafVars) sink.addBoolFlip(v)
                 // Pure ±1 steps descend a wide-domain coordinate objective far too slowly.
                 for (v in obj.leafVars) {
@@ -75,6 +79,45 @@ class ObjectiveSeed : MoveSource {
         }
     }
 
+    private fun generateLeafBatch(state: LocalSearchState, sink: MoveSink, objective: FunctionalObjective) {
+        val bools = objective.boolLeafVars
+        val ints = objective.leafVars
+        val count = bools.size + ints.size
+        if (count == 0) return
+        repeat(minOf(count, LEAVES_PER_PICK)) {
+            state.checkScoringWork()
+            val before = sink.size
+            val index = state.shaping.proposalLeafCursor % count
+            // Advance before synthesis so an interrupted expensive leaf cannot starve its successors.
+            state.shaping.proposalLeafCursor = (index + 1) % count
+            if (index < bools.size) {
+                sink.addBoolFlip(bools[index])
+            } else {
+                generateIntLeaf(state, sink, ints[index - bools.size])
+            }
+            state.shaping.geometricProposalCandidates += sink.size - before
+        }
+    }
+
+    private fun generateIntLeaf(state: LocalSearchState, sink: MoveSink, v: Int) {
+        if (!sink.allowsInt(v)) return
+        val cur = state.assignment.intValue(v)
+        val domain = state.rootDomains[v]
+        var step = 1L
+        while (step <= OBJ_SEED_MAX_STEP) {
+            state.checkScoringWork()
+            if (cur <= Long.MAX_VALUE - step && cur + step in domain) {
+                sink.addChannelingIntSet(state, v, cur + step)
+            }
+            if (cur >= Long.MIN_VALUE + step && cur - step in domain) {
+                sink.addChannelingIntSet(state, v, cur - step)
+            }
+            step = step shl 1
+        }
+        if (cur != domain.min) sink.addChannelingIntSet(state, v, domain.min)
+        if (cur != domain.max) sink.addChannelingIntSet(state, v, domain.max)
+    }
+
     /** Catalog identity. */
     companion object {
         /** Catalog id for this source. */
@@ -82,5 +125,6 @@ class ObjectiveSeed : MoveSource {
 
         /** Largest geometric step seeded per leaf var during functional-objective descent. */
         private const val OBJ_SEED_MAX_STEP = 4096
+        private const val LEAVES_PER_PICK = 8
     }
 }
