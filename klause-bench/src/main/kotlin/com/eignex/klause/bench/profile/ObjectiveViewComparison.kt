@@ -20,7 +20,9 @@ import com.eignex.klause.localsearch.movesource.Phase
 import com.eignex.klause.localsearch.movesource.Pool
 import com.eignex.klause.portfolio.LocalSearchCatalog
 import com.eignex.klause.presolve.PresolveBudget
+import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.toLinearObjective
@@ -49,7 +51,12 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 internal object ObjectiveViewComparison {
-    private enum class View { RETAINED, SUBSTITUTED, FUNCTIONAL }
+    private enum class View(val leafHotspots: Boolean = false, val geometricSteps: Boolean = false) {
+        RETAINED, SUBSTITUTED, FUNCTIONAL,
+        TERMS_ADJACENT, LEAVES_ADJACENT(true), TERMS_GEOMETRIC(false, true), LEAVES_GEOMETRIC(true, true);
+
+        val geometry: Boolean get() = ordinal >= TERMS_ADJACENT.ordinal
+    }
 
     private data class Prepared(
         val pipeline: FinitePipelinePreparation,
@@ -61,6 +68,8 @@ internal object ObjectiveViewComparison {
     )
 
     private data class Boundary(val label: String, val source: Sample)
+
+    private object UnsupportedCones : RuntimeException(null, null, false, false)
 
     private object InitialCaptured : RuntimeException(null, null, false, false)
 
@@ -82,7 +91,7 @@ internal object ObjectiveViewComparison {
         val required = setOf("suite", "problem", "sha256")
         val optional = setOf(
             "source64", "sourceGzip64", "recipe", "seed", "moves", "timeoutMillis", "screen", "greedy",
-            "preparationEngine", "basins",
+            "preparationEngine", "basins", "geometry", "center64",
         )
         require(options.keys.containsAll(required) && options.keys.all { it in required || it in optional })
         val bytes = trajectorySourceBytes(
@@ -154,11 +163,17 @@ internal object ObjectiveViewComparison {
             put("proposalEquivalenceClaim", false)
             put("sourceVerdictClaim", false)
         }.toString())
+        val suppliedCenter = options["center64"]?.let {
+            require(it.length <= 524288)
+            sourceCenter(Base64.getDecoder().decode(it).decodeToString())
+        }
+        val sourceCheck = source.problem.bake()
+        val geometry = options["geometry"]?.toBooleanStrict() ?: false
         val states = ArrayList<TrajectoryView>()
         val boundaries = ArrayList<Boundary>()
-        for (view in View.entries) {
+        for (view in View.entries.filter { geometry || !it.geometry }) {
             val directory = out.resolve(view.name.lowercase()).apply { mkdirs() }
-            val prepared = prepare(source, view, preparationEngine, seed, timeout, directory) ?: continue
+            val prepared = prepare(source, view, preparationEngine, seed, timeout, directory, suppliedCenter != null) ?: continue
             directory.resolve("model.json").writeText(buildJsonObject {
                 put("preparationNanos", prepared.nanos)
                 put("preparationAllocatedBytes", prepared.allocatedBytes)
@@ -178,21 +193,53 @@ internal object ObjectiveViewComparison {
                 directory.resolve("decline.json").writeText("{\"decline\":\"source-coordinate-map\"}")
                 continue
             }
-            if (view == View.FUNCTIONAL &&
+            if ((view == View.FUNCTIONAL || view.geometry) &&
                 (prepared.gradient == null || !LocalSearchCatalog.byLabel(recipe).perMoveInvariants)
             ) {
                 directory.resolve("decline.json").writeText("{\"decline\":\"no-maintained-functional-objective\"}")
                 continue
             }
-            val initial = run(source, prepared, view, recipe, seed, 1, false, 60000, directory, boundaries)
-            if (initial != null) states += initial
-            val remaining = timeout - (prepared.nanos + 999999) / 1000000
+            val centerBytes = trajectoryThreadBytes()
+            val centerStarted = System.nanoTime()
+            val projection = suppliedCenter?.let { point ->
+                if (point.numBoolVars != source.problem.numBoolVars || point.numIntVars != source.problem.numIntVars ||
+                    !FiniteConflictSelection.checkSource(sourceCheck, point, Cancellation.after(10.seconds))
+                ) null to "source-infeasible-or-check-incomplete"
+                else projectedSourceCenter(point, prepared.pipeline.problem as BakedProblem,
+                    prepared.coordinates, prepared.sweep, prepared.pipeline.reconstruct)
+            }
+            val centerNanos = System.nanoTime() - centerStarted
+            if (suppliedCenter != null) {
+                directory.resolve("center.json").writeText(buildJsonObject {
+                    put("source", trajectorySource(suppliedCenter))
+                    put("decline", projection?.second)
+                    put("mappingAndNativeCheckNanos", centerNanos)
+                    put("mappingAndNativeCheckBytes", trajectoryThreadBytes() - centerBytes)
+                    put("nativeSourceAccepted", projection?.first != null)
+                    put("independentWitnessCheck", false)
+                }.toString())
+                if (projection?.first == null) continue
+            }
+            val initial = try {
+                run(source, prepared, view, recipe, seed, 1, false, 60000, directory, boundaries,
+                    initial = projection?.first)
+            } catch (_: UnsupportedCones) {
+                directory.resolve("decline.json").writeText("{\"decline\":\"unsupported-objective-cones\"}")
+                continue
+            }
+            if (initial != null) {
+                states += initial
+                captureObjectiveProposals(initial, boundaries.last().source, prepared.gradient,
+                    prepared.pipeline.objective, requireNotNull(source.objective).toLinearObjective(), sourceCheck,
+                    directory.resolve("proposals.json"))
+            }
+            val remaining = timeout - (prepared.nanos + centerNanos + 999999) / 1000000
             if (remaining > 0) run(source, prepared, view, recipe, seed, moves, greedy, remaining,
-                directory, boundaries, walk = true, basins = basins)
+                directory, boundaries, walk = true, basins = basins, initial = projection?.first)
             else directory.resolve("walk-decline.json").writeText("{\"decline\":\"preparation-time-budget\"}")
         }
         out.resolve("paired.jsonl").bufferedWriter().use { writer ->
-            check(boundaries.size <= 6)
+            check(boundaries.size <= View.entries.size * 2)
             val unique = boundaries.distinctBy { trajectorySource(it.source) }
             val functionalState = states.firstOrNull { it.label == "functional" }
             val functional = functionalState?.objective
@@ -222,6 +269,7 @@ internal object ObjectiveViewComparison {
         seed: Long,
         timeout: Long,
         out: File,
+        explicitCenter: Boolean,
     ): Prepared? {
         val started = System.nanoTime()
         val allocation = allocationCounter()
@@ -242,6 +290,7 @@ internal object ObjectiveViewComparison {
             requireNotNull(plan.model), engine, objective,
             cancellation = stop, solveCancellation = stop, presolveBudget = PresolveBudget(1_375_000_000L),
             preparedPlan = plan, transformObjective = view == View.SUBSTITUTED, randomSeed = seed,
+            presolveConfig = if (explicitCenter) PresolveConfig.NONE else PresolveConfig.DEFAULT,
         ))
         if (stop() || prepared.presolve?.infeasible == true) {
             out.resolve("decline.json").writeText(buildJsonObject {
@@ -272,6 +321,7 @@ internal object ObjectiveViewComparison {
         boundaries: MutableList<Boundary>,
         walk: Boolean = false,
         basins: Boolean = false,
+        initial: Sample? = null,
     ): TrajectoryView? {
         val problem = prepared.pipeline.problem as BakedProblem
         val objective = requireNotNull(prepared.pipeline.objective)
@@ -279,6 +329,7 @@ internal object ObjectiveViewComparison {
         val label = if (walk) "walk" else "initial"
         var first: LocalSearchState? = null
         var initialWeights: DoubleArray? = null
+        var firstSource: Sample? = null
         var picks = 0L
         var samples = 0
         val stop = Cancellation.after(timeout.milliseconds)
@@ -293,6 +344,11 @@ internal object ObjectiveViewComparison {
                 override fun generate(state: LocalSearchState, sink: MoveSink) {
                     val pick = picks++
                     if (pick == 0L) {
+                        if (initial != null) check(sameSource(prepared.pipeline.reconstruct(initial),
+                            prepared.pipeline.reconstruct(state.assignment.snapshot())))
+                        if (view.geometry && !configureObjectiveProposals(state, requireNotNull(prepared.gradient),
+                            view.leafHotspots, view.geometricSteps)) throw UnsupportedCones
+                        firstSource = prepared.pipeline.reconstruct(state.assignment.snapshot())
                         first = state
                         initialWeights = if (state.weights.allocated) state.weights.factorWeights.copyOf() else null
                         boundaries += Boundary("${view.name.lowercase()}-$label",
@@ -329,6 +385,7 @@ internal object ObjectiveViewComparison {
                 costShaping = CostShaping.Linear(lambda = 1.0),
                 lsObjective = prepared.gradient.takeIf { view == View.FUNCTIONAL },
                 normalizeWeightsByClass = true, reportResiduals = true, reportPhaseTimes = true,
+                initialAssignment = initial,
             )
             out.resolve("$label-incumbents.jsonl").bufferedWriter().use { incumbents ->
                 var improvements = 0
@@ -383,6 +440,18 @@ internal object ObjectiveViewComparison {
                             put("lastObservedSource", trajectorySource(point))
                             put("lastObservedSourceObjective", sourceObjective.evaluateExact(point).toString())
                             put("independentWitnessCheck", false)
+                            put("sourceInputChanges", firstSource?.let { center ->
+                                source.intVarNames.values.distinct().filter { it !in source.definedVars }
+                                    .count { center.intValue(it) != point.intValue(it) }
+                            })
+                            put("sourceBooleanChanges", firstSource?.let { center ->
+                                (0 until center.numBoolVars).count { center.boolValue(it) != point.boolValue(it) }
+                            })
+                            put("centerObjective", firstSource?.let { sourceObjective.evaluateExact(it).toString() })
+                            val checkStarted = System.nanoTime()
+                            put("nativeSourceAccepted", FiniteConflictSelection.checkSource(source.problem.bake(),
+                                point, Cancellation.after(10.seconds)))
+                            put("nativeSourceCheckNanos", System.nanoTime() - checkStarted)
                         }
                         observed?.assignment?.let { point ->
                             put("source", trajectorySource(prepared.pipeline.reconstruct(point)))
@@ -410,6 +479,14 @@ internal object ObjectiveViewComparison {
         val activeSweep = prepared.sweep?.takeIf { captured.invariants != null }
         shadow.invariants = activeSweep?.network(problem.numIntVars, problem.numBoolVars)
         initialWeights?.copyInto(shadow.weights.factorWeights)
+        run {
+            val setter = shadow.shaping.javaClass.methods.single {
+                it.name.substringBefore('$') == "setObjective" && it.parameterCount == 1
+            }
+            setter.invoke(shadow.shaping, captured.shaping.objective)
+            if (view.geometry) check(configureObjectiveProposals(shadow, requireNotNull(prepared.gradient),
+                view.leafHotspots, view.geometricSteps))
+        }
         return TrajectoryView(
             view.name.lowercase(), shadow,
             requireNotNull(prepared.coordinates),

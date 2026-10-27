@@ -25,7 +25,7 @@ class ObjectiveSeed : MoveSource {
     override val pool: Pool = Pool.NoiseEligible
 
     override fun generate(state: LocalSearchState, sink: MoveSink) {
-        when (val obj = state.shaping.objective ?: return) {
+        when (val obj = state.shaping.proposalSeeds ?: state.shaping.objective ?: return) {
             is LinearObjective -> {
                 for (v in obj.boolWeightValues.indices) {
                     if (obj.boolWeightValues[v] == 0L) continue
@@ -52,6 +52,11 @@ class ObjectiveSeed : MoveSource {
                     if (!sink.allowsInt(v)) continue
                     val cur = state.assignment.intValue(v)
                     val d = state.rootDomains[v]
+                    if (state.shaping.adjacentProposalSteps) {
+                        if (cur > d.min) sink.addChannelingIntSet(state, v, d.lower(cur))
+                        if (cur < d.max) sink.addChannelingIntSet(state, v, d.higher(cur))
+                        continue
+                    }
                     var step = 1
                     while (step <= OBJ_SEED_MAX_STEP) {
                         val up = cur + step

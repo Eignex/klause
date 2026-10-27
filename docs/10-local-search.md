@@ -108,6 +108,12 @@ applies configuration and tabu filters, scoring and acceptance. An optional inte
 tally counts offered, pin-rejected, trimmed, admitted and committed compounds for
 diagnostic consumers; it draws no random values and changes no candidate.
 
+Internal objective proposal controls can select term or cone-leaf integer hotspots
+independently of adjacent or geometric leaf steps. They require every cone to be
+maintained by the live network and its exact term form to match the canonical
+objective. Grading and best-feasible ordering retain that canonical objective;
+proposal controls confer no source feasibility or proof authority.
+
 ### Scoring
 
 The scoring axis values a candidate, lower being better:

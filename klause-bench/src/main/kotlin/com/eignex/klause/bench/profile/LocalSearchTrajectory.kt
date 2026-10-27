@@ -52,6 +52,7 @@ import java.io.File
 import java.lang.management.ManagementFactory
 import java.util.Base64
 import kotlin.random.Random
+import kotlin.time.Duration.Companion.nanoseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -80,7 +81,7 @@ internal object LocalSearchTrajectory {
         val required = setOf("suite", "problem", "sha256", "recipe", "seed", "moves")
         val optional = setOf(
             "sliceMillis", "sliceWork", "greedy", "repairs", "controls", "center", "source64", "sourceGzip64",
-            "channel", "presolve",
+            "channel", "presolve", "center64", "timeoutMillis",
             "ownerReplay", "ownerWork", "ownerFragmentWork", "ownerSelectors", "selectorsFromWalk", "ownerConflicts",
             "ownerRecipes", "owners", "ownerSeed",
         )
@@ -140,7 +141,7 @@ internal object LocalSearchTrajectory {
         val ownerSequence = options["owners"]?.split(',')
         require((ownerRecipes.isEmpty() && ownerSequence == null) || ownerReplay || ownerSelectors)
         ownerRecipes.forEach(::trajectoryRecipe)
-        val sourceCheck = if (repairCapture) parsed.problem.bake() else null
+        val sourceCheck = if (repairCapture || "center" in options || "center64" in options) parsed.problem.bake() else null
         require(!exactControls || repairCapture)
         require(!selectors || repairCapture)
         require(!ownerReplay || exactControls)
@@ -153,14 +154,17 @@ internal object LocalSearchTrajectory {
             put("declaredDefinitions", JsonArray(parsed.definedVars.map(::JsonPrimitive)))
             put("scope", "named source declarations excluding frontend-declared definitions")
         }.toString())
-        val initial = options["center"]?.split(',')?.map(String::toLong)?.toLongArray()?.let {
+        require(options["center"] == null || options["center64"] == null)
+        val initial = options["center64"]?.let {
+            require(it.length <= 524288)
+            sourceCenter(Base64.getDecoder().decode(it).decodeToString())
+        }
+            ?: options["center"]?.split(',')?.map(String::toLong)?.toLongArray()?.let {
             require(it.size == parsed.problem.numIntVars && parsed.problem.numBoolVars == 0)
             Sample(booleanArrayOf(), it)
         }
-        require(initial == null || parsed.definedVars.isEmpty())
         require(!selectorsFromWalk || initial == null)
         require(!selectorsFromWalk || channel == null)
-        require(initial == null || channel == null)
         val skipPresolve = initial != null || selectorsFromWalk || options["presolve"] == "off"
         val views = ArrayList<TrajectoryView>()
         val observations = ArrayList<Observation>()
@@ -191,7 +195,7 @@ internal object LocalSearchTrajectory {
             put("diagnosticWork", "separate private states; two full loads and at most 64 reversible probes per pair")
             put("sourceVerdictClaim", false)
         }.toString())
-        for (variant in if (initial == null && !selectorsFromWalk) variants else variants.take(1)) {
+        for (variant in if ((initial != null && channel == null) || selectorsFromWalk) variants.take(1) else variants) {
             val rewrite = variant.label
             val preparationStarted = System.nanoTime()
             val stop = Cancellation.after(60.seconds)
@@ -235,8 +239,6 @@ internal object LocalSearchTrajectory {
                 continue
             }
             val workingObjective = prepared.objective
-            require(initial == null || (initial.numIntVars == problem.numIntVars &&
-                prepared.reconstruct(initial) == initial)) { "explicit center needs an unchanged coordinate frame" }
             val hintsStarted = System.nanoTime()
             val hints = heuristicHints(invocation, prepared, stop)
             val maintained = hints?.let { getter(it, "getSweep") as DefinitionalSweep? }
@@ -288,6 +290,32 @@ internal object LocalSearchTrajectory {
                 out.resolve("decline-$rewrite.txt").writeText("unsupported-source-coordinate-projection\n")
                 continue
             }
+            val centerBytes = trajectoryThreadBytes()
+            val centerStarted = System.nanoTime()
+            val centerProjection = initial?.let { point ->
+                if (point.numBoolVars != parsed.problem.numBoolVars || point.numIntVars != parsed.problem.numIntVars ||
+                    !FiniteConflictSelection.checkSource(checkNotNull(sourceCheck), point, stop)
+                ) {
+                    null to "source-infeasible-or-check-incomplete"
+                } else projectedSourceCenter(point, problem, coordinates, sweep, prepared.reconstruct)
+            }
+            val workingInitial = centerProjection?.first
+            if (selectors && workingInitial != null) require(sameSource(checkNotNull(initial), workingInitial))
+            val centerNanos = System.nanoTime() - centerStarted
+            if (initial != null) {
+                out.resolve("center-$rewrite.json").writeText(buildJsonObject {
+                    put("source", trajectorySource(initial))
+                    put("working", workingInitial?.let(::trajectorySource) ?: JsonNull)
+                    put("decline", centerProjection?.second)
+                    put("mappingAndNativeCheckNanos", centerNanos)
+                    put("mappingAndNativeCheckBytes", trajectoryThreadBytes() - centerBytes)
+                    put("nativeSourceAccepted", workingInitial != null)
+                    put("independentWitnessCheck", false)
+                    put("learnedState", "fresh weights, tabu, configuration and worker RNG")
+                }.toString())
+                if (workingInitial == null) continue
+            }
+            val preparationNanos = System.nanoTime() - preparationStarted
             if (selectors && !selectorsFromWalk) SemanticRepairComparison.capture(problem,
                 checkNotNull(workingObjective), requireNotNull(initial), sweep, sourceInputs, prepared,
                 checkNotNull(sourceCheck), out, seed,
@@ -304,6 +332,13 @@ internal object LocalSearchTrajectory {
             var walkBytes = 0L
             for (mode in if (repairCapture) listOf("initial", "walk", "repair") else listOf("initial", "walk")) {
                 val walk = mode != "initial"
+                val timeoutMillis = options["timeoutMillis"]?.toLong()?.also { require(it in 100..60000) } ?: 60000L
+                val remainingNanos = timeoutMillis * 1_000_000 - preparationNanos
+                if (walk && remainingNanos <= 0) {
+                    out.resolve("censored-$mode-$rewrite.txt").writeText("preparation-time-budget\n")
+                    continue
+                }
+                val walkStop = if (walk) Cancellation.after(remainingNanos.coerceAtLeast(1).nanoseconds) else stop
                 val label = if (mode == "walk") rewrite.toString() else "$mode-$rewrite"
                 out.resolve("walk-$label.jsonl").bufferedWriter().use { writer ->
                     var picks = 0L
@@ -314,6 +349,11 @@ internal object LocalSearchTrajectory {
                         override val pool = Pool.NoiseEligible
                         override fun generate(state: LocalSearchState, sink: MoveSink) {
                             val pick = picks++
+                            if (pick == 0L && initial != null) {
+                                check(sameSource(initial, prepared.reconstruct(state.assignment.snapshot()))) {
+                                    "initialization changed the checked source center"
+                                }
+                            }
                             if (pick >= 256 && pick % 512 != 0L) return
                             val sample = prepared.reconstruct(state.assignment.snapshot())
                             writer.appendLine(buildJsonObject {
@@ -370,15 +410,15 @@ internal object LocalSearchTrajectory {
                     val trace = if (mode == "repair") RepairTrajectory.attach(solver,
                         "${options.getValue("recipe")}; linear shaping 1; seeded tie stream $seed") else null
                     val params = LocalSearchParams(
-                        randomSeed = seed, maxFlips = if (walk) moves else 1L, cancellation = stop,
+                        randomSeed = seed, maxFlips = if (walk) moves else 1L, cancellation = walkStop,
                         costShaping = CostShaping.Linear(lambda = 1.0), lsObjective = gradient,
                         normalizeWeightsByClass = true, reportResiduals = true,
-                        initialAssignment = initial,
+                        initialAssignment = workingInitial,
                     )
                     if (workingObjective == null) solver.resumableSolve(params).use { run ->
                         val result = try {
-                            var observed = run.runSlice(stop, sliceMillis, sliceWork)
-                            while (observed == null && !stop()) observed = run.runSlice(stop, sliceMillis, sliceWork)
+                            var observed = run.runSlice(walkStop, sliceMillis, sliceWork)
+                            while (observed == null && !walkStop()) observed = run.runSlice(walkStop, sliceMillis, sliceWork)
                             observed
                         } catch (_: Captured) {
                             null
@@ -393,10 +433,14 @@ internal object LocalSearchTrajectory {
                         val thread = Thread.currentThread().threadId()
                         val beforeBytes = allocation.getThreadAllocatedBytes(thread)
                         val started = System.nanoTime()
+                        var lastIncumbent: com.eignex.klause.solver.result.MinimizeResult.WithSample? = null
+                        val onIncumbent: (com.eignex.klause.solver.result.MinimizeResult.WithSample) -> Unit = {
+                            lastIncumbent = it
+                        }
                         val result = try {
-                            var observed = run.runSlice(stop, sliceMillis, sliceWork) {}
-                            while (observed == null && !stop()) {
-                                observed = run.runSlice(stop, sliceMillis, sliceWork) {}
+                            var observed = run.runSlice(walkStop, sliceMillis, sliceWork, onIncumbent)
+                            while (observed == null && !walkStop()) {
+                                observed = run.runSlice(walkStop, sliceMillis, sliceWork, onIncumbent)
                             }
                             observed
                         } catch (_: Captured) {
@@ -409,14 +453,36 @@ internal object LocalSearchTrajectory {
                             walkNanos = runNanos
                             walkBytes = runBytes
                         }
-                        if (walk && result != null && sourceCheck != null) {
-                            RepairTrajectory.writeResult(out.resolve("witness-$label.json"), result, prepared,
+                        val retainedResult = result ?: lastIncumbent
+                        if (walk && retainedResult != null && sourceCheck != null) {
+                            RepairTrajectory.writeResult(out.resolve("witness-$label.json"), retainedResult, prepared,
                                 sourceCheck, picks, runNanos, runBytes)
                         }
+                        out.resolve("summary-$label.json").writeText(buildJsonObject {
+                            put("moves", run.stats.ls.moves.sum)
+                            put("restarts", run.stats.search.restarts.sum)
+                            put("picks", picks)
+                            put("cancelled", walkStop())
+                            put("runElapsedNanos", runNanos)
+                            put("runAllocatedBytes", runBytes)
+                            put("preparationNanos", preparationNanos)
+                            retainedResult?.assignment?.let { endpoint ->
+                                val point = prepared.reconstruct(endpoint)
+                                put("source", trajectorySource(point))
+                                put("sourceInputChanges", initial?.let { start ->
+                                    sourceInputs.count { start.intValue(it) != point.intValue(it) }
+                                })
+                                put("sourceBooleanChanges", initial?.let { start ->
+                                    (0 until start.numBoolVars).count { start.boolValue(it) != point.boolValue(it) }
+                                })
+                                put("sourceObjective", objective?.evaluateExact(point).toString())
+                                put("centerObjective", initial?.let { objective?.evaluateExact(it).toString() })
+                            }
+                        }.toString())
                         out.resolve("result-$label.txt").writeText(
-                            "picks=$picks\ncancelled=${stop()}\nresult=$result\nstats=${run.stats}\n",
+                            "picks=$picks\ncancelled=${walkStop()}\nresult=$result\nstats=${run.stats}\n",
                         )
-                        if (walk && result != null && !stop()) {
+                        if (walk && result != null && !walkStop()) {
                             val stats = run.stats.ls
                             val signature = listOf(result.assignment, result.objectiveValue, picks, stats.moves.sum,
                                 run.stats.search.restarts.sum, stats.stalls.sum, stats.boardRestartChanges.sum,
@@ -457,7 +523,7 @@ internal object LocalSearchTrajectory {
                             { activeSweep?.sweep(shadow.assignment, shadow.rootDomains) },
                             initial.seeding.ownerInt,
                         )
-                        traceGreedy(initial, out.resolve("greedy-$rewrite.jsonl")) { position, slot ->
+                        if (workingInitial == null) traceGreedy(initial, out.resolve("greedy-$rewrite.jsonl")) { position, slot ->
                             val boundary = if (position == problem.numBoolVars + problem.numIntVars) {
                                 "greedy-complete-$rewrite"
                             } else "greedy-before-$rewrite-$position"

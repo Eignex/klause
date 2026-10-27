@@ -28,6 +28,10 @@ class ObjectiveShaping {
 
     internal var feasibilityGated: Boolean = false
 
+    internal var proposalHotspots: Objective? = null
+    internal var proposalSeeds: FunctionalObjective? = null
+    internal var adjacentProposalSteps: Boolean = false
+
     private var objIntVarsCache: IntArray? = null
     private var objIntVarsFor: Objective? = null
 
@@ -41,7 +45,7 @@ class ObjectiveShaping {
      */
     val objectiveIntVars: IntArray
         get() {
-            val obj = objective ?: return EmptyIntArray
+            val obj = proposalHotspots ?: objective ?: return EmptyIntArray
             val cached = objIntVarsCache
             if (cached != null && objIntVarsFor === obj) return cached
             val computed = computeObjectiveIntVars(obj)
