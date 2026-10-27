@@ -56,9 +56,10 @@ class ModelJsonTest {
             IntExpr.serializer(),
             x to """{"ref":"x"}""",
             IntLit(3) to "3",
-            IntScale(2, x) to """{"scale":[2,{"ref":"x"}]}""",
+            IntScale(2, x) to """{"mul":[2,{"ref":"x"}]}""",
             IntSum(listOf(x, IntLit(1))) to """{"add":[{"ref":"x"},1]}""",
             IntMul(x, y) to """{"mul":[{"ref":"x"},{"ref":"y"}]}""",
+            IntMul(x, IntLit(2)) to """{"mul":[{"ref":"x"},2]}""",
             IntDiv(x, y) to """{"truncDiv":[{"ref":"x"},{"ref":"y"}]}""",
             IntMod(x, y) to """{"truncMod":[{"ref":"x"},{"ref":"y"}]}""",
             IntPower(x, 2) to """{"pow":[{"ref":"x"},2]}""",
@@ -104,6 +105,44 @@ class ModelJsonTest {
             IntCompare(x, IntCmpOp.EQ, y) to """{"eq":[{"ref":"x"},{"ref":"y"}]}""",
             IntCompare(IntLit(0), IntCmpOp.NE, y) to """{"ne":[0,{"ref":"y"}]}""",
         )
+    }
+
+    @Test
+    fun `integer chains encode as left nested pairs`() {
+        assertShapes(
+            IntExpr.serializer(),
+            IntSum(listOf(x, y, IntLit(1))) to """{"add":[{"add":[{"ref":"x"},{"ref":"y"}]},1]}""",
+            IntMin(listOf(x, y, IntLit(1))) to """{"min":[{"min":[{"ref":"x"},{"ref":"y"}]},1]}""",
+            IntMax(listOf(x, y, IntLit(1), IntLit(2))) to
+                """{"max":[{"max":[{"max":[{"ref":"x"},{"ref":"y"}]},1]},2]}""",
+        )
+    }
+
+    @Test
+    fun `logical chains encode as left nested pairs`() {
+        assertShapes(
+            BoolExpr.serializer(),
+            And(listOf(p, q, Not(p))) to """{"and":[{"and":[{"ref":"p"},{"ref":"q"}]},{"not":{"ref":"p"}}]}""",
+            Or(listOf(p, q, Not(p))) to """{"or":[{"or":[{"ref":"p"},{"ref":"q"}]},{"not":{"ref":"p"}}]}""",
+        )
+    }
+
+    @Test
+    fun `chains nested in the right operand keep their grouping`() {
+        assertShapes(
+            IntExpr.serializer(),
+            IntSum(listOf(x, IntSum(listOf(y, IntLit(1))))) to """{"add":[{"ref":"x"},{"add":[{"ref":"y"},1]}]}""",
+        )
+    }
+
+    @Test
+    fun `operand lists longer than two decode as one chain`() {
+        val sum = SchemaJson.decodeFromString(IntExpr.serializer(), """{"add":[{"ref":"x"},{"ref":"y"},1]}""")
+        val conjunction =
+            SchemaJson.decodeFromString(BoolExpr.serializer(), """{"and":[{"ref":"p"},{"ref":"q"},{"ref":"p"}]}""")
+
+        assertEquals(IntSum(listOf(x, y, IntLit(1))), sum)
+        assertEquals(And(listOf(p, q, p)), conjunction)
     }
 
     @Test
@@ -233,6 +272,7 @@ class ModelJsonTest {
             """{"float":{"min":0.0,"max":1.0,"bucket":3}}""" to "$.float.bucket: unknown field",
             """{"constraint":{"and":[{"ref":"a"},{"bogus":1}]}}""" to "$.constraint.and[1].bogus: unknown operator",
             """{"constraint":{"ge":[{"ref":"x"},1.5]}}""" to "$.constraint.ge[1]: expected INT",
+            """{"constraint":{"ge":[{"mul":[2.5,{"ref":"x"}]},1]}}""" to "$.constraint.ge[0].mul[0]: expected INT",
             """{"constraint":{"ge":{"left":{"ref":"x"},"right":1}}}""" to "$.constraint.ge: expected an operand array",
             """{"constraint":{"notRef":{"name":"p"}}}""" to "$.constraint.notRef: expected STRING",
             """{"${'$'}type":"int","min":0,"max":1}""" to "$: expected exactly one operator",

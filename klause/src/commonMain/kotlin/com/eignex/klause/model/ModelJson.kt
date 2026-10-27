@@ -7,7 +7,15 @@ import com.eignex.skema.serialization.JsonNodeShape.Literal
 import com.eignex.skema.serialization.JsonNodeShape.Operand
 import com.eignex.skema.serialization.JsonNodeShape.Operands
 import com.eignex.skema.serialization.jsonNode
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonEncoder
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.doubleOrNull
 
 /**
  * Compact JSON vocabularies of schema entries and expressions. Each node is one operator key
@@ -16,6 +24,11 @@ import kotlinx.serialization.json.JsonPrimitive
  *
  * Keys shared with Kumulant follow the portable expression profile, so one key never names
  * two operations: integer division is `truncDiv`/`truncMod`, and `div` stays real division.
+ * Encoding writes the profile's two-operand shapes: [IntScale] is `mul` with the coefficient
+ * first, and [IntSum], [IntMin], [IntMax], [And] and [Or] over more than two children nest
+ * to the left, so `x + 1 + 2` is `{"add": [{"add": [x, 1]}, 2]}`. Decoding merges a chain
+ * nested in the first operand back into one node and reads `mul` with a numeric left operand
+ * as [IntScale], so trees built by the Kotlin DSL round-trip unchanged.
  */
 object ModelJson {
     /** Every model vocabulary, for composing into another [JsonNodeCatalog]. */
@@ -30,7 +43,44 @@ object ModelJson {
         )
 
     /** Catalog resolving nested model vocabularies, including during JSON Schema generation. */
-    val catalog: JsonNodeCatalog = JsonNodeCatalog { serializers }
+    val catalog: JsonNodeCatalog = JsonNodeCatalog(::resolveMul) { serializers }
+}
+
+// `mul` is IntScale when its left operand is a number, as constant multiplication encodes, else IntMul.
+private fun resolveMul(candidates: List<JsonNode>, payload: JsonElement, path: String): JsonNode {
+    val left = (payload as? JsonArray)?.firstOrNull() as? JsonPrimitive
+    val type = if (left != null && !left.isString && left.doubleOrNull != null) IntScale::class else IntMul::class
+    return candidates.singleOrNull { it.type == type } ?: throw SerializationException("$path: ambiguous operator")
+}
+
+private fun <T> List<T>.nestedLeft(node: (List<T>) -> T): T =
+    drop(2).fold(node(take(2))) { left, right -> node(listOf(left, right)) }
+
+private fun IntExpr.binaryChain(): IntExpr = when {
+    this is IntSum && children.size > 2 -> children.nestedLeft(::IntSum)
+    this is IntMin && children.size > 2 -> children.nestedLeft(::IntMin)
+    this is IntMax && children.size > 2 -> children.nestedLeft(::IntMax)
+    else -> this
+}
+
+// Children decode first, so a chain nested in the first operand is already merged.
+private fun IntExpr.mergedChain(): IntExpr = when (this) {
+    is IntSum -> (children.first() as? IntSum)?.let { IntSum(it.children + children.drop(1)) } ?: this
+    is IntMin -> (children.first() as? IntMin)?.let { IntMin(it.children + children.drop(1)) } ?: this
+    is IntMax -> (children.first() as? IntMax)?.let { IntMax(it.children + children.drop(1)) } ?: this
+    else -> this
+}
+
+private fun BoolExpr.binaryChain(): BoolExpr = when {
+    this is And && children.size > 2 -> children.nestedLeft(::And)
+    this is Or && children.size > 2 -> children.nestedLeft(::Or)
+    else -> this
+}
+
+private fun BoolExpr.mergedChain(): BoolExpr = when (this) {
+    is And -> (children.first() as? And)?.let { And(it.children + children.drop(1)) } ?: this
+    is Or -> (children.first() as? Or)?.let { Or(it.children + children.drop(1)) } ?: this
+    else -> this
 }
 
 private fun varSpecNodes(): List<JsonNode> = listOf(
@@ -68,7 +118,7 @@ object IntExprSerializer : CompactSerializer<IntExpr>(
         listOf(
             jsonNode<IntRef>("ref", Operand, "name"),
             jsonNode<IntLit>("const", Literal, "value"),
-            jsonNode<IntScale>("scale", Operands, "coeff", "child"),
+            jsonNode<IntScale>("mul", Operands, "coeff", "child"),
             jsonNode<IntSum>("add", Operand, "children"),
             jsonNode<IntMul>("mul", Operands, "left", "right"),
             jsonNode<IntDiv>("truncDiv", Operands, "num", "den"),
@@ -82,7 +132,16 @@ object IntExprSerializer : CompactSerializer<IntExpr>(
             jsonNode<SetCard>("card", Operand, "set"),
         )
     },
-)
+) {
+    override fun serialize(encoder: Encoder, value: IntExpr) {
+        super.serialize(encoder, if (encoder is JsonEncoder) value.binaryChain() else value)
+    }
+
+    override fun deserialize(decoder: Decoder): IntExpr {
+        val value = super.deserialize(decoder)
+        return if (decoder is JsonDecoder) value.mergedChain() else value
+    }
+}
 
 /** Compact JSON serializer of [BoolExpr]; [IntCompare] takes its operator's key, such as `{"ge": [l, r]}`. */
 object BoolExprSerializer : CompactSerializer<BoolExpr>(
@@ -142,7 +201,16 @@ object BoolExprSerializer : CompactSerializer<BoolExpr>(
             jsonNode<GccExprOpt>("gccOpt"),
         )
     },
-)
+) {
+    override fun serialize(encoder: Encoder, value: BoolExpr) {
+        super.serialize(encoder, if (encoder is JsonEncoder) value.binaryChain() else value)
+    }
+
+    override fun deserialize(decoder: Decoder): BoolExpr {
+        val value = super.deserialize(decoder)
+        return if (decoder is JsonDecoder) value.mergedChain() else value
+    }
+}
 
 /** Compact JSON serializer of [SetExpr]. */
 object SetExprSerializer : CompactSerializer<SetExpr>(

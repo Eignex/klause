@@ -11,3 +11,6 @@ value the expression evaluates to (`"NaN"`, `"Infinity"` or `"-Infinity"` for
 non-finite binary64 values), `"accept"` when the environment accepts the shape but the
 bindings lie outside its domain, or `"reject"` when it must refuse the case before
 producing a value. An accepted case re-encodes to `canonical`, or to `expr` when absent.
+
+A case with `dsl` names the Klause Kotlin DSL construction over integer references
+`a`, `b` and `c` that encodes to `expr` and decodes back to the same tree.
