@@ -77,7 +77,7 @@ class LinearAuthorityInvocationTest {
         ), mapOf(real to BigFraction.ONE))
         val params = TheoryParams(sourceCuts = false)
 
-        for (recordFeedback in listOf(false, true)) {
+        for ((recordFeedback, resolution) in listOf(false to false, true to false, true to true)) {
             var baselineFeedback = 0
             var reusedFeedback = 0
             val baselineObserver: (SourceNumericalFeedbackResult) -> Unit = { baselineFeedback++ }
@@ -86,7 +86,7 @@ class LinearAuthorityInvocationTest {
             val baseline = LinearAuthorityInvocation(source, params, boundOrdered = true,
                 onNumericalFeedback = baselineObserver.takeIf { recordFeedback }).use { it.run { _, _ -> } }
             val reused = LinearAuthorityInvocation(source, params.copy(sourceRefutationReuse = true,
-                sourceRefutationPropagation = recordFeedback),
+                sourceRefutationPropagation = recordFeedback, sourceRefutationResolution = resolution),
                 boundOrdered = true, onNumericalFeedback = reusedObserver.takeIf { recordFeedback }).use {
                 if (!recordFeedback) it.run { _, _ -> } else {
                     var result: LinearInvocationResult? = null
