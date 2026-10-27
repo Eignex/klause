@@ -215,8 +215,8 @@ internal object RepairOwnerReplay {
                                         if (firstFloat == null) firstFloat = sample
                                         completionObjective?.invoke(sample, dynamic) != null
                                     }
-                                    val score: ((Sample) -> BigFraction?)? = completionObjective?.let { objective ->
-                                        { sample -> objective(sample, dynamic) }
+                                    val score: ((Sample) -> BigFraction?)? = completionObjective?.let { sourceScore ->
+                                        { sample -> sourceScore(sample, dynamic) }
                                     }
                                     @Suppress("UNCHECKED_CAST")
                                     (Class.forName("com.eignex.klause.solver.validation.FiniteSourceAcceptance")

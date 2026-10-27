@@ -44,6 +44,38 @@ import kotlin.time.Duration.Companion.seconds
 
 class ResumableMinimizeRealLeafTest {
     @Test
+    fun `reseed should discard an interrupted primal before completing a sibling`() {
+        val fixture = UnresolvedRealLeafFixture(true)
+        fixture.acceptProof = { _, _ -> false }
+        var interrupt = true
+        var cancelled = false
+        val params = fixture.params.copy(toleranceCheck = {
+            if (interrupt) {
+                interrupt = false
+                cancelled = true
+            }
+            true
+        })
+
+        fixture.solver.openRepair(fixture.objective, params).use { repair ->
+            repair.beginExact(Assumptions.None.withInt(0, 0L), 100L, BigFraction.ofLong(2L),
+                Cancellation { cancelled })
+            val interrupted = repair.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L)
+            assertNull(interrupted.sample)
+            assertEquals(TerminationReason.Cancelled, interrupted.reason)
+
+            cancelled = false
+            repair.beginExact(Assumptions.None.withInt(0, 1L), 100L, BigFraction.ofLong(2L), Cancellation.Never)
+            val sibling = repair.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L)
+
+            assertEquals(1L, assertNotNull(sibling.sample).ints.single())
+            assertEquals(0.5, sibling.sample.reals.single())
+            assertEquals(TerminationReason.Unsupported, sibling.reason)
+        }
+        assertEquals(fixture.opened, fixture.closed)
+    }
+
+    @Test
     fun `primal repair should compare the authoritative scaled source objective across rounded ties`() {
         val epsilon = BigFraction.ofLong(1L shl 60).reciprocal()
         for (sign in listOf(-1L, 1L)) for (offset in listOf(0L, 1L)) {
