@@ -5216,6 +5216,18 @@ retained bytes and evictions. Modeled allocation is separate from physical RSS.
 Reuse work, including its verification subset, is already included in source LP
 conflict-certification work and cumulative funded work; these counters are not additive.
 
+`param.source-refutation-propagation=true` additionally consumes checked integral
+unit-prefix exclusions through named source-bound atoms; it enables the same reuse
+index and remains disabled by default. Compare it with cache-only reuse on the same
+revision and whole-family holdouts, retaining ordinary automatic controls.
+`numericalRefutationUnitDeductions` counts first implications and
+`numericalRefutationUnitReplays` counts restoration under active antecedents.
+Record actual shared decisions, numerical queries, complete sibling coverage,
+incumbents, total funded work/allocation and whole-CLI resources. Cache lookup and
+verification counters are subsets of that work; atom naming and clause construction
+also spend the containing allowance. Lower query counts in an incomplete run alone
+establish no benefit.
+
 [Qualification 8696](https://lab.eignex.com/jobs/8696), at `81220267c6`, completes
 162 cases: the nine frozen original sources, reuse disabled/enabled and automatic
 controls under default/exact semantics, three policy seeds, P1/10 s and external
