@@ -192,7 +192,7 @@ class ProblemJson(
         runs.forEachIndexed { i, run ->
             require(run.size == 2 && run[0] <= run[1]) { "run $i must be [lo, hi] with lo <= hi" }
             // A strict gap keeps the run list canonical, so its encoding is unique.
-            require(i == 0 || run[0] > flat.last() && run[0] - 1 > flat.last()) {
+            require(i == 0 || (run[0] > flat.last() && run[0] - 1 > flat.last())) {
                 "run $i must start past the previous run with a gap"
             }
             flat.add(run[0])
