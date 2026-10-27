@@ -9,7 +9,7 @@ define lifetimes; this chapter identifies supported entry points and extension s
 
 | Surface | Contract |
 |---|---|
-| `model`, `schema`, `compile` | Model expressions, schema handles, compilation, captured source-name metadata, typed source locations and decoding |
+| `model`, `schema`, `compile` | Model expressions, their compact JSON serializers, schema handles, compilation, captured source-name metadata, typed source locations and decoding |
 | `config`, `ir` model declarations | Configuration capture, source bounds/value sets, `Problem`, literals and structural factor descriptions |
 | `solver` entry points and results | `Solver`, `Optimizer`, `SolverParams`, `Session`, `SearchStream`, their result/value types and resumable operation contracts |
 | Built-in solver facades | Engine construction, parameters, presets and counting/sampling entry points |

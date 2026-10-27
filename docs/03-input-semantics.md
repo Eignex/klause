@@ -153,6 +153,43 @@ including coefficients wider than binary64's integer precision, and
 `CompiledSchema.sourceObjective` exposes the exact objective. `optimizeOpen` uses a
 lossless linear mapping when representable and otherwise returns unsupported.
 
+### Schema JSON
+
+`definition()` snapshots a schema as a `SchemaDef` of `SchemaEntry` rows, the model
+the compiler reads. Its JSON form gives each node one operator key holding its
+operands: a named reference is `{"ref": name}`, an integer literal is a bare number,
+positional operands follow the Kotlin field order and other nodes name their fields
+with defaults omitted. `JsonSchema.parse` reads such documents and
+`JsonSchema.jsonSchema()` returns the draft 2020-12 JSON Schema derived from the
+same serializers.
+
+```json
+{"entries": {
+  "size": {"int": [1, 10]},
+  "shift": {"nominal": ["day", "night"]},
+  "nightMinSize": {"constraint": {"implies": [
+    {"nominalEq": ["shift", "night"]},
+    {"ge": [{"ref": "size"}, 3]}]}}}}
+```
+
+| Vocabulary | Keys |
+|---|---|
+| `SchemaEntry` | `bool`, `presence`, `nominal`, `int`, `float`, `set`, `multiple`, `constraint` |
+| `IntExpr` | `ref`, literal, `scale`, `add`, `mul`, `div`, `mod`, `pow`, `abs`, `min`, `max`, `if`, `element`, `card` |
+| `BoolExpr` logic | `ref`, `notRef`, `nominalEq`, `not`, `and`, `or`, `xor`, `implies`, `iff`, `atMost`, `atLeast`, `cardinality`, `pseudoBoolean` |
+| `BoolExpr` relations | `le`, `lt`, `ge`, `gt`, `eq`, `ne`, `floatLinear`, `realEq`, set `in`, `labelIn`, `subset`, `disjoint`, `setEq` |
+| `BoolExpr` globals | `allDifferent`, `symmetricAllDifferent`, `inverse`, `table`, `regular`, `costRegular`, `mdd`, `costMdd`, `circuit`, `subcircuit`, `cumulative`, `disjunctive`, `sort`, `increasing`, `diffn` and the `…Opt` presence forms |
+| `SetExpr` | `ref`, `elements`, `labels`, `union`, `intersect`, `diff` |
+| `ContinuousRealExpr` | `affine`, `mul`, `pow` |
+
+Shared arithmetic and Boolean keys match Kumulant's expressions where the semantics
+agree. Integer vocabularies accept only integer literals and `div`/`mod` truncate;
+`floatLinear` keeps binary64 coefficients, and exact real expressions form their
+own vocabulary. Decoding is strict: unknown keys, wrong operand counts and
+constructor invariants fail at their document path, such as
+`$.entries.size.int[1]`. `ModelJson.catalog` composes the vocabularies into other
+compact formats; non-JSON formats keep the sealed-class representation.
+
 ### Integer extrema and selection
 
 Nested integer `min`/`max` expressions retain `ArrayMinMax` factors over their
