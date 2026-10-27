@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "license": "Apache-2.0",
+  "attribution": "Self-authored Eignex Klause controls frozen in lab job 8750, request identities 9 through 11",
+  "cases": [
+    {
+      "sha256": "56ba5ac7bb3ad5bf54617242e0a91e3a5fb48021845c8d27836b5831052ccb0e",
+      "path": "klause-bench/smoke-corpus/qfnra-prepared-support-v1/degree-2-pairs-1-sat.smt2",
+      "suite": "smtlib-qfnra-prepared-support-v1",
+      "name": "degree-2-pairs-1-sat",
+      "expected": "sat",
+      "license": "Apache-2.0"
+    },
+    {
+      "sha256": "d0393bff290fc4ba2b56fac1ce33a8df796ec6d18329769e1360501fbe37b201",
+      "path": "klause-bench/smoke-corpus/qfnra-prepared-support-v1/degree-8-pairs-1-sat.smt2",
+      "suite": "smtlib-qfnra-prepared-support-v1",
+      "name": "degree-8-pairs-1-sat",
+      "expected": "sat",
+      "license": "Apache-2.0"
+    },
+    {
+      "sha256": "aff20e9089604a8ba9d63db5c14133824756e5c70c7412c4db62154f18624553",
+      "path": "klause-bench/smoke-corpus/qfnra-prepared-support-v1/strict-alternative.smt2",
+      "suite": "smtlib-qfnra-prepared-support-v1",
+      "name": "strict-alternative",
+      "expected": "sat",
+      "license": "Apache-2.0"
+    }
+  ]
+}
