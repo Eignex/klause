@@ -75,8 +75,10 @@ internal object PolynomialPhaseProfile {
         val request = requestBytes(args[0])
         val cases = Json.decodeFromString<List<PhaseSource>>(request.decodeToString())
         require(cases.size in 1..18 &&
-            cases.map { Triple(it.suite, it.problem, it.fixedIntegers) }.distinct().size == cases.size)
+            cases.map { listOf(it.suite, it.problem, it.fixedIntegers, it.fixedBooleans) }.distinct().size ==
+                cases.size)
         require(!preparedMode || cases.all { it.fixedIntegers.isEmpty() })
+        require(!pipelineMode || cases.all { it.fixedBooleans.isEmpty() })
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         if (System.getenv("KLAUSE_POLYNOMIAL_PHASE_CHILD") != "1") {
             launch(args, out)
@@ -125,21 +127,23 @@ internal object PolynomialPhaseProfile {
             if (preparedMode) {
                 directory.resolve("prepared-trace.json").writeText(
                     Json.encodeToString(access.measure(text, maximumWork, timeoutMs,
-                        prepared = true, capture = capture, refinement = refine, feedback = feedback,
+                        prepared = true, capture = capture, fixedBooleans = source.fixedBooleans,
+                        refinement = refine, feedback = feedback,
                         coupled = coupled)),
                 )
             } else if (directMode) {
                 directory.resolve("gate.json").writeText(Json.encodeToString(access.gate(text, timeoutMs)))
                 directory.resolve("trace.json").writeText(
                     Json.encodeToString(access.measure(text, maximumWork, timeoutMs,
-                        capture = capture, fixedIntegers = source.fixedIntegers,
+                        capture = capture, fixedIntegers = source.fixedIntegers, fixedBooleans = source.fixedBooleans,
                         refinement = refine, feedback = feedback, coupled = coupled)),
                 )
             }
             if (options["coupled"] in setOf("both", "matrix")) {
                 directory.resolve("coupled-control-trace.json").writeText(Json.encodeToString(
                     access.measure(text, maximumWork, timeoutMs, prepared = preparedMode, capture = capture,
-                        fixedIntegers = source.fixedIntegers, refinement = refine, feedback = feedback)))
+                        fixedIntegers = source.fixedIntegers, fixedBooleans = source.fixedBooleans,
+                        refinement = refine, feedback = feedback)))
             }
             if (options["coupled"] == "matrix") {
                 for ((name, preparation, joint) in listOf(
@@ -148,24 +152,26 @@ internal object PolynomialPhaseProfile {
                 )) {
                     directory.resolve("$name-trace.json").writeText(Json.encodeToString(
                         access.measure(text, maximumWork, timeoutMs, prepared = preparedMode, capture = capture,
-                            fixedIntegers = source.fixedIntegers, refinement = refine, feedback = feedback,
+                            fixedIntegers = source.fixedIntegers, fixedBooleans = source.fixedBooleans,
+                            refinement = refine, feedback = feedback,
                             coupled = true, coupledPreparation = preparation, coupledJoint = joint)))
                 }
             }
             if (options["refinement"] == "both") {
                 directory.resolve("control-trace.json").writeText(Json.encodeToString(
                     access.measure(text, maximumWork, timeoutMs, prepared = preparedMode, capture = capture,
-                        fixedIntegers = source.fixedIntegers)))
+                        fixedIntegers = source.fixedIntegers, fixedBooleans = source.fixedBooleans)))
             }
             if (options["feedback"] == "both") {
                 directory.resolve("feedback-control-trace.json").writeText(Json.encodeToString(
                     access.measure(text, maximumWork, timeoutMs, prepared = preparedMode, capture = capture,
-                        fixedIntegers = source.fixedIntegers, refinement = true)))
+                        fixedIntegers = source.fixedIntegers, fixedBooleans = source.fixedBooleans, refinement = true)))
             }
             if (options["capture"] == "both") {
                 directory.resolve("plain-trace.json").writeText(Json.encodeToString(
                     access.measure(text, maximumWork, timeoutMs, prepared = preparedMode,
-                        fixedIntegers = source.fixedIntegers, refinement = refine, feedback = feedback,
+                        fixedIntegers = source.fixedIntegers, fixedBooleans = source.fixedBooleans,
+                        refinement = refine, feedback = feedback,
                         coupled = coupled)))
             }
         }
@@ -385,6 +391,7 @@ internal object PolynomialPhaseProfile {
             prepared: Boolean = false,
             capture: Boolean = false,
             fixedIntegers: Map<String, String> = emptyMap(),
+            fixedBooleans: Map<String, Boolean> = emptyMap(),
             refinement: Boolean = false,
             feedback: Boolean = false,
             coupled: Boolean = false,
@@ -408,6 +415,15 @@ internal object PolynomialPhaseProfile {
             var names: Map<String, String> = emptyMap()
             var originalNames: Map<String, String>? = null
             var integerFixings: Map<Int, BigFraction> = emptyMap()
+            var booleanFixings: Map<Int, Boolean> = emptyMap()
+            fun booleanPins(declarations: Map<String, Int>, coordinate: (Int) -> Int): Map<Int, Boolean> {
+                require(fixedBooleans.size <= 64)
+                return fixedBooleans.map { (name, value) ->
+                    check(!token())
+                    meter.charge(1)
+                    coordinate(declarations.getValue(name)) to value
+                }.toMap()
+            }
             val source = if (prepared) {
                 val parsed = SmtLib.parse(text, cancellation = token)
                 originalNames = (parsed.source.originalSource as? PolynomialRealProblem)?.let { original ->
@@ -420,6 +436,11 @@ internal object PolynomialPhaseProfile {
                 val problem = (invocation.route as? SourceProblemRoute.PolynomialTheory)?.request?.problem
                     ?: return PhaseTrace(emptyList(), "NotPolynomial", invocation.route.javaClass.simpleName,
                         null, 0, 0, charges, stop)
+                if (fixedBooleans.isNotEmpty()) {
+                    val plan = requireNotNull(invocation.preparedPlan)
+                    require(plan.belongsTo(parsed.source.originalSource))
+                    booleanFixings = booleanPins(parsed.boolVarNames, plan::booleanCoordinate)
+                }
                 names = problem.realVarNames.mapKeys { "real.${it.key}" }.mapValues { it.value.toString() } +
                     problem.boolVarNames.mapKeys { "bool.${it.key}" }.mapValues { it.value.toString() }
                 Triple(
@@ -429,6 +450,9 @@ internal object PolynomialPhaseProfile {
                 )
             } else {
                 val parsed = parsed(text, token)
+                @Suppress("UNCHECKED_CAST")
+                val booleans = sourceType.getMethod("getBoolVarNames").invoke(parsed) as Map<String, Int>
+                booleanFixings = booleanPins(booleans) { it }
                 @Suppress("UNCHECKED_CAST")
                 val integers = sourceType.getMethod("getIntVarNames").invoke(parsed) as Map<String, Int>
                 require(integers.keys == fixedIntegers.keys) { "Every integer declaration needs an exact fixing" }
@@ -457,7 +481,7 @@ internal object PolynomialPhaseProfile {
             val owner = query.newInstance(original, source.second, source.third,
                 params.newInstance(token, maximumWork, limitsType.getConstructor().newInstance(), refinement, feedback,
                     coupled, coupledPreparation, coupledJoint),
-                condition.newInstance(emptyMap<Int, Boolean>(), fixed, fixed))
+                condition.newInstance(booleanFixings, fixed, fixed))
             val captured = if (capture) captureType.getConstructor().newInstance().also { setCapture.invoke(owner, it) }
                 else null
             var conflictPremises: Int? = null
@@ -567,6 +591,7 @@ internal object PolynomialPhaseProfile {
                 queryElapsedNs = queryElapsedNs,
                 queryThreadAllocatedBytes = queryThreadAllocatedBytes,
                 sourceCoordinates = names,
+                conditionBooleans = booleanFixings.mapKeys { it.key.toString() }.mapValues { it.value.toString() },
                 originalSourceCoordinates = originalNames,
                 coordinateNamespace = if (prepared) "prepared-polynomial-model" else "raw-polynomial-source",
                 coordinateMapping = if (prepared) "original-to-prepared correspondence unavailable"
@@ -698,6 +723,7 @@ private data class PhaseSource(
     val problem: String,
     val sha256: String,
     val fixedIntegers: Map<String, String> = emptyMap(),
+    val fixedBooleans: Map<String, Boolean> = emptyMap(),
     val gzip64: String? = null,
 )
 
@@ -748,6 +774,7 @@ internal data class PhaseTrace(
     val queryThreadAllocatedBytes: Long? = null,
     val sourceCoordinates: Map<String, String>? = null,
     val originalSourceCoordinates: Map<String, String>? = null,
+    val conditionBooleans: Map<String, String>? = null,
     val coordinateNamespace: String? = null,
     val coordinateMapping: String? = null,
     val failureCapture: Map<String, Map<String, String>>? = null,
