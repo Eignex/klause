@@ -92,7 +92,8 @@ restart schedule takes precedence.
     `bt-arm=label,…` pins named arms.
   - `mixed` (default): backtrack plus local search.
   - `localsearch` (alias `ls`): local-search portfolio. Strategy `--param`s and the
-    recipe axes `sources`, `scoring` and `acceptance` edit the pool.
+    recipe axes `sources`, `scoring` and `acceptance` edit the pool; `arm=label`
+    pins one catalog arm, which the axes still edit.
   - `alns` (aliases `lns`, `hybrid-lns`): adaptive large-neighbourhood search.
 - `--presolve <strength>`: `off`, `conservative`, `default` or `aggressive`, with
   `+/-<pass>` deltas; applies to canonical factor preparation, including polynomial

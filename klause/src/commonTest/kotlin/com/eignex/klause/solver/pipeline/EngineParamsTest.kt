@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.localsearch.movesource.MoveSourceCatalog
 import com.eignex.klause.portfolio.BacktrackCatalog
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
@@ -72,5 +73,16 @@ class EngineParamsTest {
         val recipe = resolved.pool!!.single()().editing(resolved.edit)
         assertEquals(anArm, recipe.label)
         assertTrue(!recipe.build(1L, null).lpPlan.branching)
+    }
+
+    @Test
+    fun `a pinned local search arm should accept a sources edit`() {
+        val params = EngineParams(listOf("arm=cbls-implicit/fixed", "sources=+unused-values"))
+
+        val recipe = resolveLocalSearchRecipes(params).pool!!.single()()
+
+        assertEquals("cbls-implicit/fixed", recipe.label)
+        assertTrue(recipe.seedImplicitOnRestart)
+        assertTrue(recipe.strategy.sources.any { it.source.id == MoveSourceCatalog.idOf("unused-values") })
     }
 }

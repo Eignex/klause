@@ -465,8 +465,8 @@ internal fun resolveLocalSearchRecipes(p: ExecutionOptionReader): LsResolution {
     val hasEdits = sources.isNotEmpty() || scoring.isNotEmpty() || acceptance.isNotEmpty() || restart.isNotEmpty()
     val strategyRaw = p[ExecutionOption.strategy]?.lowercase()
     val armLabel = p[ExecutionOption.localSearchArm]
-    if (armLabel != null && (strategyRaw != null || sourcesSpec != null)) {
-        pipelineConfigError("ls: arm= selects one catalog arm and is mutually exclusive with strategy=/sources=")
+    if (armLabel != null && strategyRaw != null) {
+        pipelineConfigError("ls: arm= selects one catalog arm and is mutually exclusive with strategy=")
     }
     if (armLabel != null && armLabel !in LocalSearchCatalog.labels()) {
         pipelineConfigError(
