@@ -30,6 +30,46 @@ import kotlin.test.assertTrue
 
 class LinearRefutationReuseTest {
     @Test
+    fun `resolution should imply a bound before either input has a unit prefix`() {
+        val x = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val y = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
+        val scope = SourceScope(SourceRevision("resolved-unit", "exact-affine"))
+        val source = SourceProofContext(scope, setOf(x, y), mapOf(
+            "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE,
+                y to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE)),
+            "right" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE,
+                y to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ))
+        val cache = LinearRefutationReuse(source, SourceLpBudget(), Cancellation.Never)
+        val learned = LinearRefutationReuse(source, SourceLpBudget(), Cancellation.Never, resolve = true)
+        learned.name(x, BigFraction.ZERO, 0)
+        learned.name(y, BigFraction.ZERO, 2)
+        for (upper in listOf(true, false)) {
+            val condition = SourceCondition().bound(x, if (upper) BigFraction.ZERO else BigFraction.ONE, upper)
+                .bound(y, BigFraction.ZERO, true)
+            val conflict = LinearPinnedRefutation(SourceDerivation.Combination(listOf(
+                SourceDerivation.Combination.Term(BigFraction.ONE,
+                    SourceDerivation.Premise(if (upper) "left" else "right")),
+                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(x, upper)),
+                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(y, true)),
+            )))
+            val evidence = SourceEvidence(scope.copy(condition = condition), SourceClaim.Refutation, conflict)
+            cache.retain(evidence)
+            learned.retain(evidence)
+        }
+        assertNull(cache.unit(SourceCondition()))
+
+        val unit = assertNotNull(learned.unit(SourceCondition()))
+
+        assertEquals(y, unit.coordinate)
+        assertEquals(BigFraction.ZERO, unit.threshold)
+        assertTrue(unit.upper)
+        assertTrue(unit.unfixedPivot)
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.withLinearAuthority().atScope(unit.evidence.scope)).verify(unit.evidence))
+    }
+
+    @Test
     fun `named complementary conflicts should exclude a region neither proof matches`() {
         val x = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         val y = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
