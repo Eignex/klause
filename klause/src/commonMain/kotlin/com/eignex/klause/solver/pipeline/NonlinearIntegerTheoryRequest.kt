@@ -63,7 +63,7 @@ data class NonlinearIntegerTheoryParams(
     val cellRefinement: Boolean = false,
     /** Filter fixed integer tuples using checked mandatory cells of the original source. */
     val reuseSourceCells: Boolean = false,
-    /** Alternate ordinary traversal with nearest unvisited tuples outside checked source cells. */
+    /** Alternate ordinary traversal with nearest cell-complement tuples, retaining visited fallback. */
     val steerSourceCells: Boolean = false,
 ) {
     init {
