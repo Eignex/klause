@@ -6625,9 +6625,9 @@ public final class com/eignex/klause/model/BoolExpr$DefaultImpls {
 
 public final class com/eignex/klause/model/BoolExprSerializer : com/eignex/skema/serialization/CompactSerializer {
 	public static final field INSTANCE Lcom/eignex/klause/model/BoolExprSerializer;
-	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/eignex/klause/model/BoolExpr;
+	public fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/eignex/klause/model/BoolExpr;
 	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
-	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/eignex/klause/model/BoolExpr;)V
+	public fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/eignex/klause/model/BoolExpr;)V
 	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
 }
 
@@ -7467,9 +7467,9 @@ public final class com/eignex/klause/model/IntExpr$DefaultImpls {
 
 public final class com/eignex/klause/model/IntExprSerializer : com/eignex/skema/serialization/CompactSerializer {
 	public static final field INSTANCE Lcom/eignex/klause/model/IntExprSerializer;
-	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/eignex/klause/model/IntExpr;
+	public fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/eignex/klause/model/IntExpr;
 	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
-	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/eignex/klause/model/IntExpr;)V
+	public fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/eignex/klause/model/IntExpr;)V
 	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
 }
 
