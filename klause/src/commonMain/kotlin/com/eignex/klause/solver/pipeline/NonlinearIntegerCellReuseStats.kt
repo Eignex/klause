@@ -18,6 +18,16 @@ data class NonlinearIntegerCellReuseStats(
     val repeatedSupports: Long,
     /** Polynomial checks requested, including relaxation and real repair queries. */
     val completionChecks: Long,
+    /** Whether alternating checked cell-complement proposals were enabled. */
+    val steeringEnabled: Boolean = false,
+    /** Charged nearest-complement selections, including fallbacks. */
+    val selections: Long = 0,
+    /** Selections that changed the proposal to an unvisited allowed tuple. */
+    val steeredTuples: Long = 0,
+    /** Distinct in-window tuples reaching full fixed-integer completion. */
+    val allowedTuples: Long = 0,
+    /** Candidate attempts rejected as already visited. */
+    val duplicateTuples: Long = 0,
 )
 
 internal fun cellReuseStats(
@@ -30,5 +40,7 @@ internal fun cellReuseStats(
         workers.sumOf { it.cellStats.observed }, workers.sumOf { it.cellStats.retained },
         workers.sumOf { it.cellStats.declined }, workers.sumOf { it.cellStats.excluded },
         workers.sumOf { it.cellStats.repeated }, workers.sumOf { it.completionChecks },
+        params.steerSourceCells, workers.sumOf { it.cellStats.selections }, workers.sumOf { it.cellStats.steered },
+        workers.sumOf { it.cellStats.allowed }, workers.sumOf { it.cellStats.duplicates },
     )
 }

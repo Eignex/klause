@@ -188,6 +188,7 @@ internal fun bindSourceExecutionControls(
             budget,
             reader.defaulted(ExecutionOption.niaCellRefinement, defaults.cellRefinement),
             reader.defaulted(ExecutionOption.niaCellReuse, defaults.reuseSourceCells),
+            reader.defaulted(ExecutionOption.niaCellSteering, defaults.steerSourceCells),
         )
     } else {
         null

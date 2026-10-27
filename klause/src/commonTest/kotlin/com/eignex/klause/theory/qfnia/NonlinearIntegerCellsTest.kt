@@ -20,9 +20,72 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class NonlinearIntegerCellsTest {
+    @Test
+    fun `complement proposals should preserve exact nearest endpoints and caller windows`() {
+        val cases = listOf(
+            Triple("(= (* n n) 2)", 0L, 2L),
+            Triple("(distinct n 3)", 3L, 4L),
+            Triple("(> n (/ 1 2))", 0L, 1L),
+            Triple("(< n (/ (- 1) 2))", 0L, -1L),
+            Triple("(< n 3)", 4L, 3L),
+            Triple("(> n (- 3))", -4L, -3L),
+        )
+        for ((predicate, rejected, expected) in cases) {
+            val source = SmtLibPolynomial.parse("(declare-const n Real) (assert $predicate)")
+            val arithmetic = PolynomialArithmetic()
+            val algebraic = AlgebraicArithmetic(arithmetic)
+            val scope = PolynomialCellScope.Source.prepare(source.formula, arithmetic)
+            val cell = assertNotNull(CheckedPolynomialCell.rejected(scope.predicates.single(), scope,
+                algebraic.rational(BigFraction.ofLong(rejected)), arithmetic, algebraic))
+            val cells = NonlinearIntegerCells(source.formula, listOf(0), arithmetic)
+            cells.retain(cell)
+
+            val proposal = cells.propose(listOf(bigIntOf(rejected)), PolynomialCondition(), emptySet(), algebraic)
+
+            assertEquals(listOf(bigIntOf(expected)), proposal, predicate)
+            val window = PolynomialCondition(lower = mapOf(0 to BigFraction.ofLong(rejected)),
+                upper = mapOf(0 to BigFraction.ofLong(rejected)))
+            assertNull(cells.propose(listOf(bigIntOf(rejected)), window, emptySet(), algebraic), predicate)
+        }
+    }
+
+    @Test
+    fun `overlapping integer hulls should yield no proposal when their union covers the window`() {
+        val source = SmtLibPolynomial.parse("(declare-const n Real) (assert (> n 1)) (assert (< n 0))")
+        val arithmetic = PolynomialArithmetic()
+        val algebraic = AlgebraicArithmetic(arithmetic)
+        val scope = PolynomialCellScope.Source.prepare(source.formula, arithmetic)
+        val cells = NonlinearIntegerCells(source.formula, listOf(0), arithmetic)
+        for (predicate in scope.predicates) {
+            cells.retain(assertNotNull(CheckedPolynomialCell.rejected(predicate, scope,
+                algebraic.rational(BigFraction.ZERO), arithmetic, algebraic)))
+        }
+
+        val proposal = cells.propose(listOf(bigIntOf(0)), PolynomialCondition(), emptySet(), algebraic)
+
+        assertNull(proposal)
+    }
+
+    @Test
+    fun `visited complement proposals should fall back without retaining a new tuple`() {
+        val source = SmtLibPolynomial.parse("(declare-const n Real) (assert (= (* n n) 2))")
+        val arithmetic = PolynomialArithmetic()
+        val algebraic = AlgebraicArithmetic(arithmetic)
+        val scope = PolynomialCellScope.Source.prepare(source.formula, arithmetic)
+        val cells = NonlinearIntegerCells(source.formula, listOf(0), arithmetic)
+        cells.retain(assertNotNull(CheckedPolynomialCell.rejected(scope.predicates.single(), scope,
+            algebraic.rational(BigFraction.ZERO), arithmetic, algebraic)))
+
+        val proposal = cells.propose(listOf(bigIntOf(0)), PolynomialCondition(), setOf(listOf(bigIntOf(2))), algebraic)
+
+        assertNull(proposal)
+        assertEquals(0L, cells.stats.steered)
+    }
+
     @Test
     fun `integer hulls should preserve exact signed boundaries and closure`() {
         val cases = listOf(

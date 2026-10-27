@@ -233,6 +233,11 @@ internal fun reportNativeSatisfaction(
             "niaExcludedTuples" to cells.excludedTuples.toString(),
             "niaRepeatedSupports" to cells.repeatedSupports.toString(),
             "niaCompletionChecks" to cells.completionChecks.toString(),
+            "niaCellSteering" to cells.steeringEnabled.toString(),
+            "niaCellSelections" to cells.selections.toString(),
+            "niaSteeredTuples" to cells.steeredTuples.toString(),
+            "niaAllowedTuples" to cells.allowedTuples.toString(),
+            "niaDuplicateTuples" to cells.duplicateTuples.toString(),
         ))
     }
 }

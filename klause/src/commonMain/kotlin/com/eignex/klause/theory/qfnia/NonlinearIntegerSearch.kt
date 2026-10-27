@@ -14,8 +14,12 @@ internal data class NonlinearIntegerParams(
     val strategy: NonlinearIntegerStrategy = NonlinearIntegerStrategy.MIXED,
     val seed: Long = 1,
     val reuseSourceCells: Boolean = false,
+    val steerSourceCells: Boolean = false,
 ) {
-    init { require(maximumCandidates >= 0) }
+    init {
+        require(maximumCandidates >= 0)
+        require(!steerSourceCells || reuseSourceCells) { "integer cell steering requires cell reuse" }
+    }
 }
 
 internal data class NonlinearIntegerStats(
