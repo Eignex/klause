@@ -13,6 +13,7 @@ import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.klause.localsearch.ObjectiveGuidance
 import com.eignex.klause.localsearch.movesource.ConfiguredSource
 import com.eignex.klause.localsearch.movesource.MoveSource
 import com.eignex.klause.localsearch.movesource.MoveSourceId
@@ -51,7 +52,7 @@ import kotlinx.serialization.json.put
 
 internal object ObjectiveViewComparison {
     private enum class View(val leafHotspots: Boolean = false, val geometricSteps: Boolean = false) {
-        RETAINED, SUBSTITUTED, FUNCTIONAL,
+        RETAINED, SUBSTITUTED, FUNCTIONAL, WORKER_GEOMETRIC,
         TERMS_ADJACENT, LEAVES_ADJACENT(true), TERMS_GEOMETRIC(false, true), LEAVES_GEOMETRIC(true, true);
 
         val geometry: Boolean get() = ordinal >= TERMS_ADJACENT.ordinal
@@ -89,7 +90,7 @@ internal object ObjectiveViewComparison {
         val required = setOf("suite", "problem", "sha256")
         val optional = setOf(
             "source64", "sourceGzip64", "recipe", "seed", "moves", "timeoutMillis", "screen", "greedy",
-            "preparationEngine", "basins", "geometry", "center64",
+            "preparationEngine", "basins", "geometry", "center64", "retainedWorker",
         )
         require(options.keys.containsAll(required) && options.keys.all { it in required || it in optional })
         val bytes = trajectorySourceBytes(
@@ -182,7 +183,9 @@ internal object ObjectiveViewComparison {
         }
         val states = ArrayList<TrajectoryView>()
         val boundaries = ArrayList<Boundary>()
-        for (view in View.entries.filter { geometry || !it.geometry }) {
+        for (view in View.entries.filter {
+            if (it == View.WORKER_GEOMETRIC) options["retainedWorker"] == "true" else geometry || !it.geometry
+        }) {
             val directory = out.resolve(view.name.lowercase()).apply { mkdirs() }
             val prepared = prepare(source, view, preparationEngine, seed, timeout, directory,
                 suppliedCenter != null) ?: continue
@@ -194,6 +197,7 @@ internal object ObjectiveViewComparison {
                 put("sweepPresent", prepared.sweep != null)
                 put("transformObjective", view == View.SUBSTITUTED)
                 put("functionalGrading", view == View.FUNCTIONAL)
+                put("retainedGeometricConsumer", view == View.WORKER_GEOMETRIC)
                 put("hotspots", if (view.geometry) {
                     if (view.leafHotspots) "cone leaves" else "canonical terms"
                 } else "grading objective")
@@ -403,7 +407,10 @@ internal object ObjectiveViewComparison {
             val params = LocalSearchParams(
                 randomSeed = seed, maxFlips = moves, cancellation = stop,
                 costShaping = CostShaping.Linear(lambda = 1.0),
-                lsObjective = prepared.gradient.takeIf { view == View.FUNCTIONAL },
+                lsObjective = prepared.gradient.takeIf { view == View.FUNCTIONAL || view == View.WORKER_GEOMETRIC },
+                objectiveGuidance = if (view == View.WORKER_GEOMETRIC) {
+                    ObjectiveGuidance.Geometric
+                } else ObjectiveGuidance.Functional,
                 normalizeWeightsByClass = true, reportResiduals = true, reportPhaseTimes = true,
                 initialAssignment = initial,
             )
