@@ -3699,6 +3699,29 @@ diagnostic replay costs are 33–108 ms and 11.3–12.3 MB thread allocation on 
 241–369 ms and 50.4–72.7 MB on modglob. These are instrumented completion costs,
 excluded from owner allowances, without independent certification or throughput credit.
 
+[Continuation replay 8819](https://lab.eignex.com/jobs/8819), at `19cd81b0eb`,
+reuses [8804](https://lab.eignex.com/jobs/8804)'s exact-only baseline and the same
+byte-identical 8731 controls. Both captures use Mac/aarch64, identical runtime and
+options, and advisory one-CPU/4,608-MiB budgets. Each CP owner returns three modglob
+strict improvements: two change one original input and reach about 35.1131M and
+33.5240M; the third is a same-input rounding improvement. Every modglob CP query
+remains `Unsupported`, including the two queries without a witness. Rgn gains no
+point and retains its two/one cold/retained native closures. P0033 keeps five gains
+per CP owner at 12,770/9,642 nodes; both mixed owners keep two modglob gains.
+All 54 returned points pass native original-source checks: 48 nominal exact points
+and six tolerance-qualified CP primals, without independent certification.
+
+Early-return 8804 gives retained CP four same-input improvements and no changed-input
+gain; continuation keeps better siblings, with one earlier rounding point absent.
+Both continued CP owners spend 24 modglob nodes and the baseline's
+184,161,945/52,630,634 standalone LP work units. Search, reuse observation and source
+validation allocate 467.5/265.5 MB of thread bytes, versus 432.8/236.5 MB in the
+exact-only baseline. Common center preparation adds 2.8 MB; owner close costs are
+recorded separately. Rgn CP allocation also grows, without a new witness. No
+containing allowance is exceeded; inherited small-fragment LS/mixed overspends
+reach 5,119 equivalents. These ordered instrumented costs qualify primal capability,
+without a speedup, exact-closure or owner-promotion claim.
+
 Keep the existing owner admission. Small finite controls, held-out checked centers,
 ordinary finite execution and these original MPS overlaps support no uniform owner
 replacement. Retained LP state reduces repeated preparation in this MPS overlap;
