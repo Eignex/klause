@@ -383,6 +383,8 @@ Its best objective threshold, exact discrete value and immutable best witness re
 separate from a current center accepted by a non-monotone policy. A cancelled
 closure leaves its effective scope explicitly unavailable.
 Capture has separate coordinate accounting and consumes no search random draws.
+Its default frame limit is 4096 coordinates; an explicit diagnostic allowance can
+retain at most 8192 coordinates per complete frame. Oversized frames decline as a whole.
 
 Optional residual reporting records, at each strict cost improvement, the
 maintained violation degrees per factor kind and up to eight representative
