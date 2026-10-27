@@ -1877,6 +1877,11 @@ and independently checked final endpoints remain distinct observations.
 Both runners accept `source64` or `sourceGzip64` containing the original source,
 bounded to 96 KiB encoded and 64 MiB inflated, with the original hash mandatory.
 The objective runner also accepts the same bounded `batch64` request form.
+Both runners accept the JVM property `-Dklause.bench.trajectory.compress=true` to
+gzip every JSONL file after the complete capture. Filenames gain `.gz`; decompressed
+records retain their original content. Compression time and allocation are reported
+in `compression.json` outside the walk allowance and remain part of the full process
+cost. Uncompressed output is the default.
 It accepts the shared `center64` projection for common-center replay and
 `geometry=true` adds four canonical-grading arms: term/leaf hotspots crossed with
 adjacent/geometric leaf steps. Unsupported or incompletely maintained cones

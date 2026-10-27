@@ -84,6 +84,7 @@ internal object ObjectiveViewComparison {
                 capture(request.toTypedArray(), out.resolve("$index").apply { mkdirs() })
             }
         } else capture(args, out)
+        compressTrajectoryOutput(out)
     }
 
     private fun capture(args: Array<String>, out: File) {
