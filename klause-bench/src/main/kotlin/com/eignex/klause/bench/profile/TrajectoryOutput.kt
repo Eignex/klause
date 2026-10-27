@@ -1,12 +1,13 @@
 package com.eignex.klause.bench.profile
 
 import java.io.File
+import java.lang.Boolean.getBoolean
 import java.util.zip.GZIPOutputStream
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 internal fun compressTrajectoryOutput(out: File) {
-    if (!java.lang.Boolean.getBoolean("klause.bench.trajectory.compress")) return
+    if (!getBoolean("klause.bench.trajectory.compress")) return
     val started = System.nanoTime()
     val before = trajectoryThreadBytes()
     var inputBytes = 0L
