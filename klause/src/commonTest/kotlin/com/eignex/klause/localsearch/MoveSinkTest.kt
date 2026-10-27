@@ -52,7 +52,7 @@ class MoveSinkTest {
     }
 
     @Test
-    fun `a compound tally should separate pinned rejections, collapsed trims and admissions`() {
+    fun `a compound tally should separate pinned rejections from collapsed trims and admissions`() {
         val tally = CompoundTally()
         val sink = MoveSink(Assumptions(ints = mapOf(3 to 5)))
         sink.setOwners(intArrayOf(-1, 7, -1, -1))
