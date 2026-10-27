@@ -189,6 +189,18 @@ document path, such as `$.entries.size.int[1]`. `ModelJson.catalog` composes the
 vocabularies into other compact formats; non-JSON formats keep the sealed-class
 representation.
 
+### Renaming references
+
+Each expression family and `SchemaEntry` has `mapReferences`, which rewrites every
+variable reference: integer, Boolean, set and continuous operands, global arrays,
+optional-form presence lists and the value a `presence` entry gates. Nominal labels
+are values and stay unchanged. Each traversal is an exhaustive `when` over its
+sealed family, so a new node does not compile until it rewrites its references.
+`SchemaDef.renameDeclarations` applies one function to the entry keys and to every
+reference inside the entries, preserving order, and rejects two entries mapped to
+one name. A rename that merges two coefficients of one continuous affine term is
+rejected, since adding them would round in binary64.
+
 ### Portable expressions
 
 Schema JSON and Kumulant share one expression profile, so a fragment such as
