@@ -2,6 +2,7 @@ package com.eignex.klause.theory.qfnra
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
+import com.eignex.klause.arithmetic.polynomial.Polynomial
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
@@ -79,31 +80,9 @@ internal class CheckedPolynomialCell private constructor(
         ): CheckedPolynomialCell? {
             arithmetic.step()
             if (scope is PolynomialCellScope.Source && !scope.supports(predicate, arithmetic)) return null
-            if (predicate.polynomial.termCount > MAX_CELL_TERMS) return null
-            val terms = predicate.polynomial.terms
-            var variable: Int? = null
-            var degree = 0
-            for (term in terms) {
-                arithmetic.step()
-                if (term.monomial.variableCount > 1 ||
-                    term.coefficient.num.magnitudeBitLength() > MAX_CELL_BITS ||
-                    term.coefficient.den.magnitudeBitLength() > MAX_CELL_BITS
-                ) return null
-                for (id in term.monomial.variables) {
-                    arithmetic.step()
-                    if (variable != null && variable != id) return null
-                    variable = id
-                    degree = maxOf(degree, term.monomial.exponent(id))
-                    if (degree > MAX_CELL_DEGREE) return null
-                }
-            }
-            val id = variable ?: return null
-            val coefficients = MutableList(degree + 1) { BigFraction.ZERO }
-            for (term in terms) {
-                arithmetic.step()
-                coefficients[term.monomial.exponent(id)] = term.coefficient
-            }
-            val polynomial = RationalPolynomial(coefficients)
+            val unary = unaryCellPolynomial(predicate.polynomial, arithmetic) ?: return null
+            val id = unary.variable
+            val polynomial = unary.polynomial
             if (predicate.holds(algebraic.signAt(polynomial, value))) return null
             // All roots are isolated before selecting a sign-invariant section or sector.
             val roots = algebraic.roots(polynomial)
@@ -123,6 +102,51 @@ internal class CheckedPolynomialCell private constructor(
             return CheckedPolynomialCell(id, predicate, scope, lower, null, false, false)
         }
     }
+}
+
+internal class UnaryCellPolynomial(val variable: Int, val polynomial: RationalPolynomial)
+
+internal fun unaryCellPolynomial(polynomial: Polynomial, arithmetic: PolynomialArithmetic): UnaryCellPolynomial? {
+    if (polynomial.termCount > MAX_CELL_TERMS) return null
+    val terms = polynomial.terms
+    var variable: Int? = null
+    var degree = 0
+    for (term in terms) {
+        arithmetic.step()
+        if (term.monomial.variableCount > 1 ||
+            term.coefficient.num.magnitudeBitLength() > MAX_CELL_BITS ||
+            term.coefficient.den.magnitudeBitLength() > MAX_CELL_BITS
+        ) return null
+        for (id in term.monomial.variables) {
+            arithmetic.step()
+            if (variable != null && variable != id) return null
+            variable = id
+            degree = maxOf(degree, term.monomial.exponent(id))
+            if (degree > MAX_CELL_DEGREE) return null
+        }
+    }
+    val id = variable ?: return null
+    val coefficients = MutableList(degree + 1) { BigFraction.ZERO }
+    for (term in terms) {
+        arithmetic.step()
+        coefficients[term.monomial.exponent(id)] = term.coefficient
+    }
+    return UnaryCellPolynomial(id, RationalPolynomial(coefficients))
+}
+
+internal fun fitsCellLimits(polynomial: Polynomial, arithmetic: PolynomialArithmetic): Boolean {
+    if (polynomial.termCount > MAX_CELL_TERMS) return false
+    for (term in polynomial.terms) {
+        arithmetic.step()
+        if (term.coefficient.num.magnitudeBitLength() > MAX_CELL_BITS ||
+            term.coefficient.den.magnitudeBitLength() > MAX_CELL_BITS
+        ) return false
+        for (id in term.monomial.variables) {
+            arithmetic.step()
+            if (term.monomial.exponent(id) > MAX_CELL_DEGREE) return false
+        }
+    }
+    return true
 }
 
 internal data class PolynomialCellStats(

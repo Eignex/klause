@@ -1125,6 +1125,20 @@ Strict, disequal, singular and degree-decline SAT alternatives retain their outc
 Component SAT assignments lack independent source-check receipts; native UNSAT is
 not an independent certificate, and prepared arrays supply no original-source map.
 
+### Coupled section refutation profiles
+
+`PolynomialPhaseProfile coupled=true|both` enables the internal coupled-section option
+in the direct or prepared query; `both` adds `coupled-control-trace.json` with that
+option disabled at the identical revision, source bytes and refinement/feedback
+settings. It cannot be combined with another `both` comparison. `coupledSections`
+counts attempted supports, evaluated root combinations, conflicts, already attempted
+supports, private declines and optional work, which also enters the containing native
+work. The progress checkpoints add consumed coupled exclusions and their reuses.
+`firstCoupledConflictPreview` renders the first refuted support's signed predicates,
+capped at sixteen premises with a completeness flag. Compare region, projection and
+lifting counts and total work alongside outcomes; supports and combinations alone are
+not efficacy.
+
 ### Element hull admission capture
 
 `bench.profile.ElementHullProfile` takes `suite=ID problem=NAME sha256=HEX` for a

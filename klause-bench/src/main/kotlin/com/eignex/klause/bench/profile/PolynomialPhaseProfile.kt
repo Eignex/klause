@@ -43,11 +43,11 @@ import kotlinx.serialization.json.Json
 internal object PolynomialPhaseProfile {
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.size in 1..9)
+        require(args.size in 1..10)
         val options = args.drop(1).associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.size == args.size - 1 && options.keys.all {
             it in setOf("pipeline", "timeoutMs", "repeats", "prepared", "capture",
-                "maximumWork", "refinement", "feedback")
+                "maximumWork", "refinement", "feedback", "coupled")
         })
         require(options["pipeline"] == null || options["pipeline"] in setOf("true", "both"))
         require(options["prepared"] == null || options["prepared"] == "true")
@@ -59,11 +59,15 @@ internal object PolynomialPhaseProfile {
         require(!feedback || options["refinement"] == "true")
         val refine = options["refinement"] != null
         val capture = options["capture"] != null
+        require(options["coupled"] == null || options["coupled"] in setOf("true", "both"))
+        val coupled = options["coupled"] != null
+        require(options["coupled"] != "both" ||
+            listOf("refinement", "feedback", "capture").none { options[it] == "both" })
         val maximumWork = options["maximumWork"]?.toLong()?.also { require(it >= 0) }
         val preparedMode = options["prepared"] == "true"
         val pipelineMode = options["pipeline"] != null
         val directMode = options["pipeline"] != "true"
-        require((!capture && !refine) || directMode)
+        require((!capture && !refine && !coupled) || directMode)
         val repeats = options["repeats"]?.toInt() ?: 1
         require(repeats in 1..9 && (repeats == 1 || !directMode))
         val timeoutMs = options["timeoutMs"]?.toLong() ?: 60_000L
@@ -92,6 +96,7 @@ internal object PolynomialPhaseProfile {
             "failureCapture" to options["capture"].toString(),
             "cellRefinement" to options["refinement"].toString(),
             "cellFeedback" to options["feedback"].toString(),
+            "coupledSections" to options["coupled"].toString(),
             "requestEncoding" to args[0].substringBefore('='),
             "sourceBytes" to if (cases.any { it.gzip64 != null }) "hash-pinned request or catalog" else "catalog",
             "representationLimits" to "default",
@@ -120,15 +125,21 @@ internal object PolynomialPhaseProfile {
             if (preparedMode) {
                 directory.resolve("prepared-trace.json").writeText(
                     Json.encodeToString(access.measure(text, maximumWork, timeoutMs,
-                        prepared = true, capture = capture, refinement = refine, feedback = feedback)),
+                        prepared = true, capture = capture, refinement = refine, feedback = feedback,
+                        coupled = coupled)),
                 )
             } else if (directMode) {
                 directory.resolve("gate.json").writeText(Json.encodeToString(access.gate(text, timeoutMs)))
                 directory.resolve("trace.json").writeText(
                     Json.encodeToString(access.measure(text, maximumWork, timeoutMs,
                         capture = capture, fixedIntegers = source.fixedIntegers,
-                        refinement = refine, feedback = feedback)),
+                        refinement = refine, feedback = feedback, coupled = coupled)),
                 )
+            }
+            if (options["coupled"] == "both") {
+                directory.resolve("coupled-control-trace.json").writeText(Json.encodeToString(
+                    access.measure(text, maximumWork, timeoutMs, prepared = preparedMode, capture = capture,
+                        fixedIntegers = source.fixedIntegers, refinement = refine, feedback = feedback)))
             }
             if (options["refinement"] == "both") {
                 directory.resolve("control-trace.json").writeText(Json.encodeToString(
@@ -143,7 +154,8 @@ internal object PolynomialPhaseProfile {
             if (options["capture"] == "both") {
                 directory.resolve("plain-trace.json").writeText(Json.encodeToString(
                     access.measure(text, maximumWork, timeoutMs, prepared = preparedMode,
-                        fixedIntegers = source.fixedIntegers, refinement = refine, feedback = feedback)))
+                        fixedIntegers = source.fixedIntegers, refinement = refine, feedback = feedback,
+                        coupled = coupled)))
             }
         }
     }
@@ -296,7 +308,9 @@ internal object PolynomialPhaseProfile {
             Int::class.javaPrimitiveType, paramsType, conditionType,
         )
         private val params = paramsType.getConstructor(Cancellation::class.java, Long::class.javaObjectType, limitsType,
-            Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType)
+            Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType)
+        private val coupledStats = queryType.getMethod("getCoupledStats")
+        private val coupledObserver = queryType.methods.single { it.name == "setCoupledConflictObserver" }
         private val condition = conditionType.getConstructor(Map::class.java, Map::class.java, Map::class.java)
         private val next = queryType.getMethod("next")
         private val stats = queryType.getMethod("getStats")
@@ -361,6 +375,7 @@ internal object PolynomialPhaseProfile {
             fixedIntegers: Map<String, String> = emptyMap(),
             refinement: Boolean = false,
             feedback: Boolean = false,
+            coupled: Boolean = false,
         ): PhaseTrace {
             require(!feedback || refinement)
             val clock = Cancellation.after(timeoutMs.milliseconds)
@@ -426,7 +441,8 @@ internal object PolynomialPhaseProfile {
             val allocationStart = allocationBean?.getThreadAllocatedBytes(thread)
             val queryStart = System.nanoTime()
             val owner = query.newInstance(original, source.second, source.third,
-                params.newInstance(token, maximumWork, limitsType.getConstructor().newInstance(), refinement, feedback),
+                params.newInstance(token, maximumWork, limitsType.getConstructor().newInstance(), refinement, feedback,
+                    coupled),
                 condition.newInstance(emptyMap<Int, Boolean>(), fixed, fixed))
             val captured = if (capture) captureType.getConstructor().newInstance().also { setCapture.invoke(owner, it) }
                 else null
@@ -446,6 +462,22 @@ internal object PolynomialPhaseProfile {
                 }
             }
             conflictObserver?.invoke(owner, observeConflict)
+            var coupledPremises: Int? = null
+            var coupledPreview: List<String>? = null
+            var coupledPreviewComplete: Boolean? = null
+            val observeCoupled: (List<*>) -> Unit = { premises ->
+                if (coupledPremises == null) {
+                    coupledPremises = premises.size
+                    var complete = premises.size <= 16
+                    coupledPreview = premises.take(16).map {
+                        val (rendered, exact) = previewConflictAtom(requireNotNull(it))
+                        complete = complete && exact
+                        rendered
+                    }
+                    coupledPreviewComplete = complete
+                }
+            }
+            if (coupled) coupledObserver.invoke(owner, observeCoupled)
             val checkpoints = ArrayList<PhaseCheckpoint>()
             val start = System.nanoTime()
             var calls = 0L
@@ -510,6 +542,13 @@ internal object PolynomialPhaseProfile {
                 },
                 firstCellFeedbackReuse = firstFeedback,
                 firstCellFeedbackUse = firstUse,
+                coupledSections = coupledStats.invoke(owner)?.let { value ->
+                    listOf("Supports", "Combinations", "Conflicts", "RepeatedSupports", "Declined", "Work")
+                        .associateWith { value.javaClass.getMethod("get$it").invoke(value).toString() }
+                },
+                firstCoupledConflictPremises = coupledPremises,
+                firstCoupledConflictPreview = coupledPreview,
+                firstCoupledConflictPreviewComplete = coupledPreviewComplete,
                 queryElapsedNs = queryElapsedNs,
                 queryThreadAllocatedBytes = queryThreadAllocatedBytes,
                 sourceCoordinates = names,
@@ -686,6 +725,10 @@ internal data class PhaseTrace(
     val cellFeedback: Map<String, String>? = null,
     val firstCellFeedbackReuse: Map<String, String>? = null,
     val firstCellFeedbackUse: Map<String, String>? = null,
+    val coupledSections: Map<String, String>? = null,
+    val firstCoupledConflictPremises: Int? = null,
+    val firstCoupledConflictPreview: List<String>? = null,
+    val firstCoupledConflictPreviewComplete: Boolean? = null,
     val queryElapsedNs: Long? = null,
     val queryThreadAllocatedBytes: Long? = null,
     val sourceCoordinates: Map<String, String>? = null,

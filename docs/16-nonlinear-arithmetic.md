@@ -346,6 +346,20 @@ the bounded view. Reuse diagnostics retain at most two scalar snapshots of degre
 sixteen with 4,096-bit coefficients and bounds, without optional image provenance.
 Larger points are marked incomplete. The option is disabled by default.
 
+An internal optional coupled-section refutation runs before a completed Boolean region
+is issued. For each assigned multivariate predicate, the enumerator selects by
+dependency support the first assigned univariate equation of each of its coordinates.
+When every coordinate is covered, the equations' real roots are isolated exactly and the
+signed predicate is evaluated at every root combination. Failing at all of them, or a
+covering equation without real roots, refutes that support: the enumerator learns an
+exclusion over exactly those signed premises, valid under every Boolean prefix within
+its query, condition and snapshot. Retraction keeps the remaining Boolean alternatives,
+and the exclusion never enters shared learning.
+Incomplete coverage, an already attempted support, a representation decline or the
+exhausted query-wide allowance of 16,384 units learns nothing and keeps the complete
+path; an enclosing stop remains terminal. Predicates admit the checked-cell term, degree
+and coefficient limits and at most 64 premises. The option is disabled by default.
+
 Optional query failure capture retains bounded exact observations of rejected probe
 points and CAD prefixes, their signed premises, numeric reconstruction fibres and
 condition/snapshot identity. Projection observations retain the active operands.
