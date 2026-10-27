@@ -1,0 +1,103 @@
+{
+  "version": 1,
+  "license": "Apache-2.0",
+  "attribution": "Self-authored Eignex Klause regression fixtures",
+  "cases": [
+    {
+      "sha256": "3cd77861f9cd035e508a60d8934fe372be002341376873f8143b5ea1628d4a40",
+      "path": "klause-bench/smoke-corpus/qfnra-coupled-v1/cycle-unsat.smt2",
+      "suite": "smtlib-qfnra-coupled-v1",
+      "name": "cycle-unsat",
+      "expected": "unsat",
+      "license": "Apache-2.0"
+    },
+    {
+      "sha256": "09b2534ea1867ac75434bf160aed1f6540c76a7826fb31d90f3308210c57b661",
+      "path": "klause-bench/smoke-corpus/qfnra-coupled-v1/cycle-sat.smt2",
+      "suite": "smtlib-qfnra-coupled-v1",
+      "name": "cycle-sat",
+      "expected": "sat",
+      "license": "Apache-2.0"
+    },
+    {
+      "sha256": "f7fcadc406435eda7cae0c3a2177ed0041d5a7be6b3826776d2948fa901c9963",
+      "path": "klause-bench/smoke-corpus/qfnra-coupled-v1/cycle-alternative.smt2",
+      "suite": "smtlib-qfnra-coupled-v1",
+      "name": "cycle-alternative",
+      "expected": "sat",
+      "license": "Apache-2.0"
+    },
+    {
+      "sha256": "13d567c40e8f2d7be5e02777dd8127a52fbc8e250dde93c025cc61a487faf8f9",
+      "path": "klause-bench/smoke-corpus/qfnra-coupled-v1/shifted-unsat.smt2",
+      "suite": "smtlib-qfnra-coupled-v1",
+      "name": "shifted-unsat",
+      "expected": "unsat",
+      "license": "Apache-2.0"
+    },
+    {
+      "sha256": "df4d91ed8a6330f2eed995e36da7d8f6d6acc1f701b90e4ffa92fc004426d6ea",
+      "path": "klause-bench/smoke-corpus/qfnra-coupled-v1/shifted-sat.smt2",
+      "suite": "smtlib-qfnra-coupled-v1",
+      "name": "shifted-sat",
+      "expected": "sat",
+      "license": "Apache-2.0"
+    },
+    {
+      "sha256": "fa1cd58bcb79971ebc8f6dcdaf3e5ccdd128f5697bf28bae82797dcce5810c02",
+      "path": "klause-bench/smoke-corpus/qfnra-coupled-v1/shifted-alternative.smt2",
+      "suite": "smtlib-qfnra-coupled-v1",
+      "name": "shifted-alternative",
+      "expected": "sat",
+      "license": "Apache-2.0"
+    },
+    {
+      "sha256": "d5c63f7d8c136dd5ac4d636a79a1df76e0b03f56662b5af1fb214bd133c4f2e6",
+      "path": "klause-bench/smoke-corpus/qfnra-coupled-v1/repeated-unsat.smt2",
+      "suite": "smtlib-qfnra-coupled-v1",
+      "name": "repeated-unsat",
+      "expected": "unsat",
+      "license": "Apache-2.0"
+    },
+    {
+      "sha256": "ea9d9ccc103a5bb93ef3694b3a981c81c3f1a9216a67bbfcfee093bf774bb370",
+      "path": "klause-bench/smoke-corpus/qfnra-coupled-v1/repeated-sat.smt2",
+      "suite": "smtlib-qfnra-coupled-v1",
+      "name": "repeated-sat",
+      "expected": "sat",
+      "license": "Apache-2.0"
+    },
+    {
+      "sha256": "f331930a0d20ff1941f38e38e1311c264b86097f48a8d39d89f35ff7e01790c7",
+      "path": "klause-bench/smoke-corpus/qfnra-coupled-v1/repeated-alternative.smt2",
+      "suite": "smtlib-qfnra-coupled-v1",
+      "name": "repeated-alternative",
+      "expected": "sat",
+      "license": "Apache-2.0"
+    },
+    {
+      "sha256": "3b783455ebf17bdb9ebd05c76876d3382348a3b031adf78268e2048ccbfca976",
+      "path": "klause-bench/smoke-corpus/qfnra-coupled-v1/strict-cycle-unsat.smt2",
+      "suite": "smtlib-qfnra-coupled-v1",
+      "name": "strict-cycle-unsat",
+      "expected": "unsat",
+      "license": "Apache-2.0"
+    },
+    {
+      "sha256": "06fb5a674d2cfb9dede00dd96683b3554cba9321ba40d50b25639d050a6be65a",
+      "path": "klause-bench/smoke-corpus/qfnra-coupled-v1/weak-cycle-sat.smt2",
+      "suite": "smtlib-qfnra-coupled-v1",
+      "name": "weak-cycle-sat",
+      "expected": "sat",
+      "license": "Apache-2.0"
+    },
+    {
+      "sha256": "91d163f285fd81a87452709b2063799d0f6d893ea0edade1ac8d6d5cb7c370d1",
+      "path": "klause-bench/smoke-corpus/qfnra-coupled-v1/uncovered-singular-sat.smt2",
+      "suite": "smtlib-qfnra-coupled-v1",
+      "name": "uncovered-singular-sat",
+      "expected": "sat",
+      "license": "Apache-2.0"
+    }
+  ]
+}
