@@ -1995,6 +1995,69 @@ capture. The preparation/upload-inclusive deadline failure in
 [8790](https://lab.eignex.com/jobs/8790), its spent-allowance retry and the
 pre-execution cancellation of 8788 supply no efficacy evidence.
 
+The whole-CLI [consumer matrix 8789](https://lab.eignex.com/jobs/8789), at
+`7ec9a79a17`, fixes seven source identities, seeds 3/7, P1 and ten-second
+containing budgets. GBACP and TestScheduling are mechanism-informed controls;
+the other five selected families are frozen consumer holdouts, separate from
+fresh default admission. C, F and G denote canonical, full-functional and geometric
+guidance with `cbls-plateau/ils-basin`. Pairs are actual retained two-slot races
+under the same total budget, including ordinary slot seed offsets and restarts;
+F+F and C+C supply seed-diversity controls. Ordinary mixed retains its complete
+workers and default source policy. All 112 cases finish without a case failure.
+Original hashes, compiler, distribution and runtime fingerprints match across
+arms on one Mac/aarch64 runtime, with a 3 GiB heap, Serial GC, one active processor
+and debug enabled. All 93 final witnesses pass the independent XCSP3 checker.
+The nineteen missing points remain unresolved. Values are exact minimization
+endpoints in seed order 3/7; `p` is a native optimum label, without independent
+proof certification.
+
+| Source | C | F | G | C+C | F+F | F+G | C+G | Ordinary mixed |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| RCPSP-j120-01-01_c22 | 505 / 539 | 508 / 539 | 505 / 539 | 522 / 530 | 520 / 529 | 521 / 529 | 522 / 529 | 114 / 110 |
+| Warehouse-60-120-01_c22 | 40403 / 44624 | 40403 / 43764 | 38924 / 42318 | 43515 / 44755 | 44791 / 44534 | 38412 / 43794 | 42766 / 48366 | 20859 / 18312 |
+| GBACP-UD04_c23 | 615 / 542 | 615 / 687 | 469 / 469 | 615 / 542 | 618 / 616 | 469 / 469 | 471 / 469 | 689 / 618 |
+| FlexibleJobshopScen-dh-5-16-005_c25 | 4024 / none | 4075 / none | 4024 / none | 3424 / 3696 | 3453 / 3365 | 3669 / 3731 | 3644 / 3617 | 1535 / 1403 |
+| TestScheduling-t020m10r03-1_c24 | 4954 / 4893 | 4972 / 4546 | 5711 / 5040 | 4951 / 4237 | 4916 / 4339 | 4802 / 4749 | 4954 / 3796 | 1876 (p) / 1876 (p) |
+| BinPacking2-n1c1w1a_c24 | 26 / 26 | 26 / 26 | 26 / 26 | 26 / 26 | 26 / 26 | 26 / 26 | 26 / 26 | 25 (p) / 26 |
+| NurseRostering-10_c22 | none / none | none / none | none / none | none / none | none / none | none / none | none / none | none / none |
+
+Only GBACP and TestScheduling qualify geometric proposals: twelve requested cases
+emit candidates after live-cone qualification. The other thirty geometric cases
+decline to canonical execution; their deadline-dependent differences supply no
+geometric-view evidence or family-wide inapplicability result. NurseRostering
+supplies no point in any arm, and the three single-worker FlexibleJobshop seed-7
+runs also supply none. These unavailable outcomes are retained.
+
+GBACP's single geometric and F+G workers reach checked 469 in both seeds, beating
+all canonical, existing functional, equal-budget seed-diversity and ordinary mixed
+controls. TestScheduling's single geometric worker loses both functional endpoint
+comparisons. F+G beats F+F at seed 3 and loses at seed 7; C+G improves seed 7 over
+C+C but loses seed 3. Ordinary mixed proves TestScheduling's 1876 optimum in both
+seeds and BinPacking2's 25 optimum in seed 3; the LS alternatives retain neither
+those proof outcomes nor their quality.
+
+Whole-CLI resource receipts bind by SHA-256 to all 112 solve records. They include
+solver preparation, native validation, search and closure; parent bench/corpus
+work and independent checker time remain separate. Final source checking costs
+106–387 ms per witness. Native first-feasibility timestamps are scalar observations;
+only the final complete instantiations receive independent checking.
+On GBACP, geometric and functional workers both take 10.12/10.11 seconds; peak RSS
+is 240384/222544 versus 242368/239024 KiB, and user CPU time is 13.08/11.79 versus
+13.31/12.61 seconds. Mac CPU reservations permit JIT bursts. F+G takes
+10.12/10.10 seconds and 251184/243632 KiB, versus F+F's 10.21/10.10 seconds and
+232896/241600 KiB: the composition retains its RSS increase. On TestScheduling,
+single geometric takes 10.12/10.12 seconds versus functional 10.12/10.11 seconds;
+RSS is 232240/232560 versus 232656/230992 KiB. Ordinary mixed completes its two
+proofs in 0.76/0.66 seconds at 205520/206432 KiB. Process RSS and calling-thread
+allocation have different scopes; neither the replay nor this deadline matrix
+establishes a general speed or memory improvement.
+
+These checked GBACP transitions and bounded consumption qualify an explicit
+research consumer using one prepared model. Root-start discovery and checked-center
+improvement remain separate observations. The TestScheduling losses, absent
+holdout capabilities and stronger ordinary proofs preserve default routing;
+[#3621](https://github.com/Eignex/klause/issues/3621) owns admission and retirement.
+
 The frozen worker-seed 3/7 captures at `12be285415` and `356449b93a` retain
 [mixed preparation](https://lab.eignex.com/jobs/8531),
 [local-search preparation](https://lab.eignex.com/jobs/8581), and
