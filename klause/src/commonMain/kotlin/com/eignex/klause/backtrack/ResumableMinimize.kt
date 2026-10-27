@@ -1218,8 +1218,13 @@ internal class ResumableMinimize(
             val externalBound = externalCutoff()
             val effectiveBound = if (externalBound < bestObj) externalBound else bestObj
             if (rebindable && discreteObjective) {
-                val exactBound = listOfNotNull(exactObjectiveBoundSupplier?.invoke(),
-                    incumbents.current()?.objective?.exact).minOrNull()
+                val externalExact = exactObjectiveBoundSupplier?.invoke()
+                val localExact = incumbents.current()?.objective?.exact
+                val exactBound = when {
+                    externalExact == null -> localExact
+                    localExact == null || externalExact < localExact -> externalExact
+                    else -> localExact
+                }
                 val dominated = if (exactBound != null) lpEngine.linearBoundDominates(session, exactBound)
                     else lpEngine.linearBoundDominates(session, effectiveBound)
                 if (dominated) return SearchNodeDisposition.Prune
