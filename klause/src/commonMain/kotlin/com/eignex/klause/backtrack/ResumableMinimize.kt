@@ -873,7 +873,10 @@ internal class ResumableMinimize(
         startingWitness: Boolean = false,
     ): MinimizeResult.WithSample? {
         val exact = exactSourceObjective(objective, sample, completionToleranceCheck())
-        if (rebindable && exact == null) return null
+        if (rebindable && exact == null) {
+            sawIndeterminateLeaf = true
+            return null
+        }
         val cutoff = externalCutoff()
         val matchesCutoff = startingWitness && cutoff.isFinite() &&
             (exact?.let { it == BigFraction.ofDouble(cutoff) } ?: (o == cutoff))
@@ -881,6 +884,10 @@ internal class ResumableMinimize(
             return null
         }
         val score = SourceObjectiveScore(o, exact)
+        if (rebindable && !score.display.isFinite()) {
+            sawIndeterminateLeaf = true
+            return null
+        }
         if (incumbents.offer(sample, score) !is Publication.Installed) return null
         singleObj?.let { objVarBest = sample.intValue(it.varId) }
         if (!startingWitness) {

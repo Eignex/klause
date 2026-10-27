@@ -304,7 +304,10 @@ Source encoding and relaxation assembly are atomic preparation of the request.
 Neither pause consumes the discrete model or records an indeterminate region.
 Reseeding and shared objective-floor imports are deferred while completion is
 pending, and explicit rebind or close discards its numerical owners before changing
-the traversal.
+the traversal. An exact repair query disables tolerance-optimum acceptance and
+compares the certified completion's exact objective with its rational strict
+cutoff. Missing exact coordinates or an unrepresentable result leave coverage
+incomplete; neither a rounded tie nor a declined candidate closes the cutoff.
 
 Mixed witness recovery can submit a connected real residual to `SourceLp` after
 fixing integer guesses, within its `SourceLpBudget`. Only exact primal coordinates
