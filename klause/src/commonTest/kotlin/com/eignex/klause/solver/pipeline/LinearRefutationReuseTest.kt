@@ -128,6 +128,25 @@ class LinearRefutationReuseTest {
     }
 
     @Test
+    fun `real and nonintegral missing sides should decline unit propagation`() {
+        val reuse = LinearRefutationReuse(source, SourceLpBudget(), Cancellation.Never)
+        reuse.retain(evidence)
+        assertNull(reuse.unit(SourceCondition()))
+        val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val local = SourceProofContext(scope, setOf(integer), mapOf("lower" to SourcePremise(
+            SourceInequality(mapOf(integer to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE))))
+        val conflict = LinearPinnedRefutation(SourceDerivation.Combination(listOf(
+            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("lower")),
+            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(integer, true)),
+        )))
+        val integral = LinearRefutationReuse(local, SourceLpBudget(), Cancellation.Never)
+        integral.retain(SourceEvidence(scope.copy(condition = SourceCondition(upper =
+            mapOf(integer to BigFraction.ofLong(2).reciprocal()))), SourceClaim.Refutation, conflict))
+
+        assertNull(integral.unit(SourceCondition()))
+    }
+
+    @Test
     fun `support reduction should reuse a checked refutation after an unrelated bound changes`() {
         val reuse = LinearRefutationReuse(source, SourceLpBudget(), Cancellation.Never)
         reuse.retain(evidence)
