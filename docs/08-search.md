@@ -159,6 +159,9 @@ optimality authority: missing certification keeps the fragment unresolved, inclu
 when it publishes a witness. The pending point shares the completion's work and
 cancellation scope, survives slices with that leaf and is discarded on reseeding or
 close. A rejected point supplies no conflict.
+Retained repair publishes the point and continues chronologically through sibling
+assignments; it cannot block an unresolved leaf as a proved nogood. Other traversal
+modes stop incomplete when their model continuation would require such a blocker.
 
 ### Leaf-completed columns
 

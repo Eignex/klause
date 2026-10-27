@@ -1356,7 +1356,7 @@ internal class ResumableMinimize(
                         if (pausable && params.cancellation()) return SearchModelDisposition.Pause
                         val published = if (accepted) recordIfImproving(checkNotNull(witness),
                             objective.evaluate(witness)) else null
-                        incomplete = published != null
+                        incomplete = published != null && !rebindable
                         unresolved = published == null
                         published
                     }
