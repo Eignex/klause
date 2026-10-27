@@ -5219,6 +5219,54 @@ objective-bound coverage. [8671](https://lab.eignex.com/jobs/8671) retains the
 127fc9dd2a control where `enigma` exhausts 512 MiB of cumulative allocation.
 The invocation-local admission limit preserves ordinary numerical funding.
 
+##### Unit-prefix exclusions
+
+[8741](https://lab.eignex.com/jobs/8741), at `1101fa4693`, completes 162 matched
+cache-only, prefix and automatic runs over the same nine source hashes, default/exact
+semantics, three policy seeds and P1/10 s. Egout and p0033 supply the captured cases;
+the other whole families are held out. All 27 source/seed groups retain one
+host/build/runtime across their six arms: 78 cases on Mac/aarch64 and 84 on
+Linux/amd64, with 3 GiB, Serial GC and `ActiveProcessorCount=1`. Command intervals
+overlap at most one case per host. All 69 feasible points pass independent original
+MPS solchecker checks; native proofs have no independent exported-proof check.
+All 162 whole-CLI resource receipts are retained, including after worker replacement.
+
+Every source consumes prefix deductions. Completed flugplinf refutations save
+38 queries and 405 decisions, with higher allocation. Gr4x6 retains optimum
+4047/20 but its five implications save neither queries nor decisions. The completed
+native coverage costs below repeat across source policies; p0033 uses the separate
+completion control described below. Allocation is cumulative modeled bytes.
+
+| Source | Prefix implications | LP operations, cache → prefix | Decisions, cache → prefix | Funded work, million units | Allocation, decimal MB |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| flugplinf | 307 | 1021 → 983 | 5745 → 5340 | 22.500 → 21.370 | 24.804 → 71.874 |
+| gr4x6 | 5 | 45 → 45 | 156 → 156 | 2.788 → 2.792 | 0.528 → 0.959 |
+| p0033 completion | 755 | 1324 → 1425 | 9495 → 6882 | 18.799 → 20.968 | 53.017 → 83.102 |
+
+The ten-second p0033 comparison loses three cache-only optimum proofs; neither
+policy loses feasibility, but one exact prefix run retains 3095 instead of 3089.
+One default rgn prefix run loses the cache-only witness. All other paired
+feasibility, objective and proof outcomes agree. Automatic controls prove p0033
+optimal at 3089 in all six runs. These losses remain part of the qualification.
+
+[8755](https://lab.eignex.com/jobs/8755) allows 30 seconds for one p0033 policy
+seed on Mac/aarch64 at the same revision. Both cache and prefix policies complete
+optimum 3089 under both source policies; all six witnesses pass solchecker.
+The prefix retains complete checked sibling coverage with 3147 nodes instead of
+2005. Default whole-CLI wall time is 1.95 → 2.87 s, CPU time 4.45 → 6.47 s and
+peak RSS 260208 → 279440 KiB. These are single observations, separate from the
+Linux ten-second cohort. Default flugplinf RSS also rises: 237136 → 252624 KiB
+over two Mac seeds and 140656 → 154072 KiB for one Linux seed; Linux wall time
+is 7.04 → 7.59 s. Whole-CLI costs include lookup, naming, replay and verification.
+
+[8730](https://lab.eignex.com/jobs/8730) and
+[8739](https://lab.eignex.com/jobs/8739) retain stopped prototypes where naming
+after a spent source grant ended traversal early; those lower work counts are not
+gains. The consumer pauses before naming the retained split. Unit-prefix exclusion
+is a checked opt-in capability with a finished-proof work reduction on flugplinf,
+captured-case regressions and memory costs; automatic routing and heuristic
+ordering retain their defaults.
+
 #### Checked source rounding cuts
 
 [Qualification 8117](https://lab.eignex.com/jobs/8117) compares `f59091a21a` with
