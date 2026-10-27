@@ -1,8 +1,8 @@
 package com.eignex.klause.backtrack
 
 import com.eignex.klause.backtrack.selector.IndomainMax
-import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.toExactSourceProblem
 import com.eignex.klause.ir.IntDomain
@@ -30,13 +30,14 @@ class BacktrackSolverRepairTest {
         ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
         val third = BigFraction.ofLong(3L).reciprocal()
         val epsilon = BigFraction.ofLong(1L shl 60).reciprocal()
+        val params = BacktrackParams(toleranceCheck = { true })
 
         for (sign in listOf(-1L, 1L)) {
             val objective = LinearObjective(realCoefficients = doubleArrayOf(sign.toDouble()))
             val value = third * BigFraction.ofLong(sign)
             for (offset in listOf(-1L, 0L, 1L)) {
                 val cutoff = value + epsilon * BigFraction.ofLong(offset)
-                BacktrackSolver(problem).openRepair(objective, BacktrackParams(toleranceCheck = { true })).use { repair ->
+                BacktrackSolver(problem).openRepair(objective, params).use { repair ->
                     repair.beginExact(Assumptions.None, 100L, cutoff, Cancellation.Never)
                     val result = repair.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L)
 
@@ -84,27 +85,27 @@ class BacktrackSolverRepairTest {
         for (sense in listOf("MIN", "MAX")) {
             val compiled = Mps.parse(
                 "NAME SCALED\nOBJSENSE\n $sense\nROWS\n N COST\n E R\nCOLUMNS\n" +
-                    " M0 'MARKER' 'INTORG'\n I R 1\n M1 'MARKER' 'INTEND'\n" +
-                    " X COST 0.1 R 3\nRHS\n RHS R 1 COST -0.2\nBOUNDS\n" +
+                    " M0 'MARKER' 'INTORG'\n I COST 0.1 R 1\n M1 'MARKER' 'INTEND'\n" +
+                    " X R 3\nRHS\n RHS R 1 COST -0.2\nBOUNDS\n" +
                     " BV B I\n LO B X 0\n UP B X 1\nENDATA",
             ).toExactSourceProblem()
             val sourceObjective = assertNotNull(compiled.objective).toLinearObjective()
             val objective = if (compiled.maximize) sourceObjective.negated() else sourceObjective
             val epsilon = BigFraction.ofLong(1L shl 60).reciprocal()
-            val first = if (compiled.maximize) 0L else 1L
+            val first = if (compiled.maximize) 1L else 0L
             val second = 1L - first
             BacktrackSolver(compiled.model.bake()).openRepair(objective, BacktrackParams()).use { repair ->
                 val cutoff = if (compiled.maximize) BigFraction.ofLong(-2L) + epsilon
-                    else BigFraction.ofLong(7L) * BigFraction.ofLong(3L).reciprocal() + epsilon
+                    else BigFraction.ofLong(3L) + epsilon
                 repair.beginExact(Assumptions(ints = mapOf(0 to first)), 100L, cutoff, Cancellation.Never)
                 val a = assertNotNull(repair.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L).sample)
                 repair.beginExact(Assumptions(ints = mapOf(0 to second)), 100L, cutoff, Cancellation.Never)
                 val b = assertNotNull(repair.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L).sample)
 
                 assertEquals(10L, compiled.objectiveScale)
-                assertEquals(if (compiled.maximize) "7/30" else "1/5",
+                assertEquals(if (compiled.maximize) "3/10" else "1/5",
                     compiled.sourceWitness(a.ints, assertNotNull(a.exactReals)).objective.toString())
-                assertEquals(if (compiled.maximize) "1/5" else "7/30",
+                assertEquals(if (compiled.maximize) "1/5" else "3/10",
                     compiled.sourceWitness(b.ints, assertNotNull(b.exactReals)).objective.toString())
             }
         }
