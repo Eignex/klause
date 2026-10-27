@@ -88,7 +88,13 @@ class LinearAuthorityInvocationTest {
             val reused = LinearAuthorityInvocation(source, params.copy(sourceRefutationReuse = true,
                 sourceRefutationPropagation = recordFeedback),
                 boundOrdered = true, onNumericalFeedback = reusedObserver.takeIf { recordFeedback }).use {
-                it.run { _, _ -> }
+                if (!recordFeedback) it.run { _, _ -> } else {
+                    var result: LinearInvocationResult? = null
+                    repeat(64) { _ ->
+                        if (result == null) result = it.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) { _, _ -> }
+                    }
+                    assertNotNull(result)
+                }
             }
 
             assertEquals(SourceClaim.Refutation, assertNotNull(baseline.terminal).claim)
@@ -416,7 +422,8 @@ class LinearAuthorityInvocationTest {
                         BigFraction.MINUS_ONE)),
                 ), mapOf(integer to BigFraction.ONE, other to BigFraction.ONE))
 
-            LinearAuthorityInvocation(source, TheoryParams(), boundOrdered = true).use { invocation ->
+            LinearAuthorityInvocation(source, TheoryParams(sourceRefutationPropagation = true),
+                boundOrdered = true).use { invocation ->
                 var result: LinearInvocationResult? = null
                 repeat(32) {
                     if (result == null) result = invocation.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) { _, _ -> }
