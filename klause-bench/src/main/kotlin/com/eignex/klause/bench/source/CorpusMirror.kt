@@ -1,6 +1,7 @@
 package com.eignex.klause.bench.source
 
 import java.io.File
+import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URI
 import java.nio.file.Files
@@ -77,7 +78,7 @@ internal class CorpusMirror(
                 }
                 val status = corpusTransport { connection.responseCode }
                 if (status !in setOf(200, 201, 204, 412)) {
-                    throw CorpusUnavailable(java.io.IOException("corpus mirror publication unavailable (HTTP $status)"))
+                    throw CorpusUnavailable(IOException("corpus mirror publication unavailable (HTTP $status)"))
                 }
             } finally {
                 connection.disconnect()

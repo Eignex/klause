@@ -44,7 +44,7 @@ object BenchCli {
         try {
             dispatch(args)
         } catch (failure: CorpusUnavailable) {
-            failure.printStackTrace(System.err)
+            System.err.println("${failure.message}: ${failure.cause?.javaClass?.simpleName}")
             exitProcess(75)
         }
     }

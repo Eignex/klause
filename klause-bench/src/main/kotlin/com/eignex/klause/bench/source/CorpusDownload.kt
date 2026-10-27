@@ -30,8 +30,9 @@ internal class CorpusDownload(
                 Files.move(partial, destination.toPath(), ATOMIC_MOVE, REPLACE_EXISTING)
                 return
             } catch (failure: HttpFailure) {
-                if (failure.status !in RETRYABLE_STATUS) throw failure
-                if (exhausted(attempt)) throw CorpusUnavailable(failure)
+                if (failure.status !in RETRYABLE_STATUS || exhausted(attempt)) {
+                    throw if (failure.status in RETRYABLE_STATUS) CorpusUnavailable(failure) else failure
+                }
             } catch (failure: CorpusUnavailable) {
                 if (exhausted(attempt)) throw failure
             } finally {

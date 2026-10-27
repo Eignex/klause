@@ -13,7 +13,11 @@ internal data class MirrorPublication(val url: String, val headers: Map<String, 
 @Serializable
 private data class MirrorSignature(val method: String, val key: String, val sha256: String)
 
-internal fun corpusMirrorPublication(id: String, sha: ByteArray, fallback: URI): MirrorPublication = corpusTransport {
+internal fun corpusMirrorPublication(
+    id: String,
+    sha: ByteArray,
+    fallback: URI,
+): MirrorPublication = corpusTransport {
     val signer = System.getenv("KLAUSE_BENCH_CORPUS_SIGNER") ?: return@corpusTransport MirrorPublication(fallback.toString())
     val uri = URI(signer)
     require(uri.scheme == "http" && uri.host in setOf("127.0.0.1", "localhost", "::1") && uri.userInfo == null)
