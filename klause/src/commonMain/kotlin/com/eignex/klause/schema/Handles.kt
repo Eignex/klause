@@ -41,10 +41,10 @@ class NominalHandle(
 class IntHandle(
     /** Name of the underlying integer variable. */
     val name: String,
-    /** Inclusive lower bound of the domain. */
-    val min: Int,
-    /** Inclusive upper bound of the domain. */
-    val max: Int,
+    /** Inclusive lower bound of the domain; [Long.MIN_VALUE] when open below. */
+    val min: Long,
+    /** Inclusive upper bound of the domain; [Long.MAX_VALUE] when open above. */
+    val max: Long,
 ) : IntTerm {
     override fun toIntExpr(): IntExpr = IntRef(name)
 }

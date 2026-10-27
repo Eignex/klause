@@ -96,7 +96,7 @@ term false.
 
 ## Absolute-value source forms
 
-Schema integer `abs`, FlatZinc `int_abs`, SMT-LIB integer `abs` and XCSP3
+Schema integer `abs` and `realAbs`, FlatZinc `int_abs`, SMT-LIB integer `abs` and XCSP3
 `abs`/`dist` retain [absolute-value relations](02-model.md#absolute-value-relations).
 Wide SMT operands use `AffineAbs`; FlatZinc floats use `RealAbs` or `GridAbs`
 under their selected semantics. SMT-LIB real `abs` is unsupported; the other file
@@ -191,6 +191,32 @@ presence literals and guards, and constraints over them lower to reified or
 aggregation-aware forms. `CompiledSchema.decode` maps a sample back to each handle's
 Kotlin value, testing presence first for optional handles.
 
+Integer declarations take 64-bit endpoints (`intVar(min: Long, max: Long)`), an open
+side (`openIntVar`) or a sparse value set (`intVar(values)`); an open side becomes an
+open `Problem` column. A `floatVar` with an infinite bound is open on that side.
+`impliedConstraint` and `symmetryBreakingConstraint` mark the factors their relation
+posts as implied, and the latter also sets `Problem.hasSymmetryBreaking`.
+
+### Native factors
+
+The DSL reaches every factor a `Problem` can hold. `factor(relation, bools, ints,
+reals)` posts any factor built over local ids `0 until n` of each namespace, binding
+id `i` to the `i`-th declared variable of the matching list; `factor(node, …)` takes
+the same relation as a factor-codec JSON node. The schema stores the node in the
+[problem JSON](#problem-json) factor vocabulary, and compilation decodes it with the
+registry passed as `compile(factorCodecs = …)`, renames the ids to the compiled
+columns and posts the factor unchanged. A native factor is asserted at the top level
+only.
+
+Named builders cover the common native relations: `lexLeq`/`lexLt` (one
+lexicographic factor at the top level, comparisons when reified), `valuePrecede`,
+`allDifferentTuples`, `allDifferentExcept`, `nValue` with excepted values, exact
+mixed affine `distinct`, arbitrary-width `linear` and `pseudoBoolean`, rational
+`exactLinear`, `cumulative` with variable durations, demands and capacity, and the
+real relations `realAbs`, `realMin`, `realMax`, `realElement` and `inValues`.
+Compiling a schema and writing its `Problem` as problem JSON therefore covers the
+same declarations, factors and options as the problem document itself.
+
 `CompiledSchema` retains one original source binding; `sourceId` and `sourceRealId`
 refer to its original namespaces. Source solver factories compile a schema once and
 attach fresh invocation state per operation. A private view cannot suppress an
@@ -224,11 +250,12 @@ same serializers.
 
 | Vocabulary | Keys |
 |---|---|
-| `SchemaEntry` | `bool`, `presence`, `nominal`, `int`, `float`, `set`, `multiple`, `constraint` |
+| `SchemaEntry` | `bool`, `presence`, `nominal`, `int`, `intDomain`, `float`, `set`, `multiple`, `constraint`, `implied`, `symmetryBreaking` |
 | `IntExpr` | `ref`, literal, `add`, `mul`, `truncDiv`, `truncMod`, `pow`, `abs`, `min`, `max`, `if`, `element`, `card` |
 | `BoolExpr` logic | `ref`, `notRef`, `nominalEq`, `not`, `and`, `or`, `xor`, `implies`, `iff`, `atMost`, `atLeast`, `cardinality`, `pseudoBoolean` |
 | `BoolExpr` relations | `le`, `lt`, `ge`, `gt`, `eq`, `ne`, `floatLinear`, `realEq`, set `in`, `labelIn`, `subset`, `disjoint`, `setEq` |
-| `BoolExpr` globals | `allDifferent`, `symmetricAllDifferent`, `inverse`, `table`, `regular`, `costRegular`, `mdd`, `costMdd`, `circuit`, `subcircuit`, `cumulative`, `disjunctive`, `sort`, `increasing`, `diffn` and the `…Opt` presence forms |
+| `BoolExpr` globals | `allDifferent`, `symmetricAllDifferent`, `inverse`, `table`, `regular`, `costRegular`, `mdd`, `costMdd`, `circuit`, `subcircuit`, `cumulative`, `cumulativeVars`, `disjunctive`, `sort`, `increasing`, `diffn`, `lexLess` and the `…Opt` presence forms |
+| `BoolExpr` native | `factor`: a factor-codec node with its `bools`, `ints` and `reals` bindings |
 | `SetExpr` | `ref`, `elements`, `labels`, `union`, `intersect`, `diff` |
 | `ContinuousRealExpr` | `affine`, `mul`, `pow` |
 
@@ -328,8 +355,9 @@ domain to exclude zero. See [integer division relations](02-model.md#integer-div
 
 `schemaSemantics` declares binary64 literal authority, grid defaults and
 absent-value canonicalization; compilation resolves `SemanticOverrides` and keeps
-the result on `Problem.semantics`. Declarations require explicit ranges, so
-undeclared-range overrides do not apply. Compilation preserves original real
+the result on `Problem.semantics`. Every declaration states its range, open sides
+included, so undeclared-range overrides do not apply; a grid over an open side uses
+the unranged window. Compilation preserves original real
 bounds, strict comparisons, disequalities, reified rows and nonlinear relations. A
 `FloatSpec.buckets` count describes consumer geometry only; it never constrains an
 exact source route.

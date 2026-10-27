@@ -28,10 +28,10 @@ import com.eignex.klause.model.IntMax
 import com.eignex.klause.model.IntMin
 import com.eignex.klause.model.IntTerm
 import com.eignex.klause.model.InverseChannel
+import com.eignex.klause.model.LexExpr
 import com.eignex.klause.model.MddExpr
 import com.eignex.klause.model.NValueExprOpt
 import com.eignex.klause.model.NValueMode
-import com.eignex.klause.model.Or
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.model.PseudoBooleanExpr
 import com.eignex.klause.model.RegularExpr
@@ -39,6 +39,7 @@ import com.eignex.klause.model.SortExpr
 import com.eignex.klause.model.SubcircuitExpr
 import com.eignex.klause.model.SymmetricAllDifferent
 import com.eignex.klause.model.TableConstraint
+import com.eignex.klause.model.VariableCumulativeExpr
 import com.eignex.klause.model.XorExpr
 
 /**
@@ -141,31 +142,26 @@ fun gcc(vars: List<IntTerm>, valueCounts: Map<Int, IntRange>): BoolExpr {
 
 /**
  * Lexicographic less-or-equal: `a` is no greater than `b` when read left-to-right. Lists must be
- * non-empty and of equal length.
+ * non-empty and of equal length. Asserted directly it posts one native lexicographic factor.
  */
-fun lexLeq(a: List<IntTerm>, b: List<IntTerm>): BoolExpr = lexChain(a, b, strict = false)
+fun lexLeq(a: List<IntTerm>, b: List<IntTerm>): BoolExpr =
+    LexExpr(a.map { it.toIntExpr() }, b.map { it.toIntExpr() }, strict = false)
 
 /** Strict lexicographic less-than. */
-fun lexLt(a: List<IntTerm>, b: List<IntTerm>): BoolExpr = lexChain(a, b, strict = true)
+fun lexLt(a: List<IntTerm>, b: List<IntTerm>): BoolExpr =
+    LexExpr(a.map { it.toIntExpr() }, b.map { it.toIntExpr() }, strict = true)
 
-private fun lexChain(a: List<IntTerm>, b: List<IntTerm>, strict: Boolean): BoolExpr {
-    require(a.size == b.size) { "lex: lists must have equal length, got ${a.size} and ${b.size}" }
-    require(a.isNotEmpty()) { "lex: empty lists are not supported" }
-    val ax = a.map { it.toIntExpr() }
-    val bx = b.map { it.toIntExpr() }
-    // lex(a, b) ⟺ a(0) < b(0) ∨ (a(0) = b(0) ∧ lex(a(1..), b(1..))), built from the last index inward.
-    var result: BoolExpr = if (strict) {
-        IntCompare(ax.last(), IntCmpOp.LT, bx.last())
-    } else {
-        IntCompare(ax.last(), IntCmpOp.LE, bx.last())
-    }
-    for (i in ax.size - 2 downTo 0) {
-        val less = IntCompare(ax[i], IntCmpOp.LT, bx[i])
-        val equal = IntCompare(ax[i], IntCmpOp.EQ, bx[i])
-        result = Or(listOf(less, And(listOf(equal, result))))
-    }
-    return result
-}
+/**
+ * Cumulative scheduling whose [durations], [demands] and [capacity] may be variables: at every time point
+ * the demands of the running tasks stay within [capacity].
+ */
+fun cumulative(starts: List<IntTerm>, durations: List<IntTerm>, demands: List<IntTerm>, capacity: IntTerm): BoolExpr =
+    VariableCumulativeExpr(
+        starts.map { it.toIntExpr() },
+        durations.map { it.toIntExpr() },
+        demands.map { it.toIntExpr() },
+        capacity.toIntExpr(),
+    )
 
 /**
  * Hamiltonian-cycle constraint on a successor array. Default `valueOffset = 0` matches
@@ -498,7 +494,7 @@ private fun validateTableTuples(vars: List<IntTerm>, tuples: List<List<Int>>) {
         val handle = term as? IntHandle ?: continue
         for ((tIdx, tup) in tuples.withIndex()) {
             val v = tup[i]
-            require(v in handle.min..handle.max) {
+            require(v.toLong() in handle.min..handle.max) {
                 "table: tuple #$tIdx value $v at position $i is outside operand " +
                     "${handle.name}'s domain [${handle.min}..${handle.max}]"
             }

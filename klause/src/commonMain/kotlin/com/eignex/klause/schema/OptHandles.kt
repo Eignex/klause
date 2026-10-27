@@ -32,10 +32,10 @@ class OptIntHandle(
     val value: IntHandle,
 ) {
     /** Inclusive lower bound of the value's domain. */
-    val min: Int get() = value.min
+    val min: Long get() = value.min
 
     /** Inclusive upper bound of the value's domain. */
-    val max: Int get() = value.max
+    val max: Long get() = value.max
 
     /** Yields an [IntExpr] equal to [value] when [present], otherwise [default]. Safe in any
      *  arithmetic context. */

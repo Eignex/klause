@@ -89,6 +89,7 @@ private fun varSpecNodes(): List<JsonNode> = listOf(
     jsonNode<PresenceSpec>("presence", Operand, "valueName"),
     jsonNode<NominalSpec>("nominal", Operand, "labels"),
     jsonNode<IntSpec>("int", Operands, "min", "max"),
+    jsonNode<IntDomainSpec>("intDomain"),
     jsonNode<FloatSpec>("float"),
     jsonNode<SetSpec>("set", Operand, "universe"),
     jsonNode<MultipleSpec>("multiple", Operand, "labels"),
@@ -99,7 +100,15 @@ object SchemaEntrySerializer : CompactSerializer<SchemaEntry>(
     "com.eignex.klause.model.SchemaEntry",
     SchemaEntry::class,
     ModelJson.catalog,
-    { varSpecNodes() + jsonNode<NamedConstraint>("constraint", Operand, "expr") },
+    {
+        varSpecNodes() + listOf(
+            ConstraintRole.REQUIRED to "constraint",
+            ConstraintRole.IMPLIED to "implied",
+            ConstraintRole.SYMMETRY_BREAKING to "symmetryBreaking",
+        ).map { (role, key) ->
+            jsonNode<NamedConstraint>(key, Operand, "expr", fixed = mapOf("role" to JsonPrimitive(role.name)))
+        }
+    },
 )
 
 /** Compact JSON serializer of [VarSpec], sharing the declaration keys of [SchemaEntrySerializer]. */
@@ -200,6 +209,9 @@ object BoolExprSerializer : CompactSerializer<BoolExpr>(
             jsonNode<DisjunctiveExprOpt>("disjunctiveOpt"),
             jsonNode<NValueExprOpt>("nValueOpt"),
             jsonNode<GccExprOpt>("gccOpt"),
+            jsonNode<LexExpr>("lexLess"),
+            jsonNode<VariableCumulativeExpr>("cumulativeVars"),
+            jsonNode<FactorConstraint>("factor"),
         )
     },
 ) {

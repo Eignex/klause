@@ -276,11 +276,40 @@ class ModelJsonTest {
     }
 
     @Test
+    fun `wide declarations and constraint roles have stable documented shapes`() {
+        assertShapes(
+            SchemaEntry.serializer(),
+            IntDomainSpec(lower = -5_000_000_000) to """{"intDomain":{"lower":-5000000000}}""",
+            IntDomainSpec(0, 9, listOf(listOf(0L, 2L), listOf(7L, 9L))) to
+                """{"intDomain":{"lower":0,"upper":9,"values":[[0,2],[7,9]]}}""",
+            FloatSpec(min = 0.0) to """{"float":{"min":0.0}}""",
+            NamedConstraint(p, ConstraintRole.IMPLIED) to """{"implied":{"ref":"p"}}""",
+            NamedConstraint(p, ConstraintRole.SYMMETRY_BREAKING) to """{"symmetryBreaking":{"ref":"p"}}""",
+        )
+    }
+
+    @Test
+    fun `native constraints have stable documented shapes`() {
+        val node = Json.parseToJsonElement("""{"valuePrecede":{"s":1,"t":2,"xs":[0,1]}}""")
+        assertShapes(
+            BoolExpr.serializer(),
+            LexExpr(listOf(x), listOf(y), strict = true) to
+                """{"lexLess":{"xs":[{"ref":"x"}],"ys":[{"ref":"y"}],"strict":true}}""",
+            VariableCumulativeExpr(listOf(x), listOf(y), listOf(IntLit(1)), IntLit(2)) to
+                """{"cumulativeVars":{"starts":[{"ref":"x"}],"durations":[{"ref":"y"}],"demands":[1],"capacity":2}}""",
+            FactorConstraint(node, ints = listOf("x", "y")) to
+                """{"factor":{"node":{"valuePrecede":{"s":1,"t":2,"xs":[0,1]}},"ints":["x","y"]}}""",
+        )
+    }
+
+    @Test
     fun `malformed payloads report their compact paths`() {
         val cases = listOf(
             """{"int":[0]}""" to "$.int: expected 2 operands",
             """{"int":[0,"9"]}""" to "$.int[1]: expected INT",
             """{"int":[5,1]}""" to "$.int: IntSpec needs min <= max",
+            """{"intDomain":{"lower":0,"upper":9,"values":[[0,2],[3,4]]}}""" to
+                "$.intDomain: IntDomainSpec runs must ascend with gaps",
             """{"float":{"min":0.0,"max":1.0,"bucket":3}}""" to "$.float.bucket: unknown field",
             """{"constraint":{"and":[{"ref":"a"},{"bogus":1}]}}""" to "$.constraint.and[1].bogus: unknown operator",
             """{"constraint":{"ge":[{"ref":"x"},1.5]}}""" to "$.constraint.ge[1]: expected INT",
