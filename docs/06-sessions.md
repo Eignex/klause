@@ -292,7 +292,10 @@ for both children and their captured condition maps. Resuming cannot renew eithe
 `source-lp-work-limit` defaults to one billion units and
 `source-lp-allocation-limit` to 512 MiB. Opt-in checked refutation reuse charges
 support indexing, source reconstruction, proof replay, storage and eviction to
-these same ceilings. `source-cuts` controls checked source-row
+these same ceilings. Reuse admits at most 64 MiB of cumulative modeled allocation
+and one eighth of the allocation remaining at its opening. Reaching that local
+allowance retires the cache and leaves ordinary numerical queries available.
+`source-cuts` controls checked source-row
 separation in numerical frontier traversal. `source-lp-operations` supplies an independent
 operation ceiling for controlled comparisons. Other source LP clients retain their
 operation-based admission policy.

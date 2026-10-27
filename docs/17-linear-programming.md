@@ -262,7 +262,10 @@ retain 4,096-bit numerator and denominator limits. Source reconstruction, proof 
 indexing, allocation and eviction charge cumulative source LP funding. Unknown or
 cancelled checks close no additional alternative. Metadata visits and scratch
 allocation are charged before their source maps are copied. Ordinary traversal
-keeps reuse disabled.
+keeps reuse disabled. Cumulative reuse allocation has a separate admission limit:
+the smaller of 64 MiB and one eighth of the source funding remaining at opening.
+Reaching that limit clears the cache, stops further reuse work and preserves
+ordinary numerical traversal under its remaining cumulative funding.
 
 ### Leaf completion
 
