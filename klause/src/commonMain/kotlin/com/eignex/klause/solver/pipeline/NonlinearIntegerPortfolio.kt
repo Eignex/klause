@@ -87,6 +87,6 @@ internal class NonlinearIntegerPortfolio(
                 else if (polynomial.cancellation()) TerminationReason.Cancelled else result.reason, result.stats)
         }
         return PolynomialTheoryExecution(published, scope.polynomialStats, workers.firstNotNullOfOrNull { it.resource },
-            integerCells = cellReuseStats(params, workers))
+            integerCells = cellReuseStats(params, workers), integerRoots = integerRootStats(params, workers))
     }
 }

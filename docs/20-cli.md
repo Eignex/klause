@@ -123,7 +123,7 @@ has its own work currency, separate from `node-limit`:
 |---|---|---|
 | Open linear | `open-work-limit`, `open-branching`, `open-hint-flips`, `open-hint-min-splits` | [Linear arithmetic](15-linear-arithmetic.md) |
 | Polynomial real | `nra-work-limit`, `nra-dense-coefficients`, `nra-matrix-cells` | [Polynomial completion](16-nonlinear-arithmetic.md#polynomial-real-arithmetic) |
-| Nonlinear integer | `nia-candidates`, `nia-moves`, `nia-cell-refinement`, `nia-cell-reuse`, `nia-cell-steering`, plus the polynomial limits | [Integer candidates](16-nonlinear-arithmetic.md#nonlinear-integer-arithmetic) |
+| Nonlinear integer | `nia-candidates`, `nia-moves`, `nia-cell-refinement`, `nia-cell-reuse`, `nia-cell-steering`, `nia-integer-roots`, plus the polynomial limits | [Integer candidates](16-nonlinear-arithmetic.md#nonlinear-integer-arithmetic) |
 | Quadratic optimization | the polynomial limits; open integers also use `nia-*` | [Quadratic execution](16-nonlinear-arithmetic.md#quadratic-strategy-execution) |
 | Transcendental | `nra-*` limits and shared exact-satisfaction controls | [Function checks](16-nonlinear-arithmetic.md#transcendental-real-arithmetic) |
 
@@ -152,6 +152,12 @@ defaults to false. `niaCellSteering`, `niaCellSelections`, `niaSteeredTuples`,
 work, changed proposals, distinct tuples reaching completion per cursor and
 already-visited candidate attempts. Empty complements retain ordinary traversal
 and supply no refutation.
+
+`nia-integer-roots=true` admits the complete integer roots of mandatory unary
+polynomial equalities and defaults to false. Statistics then include
+`niaRootEquations`, `niaRootDeclines`, `niaRootReuses`, `niaRootRefutedScopes`,
+`niaRootExcludedTuples` and `niaRootCompletionChecks`. A refuted scope is a cursor
+whose admitted roots miss its integer window; skipped tuples avoid fixed completions.
 
 Complete-search value guidance reports `valueSupportOrders`, `valueProbeOrders`,
 `valueProbes`, `valueProbeRefutations`, `valueProbeWork` and `valueProbeCappedOrders`

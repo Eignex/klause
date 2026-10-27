@@ -37,6 +37,23 @@ class CliModeSmtTest {
     }
 
     @Test
+    fun `SMT integer root admission should report the refuted rootless square`() {
+        val source = File.createTempFile("nia-roots", ".smt2").apply {
+            writeText("(declare-const n Int) (declare-const q Int) (assert (= (* n n) 2)) (check-sat)")
+            deleteOnExit()
+        }
+
+        val output = capture {
+            assertEquals(0, runCli(arrayOf("-e", "cp", "-s", "--param", "nia-integer-roots=true", source.absolutePath)))
+        }
+
+        assertEquals("unsat", output.lineSequence().first(), output)
+        assertTrue("; niaRootEquations=1" in output.lines(), output)
+        assertTrue("; niaRootRefutedScopes=1" in output.lines(), output)
+        assertTrue("; niaRootCompletionChecks=0" in output.lines(), output)
+    }
+
+    @Test
     fun `SMT inconsistent integer scalar equations should print unsat from the refuted route`() {
         val source = File.createTempFile("integer-premises", ".smt2").apply {
             writeText(
