@@ -3,12 +3,12 @@ package com.eignex.klause.localsearch
 import com.eignex.klause.ir.DefinitionHint
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.propagation.bake
-import com.eignex.klause.solver.Sample
 import com.eignex.klause.localsearch.movesource.ObjectiveSeed
 import com.eignex.klause.localsearch.strategy.Cbls
+import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.InstructionSlicedSearch
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
@@ -17,8 +17,8 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
-import kotlin.test.assertSame
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class ObjectiveProposalGeometryTest {

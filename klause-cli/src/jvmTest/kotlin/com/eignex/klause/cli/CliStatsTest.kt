@@ -41,6 +41,22 @@ import kotlin.time.Duration
 
 class CliStatsTest {
     @Test
+    fun `geometric counters remain absent until a consumer requests qualification`() {
+        for (requested in listOf(false, true)) {
+            val stats = SolveStats(run = RunStats(backend = "ls"), ls = if (requested) LocalSearchStats(
+                geometricProposalRuns = SumResult(1.0), geometricProposalDeclines = SumResult(2.0),
+                geometricProposalCandidates = SumResult(3.0),
+            ) else LocalSearchStats())
+
+            val pairs = lsStatPairs(stats, 1L).toMap()
+
+            assertEquals(if (requested) "1" else null, pairs["lsGeometricProposalRuns"])
+            assertEquals(if (requested) "2" else null, pairs["lsGeometricProposalDeclines"])
+            assertEquals(if (requested) "3" else null, pairs["lsGeometricProposalCandidates"])
+        }
+    }
+
+    @Test
     fun `value ordering should report support and probe costs separately`() {
         val stats = SolveStats(search = SearchStats(valueOrdering = ValueOrderingStats(1, 2, 3, 4, 5, 6)))
 

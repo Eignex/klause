@@ -136,7 +136,9 @@ internal class FunctionalObjective internal constructor(
     internal fun conesMaintained(maintains: (DefinitionalSweep.SweepNode) -> Boolean): Boolean =
         coneMemo.ordered.all { definition -> definition.origin?.let(maintains) == true }
 
-    internal fun coneMaintenanceSteps(maintains: (DefinitionalSweep.SweepNode) -> Boolean): Sequence<Boolean?> = sequence {
+    internal fun coneMaintenanceSteps(
+        maintains: (DefinitionalSweep.SweepNode) -> Boolean,
+    ): Sequence<Boolean?> = sequence {
         for ((index, definition) in coneMemo.ordered.withIndex()) {
             if (definition.origin?.let(maintains) != true) {
                 yield(false)

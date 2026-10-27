@@ -5,7 +5,10 @@ import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.BIG_ONE
 
-internal fun prepareObjectiveProposals(state: LocalSearchState, objective: IncrementalObjective?): Sequence<Unit> = sequence {
+internal fun prepareObjectiveProposals(
+    state: LocalSearchState,
+    objective: IncrementalObjective?,
+): Sequence<Unit> = sequence {
     state.shaping.proposalHotspots = null
     state.shaping.proposalSeeds = null
     state.shaping.adjacentProposalSteps = false
