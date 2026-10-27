@@ -82,7 +82,7 @@ class LinearAuthorityInvocationTest {
     }
 
     @Test
-    fun `retained frontier should consume a source bound aggregate within one LP operation`() {
+    fun `retained frontier should consume source bound aggregates within the LP operation budget`() {
         val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
         val source = SourceProofContext(scope, setOf(integer, real, residual), mapOf(
             "row" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ofLong(2),
@@ -95,15 +95,18 @@ class LinearAuthorityInvocationTest {
                 BigFraction.ofLong(100))),
         ), mapOf(integer to BigFraction.MINUS_ONE, real to BigFraction.ONE))
 
-        val result = LinearAuthorityInvocation(source,
-            TheoryParams(sourceAggregateCuts = true, sourceLpOperations = 1), boundOrdered = true).use {
-            it.run { _, _ -> }
-        }
+        for ((pointCuts, operations) in listOf(false to 1, true to 2)) {
+            val result = LinearAuthorityInvocation(source, TheoryParams(sourceAggregateCuts = true,
+                sourcePointCuts = pointCuts, sourceLpOperations = operations), boundOrdered = true).use {
+                it.run { _, _ -> }
+            }
 
-        val terminal = assertNotNull(result.terminal)
-        assertEquals(SourceValue.Rational(BigFraction.MINUS_ONE), assertIs<SourceClaim.Optimal>(terminal.claim).value)
-        assertEquals(SourceEvidenceCheck.Checked,
-            SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
+            val terminal = assertNotNull(result.terminal)
+            assertEquals(SourceValue.Rational(BigFraction.MINUS_ONE),
+                assertIs<SourceClaim.Optimal>(terminal.claim).value)
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
+        }
     }
 
     @Test
