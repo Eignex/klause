@@ -107,7 +107,6 @@ class LinearAuthorityInvocationTest {
                 (stages["numericalRefutationUnitDeductions"] ?: 0L) > 0L)
             assertTrue(reused.stats.smt.sourceLp.operations < baseline.stats.smt.sourceLp.operations)
             assertEquals(0L, stages["numericalPendingLeaves"])
-            if (recordFeedback) assertTrue(stages.getValue("numericalRefutationUnitDeductions") > 0L)
             if (recordFeedback) assertTrue(reusedFeedback < baselineFeedback)
         }
     }
@@ -133,9 +132,10 @@ class LinearAuthorityInvocationTest {
         ), mapOf(real to BigFraction.ONE))
         val params = TheoryParams(sourceCuts = false)
 
-        val baseline = LinearAuthorityInvocation(source, params, boundOrdered = true).use { it.run { _, _ -> } }
-        val reused = LinearAuthorityInvocation(source, params.copy(sourceRefutationPropagation = true),
-            boundOrdered = true).use { it.run { _, _ -> } }
+        val baseline = LinearAuthorityInvocation(source, params).use { it.run { _, _ -> } }
+        val reused = LinearAuthorityInvocation(source, params.copy(sourceRefutationPropagation = true)).use {
+            it.run { _, _ -> }
+        }
 
         assertIs<SourceClaim.Optimal>(assertNotNull(baseline.terminal).claim)
         val terminal = assertNotNull(reused.terminal)
@@ -144,8 +144,46 @@ class LinearAuthorityInvocationTest {
         assertEquals(SourceEvidenceCheck.Checked,
             SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
         val stages = assertNotNull(reused.stats.smt.completeSearchStages)
-        assertTrue(stages.getValue("numericalRefutationUnitDeductions") > 0L)
+        assertTrue(stages.getValue("numericalAvoidedQueries") > 0L)
         assertTrue(reused.stats.smt.sourceLp.operations < baseline.stats.smt.sourceLp.operations)
+        assertEquals(0L, stages["numericalPendingLeaves"])
+    }
+
+    @Test
+    fun `a unit prefix should avoid a numerical decision while preserving the checked optimum`() {
+        val left = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
+        val right = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val height = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val source = SourceProofContext(scope, setOf(integer, left, right, real, height), mapOf(
+            "left" to SourcePremise(SourceInequality(mapOf(left to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "right" to SourcePremise(SourceInequality(mapOf(right to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "sum" to SourcePremise(SourceInequality(mapOf(left to BigFraction.MINUS_ONE,
+                right to BigFraction.MINUS_ONE), BigFraction.ofLong(2).reciprocal().negated())),
+            "left-height" to SourcePremise(SourceInequality(mapOf(left to BigFraction.ONE,
+                height to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "right-height" to SourcePremise(SourceInequality(mapOf(right to BigFraction.ONE,
+                height to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "positive" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ofLong(2),
+                real to BigFraction.MINUS_ONE), BigFraction.ONE)),
+            "negative" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ofLong(-2),
+                real to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE)),
+        ), mapOf(real to BigFraction.ONE, height to BigFraction.ONE))
+        val params = TheoryParams(sourceCuts = false, sourceRefutationReuse = true)
+
+        val cached = LinearAuthorityInvocation(source, params, boundOrdered = true).use { it.run { _, _ -> } }
+        val propagated = LinearAuthorityInvocation(source, params.copy(sourceRefutationPropagation = true),
+            boundOrdered = true).use { it.run { _, _ -> } }
+
+        assertEquals(SourceValue.Rational(BigFraction.ofLong(2)),
+            assertIs<SourceClaim.Optimal>(assertNotNull(cached.terminal).claim).value)
+        val terminal = assertNotNull(propagated.terminal)
+        assertEquals(SourceValue.Rational(BigFraction.ofLong(2)), assertIs<SourceClaim.Optimal>(terminal.claim).value)
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
+        val stages = assertNotNull(propagated.stats.smt.completeSearchStages)
+        assertTrue(stages.getValue("numericalRefutationUnitDeductions") > 0L)
+        assertTrue(propagated.stats.smt.sourceLp.operations < cached.stats.smt.sourceLp.operations)
+        assertTrue(propagated.stats.openTheory.openTheoryDecisions < cached.stats.openTheory.openTheoryDecisions)
         assertEquals(0L, stages["numericalPendingLeaves"])
     }
 

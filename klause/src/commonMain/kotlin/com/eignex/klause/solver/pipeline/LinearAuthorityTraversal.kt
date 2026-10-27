@@ -284,7 +284,9 @@ internal class LinearAuthorityTraversal(
         return context.explainAtoms(SearchAtomPremise.All(premises), SearchDecision.Theory(conclusion))
     }
 
-    private fun integerAtom(context: SearchContext, coordinate: SourceCoordinate, threshold: BigFraction): SearchTheoryAtom? {
+    private fun integerAtom(
+        context: SearchContext, coordinate: SourceCoordinate, threshold: BigFraction,
+    ): SearchTheoryAtom? {
         if (cancellation() || budget.funding?.paused == true) return null
         budget.observe(conflictCertification = 1L)
         budget.funding?.charge(0L, 384L)
@@ -310,7 +312,7 @@ internal class LinearAuthorityTraversal(
 
     override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
         if (cancellation()) return SearchNodeDisposition.Indeterminate
-        if (pause() || useRefutationPropagation && budget.funding?.paused == true) return SearchNodeDisposition.Pause
+        if (pause() || (useRefutationPropagation && budget.funding?.paused == true)) return SearchNodeDisposition.Pause
         if (current.unit != null) {
             if (propagate(context) !is ComponentResult.Consistent) return SearchNodeDisposition.Indeterminate
             if (cancellation()) return SearchNodeDisposition.Indeterminate
