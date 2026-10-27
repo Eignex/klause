@@ -350,7 +350,8 @@ An internal optional coupled-section refutation runs before a completed Boolean 
 is issued. For each assigned multivariate predicate, the enumerator selects by
 dependency support the first assigned univariate equation of each of its coordinates.
 When every coordinate is covered, the equations' real roots are isolated exactly and the
-signed predicate is evaluated at every root combination. Failing at all of them, or a
+signed predicate is evaluated at every root combination, bisecting the isolating
+intervals before any exact algebraic evaluation. Failing at all of them, or a
 covering equation without real roots, refutes that support: the enumerator learns an
 exclusion over exactly those signed premises, valid under every Boolean prefix within
 its query, condition and snapshot. Retraction keeps the remaining Boolean alternatives,

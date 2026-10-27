@@ -3983,6 +3983,61 @@ five decreases and 54 increases. Ordinary mixed power rises from 48,240 to 49,99
 despite the direct fixed-query reduction. These costs retain the disabled default;
 the activation build is separate from the published implementation.
 
+### Coupled section refutations
+
+Matched `coupled=both` profiles at `d80419eb83` keep identical hash-pinned sources and
+settings, with the coupled option as the only per-arm difference and balanced charges
+in every trace. A pair is completed when both arms reach the same terminal result; a
+control that stops at its five-second deadline while the coupled arm finishes is
+counted separately and supplies no work saving.
+
+| Context | Pairs | Completed | Control stopped | Coupled conflicts / uses | Completed work, on / off |
+| --- | ---: | ---: | ---: | --- | ---: |
+| [Prefix controls 8745](https://lab.eignex.com/jobs/8745) | 16 | 15 | 1 | 16 / 31 | 644,109 / 57,410,906 |
+| [Prefix controls, cells on 8746](https://lab.eignex.com/jobs/8746) | 16 | 14 | 2 | 16 / 31 | 780,380 / 39,305,754 |
+| [Whole-family holdouts 8747](https://lab.eignex.com/jobs/8747) | 17 | 17 | 0 | 0 / 0 | 94,860 / 94,792 |
+| [Coupled-support holdouts 8748](https://lab.eignex.com/jobs/8748) | 12 | 9 | 3 | 9 / 42 | 82,894 / 4,320,173 |
+| [Raw originals 8749](https://lab.eignex.com/jobs/8749) | 9 | 7 | 0 | 0 / 0 | 848,620 / 848,599 |
+| [Prepared contexts 8750](https://lab.eignex.com/jobs/8750) | 12 | 9 | 0 | 0 / 0 | 3,549,519 / 3,548,943 |
+
+The degree-two, four-prefix UNSAT control learns one three-premise exclusion over
+`x1² = 2`, `x2² = 3` and `x1*x2 + x1 + x2 = 1` before its first region; regions,
+projected polynomials and lifted cells fall from 16/368/2,512 to zero, and native work
+from 6,546,367 to 4,661 units. Each SAT prefix control excludes the coupled branch and
+reaches its gate witness through one region instead of two. The checked-cell producer
+and feedback leave these outcomes unchanged.
+
+The twelve coupled holdouts were authored before any coupled result: three-coordinate,
+quartic and degree-sixteen covers, strict and weak rational boundaries, repeated roots,
+an exact singular algebraic zero, a rootless cover, a disjunctive cover that learns two
+exclusions through retraction, a gated strict alternative and an uncovered coordinate.
+Every coupled verdict matches the authored expectation. Quartic, degree-sixteen and
+disjunctive controls stop at their deadline. Feasible supports add work: 569 and 829
+units on the repeated-root and weak-boundary SAT cases, and 7,622 on the singular case,
+whose zero falls back to exact algebraic evaluation. The uncovered case attempts no
+support. Existing holdouts and raw originals contain no covered support; completed
+pairs add 68 and 21 units. Prepared lowering replaces products by auxiliaries, so none
+of the prepared contexts, including the three authored SAT controls, exposes a support.
+Interrupted original pairs keep different deadline frontiers.
+
+The prefix job ran on Mac/arm64 without hard limits; the others ran on Linux/amd64 with
+one CPU and a 4,608 MiB cgroup-v2 limit, final `memory.current` 1.65–1.94 GB and no OOM
+events. The coupled arm runs first in each ordered pair, so its elapsed time includes
+cold compilation and supports no throughput claim; completed prefix queries allocate
+238,711,816 against 21,210,918,248 bytes.
+
+[Ordinary source qualification 8751](https://lab.eignex.com/jobs/8751) compares the 70
+frozen 8675 identities at `d80419eb83` and the one-line activation build `185154fe70`,
+P1/seed 3/10 s with source validation. All paired source hashes, outcomes and CLI exits
+match. Each arm has 41 SAT, 25 native UNSAT, two UNKNOWN and two unchanged
+source-admission failures; 39 SAT witnesses per arm are independently valid (18 Dolmen
+0.10, 21 Z3 5.1.0), with the power-syntax checker gap and one unchecked DIMACS SAT.
+Native UNSAT has no independent certificate. Across 58 completed native pairs, `nraWork`
+rises by 8,820 units in 14 pairs and falls in none, the largest being 7,674 on the
+irrational shared-embedding UNSAT control. No ordinary source exposes the targeted
+support, so the option stays disabled by default; the activation build is not
+published.
+
 ### Polynomial Boolean bookkeeping
 
 The first-region control in `PolynomialBooleanRegionsTest` excludes normalization
