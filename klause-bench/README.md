@@ -3366,6 +3366,36 @@ mixed repair one gain against cold nonimprovements, but materially overspends it
 mixed overspends by up to 17,781. That pilot earns no equal-work admission credit;
 its repair-quality difference is absent with the adequate quantum in 8628.
 
+[Composed held-out capture 8658](https://lab.eignex.com/jobs/8658), at
+`31228ae7b3`, binds eight checked strong-walk centers across ClockTriplet, RCPSP,
+CarpetCutting and the assignment control, with seeds 7/19. All 640 semantic
+selections complete capture, including packing's Boolean auxiliaries; 397 are
+count-matched and 89 decline explicitly. Both conflict-acquisition modes contribute
+300 further count-matched scopes, with 27 actual supported-guidance consumptions.
+All 940 groups bind the same center, freedoms, complement pins and strict cutoff
+across five owners; every control-file hash matches its owner ledger.
+
+LS finds no strict gain. Cold CP finds ten and retained CP eight, all from conflict
+scopes and accepted by the native original-source checker. Retained CP has two
+better final points and two worse ones across the 851 supported matched queries;
+the other 847 tie. Its two deeper ClockTriplet points reach 162 rather than 163,
+while two missed gains retain 164. These four queries exhaust their fragments.
+Cold CP closes 719
+conditioned cutoffs and retained CP 745, with unfinished queries retained separately.
+Their actual node totals are 135,517 and 216,069; cumulative thread allocation is
+10.97 and 41.04 GB. Retained CP records no newly useful old-clause flag.
+Fragment overspend is at most one decision equivalent; containing work stays within
+200,000. Read-only explanation observations take 11.76 seconds across the CP ledgers,
+excluded from decision work but included in wall time. No completed native exhaustion
+is retagged by those observations. Mixed owners decline these global shapes.
+
+Conflict acquisition, selection and the producer's repairs retain separate costs;
+all 300 declared source-coordinate descents reach checked policy-local endpoints,
+which supply no basin or global proof claim. Walk witness/counter parity holds for
+all eight captures. These ordered diagnostics support neither unconditional retained
+CP replacement nor mixed admission on these finite globals. Witness acceptance and
+conditioned closures here are native evidence, without independent proof checking.
+
 [Scoped baseline 8448](https://lab.eignex.com/jobs/8448) runs `e805182280` on
 Linux/amd64 with the two hash-matched original modglob/rgn sources and refined
 centers from 8339. Runtime and dependency hashes, debug settings and 3 GiB Serial-GC
@@ -3424,6 +3454,20 @@ distinct from retained memory or RSS. Rgn stays at 82.2 in both walks with ident
 native work and selected-coordinate totals. Ordered diagnostic runs establish no
 uniform throughput gain, independent witness certification or source optimality;
 ordinary execution and stronger finite controls remain qualification gates.
+
+[Ordinary qualification 8569](https://lab.eignex.com/jobs/8569) preserves baseline
+`bdc5c225c9`, roles-only `3d5f0d3352` and input-pass `9023451bd9` arms with unchanged
+funding, five sources, both exact policies, default/companion execution and seeds
+1/2/3. Its completed 36-case modglob portion rejects production adoption. Ordinary
+default-mode baseline objectives are 20.7846/20.7846/20.7729M; roles-only gives
+21.4092/20.7846/20.7846M and the input pass 20.7846/21.2303/21.1986M. All nine
+finite witnesses pass independent solchecker. Three of six companion pairs improve
+from 35.1471 to 35.1131M; the other three tie, and default exact-mode points tie.
+The 27 refined witnesses have native source acceptance but unsupported independent
+checking of nonterminating rational values. The diagnostic gain from the saved
+center neither reaches the stronger finite controls nor compensates these ordinary
+losses. Source-role eligibility and the narrow pass require explicit diagnostic
+construction; production callers retain their ordinary proposal admission.
 
 [Fixed-pin replay 8339](https://lab.eignex.com/jobs/8339), at `b738c5d89a` on
 Mac/aarch64, retains four witnesses from [8302](https://lab.eignex.com/jobs/8302).
