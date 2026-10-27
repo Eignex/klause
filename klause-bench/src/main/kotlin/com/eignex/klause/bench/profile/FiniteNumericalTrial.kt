@@ -171,8 +171,8 @@ internal class FiniteNumericalTrial(
                         put("seed", coordinate(get(packet, "Seed") as SourceCoordinate))
                         put("outcome", get(packet, "Outcome").toString())
                         put("blockedRow", get(packet, "BlockedRow") as String?)
-                        put("members", JsonArray((get(packet, "Members") as List<*>).map { entry ->
-                            val member = checkNotNull(entry)
+                        put("members", JsonArray((get(packet, "Members") as List<*>).map { item ->
+                            val member = checkNotNull(item)
                             buildJsonObject {
                                 put("coordinate", coordinate(get(member, "Coordinate") as SourceCoordinate))
                                 put("plannedValue", get(member, "Value").toString())
