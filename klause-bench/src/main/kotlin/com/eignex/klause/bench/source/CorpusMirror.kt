@@ -62,8 +62,23 @@ internal class CorpusMirror(
                 connection.setRequestProperty("If-None-Match", "*")
                 val checksum = Base64.getEncoder().encodeToString(hash)
                 connection.setRequestProperty("x-amz-checksum-sha256", checksum)
-                connection.outputStream.use { output -> Files.newInputStream(archive).use { it.copyTo(output) } }
-                check(connection.responseCode in setOf(200, 201, 204, 412)) { "corpus mirror publication failed" }
+                val output = corpusTransport { connection.outputStream }
+                try {
+                    Files.newInputStream(archive).use { input ->
+                        val buffer = ByteArray(64 * 1024)
+                        while (true) {
+                            val count = input.read(buffer)
+                            if (count < 0) break
+                            corpusTransport { output.write(buffer, 0, count) }
+                        }
+                    }
+                } finally {
+                    corpusTransport { output.close() }
+                }
+                val status = corpusTransport { connection.responseCode }
+                if (status !in setOf(200, 201, 204, 412)) {
+                    throw CorpusUnavailable(java.io.IOException("corpus mirror publication unavailable (HTTP $status)"))
+                }
             } finally {
                 connection.disconnect()
             }

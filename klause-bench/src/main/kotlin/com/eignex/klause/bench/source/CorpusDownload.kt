@@ -22,7 +22,7 @@ internal class CorpusDownload(
             val partial = Files.createTempFile(parent, ".download-", ".partial")
             var connection: URLConnection? = null
             try {
-                connection = open(uri).apply {
+                connection = corpusTransport { open(uri) }.apply {
                     connectTimeout = 10_000
                     readTimeout = 30_000
                 }
@@ -30,8 +30,9 @@ internal class CorpusDownload(
                 Files.move(partial, destination.toPath(), ATOMIC_MOVE, REPLACE_EXISTING)
                 return
             } catch (failure: HttpFailure) {
-                if (failure.status !in RETRYABLE_STATUS || exhausted(attempt)) throw failure
-            } catch (failure: IOException) {
+                if (failure.status !in RETRYABLE_STATUS) throw failure
+                if (exhausted(attempt)) throw CorpusUnavailable(failure)
+            } catch (failure: CorpusUnavailable) {
                 if (exhausted(attempt)) throw failure
             } finally {
                 (connection as? HttpURLConnection)?.let { http ->
@@ -48,13 +49,27 @@ internal class CorpusDownload(
 
     private fun transfer(connection: URLConnection, partial: Path) {
         if (connection is HttpURLConnection) {
-            val status = connection.responseCode
+            val status = corpusTransport { connection.responseCode }
             if (status !in 200..299) throw HttpFailure(status)
         }
-        val bytes = connection.getInputStream().use { input -> Files.newOutputStream(partial).use { input.copyTo(it) } }
+        val input = corpusTransport { connection.getInputStream() }
+        var bytes = 0L
+        try {
+            Files.newOutputStream(partial).use { output ->
+                val buffer = ByteArray(64 * 1024)
+                while (true) {
+                    val count = corpusTransport { input.read(buffer) }
+                    if (count < 0) break
+                    output.write(buffer, 0, count)
+                    bytes += count
+                }
+            }
+        } finally {
+            corpusTransport { input.close() }
+        }
         val expected = connection.contentLengthLong
         if (expected >= 0 && bytes != expected) {
-            throw EOFException("corpus download ended after $bytes of $expected bytes")
+            throw CorpusUnavailable(EOFException("corpus download ended after $bytes of $expected bytes"))
         }
     }
 
