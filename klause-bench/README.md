@@ -3687,6 +3687,18 @@ small-fragment controls preserve LS/mixed overspends reaching 5,119/915 equivale
 no containing allowance is exceeded. These instrumented costs support exact-cutoff
 capability, without an equal-work speedup or owner-replacement qualification.
 
+[Primal capture 8796](https://lab.eignex.com/jobs/8796), at `c7082ceb70` on
+Linux/amd64, retains the first unresolved leaf of three rgn and eight modglob CP
+queries, including its fixed discrete assignment and reconstructed residual source
+rows. All eleven numerical proposals pass native original-source tolerance checks;
+unchanged-pin `LeafRealCompletion` returns eleven checked witnesses. None meets
+nominal exact feasibility. The repeated retained modglob leaf declines integer,
+rational and exact-point checks; exact continuation declines its dimension.
+Original-source acceptance supplies no missing completion certificate. Separate
+diagnostic replay costs are 33–108 ms and 11.3–12.3 MB thread allocation on rgn,
+241–369 ms and 50.4–72.7 MB on modglob. These are instrumented completion costs,
+excluded from owner allowances, without independent certification or throughput credit.
+
 Keep the existing owner admission. Small finite controls, held-out checked centers,
 ordinary finite execution and these original MPS overlaps support no uniform owner
 replacement. Retained LP state reduces repeated preparation in this MPS overlap;

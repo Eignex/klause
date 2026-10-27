@@ -8,6 +8,7 @@ import com.eignex.klause.backtrack.SearchOutcome
 import com.eignex.klause.backtrack.toBacktrackParams
 import com.eignex.klause.factor.scheduling.Diffn
 import com.eignex.klause.factor.table.Element
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SearchHints
 import com.eignex.klause.localsearch.DefinitionalSweep
@@ -45,6 +46,7 @@ import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.withPresolve
 import com.eignex.klause.solver.validation.FiniteSourceAcceptance
+import com.eignex.klause.solver.validation.LinearSourceCheck
 import com.eignex.klause.solver.validation.permitsToleranceOptimum
 import com.eignex.klause.util.Cancellation
 import kotlin.time.Duration
@@ -600,18 +602,17 @@ internal fun FinitePipeline.solve(
     } else {
         FiniteSourceAcceptance(
             { sample ->
-                linearSource.check(sample, stop) is com.eignex.klause.solver.validation.LinearSourceCheck.Accepted &&
+                linearSource.check(sample, stop) is LinearSourceCheck.Accepted &&
                     request.toleranceCheck?.invoke(sample) != false
             },
             permitsToleranceOptimum =
                 permitsToleranceOptimum &&
                     (request.toleranceCheck == null || request.toleranceCheck.permitsToleranceOptimum()),
             objective = if (linearSource.view.source.objective == null) null else { sample ->
-                val checked = linearSource.check(sample, stop) as?
-                    com.eignex.klause.solver.validation.LinearSourceCheck.Accepted
+                val checked = linearSource.check(sample, stop) as? LinearSourceCheck.Accepted
                 checked?.witness?.objective?.let { value ->
                     val scaled = value * linearSource.view.objectiveScale
-                    if (linearSource.view.source.objective.sense == com.eignex.klause.ir.ObjectiveSense.MAXIMIZE)
+                    if (linearSource.view.source.objective.sense == ObjectiveSense.MAXIMIZE)
                         scaled.negated() else scaled
                 }
             },

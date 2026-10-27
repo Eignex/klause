@@ -1435,7 +1435,7 @@ internal class ResumableMinimize(
         override val lifecycle: SearchRunLifecycle get() = this
 
         override fun onResume(context: SearchContext): SearchRunDisposition {
-            if (pendingRealLeaf != null) return SearchRunDisposition.Continue
+            if (pendingRealLeaf != null || pendingRealResult != null) return SearchRunDisposition.Continue
             boundExchange.applySharedFloor()
             val local = incumbents.current()
             if (params.valueSelector is SolutionGuided && (local != null || lpEngine.params.lpPlan.bounding)) {
