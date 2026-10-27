@@ -41,6 +41,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 internal object RepairOwnerReplay {
     private const val PIPELINE = "com.eignex.klause.solver.pipeline."
+    val DEFAULT_OWNERS = listOf("ls", "cp-cold", "cp-retained", "mixed-cold", "mixed-retained")
 
     private data class Scope(
         val id: Int, val center: Sample, val freedBools: IntArray, val freedInts: IntArray,
@@ -53,6 +54,7 @@ internal object RepairOwnerReplay {
     private data class Outcome(
         val sample: Sample?, val reason: TerminationReason?, val stats: SolveStats,
         val preparationNs: Long = 0L, val bound: Any? = null, val pauses: Long = 0L,
+        val structured: JsonObject? = null,
     )
 
     private data class ClauseUsage(
@@ -64,9 +66,15 @@ internal object RepairOwnerReplay {
         source: BakedProblem, inputs: IntArray, file: File, seed: Long, allowance: Long = 100_000L,
         fragmentAllowance: Long = 2_000L,
         sourceCheck: ((Sample, Cancellation) -> PointCheck)? = null, mixedContext: SourceProofContext? = null,
-        sourceMaximize: Boolean = false,
+        sourceMaximize: Boolean = false, structured: List<StructuredInner> = emptyList(),
+        descent: RepairDescent? = null, ownerSequence: List<String>? = null,
     ) {
+        val owners = ownerSequence ?: (DEFAULT_OWNERS.take(1) + structured.map(StructuredInner::owner) +
+            DEFAULT_OWNERS.drop(1))
         require(allowance > 0 && fragmentAllowance > 0)
+        require(owners.isNotEmpty() && owners.distinct().size == owners.size)
+        val inner = structured.associateBy(StructuredInner::owner)
+        require(owners.all { it in DEFAULT_OWNERS || it in inner })
         val bean = ManagementFactory.getThreadMXBean() as ThreadMXBean
         val thread = Thread.currentThread().threadId()
         val setupStarted = System.nanoTime()
@@ -84,8 +92,7 @@ internal object RepairOwnerReplay {
                 ?.size != problem.numRealVars
         }) {
             file.bufferedWriter().use { writer ->
-                for (id in entries.indices) for (owner in listOf("ls", "cp-cold", "cp-retained",
-                    "mixed-cold", "mixed-retained")) {
+                for (id in entries.indices) for (owner in owners) {
                     writer.appendLine(buildJsonObject {
                         put("controlIndex", id)
                         put("owner", owner)
@@ -138,9 +145,12 @@ internal object RepairOwnerReplay {
             put("threadBytes", bean.getThreadAllocatedBytes(thread) - setupAllocation)
             put("containingOwnerAllowanceStarted", false)
             put("independentWitnessCheck", false)
+            put("owners", JsonArray(owners.map(::JsonPrimitive)))
+            put("structuredOwners", JsonArray(structured.map(StructuredInner::preparation)))
+            put("postRepairDescent", descent != null)
         }.toString())
         file.bufferedWriter().use { writer ->
-            for (kind in listOf("ls", "cp-cold", "cp-retained", "mixed-cold", "mixed-retained")) {
+            for (kind in owners) {
                 val budget = NodeBudget(allowance)
                 val lifetime = Cancellation.after(10_000.milliseconds)
                 var previousCutoff: BigFraction? = null
@@ -191,6 +201,8 @@ internal object RepairOwnerReplay {
                             budget.exhausted() -> Outcome(null, TerminationReason.BudgetExhausted, before)
                             unavailable != null -> Outcome(null, TerminationReason.Unsupported, before)
                             kind == "ls" -> local(problem, objective, scope, stop, budget, seed, fragmentAllowance)
+                            kind in inner -> structuredLocal(problem, objective, scope, stop, budget, seed,
+                                fragmentAllowance, inner.getValue(kind))
                             kind.startsWith("cp") -> {
                                 val opened = System.nanoTime()
                                 native = retained ?: call(BacktrackSolver(problem), "openRepair", objective,
@@ -276,6 +288,9 @@ internal object RepairOwnerReplay {
                             outcome.reason == null -> "pause"
                             else -> "unavailable"
                         }
+                        val continued = if (!improving) null else
+                            descent?.continueFrom(problem, objective, checkNotNull(sample), seed, kind, scope.id,
+                                ::accepted)
                         writer.appendLine(buildJsonObject {
                             put("centerId", scope.id)
                             put("owner", kind)
@@ -352,6 +367,8 @@ internal object RepairOwnerReplay {
                             put("retainedClauseUses", reuse(usageBefore, usageAfter))
                             put("statsBefore", NumericalResidualProfile.json(before))
                             put("statsAfter", NumericalResidualProfile.json(outcome.stats))
+                            put("structuredInner", outcome.structured ?: JsonNull)
+                            put("postRepairDescent", continued ?: JsonNull)
                         }.toString())
                         writer.flush()
                     }
@@ -386,6 +403,14 @@ internal object RepairOwnerReplay {
             is MinimizeResult.Unbounded -> TerminationReason.Unsupported
             else -> TerminationReason.SearchExhausted
         }, result.stats, preparation)
+    }
+
+    private fun structuredLocal(problem: BakedProblem, objective: LinearObjective, scope: Scope, stop: Cancellation,
+        budget: NodeBudget, seed: Long, allowance: Long, inner: StructuredInner,
+    ): Outcome {
+        val run = inner.repair(problem, objective, scope.center, scope.pins, scope.freedBools, scope.freedInts, stop,
+            budget, seed, allowance)
+        return Outcome(run.sample, run.reason, run.stats, run.preparationNs, structured = run.report)
     }
 
     private fun complete(owner: Any, scope: Scope, stop: Cancellation, preparation: Long, allowance: Long): Outcome {

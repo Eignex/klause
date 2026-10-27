@@ -130,6 +130,7 @@ internal class LocalSearchEngine(
         strategy.schedule.restart ?: restartPolicy
     private var preparedBoardRestart: PreparedBoardRestart? = null
     internal var repairTrace: RepairTrace? = null
+    internal var compoundTally: CompoundTally? = null
     private var tracedRestart: RepairTrace.Attempt? = null
 
     private fun traceStart(state: LocalSearchState, anchor: Sample?, seed: Long?, owner: String) {
@@ -265,6 +266,7 @@ internal class LocalSearchEngine(
         timing: LocalSearchPhaseTimer?,
         onPause: () -> Unit,
     ) {
+        if (move is Move.Compound) state.compoundTally?.recordApplied()
         if (checkpoint == null || !state.hasSteppedInvariants) {
             timing.inPhase("application") { state.apply(move) }
             return
@@ -319,6 +321,7 @@ internal class LocalSearchEngine(
             LocalSearchState.preparation(model, Random(seed), effectiveAssumptions, prepared), params, checkpoint,
         )
         state.phaseTimer = timing
+        state.compoundTally = compoundTally
         state.violationSoftCap = params.violationSoftCap
         state.weights.normalizeWeightsByClass = params.normalizeWeightsByClass
         installInvariants(state, params, checkpoint)

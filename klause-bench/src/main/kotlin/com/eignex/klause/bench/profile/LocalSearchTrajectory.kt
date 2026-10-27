@@ -82,6 +82,7 @@ internal object LocalSearchTrajectory {
             "sliceMillis", "sliceWork", "greedy", "repairs", "controls", "center", "source64", "sourceGzip64",
             "channel", "presolve",
             "ownerReplay", "ownerWork", "ownerFragmentWork", "ownerSelectors", "selectorsFromWalk", "ownerConflicts",
+            "ownerRecipes", "owners",
         )
         require(options.keys.containsAll(required) && options.keys.all {
             it in required || it in optional || it == "selectors"
@@ -134,6 +135,10 @@ internal object LocalSearchTrajectory {
         val ownerSelectors = options["ownerSelectors"]?.toBooleanStrict() ?: false
         val selectorsFromWalk = options["selectorsFromWalk"]?.toBooleanStrict() ?: false
         val ownerConflicts = options["ownerConflicts"]?.toBooleanStrict() ?: false
+        val ownerRecipes = options["ownerRecipes"]?.split(',').orEmpty()
+        val ownerSequence = options["owners"]?.split(',')
+        require((ownerRecipes.isEmpty() && ownerSequence == null) || ownerReplay || ownerSelectors)
+        ownerRecipes.forEach(::trajectoryRecipe)
         val sourceCheck = if (repairCapture) parsed.problem.bake() else null
         require(!exactControls || repairCapture)
         require(!selectors || repairCapture)
@@ -231,12 +236,23 @@ internal object LocalSearchTrajectory {
             val workingObjective = prepared.objective
             require(initial == null || (initial.numIntVars == problem.numIntVars &&
                 prepared.reconstruct(initial) == initial)) { "explicit center needs an unchanged coordinate frame" }
+            val hintsStarted = System.nanoTime()
             val hints = heuristicHints(invocation, prepared, stop)
             val maintained = hints?.let { getter(it, "getSweep") as DefinitionalSweep? }
             val sweep = variant.channel.sweep(maintained, stop)
+            val gradient = hints?.let { getter(it, "getObjective") as IncrementalObjective? }
+            val hintsNanos = System.nanoTime() - hintsStarted
             val coordinates = trajectoryCoordinates(invocation, prepared, stop)
             check(!stop())
-            val gradient = hints?.let { getter(it, "getObjective") as IncrementalObjective? }
+            val structured = ownerRecipes.map { name ->
+                StructuredInner.prepare(name, { trajectoryRecipe(name) }, problem, sweep, gradient, buildJsonObject {
+                    put("definitionHintsSweepAndGradientNs", hintsNanos)
+                    put("reusedFromAcquisitionWalk", true)
+                    put("channel", variant.channel.name)
+                })
+            }
+            val descent = if (structured.isEmpty()) null else
+                RepairDescent(sweep, out.resolve("post-repair-descents-$rewrite"))
             out.resolve("model-$rewrite.json").writeText(buildJsonObject {
                 put("preparationNanos", System.nanoTime() - preparationStarted)
                 put("objective", workingObjective.toString())
@@ -279,7 +295,8 @@ internal object LocalSearchTrajectory {
                 problem, checkNotNull(workingObjective),
                 prepared, checkNotNull(sourceCheck), sourceInputs, out.resolve("owners-selectors.jsonl"), seed,
                 options["ownerWork"]?.toLong() ?: 200_000L,
-                options["ownerFragmentWork"]?.toLong() ?: 2_000L)
+                options["ownerFragmentWork"]?.toLong() ?: 2_000L,
+                structured = structured, descent = descent, ownerSequence = ownerSequence)
             var baseline: List<Any?>? = null
             var walkCenter: Sample? = null
             var walkNanos = 0L
@@ -340,17 +357,7 @@ internal object LocalSearchTrajectory {
                             }
                         }
                     }
-                    val recipeName = options.getValue("recipe")
-                    val selected = when (recipeName) {
-                        "source-coordinate-descent" -> LocalSearchRecipe(recipeName,
-                            SourceDrivenStrategy(sources = listOf(ConfiguredSource(ObjectiveSeed())),
-                                acceptance = AcceptanceRule.GreedyDescent, feasibleDescent = FeasibleDescent.SelfOwned))
-                        "cbls-extended/fixed" -> LocalSearchCatalog.byLabel("cbls-plateau/fixed").withSources {
-                            it + ConfiguredSource(SatisfiedStructured.sampledExtended(8))
-                        }
-                        else -> LocalSearchCatalog.byLabel(recipeName)
-                    }
-                    val recipe = selected.withSources {
+                    val recipe = trajectoryRecipe(options.getValue("recipe")).withSources {
                         listOf(ConfiguredSource(recorder)) + it
                     }
                     val solver = LocalSearchSolver(
@@ -429,7 +436,8 @@ internal object LocalSearchTrajectory {
                             problem, checkNotNull(workingObjective), prepared, checkNotNull(sourceCheck), sourceInputs,
                             out.resolve("owners-$rewrite.jsonl"), seed,
                             options["ownerWork"]?.toLong() ?: 100_000L,
-                            options["ownerFragmentWork"]?.toLong() ?: 2_000L)
+                            options["ownerFragmentWork"]?.toLong() ?: 2_000L,
+                            structured = structured, descent = descent, ownerSequence = ownerSequence)
                     }
                     if (!walk && captured != null) {
                         val initial = checkNotNull(captured)
@@ -505,7 +513,8 @@ internal object LocalSearchTrajectory {
                         repairObjective, prepared, sourceModel, sourceInputs,
                         out.resolve("owners-selectors.jsonl"), seed,
                         options["ownerWork"]?.toLong() ?: 200_000L,
-                        options["ownerFragmentWork"]?.toLong() ?: 2_000L)
+                        options["ownerFragmentWork"]?.toLong() ?: 2_000L,
+                        structured = structured, descent = descent, ownerSequence = ownerSequence)
                     if (ownerConflicts) for (mode in listOf("source-root", "sampled-fragment")) {
                         val directory = out.resolve("conflict-$mode").apply { mkdirs() }
                         val selections = directory.resolve("selections.jsonl")
@@ -517,7 +526,8 @@ internal object LocalSearchTrajectory {
                         RepairOwnerReplay.replay(selections, problem, repairObjective, prepared, sourceModel,
                             sourceInputs, directory.resolve("owners.jsonl"), seed,
                             options["ownerWork"]?.toLong() ?: 200_000L,
-                            options["ownerFragmentWork"]?.toLong() ?: 2_000L)
+                            options["ownerFragmentWork"]?.toLong() ?: 2_000L,
+                            structured = structured, descent = descent, ownerSequence = ownerSequence)
                     }
                 }
             }
@@ -626,6 +636,16 @@ internal object LocalSearchTrajectory {
             check(completed == true && position == order.size)
             capture(order.size, -1)
         }
+    }
+
+    private fun trajectoryRecipe(name: String): LocalSearchRecipe = when (name) {
+        "source-coordinate-descent" -> LocalSearchRecipe(name,
+            SourceDrivenStrategy(sources = listOf(ConfiguredSource(ObjectiveSeed())),
+                acceptance = AcceptanceRule.GreedyDescent, feasibleDescent = FeasibleDescent.SelfOwned))
+        "cbls-extended/fixed" -> LocalSearchCatalog.byLabel("cbls-plateau/fixed").withSources {
+            it + ConfiguredSource(SatisfiedStructured.sampledExtended(8))
+        }
+        else -> LocalSearchCatalog.byLabel(name)
     }
 
     internal fun getter(owner: Any, name: String): Any? = owner.javaClass.methods.single {

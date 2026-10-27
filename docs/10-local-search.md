@@ -102,8 +102,11 @@ within the existing resample window. The schedule
 axis gates the plateau-escape sources on its stall signal.
 
 Every source closes its candidates through the ordinary move sink, which applies
-pin, definition and implicit-owner filters. The driver then applies configuration
-and tabu filters, scoring and acceptance.
+pin, definition and implicit-owner filters. A compound touching a pin is rejected
+whole; parts on defined or foreign-owned coordinates are dropped. The driver then
+applies configuration and tabu filters, scoring and acceptance. An optional internal
+tally counts offered, pin-rejected, trimmed, admitted and committed compounds for
+diagnostic consumers; it draws no random values and changes no candidate.
 
 ### Scoring
 
