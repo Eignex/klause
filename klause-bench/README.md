@@ -1067,17 +1067,38 @@ source parsing/preparation and final trace serialization. Thread allocation is a
 when unsupported; it measures cumulative Java allocation rather than retained or peak
 physical memory. These instrumented, ordered arms do not establish warmed throughput.
 
-[Prefix controls 8632](https://lab.eignex.com/jobs/8632), at `41b0b686cb`, preserve
-ten native SAT, five native UNSAT and one deadline stop per arm. Six cases bypass
-twenty unary evaluations, with five repeated uses and no cross-owner reuse. The first
-regional trace rejects candidate zero using the checked open cell between the roots
-of `x1² = 2`, retaining its signed premises, condition, snapshot and reduction owner.
-The fifteen completed pairs add 244 containing work units in total; the stopped pair
-has different deadline frontiers and supplies no matched-work cost comparison.
-These are numeric-family reuses with zero partial-sign conflicts, not Boolean clauses
-or additional certified cells. SAT assignments in this diagnostic lack independent
-source-check receipts. These controls establish bounded reuse, without a speedup or
-source-verdict qualification claim.
+Matched profiles at `ba5b2b7c35` use the merged checked producer, identical hash-pinned
+sources and settings, and feedback as the only per-arm option. All 54 pairs match
+native outcomes and caller charges balance. The 48 completed pairs match projection,
+lifted-cell, regional and partial-sign-exclusion counts. Six deadline pairs retain
+their different search frontiers and are excluded from completed-work comparisons.
+
+| Context | Pairs | Native SAT / UNSAT / stopped per arm | Uses / numeric atom uses / cross-owner uses | Completed work delta |
+| --- | ---: | --- | --- | ---: |
+| [Unrelated-prefix controls 8676](https://lab.eignex.com/jobs/8676) | 16 | 10 / 5 / 1 | 68 / 48 / 28 | +81,620 |
+| [Whole-family holdouts 8677](https://lab.eignex.com/jobs/8677) | 17 | 12 / 5 / 0 | 10 / 10 / 0 | +4,189 |
+| [Raw originals 8678](https://lab.eignex.com/jobs/8678) | 9 | 3 / 4 / 2 | 0 / 0 / 0 | +115 |
+| [Prepared contexts 8679](https://lab.eignex.com/jobs/8679) | 12 | 5 / 4 / 3 | 8 / 8 / 0 | +12,128 |
+
+In the degree-two, four-prefix-pair UNSAT control, a mandatory source predicate
+`x1² = 2` supplies the checked open cell `(-sqrt(2), sqrt(2))`. Candidate zero is
+rejected under distinct regional owners and unrelated Boolean premises, with the
+same source, condition and snapshot. Twelve numeric atom checks consume retained
+cells, nine across owners, while the producer reaches its 16,384-unit allowance.
+Both arms visit sixteen regions, project 368 polynomials and lift 2,512 cells with
+zero partial-sign conflicts or exclusions. The hint avoids the same atom evaluation;
+it creates neither a Boolean clause nor a new certificate or candidate.
+
+The strict irrational-boundary holdout saves 54 charged units, but aggregate cost
+increases in every context. Prepared Economics consumes eight cells and preserves
+native SAT while adding 2,294 units; its ordered query allocations are 16,670,856
+versus 13,381,016 bytes, and elapsed times are 216,774,623 versus 104,457,428 ns.
+All four jobs retain one-core, 4,608-MiB hard resource receipts with no OOM events.
+These instrumented observations establish bounded numeric reuse, without supporting
+default activation or a throughput improvement. Both private options remain off.
+Strict, disequal, singular and degree-decline SAT alternatives retain their outcomes.
+Component SAT assignments lack independent source-check receipts; native UNSAT is
+not an independent certificate, and prepared arrays supply no original-source map.
 
 ### Element hull admission capture
 
