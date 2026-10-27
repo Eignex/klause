@@ -3375,7 +3375,9 @@ count-matched and 89 decline explicitly. Both conflict-acquisition modes contrib
 All 940 groups bind the same center, freedoms, complement pins and strict cutoff
 across five owners; every control-file hash matches its owner ledger.
 
-LS finds no strict gain. Cold CP finds ten and retained CP eight, all from conflict
+The inner LS repair uses its ordinary repair recipe, distinct from the outer
+`cbls-extended/fixed` acquisition walk. LS finds no strict gain. Cold CP finds ten
+and retained CP eight, all from conflict
 scopes and accepted by the native original-source checker. Retained CP has two
 better final points and two worse ones across the 851 supported matched queries;
 the other 847 tie. Its two deeper ClockTriplet points reach 162 rather than 163,
@@ -3395,6 +3397,34 @@ which supply no basin or global proof claim. Walk witness/counter parity holds f
 all eight captures. These ordered diagnostics support neither unconditional retained
 CP replacement nor mixed admission on these finite globals. Witness acceptance and
 conditioned closures here are native evidence, without independent proof checking.
+
+[Merged-proposal MPS comparison 8697](https://lab.eignex.com/jobs/8697), at
+`c6f1b10a5a`, consumes four actual source-role guided pairs from the checked modglob
+35.1471M center. Each frees x201 with one of x251/x223/x221/x255; original real
+backings x1/x3 and the full continuous residual stay free under every source row.
+All four groups match centers, freedoms, complement pins and strict cutoffs across
+five owners, with no overspend at the adequate 200,000-equivalent fragment quantum
+and 1-million containing allowance. Native LP funding retains its existing limits.
+
+Both CP owners decline the exact cutoff because the retained CP double contract
+cannot represent it. LS exhausts all four fragments without a point. Cold and
+retained mixed repair each find two checked gains, to 35.1131M and 33.5240M, and
+close the other two conditioned cutoffs. Gain queries remain incomplete and do not
+refute their initial cutoffs. Cold mixed repair spends 72,987,226 funded LP work
+with four preparations and six reuses; retained repair spends 37,396,124 with one
+preparation and nine reuses. Both perform ten checks, certify ten bounds and close
+seven leaves. Modeled allocation is 204,023,371 versus 151,049,699 bytes, separate
+from cumulative thread allocation of 787,605,896 versus 720,080,344 bytes or RSS.
+These are ordered instrumented queries with native original-source checks, without
+independent witness/proof certification or a throughput claim.
+
+Keep the existing owner admission. Small finite controls, held-out checked centers,
+ordinary finite execution and these original MPS overlaps support no uniform owner
+replacement. Retained LP state reduces repeated preparation in this MPS overlap;
+retained CP has both better and worse bounded endpoints, and ordinary source-input
+proposal promotion fails qualification. Reject a whole-family winner rule based on
+freedom or auxiliary counts. Unavailable owners, unfinished repairs and conditioned
+closures retain their local scopes and supply no global source proof.
 
 [Scoped baseline 8448](https://lab.eignex.com/jobs/8448) runs `e805182280` on
 Linux/amd64 with the two hash-matched original modglob/rgn sources and refined
@@ -3458,7 +3488,7 @@ ordinary execution and stronger finite controls remain qualification gates.
 [Ordinary qualification 8569](https://lab.eignex.com/jobs/8569) preserves baseline
 `bdc5c225c9`, roles-only `3d5f0d3352` and input-pass `9023451bd9` arms with unchanged
 funding, five sources, both exact policies, default/companion execution and seeds
-1/2/3. Its completed 36-case modglob portion rejects production adoption. Ordinary
+1/2/3. Its 36 modglob cases reject production adoption. Ordinary
 default-mode baseline objectives are 20.7846/20.7846/20.7729M; roles-only gives
 21.4092/20.7846/20.7846M and the input pass 20.7846/21.2303/21.1986M. All nine
 finite witnesses pass independent solchecker. Three of six companion pairs improve
@@ -3468,6 +3498,17 @@ checking of nonterminating rational values. The diagnostic gain from the saved
 center neither reaches the stronger finite controls nor compensates these ordinary
 losses. Source-role eligibility and the narrow pass require explicit diagnostic
 construction; production callers retain their ordinary proposal admission.
+
+The full cohort completes all 180 feasible outcomes: 153 witnesses pass independent
+solchecker and the same 27 refined modglob witnesses remain unsupported. Across
+60 matched pairs per treatment, the input pass has four wins, five losses and 51
+ties; roles alone have one win, six losses and 53 ties, using an absolute objective
+comparison tolerance of 1e-6. Losses include ordinary exact rgn and bell3a as well
+as modglob. All 72 native p0033/gr4x6 optimum labels agree across arms; their proofs
+are not independently certified. Original source hashes, Mac/aarch64 runtime,
+options and non-solver dependency hashes match; each ref has one build fingerprint,
+and compiler identity is unreported. This time-bounded cohort supports the
+production-admission rejection without a uniform throughput or source-optimum claim.
 
 [Fixed-pin replay 8339](https://lab.eignex.com/jobs/8339), at `b738c5d89a` on
 Mac/aarch64, retains four witnesses from [8302](https://lab.eignex.com/jobs/8302).
