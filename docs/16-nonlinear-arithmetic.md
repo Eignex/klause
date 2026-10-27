@@ -369,7 +369,19 @@ intervals before any exact algebraic evaluation. Failing at all of them, or a
 covering equation without real roots, refutes that support: the enumerator learns an
 exclusion over exactly those signed premises, valid under every Boolean prefix within
 its query, condition and snapshot. Retraction keeps the remaining Boolean alternatives,
-and the exclusion never enters shared learning.
+and the exclusion never enters shared learning. After individual checks, connected
+covered predicates are checked as a conjunction over one streamed product of root
+sets. Each common combination must fail at least one predicate before a joint
+exclusion is learned; individual witnesses need not agree.
+
+If direct predicates expose no refutation, a private support view eliminates total
+equational graphs with nonzero rational pivots. Each rewritten predicate retains
+its original signed premise and all definitions used by its substitutions. Selection,
+rewriting, root isolation and checking share the same containing allowance. The
+view neither mutates the query snapshot nor reconstructs source coordinates; its
+exclusion refers to the active encoded premises, including assigned definitions.
+Activation and frontend attribution remain with the prepared pipeline. Variable
+coefficients cannot supply total substitutions, including on nullified fibres.
 Incomplete coverage, an already attempted support, a representation decline or the
 exhausted query-wide allowance of 16,384 units learns nothing and keeps the complete
 path; an enclosing stop remains terminal. Predicates admit the checked-cell term, degree

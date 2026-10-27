@@ -239,6 +239,37 @@ class PolynomialBooleanRegionsTest {
     }
 
     @Test
+    fun `a joint encoded exclusion retains the guarded alternative after retraction`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const gate Bool) (declare-const a Bool) (declare-const b Bool) " +
+                "(declare-const x Real) (declare-const y Real) (declare-const z Real) " +
+                "(declare-const u Real) (declare-const v Real) (declare-const w Real) " +
+                "(assert (and (or a b) (or gate (and (= u (* x x)) (= u 1) " +
+                "(= v (* y y)) (= v 1) (= w (* z z)) (= w 1) " +
+                "(= (* x y) 1) (= (* y z) 1) (= (* x z) (- 1))))))",
+        )
+        val arithmetic = PolynomialArithmetic()
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+        val singleProgress = PolynomialQueryProgress()
+        val single = PolynomialCoupledSections(QfNraWork(QfNraParams()), PolynomialLimits(), joint = false)
+        val progress = PolynomialQueryProgress()
+        val coupled = PolynomialCoupledSections(QfNraWork(QfNraParams()), PolynomialLimits())
+
+        val control = formula.booleanRegions(arithmetic, singleProgress, coupled = single)
+            .asSequence().filterNotNull().toList()
+        val regions = formula.booleanRegions(arithmetic, progress, coupled = coupled)
+            .asSequence().filterNotNull().toList()
+
+        assertTrue(control.any { it.bools[0] != true })
+        assertEquals(0L, singleProgress.coupledConflicts)
+        assertTrue(regions.isNotEmpty())
+        assertTrue(regions.all { it.bools[0] == true })
+        assertEquals(1L, progress.coupledConflicts)
+        assertEquals(9L, progress.coupledConflictPremises)
+        assertTrue(progress.coupledExclusionUses > 0)
+    }
+
+    @Test
     fun `coupled section exclusions refute every unrelated Boolean prefix before a region`() {
         for (length in listOf(1, 2, 4)) {
             val declarations = (0 until length).joinToString(" ") {

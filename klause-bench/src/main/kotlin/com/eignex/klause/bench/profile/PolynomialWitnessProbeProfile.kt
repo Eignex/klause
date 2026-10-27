@@ -74,7 +74,8 @@ internal object PolynomialWitnessProbeProfile {
         private val conditionType = Class.forName(prefix + "PolynomialCondition")
         private val queryType = Class.forName(prefix + "QfNraQuery")
         private val params = paramsType.getConstructor(Cancellation::class.java, Long::class.javaObjectType, limitsType,
-            Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType)
+            Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType,
+            Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType)
         private val condition = conditionType.getConstructor(Map::class.java, Map::class.java, Map::class.java)
         private val query = queryType.getConstructor(
             PolynomialRealFormula::class.java,
@@ -148,6 +149,8 @@ internal object PolynomialWitnessProbeProfile {
                 false,
                 false,
                 false,
+                true,
+                true,
             )
             val preparedQuery = query.newInstance(
                 sourceFormula,

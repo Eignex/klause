@@ -1139,6 +1139,14 @@ capped at sixteen premises with a completeness flag. Compare region, projection 
 lifting counts and total work alongside outcomes; supports and combinations alone are
 not efficacy.
 
+`coupled=matrix` also saves `single-trace.json` with both support preparation and
+joint checking disabled, `prepared-support-trace.json` with preparation alone, and
+`joint-trace.json` with joint checking alone. The main trace enables both; the
+coupled control disables the whole option. These controls use the same sources,
+limits and sign checker. `PreparedSupports` and `JointSupports` count attempts,
+not consumed deductions. Explanations preview active encoded premises in their
+current snapshot; prepared identifiers supply no original-coordinate mapping.
+
 ### Element hull admission capture
 
 `bench.profile.ElementHullProfile` takes `suite=ID problem=NAME sha256=HEX` for a

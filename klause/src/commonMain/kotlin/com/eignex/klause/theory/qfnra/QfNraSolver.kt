@@ -33,6 +33,8 @@ internal data class QfNraParams(
     val cellRefinement: Boolean = false,
     val cellFeedback: Boolean = false,
     val coupledSections: Boolean = false,
+    val coupledPreparation: Boolean = true,
+    val coupledJoint: Boolean = true,
 ) {
     init { require(maximumWork == null || maximumWork >= 0) }
 }
@@ -114,7 +116,8 @@ internal class QfNraQuery(
         }
     } else null
     private val coupledSections = if (params.coupledSections) {
-        PolynomialCoupledSections(work, params.polynomialLimits)
+        PolynomialCoupledSections(work, params.polynomialLimits,
+            prepareSupports = params.coupledPreparation, joint = params.coupledJoint)
     } else null
     val coupledStats: PolynomialCoupledStats? get() = coupledSections?.stats
     var coupledConflictObserver: ((List<PolynomialAtom>) -> Unit)? = null

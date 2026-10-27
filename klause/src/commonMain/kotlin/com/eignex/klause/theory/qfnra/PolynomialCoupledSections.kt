@@ -17,6 +17,8 @@ internal data class PolynomialCoupledStats(
     val repeatedSupports: Long = 0,
     val declined: Long = 0,
     val work: Long = 0,
+    val preparedSupports: Long = 0,
+    val jointSupports: Long = 0,
 )
 
 // Every real point satisfying univariate equations lies in the product of their root sets, so a coupled
@@ -26,6 +28,8 @@ internal class PolynomialCoupledSections(
     private val parent: QfNraWork,
     limits: PolynomialLimits,
     private val maximumWork: Long = MAX_COUPLED_WORK,
+    private val prepareSupports: Boolean = true,
+    private val joint: Boolean = true,
 ) {
     private var supportCount = 0L
     private var combinationCount = 0L
@@ -33,8 +37,11 @@ internal class PolynomialCoupledSections(
     private var repeatedCount = 0L
     private var declineCount = 0L
     private var spentWork = 0L
+    private var preparedCount = 0L
+    private var jointCount = 0L
     val stats: PolynomialCoupledStats get() = PolynomialCoupledStats(
         supportCount, combinationCount, conflictCount, repeatedCount, declineCount, spentWork,
+        preparedCount, jointCount,
     )
     val available: Boolean get() = spentWork < maximumWork
     private var parentStopped = false
@@ -57,7 +64,14 @@ internal class PolynomialCoupledSections(
         if (!available || required.size > MAX_COUPLED_PREMISES) return null
         return try {
             arithmetic.step()
-            refuteSupports(required, identities, checked)
+            val direct = required.mapIndexed { index, atom ->
+                arithmetic.step()
+                PolynomialCoupledSupport(atom, setOf(index))
+            }
+            refuteSupports(direct, identities, checked, prepared = false)?.let { return it }
+            if (!prepareSupports) return null
+            val prepared = prepareCoupledSupport(direct, arithmetic) ?: return null
+            refuteSupports(prepared, identities, checked, prepared = true)
         } catch (stop: PolynomialInterrupted) {
             if (parentStopped) throw stop
             declineCount++
@@ -69,14 +83,17 @@ internal class PolynomialCoupledSections(
     }
 
     private fun refuteSupports(
-        required: List<PolynomialAtom>,
+        required: List<PolynomialCoupledSupport>,
         identities: List<Long>,
         checked: MutableSet<List<Long>>,
+        prepared: Boolean,
     ): List<Int>? {
         val sections = HashMap<Int, Int>()
         val equations = arrayOfNulls<UnaryCellPolynomial>(required.size)
-        for ((index, atom) in required.withIndex()) {
+        val candidates = ArrayList<Int>()
+        for ((index, entry) in required.withIndex()) {
             arithmetic.step()
+            val atom = entry.atom
             if (atom.relation != PolynomialRelation.EQ) continue
             val equation = unaryCellPolynomial(atom.polynomial, arithmetic) ?: continue
             equations[index] = equation
@@ -84,37 +101,98 @@ internal class PolynomialCoupledSections(
         }
         if (sections.isEmpty()) return null
         val roots = HashMap<Int, MutableList<AlgebraicReal>>()
-        for ((index, atom) in required.withIndex()) {
+        for ((index, entry) in required.withIndex()) {
             arithmetic.step()
-            val variables = atom.polynomial.variables
+            val variables = entry.atom.polynomial.variables
             if (variables.size < 2 || variables.any { arithmetic.step(); it !in sections }) continue
-            if (!fitsCellLimits(atom.polynomial, arithmetic)) continue
-            val support = (variables.map { arithmetic.step(); sections.getValue(it) } + index).sorted()
-            if (!checked.add(support.map { arithmetic.step(); identities[it] })) {
-                repeatedCount++
-                continue
-            }
-            supportCount++
-            for (variable in variables) {
+            if (!fitsCellLimits(entry.atom.polynomial, arithmetic)) continue
+            candidates.add(index)
+            checkSupport(listOf(index), required, identities, checked, sections, equations, roots, prepared)
+                ?.let { return it }
+        }
+        if (!joint || candidates.size < 2) return null
+        val remaining = candidates.toMutableList()
+        while (remaining.isNotEmpty()) {
+            arithmetic.step()
+            val connected = arrayListOf(remaining.removeAt(0))
+            val variables = required[connected.first()].atom.polynomial.variables.toMutableSet()
+            var changed = true
+            while (changed) {
                 arithmetic.step()
-                val section = sections.getValue(variable)
-                val values = roots.getOrPut(variable) {
-                    algebraic.roots(checkNotNull(equations[section]).polynomial).toMutableList()
-                }
-                if (values.isEmpty()) {
-                    conflictCount++
-                    return listOf(section)
+                changed = false
+                val iterator = remaining.iterator()
+                while (iterator.hasNext()) {
+                    arithmetic.step()
+                    val index = iterator.next()
+                    val dependencies = required[index].atom.polynomial.variables
+                    if (dependencies.any { arithmetic.step(); it in variables }) {
+                        for (variable in dependencies) { arithmetic.step(); variables.add(variable) }
+                        connected.add(index)
+                        iterator.remove()
+                        changed = true
+                    }
                 }
             }
-            if (satisfiable(atom, variables, roots)) continue
-            conflictCount++
-            return support
+            if (connected.size > 1) {
+                checkSupport(connected, required, identities, checked, sections, equations, roots, prepared)
+                    ?.let { return it }
+            }
         }
         return null
     }
 
+    private fun checkSupport(
+        predicates: List<Int>,
+        required: List<PolynomialCoupledSupport>,
+        identities: List<Long>,
+        checked: MutableSet<List<Long>>,
+        sections: Map<Int, Int>,
+        equations: Array<UnaryCellPolynomial?>,
+        roots: MutableMap<Int, MutableList<AlgebraicReal>>,
+        prepared: Boolean,
+    ): List<Int>? {
+        val variables = LinkedHashSet<Int>()
+        for (index in predicates) for (variable in required[index].atom.polynomial.variables) {
+            arithmetic.step()
+            variables.add(variable)
+        }
+        val support = LinkedHashSet<Int>()
+        for (index in variables.map { arithmetic.step(); sections.getValue(it) } + predicates) {
+            for (premise in required[index].premises) { arithmetic.step(); support.add(premise) }
+        }
+        val ordered = support.sorted()
+        repeat(ordered.size) { arithmetic.step() }
+        val key = buildList {
+            add(if (prepared) -1L else -2L)
+            add(if (predicates.size > 1) -1L else -2L)
+            for (index in ordered) { arithmetic.step(); add(identities[index]) }
+        }
+        if (!checked.add(key)) {
+            repeatedCount++
+            return null
+        }
+        supportCount++
+        if (prepared) preparedCount++
+        if (predicates.size > 1) jointCount++
+        for (variable in variables) {
+            arithmetic.step()
+            val section = sections.getValue(variable)
+            val values = roots.getOrPut(variable) {
+                algebraic.roots(checkNotNull(equations[section]).polynomial).toMutableList()
+            }
+            if (values.isEmpty()) {
+                conflictCount++
+                return required[section].premises.sorted()
+            }
+        }
+        val atoms = predicates.map { arithmetic.step(); required[it].atom }
+        if (satisfiable(atoms, variables.toList(), roots)) return null
+        conflictCount++
+        return ordered
+    }
+
     private fun satisfiable(
-        atom: PolynomialAtom,
+        atoms: List<PolynomialAtom>,
         variables: List<Int>,
         roots: Map<Int, MutableList<AlgebraicReal>>,
     ): Boolean {
@@ -122,7 +200,7 @@ internal class PolynomialCoupledSections(
         while (true) {
             arithmetic.step()
             combinationCount++
-            if (atom.holds(sign(atom, variables, choice, roots))) return true
+            if (atoms.all { arithmetic.step(); it.holds(sign(it, variables, choice, roots)) }) return true
             var position = 0
             while (position < variables.size) {
                 arithmetic.step()
