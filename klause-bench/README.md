@@ -5693,42 +5693,72 @@ ordering retain their defaults.
 
 `param.source-refutation-resolution=true` enables checked pairwise resolution over
 already named integral source-bound predicates, together with unit propagation.
-It remains disabled by default. Record `numericalRefutationReuseResolutionProofs`
-as retained proofs, `numericalRefutationReuseResolutionHits` as checked region
-imports and `numericalRefutationResolvedDeductions` as actual unit consumptions.
-`numericalRefutationSupportReasons` counts reasons shortened to established support;
-it does not establish a changed trajectory or saved work. Complete Boolean scope,
-opening restrictions and the existing cumulative source/proof limits remain required.
-`numericalRefutationReuseResolutionUnfixedHits` and
+It remains disabled by default. `numericalRefutationReuseResolutionProofs` counts
+retained proofs, `numericalRefutationReuseResolutionHits` checked region imports,
+and `numericalRefutationResolvedDeductions` actual unit consumptions.
+`numericalRefutationSupportReasons` counts shortened reasons, without establishing
+a changed trajectory. `numericalRefutationReuseResolutionUnfixedHits` and
 `numericalRefutationUnfixedDeductions` additionally require the removed pivot to
-remain undecided in the checked exclusion scope, so neither immediate input proof
-matches that scope individually. Their observation work spends the same allowance.
+remain undecided in the checked exclusion scope: neither immediate input proof
+matches individually. Observation work spends the same cumulative allowance.
 
 [Pilot 8795](https://lab.eignex.com/jobs/8795), at `7fbb3e59d6` on Mac/aarch64,
-compares exact cache, unit, resolution and automatic controls on captured egout and
-p0033, seed 3, P1/30 s, with eight whole-CLI resource receipts. All seven returned
-witnesses pass the independent original MPS solchecker. Native proofs have no
-independent exported-proof check. A mistaken miplib3 flugplinf selector admits no
-case and supplies no holdout evidence.
+returns seven independently checked original MPS witnesses across eight exact-policy
+cases. P0033 consumes 22 resolved deductions and one region import, preserving
+native optimum 3089 at higher work/time. Unit to resolution whole-CLI wall time is
+2.85 to 3.32 s and peak RSS 287,696 to 300,880 KiB. Egout has no complementary
+candidates before pool retirement; shortening 5,911 reasons leaves its checks and
+pending leaves unchanged. A mistaken miplib3 flugplinf selector admits no case and
+supplies no holdout evidence. The pilot precedes support/scalar/scratch metering
+corrections; use the qualification revision for current cost comparisons.
 
-P0033 consumes 22 resolved deductions and one checked resolved-region import from
-429 retained resolvents, preserving native optimum 3089 and zero pending leaves.
-Its cache/unit/resolution decisions are 9,495/6,882/10,854; LP operations are
-1,324/1,425/1,964 and funded work is 18.799/20.968/29.277 million units. Resolution
-retains 2,617 coverage nodes against 3,147 for units and 2,005 for cache-only reuse;
-those partitions supply no coverage ordering. Unit to resolution whole-CLI wall time
-is 2.85 to 3.32 s, CPU time 6.40 to 7.50 s and peak RSS 287,696 to 300,880 KiB.
-Cumulative modeled source allocation falls from 83.102 to 75.570 MB while the
-refutation pool spends its 64 MiB allowance. The ordinary control also proves 3089.
-These are single trajectory observations and establish consumed learning at a cost,
-not an efficiency gain.
+[Qualification 8799](https://lab.eignex.com/jobs/8799), at `9fb998f3fd`, completes
+72 Linux/amd64 cases on the same nine original hashes as 8741: captured egout/p0033
+and seven whole-family holdouts, cache/unit/resolution/ordinary controls under both
+semantic policies, seed 3 and P1/30 s. Each source keeps one host/build/runtime for
+its eight arms, with 3 GiB, Serial GC and one active processor. All 72 whole-CLI
+resource receipts are retained and all 28 returned witnesses pass independent
+original MPS solchecker checks. Native proofs have no independent exported-proof
+check. These are single trajectories, not timing repetitions.
 
-Egout has no complementary resolution candidates before its pool retires. Shortening
-5,911 unit reasons leaves its 5,101 numerical checks and 1,708 pending leaves equal
-to the unit control. Both retain objective 12223941/20000; the cache control has no
-witness, and the automatic control retains 6112193/10000. All remain unproved.
-The pilot omits the later per-visit support and scalar/scratch metering corrections;
-use the qualification revision for current cost comparisons.
+All paired numerical policies preserve feasibility, exact objective and native
+proof outcome. P0033 proves 3089, gr4x6 proves 4047/20 and flugplinf proves
+infeasibility, with zero pending leaves. Other numerical cases remain unknown and
+have no witness. Ordinary controls find witnesses on every feasible family and
+also prove enigma optimal at zero. The complete-proof costs below repeat in both
+semantic policies; each cell gives cache / unit / resolution. Allocation is
+cumulative modeled source bytes in decimal MB.
+
+| Source | Numerical checks | LP operations | Decisions | Funded work, million | Allocation, MB |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| p0033 | 1343 / 1456 / 1998 | 1324 / 1425 / 1899 | 9495 / 6882 / 10095 | 18.799 / 20.968 / 28.450 | 53.017 / 83.102 / 76.180 |
+| flugplinf | 1021 / 983 / 1165 | 1021 / 983 / 1166 | 5745 / 5340 / 5707 | 22.500 / 21.370 / 25.378 | 24.804 / 71.874 / 69.726 |
+| gr4x6 | 45 / 45 / 45 | 45 / 45 / 45 | 156 / 156 / 156 | 2.7885 / 2.7924 / 2.7925 | 0.528 / 0.959 / 0.972 |
+
+Per semantic policy, resolved imports/deductions are bell3a 10/1, bell5 2/0,
+flugplinf 0/2 and p0033 1/22; the other five sources consume none. Fewer retained
+nodes describe different coverage partitions, not a coverage ordering or gain.
+Peak index storage is 1,048,538 bytes, pool allocation 67,108,826 bytes and source
+allocation 97,399,189 bytes, within their existing cumulative limits.
+
+[Unfixed-pivot replay 8808](https://lab.eignex.com/jobs/8808), at `df8972371e`
+on Linux/amd64, completes all eight p0033 controls and independently checks all
+eight witnesses. Ten of the 22 resolved deductions per semantic policy retain an
+undecided pivot in their exclusion scope, beyond individual input matching/unit
+checks. The resolved-region import itself has a decided pivot. Every policy
+preserves native optimum 3089. Observation charges preserve 1,899 LP operations,
+1,998 checks and 10,095 decisions, at 28,450,217 funded work and 76,201,275 modeled
+bytes. Unit to resolution whole-CLI wall time is 14.75 to 15.92 s in default
+semantics and 14.00 to 17.67 s in exact semantics; peak RSS is 168,556 to 168,080
+and 159,976 to 165,456 KiB. Ordinary controls take 2.88/2.79 s. Whole-CLI costs
+include frontend preparation, native checking and cleanup; independent solchecker
+checks add 6–9 ms. No efficiency or default-admission claim follows.
+
+Both qualification jobs retain server-managed infrastructure losses and repeated
+uncommitted groups before successful receipts. Interrupted attempts supply no
+solver outcome or throughput evidence; they are not imputed as completed coverage.
+The retained capability is checked support-based learning at a cost. Automatic
+routing and all refutation-consumer defaults stay unchanged.
 
 #### Checked source rounding cuts
 
