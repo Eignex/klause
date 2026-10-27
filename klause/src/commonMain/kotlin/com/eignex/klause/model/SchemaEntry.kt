@@ -8,11 +8,11 @@ import kotlinx.serialization.Serializable
  * [com.eignex.skema.SchemaDef]'s entries map; the map key is the entry's name, so
  * spec types don't carry a redundant `name` field.
  */
-@Serializable
+@Serializable(with = SchemaEntrySerializer::class)
 sealed interface SchemaEntry
 
 /** A schema entry that declares a decision variable (as opposed to a named constraint). */
-@Serializable
+@Serializable(with = VarSpecSerializer::class)
 sealed interface VarSpec : SchemaEntry
 
 /** A single Boolean decision variable. */

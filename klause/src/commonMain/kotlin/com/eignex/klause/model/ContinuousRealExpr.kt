@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /** Exact continuous source expressions; finite coefficients denote binary64 rationals. */
-@Serializable
+@Serializable(with = ContinuousRealExprSerializer::class)
 sealed interface ContinuousRealExpr {
     /** `sum(coefficients(name) * name) + constant` over named continuous variables. */
     @Serializable

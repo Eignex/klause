@@ -10,7 +10,7 @@ interface IntTerm {
 }
 
 /** An integer-valued node in the constraint AST. */
-@Serializable
+@Serializable(with = IntExprSerializer::class)
 sealed interface IntExpr : IntTerm {
     override fun toIntExpr(): IntExpr = this
 }

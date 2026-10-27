@@ -1,58 +1,52 @@
 {
     "entries": {
-        "premium": {
-            "$type": "bool"
-        },
+        "premium": "bool",
         "type": {
-            "$type": "nominal",
-            "labels": [
+            "nominal": [
                 "a",
                 "b",
                 "c"
             ]
         },
         "budget": {
-            "$type": "int",
-            "min": 100,
-            "max": 1000
+            "int": [
+                100,
+                1000
+            ]
         },
         "capWhenA": {
-            "$type": "constraint",
-            "expr": {
-                "$type": "imp",
-                "left": {
-                    "$type": "nomeq",
-                    "name": "type",
-                    "label": "a"
-                },
-                "right": {
-                    "$type": "intcmp",
-                    "left": {
-                        "$type": "intref",
-                        "name": "budget"
+            "constraint": {
+                "implies": [
+                    {
+                        "nominalEq": [
+                            "type",
+                            "a"
+                        ]
                     },
-                    "op": "LE",
-                    "right": {
-                        "$type": "intlit",
-                        "value": 500
+                    {
+                        "le": [
+                            {
+                                "ref": "budget"
+                            },
+                            500
+                        ]
                     }
-                }
+                ]
             }
         },
         "noPremForB": {
-            "$type": "constraint",
-            "expr": {
-                "$type": "imp",
-                "left": {
-                    "$type": "nomeq",
-                    "name": "type",
-                    "label": "b"
-                },
-                "right": {
-                    "$type": "ref",
-                    "name": "premium",
-                    "negated": true
-                }
+            "constraint": {
+                "implies": [
+                    {
+                        "nominalEq": [
+                            "type",
+                            "b"
+                        ]
+                    },
+                    {
+                        "notRef": "premium"
+                    }
+                ]
             }
         }
     }
