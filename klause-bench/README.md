@@ -4674,6 +4674,41 @@ The checked cubic gain supports the bounded optional mechanism. Additional faile
 completions and mixed costs retain the disabled defaults and provide no general
 throughput or memory improvement claim. Proposal exhaustion supplies no source proof.
 
+[8805](https://lab.eignex.com/jobs/8805) compares integer-root admission with ordinary
+defaults, filtering and steering over the same 29 frozen sources, seeds 3/7, P1, ten
+seconds, source validation and CLI resources. Activation builds share the
+`50066736c6` implementation and differ only in defaults. All 232 cases ran on one
+Mac/aarch64 host with matching source hashes. Every triple keeps its SAT outcome, and
+no arm loses an UNSAT result. Only the root arm turns ten rootless controls from
+UNKNOWN into native UNSAT: the four squares, four powers, `mixed/singular-empty` and
+`open-no-integer-root`. It spends no completion queries on them. The cubic witness
+takes one completion and 3,033 native units, against 8/4 steered checks and
+33,393/550,748 ordinary units.
+
+That run exposed one cost: `wide-integer-square` exhausted the 65,536-unit equation
+allowance in an algebraic ceiling search, declining `n*n = 10^40` at 66,107 units
+against 498. Bracketing roots on the integer grid fixes it.
+[8835](https://lab.eignex.com/jobs/8835) reruns ordinary defaults and the root arm at
+`32d0b5f978` on the same host, 116 cases with unchanged outcomes.
+
+| Source / seed | Native work, ordinary / roots | CLI wall seconds | Peak RSS KiB |
+|---|---|---|---|
+| `powers/square-8` / 3 | 1674203 / 316 | 1.01 / 0.21 | 202480 / 106848 |
+| `degree/power-17` / 3 | 20174126 / 1065 | 10.10 / 0.21 | 216032 / 106784 |
+| `mixed/singular-empty` / 3 | 7193251 / 318 | 4.00 / 0.23 | 234464 / 107344 |
+| `cubic/root-neighbor` / 7 | 550748 / 1501 | 0.59 / 0.22 | 206736 / 112320 |
+| `wide-integer-square` / 3 | 498 / 2999 | 0.22 / 0.23 | 111504 / 113488 |
+
+Other refuted controls spend 309–1,332 units. Sources without an admissible equality
+spend at most 16 more units on the scan, with unchanged trajectories and witnesses.
+`overflow-cancellation` declines its zero difference. Guarded, rational-window,
+annulus, repeated-root and finite-routed controls keep their outcomes. The twenty
+native refutations have no independent certificate and no lab reference row; they
+match the manifests' mathematical expectations. In both jobs each arm reports 28
+models: 24 pass Dolmen 0.10 and four power-syntax checks remain UNKNOWN with
+`E:unbound-id`. These self-authored fixtures are built around unary equalities, so
+the disabled default stays until a held-out corpus qualifies it.
+
 ### State ownership
 
 Retain concrete buffer owners, separate indexed vector roles and one cursor/cleanup
