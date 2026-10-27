@@ -205,8 +205,11 @@ internal object MpsProofFrontier {
             }
             val captureStop = Cancellation.after(10.seconds)
             val snapshot = NumericalFrontierSnapshot(context, captureStop, scale)
-            val frontier = snapshot.capture(invocation)
-            Reports.writeJson(out.resolve("cuts.json").path, snapshot.cuts(invocation))
+            // A snapshot past its inspection allowance leaves the solve record intact.
+            val frontier = runCatching { snapshot.capture(invocation) }.getOrElse {
+                buildJsonObject { put("unavailable", it.message) }
+            }
+            runCatching { Reports.writeJson(out.resolve("cuts.json").path, snapshot.cuts(invocation)) }
             if (journal != null) {
                 Reports.writeJson(out.resolve("selection.json").path, selection.capture(journal))
                 if (options["replay"]?.toBooleanStrict() == true) {

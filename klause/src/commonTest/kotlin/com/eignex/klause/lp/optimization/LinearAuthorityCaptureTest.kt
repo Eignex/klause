@@ -231,6 +231,19 @@ class LinearAuthorityCaptureTest {
     }
 
     @Test
+    fun `a delivery-only record should spend on references instead of copied rows`() {
+        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, Cancellation.Never)
+        capture.deliver(10_000L, 1_000_000L)
+        capture.record(source, null, null, null, LinearAuthorityResult())
+        val archived = capture.constructedBytes
+
+        capture.record(source, null, null, null, LinearAuthorityResult())
+
+        assertNotNull(capture.delivered)
+        assertTrue(capture.constructedBytes - archived < archived)
+    }
+
+    @Test
     fun `a query beyond the delivery allowance should be reported as oversized`() {
         val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, Cancellation.Never)
         capture.deliver(1L, 1_000_000L)
