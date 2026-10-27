@@ -109,6 +109,8 @@ data class TheoryParams(
     val sourceAggregateCuts: Boolean = false,
     /** Reuse checked refutations within one numerical traversal under their proved source restrictions. */
     val sourceRefutationReuse: Boolean = false,
+    /** Qualification-only control for the internal cut-support ordering. */
+    val sourceSupportBranching: Boolean = false,
 ) {
     init {
         require(sourceLpWorkLimit >= 0 && sourceLpAllocationLimit >= 0 && sourceLpOperations >= 0)

@@ -95,10 +95,11 @@ internal class LinearAuthorityInvocation(
         SourceLpBudget(maxOperations = params.sourceLpOperations, onWork = state.smt::observeSourceLp,
             funding = funding), stop, ::paused, ::offer,
         { incumbent?.let { sample -> value?.let { sample to it } } }, useBranchHistory, borrowedAuthority,
-        useGuidance = boundOrdered || guidance || supportBranching || onNumericalFeedback != null,
+        useGuidance = boundOrdered || guidance || supportBranching || params.sourceSupportBranching ||
+            onNumericalFeedback != null,
         inheritBounds = boundOrdered, useCuts = cuts,
         useActiveRows = activeRows, useRefutationReuse = params.sourceRefutationReuse,
-        useSupportBranching = supportBranching,
+        useSupportBranching = supportBranching || params.sourceSupportBranching,
         pointCuts = boundOrdered && params.sourcePointCuts, onNumericalFeedback = onNumericalFeedback,
         aggregateCuts = boundOrdered && params.sourceAggregateCuts)
     private val session = SearchComponentSet(listOf(component)).session(params.maxLeaves, stop).also {

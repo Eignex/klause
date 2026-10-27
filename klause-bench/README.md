@@ -5876,6 +5876,11 @@ whole-process memory. Ordinary execution exposes no support-ordering option.
 The frozen `codex/source-feedback-qualification` revision retains the experimental
 CLI control used by the ordinary comparisons; its existence does not admit the policy.
 
+The composed qualification build exposes `source-support-branching=true` to
+activate the same internal consumer in ordinary CLI comparisons. Its default is
+false. This control belongs to the retained qualification revision and supplies
+no production policy admission.
+
 [Pilot 8586](https://lab.eignex.com/jobs/8586), at `3fb3878bb6`, completes 48
 ten-second P1 cases on four frozen MPS sources, seeds 1/3 and default/exact
 policies. Installed distribution, runtime/options and build fingerprint match on
