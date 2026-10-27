@@ -5911,6 +5911,43 @@ is a checked opt-in capability with a finished-proof work reduction on flugplinf
 captured-case regressions and memory costs; automatic routing and heuristic
 ordering retain their defaults.
 
+##### Named refutation resolution
+
+`param.source-refutation-resolution=true` enables checked pairwise resolution over
+already named integral source-bound predicates, together with unit propagation.
+It remains disabled by default. Record `numericalRefutationReuseResolutionProofs`
+as retained proofs, `numericalRefutationReuseResolutionHits` as checked region
+imports and `numericalRefutationResolvedDeductions` as actual unit consumptions.
+`numericalRefutationSupportReasons` counts reasons shortened to established support;
+it does not establish a changed trajectory or saved work. Complete Boolean scope,
+opening restrictions and the existing cumulative source/proof limits remain required.
+
+[Pilot 8795](https://lab.eignex.com/jobs/8795), at `7fbb3e59d6` on Mac/aarch64,
+compares exact cache, unit, resolution and automatic controls on captured egout and
+p0033, seed 3, P1/30 s, with eight whole-CLI resource receipts. All seven returned
+witnesses pass the independent original MPS solchecker. Native proofs have no
+independent exported-proof check. A mistaken miplib3 flugplinf selector admits no
+case and supplies no holdout evidence.
+
+P0033 consumes 22 resolved deductions and one checked resolved-region import from
+429 retained resolvents, preserving native optimum 3089 and zero pending leaves.
+Its cache/unit/resolution decisions are 9,495/6,882/10,854; LP operations are
+1,324/1,425/1,964 and funded work is 18.799/20.968/29.277 million units. Resolution
+retains 2,617 coverage nodes against 3,147 for units and 2,005 for cache-only reuse;
+those partitions supply no coverage ordering. Unit to resolution whole-CLI wall time
+is 2.85 to 3.32 s, CPU time 6.40 to 7.50 s and peak RSS 287,696 to 300,880 KiB.
+Cumulative modeled source allocation falls from 83.102 to 75.570 MB while the
+refutation pool spends its 64 MiB allowance. The ordinary control also proves 3089.
+These are single trajectory observations and establish consumed learning at a cost,
+not an efficiency gain.
+
+Egout has no complementary resolution candidates before its pool retires. Shortening
+5,911 unit reasons leaves its 5,101 numerical checks and 1,708 pending leaves equal
+to the unit control. Both retain objective 12223941/20000; the cache control has no
+witness, and the automatic control retains 6112193/10000. All remain unproved.
+The pilot omits the later per-visit support and scalar/scratch metering corrections;
+use the qualification revision for current cost comparisons.
+
 #### Checked source rounding cuts
 
 [Qualification 8117](https://lab.eignex.com/jobs/8117) compares `f59091a21a` with

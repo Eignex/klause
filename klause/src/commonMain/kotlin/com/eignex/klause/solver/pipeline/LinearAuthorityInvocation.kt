@@ -105,9 +105,10 @@ internal class LinearAuthorityInvocation(
         pointCuts = boundOrdered && params.sourcePointCuts, onNumericalFeedback = onNumericalFeedback,
         aggregateCuts = boundOrdered && params.sourceAggregateCuts, latestFeedback = latestFeedback)
     private val session = SearchComponentSet(listOf(component)).session(params.maxLeaves, stop,
-        atoms = if (params.sourceRefutationPropagation || params.sourceRefutationResolution) SearchAtomRegistry(context.coordinates.filter {
-            it.kind == com.eignex.klause.solver.evidence.SourceCoordinate.Kind.Boolean
-        }.maxOfOrNull { it.id + 1 } ?: 0) else null).also {
+        atoms = if (params.sourceRefutationPropagation || params.sourceRefutationResolution) SearchAtomRegistry(
+            context.coordinates.filter {
+                it.kind == com.eignex.klause.solver.evidence.SourceCoordinate.Kind.Boolean
+            }.maxOfOrNull { it.id + 1 } ?: 0) else null).also {
         it.bindOpenTheoryWork(state.work)
     }
     private var initialized = false

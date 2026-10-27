@@ -86,7 +86,8 @@ class LinearRefutationReuseTest {
             assertEquals(SourceEvidenceCheck.Checked,
                 SourceEvidenceVerifier(source.withLinearAuthority().atScope(excluded.scope)).verify(excluded))
         }
-        assertNull(learned.find(SourceCondition(upper = mapOf(y to BigFraction.ONE, z to BigFraction.ZERO))))
+        assertNull(learned.find(opening.pin(0, true).bound(y, BigFraction.ONE, true)
+            .bound(z, BigFraction.ZERO, true)))
         assertNull(learned.find(SourceCondition(bools = mapOf(0 to true),
             upper = mapOf(y to BigFraction.ZERO, z to BigFraction.ZERO))))
         assertNull(learned.find(opening.pin(0, false).bound(y, BigFraction.ZERO, true)
