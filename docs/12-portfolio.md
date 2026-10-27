@@ -22,7 +22,9 @@ arithmetic routes reject finite-only explicit policy instead of ignoring it. Rec
 defaults carry no witness or proof authority.
 
 Explicit `objective-guidance=canonical|functional|geometric` selects local-search
-objective guidance. A comma-separated list expands each selected recipe into
+objective guidance within an explicitly selected recipe pool (`arm`, a named
+`strategy`, or LS axis edits). It cannot construct an automatic pool.
+A comma-separated list expands each selected recipe into
 fresh slots in that order; `arm=cbls-plateau/ils-basin` with
 `objective-guidance=functional,geometric` and two LS arms runs a retained pair.
 Functional guidance is the ordinary default. Canonical guidance retains linear

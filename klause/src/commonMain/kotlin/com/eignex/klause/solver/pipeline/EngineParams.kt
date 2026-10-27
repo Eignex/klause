@@ -528,7 +528,10 @@ internal fun resolveLocalSearchRecipes(p: ExecutionOptionReader): LsResolution {
         }
     }
     val guidedPool = guidance?.let { modes ->
-        (pool ?: LocalSearchCatalog.factories(Kind.COP)).flatMap { factory ->
+        val selected = pool ?: pipelineConfigError(
+            "objective-guidance requires arm=, a named strategy=, or explicit LS axis edits",
+        )
+        selected.flatMap { factory ->
             modes.map { mode -> { factory().withObjectiveGuidance(mode) } }
         }
     } ?: pool
