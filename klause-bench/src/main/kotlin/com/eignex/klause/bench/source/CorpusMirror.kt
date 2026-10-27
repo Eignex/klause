@@ -49,15 +49,18 @@ internal class CorpusMirror(
                     digest.update(buffer, 0, count)
                 }
             }
-            val connection = address(id).toURL().openConnection() as HttpURLConnection
+            val hash = digest.digest()
+            val publication = corpusMirrorPublication(id, hash, address(id))
+            val connection = URI(publication.url).toURL().openConnection() as HttpURLConnection
             try {
                 connection.requestMethod = "PUT"
                 connection.connectTimeout = 10_000
                 connection.readTimeout = 30_000
                 connection.doOutput = true
+                publication.headers.forEach { (name, value) -> connection.setRequestProperty(name, value) }
                 connection.setFixedLengthStreamingMode(Files.size(archive))
                 connection.setRequestProperty("If-None-Match", "*")
-                val checksum = Base64.getEncoder().encodeToString(digest.digest())
+                val checksum = Base64.getEncoder().encodeToString(hash)
                 connection.setRequestProperty("x-amz-checksum-sha256", checksum)
                 connection.outputStream.use { output -> Files.newInputStream(archive).use { it.copyTo(output) } }
                 check(connection.responseCode in setOf(200, 201, 204, 412)) { "corpus mirror publication failed" }
