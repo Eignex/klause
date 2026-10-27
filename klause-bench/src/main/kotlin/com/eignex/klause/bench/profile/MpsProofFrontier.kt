@@ -35,8 +35,10 @@ import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.util.Cancellation
 import java.io.File
+import java.util.Base64
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -49,7 +51,19 @@ internal object MpsProofFrontier {
     fun main(args: Array<String>) {
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         if (System.getenv("KLAUSE_FRONTIER_MEASURED_JVM") != "1") {
-            launch(args, out)
+            if (args.size == 1 && args[0].startsWith("batch64=")) {
+                val request = Base64.getDecoder().decode(args[0].substringAfter('='))
+                require(request.size <= 64 * 1024)
+                val runs = Json.decodeFromString<List<List<String>>>(request.decodeToString())
+                require(runs.size in 1..64)
+                // Each run gets a fresh measured JVM, so earlier runs leave no compiled or cached state behind.
+                runs.forEachIndexed { index, run ->
+                    val directory = out.resolve("$index").apply { mkdirs() }
+                    runCatching { launch(run.toTypedArray(), directory) }.onFailure {
+                        directory.resolve("launch-failure.txt").writeText("${it.message}\n")
+                    }
+                }
+            } else launch(args, out)
             return
         }
         require(Runtime.getRuntime().availableProcessors() == 1)
@@ -332,6 +346,7 @@ internal object MpsProofFrontier {
         val builder = ProcessBuilder(command).redirectOutput(out.resolve("measured.stdout"))
             .redirectError(out.resolve("measured.stderr"))
         builder.environment()["KLAUSE_FRONTIER_MEASURED_JVM"] = "1"
+        builder.environment()["OUT"] = out.path
         out.resolve("launcher.json").writeText(buildJsonObject {
             put("command", buildJsonArray { command.forEach { add(JsonPrimitive(it)) } })
         }.toString() + "\n")
