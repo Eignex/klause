@@ -606,7 +606,7 @@ internal fun FinitePipeline.solve(
             permitsToleranceOptimum =
                 permitsToleranceOptimum &&
                     (request.toleranceCheck == null || request.toleranceCheck.permitsToleranceOptimum()),
-            objective = { sample ->
+            objective = if (linearSource.view.source.objective == null) null else { sample ->
                 val checked = linearSource.check(sample, stop) as?
                     com.eignex.klause.solver.validation.LinearSourceCheck.Accepted
                 checked?.witness?.objective?.let { value ->
