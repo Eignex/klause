@@ -1852,6 +1852,8 @@ throughput, native proof nor independently checked source feasibility.
 probe API for retained linear, exactly substituted linear and retained functional
 objectives. It accepts `suite`, `problem`, `sha256`, optional `recipe`, worker `seed`,
 `moves`, `timeoutMillis`, `greedy`, and `screen=true` for a parse-only capability receipt.
+`retainedWorker=true` adds the production canonical-graded geometric consumer,
+installed through search initialization rather than the observation source.
 `preparationEngine=mixed` selects default finite presolve; `preparationEngine=ls`
 selects the source-preserving local-search presolve policy used by sole-arm CLI runs.
 Each view runs alone; preparation counts against its time allowance. Up to six

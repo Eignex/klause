@@ -7,7 +7,10 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.localsearch.movesource.ObjectiveSeed
+import com.eignex.klause.localsearch.strategy.Cbls
+import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -19,6 +22,37 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ObjectiveProposalGeometryTest {
+    @Test
+    fun `geometric search retains its trajectory across instruction slices`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 8) }, emptyArray())
+        val sweep = assertNotNull(DefinitionalSweep.fromSource(problem, listOf(
+            DefinitionHint.Linear(1, longArrayOf(1, -1), arrayOf(
+                DefinitionHint.Operand.Variable(0), DefinitionHint.Operand.Variable(1)), 0),
+        )))
+        val canonical = LinearObjective(intCoefficients = longArrayOf(0, 1))
+        val params = LocalSearchParams(maxFlips = 4, randomSeed = 0,
+            initialAssignment = Sample(booleanArrayOf(), longArrayOf(4, 4)),
+            lsObjective = sweep.functionalObjective(canonical), objectiveGuidance = ObjectiveGuidance.Geometric)
+        val solver = LocalSearchSolver(problem.bake(), strategy = Cbls(), definitionalSweep = sweep,
+            perMoveInvariants = true, greedyRepairOnRestart = false)
+        val whole = solver.minimize(canonical, params)
+        val incumbents = mutableListOf<Sample>()
+
+        solver.resumable(canonical, params).use { run ->
+            val sliced = run as InstructionSlicedSearch
+            repeat(5) {
+                if (!run.isDone) sliced.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 1) {
+                    incumbents += it.sample
+                }
+            }
+
+            assertTrue(run.isDone)
+            assertEquals(whole.assignment, incumbents.last())
+            assertEquals(whole.stats.ls.geometricProposalCandidates, run.stats.ls.geometricProposalCandidates)
+            assertEquals(1.0, run.stats.ls.geometricProposalRuns.sum)
+        }
+    }
+
     @Test
     fun `retained geometric generation reaches later leaves in bounded batches`() {
         val problem = Problem(0, 17, Array(17) { IntDomain(0, 16) }, emptyArray())
