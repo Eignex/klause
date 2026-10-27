@@ -288,7 +288,7 @@ internal class LinearAuthorityTraversal(
         if (cancellation() || budget.funding?.paused == true) return null
         budget.observe(conflictCertification = 1L)
         budget.funding?.charge(0L, 384L)
-        if (cancellation() || budget.funding?.paused == true) return null
+        if (cancellation()) return null
         return SourceBoundAtom.integerSplit(context,
             listOf(SourceBoundTerm(SearchIntValue(coordinate.id), BigFraction.ONE)), threshold)
     }
@@ -310,11 +310,11 @@ internal class LinearAuthorityTraversal(
 
     override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
         if (cancellation()) return SearchNodeDisposition.Indeterminate
-        if (pause()) return SearchNodeDisposition.Pause
+        if (pause() || useRefutationPropagation && budget.funding?.paused == true) return SearchNodeDisposition.Pause
         if (current.unit != null) {
             if (propagate(context) !is ComponentResult.Consistent) return SearchNodeDisposition.Indeterminate
             if (cancellation()) return SearchNodeDisposition.Indeterminate
-            if (pause()) return SearchNodeDisposition.Pause
+            if (pause() || budget.funding?.paused == true) return SearchNodeDisposition.Pause
         }
         if (current.result?.evidence?.claim == SourceClaim.Refutation) return SearchNodeDisposition.Prune
         if (source.coordinates.any {
@@ -462,7 +462,8 @@ internal class LinearAuthorityTraversal(
             current.split = CoverageSplit.Integer(selected.first, selected.second, current.condition, candidate)
             splitCreated()
             observe("numericalFractionalSplits")
-            return SearchNodeDisposition.Expand
+            return if (useRefutationPropagation && budget.funding?.paused == true) SearchNodeDisposition.Pause
+                else SearchNodeDisposition.Expand
         }
         if (result.evidence != null) return SearchNodeDisposition.Prune
         val guarded = branch.premises.values.filter { it.integerPins.isNotEmpty() }
@@ -476,7 +477,8 @@ internal class LinearAuthorityTraversal(
                 current.split = CoverageSplit.Integer(coordinate, threshold, current.condition)
                 splitCreated()
                 observe("numericalIndicatorSplits")
-                return SearchNodeDisposition.Expand
+                return if (useRefutationPropagation && budget.funding?.paused == true) SearchNodeDisposition.Pause
+                    else SearchNodeDisposition.Expand
             }
         }
         return SearchNodeDisposition.Indeterminate
