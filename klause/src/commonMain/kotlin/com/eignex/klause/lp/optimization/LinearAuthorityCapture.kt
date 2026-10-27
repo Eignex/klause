@@ -250,8 +250,8 @@ internal class LinearAuthorityCapture(
         val definitions = template?.cuts?.rows.orEmpty()
         for ((id, cut) in definitions.withIndex()) {
             val extraOwners = (cut.owners.size - 1).toLong()
-            if (!spend(1L + extraOwners, 128L + extraOwners * 32L) ||
-                !shared && (!row(cut.inequality) || !proof(cut.derivation))) return
+            if (!spend(1L + extraOwners, 128L + extraOwners * 32L)) return
+            if (!shared && (!row(cut.inequality) || !proof(cut.derivation))) return
             var violation: BigFraction? = null
             if (point != null && cut.inequality.coefficients.keys.all { it in point }) {
                 var activity = BigFraction.ZERO
