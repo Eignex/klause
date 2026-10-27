@@ -209,8 +209,8 @@ evaluate it rejects the expression rather than reinterpreting it.
 A schema binds each reference to the declared variable of its operand's sort, and
 compilation fails naming an unbound one. An integer literal is an integer token in
 32-bit range, and `pow` takes a nonnegative integer literal exponent with
-`0^0 = 1`; `2.0`, `1e2`, `2.5` and other exponents are binary64, which integer
-vocabularies reject. Binary64 writes integral values as integer tokens, so integral
+`0^0 = 1`. Literals such as `2.0`, `1e2` and `2.5`, and any other exponent, are
+binary64 only, and integer vocabularies reject them. Binary64 writes integral values as integer tokens, so integral
 fragments stay portable. Two-operand keys take exactly two operands in binary64,
 where a longer list would hide the rounding order. Integer vocabularies extend
 `add`, `min`, `max`, `and` and `or` to any nonempty list, and name truncating
