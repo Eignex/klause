@@ -281,6 +281,16 @@ failed improvement queries supply no unconditional conflict. The original source
 objective, invocation window and complete Boolean substitution remain bound to the
 opening, including when it borrows a numerical owner.
 
+`source-refutation-propagation=true` additionally enables integral unit-prefix
+deductions and the same refutation index. Only a single missing inclusive bound on
+a source integer with an integral endpoint is eligible. Complete Boolean scope,
+opening pins and all other restrictions must already hold. The augmented scope's
+fresh import check proves the excluded sibling; named prefix facts justify its
+complement through shared search. Missing names, unsupported endpoints and stopped
+checks leave the alternatives available. Source-bound registration and clause
+construction spend the containing numerical funding; the session registry admits
+at most 4,096 atom pairs and explanations at most 4,096 references.
+
 The index retains at most 256 entries and 1 MiB of modeled proof/scope storage,
 evicting the oldest entry when either capacity is reached. Support traversal admits
 at most 4,096 nodes and depth 64; each retention or lookup shares at most 100,000
