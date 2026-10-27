@@ -57,6 +57,20 @@ class PolynomialPhaseProfileTest {
     }
 
     @Test
+    fun `coupled traces retain the first explained conflict and charged work`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = "$declarations (assert (and (= (* x1 x1) 2) (= (* x2 x2) 3) (= (+ (* x1 x2) x1 x2) 1)))"
+
+        val trace = PolynomialPhaseProfile.PhaseAccess().measure(source, coupled = true)
+
+        assertEquals("Unsatisfiable", trace.result)
+        assertEquals(trace.nativeWork, trace.chargeSum)
+        assertEquals(3, trace.firstCoupledConflictPremises)
+        assertEquals(true, trace.firstCoupledConflictPreviewComplete)
+        assertEquals("1", requireNotNull(trace.coupledSections)["Conflicts"])
+    }
+
+    @Test
     fun `a retained source is decoded without catalog resolution`() {
         val source = "(assert false)".encodeToByteArray()
         val compressed = ByteArrayOutputStream()

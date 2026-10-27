@@ -32,6 +32,7 @@ internal data class QfNraParams(
     val polynomialLimits: PolynomialLimits = PolynomialLimits(),
     val cellRefinement: Boolean = false,
     val cellFeedback: Boolean = false,
+    val coupledSections: Boolean = false,
 ) {
     init { require(maximumWork == null || maximumWork >= 0) }
 }
@@ -112,6 +113,11 @@ internal class QfNraQuery(
             checkedCellObserver?.invoke(it)
         }
     } else null
+    private val coupledSections = if (params.coupledSections) {
+        PolynomialCoupledSections(work, params.polynomialLimits)
+    } else null
+    val coupledStats: PolynomialCoupledStats? get() = coupledSections?.stats
+    var coupledConflictObserver: ((List<PolynomialAtom>) -> Unit)? = null
     val cellStats: PolynomialCellStats? get() = cellRefinement?.stats
     val cellFeedbackStats: PolynomialCellFeedbackStats? get() = cellFeedback?.stats
     val firstCellFeedbackUse: PolynomialCellFeedbackUse? get() = cellFeedback?.firstRegionUse
@@ -294,7 +300,9 @@ internal class QfNraQuery(
             onConflict = {
                 failureCapture?.signConflict(it, progress.searchSnapshot, work.spentWork, arithmetic)
                 partialConflictObserver?.invoke(it)
-            })
+            },
+            coupled = coupledSections,
+            onCoupledConflict = { coupledConflictObserver?.invoke(it) })
         var incomplete: PolynomialResource? = null
         while (true) {
             failureCapture?.operation("boolean-region", progress.searchSnapshot, progress.regions,

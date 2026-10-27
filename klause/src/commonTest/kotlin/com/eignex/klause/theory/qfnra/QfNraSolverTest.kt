@@ -1029,6 +1029,26 @@ class QfNraSolverTest {
     }
 
     @Test
+    fun `coupled sections refute a repeated support before regional projection`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" } +
+            (0 until 4).joinToString(" ") { " (declare-const a$it Bool) (declare-const b$it Bool)" }
+        val prefix = (0 until 4).joinToString(" ") { "(or a$it b$it)" }
+        val source = SmtLibPolynomial.parse("$declarations (assert (and $prefix (= (* x3 x4) 1) " +
+            "(= (* x0 x0) 2) (= (* x1 x1) 2) (= (* x2 x2) 3) (= (+ (* x1 x2) x1 x2) 1)))")
+        val query = QfNraQuery(source.formula, source.boolCount, source.realCount,
+            QfNraParams(coupledSections = true), PolynomialCondition())
+
+        var result: QfNraResult? = null
+        while (result == null) result = query.next()
+
+        val stats = assertIs<QfNraResult.Unsatisfiable>(result).stats
+        assertEquals(0L, stats.booleanTheoryRegions)
+        assertEquals(0L, stats.projectedPolynomials)
+        assertEquals(0L, stats.liftedCells)
+        assertEquals(1L, query.progress.coupledConflicts)
+    }
+
+    @Test
     fun `returned witnesses should survive buffer mutation and another invocation`() {
         val source = SmtLibPolynomial.parse(
             """
