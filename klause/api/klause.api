@@ -11623,6 +11623,7 @@ public final class com/eignex/klause/solver/pipeline/ExecutionOption$Companion {
 	public final fun getSourceLpWorkLimit ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getSourcePointCuts ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getSourceRefutationReuse ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getSourceSupportBranching ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getSources ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getStrategy ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getSubsumeBatch ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
@@ -12972,8 +12973,8 @@ public final class com/eignex/klause/solver/pipeline/StrategyAdmission {
 
 public final class com/eignex/klause/solver/pipeline/TheoryParams {
 	public fun <init> ()V
-	public fun <init> (JJJLjava/lang/Long;Ljava/lang/Integer;ILjava/lang/Long;Lcom/eignex/klause/solver/pipeline/OpenBranching;JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/backtrack/NodeBudget;IJJLjava/lang/Long;JJIZZZZ)V
-	public synthetic fun <init> (JJJLjava/lang/Long;Ljava/lang/Integer;ILjava/lang/Long;Lcom/eignex/klause/solver/pipeline/OpenBranching;JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/backtrack/NodeBudget;IJJLjava/lang/Long;JJIZZZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (JJJLjava/lang/Long;Ljava/lang/Integer;ILjava/lang/Long;Lcom/eignex/klause/solver/pipeline/OpenBranching;JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/backtrack/NodeBudget;IJJLjava/lang/Long;JJIZZZZZ)V
+	public synthetic fun <init> (JJJLjava/lang/Long;Ljava/lang/Integer;ILjava/lang/Long;Lcom/eignex/klause/solver/pipeline/OpenBranching;JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/backtrack/NodeBudget;IJJLjava/lang/Long;JJIZZZZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()J
 	public final fun component10 ()Lcom/eignex/klause/util/Cancellation;
 	public final fun component11 ()Lcom/eignex/klause/util/Cancellation;
@@ -12990,6 +12991,7 @@ public final class com/eignex/klause/solver/pipeline/TheoryParams {
 	public final fun component21 ()Z
 	public final fun component22 ()Z
 	public final fun component23 ()Z
+	public final fun component24 ()Z
 	public final fun component3 ()J
 	public final fun component4 ()Ljava/lang/Long;
 	public final fun component5 ()Ljava/lang/Integer;
@@ -12997,8 +12999,8 @@ public final class com/eignex/klause/solver/pipeline/TheoryParams {
 	public final fun component7 ()Ljava/lang/Long;
 	public final fun component8 ()Lcom/eignex/klause/solver/pipeline/OpenBranching;
 	public final fun component9 ()J
-	public final fun copy (JJJLjava/lang/Long;Ljava/lang/Integer;ILjava/lang/Long;Lcom/eignex/klause/solver/pipeline/OpenBranching;JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/backtrack/NodeBudget;IJJLjava/lang/Long;JJIZZZZ)Lcom/eignex/klause/solver/pipeline/TheoryParams;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/TheoryParams;JJJLjava/lang/Long;Ljava/lang/Integer;ILjava/lang/Long;Lcom/eignex/klause/solver/pipeline/OpenBranching;JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/backtrack/NodeBudget;IJJLjava/lang/Long;JJIZZZZILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/TheoryParams;
+	public final fun copy (JJJLjava/lang/Long;Ljava/lang/Integer;ILjava/lang/Long;Lcom/eignex/klause/solver/pipeline/OpenBranching;JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/backtrack/NodeBudget;IJJLjava/lang/Long;JJIZZZZZ)Lcom/eignex/klause/solver/pipeline/TheoryParams;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/TheoryParams;JJJLjava/lang/Long;Ljava/lang/Integer;ILjava/lang/Long;Lcom/eignex/klause/solver/pipeline/OpenBranching;JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/backtrack/NodeBudget;IJJLjava/lang/Long;JJIZZZZZILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/TheoryParams;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAlnsIterations ()I
 	public final fun getCancellation ()Lcom/eignex/klause/util/Cancellation;
@@ -13022,6 +13024,7 @@ public final class com/eignex/klause/solver/pipeline/TheoryParams {
 	public final fun getSourceLpWorkLimit ()J
 	public final fun getSourcePointCuts ()Z
 	public final fun getSourceRefutationReuse ()Z
+	public final fun getSourceSupportBranching ()Z
 	public final fun getTimeout ()Lcom/eignex/klause/util/Cancellation;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
