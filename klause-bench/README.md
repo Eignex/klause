@@ -5119,6 +5119,66 @@ retained bytes and evictions. Modeled allocation is separate from physical RSS.
 Reuse work, including its verification subset, is already included in source LP
 conflict-certification work and cumulative funded work; these counters are not additive.
 
+[Qualification 8696](https://lab.eignex.com/jobs/8696), at `81220267c6`, completes
+162 cases: the nine frozen original sources, reuse disabled/enabled and automatic
+controls under default/exact semantics, three policy seeds, P1/10 s and external
+whole-CLI resource recording. All original hashes match. Each source/seed keeps
+all six arms on one host/build/runtime; 126 cases run on Linux/amd64 and 36 on
+Mac/aarch64. Distribution jars match across platforms. The runtime options are
+3 GiB, Serial GC and `ActiveProcessorCount=1`; command intervals overlap at most
+one case per host. These are policy seeds with one repetition each.
+
+All 54 paired frontier comparisons preserve feasibility, exact objective and
+native/source proof outcome. All 70 feasible points pass the lab's independent
+MPS solchecker; native proofs have no independent exported-proof check. Every
+reused `p0033` run proves 3089, every `gr4x6` run proves 4047/20, and every
+`flugplinf` run proves infeasibility. The Mac `rgn` seed retains its witness in
+both policies; its Linux seeds remain unknown. Other numerical outcomes remain
+unknown. Automatic controls also prove `enigma` optimal at zero.
+
+The default-tolerance Linux strata below report medians over the indicated
+number of policy seeds. A one-seed stratum is one observation. Closed/pending
+leaf counts describe different partitions and establish no coverage ordering.
+
+| Source (seeds) | LP operations, off → on | Checked imports | Closed/pending, off → on | Funded work, million units, off → on |
+| --- | ---: | ---: | --- | ---: |
+| bell3a (2) | 818 → 817.5 | 232 | 322/304 → 385/326.5 | 99.57 → 98.46 |
+| bell5 (2) | 1062 → 978 | 175 | 180/724 → 199/759.5 | 100.12 → 99.41 |
+| dcmulti (3) | 166 → 151 | 23 | 31/115 → 33/112 | 285.94 → 278.38 |
+| egout (2) | 930.5 → 638 | 275 | 357/228 → 359.5/198.5 | 192.64 → 146.70 |
+| enigma (3) | 1100 → 1091 | 156 | 506/248 → 577/215 | 155.99 → 151.68 |
+| flugplinf (3) | 1104 → 1021 | 88 | 552/0 → 555/0 | 23.12 → 22.50 |
+| gr4x6 (3) | 45 → 45 | 0 | 33/0 → 33/0 | 2.7862 → 2.7885 |
+| p0033 (1) | 1896 → 1324 | 576 | 1026/0 → 1003/0 | 27.60 → 18.80 |
+| rgn (2) | 408.5 → 403.5 | 16.5 | 80/284 → 80/283 | 102.23 → 101.62 |
+
+The complete `p0033` counts repeat in both semantics and all three seeds.
+Its pool spends 779,675 work units, including 382,802 verification units,
+48,090,660 modeled allocation bytes, including 44,462,192 verification bytes,
+and peaks at 707,548 retained bytes. Total funded allocation grows from
+5,118,124 to 53,016,528 bytes despite lower total funded work. Linux CLI wall
+times are 8.09 → 6.92 s and 8.48 → 7.04 s for default/exact; peak RSS is
+160,112 → 151,980 KiB and 162,976 → 156,268 KiB. The two Mac seeds have median
+times 2.28 → 1.75 s and 2.17 → 1.90 s, with RSS 261,472 → 248,656 KiB and
+260,632 → 251,776 KiB. Timings stay within their platform strata.
+
+Local allocation admission retires 22 of the 54 enabled caches. Maximum pool
+allocation is 67,094,459 bytes, within 64 MiB; maximum source funded allocation
+is 152,120,890 bytes. `enigma` retires at 66,934,014 pool bytes, continues
+numerical queries through the deadline and remains unknown. Its peak retained
+storage is 1,047,419 bytes; charged evictions include retirement cleanup.
+`gr4x6` gains no hits and adds 2,305 work units and 261,406 modeled bytes.
+`flugplinf` saves operations but Linux median wall time increases
+4.81 → 5.02 s and 4.73 → 5.02 s. The time-limited Mac `bell3a`, `bell5` and
+`egout` runs complete fewer LP operations with reuse and retain unknown outcomes.
+These costs support keeping reuse opt-in and automatic routing unchanged.
+
+[8657](https://lab.eignex.com/jobs/8657) retains the rejected 85524cc2b1
+certificate-loss control; freshly checked imported refutations must also discharge
+objective-bound coverage. [8671](https://lab.eignex.com/jobs/8671) retains the
+127fc9dd2a control where `enigma` exhausts 512 MiB of cumulative allocation.
+The invocation-local admission limit preserves ordinary numerical funding.
+
 #### Checked source rounding cuts
 
 [Qualification 8117](https://lab.eignex.com/jobs/8117) compares `f59091a21a` with
