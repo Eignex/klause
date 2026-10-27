@@ -21,7 +21,7 @@ internal sealed interface SourceNumericalSupportResult {
         val reason: Reason,
     ) : SourceNumericalSupportResult
 
-    enum class Reason { NoRefutation, Unsupported, Limit, Cancelled, Funding }
+    enum class Reason { Unrequested, NoRefutation, Unsupported, Limit, Cancelled, Funding }
 }
 
 // This visits captured proof references for ranking; it neither reduces nor verifies a proof scope.
@@ -36,6 +36,8 @@ internal fun sourceNumericalRefutationSupport(
         SourceNumericalSupportResult.Reason.Cancelled)
     if (funding.paused) return SourceNumericalSupportResult.Unavailable(feedback,
         SourceNumericalSupportResult.Reason.Funding)
+    if (!query.projection.refutation) return SourceNumericalSupportResult.Unavailable(feedback,
+        SourceNumericalSupportResult.Reason.Unrequested)
     val evidence = query.refutation ?: return SourceNumericalSupportResult.Unavailable(feedback,
         SourceNumericalSupportResult.Reason.NoRefutation)
     val coordinates = linkedSetOf<SourceCoordinate>()

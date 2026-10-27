@@ -6850,6 +6850,13 @@ of argument arrays>` runs up to 64 frontier requests, each in a fresh one-proces
 JVM under `OUT/<index>`; a snapshot past its inspection allowance keeps the solve record.
 Stages add `numericalFeedbackLateCollections` and `numericalSupportLateSelections`
 for queries consumed after the archive stops.
+`feedbackRequest=requested|full` selects whether queries delivered after the archive
+stops hold only the support consumer's requested projection (the default) or the full
+record. Stages add `numericalFeedbackCutEvaluations` and
+`numericalFeedbackArithmeticTerms` for exact cut-violation visits, and the record adds
+the solve thread's elapsed time and allocated bytes. `solveSeconds=<n>` replaces the
+ten-second deadline, which includes preparation, with one that starts at the solve, so an
+`operations=<n>` cap rather than the wall clock ends the query stream.
 
 [Delivery comparison 8737](https://lab.eignex.com/jobs/8737), at `2a3f3b564c` on
 Mac/aarch64, runs source order, prefix and latest delivery on 21 exact ten-second

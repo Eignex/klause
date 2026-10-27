@@ -6,6 +6,7 @@ import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.optimization.LinearAuthority
 import com.eignex.klause.lp.optimization.LinearAuthorityCapture
+import com.eignex.klause.lp.optimization.LinearAuthorityFeedbackRequest
 import com.eignex.klause.lp.optimization.linearCoordinatesSupported
 import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.simplex.exact.BigFraction
@@ -57,6 +58,7 @@ internal class LinearAuthorityInvocation(
     supportBranching: Boolean = false,
     onNumericalFeedback: ((SourceNumericalFeedbackResult) -> Unit)? = null,
     latestFeedback: Boolean = true,
+    feedbackRequest: LinearAuthorityFeedbackRequest? = null,
 ) : AutoCloseable {
     init {
         require(borrowedAuthority?.funding == null || borrowedAuthority.funding === funding) {
@@ -103,7 +105,8 @@ internal class LinearAuthorityInvocation(
         useRefutationPropagation = params.sourceRefutationPropagation,
         useRefutationResolution = params.sourceRefutationResolution, useSupportBranching = supportBranching,
         pointCuts = boundOrdered && params.sourcePointCuts, onNumericalFeedback = onNumericalFeedback,
-        aggregateCuts = boundOrdered && params.sourceAggregateCuts, latestFeedback = latestFeedback)
+        aggregateCuts = boundOrdered && params.sourceAggregateCuts, latestFeedback = latestFeedback,
+        feedbackRequest = feedbackRequest)
     private val session = SearchComponentSet(listOf(component)).session(params.maxLeaves, stop,
         atoms = if (params.sourceRefutationPropagation || params.sourceRefutationResolution) SearchAtomRegistry(
             context.coordinates.filter {

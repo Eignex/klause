@@ -3,6 +3,7 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.localsearch.InvariantNetwork
 import com.eignex.klause.lp.SourceLpFunding
+import com.eignex.klause.lp.optimization.LinearAuthorityFeedbackRequest
 import com.eignex.klause.meta.alns.DestroyOperator
 import com.eignex.klause.meta.alns.FreedVars
 import com.eignex.klause.meta.alns.RepairBlockClosure
@@ -103,6 +104,11 @@ internal class FiniteNumericalRemoval(
             retire(Status.Incompatible)
             return
         }
+        if (!feedback.query.projection.covers(request)) {
+            retire(Status.Unavailable)
+            unavailableReason = "unrequested"
+            return
+        }
         scores = IntArray(count.toInt())
         directions = IntArray(count.toInt())
         when (signal) {
@@ -189,6 +195,12 @@ internal class FiniteNumericalRemoval(
         originScope = query.scope
         originCutoff = cutoff
         rankedInputs = scores.count { it != 0 }
+    }
+
+    // The projection each signal reads; a narrower delivered query is unavailable rather than agreeing.
+    val request: LinearAuthorityFeedbackRequest get() = when (signal) {
+        Signal.Disagreement -> LinearAuthorityFeedbackRequest(point = true)
+        Signal.Refutation -> LinearAuthorityFeedbackRequest(refutation = true)
     }
 
     private fun compatible(query: SourceProofContext, pins: Assumptions, cutoff: SourceNumericalCutoff?): Boolean {

@@ -375,10 +375,17 @@ consumers. The journal keeps two separately bounded channels: an inspection arch
 of the first queries, and a single latest-query slot that each completed query
 replaces. Archive retention therefore never withholds a later query; a prefix-only
 control reads the archive alone and reports later queries as retention-limited.
-Both channels share one record construction. Each record exposes exact-valued
+Both channels share one record construction. Each archived record exposes exact-valued
 relaxation coordinates, generating cut
 masks, active source rows and scoped checked bounds/refutations, with independent
-point availability. Such coordinates can contain numerical residuals and require
+point availability. A consumer names the projection it reads: the point, installed
+cut activity or the refutation. A query delivered after the archive stops holds only
+the requested projection and records it, so a withheld field is explicit rather than
+unavailable, and the query state still reports the actual point outcome. Installed
+cut activity keeps the installed, checked cuts with active owners; their violations
+are evaluated on demand while that query is still delivered, and a replaced,
+released, cancelled or oversized evaluation declines. A callback without a request
+receives the full record, and an external observer keeps its full archive. Such coordinates can contain numerical residuals and require
 full source checking before publication. Compatibility requires the same source
 premises, semantics, objective and exact query restrictions. A cutoff attribution
 requires its actual strict objective premise; an acquisition without that premise
@@ -398,7 +405,9 @@ reduction. Its coordinate set supplies ranking only.
 
 An internal research consumer orders integer splits by near-tight,
 installed checked cut supports, preferring smaller supports and greater fractional
-distance from an integer, with source-order ties and fallback. Both complementary
+distance from an integer, with source-order ties and fallback. It requests the point
+and installed cut activity, and evaluates a cut only when its support holds a
+fractional candidate that could change the choice. Both complementary
 alternatives remain in coverage. Feedback never supplies pruning or parent proof
 authority. Construction, replacement, retention and scoring debit the containing
 source LP funding cumulatively; evicting a delivered query neither refunds that
@@ -407,8 +416,10 @@ entries and 8 MiB modeled storage, and a delivered query has the same entry and
 byte allowance on its own. Archived records are charged for copies of the source
 rows, cut definitions and cited derivations they reference. Once the archive stops, a
 delivered record keeps only references to those immutable structures, which the
-authority prepared and still holds. It is charged for those references, its point,
-cut violations, scope and checked evidence.
+authority prepared and still holds. It is charged for those references, its scope and
+the requested point, cuts and evidence. An on-demand cut evaluation spends the
+delivered query's remaining allowance and the same cumulative ledger; it issues no LP
+query and renews no allowance.
 
 `LinearAuthority.advance` consumes the shared sparse preparation, floating and
 bound-certificate policy through that same scoped owner. One admitted operation

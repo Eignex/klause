@@ -339,7 +339,9 @@ an unchanged complete Boolean/integer coordinate frame and exact caller/query
 pins; unmapped coordinates and additional deduced restrictions decline. It checks
 the normalized objective, original premises, semantic checker and actual cutoff
 row before retaining at most 4,096 scores. Missing feedback, missing points,
-agreement and empty captured support remain distinct outcomes. Scoring and
+agreement and empty captured support remain distinct outcomes. Each signal requests
+its projection, the point or the refutation, and a delivered query without it is
+unrequested rather than agreement or an empty support. Scoring and
 selection debit the producer's containing funding; cancellation or exhausted
 funding declines selection as a whole. Model, objective, center or caller-pin
 changes retire guidance, and close releases its query scope. These rankings

@@ -31,7 +31,7 @@ class LinearSupportBranchingTest {
     @Test
     fun `tight cut support should rank the more fractional integer coordinate`() {
         val funding = SourceLpFunding(1_000L, 10_000L).apply { grant(1_000L) }
-        val branching = LinearSupportBranching(funding)
+        val branching = LinearSupportBranching(funding, SourceNumericalFeedback(funding, Cancellation.Never))
 
         val selected = branching.select(SourceNumericalFeedbackResult.Available(query, null),
             point.toList(), Cancellation.Never)
@@ -44,7 +44,7 @@ class LinearSupportBranchingTest {
     @Test
     fun `equal support scores should retain source order rather than coordinate identifiers`() {
         val funding = SourceLpFunding(1_000L, 10_000L).apply { grant(1_000L) }
-        val branching = LinearSupportBranching(funding)
+        val branching = LinearSupportBranching(funding, SourceNumericalFeedback(funding, Cancellation.Never))
         val tiedPoint = linkedMapOf(y to BigFraction.ofLong(2).reciprocal(), x to BigFraction.ofLong(2).reciprocal())
         val tiedRow = SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ONE), BigFraction.ONE)
         val context = SourceProofContext(source.scope, source.coordinates,
@@ -59,9 +59,23 @@ class LinearSupportBranchingTest {
     }
 
     @Test
+    fun `a requested projection no longer delivered should fall back to source order`() {
+        val funding = SourceLpFunding(1_000L, 10_000L).apply { grant(1_000L) }
+        val branching = LinearSupportBranching(funding, SourceNumericalFeedback(funding, Cancellation.Never))
+        val released = query.copy(cuts = listOf(cut.copy(violation = null)),
+            projection = LinearSupportBranching.REQUEST)
+
+        val selected = branching.select(SourceNumericalFeedbackResult.Available(released, null),
+            point.toList(), Cancellation.Never)
+
+        assertEquals(x to point.getValue(x), selected)
+        assertEquals(1L, branching.fallbacks)
+    }
+
+    @Test
     fun `uninstalled inactive unchecked and slack cuts should preserve source order`() {
         val funding = SourceLpFunding(1_000L, 10_000L).apply { grant(1_000L) }
-        val branching = LinearSupportBranching(funding)
+        val branching = LinearSupportBranching(funding, SourceNumericalFeedback(funding, Cancellation.Never))
 
         for (ignored in listOf(cut.copy(installed = false), cut.copy(ownerActive = false),
             cut.copy(checked = false), cut.copy(violation = BigFraction.MINUS_ONE))) {

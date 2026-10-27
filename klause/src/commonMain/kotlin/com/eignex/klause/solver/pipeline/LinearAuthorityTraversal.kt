@@ -6,6 +6,7 @@ import com.eignex.klause.lp.optimization.LinearActiveRows
 import com.eignex.klause.lp.optimization.LinearApproach
 import com.eignex.klause.lp.optimization.LinearAuthority
 import com.eignex.klause.lp.optimization.LinearAuthorityCapture
+import com.eignex.klause.lp.optimization.LinearAuthorityFeedbackRequest
 import com.eignex.klause.lp.optimization.LinearAuthorityResult
 import com.eignex.klause.lp.optimization.atScope
 import com.eignex.klause.lp.optimization.floorSplit
@@ -65,6 +66,7 @@ internal class LinearAuthorityTraversal(
     private val onNumericalFeedback: ((SourceNumericalFeedbackResult) -> Unit)? = null,
     aggregateCuts: Boolean = false,
     latestFeedback: Boolean = true,
+    feedbackRequest: LinearAuthorityFeedbackRequest? = null,
 ) : SearchBrancher, SearchBranchProposal, SearchNodePolicy, AutoCloseable {
     override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
 
@@ -87,12 +89,17 @@ internal class LinearAuthorityTraversal(
     private val propagateRefutations = useRefutationPropagation || useRefutationResolution
     private val refutations = if (useRefutationReuse || propagateRefutations)
         LinearRefutationReuse(source, budget, cancellation, resolve = useRefutationResolution) else null
+    // A callback without an explicit request receives the full projection.
     private val feedback = if (useSupportBranching || onNumericalFeedback != null) {
-        SourceNumericalFeedback(requireNotNull(budget.funding), cancellation, latestFeedback)
+        val callback = feedbackRequest ?: if (onNumericalFeedback != null) LinearAuthorityFeedbackRequest.Full
+            else LinearAuthorityFeedbackRequest()
+        SourceNumericalFeedback(requireNotNull(budget.funding), cancellation, latestFeedback,
+            if (useSupportBranching) callback + LinearSupportBranching.REQUEST else callback)
             .also { it.attach(authority) }
     } else null
-    private val supportBranching = if (useSupportBranching) LinearSupportBranching(requireNotNull(budget.funding))
-        else null
+    private val supportBranching = feedback?.takeIf { useSupportBranching }?.let {
+        LinearSupportBranching(requireNotNull(budget.funding), it)
+    }
 
     fun captureTo(journal: LinearAuthorityCapture) {
         authority.capture = journal
@@ -131,7 +138,9 @@ internal class LinearAuthorityTraversal(
         "numericalLpReuses" to authority.reuses,
     ) + (feedback?.let { mapOf("numericalFeedbackCollections" to it.collections,
         "numericalFeedbackLateCollections" to it.lateCollections,
-        "numericalFeedbackUnavailable" to it.unavailable) } ?: emptyMap()) +
+        "numericalFeedbackUnavailable" to it.unavailable,
+        "numericalFeedbackCutEvaluations" to it.evaluatedCuts,
+        "numericalFeedbackArithmeticTerms" to it.evaluatedTerms) } ?: emptyMap()) +
         (supportBranching?.let { mapOf("numericalSupportConsultations" to it.consultations,
             "numericalSupportSelections" to it.selections, "numericalSupportFallbacks" to it.fallbacks) }
             ?: emptyMap()) + refutations?.observations().orEmpty()

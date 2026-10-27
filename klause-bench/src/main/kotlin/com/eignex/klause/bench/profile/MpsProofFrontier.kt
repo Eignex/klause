@@ -34,7 +34,9 @@ import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.util.Cancellation
+import com.sun.management.ThreadMXBean
 import java.io.File
+import java.lang.management.ManagementFactory
 import java.util.Base64
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.seconds
@@ -82,7 +84,8 @@ internal object MpsProofFrontier {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val supported = setOf("suite", "problem", "sha256", "exact", "probe", "history", "frontier", "cuts",
             "selection", "replay", "operations", "activeRows", "supportBranching", "pointCuts", "aggregate-probe",
-            "aggregate-mixed", "aggregate-replay", "aggregateCuts", "refutationReuse", "feedbackDelivery")
+            "aggregate-mixed", "aggregate-replay", "aggregateCuts", "refutationReuse", "feedbackDelivery",
+            "feedbackRequest", "solveSeconds")
         require(options.keys.containsAll(setOf("suite", "problem", "sha256", "exact")) &&
             (options.keys - supported).isEmpty())
         val probe = options["probe"]?.toBooleanStrict() ?: false
@@ -118,10 +121,15 @@ internal object MpsProofFrontier {
         require(prepared.route is SourceProblemRoute.NativeFormula)
         val execution = checkNotNull(field(prepared.route, "execution"))
         val request = field(execution, "request") as NumericalLinearRequest
-        val solveStop = preparationStop or Cancellation.after(10.seconds)
+        val solveSeconds = options["solveSeconds"]?.toInt()?.also { require(it in 1..600) }
+        // An explicit solve deadline starts after preparation, so an operation-capped stream is not cut by parsing.
+        val solveStop = if (solveSeconds == null) preparationStop or Cancellation.after(10.seconds)
+            else Cancellation.after(solveSeconds.seconds)
         val supportBranching = options["supportBranching"]?.toBooleanStrict() ?: false
         val feedbackDelivery = options["feedbackDelivery"] ?: "latest"
         require(feedbackDelivery in setOf("latest", "prefix"))
+        val feedbackRequest = options["feedbackRequest"] ?: "requested"
+        require(feedbackRequest in setOf("requested", "full"))
         val params = TheoryParams(timeout = solveStop, cancellation = solveStop, randomSeed = 3L,
             sourceCuts = options["cuts"]?.toBooleanStrict() ?: true,
             sourcePointCuts = options["pointCuts"]?.toBooleanStrict() ?: false,
@@ -154,7 +162,7 @@ internal object MpsProofFrontier {
         val system = NumericalFrontierSnapshot.system(context)
         Reports.writeJson(out.resolve("native-system.json").path, system)
         val invocation = NumericalFrontierSnapshot.open(context, params, historyEnabled, frontierEnabled, activeRows,
-            supportBranching, feedbackDelivery == "latest")
+            supportBranching, feedbackDelivery == "latest", feedbackRequest == "full")
         val selection = NumericalSelectionSnapshot(Cancellation.after(30.seconds))
         val journal = if (options["selection"]?.toBooleanStrict() == true || aggregateProbe) {
             selection.attach(invocation)
@@ -162,6 +170,9 @@ internal object MpsProofFrontier {
         val history = ArrayList<JsonObject>()
         out.resolve("incumbents.jsonl").writeText("")
         out.resolve("bounds.jsonl").writeText("")
+        val allocation = ManagementFactory.getThreadMXBean() as ThreadMXBean
+        val thread = Thread.currentThread().threadId()
+        val startedBytes = allocation.getThreadAllocatedBytes(thread)
         val started = System.nanoTime()
         var lastBound: String? = null
         try {
@@ -203,6 +214,8 @@ internal object MpsProofFrontier {
                 history += entry
                 out.resolve("incumbents.jsonl").appendText(entry.toString() + "\n")
             }
+            val solveElapsed = System.nanoTime() - started
+            val solveAllocated = allocation.getThreadAllocatedBytes(thread) - startedBytes
             val captureStop = Cancellation.after(10.seconds)
             val snapshot = NumericalFrontierSnapshot(context, captureStop, scale)
             // A snapshot past its inspection allowance leaves the solve record intact.
@@ -248,7 +261,10 @@ internal object MpsProofFrontier {
                 put("sourceSemantics", original.semantics.toString())
                 put("exactRequested", exact)
                 put("randomSeed", params.randomSeed)
-                put("solveDeadlineSeconds", 10)
+                put("solveDeadlineSeconds", solveSeconds ?: 10)
+                put("solveDeadlineIncludesPreparation", solveSeconds == null)
+                put("solveElapsedNs", solveElapsed)
+                put("solveThreadAllocatedBytes", solveAllocated)
                 put("captureDeadlineSeconds", 10)
                 put("captureNodeAllowance", 4096)
                 put("processors", Runtime.getRuntime().availableProcessors())
@@ -263,6 +279,7 @@ internal object MpsProofFrontier {
                 put("sourceCuts", params.sourceCuts)
                 put("supportBranching", supportBranching)
                 put("feedbackDelivery", feedbackDelivery)
+                put("feedbackRequest", feedbackRequest)
                 put("pointCuts", params.sourcePointCuts)
                 put("aggregateCuts", params.sourceAggregateCuts)
                 put("refutationReuse", params.sourceRefutationReuse)
@@ -355,7 +372,8 @@ internal object MpsProofFrontier {
         }.toString() + "\n")
         val process = builder.start()
         try {
-            val timeoutSeconds = if ("feedbackControls=true" in args) 360L else 120L
+            val solveSeconds = args.firstOrNull { it.startsWith("solveSeconds=") }?.substringAfter('=')?.toLong()
+            val timeoutSeconds = if ("feedbackControls=true" in args) 360L else 120L + (solveSeconds ?: 0L)
             check(process.waitFor(timeoutSeconds, TimeUnit.SECONDS)) { "frontier JVM transport timeout" }
             check(process.exitValue() == 0) { "frontier JVM failed" }
         } finally {

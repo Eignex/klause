@@ -13,6 +13,32 @@ import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.magnitudeBitLength
 
+// The fields a feedback consumer reads from a completed query; Full is the inspection archive's shape.
+internal data class LinearAuthorityFeedbackRequest(
+    val point: Boolean = false,
+    val cuts: Cuts = Cuts.None,
+    val refutation: Boolean = false,
+) {
+    // Installed keeps installed, checked cuts with active owners and evaluates their violations on demand.
+    enum class Cuts { None, Installed, All }
+
+    operator fun plus(other: LinearAuthorityFeedbackRequest) = LinearAuthorityFeedbackRequest(
+        point || other.point, maxOf(cuts, other.cuts), refutation || other.refutation)
+
+    fun covers(other: LinearAuthorityFeedbackRequest): Boolean =
+        (point || !other.point) && cuts >= other.cuts && (refutation || !other.refutation)
+
+    companion object {
+        val Full = LinearAuthorityFeedbackRequest(point = true, cuts = Cuts.All, refutation = true)
+    }
+}
+
+internal sealed interface LinearAuthorityCutViolation {
+    data class Available(val value: BigFraction) : LinearAuthorityCutViolation
+    data class Unavailable(val reason: Reason) : LinearAuthorityCutViolation
+    enum class Reason { Unrequested, NoPoint, Uncovered, Released, Oversized, Limit, Cancelled }
+}
+
 internal data class LinearAuthorityCapturedCut(
     val id: Int,
     val owner: Int,
@@ -43,12 +69,16 @@ internal data class LinearAuthorityCapturedQuery(
     val incumbent: BigFraction? = null,
     val parentQuery: Int? = null,
     val boundDisposition: String = "unknown",
+    val projection: LinearAuthorityFeedbackRequest = LinearAuthorityFeedbackRequest.Full,
 )
 
 // Source values and derivations are immutable; numerical owners, queries and their buffers never escape.
 // The archive keeps a bounded inspection prefix. Delivery holds only the latest completed query under a per-query
 // allowance, so a full archive never withholds later queries from a runtime consumer. Archived and delivered
 // records share one construction, which the cumulative constructed ledger counts once; eviction never lowers it.
+// A delivery-only record holds just the requested projection; a field outside it is withheld, never computed.
+// Installed-cut violations are evaluated on demand against the delivered query's remaining allowance and the same
+// ledger, and only while that query is still delivered.
 internal class LinearAuthorityCapture(
     private var maximumRecords: Int,
     private var maximumEntries: Long,
@@ -80,15 +110,22 @@ internal class LinearAuthorityCapture(
     private var delivering = false
     private var deliveryEntries = 0L
     private var deliveryBytes = 0L
+    private var deliveryRequest = LinearAuthorityFeedbackRequest()
     var delivered: LinearAuthorityCapturedQuery? = null
         private set
+    private var deliveredBase: LinearAuthorityCapturedQuery? = null
     var deliveryOverflowed: Boolean = false
+        private set
+    var evaluatedCuts: Long = 0L
+        private set
+    var evaluatedTerms: Long = 0L
         private set
     private var inProgress = false
     private var archive = true
     private var live = false
     private var liveEntries = 0L
     private var liveBytes = 0L
+    private var pointWithheld = false
 
     fun restrict(records: Int, entries: Long, bytes: Long) {
         require(records >= 0 && entries >= 0 && bytes >= 0)
@@ -97,17 +134,24 @@ internal class LinearAuthorityCapture(
         maximumBytes = minOf(maximumBytes, bytes)
     }
 
-    fun deliver(entries: Long, bytes: Long) {
+    fun deliver(
+        entries: Long,
+        bytes: Long,
+        request: LinearAuthorityFeedbackRequest = LinearAuthorityFeedbackRequest.Full,
+    ) {
         require(entries > 0 && bytes > 0)
         deliveryEntries = if (delivering) minOf(deliveryEntries, entries) else entries
         deliveryBytes = if (delivering) minOf(deliveryBytes, bytes) else bytes
+        deliveryRequest = if (delivering) deliveryRequest + request else request
         delivering = true
     }
 
     fun stopDelivery() {
         delivering = false
         delivered = null
+        deliveredBase = null
         deliveryOverflowed = false
+        deliveryRequest = LinearAuthorityFeedbackRequest()
         live = false
     }
 
@@ -119,11 +163,15 @@ internal class LinearAuthorityCapture(
     private fun begin() {
         if (inProgress) return
         inProgress = true
-        archive = true
+        // A full archive is known before construction, so a delivery-only query never spends archive allowance.
+        archive = retained.size < maximumRecords
         live = delivering
         liveEntries = 0L
         liveBytes = 0L
         deliveryOverflowed = false
+        pointWithheld = false
+        // The next query's allowance restarts here, so the previous delivery can no longer be evaluated against it.
+        deliveredBase = null
     }
 
     private fun spend(count: Long, allocation: Long): Boolean {
@@ -164,6 +212,10 @@ internal class LinearAuthorityCapture(
 
     fun point(coordinates: List<SourceCoordinate>, values: List<BigFraction>): Map<SourceCoordinate, BigFraction>? {
         begin()
+        if (!archive && !deliveryRequest.point) {
+            pointWithheld = values.size == coordinates.size
+            return null
+        }
         val archiving = archive
         if (values.size != coordinates.size || !spend(values.size.toLong(), values.size * 48L) ||
             !values.all(::scalar)) {
@@ -208,6 +260,7 @@ internal class LinearAuthorityCapture(
         inProgress = false
         attempted++
         delivered = null
+        deliveredBase = null
         if (archive && retained.size >= maximumRecords) {
             limitReached = true
             archive = false
@@ -215,6 +268,8 @@ internal class LinearAuthorityCapture(
         // Once the archive stops, a delivered record holds references to the immutable source rows, cut
         // definitions and cited derivations its authority prepared; it spends only on references and owned values.
         val shared = !archive && live
+        val projection = if (shared) deliveryRequest else LinearAuthorityFeedbackRequest.Full
+        val full = projection == LinearAuthorityFeedbackRequest.Full
         if (!spend(1L, 256L)) return
         val open = source.coordinates.any {
             it.kind == SourceCoordinate.Kind.Boolean && it.id !in source.scope.condition.bools
@@ -239,8 +294,9 @@ internal class LinearAuthorityCapture(
         val condition = source.scope.condition
         if (!spend(condition.bools.size.toLong(), condition.bools.size * 48L) ||
             !(condition.lower.values + condition.upper.values).all(::scalar)) return
-        if (point != null && !point.values.all(::scalar)) return
-        val cited = query?.cited.orEmpty()
+        val values = point?.takeIf { projection.point }
+        if (values != null && !values.values.all(::scalar)) return
+        val cited = if (full) query?.cited.orEmpty() else emptyList()
         if (shared) {
             if (!spend(cited.size.toLong(), cited.size * 16L)) return
         } else for ((inequality, derivation) in cited) {
@@ -248,48 +304,47 @@ internal class LinearAuthorityCapture(
         }
         val candidates = ArrayList<LinearAuthorityCapturedCut>()
         val definitions = template?.cuts?.rows.orEmpty()
-        for ((id, cut) in definitions.withIndex()) {
+        val ids = when (projection.cuts) {
+            LinearAuthorityFeedbackRequest.Cuts.All -> definitions.indices.toList()
+            LinearAuthorityFeedbackRequest.Cuts.Installed -> if (query == null) emptyList() else
+                query.installedCuts.filter { it in definitions.indices && it in query.checkedCuts }.sorted()
+            LinearAuthorityFeedbackRequest.Cuts.None -> emptyList()
+        }
+        for (id in ids) {
+            val cut = definitions[id]
+            val ownerActive = query != null && cut.owners.none { it in query.inactive }
+            if (projection.cuts == LinearAuthorityFeedbackRequest.Cuts.Installed && !ownerActive) continue
             val extraOwners = (cut.owners.size - 1).toLong()
             if (!spend(1L + extraOwners, 128L + extraOwners * 32L)) return
             if (!shared && (!row(cut.inequality) || !proof(cut.derivation))) return
             var violation: BigFraction? = null
-            if (point != null && cut.inequality.coefficients.keys.all { it in point }) {
-                var activity = BigFraction.ZERO
-                for ((coordinate, coefficient) in cut.inequality.coefficients) {
-                    val value = point.getValue(coordinate)
-                    if (coefficient.num.magnitudeBitLength() + value.num.magnitudeBitLength() > 4096 ||
-                        coefficient.den.magnitudeBitLength() + value.den.magnitudeBitLength() > 4096) return
-                    val product = coefficient * value
-                    if (!scalar(product) || !canAdd(activity, product)) return
-                    activity += product
-                    if (!scalar(activity)) return
-                }
-                if (!canAdd(activity, cut.inequality.rhs)) return
-                violation = activity - cut.inequality.rhs
-                if (!scalar(violation)) return
+            if (projection.cuts == LinearAuthorityFeedbackRequest.Cuts.All && values != null &&
+                cut.inequality.coefficients.keys.all { it in values }) {
+                violation = violation(values, cut.inequality) ?: return
             }
             candidates += LinearAuthorityCapturedCut(id, cut.owner, cut.inequality, cut.derivation,
-                query != null && id in query.installedCuts,
-                query != null && cut.owners.none { it in query.inactive },
+                query != null && id in query.installedCuts, ownerActive,
                 query != null && id in query.checkedCuts, violation, cut.owners)
         }
         val refutation = result.evidence?.takeIf { it.claim == SourceClaim.Refutation }
-        for (evidence in listOfNotNull(result.bound, refutation)) {
-            if (!proof(evidence.derivation)) return
+        val retainedRefutation = refutation?.takeIf { projection.refutation }
+        for (evidence in listOfNotNull(result.bound, retainedRefutation)) {
+            if (if (full) !proof(evidence.derivation) else !spend(1L, 16L)) return
         }
         val captured = LinearAuthorityCapturedQuery((attempted - 1L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
             source, numeric.atScope(source.scope),
             query?.coordinates.orEmpty().toList(),
-            cited.toList(), query?.inactive.orEmpty().toSet(), point?.toMap(), candidates.toList(),
-            template?.cuts?.observations.orEmpty().toMap(), result.bound, refutation, when {
+            cited.toList(), query?.inactive.orEmpty().toSet(), values?.toMap(), candidates.toList(),
+            if (full) template?.cuts?.observations.orEmpty().toMap() else emptyMap(), result.bound,
+            retainedRefutation, when {
                 refutation != null -> "checked-refutation"
                 open && query != null -> "active-no-refutation"
                 open -> "open-booleans"
                 query == null -> "query-unavailable"
-                point == null -> "point-unavailable"
+                point == null && !pointWithheld -> "point-unavailable"
                 result.bound == null -> "bound-unavailable"
                 else -> "completed"
-            })
+            }, projection = projection)
         if (archive) {
             retained += captured
             recordedAttempt = attempted
@@ -298,6 +353,7 @@ internal class LinearAuthorityCapture(
             constructedEntries++
             constructedBytes += 64L
             delivered = captured
+            deliveredBase = captured
         }
     }
 
@@ -327,6 +383,66 @@ internal class LinearAuthorityCapture(
             parentQuery = retained.lastOrNull { it.context.scope == parent }?.id, boundDisposition = disposition)
         if (archive && archived != null) retained[retained.lastIndex] = linked
         if (live && current != null) delivered = linked
+    }
+
+    fun violation(query: LinearAuthorityCapturedQuery, cut: LinearAuthorityCapturedCut): LinearAuthorityCutViolation {
+        val values = query.point
+        fun missing(reason: LinearAuthorityCutViolation.Reason) = LinearAuthorityCutViolation.Unavailable(reason)
+        when (query.projection.cuts) {
+            LinearAuthorityFeedbackRequest.Cuts.None -> return missing(LinearAuthorityCutViolation.Reason.Unrequested)
+            LinearAuthorityFeedbackRequest.Cuts.All -> return cut.violation?.let {
+                LinearAuthorityCutViolation.Available(it)
+            } ?: missing(if (values == null) LinearAuthorityCutViolation.Reason.NoPoint
+                else LinearAuthorityCutViolation.Reason.Uncovered)
+            LinearAuthorityFeedbackRequest.Cuts.Installed -> Unit
+        }
+        val base = deliveredBase
+        if (inProgress || base == null || (query !== base && query !== delivered)) {
+            return missing(LinearAuthorityCutViolation.Reason.Released)
+        }
+        if (stop()) return missing(LinearAuthorityCutViolation.Reason.Cancelled)
+        if (values == null) return missing(LinearAuthorityCutViolation.Reason.NoPoint)
+        if (!cut.inequality.coefficients.keys.all { it in values }) {
+            return missing(LinearAuthorityCutViolation.Reason.Uncovered)
+        }
+        // Evaluation extends only the delivered query's own allowance; the archive never holds its result.
+        val archiving = archive
+        val delivering = live
+        val overflowed = deliveryOverflowed
+        val limited = limitReached
+        archive = false
+        live = true
+        try {
+            violation(values, cut.inequality)?.let { return LinearAuthorityCutViolation.Available(it) }
+            return missing(when {
+                stop() -> LinearAuthorityCutViolation.Reason.Cancelled
+                !live -> LinearAuthorityCutViolation.Reason.Oversized
+                else -> LinearAuthorityCutViolation.Reason.Limit
+            })
+        } finally {
+            archive = archiving
+            live = delivering
+            deliveryOverflowed = overflowed
+            limitReached = limited
+        }
+    }
+
+    // Null when an operand exceeds the exact arithmetic limits or the remaining allowance.
+    private fun violation(values: Map<SourceCoordinate, BigFraction>, inequality: SourceInequality): BigFraction? {
+        evaluatedCuts++
+        var activity = BigFraction.ZERO
+        for ((coordinate, coefficient) in inequality.coefficients) {
+            val value = values.getValue(coordinate)
+            if (coefficient.num.magnitudeBitLength() + value.num.magnitudeBitLength() > 4096 ||
+                coefficient.den.magnitudeBitLength() + value.den.magnitudeBitLength() > 4096) return null
+            evaluatedTerms++
+            val product = coefficient * value
+            if (!scalar(product) || !canAdd(activity, product)) return null
+            activity += product
+            if (!scalar(activity)) return null
+        }
+        if (!canAdd(activity, inequality.rhs)) return null
+        return (activity - inequality.rhs).takeIf(::scalar)
     }
 
     private fun canAdd(left: BigFraction, right: BigFraction): Boolean =

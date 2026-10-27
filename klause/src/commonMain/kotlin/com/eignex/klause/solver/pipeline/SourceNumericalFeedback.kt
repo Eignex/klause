@@ -4,7 +4,10 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.optimization.LinearAuthority
 import com.eignex.klause.lp.optimization.LinearAuthorityCapture
+import com.eignex.klause.lp.optimization.LinearAuthorityCapturedCut
 import com.eignex.klause.lp.optimization.LinearAuthorityCapturedQuery
+import com.eignex.klause.lp.optimization.LinearAuthorityCutViolation
+import com.eignex.klause.lp.optimization.LinearAuthorityFeedbackRequest
 import com.eignex.klause.lp.optimization.LinearAuthorityResult
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceInequality
@@ -101,10 +104,12 @@ internal data class SourceNumericalAcquisition(
 // Exact-valued relaxation coordinates are guidance, including when a bound was certified.
 // Latest delivery reads the journal's delivered query, so archive retention never withholds a later query.
 // Prefix delivery reads only the archive and reports every query after its retention limit as unavailable.
+// The request names the projection this consumer reads; a query delivered after the archive stops holds only that.
 internal class SourceNumericalFeedback(
     private val funding: SourceLpFunding,
     private val cancellation: Cancellation,
     private val latest: Boolean = true,
+    val request: LinearAuthorityFeedbackRequest = LinearAuthorityFeedbackRequest.Full,
 ) {
     private var journal = LinearAuthorityCapture(64, 250_000L, 8L * 1024 * 1024, cancellation)
     private val owned = journal
@@ -117,6 +122,8 @@ internal class SourceNumericalFeedback(
         private set
     var unavailable: Long = 0L
         private set
+    val evaluatedCuts: Long get() = journal.evaluatedCuts
+    val evaluatedTerms: Long get() = journal.evaluatedTerms
 
     fun attach(authority: LinearAuthority) {
         require(authority.funding === funding)
@@ -131,7 +138,7 @@ internal class SourceNumericalFeedback(
             consumed = journal.attempted
         }
         journal.restrict(64, 250_000L, 8L * 1024 * 1024)
-        if (latest) journal.deliver(250_000L, 8L * 1024 * 1024)
+        if (latest) journal.deliver(250_000L, 8L * 1024 * 1024, request)
     }
 
     fun acquire(
@@ -154,6 +161,12 @@ internal class SourceNumericalFeedback(
 
     fun refutationSupport(record: SourceNumericalFeedbackResult.Available): SourceNumericalSupportResult =
         sourceNumericalRefutationSupport(record, funding, cancellation)
+
+    // On-demand evaluation is debited to source funding at once; a replaced or released query declines.
+    fun violation(
+        record: SourceNumericalFeedbackResult.Available,
+        cut: LinearAuthorityCapturedCut,
+    ): LinearAuthorityCutViolation = journal.violation(record.query, cut).also { settle() }
 
     private fun settle() {
         funding.charge(journal.constructedEntries - chargedEntries, journal.constructedBytes - chargedBytes)

@@ -32,6 +32,8 @@ class LinearAuthorityCaptureTest {
     private val source = SourceProofContext(scope, setOf(x), mapOf(
         "lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(-2)), BigFraction.MINUS_ONE)),
     ), mapOf(x to BigFraction.ONE))
+    private val installed = LinearAuthorityFeedbackRequest(point = true,
+        cuts = LinearAuthorityFeedbackRequest.Cuts.Installed)
 
     @Test
     fun `candidate violation should precede insertion and survive owner close`() {
@@ -269,5 +271,138 @@ class LinearAuthorityCaptureTest {
         assertEquals("open-booleans", capture.records.single().state)
         assertNull(capture.records.single().point)
         assertTrue(capture.records.single().cuts.isEmpty())
+    }
+
+    @Test
+    fun `a requested projection should match the full record on its requested fields`() {
+        for (request in listOf(installed, LinearAuthorityFeedbackRequest(refutation = true),
+            LinearAuthorityFeedbackRequest())) {
+            val full = LinearAuthorityCapture(0, 0L, 0L, Cancellation.Never).apply { deliver(10_000L, 1_000_000L) }
+            val narrow = LinearAuthorityCapture(0, 0L, 0L, Cancellation.Never).apply {
+                deliver(10_000L, 1_000_000L, request)
+            }
+            for (mask in listOf(emptySet(), null)) {
+                val (expected, actual) = listOf(full, narrow).map { capture ->
+                    LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
+                        authority.capture = capture
+                        authority.advance(source, Cancellation.Never, cuts = true, cutMask = mask)
+                    }
+                    assertNotNull(capture.delivered)
+                }
+
+                assertEquals(request, actual.projection)
+                assertEquals(expected.state, actual.state)
+                assertEquals(expected.context, actual.context)
+                assertEquals(expected.point.takeIf { request.point }, actual.point)
+                assertEquals(expected.refutation.takeIf { request.refutation }, actual.refutation)
+                val kept = if (request.cuts == LinearAuthorityFeedbackRequest.Cuts.None) emptyList()
+                    else expected.cuts.filter { it.installed && it.checked && it.ownerActive }
+                assertEquals(kept.map { it.copy(violation = null) }, actual.cuts)
+                for ((reference, cut) in kept.zip(actual.cuts)) {
+                    assertEquals(full.violation(expected, reference), narrow.violation(actual, cut))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `a requested projection should never evaluate unrequested cuts`() {
+        val full = LinearAuthorityCapture(0, 0L, 0L, Cancellation.Never).apply { deliver(10_000L, 1_000_000L) }
+        val narrow = LinearAuthorityCapture(0, 0L, 0L, Cancellation.Never).apply {
+            deliver(10_000L, 1_000_000L, installed)
+        }
+
+        for (capture in listOf(full, narrow)) {
+            LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
+                authority.capture = capture
+                authority.advance(source, Cancellation.Never, cuts = true, cutMask = emptySet())
+            }
+        }
+
+        assertEquals(1L, full.evaluatedCuts)
+        assertEquals(0L, narrow.evaluatedCuts)
+        assertTrue(narrow.constructedBytes < full.constructedBytes)
+    }
+
+    @Test
+    fun `on-demand evaluation should debit the cumulative construction ledger`() {
+        val capture = LinearAuthorityCapture(0, 0L, 0L, Cancellation.Never).apply {
+            deliver(10_000L, 1_000_000L, installed)
+        }
+        LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
+            authority.capture = capture
+            authority.advance(source, Cancellation.Never, cuts = true)
+        }
+        val record = assertNotNull(capture.delivered)
+        val bytes = capture.constructedBytes
+
+        val evaluated = capture.violation(record, record.cuts.single())
+
+        assertEquals(LinearAuthorityCutViolation.Available(BigFraction.ZERO), evaluated)
+        assertTrue(capture.constructedBytes > bytes)
+        assertEquals(1L, capture.evaluatedCuts)
+    }
+
+    @Test
+    fun `on-demand evaluation beyond the delivered allowance should be oversized`() {
+        val measured = LinearAuthorityCapture(0, 0L, 0L, Cancellation.Never).apply {
+            deliver(10_000L, 1_000_000L, installed)
+        }
+        LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
+            authority.capture = measured
+            authority.advance(source, Cancellation.Never, cuts = true)
+        }
+        val capture = LinearAuthorityCapture(0, 0L, 0L, Cancellation.Never).apply {
+            deliver(10_000L, measured.constructedBytes - 64L, installed)
+        }
+        LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
+            authority.capture = capture
+            authority.advance(source, Cancellation.Never, cuts = true)
+        }
+        val record = assertNotNull(capture.delivered)
+
+        val evaluated = capture.violation(record, record.cuts.single())
+
+        assertEquals(LinearAuthorityCutViolation.Unavailable(LinearAuthorityCutViolation.Reason.Oversized), evaluated)
+        assertTrue(capture.delivered === record)
+    }
+
+    @Test
+    fun `on-demand evaluation should decline once its query is replaced or released`() {
+        val capture = LinearAuthorityCapture(0, 0L, 0L, Cancellation.Never).apply {
+            deliver(10_000L, 1_000_000L, installed)
+        }
+        val (replaced, released) = LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
+            authority.capture = capture
+            authority.advance(source, Cancellation.Never, cuts = true)
+            val first = assertNotNull(capture.delivered)
+            authority.advance(source, Cancellation.Never, cuts = true, cutMask = emptySet())
+            authority.advance(source, Cancellation.Never, cuts = true)
+            first to assertNotNull(capture.delivered).also { capture.stopDelivery() }
+        }
+
+        for (record in listOf(replaced, released)) {
+            assertEquals(LinearAuthorityCutViolation.Unavailable(LinearAuthorityCutViolation.Reason.Released),
+                capture.violation(record, record.cuts.single()))
+        }
+        assertEquals(0L, capture.evaluatedCuts)
+    }
+
+    @Test
+    fun `on-demand evaluation should decline after cancellation`() {
+        var stopped = false
+        val capture = LinearAuthorityCapture(0, 0L, 0L, Cancellation { stopped }).apply {
+            deliver(10_000L, 1_000_000L, installed)
+        }
+        LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
+            authority.capture = capture
+            authority.advance(source, Cancellation.Never, cuts = true)
+        }
+        val record = assertNotNull(capture.delivered)
+        stopped = true
+
+        val evaluated = capture.violation(record, record.cuts.single())
+
+        assertEquals(LinearAuthorityCutViolation.Unavailable(LinearAuthorityCutViolation.Reason.Cancelled), evaluated)
     }
 }
