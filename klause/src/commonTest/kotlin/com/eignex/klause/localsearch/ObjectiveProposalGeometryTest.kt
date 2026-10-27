@@ -59,4 +59,24 @@ class ObjectiveProposalGeometryTest {
 
         assertFalse(admitted)
     }
+
+    @Test
+    fun `complete candidate values detect domain clamping despite maintained cones`() {
+        val problem = Problem(0, 2, arrayOf(IntDomain(0, 8), IntDomain(0, 4)), emptyArray())
+        val sweep = assertNotNull(DefinitionalSweep.fromSource(problem, listOf(
+            DefinitionHint.Linear(1, longArrayOf(1, -1), arrayOf(
+                DefinitionHint.Operand.Variable(0), DefinitionHint.Operand.Variable(1)), 0),
+        )))
+        val canonical = LinearObjective(intCoefficients = longArrayOf(0, 1))
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        state.invariants = sweep.network(2, 0)
+        state.shaping.objective = canonical
+        sweep.sweep(state.assignment, state.rootDomains)
+        state.recompute()
+
+        val agrees = objectiveProposalValuesAgree(state, assertNotNull(sweep.functionalObjective(canonical)),
+            Move.IntSet(0, 8))
+
+        assertFalse(agrees)
+    }
 }

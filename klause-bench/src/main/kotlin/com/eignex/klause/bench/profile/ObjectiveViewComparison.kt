@@ -169,6 +169,10 @@ internal object ObjectiveViewComparison {
         }
         val sourceCheck = source.problem.bake()
         val geometry = options["geometry"]?.toBooleanStrict() ?: false
+        if (suppliedCenter != null && LocalSearchCatalog.byLabel(recipe).seedImplicitOnRestart) {
+            out.resolve("decline.json").writeText("{\"decline\":\"center-implicit-ownership-unsupported\"}")
+            return
+        }
         val states = ArrayList<TrajectoryView>()
         val boundaries = ArrayList<Boundary>()
         for (view in View.entries.filter { geometry || !it.geometry }) {
@@ -229,9 +233,10 @@ internal object ObjectiveViewComparison {
             }
             if (initial != null) {
                 states += initial
-                captureObjectiveProposals(initial, boundaries.last().source, prepared.gradient,
+                val qualified = captureObjectiveProposals(initial, boundaries.last().source, prepared.gradient,
                     prepared.pipeline.objective, requireNotNull(source.objective).toLinearObjective(), sourceCheck,
                     directory.resolve("proposals.json"))
+                if (view.geometry && !qualified) continue
             }
             val remaining = timeout - (prepared.nanos + centerNanos + 999999) / 1000000
             if (remaining > 0) run(source, prepared, view, recipe, seed, moves, greedy, remaining,

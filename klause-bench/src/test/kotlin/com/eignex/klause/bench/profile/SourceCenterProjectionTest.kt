@@ -1,18 +1,40 @@
 package com.eignex.klause.bench.profile
 
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.ir.DefinitionHint
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.VarRemap
+import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class SourceCenterProjectionTest {
+    @Test
+    fun `fresh definition networks retain a complete mixed center`() {
+        val problem = Problem(1, 1, arrayOf(IntDomain(0, 1)),
+            arrayOf(ReifiedLinear(0, longArrayOf(1), intArrayOf(0), LinearOp.EQ, 1)))
+        val sweep = assertNotNull(DefinitionalSweep.fromSource(problem,
+            listOf(DefinitionHint.BooleanValue(0, Lit.make(0, true)))))
+        val center = Sample(booleanArrayOf(true), longArrayOf(1))
+
+        val (projected, decline) = projectedSourceCenter(center, problem.bake(),
+            VarRemap(intArrayOf(0), intArrayOf(0)), sweep, { it })
+
+        assertNull(decline)
+        assertEquals(center, projected)
+    }
+
     @Test
     fun `complete centers follow reordered Boolean and integer maps`() {
         val problem = Problem(2, 2, Array(2) { IntDomain(0, 9) }, emptyArray())

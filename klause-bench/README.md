@@ -1662,7 +1662,9 @@ source round trips after definition reconciliation. Native source and working
 feasibility checks precede the warm start. The first observed state must retain
 that source center; random initialization and greedy replacement are bypassed.
 Channel arms replay the same supplied center with fresh weights, tabu,
-configuration and worker RNG. `timeoutMillis=100..60000` contains preparation and
+configuration and worker RNG. Implicit-seeding recipes decline explicit-center
+replay because that seeding can replace the center and establish different owners.
+`timeoutMillis=100..60000` contains preparation and
 each walk; `moves` retains the ordinary containing move/restart cap. Mapping and
 checking cost and deadline censoring stay explicit.
 `recipe=source-coordinate-descent`
@@ -1878,7 +1880,10 @@ decline. The ordinary sink retains pins, definitions and ownership; no source
 relation or feasible objective order changes. `proposals.json` separates raw
 templates from sink-emitted moves (channel expansion can add moves), and retains
 up to 32 complete candidate destinations, exact canonical/source values and native
-source checks. Complete candidate value agreement and the structural cone check
+source checks. Every distinct emitted seed move at that center receives a complete
+value comparison under a ten-second allowance; disagreements or incomplete scans
+decline geometry walks. Domain clamping can make raw cone values differ despite
+live maintenance. Complete candidate value agreement and the structural cone check
 remain distinct from global equivalence inferred from sampled grades. Walk counts,
 native incumbents, time and allocation remain the efficacy observations; proposal
 counts alone establish no improvement. Private proposal screening runs outside
