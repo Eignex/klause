@@ -745,7 +745,7 @@ internal object Suites {
         vendored("assignment-exchange", Category.OPTIMIZATION, Expected.Unknown,
             relPath = "finite-repair/assignment-exchange.xml")
         for (name in listOf("resource-exchange", "placement-exchange", "assignment-cycle", "resource-cycle",
-            "placement-cycle", "assignment-four-cycle")) {
+            "placement-cycle", "assignment-four-cycle", "assignment-unused")) {
             vendored(name, Category.OPTIMIZATION, Expected.Unknown, relPath = "finite-repair/$name.xml")
         }
         for (name in listOf("overlap-tables-unsat", "overlap-mdd-unsat", "overlap-mdd-sat")) {

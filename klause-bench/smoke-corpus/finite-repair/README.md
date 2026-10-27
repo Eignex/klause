@@ -23,3 +23,8 @@ the fixed `y=0`, `one=1` declarations to that center. Other declarations are
 unrelated inputs. `assignment-four-cycle.xml` extends the same construction to
 four active declarations, with center `0,0,0,1,0,0,2,0,0,3` and optimum zero.
 No proper subset of its active inputs admits a strict improvement.
+
+`assignment-unused.xml` keeps spare values: active `x3`, `x6` have domains `{1,3}`,
+`{1,2}`, so value `3` is unused at center `0,0,0,1,0,0,2` with objective two. The
+optimum `x3=3`, `x6=1` changes both active inputs and the occupied value set; no
+exchange of their current values is in both domains, and neither alone improves.
