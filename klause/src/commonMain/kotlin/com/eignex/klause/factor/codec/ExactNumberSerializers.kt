@@ -1,4 +1,4 @@
-package com.eignex.klause.formats.json
+package com.eignex.klause.factor.codec
 
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.simplex.exact.BigFraction
@@ -36,7 +36,7 @@ private fun parseRationalParts(text: String): Pair<BigInt, BigInt> {
 /** Arbitrary-width integer as a decimal string. */
 internal object BigIntSerializer : KSerializer<BigInt> {
     override val descriptor: SerialDescriptor =
-        PrimitiveSerialDescriptor("com.eignex.klause.formats.json.ExactInteger", PrimitiveKind.STRING)
+        PrimitiveSerialDescriptor("com.eignex.klause.factor.codec.ExactInteger", PrimitiveKind.STRING)
 
     override fun serialize(encoder: Encoder, value: BigInt) = encoder.encodeString(value.toString())
 
@@ -46,7 +46,7 @@ internal object BigIntSerializer : KSerializer<BigInt> {
 /** Exact rational as `numerator` or `numerator/denominator`. */
 internal object BigFractionSerializer : KSerializer<BigFraction> {
     override val descriptor: SerialDescriptor =
-        PrimitiveSerialDescriptor("com.eignex.klause.formats.json.ExactRational", PrimitiveKind.STRING)
+        PrimitiveSerialDescriptor("com.eignex.klause.factor.codec.ExactRational", PrimitiveKind.STRING)
 
     override fun serialize(encoder: Encoder, value: BigFraction) = encoder.encodeString(value.toString())
 
@@ -57,7 +57,7 @@ internal object BigFractionSerializer : KSerializer<BigFraction> {
 /** Source-semantic rational, written like [BigFractionSerializer]. */
 internal object SemanticRationalSerializer : KSerializer<SemanticRational> {
     override val descriptor: SerialDescriptor =
-        PrimitiveSerialDescriptor("com.eignex.klause.formats.json.SemanticRational", PrimitiveKind.STRING)
+        PrimitiveSerialDescriptor("com.eignex.klause.factor.codec.SemanticRational", PrimitiveKind.STRING)
 
     override fun serialize(encoder: Encoder, value: SemanticRational) = encoder.encodeString(
         if (value.denominator == BIG_ONE) "${value.numerator}" else "${value.numerator}/${value.denominator}",

@@ -35,6 +35,9 @@ import com.eignex.klause.factor.bool.GaussianXor
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.bool.Xor
 import com.eignex.klause.factor.circuit.Circuit
+import com.eignex.klause.factor.codec.FactorCodecs
+import com.eignex.klause.factor.codec.MissingFactorCodecException
+import com.eignex.klause.factor.codec.factorCodec
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.AllDifferentTuples
 import com.eignex.klause.factor.global.Distinct
@@ -431,18 +434,6 @@ class ProblemJsonTest {
         val error = assertFailsWith<MissingFactorCodecException> { json.decodeFromString(text) }
 
         assertEquals("$.factors[0].parity", error.path)
-    }
-
-    @Test
-    fun `a registry should reject a second codec for a key or factor class`() {
-        val duplicates = listOf(
-            factorCodec<Parity, ParityPayload>("clause", { ParityPayload(it.x, it.even) }, { Parity(it.x, it.even) }),
-            factorCodec<Clause, ParityPayload>("parityClause", { ParityPayload(0, true) }, { Clause(intArrayOf(0)) }),
-        )
-
-        for (duplicate in duplicates) {
-            assertFailsWith<IllegalArgumentException>(duplicate.key) { FactorCodecs.builtin + duplicate }
-        }
     }
 
     @Test

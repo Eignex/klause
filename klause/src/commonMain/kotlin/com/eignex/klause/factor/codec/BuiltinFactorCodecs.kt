@@ -1,4 +1,4 @@
-package com.eignex.klause.formats.json
+package com.eignex.klause.factor.codec
 
 // Every factor a source model can hold. Engine projections that solving appends to a baked model
 // (`DifferenceSystem`, `ExactSearchRow`, encoded theory rows and the objective-bound factor) carry

@@ -134,8 +134,8 @@ bounds keep their binary64 values, signed zeros included. The document also carr
 implied-factor indices, `symmetryBreaking`, non-default resource `settings` and the
 declared and effective source `semantics`, each omitted at its default.
 
-Each factor is `{key: payload}`, written by the `FactorCodec` registered for its exact
-class, so native kinds and options survive without decomposition or narrowing.
+Each factor is `{key: payload}`, written by the `factor.codec.FactorCodec` registered for
+its exact class, so native kinds and options survive without decomposition or narrowing.
 Constants keep the width they were built at: 64-bit integers are numbers, wider
 integers and exact rationals are decimal strings such as `"-3/4"`, and binary64
 constants use the shortest exact decimal. `FactorCodecs.builtin` covers every factor a
