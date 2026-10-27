@@ -11618,6 +11618,7 @@ public final class com/eignex/klause/solver/pipeline/ExecutionOption$Companion {
 	public final fun getNiaCandidates ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getNiaCellRefinement ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getNiaCellReuse ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getNiaCellSteering ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getNiaMoves ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getNodeLimit ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getNoise ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
@@ -11963,8 +11964,13 @@ public final class com/eignex/klause/solver/pipeline/NativeGridOutcome {
 }
 
 public final class com/eignex/klause/solver/pipeline/NonlinearIntegerCellReuseStats {
-	public fun <init> (ZZJJJJJJ)V
+	public fun <init> (ZZJJJJJJZJJJJ)V
+	public synthetic fun <init> (ZZJJJJJJZJJJJILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Z
+	public final fun component10 ()J
+	public final fun component11 ()J
+	public final fun component12 ()J
+	public final fun component13 ()J
 	public final fun component2 ()Z
 	public final fun component3 ()J
 	public final fun component4 ()J
@@ -11972,33 +11978,40 @@ public final class com/eignex/klause/solver/pipeline/NonlinearIntegerCellReuseSt
 	public final fun component6 ()J
 	public final fun component7 ()J
 	public final fun component8 ()J
-	public final fun copy (ZZJJJJJJ)Lcom/eignex/klause/solver/pipeline/NonlinearIntegerCellReuseStats;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/NonlinearIntegerCellReuseStats;ZZJJJJJJILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/NonlinearIntegerCellReuseStats;
+	public final fun component9 ()Z
+	public final fun copy (ZZJJJJJJZJJJJ)Lcom/eignex/klause/solver/pipeline/NonlinearIntegerCellReuseStats;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/NonlinearIntegerCellReuseStats;ZZJJJJJJZJJJJILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/NonlinearIntegerCellReuseStats;
 	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAllowedTuples ()J
 	public final fun getCompletionChecks ()J
 	public final fun getDeclined ()J
+	public final fun getDuplicateTuples ()J
 	public final fun getExcludedTuples ()J
 	public final fun getObserved ()J
 	public final fun getProducerEnabled ()Z
 	public final fun getRepeatedSupports ()J
 	public final fun getRetained ()J
 	public final fun getReuseEnabled ()Z
+	public final fun getSelections ()J
+	public final fun getSteeredTuples ()J
+	public final fun getSteeringEnabled ()Z
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParams {
 	public fun <init> ()V
-	public fun <init> (Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;JJLcom/eignex/klause/backtrack/NodeBudget;ZZ)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;JJLcom/eignex/klause/backtrack/NodeBudget;ZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;JJLcom/eignex/klause/backtrack/NodeBudget;ZZZ)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;JJLcom/eignex/klause/backtrack/NodeBudget;ZZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;
 	public final fun component2 ()J
 	public final fun component3 ()J
 	public final fun component4 ()Lcom/eignex/klause/backtrack/NodeBudget;
 	public final fun component5 ()Z
 	public final fun component6 ()Z
-	public final fun copy (Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;JJLcom/eignex/klause/backtrack/NodeBudget;ZZ)Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParams;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParams;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;JJLcom/eignex/klause/backtrack/NodeBudget;ZZILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParams;
+	public final fun component7 ()Z
+	public final fun copy (Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;JJLcom/eignex/klause/backtrack/NodeBudget;ZZZ)Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParams;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParams;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;JJLcom/eignex/klause/backtrack/NodeBudget;ZZZILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParams;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getCellRefinement ()Z
 	public final fun getMaximumCandidates ()J
@@ -12006,6 +12019,7 @@ public final class com/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParam
 	public final fun getNodeBudget ()Lcom/eignex/klause/backtrack/NodeBudget;
 	public final fun getPolynomial ()Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;
 	public final fun getReuseSourceCells ()Z
+	public final fun getSteerSourceCells ()Z
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
