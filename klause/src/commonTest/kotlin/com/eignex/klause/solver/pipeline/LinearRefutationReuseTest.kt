@@ -85,7 +85,7 @@ class LinearRefutationReuseTest {
         val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
         val opening = SourceCondition(upper = mapOf(other to BigFraction.ZERO))
-        val local = SourceProofContext(scope.copy(condition = opening), setOf(integer, bool, other),
+        val local = SourceProofContext(scope.copy(condition = opening), setOf(integer, bool, x, other),
             mapOf("lower" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.MINUS_ONE),
                 BigFraction.MINUS_ONE), mapOf(0 to true))))
         val conflict = LinearPinnedRefutation(SourceDerivation.Combination(listOf(
