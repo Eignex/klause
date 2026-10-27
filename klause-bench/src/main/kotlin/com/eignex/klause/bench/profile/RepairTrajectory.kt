@@ -26,10 +26,11 @@ import kotlin.random.Random
 import kotlin.time.Duration.Companion.seconds
 
 internal object RepairTrajectory {
-    fun attach(solver: LocalSearchSolver, rule: String): Any {
+    fun attach(solver: LocalSearchSolver, rule: String, maxCoordinates: Int = 4096): Any {
+        require(maxCoordinates in 1..TRAJECTORY_COORDINATE_LIMIT)
         val type = Class.forName("com.eignex.klause.localsearch.RepairTrace")
         val trace = type.getDeclaredConstructor(String::class.java, Int::class.javaPrimitiveType,
-            Int::class.javaPrimitiveType).newInstance(rule, 32, 4096)
+            Int::class.javaPrimitiveType).newInstance(rule, 32, maxCoordinates)
         val engine = checkNotNull(get(solver, "Engine"))
         engine.javaClass.methods.single { it.name.substringBefore('$') == "setRepairTrace" }.invoke(engine, trace)
         return trace
