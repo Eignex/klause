@@ -34,6 +34,7 @@ internal class LinearRefutationReuse(
         val evidence: SourceEvidence,
         val support: SourceCondition,
         val resolved: Boolean,
+        val unfixedPivot: Boolean,
     )
     private data class Side(val coordinate: SourceCoordinate, val upper: Boolean)
     private data class Predicate(val coordinate: SourceCoordinate, val value: BigFraction, val upper: Boolean)
@@ -362,6 +363,16 @@ internal class LinearRefutationReuse(
         }
     }
 
+    private fun unfixedPivot(entry: Entry, condition: SourceCondition): Boolean? {
+        if (entry.depth == 0) return false
+        if (!spend(2L + 2L * entry.restrictions, 192L + 96L * entry.restrictions)) return null
+        val split = entry.evidence.derivation as? SourceDerivation.IntegerSplit ?: return false
+        val lower = condition.lower[split.coordinate]
+        val upper = condition.upper[split.coordinate]
+        return (upper == null || upper > split.threshold) &&
+            (lower == null || lower < split.threshold + BigFraction.ONE)
+    }
+
     fun find(condition: SourceCondition): SourceEvidence? {
         if (retired || entries.isEmpty() || cancellation() || budget.funding?.paused == true) return null
         proofPolls = 0
@@ -383,11 +394,13 @@ internal class LinearRefutationReuse(
             if (!condition.implies(entry.evidence.scope.condition)) continue
             val imported = SourceEvidence(source.scope.copy(condition = condition), SourceClaim.Refutation,
                 SourceDerivation.Import(entry.evidence))
+            val unfixed = unfixedPivot(entry, condition) ?: return null
             when (verify(imported)) {
                 SourceEvidenceCheck.Checked -> {
                     if (retired || cancellation() || budget.funding?.paused == true) return null
                     observe("Hits")
                     if (entry.depth > 0) observe("ResolutionHits")
+                    if (unfixed) observe("ResolutionUnfixedHits")
                     return imported
                 }
                 is SourceEvidenceCheck.Rejected -> observe("Rejected")
@@ -429,12 +442,13 @@ internal class LinearRefutationReuse(
             val scoped = condition.bound(coordinate, value, isUpper)
             val imported = SourceEvidence(source.scope.copy(condition = scoped), SourceClaim.Refutation,
                 SourceDerivation.Import(entry.evidence))
+            val unfixed = unfixedPivot(entry, scoped) ?: return null
             when (verify(imported)) {
                 SourceEvidenceCheck.Checked -> {
                     if (retired || cancellation() || budget.funding?.paused == true) return null
                     observe("UnitChecks")
                     if (entry.depth > 0) observe("ResolutionUnits")
-                    return UnitExclusion(coordinate, threshold, isUpper, imported, required, entry.depth > 0)
+                    return UnitExclusion(coordinate, threshold, isUpper, imported, required, entry.depth > 0, unfixed)
                 }
                 is SourceEvidenceCheck.Rejected -> observe("UnitRejected")
                 is SourceEvidenceCheck.Unavailable -> {

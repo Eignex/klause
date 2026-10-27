@@ -276,6 +276,7 @@ internal class LinearAuthorityTraversal(
             val result = context.imply(survivor.literal, explanation)
             if (result !is ComponentResult.Consistent) return result
             if (exclusion.resolved) observe("numericalRefutationResolvedDeductions")
+            if (exclusion.unfixedPivot) observe("numericalRefutationUnfixedDeductions")
         }
         return ComponentResult.Consistent
     }
