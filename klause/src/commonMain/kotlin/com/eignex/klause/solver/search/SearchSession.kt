@@ -548,17 +548,9 @@ class SearchSession(
     }
 
     private fun resolve(clause: List<Int>, pivot: Int, reason: SearchExplanation): List<Int>? {
-        val implied = pivot xor 1
-        if (implied !in reason.literals) return null
-        val resolvent = LinkedHashSet<Int>(clause.size + reason.literals.size)
-        for (literal in clause) if (literal != pivot && !addFalseLiteral(resolvent, literal)) return null
-        for (literal in reason.literals) if (literal != implied && !addFalseLiteral(resolvent, literal)) return null
-        if (pivot in resolvent) return null
-        return resolvent.toList()
+        val resolvent = resolveSearchClauses(clause.toIntArray(), reason.literals, pivot) ?: return null
+        return resolvent.takeIf { it.all(::isFalseLiteral) }?.toList()
     }
-
-    private fun addFalseLiteral(clause: MutableSet<Int>, literal: Int): Boolean =
-        isFalseLiteral(literal) && literal xor 1 !in clause && (literal in clause || clause.add(literal))
 
     private var coordinateOwners: Map<SearchComponent, SearchCoordinateOwnership>? = null
 

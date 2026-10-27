@@ -70,6 +70,16 @@ deduction. The coverage tree retains the excluded sibling's checked refutation
 alongside the surviving branch. Retraction removes the implication, and replay
 restores it only after its named antecedents hold again.
 
+Opt-in numerical refutation resolution combines checked clauses across an already
+named complementary integral predicate. Shared clause resolution removes the pivot;
+an exhaustive source integer split checks both imported refutations in the resulting
+scope. Only a fresh checked import can exclude a queued region. Such exclusions and
+unit deductions retain ordinary coverage-tree accounting. Complete Boolean scope and
+opening restrictions remain premises; stopped resolution leaves alternatives open.
+Unit reasons select established support predicates, including stronger endpoints,
+and omit unrelated integer decisions. Clause and proof storage share the bounded
+invocation-local refutation index and cumulative source allowances.
+
 A model policy can pause required completion with `SearchModelDisposition.Pause`.
 The run retains the assembled model and its decision trail, and retries that policy
 before node pruning, branching or complete checks. Pausing neither blocks the model

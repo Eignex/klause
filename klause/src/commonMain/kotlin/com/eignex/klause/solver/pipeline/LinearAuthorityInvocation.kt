@@ -101,11 +101,11 @@ internal class LinearAuthorityInvocation(
         inheritBounds = boundOrdered, useCuts = cuts,
         useActiveRows = activeRows, useRefutationReuse = params.sourceRefutationReuse,
         useRefutationPropagation = params.sourceRefutationPropagation,
-        useSupportBranching = supportBranching,
+        useRefutationResolution = params.sourceRefutationResolution, useSupportBranching = supportBranching,
         pointCuts = boundOrdered && params.sourcePointCuts, onNumericalFeedback = onNumericalFeedback,
         aggregateCuts = boundOrdered && params.sourceAggregateCuts, latestFeedback = latestFeedback)
     private val session = SearchComponentSet(listOf(component)).session(params.maxLeaves, stop,
-        atoms = if (params.sourceRefutationPropagation) SearchAtomRegistry(context.coordinates.filter {
+        atoms = if (params.sourceRefutationPropagation || params.sourceRefutationResolution) SearchAtomRegistry(context.coordinates.filter {
             it.kind == com.eignex.klause.solver.evidence.SourceCoordinate.Kind.Boolean
         }.maxOfOrNull { it.id + 1 } ?: 0) else null).also {
         it.bindOpenTheoryWork(state.work)

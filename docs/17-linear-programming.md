@@ -291,6 +291,17 @@ checks leave the alternatives available. Source-bound registration and clause
 construction spend the containing numerical funding; the session registry admits
 at most 4,096 atom pairs and explanations at most 4,096 references.
 
+`source-refutation-resolution=true` enables the unit consumer and bounded pairwise
+resolution over already named integral predicates. Reduced refutation scopes become
+clauses; shared clause resolution removes a complementary pivot, and a source
+integer-split derivation checks the two imported proofs. Complete Boolean
+substitutions and opening restrictions are retained. A checked resolvent can exclude
+a queued region that neither input refutation covers individually. Unit reasons
+use the named established support rather than the entire decision prefix. Stronger
+endpoints can justify a premise; weaker or unnamed predicates decline. The index
+retains the resolvent and its proof under the same cumulative work/allocation and
+storage limits; unavailable checks supply no exclusion.
+
 The index retains at most 256 entries and 1 MiB of modeled proof/scope storage,
 evicting the oldest entry when either capacity is reached. Support traversal admits
 at most 4,096 nodes and depth 64; each retention or lookup shares at most 100,000

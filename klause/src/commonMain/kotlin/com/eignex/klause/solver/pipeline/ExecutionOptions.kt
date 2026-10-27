@@ -155,6 +155,10 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         val sourceRefutationPropagation: ExecutionOption<Boolean> =
             ExecutionOption("source-refutation-propagation", ValueKind.BOOLEAN)
 
+        /** Checked resolution over named numerical source-bound predicates. */
+        val sourceRefutationResolution: ExecutionOption<Boolean> =
+            ExecutionOption("source-refutation-resolution", ValueKind.BOOLEAN)
+
         /** Native polynomial or function arithmetic work; null means unlimited. */
         val nraWorkLimit: ExecutionOption<Long?> = ExecutionOption("nra-work-limit", ValueKind.ALLOWANCE)
 
@@ -406,6 +410,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 presolveProbePerVar, presolveProbeTotal,
                 nodeLimit, openWorkLimit, sourceLpWorkLimit, sourceLpAllocationLimit, sourceLpOperations, sourceCuts,
                 sourcePointCuts, sourceAggregateCuts, sourceRefutationReuse, sourceRefutationPropagation,
+                sourceRefutationResolution,
                 nraWorkLimit, nraDenseCoefficients, nraMatrixCells, niaCandidates, niaMoves,
                 niaCellRefinement, niaCellReuse, niaCellSteering,
                 maxFlips, maxInstructions, alnsIterations, sharedRestart, openBranching,

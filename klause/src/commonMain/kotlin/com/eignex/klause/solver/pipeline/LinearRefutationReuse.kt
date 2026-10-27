@@ -13,6 +13,7 @@ import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceProofContext
+import com.eignex.klause.solver.search.resolveSearchClauses
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.magnitudeBitLength
@@ -24,15 +25,19 @@ internal class LinearRefutationReuse(
     private val maximumEntries: Int = 256,
     private val maximumBytes: Long = 1_048_576L,
     maximumAllocation: Long = 67_108_864L,
+    private val resolve: Boolean = false,
 ) {
     class UnitExclusion(
         val coordinate: SourceCoordinate,
         val threshold: BigFraction,
         val upper: Boolean,
         val evidence: SourceEvidence,
+        val support: SourceCondition,
     )
     private data class Side(val coordinate: SourceCoordinate, val upper: Boolean)
-    private class Entry(val evidence: SourceEvidence, val anchor: Side?, val bytes: Long, val restrictions: Long)
+    private data class Predicate(val coordinate: SourceCoordinate, val value: BigFraction, val upper: Boolean)
+    private class Entry(val evidence: SourceEvidence, val anchor: Side?, val bytes: Long, val restrictions: Long,
+        val clause: IntArray?, val nodes: Int, val depth: Int)
     private class Support {
         val assumptions = linkedSetOf<Side>()
         var nodes = 0
@@ -41,6 +46,10 @@ internal class LinearRefutationReuse(
     private val entries = linkedMapOf<Long, Entry>()
     private val indexed = hashMapOf<Side, MutableSet<Long>>()
     private val unconditional = linkedSetOf<Long>()
+    private val names = hashMapOf<Predicate, Int>()
+    private val predicates = hashMapOf<Int, Predicate>()
+    private val scopes = hashMapOf<SourceCondition, Long>()
+    private var nameBytes = 0L
     private var nextId = 0L
     private var retainedBytes = 0L
     private var peakBytes = 0L
@@ -62,6 +71,7 @@ internal class LinearRefutationReuse(
     fun observations(): Map<String, Long> = counts.mapKeys { "numericalRefutationReuse${it.key}" } + mapOf(
         "numericalRefutationReuseRetained" to entries.size.toLong(),
         "numericalRefutationReuseBytes" to retainedBytes,
+        "numericalRefutationReuseNameBytes" to nameBytes,
         "numericalRefutationReusePeakBytes" to peakBytes,
         "numericalRefutationReuseAllocation" to allocated,
         "numericalRefutationReuseWork" to work,
@@ -70,6 +80,23 @@ internal class LinearRefutationReuse(
     )
 
     private fun observe(name: String) { counts[name] = (counts[name] ?: 0L) + 1L }
+
+    fun name(coordinate: SourceCoordinate, threshold: BigFraction, positive: Int) {
+        if (!resolve) return
+        val below = Predicate(coordinate, threshold, true)
+        if (below in names) return
+        if (nameBytes + 384L > maximumBytes / 4L) {
+            observe("ResolutionNameStops")
+            return
+        }
+        if (!spend(2L, 384L)) return
+        val above = Predicate(coordinate, threshold + BigFraction.ONE, false)
+        names[below] = positive
+        names[above] = positive xor 1
+        predicates[positive] = below
+        predicates[positive xor 1] = above
+        nameBytes += 384L
+    }
 
     private fun charge(units: Long, bytes: Long = 0L) {
         budget.observe(conflictCertification = units)
@@ -215,23 +242,107 @@ internal class LinearRefutationReuse(
                 return
             }
         }
-        val retainedCondition = retained.scope.condition
+        val entry = store(retained, captured.bytes, captured.nodes, 0) ?: return
+        if (resolve && entry.clause != null) resolve(entry)
+    }
+
+    private fun store(evidence: SourceEvidence, proofBytes: Long, nodes: Int, depth: Int): Entry? {
+        val retainedCondition = evidence.scope.condition
+        if (resolve && retainedCondition in scopes) return null
         val lowers = retainedCondition.lower
         val uppers = retainedCondition.upper
         val sides = lowers.keys.map { Side(it, false) } + uppers.keys.map { Side(it, true) }
-        val bytes = captured.bytes + 64L * (sides.size + retainedCondition.bools.size) +
+        val bytes = proofBytes + 64L * (sides.size + retainedCondition.bools.size) +
             (lowers.values + uppers.values).sumOf {
                 64L + (it.num.magnitudeBitLength().toLong() + it.den.magnitudeBitLength() + 7L) / 8L
             }
-        if (bytes > maximumBytes || !spend(1L + sides.size, bytes)) return
-        while (entries.size >= maximumEntries || bytes > maximumBytes - retainedBytes) evict()
+        if (bytes > maximumBytes - nameBytes || !spend(1L + sides.size, bytes)) return null
+        val clause = if (resolve) clause(retainedCondition) else null
+        if (retired || cancellation() || budget.funding?.paused == true) return null
+        while (entries.size >= maximumEntries || bytes > maximumBytes - nameBytes - retainedBytes) evict()
         val anchor = sides.minWithOrNull(compareBy({ it.coordinate.kind.ordinal }, { it.coordinate.id }, { it.upper }))
         val id = nextId++
-        entries[id] = Entry(retained, anchor, bytes, (sides.size + retainedCondition.bools.size).toLong())
+        val entry = Entry(evidence, anchor, bytes, (sides.size + retainedCondition.bools.size).toLong(),
+            clause, nodes, depth)
+        entries[id] = entry
+        if (resolve) scopes[retainedCondition] = id
         if (anchor == null) unconditional += id else indexed.getOrPut(anchor) { linkedSetOf() }.add(id)
         retainedBytes += bytes
         peakBytes = maxOf(peakBytes, retainedBytes)
         observe("RetainedProofs")
+        return entry
+    }
+
+    private fun clause(condition: SourceCondition): IntArray? {
+        val opening = source.scope.condition
+        val size = condition.bools.size + condition.lower.size + condition.upper.size
+        if (size > 4096 || !spend(1L + size, 128L * size)) return null
+        val literals = ArrayList<Int>()
+        for ((id, value) in condition.bools) if (opening.bools[id] != value) {
+            literals += (id shl 1) or if (value) 1 else 0
+        }
+        for ((upper, bounds) in listOf(false to condition.lower, true to condition.upper)) {
+            for ((coordinate, value) in bounds) {
+                val required = SourceCondition().bound(coordinate, value, upper)
+                if (opening.implies(required)) continue
+                val name = names[Predicate(coordinate, value, upper)]
+                if (name == null) {
+                    observe("ResolutionNameDeclines")
+                    return null
+                }
+                literals += name xor 1
+            }
+        }
+        return literals.toIntArray()
+    }
+
+    private fun condition(clause: IntArray): SourceCondition {
+        var result = source.scope.condition
+        for (literal in clause) {
+            val bound = predicates[literal xor 1]
+            result = if (bound != null) result.bound(bound.coordinate, bound.value, bound.upper)
+                else result.pin(literal ushr 1, literal and 1 != 0)
+        }
+        return result
+    }
+
+    private fun resolve(added: Entry) {
+        val clause = added.clause ?: return
+        if (!spend(entries.size.toLong(), entries.size * 8L)) return
+        val candidates = entries.values.toList()
+        for (entry in candidates) {
+            val other = entry.clause ?: continue
+            if (entry === added || entry.depth >= 32 || added.nodes + entry.nodes + 3 > 4096) continue
+            for (pivot in clause) {
+                if (!spend(1L + clause.size + other.size, 64L + 16L * (clause.size + other.size))) return
+                val bound = predicates[pivot xor 1] ?: continue
+                if (pivot xor 1 !in other) continue
+                observe("ResolutionCandidates")
+                val resolved = resolveSearchClauses(clause, other, pivot) ?: continue
+                val required = condition(resolved)
+                if (required in scopes) continue
+                val threshold = if (bound.upper) bound.value else bound.value - BigFraction.ONE
+                val first = SourceDerivation.Import(added.evidence)
+                val second = SourceDerivation.Import(entry.evidence)
+                val proof = SourceDerivation.IntegerSplit(bound.coordinate, threshold,
+                    if (bound.upper) first else second, if (bound.upper) second else first)
+                val evidence = SourceEvidence(source.scope.copy(condition = required), SourceClaim.Refutation, proof)
+                proofPolls = 0
+                when (verify(evidence)) {
+                    SourceEvidenceCheck.Checked -> {
+                        if (store(evidence, added.bytes + entry.bytes + 256L,
+                                added.nodes + entry.nodes + 3, maxOf(added.depth, entry.depth) + 1) != null) {
+                            observe("ResolutionProofs")
+                        }
+                    }
+                    is SourceEvidenceCheck.Rejected -> observe("ResolutionRejected")
+                    is SourceEvidenceCheck.Unavailable -> {
+                        observe("Unavailable")
+                        if (retired || cancellation() || budget.funding?.paused == true) return
+                    }
+                }
+            }
+        }
     }
 
     fun find(condition: SourceCondition): SourceEvidence? {
@@ -259,6 +370,7 @@ internal class LinearRefutationReuse(
                 SourceEvidenceCheck.Checked -> {
                     if (retired || cancellation() || budget.funding?.paused == true) return null
                     observe("Hits")
+                    if (entry.depth > 0) observe("ResolutionHits")
                     return imported
                 }
                 is SourceEvidenceCheck.Rejected -> observe("Rejected")
@@ -304,7 +416,8 @@ internal class LinearRefutationReuse(
                 SourceEvidenceCheck.Checked -> {
                     if (retired || cancellation() || budget.funding?.paused == true) return null
                     observe("UnitChecks")
-                    return UnitExclusion(coordinate, threshold, isUpper, imported)
+                    if (entry.depth > 0) observe("ResolutionUnits")
+                    return UnitExclusion(coordinate, threshold, isUpper, imported, required)
                 }
                 is SourceEvidenceCheck.Rejected -> observe("UnitRejected")
                 is SourceEvidenceCheck.Unavailable -> {
@@ -321,6 +434,7 @@ internal class LinearRefutationReuse(
         val id = first.key
         val entry = first.value
         entries.remove(id)
+        if (resolve) scopes.remove(entry.evidence.scope.condition)
         val bucket = entry.anchor?.let { indexed.getValue(it) } ?: unconditional
         bucket.remove(id)
         if (bucket.isEmpty() && entry.anchor != null) indexed.remove(entry.anchor)
@@ -329,5 +443,10 @@ internal class LinearRefutationReuse(
         observe("Evictions")
     }
 
-    fun clear() { while (entries.isNotEmpty()) evict() }
+    fun clear() {
+        while (entries.isNotEmpty()) evict()
+        names.clear()
+        predicates.clear()
+        nameBytes = 0L
+    }
 }
