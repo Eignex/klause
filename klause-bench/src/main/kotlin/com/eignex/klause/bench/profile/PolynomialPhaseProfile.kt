@@ -557,7 +557,8 @@ internal object PolynomialPhaseProfile {
                 firstCellFeedbackReuse = firstFeedback,
                 firstCellFeedbackUse = firstUse,
                 coupledSections = coupledStats.invoke(owner)?.let { value ->
-                    listOf("Supports", "Combinations", "Conflicts", "RepeatedSupports", "Declined", "Work")
+                    listOf("Supports", "Combinations", "Conflicts", "RepeatedSupports", "Declined", "Work",
+                        "PreparedSupports", "JointSupports")
                         .associateWith { value.javaClass.getMethod("get$it").invoke(value).toString() }
                 },
                 firstCoupledConflictPremises = coupledPremises,

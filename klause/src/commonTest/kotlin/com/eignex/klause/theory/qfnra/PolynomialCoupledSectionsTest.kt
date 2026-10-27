@@ -17,9 +17,10 @@ class PolynomialCoupledSectionsTest {
     @Test
     fun `joint root choices refute an inconsistent cycle that each predicate satisfies`() {
         for (closing in listOf(-1, 1)) {
+            val numeral = if (closing < 0) "(- 1)" else "1"
             val source = SmtLibPolynomial.parse("(declare-const x Real) (declare-const y Real) " +
                 "(declare-const z Real) (assert (and (= (* x x) 1) (= (* y y) 1) (= (* z z) 1) " +
-                "(= (* x y) 1) (= (* y z) 1) (= (* x z) $closing)))")
+                "(= (* x y) 1) (= (* y z) 1) (= (* x z) $numeral)))")
             val required = assertNotNull(PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
                 .forcedAtoms(PolynomialArithmetic()))
             val single = PolynomialCoupledSections(QfNraWork(QfNraParams()), PolynomialLimits(),
@@ -38,22 +39,51 @@ class PolynomialCoupledSectionsTest {
     }
 
     @Test
-    fun `total encoded definitions retain every premise of a recovered support`() {
+    fun `an unfinished joint check learns nothing within the containing allowance`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (declare-const y Real) " +
-            "(declare-const u Real) (declare-const v Real) (declare-const w Real) " +
-            "(assert (and (= u (* x x)) (= u 2) (= v (* y y)) (= v 3) " +
-            "(= w (+ (* x y) x y)) (= w 1)))")
+            "(declare-const z Real) (assert (and (= (* x x) 1) (= (* y y) 1) (= (* z z) 1) " +
+            "(= (* x y) 1) (= (* y z) 1) (= (* x z) (- 1))))")
         val required = assertNotNull(PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
             .forcedAtoms(PolynomialArithmetic()))
-        val direct = PolynomialCoupledSections(QfNraWork(QfNraParams()), PolynomialLimits(), prepareSupports = false)
-        val prepared = PolynomialCoupledSections(QfNraWork(QfNraParams()), PolynomialLimits())
         val identities = required.indices.map { it.toLong() }
+        val single = PolynomialCoupledSections(QfNraWork(QfNraParams()), PolynomialLimits(),
+            prepareSupports = false, joint = false)
+        assertNull(single.refute(required, identities, HashSet()))
+        val parent = QfNraWork(QfNraParams())
+        val joint = PolynomialCoupledSections(parent, PolynomialLimits(), maximumWork = single.stats.work + 1,
+            prepareSupports = false)
 
-        assertNull(direct.refute(required, identities, HashSet()))
-        val support = prepared.refute(required, identities, HashSet())
+        val support = joint.refute(required, identities, HashSet())
 
-        assertEquals(required.indices.toList(), support)
-        assertEquals(1L, prepared.stats.preparedSupports)
+        assertNull(support)
+        assertEquals(0L, joint.stats.conflicts)
+        assertEquals(1L, joint.stats.declined)
+        assertFalse(parent.isCancelled())
+        assertEquals(joint.stats.work, parent.spentWork)
+    }
+
+    @Test
+    fun `total encoded definitions retain every premise of a recovered support`() {
+        for (weak in listOf(false, true)) {
+            fun equality(variable: String, value: Int): String = if (weak) {
+                "(and (<= $variable $value) (<= (- $variable) (- $value)))"
+            } else "(= $variable $value)"
+            val source = SmtLibPolynomial.parse("(declare-const x Real) (declare-const y Real) " +
+                "(declare-const u Real) (declare-const v Real) (declare-const w Real) " +
+                "(assert (and (= u (* x x)) ${equality("u", 2)} (= v (* y y)) ${equality("v", 3)} " +
+                "(= w (+ (* x y) x y)) ${equality("w", 1)}))")
+            val required = assertNotNull(PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+                .forcedAtoms(PolynomialArithmetic()))
+            val direct = PolynomialCoupledSections(QfNraWork(QfNraParams()), PolynomialLimits(), prepareSupports = false)
+            val prepared = PolynomialCoupledSections(QfNraWork(QfNraParams()), PolynomialLimits())
+            val identities = required.indices.map { it.toLong() }
+
+            assertNull(direct.refute(required, identities, HashSet()))
+            val support = prepared.refute(required, identities, HashSet())
+
+            assertEquals(required.indices.toList(), support)
+            assertEquals(1L, prepared.stats.preparedSupports)
+        }
     }
 
     @Test

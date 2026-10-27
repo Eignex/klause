@@ -375,7 +375,9 @@ sets. Each common combination must fail at least one predicate before a joint
 exclusion is learned; individual witnesses need not agree.
 
 If direct predicates expose no refutation, a private support view eliminates total
-equational graphs with nonzero rational pivots. Each rewritten predicate retains
+equational graphs with nonzero rational pivots. Matching rational multiples of weak
+inequalities can supply an equality only when their signed intersection is exactly
+zero; the support retains every participating inequality. Each rewritten predicate retains
 its original signed premise and all definitions used by its substitutions. Selection,
 rewriting, root isolation and checking share the same containing allowance. The
 view neither mutates the query snapshot nor reconstructs source coordinates; its
