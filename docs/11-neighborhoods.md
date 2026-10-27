@@ -348,6 +348,22 @@ When supplied, the immutable definition network closes both guided and fallback
 selections through the shared block closure. Required caller pins decline the
 whole block; closure visits and bounded working storage debit the same funding.
 
+The opt-in `SourceRows` completion turns each supported seed into a packet through
+the original source premises. A seed plans one domain step: toward its relaxation
+value for disagreement, in each admissible direction for refutation support. Every
+active row the plan violates admits compensating inputs, supported inputs first and
+then in source order: an input moves just far enough within its root domain, or a
+guard or indicator changes and deactivates the row. Caller-pinned and root-fixed
+inputs never compensate. Each member records the row that added it. A packet whose
+row cannot be restored is unrepairable, a seed without a step is immovable and an
+oversized packet is limited; none of these contributes partial freedoms. Selection
+takes whole complete packets, those covering more supported seeds first, while they
+fit the request, then fills the remaining places by the ordinary ranking. A request
+smaller than every complete packet, or guidance without one, declines with no
+freedoms rather than falling back to random removal. Completion debits the same
+funding and retires with the snapshot. The plan is only a hint: the repair enforces
+every row, pin and definition, and completion asserts no deduction.
+
 ### Handles and exclusive ownership
 
 Local-search handles retain assignment, RNG, factor payloads, restart progress and

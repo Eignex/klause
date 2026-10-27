@@ -108,19 +108,23 @@ internal class FiniteNumericalTrial(
             unavailableReason = field(captured, "reason").toString()
             return
         }
-        if (arm == "numerical-refutation") {
+        val refutation = arm.startsWith("numerical-refutation")
+        if (refutation) {
             support = publisherType.methods.single { it.name == "refutationSupport" }.invoke(publisher, captured)
         }
         if (arm != "numerical-ablated") {
             val type = Class.forName("com.eignex.klause.solver.pipeline.FiniteNumericalRemoval")
             val kind = Class.forName("com.eignex.klause.solver.pipeline.FiniteNumericalRemoval\$Signal")
+            val completion = Class.forName("com.eignex.klause.solver.pipeline.FiniteNumericalRemoval\$Completion")
             selector = type.getDeclaredConstructor(BakedProblem::class.java, LinearObjective::class.java,
                 SourceProofContext::class.java, fundingType, kind, Assumptions::class.java,
-                Class.forName("com.eignex.klause.localsearch.InvariantNetwork"))
+                Class.forName("com.eignex.klause.localsearch.InvariantNetwork"), completion)
                 .newInstance(problem, objective, source, funding,
                     kind.enumConstants.single {
-                        it.toString() == if (arm == "numerical-refutation") "Refutation" else "Disagreement"
-                    }, Assumptions.None, null)
+                        it.toString() == if (refutation) "Refutation" else "Disagreement"
+                    }, Assumptions.None, null, completion.enumConstants.single {
+                        it.toString() == if (arm.endsWith("-completed")) "SourceRows" else "None"
+                    })
             type.methods.single { it.name == "accept" }
                 .invoke(selector, center, pins, prepared, cutoff, captured, support, stop)
         }
@@ -153,6 +157,31 @@ internal class FiniteNumericalTrial(
         put("guidanceStatus", selector?.let { get(it, "Status").toString() })
         put("rankedInputs", selector?.let { get(it, "RankedInputs") as Int })
         put("guidanceUnavailableReason", selector?.let { get(it, "UnavailableReason") as String? })
+        selector?.takeIf { get(it, "Completion").toString() == "SourceRows" }?.let { owner ->
+            put("completion", buildJsonObject {
+                put("rule", "planned domain steps through violated original source rows; supported compensators first")
+                put("lastDecline", get(owner, "LastDecline") as String?)
+                put("lastCompletedInputsBoolThenInt", JsonArray((get(owner, "LastCompletedInputs") as IntArray)
+                    .map(::JsonPrimitive)))
+                put("lastFilledInputs", get(owner, "LastFilledInputs") as Int)
+                put("packets", JsonArray((get(owner, "Packets") as List<*>).map { entry ->
+                    val packet = checkNotNull(entry)
+                    buildJsonObject {
+                        put("seed", coordinate(get(packet, "Seed") as SourceCoordinate))
+                        put("outcome", get(packet, "Outcome").toString())
+                        put("blockedRow", get(packet, "BlockedRow") as String?)
+                        put("members", JsonArray((get(packet, "Members") as List<*>).map { entry ->
+                            val member = checkNotNull(entry)
+                            buildJsonObject {
+                                put("coordinate", coordinate(get(member, "Coordinate") as SourceCoordinate))
+                                put("plannedValue", get(member, "Value").toString())
+                                put("addedByRow", get(member, "Row") as String?)
+                            }
+                        }))
+                    }
+                }))
+            })
+        }
         budget?.let {
             put("sourceOperations", get(it, "Operations") as Int)
             put("reservedSourceWork", get(it, "ReservedWork") as Long)
@@ -164,12 +193,7 @@ internal class FiniteNumericalTrial(
             if (it.javaClass.simpleName == "Available") {
                 @Suppress("UNCHECKED_CAST")
                 val coordinates = field(it, "coordinates") as Set<SourceCoordinate>
-                put("supportCoordinates", JsonArray(coordinates.map { coordinate ->
-                    buildJsonObject {
-                        put("kind", coordinate.kind.name)
-                        put("id", coordinate.id)
-                    }
-                }))
+                put("supportCoordinates", JsonArray(coordinates.map(::coordinate)))
             } else put("supportUnavailableReason", field(it, "reason").toString())
         }
         publisher?.let {
@@ -178,6 +202,11 @@ internal class FiniteNumericalTrial(
         }
         put("independentProofClaim", false)
         put("globalProofClaim", false)
+    }
+
+    private fun coordinate(value: SourceCoordinate) = buildJsonObject {
+        put("kind", value.kind.name)
+        put("id", value.id)
     }
 
     private fun get(owner: Any, property: String): Any? = owner.javaClass.methods.single {

@@ -55,6 +55,43 @@ class FiniteNumericalRemovalTest {
     }
 
     @Test
+    fun `completed selections should decline a request smaller than every packet`() {
+        val funding = SourceLpFunding(1_000_000, 4_000_000).apply { grant(1_000_000) }
+        val publisher = SourceNumericalFeedback(funding, Cancellation.Never)
+        val acquisition = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use {
+            publisher.acquire(it, source, cuts = false)
+        }
+        val removal = FiniteNumericalRemoval(problem, objective, source, funding,
+            FiniteNumericalRemoval.Signal.Disagreement, completion = FiniteNumericalRemoval.Completion.SourceRows)
+
+        removal.accept(center, Assumptions.None, source, null, acquisition.feedback)
+        val freed = removal.destroy(Random(17), problem, center, objective, 0.25)
+
+        assertTrue(freed.isEmpty)
+        assertEquals(FiniteNumericalRemoval.Status.Supported, removal.status)
+        assertEquals("packet-exceeds-request", removal.lastDecline)
+    }
+
+    @Test
+    fun `completed selections should fill places left after their packets`() {
+        val funding = SourceLpFunding(1_000_000, 4_000_000).apply { grant(1_000_000) }
+        val publisher = SourceNumericalFeedback(funding, Cancellation.Never)
+        val acquisition = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use {
+            publisher.acquire(it, source, cuts = false)
+        }
+        val removal = FiniteNumericalRemoval(problem, objective, source, funding,
+            FiniteNumericalRemoval.Signal.Disagreement, completion = FiniteNumericalRemoval.Completion.SourceRows)
+
+        removal.accept(center, Assumptions.None, source, null, acquisition.feedback)
+        val freed = removal.destroy(Random(17), problem, center, objective, 0.75)
+
+        assertEquals(setOf(0, 3), removal.lastCompletedInputs.toSet())
+        assertEquals(1, removal.lastFilledInputs)
+        assertEquals(3, freed.ints.size)
+        assertTrue(freed.ints.toSet().containsAll(setOf(0, 3)))
+    }
+
+    @Test
     fun `an agreeing relaxation should retain agreement with random fallback`() {
         val funding = SourceLpFunding(1_000_000, 4_000_000).apply { grant(1_000_000) }
         val publisher = SourceNumericalFeedback(funding, Cancellation.Never)

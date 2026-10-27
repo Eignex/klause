@@ -10,6 +10,8 @@ import com.eignex.klause.meta.alns.RepairBlockInterrupted
 import com.eignex.klause.meta.alns.RepairBlockWork
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.baked
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceCoordinate
@@ -30,13 +32,16 @@ internal class FiniteNumericalRemoval(
     val signal: Signal,
     private val callerPins: Assumptions = Assumptions.None,
     private val definitions: InvariantNetwork? = null,
+    val completion: Completion = Completion.None,
 ) : DestroyOperator, AutoCloseable {
     enum class Signal { Disagreement, Refutation }
-    enum class Status { Unavailable, NoPoint, Agreement, EmptySupport, Supported, Incompatible,
+    enum class Completion { None, SourceRows }
+    enum class Status { Unavailable, NoPoint, Agreement, EmptySupport, Supported, Incomplete, Incompatible,
         Unsupported, Limited, Cancelled, Funding, ClosureDeclined, Closed }
 
     private var center: Sample? = null
     private var scores = intArrayOf()
+    private var directions = intArrayOf()
     private var token = Cancellation.Never
     private var closed = false
     var status = Status.Unavailable
@@ -48,6 +53,14 @@ internal class FiniteNumericalRemoval(
     var unavailableReason: String? = null
         private set
     var rankedInputs = 0
+        private set
+    var packets: List<SourceRowCompletion.Packet> = emptyList()
+        private set
+    var lastDecline: String? = null
+        private set
+    var lastCompletedInputs = intArrayOf()
+        private set
+    var lastFilledInputs = 0
         private set
 
     fun accept(
@@ -91,6 +104,7 @@ internal class FiniteNumericalRemoval(
             return
         }
         scores = IntArray(count.toInt())
+        directions = IntArray(count.toInt())
         when (signal) {
             Signal.Disagreement -> {
                 val point = feedback.query.point
@@ -122,7 +136,10 @@ internal class FiniteNumericalRemoval(
                         retire(Status.Limited)
                         return
                     }
-                    if (!frozen(index) && relaxed != value(incumbent, index)) scores[index] = 1
+                    if (!frozen(index) && relaxed != value(incumbent, index)) {
+                        scores[index] = 1
+                        directions[index] = (relaxed - value(incumbent, index)).signum()
+                    }
                 }
                 status = if (scores.any { it != 0 }) Status.Supported else Status.Agreement
             }
@@ -151,6 +168,23 @@ internal class FiniteNumericalRemoval(
             }
         }
         if (blocked()) return
+        if (completion == Completion.SourceRows && status == Status.Supported) {
+            val seeds = ArrayList<Pair<Int, Int>>()
+            for (index in scores.indices) {
+                if (scores[index] == 0) continue
+                if (directions[index] != 0) {
+                    seeds += index to directions[index]
+                } else {
+                    seeds += index to 1
+                    seeds += index to -1
+                }
+            }
+            val completed = SourceRowCompletion(model, source, funding, ::frozen) { token() || funding.paused }
+                .complete(incumbent, seeds) { scores[it] != 0 }
+            if (blocked()) return
+            packets = checkNotNull(completed)
+            if (packets.none { it.outcome == SourceRowCompletion.Outcome.Complete }) status = Status.Incomplete
+        }
         center = incumbent
         originScope = query.scope
         originCutoff = cutoff
@@ -210,6 +244,10 @@ internal class FiniteNumericalRemoval(
     private fun frozen(index: Int): Boolean = if (index < model.numBoolVars) callerPins.isFrozenBool(index)
         else callerPins.isFrozenInt(index - model.numBoolVars)
 
+    private fun rootFixed(index: Int): Boolean = if (index < model.numBoolVars) {
+        (model.baked as? PropagationResult.Implied)?.boolValueOrNull(index) != null
+    } else model.rootIntDomain(index - model.numBoolVars).isFixed
+
     private fun value(sample: Sample, index: Int): BigFraction = if (index < model.numBoolVars) {
         if (sample.boolValue(index)) BigFraction.ONE else BigFraction.ZERO
     } else BigFraction.ofLong(sample.intValue(index - model.numBoolVars))
@@ -235,6 +273,13 @@ internal class FiniteNumericalRemoval(
         if (blocked(cancellation)) return FreedVars(intArrayOf(), intArrayOf())
         if (!closed && (problem !== model || objective !== this.objective ||
                 (center != null && center !== incumbent))) retire(Status.Incompatible)
+        lastDecline = null
+        lastCompletedInputs = intArrayOf()
+        lastFilledInputs = 0
+        if (status == Status.Incomplete) {
+            lastDecline = "incomplete-packets"
+            return FreedVars(intArrayOf(), intArrayOf())
+        }
         if (status != Status.Supported) {
             return closeSelection(problem,
                 DestroyOperator.Random.destroy(rng, problem, incumbent, objective, fraction), cancellation)
@@ -243,16 +288,36 @@ internal class FiniteNumericalRemoval(
         if (blocked(cancellation)) return FreedVars(intArrayOf(), intArrayOf())
         val order = scores.indices.shuffled(rng)
         val count = (fraction * scores.size).toInt().coerceIn(1, scores.size)
-        val selected = ArrayList<Int>(count)
+        val selected = LinkedHashSet<Int>(count)
+        if (completion == Completion.SourceRows) {
+            val complete = packets.filter { it.outcome == SourceRowCompletion.Outcome.Complete }
+                .map { packet -> packet.members.map { checkNotNull(index(it.coordinate)) } }
+            val ranked = complete.indices.shuffled(rng).sortedByDescending { packet ->
+                complete[packet].count { scores[it] != 0 }
+            }
+            for (packet in ranked) {
+                funding.charge(1L + complete[packet].size)
+                if (blocked(cancellation)) return FreedVars(intArrayOf(), intArrayOf())
+                val added = complete[packet].filter { it !in selected }
+                if (selected.size + added.size <= count) selected += added
+            }
+            if (selected.isEmpty()) {
+                lastDecline = "packet-exceeds-request"
+                return FreedVars(intArrayOf(), intArrayOf())
+            }
+            lastCompletedInputs = selected.toIntArray()
+        }
         for (weight in 1 downTo 0) {
+            if (selected.size == count) break
             for (index in order) {
                 funding.charge(1)
                 if (blocked(cancellation)) return FreedVars(intArrayOf(), intArrayOf())
-                if (!frozen(index) && scores[index] == weight) selected += index
+                if (!frozen(index) && scores[index] == weight && index !in selected &&
+                    (completion == Completion.None || !rootFixed(index))) selected += index
                 if (selected.size == count) break
             }
-            if (selected.size == count) break
         }
+        lastFilledInputs = selected.size - lastCompletedInputs.size
         return closeSelection(problem, FreedVars(selected.filter { it < model.numBoolVars }.toIntArray(),
             selected.filter { it >= model.numBoolVars }.map { it - model.numBoolVars }.toIntArray()), cancellation)
     }
@@ -295,6 +360,11 @@ internal class FiniteNumericalRemoval(
     private fun retire(reason: Status) {
         center = null
         scores = intArrayOf()
+        directions = intArrayOf()
+        packets = emptyList()
+        lastDecline = null
+        lastCompletedInputs = intArrayOf()
+        lastFilledInputs = 0
         token = Cancellation.Never
         originScope = null
         originCutoff = null

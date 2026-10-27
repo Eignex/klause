@@ -1995,6 +1995,17 @@ native evidence checks. Whole-packet/count mismatches and unavailable feedback
 remain explicit. Linear [fixture controls](smoke-corpus/finite-repair-evidence/README.md)
 separate coordinated freedoms, fractional guidance and independent recovery.
 
+The `numerical-disagreement-completed` and `numerical-refutation-completed` arms
+consume the same acquisition through source-row completion. They take one draw at
+the requested count; a request smaller than every complete packet declines without
+repair rather than truncating or retrying. Records keep each seed's packet outcome,
+planned values, the row that added every member, the consumed packet inputs and the
+ranked fill count. Each consumed packet member also gets a proper-subset control:
+the same effective freedom without that member, repaired from the same center under
+its own 1,000-decision allowance and the shared deadline. Those controls are not
+charged to the arm; an exhausted subset without improvement shows that the removed
+input was required at that center.
+
 ### Table profiling
 
 `bench.profile.ExtensionalCompositionProfile` accepts `suite=ID problem=NAME

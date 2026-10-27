@@ -228,8 +228,8 @@ internal object FiniteConflictSelection {
             for (requestedCount in listOf(2, 3, 4, 8).filter { it <= eligible.size }) {
                 val arms = listOf("random", "objective", "adjacency", "conflict", "acquisition-ablated") +
                     (if (semanticKind == null) emptyList() else listOf("semantic")) +
-                    (if (numerical) listOf("numerical-disagreement", "numerical-refutation", "numerical-ablated")
-                        else emptyList())
+                    (if (numerical) listOf("numerical-disagreement", "numerical-refutation", "numerical-ablated",
+                        "numerical-disagreement-completed", "numerical-refutation-completed") else emptyList())
                 for (arm in arms) {
                     val deadline = Cancellation.after(5.seconds)
                     val containingWork = if (numerical) 2_000_000L else DECISIONS
@@ -318,7 +318,8 @@ internal object FiniteConflictSelection {
                         val operator = when (arm) {
                             "conflict" -> guidance
 
-                            "numerical-disagreement", "numerical-refutation" -> numericalTrial?.selector
+                            "numerical-disagreement", "numerical-refutation", "numerical-disagreement-completed",
+                            "numerical-refutation-completed" -> numericalTrial?.selector
                                 ?: companion.javaClass.methods.single { it.name == "getRandom" }.invoke(companion)
 
                             "semantic" -> {
@@ -339,7 +340,9 @@ internal object FiniteConflictSelection {
 
                             else -> companion.javaClass.methods.single { it.name == "getRandom" }.invoke(companion)
                         }
-                        val selected = select(operator, seed, requestedCount, stop, completePacket = arm == "semantic")
+                        val completedArm = arm.endsWith("-completed")
+                        val selected = select(operator, seed, requestedCount, stop,
+                            completePacket = arm == "semantic" || completedArm)
                         val requestedBools = selected.requestedBools
                         val requestedInts = selected.requestedInts
                         val bools = selected.bools
@@ -385,6 +388,40 @@ internal object FiniteConflictSelection {
                         }
                         val descentAccepted = descent?.let { checkSource(it.sample, deadline) }
                         check(descentAccepted != false || deadline())
+                        val armElapsed = System.nanoTime() - started
+                        val armAllocated = allocation.getThreadAllocatedBytes(thread) - startedBytes
+                        val packet = numericalTrial?.selector?.takeIf { completedArm && matched }
+                            ?.let { get(it, "LastCompletedInputs") as IntArray } ?: IntArray(0)
+                        val subsetControls = packet.map { removed ->
+                            val subsetBools = bools.filter { it != removed }.toIntArray()
+                            val subsetInts = ints.filter { problem.numBoolVars + it != removed }.toIntArray()
+                            val subsetFreed = freedType.getDeclaredConstructor(IntArray::class.java,
+                                IntArray::class.java).newInstance(subsetBools, subsetInts)
+                            val subsetPins = scope.javaClass.methods.single { it.name == "pins" }
+                                .invoke(scope, problem, center, subsetFreed) as Assumptions
+                            val subsetAllowance = NodeBudget(REPAIR_DECISIONS)
+                            val subsetResult = if (deadline()) null else BacktrackSolver(problem).minimize(objective,
+                                BacktrackParams(randomSeed = seed, cancellation = deadline,
+                                    objectiveBoundSupplier = { objective.evaluate(center) },
+                                    maxDecisions = REPAIR_DECISIONS, nodeBudget = subsetAllowance,
+                                    assumptions = subsetPins))
+                            val subsetRepaired = subsetResult?.assignment
+                            val subsetAccepted = subsetRepaired?.let { checkSource(it, deadline) }
+                            check(subsetAccepted != false || deadline())
+                            buildJsonObject {
+                                put("removedBoolThenInt", removed)
+                                put("effectiveSearchedInputs", subsetBools.size + subsetInts.size)
+                                put("strictImprovement", subsetRepaired?.let {
+                                    subsetAccepted == true &&
+                                        objective.evaluateExact(it) < objective.evaluateExact(center)
+                                } ?: false)
+                                put("completedLocalExhaustion", subsetResult != null &&
+                                    reason(subsetResult) == TerminationReason.SearchExhausted)
+                                put("repairReason", reason(subsetResult)?.name)
+                                put("nativeWork", subsetAllowance.spent)
+                                put("chargedToArm", false)
+                            }
+                        }
                         val outcome = when {
                             !matched -> "effective-count-mismatch"
                             improved -> "checked-improvement"
@@ -435,6 +472,7 @@ internal object FiniteConflictSelection {
                                 )
                                 put("numericalGuidanceConsumed", numericalCapture?.get("guidanceStatus") ==
                                     JsonPrimitive("Supported") && arm != "numerical-ablated")
+                                if (completedArm) put("completionConsumed", packet.isNotEmpty())
                                 put("capturedConflicts", get(guidance, "Conflicts") as Int)
                                 put("captureCapped", get(guidance, "Capped") as Boolean)
                                 put("captureAndSelectionVisits", get(guidance, "Visits") as Long)
@@ -503,8 +541,9 @@ internal object FiniteConflictSelection {
                                 put("totalWork", allowance.spent + (numericalTrial?.work ?: 0L))
                                 put("numericalCuts", if (numericalArm) numericalCuts else null)
                                 numericalCapture?.let { put("numerical", it) }
-                                put("elapsedNanos", System.nanoTime() - started)
-                                put("allocatedBytes", allocation.getThreadAllocatedBytes(thread) - startedBytes)
+                                put("elapsedNanos", armElapsed)
+                                put("allocatedBytes", armAllocated)
+                                if (completedArm) put("properSubsetControls", JsonArray(subsetControls))
                                 put("cancelled", stop())
                                 put("repairResult", result?.let { it::class.simpleName })
                                 put("repairReason", reason(result)?.name)
