@@ -380,7 +380,11 @@ authority. Construction, replacement, retention and scoring debit the containing
 source LP funding cumulatively; evicting a delivered query neither refunds that
 ledger nor issues another LP solve. The archive retains at most 64 records, 250,000
 entries and 8 MiB modeled storage, and a delivered query has the same entry and
-byte allowance on its own.
+byte allowance on its own. Archived records are charged for copies of the source
+rows, cut definitions and cited derivations they reference. Once the archive stops, a
+delivered record keeps only references to those immutable structures, which the
+authority prepared and still holds. It is charged for those references, its point,
+cut violations, scope and checked evidence.
 
 `LinearAuthority.advance` consumes the shared sparse preparation, floating and
 bound-certificate policy through that same scoped owner. One admitted operation
