@@ -89,7 +89,6 @@ internal class OpenPortfolio(
     private val finiteCompanion: Problem? = null,
     private val jointCompanion: Boolean = false,
     private val shareCompanions: Boolean = true,
-    private val jointRepairInputs: IntArray? = null,
 ) {
     private val descentVerdict = AtomicReference<OpenTheoryOptimum.Unbounded?>(null)
     private val lifetime = theoryParams.cancellation or theoryParams.timeout
@@ -366,8 +365,7 @@ internal class OpenPortfolio(
             add(PortfolioArmFactory(preparedPlan, arm, ArmFamily.LocalSearch) { slot ->
                 val local = workerParams(slot)
                 val repair = slot.own(JointLinearRepair(model, context, objective, local, boundOrdered = true,
-                    external = { if (shareCompanions) incumbents.exchange.current()?.assignment else null },
-                    sourceIntegers = jointRepairInputs))
+                    external = { if (shareCompanions) incumbents.exchange.current()?.assignment else null }))
                 val worker = exactNeighborhoodWorker("ls/joint-linear-companion", arm, objective,
                     lifetime or slot.cancellation, theoryParams.timeout, { repair.exhausted },
                     open = { repair.search(adaptive = false, seed = slot.seed) })

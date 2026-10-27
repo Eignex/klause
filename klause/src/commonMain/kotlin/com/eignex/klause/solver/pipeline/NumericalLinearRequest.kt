@@ -135,7 +135,7 @@ class NumericalLinearRequest internal constructor(
     ): LinearOptimizationResult {
         require(cores > 0)
         if (engine == FiniteEngine.LOCAL_SEARCH || engine == FiniteEngine.ALNS) {
-            return repair(params, engine == FiniteEngine.ALNS, publication, preparedPlan)
+            return repair(params, engine == FiniteEngine.ALNS, publication)
         }
         if (engine == FiniteEngine.FIXED && !companions) {
             return solve(params, onIncumbent = { sample, value ->
@@ -156,7 +156,6 @@ class NumericalLinearRequest internal constructor(
             publication = publication, preparedSource = workingPlan, completeOnly = true, numericalOnly = true,
             boundOrdered = boundOrdered,
             finiteCompanion = companionModel, jointCompanion = companions, shareCompanions = sharing,
-            jointRepairInputs = preparedPlan.jointRepairIntegers(model),
         )
         val result = portfolio.minimize(executionObjective, null, stop).linearResult ?: return unavailable(params, stop)
         return LinearOptimizationResult(
@@ -175,14 +174,13 @@ class NumericalLinearRequest internal constructor(
         params: TheoryParams,
         adaptive: Boolean,
         publication: SourcePublicationObserver,
-        preparedPlan: PreparedSourcePlan,
     ): LinearOptimizationResult {
         val stop = cancellation or params.timeout or params.cancellation
         val context = authorityContext(objective ?: LinearObjective(), stop) ?: return unavailable(params, stop)
         if (model.numBoolVars != 0) return unavailable(params, stop)
         val executionObjective = if (maximize) objective?.negated() else objective
         return JointLinearRepair(model, context, executionObjective, params.copy(cancellation = stop),
-            boundOrdered = boundOrdered, sourceIntegers = preparedPlan.jointRepairIntegers(model)).use { repair ->
+            boundOrdered = boundOrdered).use { repair ->
             repair.search(adaptive).use { search ->
                 var incumbent: Sample? = null
                 var value: BigFraction? = null

@@ -229,17 +229,17 @@ adjacency entries; its index admits at most
 pinned to the current center, while the continuous residual remains free under
 every source row.
 
-The source plan identifies eligible discrete inputs separately from integer
-backings of original real columns. Backings participate in connectivity as bridges,
-remain free in every residual and consume no discrete seed or freedom quota.
-Canonical integer declarations without a separate source mapping remain eligible.
+Explicit diagnostic callers can identify original integer declarations separately
+from integer backings of original real columns. Backings participate in connectivity
+as bridges, remain free in every residual and consume no discrete seed or freedom
+quota. Ordinary callers retain canonical integer eligibility.
 
-The source-input pass tries a narrow neighborhood for each eligible discrete
-seed after a checked cutoff changes, before honoring wider nonadaptive proposals.
-Pending candidates and cumulative funding survive each slice. Adaptive proposals
-keep their selected widths; the pass supplies no coverage or proof authority.
-It applies when a caller supplies source integer roles; diagnostic comparisons can
-disable it while retaining the same roles and containing allowances.
+With supplied source roles, the diagnostic source-input pass tries a narrow
+neighborhood for each eligible seed after a checked cutoff changes, before wider
+nonadaptive proposals. Pending candidates and cumulative funding survive each
+slice. Adaptive proposals keep their selected widths; the pass supplies no coverage
+or proof authority. Production callers omit source roles and retain their ordinary
+proposal schedule.
 
 Each candidate runs the shared numerical traversal with a borrowed source LP
 authority. Candidate coverage and compatible LP state survive slice boundaries;
