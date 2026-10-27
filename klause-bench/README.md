@@ -1948,7 +1948,8 @@ Follow-up compression retains all JSONL bytes, reducing 121.6 MB to 4.1 MB after
 capture at a separate 1.56-second cost; it changes no walk allowance.
 
 Retained-worker comparisons select `param.objective-guidance=canonical`,
-`functional` or `geometric`. With `param.arm=cbls-plateau/ils-basin`,
+`functional` or `geometric` within an explicit LS recipe pool. With
+`param.arm=cbls-plateau/ils-basin`,
 `param.arms=2` and `param.objective-guidance=functional,geometric`, two private
 retained slots share the containing budget. Compare against `functional,functional`
 at the same total budget to preserve ordinary slot seed offsets and restart
@@ -1958,6 +1959,41 @@ fallback; candidate offers alone establish no useful transition. `param.ls-phase
 retains active preparation and search cost. Use lab resource measurements and
 source validation for whole-process cost and independent final-witness checks;
 native source checks and heuristic terminals supply no proof authority.
+
+The retained-consumer [replay 8803](https://lab.eignex.com/jobs/8803), at
+`b5510ecde5`, reuses 8762's original hashes, complete checked centers, seeds 3/7,
+recipe, 1,000 moves/restarts and twenty-second containing walk allowances. The
+production geometric policy initializes through the engine, using the prepared
+cones and live network. All sixteen walks complete uncensored and their endpoints
+pass native original-source checks; these captures have no independent XCSP3
+certification. Exact endpoints use seed order 3/7:
+
+| Source | Center | Canonical | Full functional | Retained geometric |
+| --- | --- | --- | --- | --- |
+| GBACP-UD04 | 1774 / 1624 | 834 / 1121 | 687 / 685 | 543 / 689 |
+| TestScheduling-t020m10r03-1 | 8025 / 6132 | 7541 / 5727 | 6674 / 5708 | 7541 / 6085 |
+
+Geometric GBACP improves one functional endpoint and loses the other; both
+TestScheduling endpoints lose to functional guidance, and seed 7 also loses to
+canonical guidance. Calling-thread walk allocation is 106–109 MB for geometric
+GBACP versus 1.29–1.30 GB functional and 35–37 MB canonical. TestScheduling uses
+90–110 MB versus 218 MB functional and 30–33 MB canonical. Ordered, instrumented
+walk times are 1.14–1.57 / 9.64–11.15 / 0.79–1.80 seconds on GBACP and
+0.77–0.86 / 1.51–3.61 / 0.39–1.46 seconds on TestScheduling, respectively.
+These are changed trajectories, without a general throughput or memory claim.
+
+Geometric preparation costs 20–206 ms and 2.6–12.0 MB; checked center mapping costs
+2.7–14.7 ms and 1.4–4.0 MB. Initial observation costs 8–54 ms and 1.0–2.1 MB;
+private seed probing costs 0.27–1.17 ms and 0.23–0.32 MB. Final native checks cost
+2–8 ms outside the walk timer. The full capture command takes 50.5 seconds,
+including loading, all views, probes, validation, handle closure and serialization;
+compression accounts for 0.735 seconds and 1.91 MB outside walk allowances.
+The Linux/amd64 JVM uses a 2 GiB heap, Serial GC and one active processor, as
+recorded in its command; inherited CLI provenance options describe a separate
+3 GiB CLI configuration. Runtime, compiler and distribution hashes stay in the
+capture. The preparation/upload-inclusive deadline failure in
+[8790](https://lab.eignex.com/jobs/8790), its spent-allowance retry and the
+pre-execution cancellation of 8788 supply no efficacy evidence.
 
 The frozen worker-seed 3/7 captures at `12be285415` and `356449b93a` retain
 [mixed preparation](https://lab.eignex.com/jobs/8531),

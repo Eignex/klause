@@ -15,6 +15,13 @@ import kotlin.test.assertTrue
 
 class EngineParamsTest {
     @Test
+    fun `objective guidance must not create an automatic recipe pool`() {
+        assertFailsWith<PipelineConfigException> {
+            resolveLocalSearchRecipes(EngineParams(listOf("objective-guidance=geometric")))
+        }
+    }
+
+    @Test
     fun `explicit objective guidance expands one recipe into fresh composition slots`() {
         val resolved = resolveLocalSearchRecipes(EngineParams(listOf(
             "arm=cbls-plateau/ils-basin", "objective-guidance=functional,geometric",
