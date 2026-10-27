@@ -276,8 +276,9 @@ internal class LinearAuthorityCapture(
         }
         val numeric = numericSource ?: template?.numeric ?: source
         if (shared) {
-            val references = 1L + source.premises.size + numeric.coordinates.size + numeric.objective.size +
-                (if (numeric !== source) numeric.premises.size else 0)
+            // A requested record holds the source context, scope, query lists and point map whole; it copies none.
+            val references = if (!full) 8L else 1L + source.premises.size + numeric.coordinates.size +
+                numeric.objective.size + (if (numeric !== source) numeric.premises.size else 0)
             if (!spend(references, references * 16L)) return
         } else {
             for ((id, premise) in source.premises) {
@@ -292,10 +293,11 @@ internal class LinearAuthorityCapture(
                 !numeric.objective.values.all(::scalar) || !scalar(numeric.objectiveConstant)) return
         }
         val condition = source.scope.condition
-        if (!spend(condition.bools.size.toLong(), condition.bools.size * 48L) ||
-            !(condition.lower.values + condition.upper.values).all(::scalar)) return
+        if (full && (!spend(condition.bools.size.toLong(), condition.bools.size * 48L) ||
+            !(condition.lower.values + condition.upper.values).all(::scalar))) return
         val values = point?.takeIf { projection.point }
-        if (values != null && !values.values.all(::scalar)) return
+        // The point map was charged when it was captured.
+        if (full && values != null && !values.values.all(::scalar)) return
         val cited = if (full) query?.cited.orEmpty() else emptyList()
         if (shared) {
             if (!spend(cited.size.toLong(), cited.size * 16L)) return
@@ -333,8 +335,9 @@ internal class LinearAuthorityCapture(
         }
         val captured = LinearAuthorityCapturedQuery((attempted - 1L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
             source, numeric.atScope(source.scope),
-            query?.coordinates.orEmpty().toList(),
-            cited.toList(), query?.inactive.orEmpty().toSet(), values?.toMap(), candidates.toList(),
+            query?.coordinates.orEmpty().let { if (full) it.toList() else it },
+            cited.toList(), query?.inactive.orEmpty().let { if (full) it.toSet() else it },
+            if (full) values?.toMap() else values, candidates.toList(),
             if (full) template?.cuts?.observations.orEmpty().toMap() else emptyMap(), result.bound,
             retainedRefutation, when {
                 refutation != null -> "checked-refutation"
@@ -366,8 +369,13 @@ internal class LinearAuthorityCapture(
         live = current != null
         val overflowed = deliveryOverflowed
         try {
-            if (sibling != null && !proof(sibling.derivation)) return
-            if (incumbent != null && !scalar(incumbent)) return
+            if (record.projection != LinearAuthorityFeedbackRequest.Full) {
+                // A requested record references the sibling bound and incumbent its traversal already holds.
+                if (!spend(2L, 32L)) return
+            } else {
+                if (sibling != null && !proof(sibling.derivation)) return
+                if (incumbent != null && !scalar(incumbent)) return
+            }
         } finally {
             deliveryOverflowed = overflowed
         }

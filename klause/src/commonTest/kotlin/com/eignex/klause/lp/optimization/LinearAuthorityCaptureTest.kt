@@ -327,6 +327,23 @@ class LinearAuthorityCaptureTest {
     }
 
     @Test
+    fun `a requested record should reference its scope condition instead of charging its bounds`() {
+        val bounded = source.atScope(scope.copy(condition = SourceCondition(lower = mapOf(x to BigFraction.ZERO),
+            upper = mapOf(x to BigFraction.ONE))))
+        fun charged(request: LinearAuthorityFeedbackRequest, context: SourceProofContext): Long {
+            val capture = LinearAuthorityCapture(0, 0L, 0L, Cancellation.Never).apply {
+                deliver(10_000L, 1_000_000L, request)
+            }
+            capture.record(context, null, null, null, LinearAuthorityResult())
+            return capture.constructedBytes
+        }
+
+        assertEquals(charged(installed, source), charged(installed, bounded))
+        assertTrue(charged(LinearAuthorityFeedbackRequest.Full, source) <
+            charged(LinearAuthorityFeedbackRequest.Full, bounded))
+    }
+
+    @Test
     fun `on-demand evaluation should debit the cumulative construction ledger`() {
         val capture = LinearAuthorityCapture(0, 0L, 0L, Cancellation.Never).apply {
             deliver(10_000L, 1_000_000L, installed)

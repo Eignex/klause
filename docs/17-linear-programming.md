@@ -416,8 +416,11 @@ entries and 8 MiB modeled storage, and a delivered query has the same entry and
 byte allowance on its own. Archived records are charged for copies of the source
 rows, cut definitions and cited derivations they reference. Once the archive stops, a
 delivered record keeps only references to those immutable structures, which the
-authority prepared and still holds. It is charged for those references, its scope and
-the requested point, cuts and evidence. An on-demand cut evaluation spends the
+authority prepared and still holds. A full delivered record is charged per referenced
+row, coordinate and objective entry, for its scope, point, cut violations and checked
+evidence. A requested record is charged for what it allocates: its point once when
+captured, its installed cuts, and one reference each for the source context, scope,
+query lists, evidence, sibling bound and incumbent. An on-demand cut evaluation spends the
 delivered query's remaining allowance and the same cumulative ledger; it issues no LP
 query and renews no allowance.
 
