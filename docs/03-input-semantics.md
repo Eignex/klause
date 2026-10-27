@@ -175,7 +175,7 @@ same serializers.
 | Vocabulary | Keys |
 |---|---|
 | `SchemaEntry` | `bool`, `presence`, `nominal`, `int`, `float`, `set`, `multiple`, `constraint` |
-| `IntExpr` | `ref`, literal, `scale`, `add`, `mul`, `truncDiv`, `truncMod`, `pow`, `abs`, `min`, `max`, `if`, `element`, `card` |
+| `IntExpr` | `ref`, literal, `add`, `mul`, `truncDiv`, `truncMod`, `pow`, `abs`, `min`, `max`, `if`, `element`, `card` |
 | `BoolExpr` logic | `ref`, `notRef`, `nominalEq`, `not`, `and`, `or`, `xor`, `implies`, `iff`, `atMost`, `atLeast`, `cardinality`, `pseudoBoolean` |
 | `BoolExpr` relations | `le`, `lt`, `ge`, `gt`, `eq`, `ne`, `floatLinear`, `realEq`, set `in`, `labelIn`, `subset`, `disjoint`, `setEq` |
 | `BoolExpr` globals | `allDifferent`, `symmetricAllDifferent`, `inverse`, `table`, `regular`, `costRegular`, `mdd`, `costMdd`, `circuit`, `subcircuit`, `cumulative`, `disjunctive`, `sort`, `increasing`, `diffn` and the `…Opt` presence forms |
@@ -219,21 +219,34 @@ evaluate it rejects the expression rather than reinterpreting it.
 | condition, then, else | `if` |
 
 A schema binds each reference to the declared variable of its operand's sort, and
-compilation fails naming an unbound one. An integer literal is a number without a
-fraction part, such as `100` or `1e2`, in 32-bit range, and `pow` takes a nonnegative
-integer literal exponent with `0^0 = 1`. Literals such as `2.0` and `2.5`, and any
-other exponent, are binary64 only, and integer vocabularies reject them. Both
-environments write integral values as integer tokens, so integral fragments stay
-portable. Two-operand keys take exactly two operands in binary64,
-where a longer list would hide the rounding order. Integer vocabularies extend
-`add`, `min`, `max`, `and` and `or` to any nonempty list, and name truncating
+compilation fails naming an unbound one. An integer literal is a number with an
+integral value in 32-bit range, in any notation such as `100`, `100.0` or `1e2`, and
+`pow` takes a nonnegative integer literal exponent with `0^0 = 1`. Literals such as
+`2.5`, and any other exponent, are binary64 only, and integer vocabularies reject
+them. Both environments write integral values as integer tokens, so integral
+fragments stay portable. Two-operand keys take exactly two operands in binary64,
+where a longer list would hide the rounding order. Integer vocabularies also decode
+`add`, `min`, `max`, `and` and `or` over any nonempty list, and name truncating
 division `truncDiv` and `truncMod`, whose remainder takes the dividend's sign.
 `div` is binary64 division with IEEE 754 non-finite results, and integer
 vocabularies reject it. Klause's other keys, and Kumulant's `sub`, `neg` and
-transcendental functions, are extensions of one side. The conformance fixture
+transcendental functions, are extensions of one side.
+
+Schema JSON writes the Kotlin DSL's integer and Boolean trees in portable shapes.
+`add`, `min`, `max`, `and` and `or` nodes with more than two children nest to the
+left, so `x + 1 + 2` is `{"add": [{"add": [x, 1]}, 2]}`. Subtraction adds the
+negated operand, and negation and constant multiplication are `mul` with the integer
+constant first, so `x - y` is `{"add": [x, {"mul": [-1, y]}]}`. Integer evaluation
+is exact, so the nesting never changes a value. Decoding keeps every grouping except
+a chain nested in the first operand, which merges into its parent, and reads `mul`
+with a numeric left operand as a scaled term. Canonical documents therefore
+re-encode unchanged, and trees built by chaining DSL operators decode to the trees
+that encoded them.
+
+The conformance fixture
 `klause/src/jvmTest/resources/portable-expression/conformance.json`, which Kumulant
 keeps verbatim, records each environment's values, canonical encodings and
-rejections.
+rejections, and the Kotlin DSL construction of each DSL-emitted shape.
 
 The Kotlin builders of both libraries spell the shared operations alike: infix
 `lt`, `le`, `eq`, `ne`, `ge` and `gt` with a literal on either side, arithmetic

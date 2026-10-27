@@ -17872,7 +17872,10 @@ final object com.eignex.klause.lp/BuiltInRelaxationProjectionProvider : com.eign
     final fun select(com.eignex.klause.ir/Factor): com.eignex.klause.lp/RelaxationProjection? // com.eignex.klause.lp/BuiltInRelaxationProjectionProvider.select|select(com.eignex.klause.ir.Factor){}[0]
 }
 
-final object com.eignex.klause.model/BoolExprSerializer : com.eignex.skema.serialization/CompactSerializer<com.eignex.klause.model/BoolExpr> // com.eignex.klause.model/BoolExprSerializer|null[0]
+final object com.eignex.klause.model/BoolExprSerializer : com.eignex.skema.serialization/CompactSerializer<com.eignex.klause.model/BoolExpr> { // com.eignex.klause.model/BoolExprSerializer|null[0]
+    final fun deserialize(kotlinx.serialization.encoding/Decoder): com.eignex.klause.model/BoolExpr // com.eignex.klause.model/BoolExprSerializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+    final fun serialize(kotlinx.serialization.encoding/Encoder, com.eignex.klause.model/BoolExpr) // com.eignex.klause.model/BoolExprSerializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.eignex.klause.model.BoolExpr){}[0]
+}
 
 final object com.eignex.klause.model/BoolSpec : com.eignex.klause.model/VarSpec, kotlinx.serialization.internal/SerializerFactory { // com.eignex.klause.model/BoolSpec|null[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.model/BoolSpec.equals|equals(kotlin.Any?){}[0]
@@ -17884,7 +17887,10 @@ final object com.eignex.klause.model/BoolSpec : com.eignex.klause.model/VarSpec,
 
 final object com.eignex.klause.model/ContinuousRealExprSerializer : com.eignex.skema.serialization/CompactSerializer<com.eignex.klause.model/ContinuousRealExpr> // com.eignex.klause.model/ContinuousRealExprSerializer|null[0]
 
-final object com.eignex.klause.model/IntExprSerializer : com.eignex.skema.serialization/CompactSerializer<com.eignex.klause.model/IntExpr> // com.eignex.klause.model/IntExprSerializer|null[0]
+final object com.eignex.klause.model/IntExprSerializer : com.eignex.skema.serialization/CompactSerializer<com.eignex.klause.model/IntExpr> { // com.eignex.klause.model/IntExprSerializer|null[0]
+    final fun deserialize(kotlinx.serialization.encoding/Decoder): com.eignex.klause.model/IntExpr // com.eignex.klause.model/IntExprSerializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+    final fun serialize(kotlinx.serialization.encoding/Encoder, com.eignex.klause.model/IntExpr) // com.eignex.klause.model/IntExprSerializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.eignex.klause.model.IntExpr){}[0]
+}
 
 final object com.eignex.klause.model/ModelJson { // com.eignex.klause.model/ModelJson|null[0]
     final val catalog // com.eignex.klause.model/ModelJson.catalog|{}catalog[0]

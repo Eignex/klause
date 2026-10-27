@@ -5,6 +5,17 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.compile.compile
 import com.eignex.klause.formats.json.JsonSchema
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.schema.and
+import com.eignex.klause.schema.ge
+import com.eignex.klause.schema.gt
+import com.eignex.klause.schema.le
+import com.eignex.klause.schema.lt
+import com.eignex.klause.schema.min
+import com.eignex.klause.schema.minus
+import com.eignex.klause.schema.or
+import com.eignex.klause.schema.plus
+import com.eignex.klause.schema.times
+import com.eignex.klause.schema.unaryMinus
 import com.eignex.skema.SchemaJson
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
@@ -69,6 +80,40 @@ class ModelJsonConformanceTest {
         }
     }
 
+    @Test
+    fun `DSL expressions encode to their fixture forms`() {
+        val dslCases = cases.filter { "dsl" in it }
+
+        val encoded = dslCases.associate { case ->
+            val source = case.getValue("dsl").jsonPrimitive.content
+            val json = if (case.isBoolean) {
+                SchemaJson.encodeToJsonElement(BoolExpr.serializer(), BOOL_DSL.getValue(source))
+            } else {
+                SchemaJson.encodeToJsonElement(IntExpr.serializer(), INT_DSL.getValue(source))
+            }
+            source to json
+        }
+
+        assertEquals(INT_DSL.keys + BOOL_DSL.keys, encoded.keys)
+        assertEquals(dslCases.associate { it.getValue("dsl").jsonPrimitive.content to it.getValue("expr") }, encoded)
+    }
+
+    @Test
+    fun `fixture forms of DSL expressions decode to the DSL trees`() {
+        for (case in cases.filter { "dsl" in it }) {
+            val source = case.getValue("dsl").jsonPrimitive.content
+            val expr = case.getValue("expr")
+
+            val decoded: Any = if (case.isBoolean) {
+                SchemaJson.decodeFromJsonElement(BoolExpr.serializer(), expr)
+            } else {
+                SchemaJson.decodeFromJsonElement(IntExpr.serializer(), expr)
+            }
+
+            assertEquals(INT_DSL[source] ?: BOOL_DSL[source], decoded, source)
+        }
+    }
+
     private fun entries(case: JsonObject, index: Int): List<Pair<String, JsonElement>> {
         val bindings = case.getValue("bindings").jsonObject.map { (name, value) ->
             val fixed = value.jsonPrimitive.int
@@ -116,5 +161,23 @@ class ModelJsonConformanceTest {
         val ONE = JsonPrimitive(1)
         val ZERO = JsonPrimitive(0)
         const val RESULT_BOUND = 1_000
+
+        val a = IntRef("a")
+        val b = IntRef("b")
+        val c = IntRef("c")
+        val INT_DSL: Map<String, IntExpr> = mapOf(
+            "a + 1 + 2" to a + 1 + 2,
+            "a - 1" to a - 1,
+            "a - b" to a - b,
+            "a - b + 1" to a - b + 1,
+            "-a" to -a,
+            "a * 2" to a * 2,
+            "2 * a - b" to 2 * a - b,
+            "min(a, b, c)" to min(a, b, c),
+        )
+        val BOOL_DSL: Map<String, BoolExpr> = mapOf(
+            "(a ge 0) and (a le 9) and (b ge 0)" to ((a ge 0) and (a le 9) and (b ge 0)),
+            "(a lt 0) or (a gt 9) or (b lt 0)" to ((a lt 0) or (a gt 9) or (b lt 0)),
+        )
     }
 }
