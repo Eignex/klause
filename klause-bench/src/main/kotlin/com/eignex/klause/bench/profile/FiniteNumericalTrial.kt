@@ -93,9 +93,10 @@ internal class FiniteNumericalTrial(
             it.parameterCount == 8 && it.parameterTypes.last().simpleName == "DefaultConstructorMarker"
         }.newInstance(16, null, null, null, null, funding, 30, null)
         val authorityType = Class.forName("com.eignex.klause.lp.optimization.LinearAuthority")
+        val policy = Class.forName("com.eignex.klause.lp.SparseSourceLpPolicy").getConstructor().newInstance()
         authority = authorityType.declaredConstructors.single {
-            it.parameterCount == 6 && it.parameterTypes.last().simpleName == "DefaultConstructorMarker"
-        }.newInstance(budget, null, true, null, 10, null)
+            it.parameterCount == 6 && it.parameterTypes.last() == Boolean::class.javaPrimitiveType
+        }.newInstance(budget, { _: Any? -> }, true, policy, emptyList<Any>(), false)
         val publisherType = Class.forName("com.eignex.klause.solver.pipeline.SourceNumericalFeedback")
         publisher = publisherType.getDeclaredConstructor(fundingType, Cancellation::class.java)
             .newInstance(funding, stop)
