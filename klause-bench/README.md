@@ -5348,6 +5348,35 @@ native checks in their recorded scopes. Inspection completes; later records rema
 unavailable. Its separate inspection allowance supplies neither an independent
 witness/proof check nor a whole-process timing claim.
 
+[Held-out comparison 8625](https://lab.eignex.com/jobs/8625), at `e43ed4c2ea`,
+completes all 96 ten-second P1 cases on pp08aCUTS, gr4x6, modglob and enigma,
+seeds 1/3 and default/exact policies. Arms compare numerical support/source order,
+ordinary execution, equal-budget independent companions, and shared companions
+with each ordering. The recovered retry preserves all 84 accepted records and
+runs only the remaining 12 cases. All 32 support arms consume zero changed
+choices; bounded unavailable records do not establish general inapplicability.
+On gr4x6 all arms retain the native optimum and independently valid witnesses.
+The support consumer preserves 45 LP operations and 65 nodes while funded work
+grows from 2,786,191 to 2,919,225 and modeled allocation from 266,250 to 8,929,427
+bytes. Shared-companion outcome changes with zero changed choices supply no
+support-ordering credit. Ordinary execution closes all four enigma native proofs;
+none of its numerical or companion controls closes one.
+
+Of 70 reported witnesses, 56 pass independent solchecker checks. Fourteen modglob
+points remain unsupported because their exact rational objective has no finite
+decimal representation; native source checks remain separate. Native proofs have
+no independent proof check. The Klause, CLI and Koblas JARs match across
+Mac/aarch64 and Linux/amd64; each source/seed block retains one worker/runtime.
+Whole-process RSS and external timing receipts remain paired within those blocks,
+without independent timing repetitions or cross-platform throughput comparisons.
+The seed-1 default gr4x6 pair changes peak RSS from 105,636 to 112,212 KiB and
+external wall time from 1.91 to 1.81 s; this timing pair establishes no speedup.
+The consumed pilot loss and zero-change held-out costs reject support-ordering
+promotion. The scoped producer and internal comparison remain available. Final
+composition requires the measured selection, reuse and aggregation dispositions;
+these sources overlap their qualification cohorts and are not an untouched
+composed-study holdout.
+
 #### Active rows before Boolean completion
 
 [8424](https://lab.eignex.com/jobs/8424) and
