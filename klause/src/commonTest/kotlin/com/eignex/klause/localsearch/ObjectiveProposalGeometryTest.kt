@@ -55,7 +55,8 @@ class ObjectiveProposalGeometryTest {
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
         state.shaping.objective = canonical
 
-        val admitted = configureObjectiveProposals(state, assertNotNull(sweep.functionalObjective(canonical)), true, true)
+        val admitted = configureObjectiveProposals(state,
+            assertNotNull(sweep.functionalObjective(canonical)), true, true)
 
         assertFalse(admitted)
     }

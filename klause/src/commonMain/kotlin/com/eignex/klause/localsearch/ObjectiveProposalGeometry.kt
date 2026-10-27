@@ -3,6 +3,7 @@ package com.eignex.klause.localsearch
 import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.BIG_ONE
 
 internal fun configureObjectiveProposals(
     state: LocalSearchState,
@@ -35,5 +36,6 @@ internal fun objectiveProposalValuesAgree(
     val functional = objective as? FunctionalObjective ?: return false
     val canonical = state.shaping.objective as? LinearObjective ?: functional.termForm ?: return false
     val destination = state.inspectMove(move, canonical).assignment
-    return functional.evaluateExact(destination) == canonical.evaluateExact(destination)
+    val value = canonical.evaluateExact(destination)
+    return value.den == BIG_ONE && functional.evaluateExact(destination) == value.num
 }

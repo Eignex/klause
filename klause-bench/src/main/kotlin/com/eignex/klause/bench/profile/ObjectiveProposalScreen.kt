@@ -45,19 +45,22 @@ internal fun captureObjectiveProposals(
         if (stop()) break
         val inspection = state.inspectMove(move, canonical)
         val point = view.reconstruct(inspection.assignment)
-        val agreement = functional?.let {
+        val agreement = functional?.let { gradient ->
             Class.forName("com.eignex.klause.localsearch.ObjectiveProposalGeometryKt").methods.single {
                 it.name == "objectiveProposalValuesAgree"
-            }.invoke(null, state, it, move) as Boolean
+            }.invoke(null, state, gradient, move) as Boolean
         }
+        val canonicalValue = canonical.evaluateExact(inspection.assignment)
+        val sourceValue = sourceObjective.evaluateExact(point)
+        val sourceAgreement = canonicalValue == sourceValue
         visited++
-        if (agreement != true) disagreements++
+        if (agreement != true || !sourceAgreement) disagreements++
         if (probes.size < 32) probes += buildJsonObject {
             put("move", move.toString())
             put("source", trajectorySource(point))
-            put("canonicalValue", canonical.evaluateExact(inspection.assignment).toString())
-            put("sourceExpressionValue", sourceObjective.evaluateExact(point).toString())
-            put("completeCandidateValueAgreement", agreement)
+            put("canonicalValue", canonicalValue.toString())
+            put("sourceExpressionValue", sourceValue.toString())
+            put("completeCandidateValueAgreement", agreement == true && sourceAgreement)
             put("netDelta", inspection.netDelta)
             put("objectiveDelta", inspection.objectiveDelta)
             put("nativeSourceAccepted", FiniteConflictSelection.checkSource(sourceModel, point, stop))
@@ -74,8 +77,11 @@ internal fun captureObjectiveProposals(
         put("completeCandidateValuesChecked", visited)
         put("candidateValueDisagreements", disagreements)
         put("candidateValueQualification", complete)
-        if (!complete) put("decline", if (disagreements > 0) "candidate-value-disagreement"
-            else "incomplete-candidate-value-scan")
+        if (!complete) put("decline", when {
+            functional == null -> "no-functional-objective"
+            disagreements > 0 -> "candidate-value-disagreement"
+            else -> "incomplete-candidate-value-scan"
+        })
         put("filterAccounting", "templates precede pins, definitions and owners; channel expansion can add moves")
         put("candidates", JsonArray(probes))
         put("candidateLimit", 32)
