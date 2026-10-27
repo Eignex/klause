@@ -197,7 +197,8 @@ data class FloatLinearConstraint(
         var h = coeffs.contentHashCode()
         h = 31 * h + varNames.hashCode()
         h = 31 * h + op.hashCode()
-        h = 31 * h + bound.hashCode()
+        // equals compares bound numerically, so 0.0 and -0.0 must share a hash.
+        h = 31 * h + (if (bound == 0.0) 0.0 else bound).hashCode()
         return h
     }
 }
