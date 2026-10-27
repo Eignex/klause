@@ -1712,6 +1712,20 @@ remain unavailable rather than becoming completed fully pinned repairs. Cold
 fragments start from the specified owner seed; retained fragments keep RNG and
 activity state. These comparisons do not attribute all node differences to clauses
 or charge selection costs as owner repair work.
+
+`ownerRecipes=r1,r2` adds an opt-in `ls:<recipe>` inner owner per named trajectory
+recipe to every owner replay. Each repair builds a fresh recipe with the acquisition
+walk's definition sweep, per-move invariants, implicit-seeding switch, gradient view,
+class-normalized weights and linear shaping, then warm-starts at the captured center
+under the same pins, cutoff, seed and fragment allowance as the default `ls` owner.
+A warm start seeds no implicit owner until a restart. Rows record the internal
+compound tally, restarts, slices, maintained-definition and implicit-seed scope
+mismatches; pins are never released to admit a compound. Shared hint, sweep and
+gradient preparation is reported once in the owner preparation file, outside the
+repair allowances. Every checked improvement from any owner then runs the declared
+unpinned source-coordinate descent with 128 moves, 2,000 decision equivalents and
+two seconds, recorded separately with its native source check. `owners=a,b,...`
+selects the owner sequence; the default places structured owners after `ls`.
 Owner replay captures selector sets without a duplicate producer-side CP solve;
 `producerRepairEvaluated` distinguishes this capture from selector-only comparisons
 that also evaluate their own repairs.

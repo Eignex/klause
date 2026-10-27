@@ -253,6 +253,11 @@ class SourceDrivenStrategy(
         alternativeSink.setAssumptions(state.assumptions)
         alternativeSink.setInvariants(state.invariants)
         alternativeSink.setOwners(state.seeding.ownerInt)
+        // With a Boolean closure, compounds are tallied once at the raw sink before closing into the pools.
+        val pooledTally = if (state.booleanRepairs == null) state.compoundTally else null
+        noiseSink.compoundTally = pooledTally
+        scoreSink.compoundTally = pooledTally
+        alternativeSink.compoundTally = pooledTally
         if (prioritizePrimaryRepairs) {
             noiseSink.alternativeRepairs = alternativeSink
             scoreSink.alternativeRepairs = alternativeSink
@@ -274,12 +279,14 @@ class SourceDrivenStrategy(
                 raw.setAssumptions(state.assumptions)
                 raw.setInvariants(state.invariants)
                 raw.setOwners(state.seeding.ownerInt)
+                raw.compoundTally = state.compoundTally
                 val alternatives = if (prioritizePrimaryRepairs) {
                     (repairAlternativeSink ?: MoveSink().also { repairAlternativeSink = it }).also {
                         it.clear()
                         it.setAssumptions(state.assumptions)
                         it.setInvariants(state.invariants)
                         it.setOwners(state.seeding.ownerInt)
+                        it.compoundTally = state.compoundTally
                         raw.alternativeRepairs = it
                     }
                 } else null

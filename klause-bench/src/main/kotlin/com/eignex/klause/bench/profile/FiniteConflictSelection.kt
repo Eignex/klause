@@ -52,8 +52,8 @@ internal object FiniteConflictSelection {
     private const val DECISIONS = 2000L
     private const val ACQUISITION_DECISIONS = 128L
     private const val REPAIR_DECISIONS = 1000L
-    private const val DESCENT_MOVES = 128L
-    private const val DESCENT_RULE = "first feasible source-coordinate descent; linear shaping 1; seeded ties"
+    internal const val DESCENT_MOVES = 128L
+    internal const val DESCENT_RULE = "first feasible source-coordinate descent; linear shaping 1; seeded ties"
 
     private class Selection(
         val requestedBools: IntArray,
@@ -565,9 +565,9 @@ internal object FiniteConflictSelection {
         else -> null
     }
 
-    private class Descent(val sample: Sample, val endpoint: String, val moves: Double)
+    internal class Descent(val sample: Sample, val endpoint: String, val moves: Double)
 
-    private fun descend(
+    internal fun descend(
         problem: BakedProblem,
         objective: LinearObjective,
         initial: Sample,

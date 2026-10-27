@@ -216,6 +216,7 @@ class LocalSearchState private constructor(
         internal set
 
     internal var booleanRepairs: BooleanRepairClosure? = null
+    internal var compoundTally: CompoundTally? = null
 
     /** Soft cap for `compressViolation`: residuals at or below it
      *  keep exact unit resolution, above it a log tail bounds how much one large-magnitude factor
