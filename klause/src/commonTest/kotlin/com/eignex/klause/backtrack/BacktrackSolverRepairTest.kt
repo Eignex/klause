@@ -2,12 +2,18 @@ package com.eignex.klause.backtrack
 
 import com.eignex.klause.backtrack.selector.IndomainMax
 import com.eignex.klause.factor.bool.Cardinality
+import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.formats.mps.Mps
+import com.eignex.klause.formats.mps.toExactSourceProblem
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -17,6 +23,92 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class BacktrackSolverRepairTest {
+    @Test
+    fun `exact repair should distinguish both sides of a rational cutoff from equality`() {
+        val problem = Problem(0, 0, emptyArray(), arrayOf(
+            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(3.0), LinearOp.EQ, 1.0),
+        ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
+        val third = BigFraction.ofLong(3L).reciprocal()
+        val epsilon = BigFraction.ofLong(1L shl 60).reciprocal()
+
+        for (sign in listOf(-1L, 1L)) {
+            val objective = LinearObjective(realCoefficients = doubleArrayOf(sign.toDouble()))
+            val value = third * BigFraction.ofLong(sign)
+            for (offset in listOf(-1L, 0L, 1L)) {
+                val cutoff = value + epsilon * BigFraction.ofLong(offset)
+                BacktrackSolver(problem).openRepair(objective, BacktrackParams(toleranceCheck = { true })).use { repair ->
+                    repair.beginExact(Assumptions.None, 100L, cutoff, Cancellation.Never)
+                    val result = repair.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L)
+
+                    assertEquals(TerminationReason.SearchExhausted, result.reason)
+                    if (offset > 0L) {
+                        assertEquals(third, assertNotNull(result.sample).exactReals?.single())
+                    } else assertNull(result.sample)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `exact repair should admit a wide integer improvement tied in floating point`() {
+        val value = 9_007_199_254_740_992L
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L))
+        val problem = Problem(0, 1, arrayOf(IntDomain(value, value + 2L)), emptyArray()).bake()
+        val cutoff = BigFraction.ofLong(value + 1L)
+
+        BacktrackSolver(problem).openRepair(objective, BacktrackParams()).use { repair ->
+            repair.beginExact(Assumptions.None, 100L, cutoff, Cancellation.Never)
+            val result = repair.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L)
+
+            assertEquals(value, assertNotNull(result.sample).ints.single())
+            assertEquals(TerminationReason.SearchExhausted, result.reason)
+        }
+    }
+
+    @Test
+    fun `exact repair should reject a rational loosening within the same floating value`() {
+        val third = BigFraction.ofLong(3L).reciprocal()
+        val epsilon = BigFraction.ofLong(1L shl 60).reciprocal()
+        val solver = BacktrackSolver(Problem(0, 0, emptyArray(), emptyArray()).bake())
+        solver.openRepair(LinearObjective(), BacktrackParams()).use { repair ->
+            repair.beginExact(Assumptions.None, 100L, third, Cancellation.Never)
+
+            assertFailsWith<IllegalArgumentException> {
+                repair.beginExact(Assumptions.None, 100L, third + epsilon, Cancellation.Never)
+            }
+        }
+    }
+
+    @Test
+    fun `exact repair should preserve scaled source direction across sibling reseeding`() {
+        for (sense in listOf("MIN", "MAX")) {
+            val compiled = Mps.parse(
+                "NAME SCALED\nOBJSENSE\n $sense\nROWS\n N COST\n E R\nCOLUMNS\n" +
+                    " M0 'MARKER' 'INTORG'\n I R 1\n M1 'MARKER' 'INTEND'\n" +
+                    " X COST 0.1 R 3\nRHS\n RHS R 1\nBOUNDS\n" +
+                    " BV B I\n LO B X 0\n UP B X 1\nENDATA",
+            ).toExactSourceProblem()
+            val sourceObjective = assertNotNull(compiled.objective).toLinearObjective()
+            val objective = if (compiled.maximize) sourceObjective.negated() else sourceObjective
+            val epsilon = BigFraction.ofLong(1L shl 60).reciprocal()
+            val first = if (compiled.maximize) 1L else 0L
+            val second = 1L - first
+            BacktrackSolver(compiled.model.bake()).openRepair(objective, BacktrackParams()).use { repair ->
+                val cutoff = if (compiled.maximize) epsilon else BigFraction.ofLong(3L).reciprocal() + epsilon
+                repair.beginExact(Assumptions(ints = mapOf(0 to first)), 100L, cutoff, Cancellation.Never)
+                val a = assertNotNull(repair.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L).sample)
+                repair.beginExact(Assumptions(ints = mapOf(0 to second)), 100L, cutoff, Cancellation.Never)
+                val b = assertNotNull(repair.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L).sample)
+
+                assertEquals(10L, compiled.objectiveScale)
+                assertEquals(if (compiled.maximize) "0" else "1/30",
+                    compiled.sourceWitness(a.ints, assertNotNull(a.exactReals)).objective.toString())
+                assertEquals(if (compiled.maximize) "1/30" else "0",
+                    compiled.sourceWitness(b.ints, assertNotNull(b.exactReals)).objective.toString())
+            }
+        }
+    }
+
     @Test
     fun `repair should leave an unconsumed improving ray unavailable`() {
         val model = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,

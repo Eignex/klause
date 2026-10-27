@@ -125,6 +125,7 @@ internal class ResumableMinimize(
     private val pausable: Boolean = true,
     // Repair owns the handle across fragment terminals and explicitly closes it after the final fragment.
     private val rebindable: Boolean = false,
+    private val exactObjectiveBoundSupplier: (() -> BigFraction?)? = null,
     // A containing search charges private work and owns its overspend debt.
     private val ownsWorkDebt: Boolean = true,
     initialCandidate: Sample? = null,
@@ -238,6 +239,16 @@ internal class ResumableMinimize(
         return exact < checkNotNull(BigFraction.ofDouble(cutoff))
     }
 
+    private fun beatsExternalCutoff(exact: BigFraction?, reported: Double): Boolean {
+        val cutoff = externalCutoff()
+        val exactCutoff = exactObjectiveBoundSupplier?.invoke()
+        return when {
+            exactCutoff != null -> exact != null && exact < exactCutoff
+            exact != null -> beatsCutoff(exact, cutoff)
+            else -> reported < cutoff
+        }
+    }
+
     private val resources = SearchInvocationResources().also { owner ->
         owner.own(AutoCloseable { sink.stop() })
     }
@@ -254,9 +265,12 @@ internal class ResumableMinimize(
         cancellation: Cancellation,
         workLimit: Long = 0L,
     ): LeafRealResult {
-        val result = realLeafOwner().solve(sample, cancellation, params.toleranceCheck, workLimit)
+        val result = realLeafOwner().solve(sample, cancellation, completionToleranceCheck(), workLimit)
         return checkedLeafResult(sample, result)
     }
+
+    private fun completionToleranceCheck(): ((Sample) -> Boolean)? =
+        if (exactObjectiveBoundSupplier?.invoke() != null) null else params.toleranceCheck
 
     private fun realLeafOwner(): LeafRealSolver = leafSolver ?: LeafRealSolver(
         problem, objective, params.lpPlan.componentSplit, sink.lp, solver.lpSolveContext,
@@ -272,7 +286,7 @@ internal class ResumableMinimize(
     }
 
     private fun advanceRealLeaf(sample: Sample): LeafRealResult? {
-        val cursor = pendingRealLeaf ?: realLeafOwner().openSolve(sample, runEndToken(), params.toleranceCheck)
+        val cursor = pendingRealLeaf ?: realLeafOwner().openSolve(sample, runEndToken(), completionToleranceCheck())
             .also { pendingRealLeaf = it }
         val allowance = slice.remainingLpWork()
         if (allowance == 0L) return null
@@ -293,7 +307,7 @@ internal class ResumableMinimize(
         ) return result
         val completed = sample.copy(reals = result.reals, exactReals = result.exactReals)
         val tolerated = result.verdict == LpVerdict.TOLERANCE_OPTIMUM &&
-            params.toleranceCheck?.invoke(completed) == true
+            completionToleranceCheck()?.invoke(completed) == true
         return if (tolerated || verifyRealCoordinates(problem, completed) is Verification.Accepted) result
         else LeafRealResult(LpVerdict.INDETERMINATE, doubleArrayOf())
     }
@@ -858,12 +872,12 @@ internal class ResumableMinimize(
         o: Double,
         startingWitness: Boolean = false,
     ): MinimizeResult.WithSample? {
-        val exact = exactSourceObjective(objective, sample, params.toleranceCheck)
+        val exact = exactSourceObjective(objective, sample, completionToleranceCheck())
         if (rebindable && exact == null) return null
         val cutoff = externalCutoff()
         val matchesCutoff = startingWitness && cutoff.isFinite() &&
             (exact?.let { it == BigFraction.ofDouble(cutoff) } ?: (o == cutoff))
-        if (cutoff.isNaN() || (!matchesCutoff && !(exact?.let { beatsCutoff(it, cutoff) } ?: (o < cutoff)))) {
+        if (cutoff.isNaN() || (!matchesCutoff && !beatsExternalCutoff(exact, o))) {
             return null
         }
         val score = SourceObjectiveScore(o, exact)
@@ -1077,13 +1091,16 @@ internal class ResumableMinimize(
             var outcome = "FAILED"
             try {
                 val accepted = verifiedLpProposal(proposal, rootToken) { outcome = it } ?: return null
-                val cutoff = minOf(bestObj, externalCutoff())
-                if (cutoff.isNaN()) {
+                if (externalCutoff().isNaN()) {
                     outcome = "INVALID_CUTOFF"
                     return null
                 }
-                val exact = exactSourceObjective(objective, accepted.assignment, params.toleranceCheck)
-                val improving = exact?.let { beatsCutoff(it, cutoff) } ?: (accepted.objective < cutoff)
+                val exact = exactSourceObjective(objective, accepted.assignment, completionToleranceCheck())
+                val standing = incumbents.current()?.objective
+                val improvesLocal = if (exact != null && standing?.exact != null) {
+                    exact < standing.exact
+                } else accepted.objective < bestObj
+                val improving = improvesLocal && beatsExternalCutoff(exact, accepted.objective)
                 outcome = when {
                     !improving -> "NON_IMPROVING"
                     rootToken() -> "CANCELLED"
@@ -1201,7 +1218,11 @@ internal class ResumableMinimize(
             val externalBound = externalCutoff()
             val effectiveBound = if (externalBound < bestObj) externalBound else bestObj
             if (rebindable && discreteObjective) {
-                if (lpEngine.linearBoundDominates(session, effectiveBound)) return SearchNodeDisposition.Prune
+                val exactBound = listOfNotNull(exactObjectiveBoundSupplier?.invoke(),
+                    incumbents.current()?.objective?.exact).minOrNull()
+                val dominated = if (exactBound != null) lpEngine.linearBoundDominates(session, exactBound)
+                    else lpEngine.linearBoundDominates(session, effectiveBound)
+                if (dominated) return SearchNodeDisposition.Prune
             }
             // Persistent LP fixings may use only a cutoff that survives every later repair.
             val lpBound = if (rebindable) externalBound else effectiveBound

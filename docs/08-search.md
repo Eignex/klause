@@ -139,7 +139,9 @@ above the cutoff do not seed it. This starting witness supplies bounds without
 priming solution guidance or earning incumbent progress. Restarting workers retain
 their discovery and root-primal startup path. Rebindable neighborhood searches retain strict
 improvement admission, and exhaustion under an external cutoff keeps its conditional
-result scope.
+result scope. Exact repair cutoffs remain rational through admission and discrete
+dominance. LP pruning may use their rounded-up floating enclosure; equality in the
+displayed objective cannot reject an exact improvement.
 
 ### Leaf-completed columns
 

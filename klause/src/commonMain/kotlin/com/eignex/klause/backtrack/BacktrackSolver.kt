@@ -11,6 +11,7 @@ import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.schema.VariableSchema
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.PullSearchStream
 import com.eignex.klause.solver.RepairSearch
@@ -131,6 +132,8 @@ class BacktrackSolver internal constructor(
     @Suppress("TooGenericExceptionCaught") // the repair owner must preserve arbitrary primary and cleanup failures
     internal fun openRepair(objective: LinearObjective, params: BacktrackParams): RepairSearch {
         var activeCutoff = Double.POSITIVE_INFINITY
+        var activeExactCutoff: BigFraction? = null
+        var exactCompletion = false
         var activeCancellation = params.cancellation
         val handleCancellation = object : Cancellation {
             override fun isCancelled(): Boolean = activeCancellation()
@@ -143,6 +146,7 @@ class BacktrackSolver internal constructor(
             params.copy(objectiveBoundSupplier = { activeCutoff },
                 cancellation = handleCancellation.withLifetime(handleCancellation)),
             rebindable = true,
+            exactObjectiveBoundSupplier = { activeExactCutoff.takeIf { exactCompletion } },
         )
         return object : RepairSearch {
             private var started = false
@@ -158,13 +162,41 @@ class BacktrackSolver internal constructor(
                 cutoff: Double,
                 cancellation: Cancellation,
             ) {
+                beginFragment(assumptions, decisionBudget, cutoff, BigFraction.ofDouble(cutoff), false, cancellation)
+            }
+
+            override fun beginExact(
+                assumptions: Assumptions,
+                decisionBudget: Long,
+                cutoff: BigFraction,
+                cancellation: Cancellation,
+            ) {
+                beginFragment(assumptions, decisionBudget,
+                    SourceObjectiveScore(cutoff.toDouble(), cutoff).pruningBound, cutoff, true, cancellation)
+            }
+
+            private fun beginFragment(
+                assumptions: Assumptions,
+                decisionBudget: Long,
+                cutoff: Double,
+                exactCutoff: BigFraction?,
+                requireExactCompletion: Boolean,
+                cancellation: Cancellation,
+            ) {
                 try {
                     check(!closed) { "repair search is closed" }
                     require(decisionBudget >= 0L)
-                    require(!cutoff.isNaN() && cutoff <= activeCutoff) {
+                    val monotone = if (exactCutoff != null && activeExactCutoff != null) {
+                        exactCutoff <= checkNotNull(activeExactCutoff)
+                    } else if (exactCutoff == null && cutoff == Double.POSITIVE_INFINITY) {
+                        activeExactCutoff == null && activeCutoff == Double.POSITIVE_INFINITY
+                    } else cutoff <= activeCutoff
+                    require(!cutoff.isNaN() && monotone) {
                         "repair objective cutoff must be non-increasing"
                     }
                     activeCutoff = cutoff
+                    activeExactCutoff = exactCutoff
+                    exactCompletion = requireExactCompletion
                     activeCancellation = params.cancellation or cancellation
                     handle.rebind(assumptions, decisionBudget)
                     best = null
