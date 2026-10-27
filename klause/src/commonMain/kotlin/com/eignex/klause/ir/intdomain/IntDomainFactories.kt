@@ -121,3 +121,26 @@ internal fun intDomainFromRuns(
     }
     return SurvivorsDomain(newMin, newMax, sv, storage)
 }
+
+/**
+ * The present values of this domain as a flattened run list (`lo,hi` pairs, sorted, disjoint with strict
+ * gaps), the inverse of [intDomainFromRuns]. Contiguous and run-list representations answer directly, so
+ * a wide sparse domain costs its run count rather than its span; any other representation is enumerated.
+ */
+internal fun IntDomain.runBounds(): LongArray = when (this) {
+    is ContiguousDomain -> longArrayOf(min, max)
+    is RunsDomain -> copyRuns()
+    else -> {
+        val values = requireNotNull(spanOrNull()) { "domain [$min, $max] holds too many values to list" }
+        val runs = LongArrayList()
+        values.forEach { value ->
+            if (runs.size > 0 && runs.last() == value - 1) {
+                runs[runs.size - 1] = value
+            } else {
+                runs.add(value)
+                runs.add(value)
+            }
+        }
+        runs.toLongArray()
+    }
+}

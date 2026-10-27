@@ -10,6 +10,7 @@ schema frontend. The next two chapters cover file formats.
 | Source | Detailed contract |
 |---|---|
 | Kotlin schema DSL | [Schema lowering](#schema-lowering): float representation, exact products and refused contexts |
+| Problem JSON | [Problem JSON](#problem-json): lossless interchange of any `Problem` and its captured semantics |
 | DIMACS, WCNF, OPB/WBO and XCSP3 | [Finite formats](04-finite-formats.md): encodings and objectives |
 | FlatZinc | [FlatZinc semantics](04-finite-formats.md#flatzinc): Boolean channels, exact/grid floats and reconstruction |
 | MPS | [MPS semantics](05-arithmetic-formats.md): decimal correspondence, exact certification and tolerances |
@@ -107,6 +108,55 @@ formats have no absolute-value syntax.
 fallback policy and solution guidance. Frontends translate syntax into these groups
 before finite execution; real columns never enter integer branch groups, and
 backtracking owns selector allocation.
+
+## Problem JSON
+
+`formats.json.ProblemJson` writes a `Problem` as one document and reads it back
+unchanged, whether the model came from the IR, the schema compiler or a file format.
+Decoding a written document and encoding the result reproduces it exactly.
+
+```json
+{"bools": 2,
+ "ints": [{"lower": 0, "upper": 9, "values": [[0, 2], [7, 9]]}, {"upper": 5, "box": [[-100, 5]]}],
+ "reals": [{"lower": 0.0}],
+ "factors": [{"clause": {"literals": [0, 3]}},
+             {"linear": {"vars": [0, 1], "op": "LE", "coefficients": [1, -1], "bound": 4}}],
+ "implied": [1]}
+```
+
+Variables are column ids. A Boolean literal is the `Lit` code `2·variable + negated`, and
+a coordinate that may name any namespace is the `Term` code `4·id + tag`, with tag 0 for
+an integer column, 1 for a literal and 2 for a real column. An absent integer or real
+bound is open. `values` lists a declared value set as disjoint `[lo, hi]` runs, so a
+sparse column costs its run count rather than its span; `box` lists the finite fallback
+box a lane materialized for a column with an open side, which declares nothing. Real
+bounds keep their binary64 values, signed zeros included. The document also carries
+implied-factor indices, `symmetryBreaking`, non-default resource `settings` and the
+declared and effective source `semantics`, each omitted at its default.
+
+Each factor is `{key: payload}`, written by the `FactorCodec` registered for its exact
+class, so native kinds and options survive without decomposition or narrowing.
+Constants keep the width they were built at: 64-bit integers are numbers, wider
+integers and exact rationals are decimal strings such as `"-3/4"`, and binary64
+constants use the shortest exact decimal. `FactorCodecs.builtin` covers every factor a
+source model can hold. Engine projections appended to a prepared model
+(`DifferenceSystem`, `ExactSearchRow`, encoded theory rows and objective bounds) carry
+derived search state and have no codec.
+
+A custom factor persists by registering a codec with a serializable payload class:
+
+```kotlin
+val json = ProblemJson(FactorCodecs.builtin + factorCodec<Parity, ParityPayload>(
+    "parity", { ParityPayload(it.x, it.even) }, { Parity(it.x, it.even) }))
+```
+
+Keys, factor classes and payload classes are unique within a registry. Encoding a
+factor whose class has no codec, or decoding a key that names none, raises
+`MissingFactorCodecException` with the factor's path, such as `$.factors[3]`. Decoding
+is strict: unknown fields, malformed runs, incomplete constant groups and factor or model
+invariants fail as `JsonFormatException` at their document path. `jsonSchema()`
+returns the draft 2020-12 JSON Schema of the documents an instance reads, including
+its registered payloads.
 
 ## Schema lowering
 
