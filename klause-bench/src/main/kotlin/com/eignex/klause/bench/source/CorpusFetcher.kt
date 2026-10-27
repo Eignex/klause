@@ -4,6 +4,7 @@ import com.eignex.klause.bench.catalog.ExternalCollection
 import com.eignex.klause.bench.catalog.FetchMethod
 import com.eignex.klause.bench.catalog.ProblemSource
 import java.io.File
+import java.lang.Boolean.getBoolean
 import java.net.URI
 import java.nio.file.Files
 import java.util.zip.CRC32
@@ -51,9 +52,11 @@ internal object CorpusFetcher {
     private fun defaultCacheRoot(): File = File(xdgCacheHome(), "klause-bench/corpus")
 
     private val storageRoot: File
-        get() = if (java.lang.Boolean.getBoolean("klause.bench.corpus.shared")) defaultCacheRoot() else cacheRoot
+        get() = if (getBoolean("klause.bench.corpus.shared")) defaultCacheRoot() else cacheRoot
 
     private val downloads = CorpusDownload()
+    private val mirror: CorpusMirror?
+        get() = System.getenv("KLAUSE_BENCH_CORPUS_MIRROR")?.takeIf { it.isNotBlank() }?.let { CorpusMirror(URI(it)) }
 
     /** `$XDG_CACHE_HOME` when set, else `~/.cache` (the XDG base-dir default). */
     private fun xdgCacheHome(): File = System.getenv("XDG_CACHE_HOME")?.takeIf { it.isNotBlank() }?.let { File(it) }
@@ -119,6 +122,11 @@ internal object CorpusFetcher {
         cache.markUsed(collection.id)
         var fetched = false
         val directory = CorpusStore(storageRoot, cacheRoot).ensure(collection.id) { dir ->
+            val remote = mirror
+            if (remote?.restore(collection.id, dir) == true) {
+                fetched = true
+                return@ensure
+            }
             cache.enforce()
             log("fetching '${collection.id}' (${collection.license}) — ${collection.reason}")
             when (val method = collection.fetch) {
@@ -131,6 +139,11 @@ internal object CorpusFetcher {
                 is FetchMethod.GbdFiles -> gbdFiles(collection, method, dir)
             }
             collection.extensionless?.let { (marker, ext) -> nameBare(dir, marker, ext) }
+            if (remote != null && System.getenv("KLAUSE_BENCH_CORPUS_MIRROR_WRITE") == "true") {
+                runCatching { remote.publish(collection.id, dir) }.onFailure {
+                    System.err.println("corpus mirror publication deferred: ${it.javaClass.simpleName}")
+                }
+            }
             fetched = true
         }
         if (fetched) {
@@ -178,7 +191,9 @@ internal object CorpusFetcher {
 
     private fun tarballZst(c: ExternalCollection, dir: File) {
         dir.mkdirs()
-        downloaded(c.url, dir, ".tar.zst") { tar -> run("tar", "--zstd", "-xf", tar.absolutePath, "-C", dir.absolutePath) }
+        downloaded(c.url, dir, ".tar.zst") { tar ->
+            run("tar", "--zstd", "-xf", tar.absolutePath, "-C", dir.absolutePath)
+        }
         compress(dir)
     }
 

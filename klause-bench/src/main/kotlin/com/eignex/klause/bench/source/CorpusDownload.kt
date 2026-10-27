@@ -25,24 +25,16 @@ internal class CorpusDownload(
                     connectTimeout = 10_000
                     readTimeout = 30_000
                 }
-                if (connection is HttpURLConnection) {
-                    val status = connection.responseCode
-                    if (status !in 200..299) throw HttpFailure(status)
-                }
-                val bytes = connection.getInputStream().use { input ->
-                    Files.newOutputStream(partial).use { input.copyTo(it) }
-                }
-                val expected = connection.contentLengthLong
-                if (expected >= 0 && bytes != expected) throw EOFException("corpus download ended after $bytes of $expected bytes")
+                transfer(connection, partial)
                 Files.move(partial, destination.toPath(), ATOMIC_MOVE, REPLACE_EXISTING)
                 return
+            } catch (failure: HttpFailure) {
+                if (failure.status !in RETRYABLE_STATUS || exhausted(attempt)) throw failure
             } catch (failure: IOException) {
-                if (Thread.currentThread().isInterrupted || attempt == ATTEMPTS - 1 ||
-                    failure is HttpFailure && failure.status !in RETRYABLE_STATUS
-                ) throw failure
+                if (exhausted(attempt)) throw failure
             } finally {
                 (connection as? HttpURLConnection)?.let { http ->
-                    http.errorStream?.close()
+                    runCatching { http.errorStream?.close() }
                     http.disconnect()
                 }
                 Files.deleteIfExists(partial)
@@ -51,7 +43,21 @@ internal class CorpusDownload(
         }
     }
 
-    private class HttpFailure(val status: Int) : IOException("corpus download returned HTTP $status")
+    private fun exhausted(attempt: Int): Boolean = Thread.currentThread().isInterrupted || attempt == ATTEMPTS - 1
+
+    private fun transfer(connection: URLConnection, partial: java.nio.file.Path) {
+        if (connection is HttpURLConnection) {
+            val status = connection.responseCode
+            if (status !in 200..299) throw HttpFailure(status)
+        }
+        val bytes = connection.getInputStream().use { input -> Files.newOutputStream(partial).use { input.copyTo(it) } }
+        val expected = connection.contentLengthLong
+        if (expected >= 0 && bytes != expected) {
+            throw EOFException("corpus download ended after $bytes of $expected bytes")
+        }
+    }
+
+    internal class HttpFailure(val status: Int) : IOException("corpus download returned HTTP $status")
 
     private companion object {
         const val ATTEMPTS = 4

@@ -94,7 +94,9 @@ class CorpusStoreTest {
             }
             val workspace = File(root, "workspace")
 
-            val collection = CorpusStore(cache, workspace).ensure("requested") { error("cached collection must work offline") }
+            val collection = CorpusStore(cache, workspace).ensure("requested") {
+                error("cached collection must work offline")
+            }
 
             assertEquals("requested", File(collection, "model.opb").readText())
             assertEquals(listOf("requested"), workspace.list()!!.toList())
