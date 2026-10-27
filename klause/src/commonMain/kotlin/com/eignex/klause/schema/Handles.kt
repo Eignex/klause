@@ -184,6 +184,24 @@ infix fun FloatTerm.eq(threshold: Double): BoolExpr = toFloatExpr().compareWith(
 /** `this ≠ threshold`. */
 infix fun FloatTerm.ne(threshold: Double): BoolExpr = toFloatExpr().compareWith(threshold, IntCmpOp.NE)
 
+/** `this ≤ t`. */
+infix fun Double.le(t: FloatTerm): BoolExpr = t.toFloatExpr().compareWith(this, IntCmpOp.GE)
+
+/** `this < t`. */
+infix fun Double.lt(t: FloatTerm): BoolExpr = t.toFloatExpr().compareWith(this, IntCmpOp.GT)
+
+/** `this ≥ t`. */
+infix fun Double.ge(t: FloatTerm): BoolExpr = t.toFloatExpr().compareWith(this, IntCmpOp.LE)
+
+/** `this > t`. */
+infix fun Double.gt(t: FloatTerm): BoolExpr = t.toFloatExpr().compareWith(this, IntCmpOp.LT)
+
+/** `this = t`. */
+infix fun Double.eq(t: FloatTerm): BoolExpr = t.toFloatExpr().compareWith(this, IntCmpOp.EQ)
+
+/** `this ≠ t`. */
+infix fun Double.ne(t: FloatTerm): BoolExpr = t.toFloatExpr().compareWith(this, IntCmpOp.NE)
+
 /** `this ≤ other`. */
 infix fun FloatTerm.le(other: FloatTerm): BoolExpr = (this - other) le 0.0
 

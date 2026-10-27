@@ -9819,15 +9819,22 @@ public final class com/eignex/klause/schema/BuildersKt {
 	public static final fun gcc (Ljava/util/List;Ljava/util/Map;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun gccOpt (Ljava/util/List;Ljava/util/Map;Ljava/util/List;Z)Lcom/eignex/klause/model/BoolExpr;
 	public static synthetic fun gccOpt$default (Ljava/util/List;Ljava/util/Map;Ljava/util/List;ZILjava/lang/Object;)Lcom/eignex/klause/model/BoolExpr;
+	public static final fun ifThenElse (Lcom/eignex/klause/model/BoolTerm;II)Lcom/eignex/klause/model/IntExpr;
+	public static final fun ifThenElse (Lcom/eignex/klause/model/BoolTerm;ILcom/eignex/klause/model/IntTerm;)Lcom/eignex/klause/model/IntExpr;
+	public static final fun ifThenElse (Lcom/eignex/klause/model/BoolTerm;Lcom/eignex/klause/model/IntTerm;I)Lcom/eignex/klause/model/IntExpr;
 	public static final fun ifThenElse (Lcom/eignex/klause/model/BoolTerm;Lcom/eignex/klause/model/IntTerm;Lcom/eignex/klause/model/IntTerm;)Lcom/eignex/klause/model/IntExpr;
 	public static final fun increasing (Ljava/util/List;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun inverse (Ljava/util/List;Ljava/util/List;II)Lcom/eignex/klause/model/BoolExpr;
 	public static synthetic fun inverse$default (Ljava/util/List;Ljava/util/List;IIILjava/lang/Object;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun lexLeq (Ljava/util/List;Ljava/util/List;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun lexLt (Ljava/util/List;Ljava/util/List;)Lcom/eignex/klause/model/BoolExpr;
-	public static final fun max ([Lcom/eignex/klause/model/IntTerm;)Lcom/eignex/klause/model/IntExpr;
+	public static final fun max (Lcom/eignex/klause/model/IntTerm;I)Lcom/eignex/klause/model/IntExpr;
+	public static final fun max (Lcom/eignex/klause/model/IntTerm;Lcom/eignex/klause/model/IntTerm;)Lcom/eignex/klause/model/IntExpr;
+	public static final fun maxOf ([Lcom/eignex/klause/model/IntTerm;)Lcom/eignex/klause/model/IntExpr;
 	public static final fun mdd (Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;ILjava/util/List;)Lcom/eignex/klause/model/BoolExpr;
-	public static final fun min ([Lcom/eignex/klause/model/IntTerm;)Lcom/eignex/klause/model/IntExpr;
+	public static final fun min (Lcom/eignex/klause/model/IntTerm;I)Lcom/eignex/klause/model/IntExpr;
+	public static final fun min (Lcom/eignex/klause/model/IntTerm;Lcom/eignex/klause/model/IntTerm;)Lcom/eignex/klause/model/IntExpr;
+	public static final fun minOf ([Lcom/eignex/klause/model/IntTerm;)Lcom/eignex/klause/model/IntExpr;
 	public static final fun nValueOpt (Lcom/eignex/klause/model/IntTerm;Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/model/NValueMode;)Lcom/eignex/klause/model/BoolExpr;
 	public static synthetic fun nValueOpt$default (Lcom/eignex/klause/model/IntTerm;Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/model/NValueMode;ILjava/lang/Object;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun notTable (Ljava/util/List;Ljava/util/List;)Lcom/eignex/klause/model/BoolExpr;
@@ -9877,19 +9884,25 @@ public abstract interface class com/eignex/klause/schema/FloatTerm {
 }
 
 public final class com/eignex/klause/schema/HandlesKt {
+	public static final fun eq (DLcom/eignex/klause/schema/FloatTerm;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun eq (Lcom/eignex/klause/schema/FloatTerm;D)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun eq (Lcom/eignex/klause/schema/FloatTerm;Lcom/eignex/klause/schema/FloatTerm;)Lcom/eignex/klause/model/BoolExpr;
+	public static final fun ge (DLcom/eignex/klause/schema/FloatTerm;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun ge (Lcom/eignex/klause/schema/FloatTerm;D)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun ge (Lcom/eignex/klause/schema/FloatTerm;Lcom/eignex/klause/schema/FloatTerm;)Lcom/eignex/klause/model/BoolExpr;
+	public static final fun gt (DLcom/eignex/klause/schema/FloatTerm;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun gt (Lcom/eignex/klause/schema/FloatTerm;D)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun gt (Lcom/eignex/klause/schema/FloatTerm;Lcom/eignex/klause/schema/FloatTerm;)Lcom/eignex/klause/model/BoolExpr;
+	public static final fun le (DLcom/eignex/klause/schema/FloatTerm;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun le (Lcom/eignex/klause/schema/FloatTerm;D)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun le (Lcom/eignex/klause/schema/FloatTerm;Lcom/eignex/klause/schema/FloatTerm;)Lcom/eignex/klause/model/BoolExpr;
+	public static final fun lt (DLcom/eignex/klause/schema/FloatTerm;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun lt (Lcom/eignex/klause/schema/FloatTerm;D)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun lt (Lcom/eignex/klause/schema/FloatTerm;Lcom/eignex/klause/schema/FloatTerm;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun minus (DLcom/eignex/klause/schema/FloatTerm;)Lcom/eignex/klause/schema/FloatExpr;
 	public static final fun minus (Lcom/eignex/klause/schema/FloatTerm;D)Lcom/eignex/klause/schema/FloatExpr;
 	public static final fun minus (Lcom/eignex/klause/schema/FloatTerm;Lcom/eignex/klause/schema/FloatTerm;)Lcom/eignex/klause/schema/FloatExpr;
+	public static final fun ne (DLcom/eignex/klause/schema/FloatTerm;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun ne (Lcom/eignex/klause/schema/FloatTerm;D)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun ne (Lcom/eignex/klause/schema/FloatTerm;Lcom/eignex/klause/schema/FloatTerm;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun plus (DLcom/eignex/klause/schema/FloatTerm;)Lcom/eignex/klause/schema/FloatExpr;
@@ -9911,6 +9924,8 @@ public final class com/eignex/klause/schema/IntHandle : com/eignex/klause/model/
 }
 
 public final class com/eignex/klause/schema/IntOperatorsKt {
+	public static final fun div (ILcom/eignex/klause/model/IntTerm;)Lcom/eignex/klause/model/IntExpr;
+	public static final fun div (Lcom/eignex/klause/model/IntTerm;I)Lcom/eignex/klause/model/IntExpr;
 	public static final fun div (Lcom/eignex/klause/model/IntTerm;Lcom/eignex/klause/model/IntTerm;)Lcom/eignex/klause/model/IntExpr;
 	public static final fun eq (ILcom/eignex/klause/model/IntTerm;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun eq (Lcom/eignex/klause/model/IntTerm;I)Lcom/eignex/klause/model/BoolExpr;
@@ -9936,6 +9951,8 @@ public final class com/eignex/klause/schema/IntOperatorsKt {
 	public static final fun plus (ILcom/eignex/klause/model/IntTerm;)Lcom/eignex/klause/model/IntExpr;
 	public static final fun plus (Lcom/eignex/klause/model/IntTerm;I)Lcom/eignex/klause/model/IntExpr;
 	public static final fun plus (Lcom/eignex/klause/model/IntTerm;Lcom/eignex/klause/model/IntTerm;)Lcom/eignex/klause/model/IntExpr;
+	public static final fun rem (ILcom/eignex/klause/model/IntTerm;)Lcom/eignex/klause/model/IntExpr;
+	public static final fun rem (Lcom/eignex/klause/model/IntTerm;I)Lcom/eignex/klause/model/IntExpr;
 	public static final fun rem (Lcom/eignex/klause/model/IntTerm;Lcom/eignex/klause/model/IntTerm;)Lcom/eignex/klause/model/IntExpr;
 	public static final fun times (ILcom/eignex/klause/model/IntTerm;)Lcom/eignex/klause/model/IntExpr;
 	public static final fun times (Lcom/eignex/klause/model/IntTerm;I)Lcom/eignex/klause/model/IntExpr;
