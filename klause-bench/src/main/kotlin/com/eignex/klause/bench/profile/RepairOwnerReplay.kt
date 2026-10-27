@@ -172,12 +172,7 @@ internal object RepairOwnerReplay {
                         activeCenter = scope.center
                         val allocationStart = bean.getThreadAllocatedBytes(thread)
                         val start = System.nanoTime()
-                        val unavailable = scope.unavailable ?: when {
-                            kind.startsWith("cp") && (!scope.cutoff.toDouble().isFinite() ||
-                                BigFraction.ofDouble(scope.cutoff.toDouble()) != scope.cutoff) ->
-                                "exact cutoff is not representable by the retained CP double contract"
-                            else -> null
-                        }
+                        val unavailable = scope.unavailable
                         val looser = unavailable == null && previousCutoff?.let { scope.cutoff > it } == true
                         if (looser && retained != null) {
                             if (kind == "mixed-retained") accountMixed(retained)
@@ -395,7 +390,7 @@ internal object RepairOwnerReplay {
 
     private fun complete(owner: Any, scope: Scope, stop: Cancellation, preparation: Long, allowance: Long): Outcome {
         val start = System.nanoTime()
-        call(owner, "begin", scope.pins, allowance, scope.cutoff.toDouble(), stop)
+        call(owner, "beginExact", scope.pins, allowance, scope.cutoff, stop)
         val prepared = preparation + System.nanoTime() - start
         var result: Any
         var pauses = 0L

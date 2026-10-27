@@ -3347,8 +3347,10 @@ freedom. Missing bounds decline this finite overlap explicitly, retaining the
 mixed cold reports; they establish no whole-family inapplicability. Mixed owners
 use the original authority rows; finite-owner closures refer only to their
 conditioned working model. Every accepted point passes `checkMpsWitness` on the
-original columns. Real snapshots without exact values and nonrepresentable CP
-cutoffs remain unavailable; finite domains are never invented by this replay.
+original columns. Real snapshots without exact values remain unavailable; finite
+domains are never invented by this replay. CP owners consume the exact strict
+working cutoff through `beginExact`, retaining rational equality and direction
+without a floating representability restriction.
 Reports distinguish completed conditioned optimization from a closed initial
 strict cutoff: an improving point can accompany the former, while only a
 nonimproving working query establishes the latter. Both the working and checked

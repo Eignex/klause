@@ -48,7 +48,13 @@ strategy and restart state belong to the solver.
 
 Repair handles are a separate internal contract. Their cutoff must be monotone
 non-increasing because retained objective-bound clauses survive fragment reseeding;
-session push/pop always starts a fresh search.
+session push/pop always starts a fresh search. `RepairSearch.beginExact` accepts a
+strict rational cutoff in minimized working-objective units. Cutoff monotonicity,
+incumbent admission and discrete objective dominance compare exact values, including
+values with identical floating displays. A looser condition requires a fresh handle.
+Floating LP pruning receives an enclosing upper bound, and continuous completion
+requires exact certification instead of a tolerance optimum. Source callers retain
+responsibility for objective scaling and direction.
 
 A retained repair starts an explicit fragment and advances it in slices. Its
 best improving sample and stop reason are independent: a missing reason means a

@@ -1,6 +1,7 @@
 package com.eignex.klause.solver
 
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
@@ -176,6 +177,10 @@ internal interface RepairSearch : AutoCloseable {
     val work: Long get() = stats.search.nodes.sum.toLong()
 
     fun begin(assumptions: Assumptions, decisionBudget: Long, cutoff: Double, cancellation: Cancellation)
+
+    fun beginExact(assumptions: Assumptions, decisionBudget: Long, cutoff: BigFraction, cancellation: Cancellation) {
+        throw UnsupportedOperationException("exact repair cutoffs are unavailable")
+    }
 
     fun runSlice(cancellation: Cancellation, millis: Long, work: Long): RepairSearchStep
 
