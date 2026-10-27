@@ -1727,7 +1727,9 @@ unpinned source-coordinate descent with 128 moves, 2,000 decision equivalents an
 two seconds, recorded separately with its native source check. `owners=a,b,...`
 selects the owner sequence; the default places structured owners after `ls`.
 `ownerSeed=N` reseeds only the owners and their descents, keeping the walk,
-selections and captured scopes of `seed`.
+selections and captured scopes of `seed`. Recipe `cbls-extended/fixed` names the
+trajectory's plateau walk with sampled extended structured moves; `catalog:<label>`
+selects the catalog arm itself, such as the implicitly seeded `cbls-extended/fixed`.
 Owner replay captures selector sets without a duplicate producer-side CP solve;
 `producerRepairEvaluated` distinguishes this capture from selector-only comparisons
 that also evaluate their own repairs.
