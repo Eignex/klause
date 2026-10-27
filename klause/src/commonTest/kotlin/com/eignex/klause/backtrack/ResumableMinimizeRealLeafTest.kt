@@ -44,6 +44,29 @@ import kotlin.time.Duration.Companion.seconds
 
 class ResumableMinimizeRealLeafTest {
     @Test
+    fun `witness-only repair should continue to a better sibling without closing unresolved coverage`() {
+        val fixture = UnresolvedRealLeafFixture(true)
+        fixture.acceptProof = { _, _ -> false }
+        val offered = ArrayList<Long>()
+        val params = fixture.params.copy(
+            toleranceCheck = { it.ints.single() + 2.0 * it.reals.single() == 2.0 },
+            improvedSolutionSink = { sample, _ -> offered += sample.ints.single() },
+        )
+
+        fixture.solver.openRepair(fixture.objective, params).use { repair ->
+            repair.beginExact(Assumptions.None, 100L, BigFraction.ofLong(2L), Cancellation.Never)
+            val result = repair.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L)
+
+            val sample = assertNotNull(result.sample)
+            assertEquals(1L, sample.ints.single())
+            assertEquals(0.5, sample.reals.single())
+            assertEquals(listOf(0L, 1L), offered)
+            assertEquals(TerminationReason.Unsupported, result.reason)
+        }
+        assertEquals(fixture.opened, fixture.closed)
+    }
+
+    @Test
     fun `reseed should discard an interrupted primal before completing a sibling`() {
         val fixture = UnresolvedRealLeafFixture(true)
         fixture.acceptProof = { _, _ -> false }
