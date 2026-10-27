@@ -8160,6 +8160,15 @@ public final class com/eignex/klause/model/PseudoBooleanExpr$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
+public final class com/eignex/klause/model/ReferencesKt {
+	public static final fun mapReferences (Lcom/eignex/klause/model/BoolExpr;Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/model/BoolExpr;
+	public static final fun mapReferences (Lcom/eignex/klause/model/ContinuousRealExpr;Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/model/ContinuousRealExpr;
+	public static final fun mapReferences (Lcom/eignex/klause/model/IntExpr;Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/model/IntExpr;
+	public static final fun mapReferences (Lcom/eignex/klause/model/SchemaEntry;Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/model/SchemaEntry;
+	public static final fun mapReferences (Lcom/eignex/klause/model/SetExpr;Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/model/SetExpr;
+	public static final fun renameDeclarations (Lcom/eignex/skema/SchemaDef;Lkotlin/jvm/functions/Function1;)Lcom/eignex/skema/SchemaDef;
+}
+
 public final class com/eignex/klause/model/RegularExpr : com/eignex/klause/model/BoolExpr {
 	public static final field Companion Lcom/eignex/klause/model/RegularExpr$Companion;
 	public fun <init> (Ljava/util/List;IILjava/util/List;ILjava/util/List;)V
