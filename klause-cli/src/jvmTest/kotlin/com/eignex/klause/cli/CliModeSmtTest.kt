@@ -20,16 +20,20 @@ class CliModeSmtTest {
             deleteOnExit()
         }
 
-        val output = capture {
-            assertEquals(0, runCli(arrayOf("-e", "cp", "-s", "--param", "nia-candidates=12",
-                "--param", "nia-cell-refinement=true", "--param", "nia-cell-reuse=true", source.absolutePath)))
-        }
+        for (steering in listOf(false, true)) {
+            val output = capture {
+                assertEquals(0, runCli(arrayOf("-e", "cp", "-s", "--param", "nia-candidates=12",
+                    "--param", "nia-cell-refinement=true", "--param", "nia-cell-reuse=true",
+                    "--param", "nia-cell-steering=$steering", source.absolutePath)))
+            }
 
-        assertTrue("unknown" in output.lines(), output)
-        assertTrue("; niaCellProducer=true" in output.lines(), output)
-        assertTrue("; niaCellReuse=true" in output.lines(), output)
-        assertTrue(output.lines().any { it.matches(Regex("; niaExcludedTuples=[1-9][0-9]*")) }, output)
-        assertTrue(output.lines().any { it.matches(Regex("; niaRepeatedSupports=[1-9][0-9]*")) }, output)
+            assertTrue("unknown" in output.lines(), output)
+            assertTrue("; niaCellProducer=true" in output.lines(), output)
+            assertTrue("; niaCellReuse=true" in output.lines(), output)
+            assertTrue("; niaCellSteering=$steering" in output.lines(), output)
+            assertTrue(output.lines().any { it.matches(Regex("; niaExcludedTuples=[1-9][0-9]*")) }, output)
+            assertTrue(output.lines().any { it.matches(Regex("; niaRepeatedSupports=[1-9][0-9]*")) }, output)
+        }
     }
 
     @Test
