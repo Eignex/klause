@@ -10,6 +10,8 @@ import com.eignex.klause.localsearch.InvariantNetwork
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.optimization.LinearAuthority
+import com.eignex.klause.lp.optimization.LinearAuthorityCapture
+import com.eignex.klause.lp.optimization.LinearAuthorityFeedbackRequest
 import com.eignex.klause.lp.optimization.atScope
 import com.eignex.klause.meta.alns.DestroyOperator
 import com.eignex.klause.propagation.Assumptions
@@ -129,6 +131,44 @@ class FiniteNumericalRemovalTest {
 
         assertEquals(FiniteNumericalRemoval.Status.NoPoint, removal.status)
         assertEquals(DestroyOperator.Random.destroy(Random(17), model, incumbent, objective, 0.5), freed)
+    }
+
+    @Test
+    fun `a delivered point projection should rank like the full relaxation record`() {
+        val funding = SourceLpFunding(1_000_000, 4_000_000).apply { grant(1_000_000) }
+        val removal = FiniteNumericalRemoval(problem, objective, source, funding,
+            FiniteNumericalRemoval.Signal.Disagreement)
+        val publisher = SourceNumericalFeedback(funding, Cancellation.Never, request = removal.request)
+        val acquisition = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use {
+            it.capture = LinearAuthorityCapture(0, 0L, 0L, Cancellation.Never)
+            publisher.acquire(it, source, cuts = false)
+        }
+
+        removal.accept(center, Assumptions.None, source, null, acquisition.feedback)
+        val freed = removal.destroy(Random(17), problem, center, objective, 0.5)
+
+        assertEquals(removal.request, assertIs<SourceNumericalFeedbackResult.Available>(acquisition.feedback)
+            .query.projection)
+        assertEquals(FiniteNumericalRemoval.Status.Supported, removal.status)
+        assertEquals(setOf(0, 3), freed.ints.toSet())
+    }
+
+    @Test
+    fun `a delivered projection without the signal field should be unavailable rather than agreement`() {
+        val funding = SourceLpFunding(1_000_000, 4_000_000).apply { grant(1_000_000) }
+        val publisher = SourceNumericalFeedback(funding, Cancellation.Never,
+            request = LinearAuthorityFeedbackRequest(refutation = true))
+        val acquisition = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use {
+            it.capture = LinearAuthorityCapture(0, 0L, 0L, Cancellation.Never)
+            publisher.acquire(it, source, cuts = false)
+        }
+        val removal = FiniteNumericalRemoval(problem, objective, source, funding,
+            FiniteNumericalRemoval.Signal.Disagreement)
+
+        removal.accept(center, Assumptions.None, source, null, acquisition.feedback)
+
+        assertEquals(FiniteNumericalRemoval.Status.Unavailable, removal.status)
+        assertEquals("unrequested", removal.unavailableReason)
     }
 
     @Test

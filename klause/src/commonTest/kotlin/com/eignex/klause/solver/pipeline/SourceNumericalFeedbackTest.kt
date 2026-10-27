@@ -6,6 +6,7 @@ import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.optimization.LinearAuthority
 import com.eignex.klause.lp.optimization.LinearAuthorityCapture
 import com.eignex.klause.lp.optimization.LinearAuthorityCapturedQuery
+import com.eignex.klause.lp.optimization.LinearAuthorityFeedbackRequest
 import com.eignex.klause.lp.optimization.LinearAuthorityResult
 import com.eignex.klause.lp.optimization.LinearPinnedRefutation
 import com.eignex.klause.lp.optimization.atScope
@@ -336,6 +337,59 @@ class SourceNumericalFeedbackTest {
         assertTrue(records.any {
             (it as? SourceNumericalFeedbackResult.Unavailable)?.reason == SourceNumericalFeedbackResult.Reason.Retention
         })
+    }
+
+    @Test
+    fun `an archival observer should keep full records while later deliveries hold the requested projection`() {
+        val funding = SourceLpFunding(1_000_000L, 4_000_000L).apply { grant(1_000_000L) }
+        val feedback = SourceNumericalFeedback(funding, Cancellation.Never, request = LinearSupportBranching.REQUEST)
+        val journal = LinearAuthorityCapture(1, 1_000_000L, 16_000_000L, Cancellation.Never)
+        val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
+        val guarded = SourceProofContext(scope.copy(condition = SourceCondition(bools = mapOf(0 to true))),
+            setOf(x, bool), source.premises.mapValues { (_, premise) ->
+                SourcePremise(premise.inequality, mapOf(0 to true))
+            } + ("zero" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO))),
+            source.objective)
+        val retracted = guarded.atScope(scope.copy(condition = SourceCondition(bools = mapOf(0 to false))))
+        val delivered = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use { authority ->
+            authority.capture = journal
+            listOf(feedback.acquire(authority, guarded, cuts = false).feedback,
+                feedback.acquire(authority, retracted, cuts = false).feedback)
+        }
+
+        val (archived, late) = delivered.map { assertIs<SourceNumericalFeedbackResult.Available>(it).query }
+        assertEquals(LinearAuthorityFeedbackRequest.Full, journal.records.single().projection)
+        assertEquals(LinearAuthorityFeedbackRequest.Full, archived.projection)
+        assertEquals(LinearSupportBranching.REQUEST, late.projection)
+        assertEquals(BigFraction.ZERO, late.point?.get(x))
+        assertTrue(late.cited.isEmpty())
+        assertTrue(assertIs<SourceNumericalFeedbackResult.Available>(delivered.last()).compatible(retracted, null))
+    }
+
+    @Test
+    fun `requested support feedback should reproduce full feedback decisions at lower cost`() {
+        fun run(request: LinearAuthorityFeedbackRequest?) = LinearAuthorityInvocation(source, TheoryParams(),
+            boundOrdered = true, supportBranching = true, feedbackRequest = request).use {
+            it.captureTo(LinearAuthorityCapture(1, 1_000_000L, 16_000_000L, Cancellation.Never))
+            it.run { _, _ -> }
+        }
+
+        val full = run(LinearAuthorityFeedbackRequest.Full)
+        val requested = run(null)
+
+        assertEquals(full.value, requested.value)
+        assertEquals(full.terminal?.claim, requested.terminal?.claim)
+        val expected = assertNotNull(full.stats.smt.completeSearchStages)
+        val actual = assertNotNull(requested.stats.smt.completeSearchStages)
+        for (decision in listOf("numericalSupportConsultations", "numericalSupportSelections",
+            "numericalSupportFallbacks", "numericalFeedbackCollections", "numericalFeedbackLateCollections",
+            "numericalFractionalSplits")) {
+            assertEquals(expected[decision], actual[decision], decision)
+        }
+        assertTrue(actual.getValue("numericalFeedbackLateCollections") > 0L)
+        assertTrue(actual.getValue("numericalFeedbackArithmeticTerms") <=
+            expected.getValue("numericalFeedbackArithmeticTerms"))
+        assertTrue(actual.getValue("numericalFundedAllocation") < expected.getValue("numericalFundedAllocation"))
     }
 
     @Test
