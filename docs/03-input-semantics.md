@@ -215,7 +215,20 @@ mixed affine `distinct`, arbitrary-width `linear` and `pseudoBoolean`, rational
 `exactLinear`, `cumulative` with variable durations, demands and capacity, and the
 real relations `realAbs`, `realMin`, `realMax`, `realElement` and `inValues`.
 Compiling a schema and writing its `Problem` as problem JSON therefore covers the
-same declarations, factors and options as the problem document itself.
+same declarations, factors and options as the problem document itself:
+
+| Problem JSON | Kotlin DSL |
+|---|---|
+| Boolean columns | `boolVar`, and the indicators of presence, nominal and set variables |
+| Integer range, 64-bit or open | `intVar`, `openIntVar` |
+| Integer value set | `intVar(values)` |
+| Real column, open or closed | `floatVar` |
+| Any built-in or registered factor | `factor(relation, …)` or a named builder |
+| Implied factors, symmetry declaration | `impliedConstraint`, `symmetryBreakingConstraint` |
+| Settings and source semantics | `compile(config, semanticOverrides)`; the declared format is `SCHEMA` |
+
+An open column's fallback `box` is not a declaration; the DSL leaves it at the full
+signed-word range.
 
 `CompiledSchema` retains one original source binding; `sourceId` and `sourceRealId`
 refer to its original namespaces. Source solver factories compile a schema once and

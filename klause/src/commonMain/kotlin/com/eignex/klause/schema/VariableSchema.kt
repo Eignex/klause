@@ -24,7 +24,7 @@ internal fun presenceName(varName: String): String = "$varName$PRESENCE_SUFFIX"
 
 /** The declaration of an integer taking exactly [values], as ascending runs over their hull. */
 internal fun valueSetSpec(values: Collection<Long>): IntDomainSpec {
-    val sorted = values.toSortedSet().toList()
+    val sorted: List<Long> = values.distinct().sorted()
     require(sorted.isNotEmpty()) { "intVar: values must not be empty" }
     val runs = ArrayList<List<Long>>()
     for (value in sorted) {
@@ -32,7 +32,7 @@ internal fun valueSetSpec(values: Collection<Long>): IntDomainSpec {
         if (last != null && last[1] == value - 1) {
             runs[runs.lastIndex] = listOf(last[0], value)
         } else {
-            runs += listOf(value, value)
+            runs.add(listOf(value, value))
         }
     }
     return IntDomainSpec(sorted.first(), sorted.last(), runs)

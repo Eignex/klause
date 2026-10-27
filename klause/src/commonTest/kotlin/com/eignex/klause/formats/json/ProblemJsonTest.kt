@@ -75,13 +75,12 @@ class ProblemJsonTest {
     @Test
     fun `every built-in codec should round trip a factor with its native kind and payload`() {
         val samples = factorCodecSamples()
+        val factors = samples.map { it.second }
 
-        for ((key, factor) in samples) {
-            val decoded = roundTrip(problem(factor)).factors.single()
+        val decoded = roundTrip(problem(*factors.toTypedArray())).factors.toList()
 
-            assertEquals(factor::class, decoded::class, key)
-            assertEquals(factor.structuralKey(), decoded.structuralKey(), key)
-        }
+        assertEquals(factors.map { it::class }, decoded.map { it::class })
+        assertEquals(factors.map { it.structuralKey() }, decoded.map { it.structuralKey() })
         assertEquals(FactorCodecs.builtin.codecs.map { it.key }.toSet(), samples.map { it.first }.toSet())
     }
 

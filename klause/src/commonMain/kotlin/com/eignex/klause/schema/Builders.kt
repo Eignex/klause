@@ -452,23 +452,32 @@ fun allDifferent(vararg xs: IntTerm): BoolExpr {
     return AllDifferent(xs.map { it.toIntExpr() })
 }
 
-private fun unionDomainSize(ranges: List<Pair<Int, Int>>): Long {
+// Saturates at Long.MAX_VALUE: 64-bit ranges can hold more values than a Long counts.
+private fun unionDomainSize(ranges: List<Pair<Long, Long>>): Long {
     if (ranges.isEmpty()) return 0L
     val sorted = ranges.sortedBy { it.first }
     var total = 0L
     var curLo = sorted[0].first
     var curHi = sorted[0].second
+    fun addRun() {
+        val width = curHi - curLo
+        total = if (width < 0L || width == Long.MAX_VALUE || total > Long.MAX_VALUE - width - 1) {
+            Long.MAX_VALUE
+        } else {
+            total + width + 1
+        }
+    }
     for (i in 1 until sorted.size) {
         val (lo, hi) = sorted[i]
-        if (lo <= curHi + 1) {
+        if (curHi == Long.MAX_VALUE || lo <= curHi + 1) {
             if (hi > curHi) curHi = hi
         } else {
-            total += (curHi - curLo + 1).toLong()
+            addRun()
             curLo = lo
             curHi = hi
         }
     }
-    total += (curHi - curLo + 1).toLong()
+    addRun()
     return total
 }
 

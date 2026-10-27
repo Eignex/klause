@@ -42,7 +42,7 @@ class NativeFactorsTest {
     private val serializer = SchemaDef.serializer(SchemaEntry.serializer())
 
     private fun definition(constraints: List<BoolExpr>): SchemaDef<SchemaEntry> = SchemaDef(
-        buildMap {
+        buildMap<String, SchemaEntry> {
             bools.forEach { put(it.name, BoolSpec) }
             ints.forEach { put(it.name, IntSpec(-10, 10)) }
             reals.forEach { put(it.name, FloatSpec(-5.0, 5.0)) }
