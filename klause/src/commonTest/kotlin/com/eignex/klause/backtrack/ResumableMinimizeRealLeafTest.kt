@@ -43,6 +43,72 @@ import kotlin.time.Duration.Companion.seconds
 
 class ResumableMinimizeRealLeafTest {
     @Test
+    fun `exact repair should publish checked primal improvements without closing unresolved leaves`() {
+        val epsilon = BigFraction.ofLong(1L shl 60).reciprocal()
+        for (offset in listOf(-1L, 0L, 1L)) {
+            val fixture = UnresolvedRealLeafFixture(false)
+            fixture.acceptProof = { _, _ -> false }
+            val cutoff = BigFraction.ofDouble(0.5)!! + epsilon * BigFraction.ofLong(offset)
+            val params = fixture.params.copy(toleranceCheck = { it.reals.single() == 0.5 })
+
+            fixture.solver.openRepair(fixture.objective, params).use { repair ->
+                repair.beginExact(Assumptions.None, 100L, cutoff, Cancellation.Never)
+                val result = repair.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L)
+
+                assertEquals(TerminationReason.Unsupported, result.reason)
+                if (offset > 0L) {
+                    val sample = assertNotNull(result.sample)
+                    assertEquals(0.5, sample.reals.single())
+                    assertNull(sample.exactReals)
+                } else assertNull(result.sample)
+            }
+            assertEquals(fixture.opened, fixture.closed)
+        }
+    }
+
+    @Test
+    fun `source rejection should leave exact repair unresolved without publishing a point`() {
+        val fixture = UnresolvedRealLeafFixture(false)
+        fixture.acceptProof = { _, _ -> false }
+        val params = fixture.params.copy(toleranceCheck = { false })
+
+        fixture.solver.openRepair(fixture.objective, params).use { repair ->
+            repair.beginExact(Assumptions.None, 100L, BigFraction.ONE, Cancellation.Never)
+            val result = repair.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L)
+
+            assertNull(result.sample)
+            assertEquals(TerminationReason.Unsupported, result.reason)
+        }
+        assertEquals(fixture.opened, fixture.closed)
+    }
+
+    @Test
+    fun `checked primal repair should preserve sibling pins across work slices`() {
+        val fixture = UnresolvedRealLeafFixture(true)
+        fixture.acceptProof = { _, _ -> false }
+        val params = fixture.params.copy(toleranceCheck = { it.ints.single() + 2.0 * it.reals.single() == 2.0 })
+
+        fixture.solver.openRepair(fixture.objective, params).use { repair ->
+            for (pin in listOf(0L, 1L, 0L)) {
+                repair.beginExact(Assumptions.None.withInt(0, pin), 100L,
+                    BigFraction.ofLong(2L), Cancellation.Never)
+                var slices = 0
+                var result = repair.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L)
+                while (result.reason == null && slices++ < 128) {
+                    result = repair.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L)
+                }
+
+                val sample = assertNotNull(result.sample)
+                assertEquals(pin, sample.ints.single())
+                assertEquals((2.0 - pin) / 2.0, sample.reals.single())
+                assertNull(sample.exactReals)
+                assertEquals(TerminationReason.Unsupported, result.reason)
+            }
+        }
+        assertEquals(fixture.opened, fixture.closed)
+    }
+
+    @Test
     fun `continuous completion should retain its discrete leaf across work slices`() {
         val n = 24
         val problem = Problem(

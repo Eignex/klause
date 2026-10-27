@@ -1,10 +1,12 @@
 package com.eignex.klause.solver.validation
 
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.simplex.exact.BigFraction
 
 internal class FiniteSourceAcceptance(
     private val accepts: (Sample) -> Boolean,
     val permitsToleranceOptimum: Boolean,
+    val objective: ((Sample) -> BigFraction?)? = null,
 ) : (Sample) -> Boolean {
     override fun invoke(sample: Sample): Boolean = accepts(sample)
 }
