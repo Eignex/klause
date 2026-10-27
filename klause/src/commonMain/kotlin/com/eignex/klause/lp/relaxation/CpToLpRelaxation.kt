@@ -1712,9 +1712,9 @@ internal fun LeafRealResult.checkedEncoding(
     val point = sample.copy(reals = reals, exactReals = exactReals)
     if (encoded.encodingSourceRealCount != encoded.numRealVars) {
         return if (privateLinearCompletion(encoded, point, cancellation) == true) this
-        else LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+        else LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray, uncertifiedReals = reals)
     }
     val checked = verifyRealCoordinates(encoded, point)
     return if (!cancellation() && checked is Verification.Accepted) this
-    else LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+    else LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray, uncertifiedReals = reals)
 }

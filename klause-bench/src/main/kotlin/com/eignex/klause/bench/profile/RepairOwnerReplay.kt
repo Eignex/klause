@@ -49,7 +49,7 @@ internal object RepairOwnerReplay {
         val sourceCutoff: BigFraction?, val captured: JsonObject, val unavailable: String?,
     )
 
-    data class PointCheck(val accepted: Boolean, val objective: BigFraction? = null)
+    data class PointCheck(val accepted: Boolean, val objective: BigFraction? = null, val exact: Boolean? = null)
 
     private data class Outcome(
         val sample: Sample?, val reason: TerminationReason?, val stats: SolveStats,
@@ -69,6 +69,7 @@ internal object RepairOwnerReplay {
         sourceMaximize: Boolean = false, structured: List<StructuredInner> = emptyList(),
         descent: RepairDescent? = null, ownerSequence: List<String>? = null,
         completionReplay: ((Sample, Cancellation) -> JsonObject)? = null,
+        completionObjective: ((Sample, Cancellation) -> BigFraction?)? = null,
     ) {
         val owners = ownerSequence ?: (DEFAULT_OWNERS.take(1) + structured.map(StructuredInner::owner) +
             DEFAULT_OWNERS.drop(1))
@@ -208,12 +209,23 @@ internal object RepairOwnerReplay {
                                 fragmentAllowance, inner.getValue(kind))
                             kind.startsWith("cp") -> {
                                 val opened = System.nanoTime()
+                                val check: ((Sample) -> Boolean)? = if (completionReplay == null &&
+                                    completionObjective == null) null else {
+                                    val accepts: (Sample) -> Boolean = { sample ->
+                                        if (firstFloat == null) firstFloat = sample
+                                        completionObjective?.invoke(sample, dynamic) != null
+                                    }
+                                    val score: ((Sample) -> BigFraction?)? = completionObjective?.let { objective ->
+                                        { sample -> objective(sample, dynamic) }
+                                    }
+                                    @Suppress("UNCHECKED_CAST")
+                                    (Class.forName("com.eignex.klause.solver.validation.FiniteSourceAcceptance")
+                                        .constructors.single { it.parameterCount == 3 }
+                                        .newInstance(accepts, false, score) as (Sample) -> Boolean)
+                                }
                                 native = retained ?: call(BacktrackSolver(problem), "openRepair", objective,
                                     BacktrackParams(nodeBudget = budget, randomSeed = seed, cancellation = dynamic,
-                                        toleranceCheck = completionReplay?.let { { sample ->
-                                            if (firstFloat == null) firstFloat = sample
-                                            false
-                                        } }))
+                                        toleranceCheck = check))
                                 val preparation = System.nanoTime() - opened
                                 if (kind == "cp-retained") retained = native
                                 else transient = native as AutoCloseable
@@ -271,7 +283,7 @@ internal object RepairOwnerReplay {
                         val verificationStarted = System.nanoTime()
                         val verificationAllocation = bean.getThreadAllocatedBytes(thread)
                         val realAuthority = sample == null || problem.numRealVars == 0 ||
-                            sample.exactReals?.size == problem.numRealVars
+                            sample.exactReals?.size == problem.numRealVars || completionObjective != null
                         val verification = sample?.takeIf { realAuthority }?.let { accepted(it, lifetime) }
                         val checked = verification?.accepted
                         val verificationNs = System.nanoTime() - verificationStarted
@@ -279,7 +291,11 @@ internal object RepairOwnerReplay {
                         val sourceImproving = scope.sourceCutoff?.let { cutoff -> verification?.objective?.let {
                             if (sourceMaximize) it > cutoff else it < cutoff
                         } }
-                        val workingImproving = sample != null && objective.evaluateExact(sample) < scope.cutoff
+                        val score = sample?.let { point ->
+                            if (kind.startsWith("cp") && completionObjective != null)
+                                completionObjective(point, lifetime) else objective.evaluateExact(point)
+                        }
+                        val workingImproving = score != null && score < scope.cutoff
                         val improving = checked == true && workingImproving &&
                             (scope.sourceCutoff == null || sourceImproving == true)
                         val status = when {
@@ -340,11 +356,14 @@ internal object RepairOwnerReplay {
                             })
                             put("center", sample(scope.center))
                             put("nativeSourceAccepted", checked)
+                            put("sourceExactlyFeasible", verification?.exact)
                             put("sourceCenterObjective", scope.sourceCutoff?.toString())
                             put("sourceCandidateObjective", verification?.objective?.toString())
                             put("sourceStrictImprovement", sourceImproving)
                             put("workingStrictImprovement", workingImproving)
-                            put("objective", sample?.let { objective.evaluateExact(it).toString() })
+                            put("objective", score?.toString())
+                            put("nativeAuxiliaryObjective", sample?.let { objective.evaluateExact(it).toString() })
+                            put("sourcePrimalCompletion", completionObjective != null)
                             put("candidate", sample?.let { sample(prepared.reconstruct(it)) } ?: JsonNull)
                             put("conditionedSearchComplete", outcome.reason == TerminationReason.SearchExhausted)
                             put("conditionedCutoffClosure", outcome.reason == TerminationReason.SearchExhausted &&
@@ -384,11 +403,17 @@ internal object RepairOwnerReplay {
                         writer.flush()
                     }
                 } finally {
+                    val closeStart = System.nanoTime()
+                    val closeAllocation = bean.getThreadAllocatedBytes(thread)
                     try {
                         transient?.close()
                     } finally {
                         (retained as? AutoCloseable)?.close()
                     }
+                    file.resolveSibling("${file.nameWithoutExtension}-close-$kind.json").writeText(buildJsonObject {
+                        put("elapsedNs", System.nanoTime() - closeStart)
+                        put("threadBytes", bean.getThreadAllocatedBytes(thread) - closeAllocation)
+                    }.toString())
                 }
             }
         }
