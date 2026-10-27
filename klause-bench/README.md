@@ -1025,6 +1025,60 @@ activation revision, using the existing source reconstruction, model rendering a
 checkers. Component traces keep their native verdict scope; prepared slot arrays have
 no original-source correspondence in this diagnostic.
 
+### Regional checked-cell feedback profiles
+
+`PolynomialPhaseProfile refinement=true feedback=true|both` selects private numeric
+feedback with the same checked producer. `both` adds `feedback-control-trace.json`
+with feedback disabled and refinement enabled at the identical revision and settings.
+The feedback option requires `refinement=true`; it cannot silently compare different
+producers. `cellFeedback` records admissions, lookups, completed uses, repeated uses,
+uses under distinct regional owners, evictions, snapshot replacements and scope declines.
+`MetadataVisits` counts attempted metadata visits, not total feedback work; every visit
+polls/charges the caller, and exact endpoint comparisons also enter the containing
+native and optional refinement work. Compare total costs, actual avoided evaluations
+and region progress alongside outcomes.
+
+`CandidateUses`, `CandidateWork` and `CandidateDeclines` isolate numeric atom checks
+that consult the view outside the producer allowance. Their separate cumulative
+8,192-unit allowance still charges the containing query and survives snapshot changes.
+Regional scope copies and replacement cleanup remain separately charged to the caller.
+These checks may reject a required positive atom at the same point and position as
+its ordinary evaluation; they supply no family or Boolean exclusion. Private stops
+decline the hint and retain the original evaluation. Source/query facts must match
+the active predicate and scope; regional facts retain their original producer owner.
+
+`firstCellFeedbackReuse` retains the first observed use across regional owners,
+including its checked predicate/cell, signed regional premises, numeric conditions
+and process-local source/snapshot/reduction identities. Scope previews cap condition
+maps and wide coefficients and mark incomplete rendering. The engine retains the
+exact guards; these diagnostic strings supply no proof or persistent source mapping.
+An origin is an observed producing regional context or the first successful regional
+lookup; importing a bank fact does not assign it a regional origin.
+An absent trace establishes no cross-region reuse, even when lookup counts are nonzero.
+`firstCellFeedbackUse` also records reuse within one regional owner. Both traces keep
+the actual rejected numeric candidate's defining coefficients, root and isolating
+bounds, with an explicit completeness flag for bounded rendering.
+Retained trace scalars admit degree sixteen and 4,096-bit coefficients and isolating
+bounds, with optional image provenance removed. Larger values keep the scoped cell
+metadata and mark the numeric preview incomplete, without retaining their candidate graph.
+`queryElapsedNs` and `queryThreadAllocatedBytes` cover query construction through its
+terminal return, including reflection and in-loop diagnostic rendering. They exclude
+source parsing/preparation and final trace serialization. Thread allocation is absent
+when unsupported; it measures cumulative Java allocation rather than retained or peak
+physical memory. These instrumented, ordered arms do not establish warmed throughput.
+
+[Prefix controls 8632](https://lab.eignex.com/jobs/8632), at `41b0b686cb`, preserve
+ten native SAT, five native UNSAT and one deadline stop per arm. Six cases bypass
+twenty unary evaluations, with five repeated uses and no cross-owner reuse. The first
+regional trace rejects candidate zero using the checked open cell between the roots
+of `x1² = 2`, retaining its signed premises, condition, snapshot and reduction owner.
+The fifteen completed pairs add 244 containing work units in total; the stopped pair
+has different deadline frontiers and supplies no matched-work cost comparison.
+These are numeric-family reuses with zero partial-sign conflicts, not Boolean clauses
+or additional certified cells. SAT assignments in this diagnostic lack independent
+source-check receipts. These controls establish bounded reuse, without a speedup or
+source-verdict qualification claim.
+
 ### Element hull admission capture
 
 `bench.profile.ElementHullProfile` takes `suite=ID problem=NAME sha256=HEX` for a
@@ -5292,57 +5346,3 @@ support unchanged complete-check accounting, with no partial-policy benefit or
 throughput claim. Useful captured conflicts qualify the bounded internal consumer;
 inactive-state cost and original-source applicability keep automatic activation
 disabled.
-
-### Regional checked-cell feedback profiles
-
-`PolynomialPhaseProfile refinement=true feedback=true|both` selects private numeric
-feedback with the same checked producer. `both` adds `feedback-control-trace.json`
-with feedback disabled and refinement enabled at the identical revision and settings.
-The feedback option requires `refinement=true`; it cannot silently compare different
-producers. `cellFeedback` records admissions, lookups, completed uses, repeated uses,
-uses under distinct regional owners, evictions, snapshot replacements and scope declines.
-`MetadataVisits` counts attempted metadata visits, not total feedback work; every visit
-polls/charges the caller, and exact endpoint comparisons also enter the containing
-native and optional refinement work. Compare total costs, actual avoided evaluations
-and region progress alongside outcomes.
-
-`CandidateUses`, `CandidateWork` and `CandidateDeclines` isolate numeric atom checks
-that consult the view outside the producer allowance. Their separate cumulative
-8,192-unit allowance still charges the containing query and survives snapshot changes.
-Regional scope copies and replacement cleanup remain separately charged to the caller.
-These checks may reject a required positive atom at the same point and position as
-its ordinary evaluation; they supply no family or Boolean exclusion. Private stops
-decline the hint and retain the original evaluation. Source/query facts must match
-the active predicate and scope; regional facts retain their original producer owner.
-
-`firstCellFeedbackReuse` retains the first observed use across regional owners,
-including its checked predicate/cell, signed regional premises, numeric conditions
-and process-local source/snapshot/reduction identities. Scope previews cap condition
-maps and wide coefficients and mark incomplete rendering. The engine retains the
-exact guards; these diagnostic strings supply no proof or persistent source mapping.
-An origin is an observed producing regional context or the first successful regional
-lookup; importing a bank fact does not assign it a regional origin.
-An absent trace establishes no cross-region reuse, even when lookup counts are nonzero.
-`firstCellFeedbackUse` also records reuse within one regional owner. Both traces keep
-the actual rejected numeric candidate's defining coefficients, root and isolating
-bounds, with an explicit completeness flag for bounded rendering.
-Retained trace scalars admit degree sixteen and 4,096-bit coefficients and isolating
-bounds, with optional image provenance removed. Larger values keep the scoped cell
-metadata and mark the numeric preview incomplete, without retaining their candidate graph.
-`queryElapsedNs` and `queryThreadAllocatedBytes` cover query construction through its
-terminal return, including reflection and in-loop diagnostic rendering. They exclude
-source parsing/preparation and final trace serialization. Thread allocation is absent
-when unsupported; it measures cumulative Java allocation rather than retained or peak
-physical memory. These instrumented, ordered arms do not establish warmed throughput.
-
-[Prefix controls 8632](https://lab.eignex.com/jobs/8632), at `41b0b686cb`, preserve
-ten native SAT, five native UNSAT and one deadline stop per arm. Six cases bypass
-twenty unary evaluations, with five repeated uses and no cross-owner reuse. The first
-regional trace rejects candidate zero using the checked open cell between the roots
-of `x1² = 2`, retaining its signed premises, condition, snapshot and reduction owner.
-The fifteen completed pairs add 244 containing work units in total; the stopped pair
-has different deadline frontiers and supplies no matched-work cost comparison.
-These are numeric-family reuses with zero partial-sign conflicts, not Boolean clauses
-or additional certified cells. SAT assignments in this diagnostic lack independent
-source-check receipts. These controls establish bounded reuse, without a speedup or
-source-verdict qualification claim.
