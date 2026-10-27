@@ -5943,6 +5943,37 @@ composition requires the measured selection, reuse and aggregation dispositions;
 these sources overlap their qualification cohorts and are not an untouched
 composed-study holdout.
 
+`feedbackDelivery=latest|prefix` selects the journal channel the support consumer
+reads: the latest completed query, or the archive alone. `batch64=<base64 JSON array
+of argument arrays>` runs up to 64 frontier requests, each in a fresh one-processor
+JVM under `OUT/<index>`; a snapshot past its inspection allowance keeps the solve record.
+Stages add `numericalFeedbackLateCollections` and `numericalSupportLateSelections`
+for queries consumed after the archive stops.
+
+[Delivery comparison 8737](https://lab.eignex.com/jobs/8737), at `2a3f3b564c` on
+Mac/aarch64, runs source order, prefix and latest delivery on 21 exact ten-second
+frontier sources (p0033 development, the rest held out). Latest delivery reaches
+later states: p0033 consumes 379 late records with 353 changed choices, lseu 357 with
+348. With every delivered record charged as a full copy, its modeled allocation reaches
+0.18 to 0.54 GB against about 10 MB for prefix delivery. It exhausts the 512 MiB
+source funding on six matched sources where the other arms do not, and on three
+unmatched ones; pp08aCUTS exhausts work in every arm. Checks fall, and p0033 loses
+the native incumbent 3095 that both other arms keep. Post-solve snapshot limits
+discard nine records and gr4x6 times out in every arm.
+
+[Delivery comparison 8763](https://lab.eignex.com/jobs/8763), at `c28758a1e1` on
+Linux/amd64, repeats the comparison on the remaining 20 sources after delivery-only
+records charge references and owned values. All 60 records complete and no arm
+exhausts funding. Latest-delivery allocation remains 2.5 to 25 times prefix (25 to
+272 MB against 9 to 11 MB), mostly cut-violation arithmetic per delivered query.
+Only p0033 (149 late changed choices) and lseu (141) change decisions. Neither gains a
+checked outcome: source order alone finds p0033's native incumbent 3095, and lseu closes
+no leaves against prefix's 11. The other sources consume late records without changed
+choices; their check counts differ by up to about a fifth in both directions under
+the wall cutoff. No arm publishes an
+independently checked witness or proof. Later availability establishes no
+support-ordering benefit; the consumer stays an internal comparison.
+
 #### Active rows before Boolean completion
 
 [8424](https://lab.eignex.com/jobs/8424) and
