@@ -31,7 +31,7 @@ internal data class QfNraParams(
     val maximumWork: Long? = null,
     val polynomialLimits: PolynomialLimits = PolynomialLimits(),
     val cellRefinement: Boolean = true,
-    val cellFeedback: Boolean = false,
+    val cellFeedback: Boolean = true,
 ) {
     init { require(maximumWork == null || maximumWork >= 0) }
 }
