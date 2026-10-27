@@ -63,10 +63,13 @@ data class NonlinearIntegerTheoryParams(
     val cellRefinement: Boolean = false,
     /** Filter fixed integer tuples using checked mandatory cells of the original source. */
     val reuseSourceCells: Boolean = false,
+    /** Alternate ordinary traversal with nearest unvisited tuples outside checked source cells. */
+    val steerSourceCells: Boolean = false,
 ) {
     init {
         require(maximumCandidates >= 0 && maximumMoves >= 0)
         require(!reuseSourceCells || cellRefinement) { "integer cell reuse requires cell refinement" }
+        require(!steerSourceCells || reuseSourceCells) { "integer cell steering requires cell reuse" }
     }
 }
 
@@ -281,6 +284,7 @@ internal class NonlinearIntegerInvocation(
                 strategy = NonlinearIntegerStrategy.SEARCH,
                 seed = slot.seed,
                 reuseSourceCells = params.reuseSourceCells,
+                steerSourceCells = params.steerSourceCells,
             ),
             pins,
         )
@@ -400,6 +404,7 @@ internal class NonlinearIntegerInvocation(
                 },
                 seed = polynomial.strategy.backtrack.randomSeed ?: 1L,
                 reuseSourceCells = params.reuseSourceCells,
+                steerSourceCells = params.steerSourceCells,
             ),
             condition,
         )
