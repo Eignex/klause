@@ -22,6 +22,7 @@ internal class LinearRefutationReuse(
     private val cancellation: Cancellation,
     private val maximumEntries: Int = 256,
     private val maximumBytes: Long = 1_048_576L,
+    maximumAllocation: Long = 67_108_864L,
 ) {
     private data class Side(val coordinate: SourceCoordinate, val upper: Boolean)
     private class Entry(val evidence: SourceEvidence, val anchor: Side?, val bytes: Long, val restrictions: Long)
@@ -37,6 +38,9 @@ internal class LinearRefutationReuse(
     private var retainedBytes = 0L
     private var peakBytes = 0L
     private var allocated = 0L
+    private val allocationLimit = minOf(maximumAllocation,
+        budget.funding?.remainingAllocation?.div(8L) ?: maximumAllocation)
+    private var retired = false
     private var work = 0L
     private var verificationWork = 0L
     private var verificationAllocation = 0L
@@ -46,7 +50,7 @@ internal class LinearRefutationReuse(
     private var sourceShape: Pair<Long, Long>? = null
     private var sourceWidthDeclined = false
 
-    init { require(maximumEntries >= 0 && maximumBytes >= 0L) }
+    init { require(maximumEntries >= 0 && maximumBytes >= 0L && maximumAllocation >= 0L) }
 
     fun observations(): Map<String, Long> = counts.mapKeys { "numericalRefutationReuse${it.key}" } + mapOf(
         "numericalRefutationReuseRetained" to entries.size.toLong(),
@@ -68,7 +72,13 @@ internal class LinearRefutationReuse(
     }
 
     private fun spend(units: Long, bytes: Long = 0L): Boolean {
-        if (cancellation() || budget.funding?.paused == true) return false
+        if (retired || cancellation() || budget.funding?.paused == true) return false
+        if (bytes > allocationLimit - allocated) {
+            retired = true
+            observe("AllocationStops")
+            clear()
+            return false
+        }
         charge(units, bytes)
         return !cancellation() && budget.funding?.paused != true
     }
@@ -158,7 +168,7 @@ internal class LinearRefutationReuse(
     }
 
     fun retain(evidence: SourceEvidence) {
-        if (maximumEntries == 0 || maximumBytes == 0L || evidence.claim != SourceClaim.Refutation ||
+        if (retired || maximumEntries == 0 || maximumBytes == 0L || evidence.claim != SourceClaim.Refutation ||
             evidence.scope.revision != source.scope.revision || evidence.scope.objective != source.scope.objective ||
             cancellation() || budget.funding?.paused == true
         ) return
@@ -218,7 +228,7 @@ internal class LinearRefutationReuse(
     }
 
     fun find(condition: SourceCondition): SourceEvidence? {
-        if (entries.isEmpty() || cancellation() || budget.funding?.paused == true) return null
+        if (retired || entries.isEmpty() || cancellation() || budget.funding?.paused == true) return null
         proofPolls = 0
         observe("Lookups")
         val lower = condition.lower
@@ -240,14 +250,14 @@ internal class LinearRefutationReuse(
                 SourceDerivation.Import(entry.evidence))
             when (verify(imported)) {
                 SourceEvidenceCheck.Checked -> {
-                    if (cancellation() || budget.funding?.paused == true) return null
+                    if (retired || cancellation() || budget.funding?.paused == true) return null
                     observe("Hits")
                     return imported
                 }
                 is SourceEvidenceCheck.Rejected -> observe("Rejected")
                 is SourceEvidenceCheck.Unavailable -> {
                     observe("Unavailable")
-                    if (cancellation() || budget.funding?.paused == true || proofPolls > 100_000) return null
+                    if (retired || cancellation() || budget.funding?.paused == true || proofPolls > 100_000) return null
                 }
             }
         }

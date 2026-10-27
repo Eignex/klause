@@ -23,6 +23,7 @@ import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -222,6 +223,25 @@ class LinearRefutationReuseTest {
     }
 
     @Test
+    fun `reuse allocation admission should retire the cache before exhausting numerical funding`() {
+        for (allocation in listOf(32_768L, 1_000_000L)) {
+            val funding = SourceLpFunding(1_000_000L, allocation).apply { grant(1_000_000L) }
+            val reuse = LinearRefutationReuse(source, SourceLpBudget(funding = funding), Cancellation.Never,
+                maximumAllocation = 8192L)
+            reuse.retain(evidence)
+            assertNotNull(reuse.find(restricted.condition))
+
+            repeat(16) { reuse.find(restricted.condition) }
+
+            assertNull(reuse.find(restricted.condition))
+            assertEquals(1L, reuse.observations()["numericalRefutationReuseAllocationStops"])
+            assertEquals(0L, reuse.observations()["numericalRefutationReuseRetained"])
+            assertTrue(funding.allocated <= minOf(8192L, allocation / 8L))
+            assertFalse(funding.exhausted)
+        }
+    }
+
+    @Test
     fun `source snapshot admission should charge every premise before a work pause`() {
         val rows = source.premises + (0 until 1000).associate {
             "unused/$it" to SourcePremise(SourceInequality(emptyMap(), BigFraction.ZERO))
@@ -244,13 +264,14 @@ class LinearRefutationReuseTest {
             "unused/$it" to SourcePremise(SourceInequality(emptyMap(), BigFraction.ZERO))
         }
         val context = SourceProofContext(scope, source.coordinates, rows)
-        val funding = SourceLpFunding(1_000_000L, 6_000L).apply { grant(1_000_000L) }
-        val reuse = LinearRefutationReuse(context, SourceLpBudget(funding = funding), Cancellation.Never)
+        val funding = SourceLpFunding(1_000_000L, 96_000L).apply { grant(1_000_000L) }
+        val reuse = LinearRefutationReuse(context, SourceLpBudget(funding = funding), Cancellation.Never,
+            maximumAllocation = 6_000L)
 
         reuse.retain(evidence)
 
-        assertTrue(funding.exhausted)
-        assertTrue(funding.allocated <= 8_192L)
+        assertFalse(funding.exhausted)
+        assertTrue(funding.allocated <= 6_000L)
         assertNull(reuse.find(restricted.condition))
         assertEquals(0L, reuse.observations()["numericalRefutationReuseRetained"])
     }
