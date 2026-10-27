@@ -18,6 +18,20 @@ import kotlin.test.assertNull
 
 class LinearRefutationSupportTest {
     @Test
+    fun `stopped support selection should not publish a partial reason`() {
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(0))
+        session.initialize()
+        val x = assertNotNull(SourceBoundAtom.integerSplit(session,
+            listOf(SourceBoundTerm(SearchIntValue(0), BigFraction.ONE)), BigFraction.ZERO))
+
+        val selected = linearRefutationSupport(SourceCondition(), emptyList(), SourceCondition(), x.negative) {
+            false
+        }
+
+        assertNull(selected)
+    }
+
+    @Test
     fun `unit support should omit unrelated decisions and retain stronger established endpoints`() {
         for (endpoint in listOf(BigFraction.ZERO, BigFraction.MINUS_ONE, BigFraction.ONE)) {
             val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(0))

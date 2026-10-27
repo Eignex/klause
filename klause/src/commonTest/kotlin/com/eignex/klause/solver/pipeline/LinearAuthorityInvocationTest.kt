@@ -451,7 +451,9 @@ class LinearAuthorityInvocationTest {
     @Test
     fun `bound frontier should preserve complete sibling proofs across slices`() {
         val other = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
-        for (sense in ObjectiveSense.entries) {
+        for ((sense, resolution) in ObjectiveSense.entries.flatMap { sense ->
+            listOf(false, true).map { sense to it }
+        }) {
             val direction = if (sense == ObjectiveSense.MINIMIZE) BigFraction.ONE else BigFraction.MINUS_ONE
             val source = SourceProofContext(scope.copy(objective = SourceObjective("sum", sense)),
                 setOf(integer, other), mapOf(
@@ -461,7 +463,8 @@ class LinearAuthorityInvocationTest {
                         BigFraction.MINUS_ONE)),
                 ), mapOf(integer to BigFraction.ONE, other to BigFraction.ONE))
 
-            LinearAuthorityInvocation(source, TheoryParams(sourceRefutationPropagation = true),
+            LinearAuthorityInvocation(source, TheoryParams(sourceRefutationPropagation = true,
+                sourceRefutationResolution = resolution),
                 boundOrdered = true).use { invocation ->
                 var result: LinearInvocationResult? = null
                 repeat(32) {
