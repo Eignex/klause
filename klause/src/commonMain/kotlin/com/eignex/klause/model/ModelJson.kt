@@ -13,6 +13,9 @@ import kotlinx.serialization.json.JsonPrimitive
  * Compact JSON vocabularies of schema entries and expressions. Each node is one operator key
  * holding its operands, a named reference is `{"ref": name}` and an integer literal is a bare
  * number. Other formats keep the sealed-class representation.
+ *
+ * Keys shared with Kumulant follow the portable expression profile, so one key never names
+ * two operations: integer division is `truncDiv`/`truncMod`, and `div` stays real division.
  */
 object ModelJson {
     /** Every model vocabulary, for composing into another [JsonNodeCatalog]. */
@@ -68,8 +71,8 @@ object IntExprSerializer : CompactSerializer<IntExpr>(
             jsonNode<IntScale>("scale", Operands, "coeff", "child"),
             jsonNode<IntSum>("add", Operand, "children"),
             jsonNode<IntMul>("mul", Operands, "left", "right"),
-            jsonNode<IntDiv>("div", Operands, "num", "den"),
-            jsonNode<IntMod>("mod", Operands, "num", "den"),
+            jsonNode<IntDiv>("truncDiv", Operands, "num", "den"),
+            jsonNode<IntMod>("truncMod", Operands, "num", "den"),
             jsonNode<IntPower>("pow", Operands, "base", "exponent"),
             jsonNode<IntAbs>("abs", Operand, "child"),
             jsonNode<IntMin>("min", Operand, "children"),
