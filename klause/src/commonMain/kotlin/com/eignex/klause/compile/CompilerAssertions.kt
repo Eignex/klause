@@ -27,6 +27,7 @@ import com.eignex.klause.model.CumulativeExprOpt
 import com.eignex.klause.model.DiffnExpr
 import com.eignex.klause.model.DisjunctiveExpr
 import com.eignex.klause.model.DisjunctiveExprOpt
+import com.eignex.klause.model.FactorConstraint
 import com.eignex.klause.model.FloatLinearConstraint
 import com.eignex.klause.model.GccExprOpt
 import com.eignex.klause.model.Iff
@@ -38,6 +39,7 @@ import com.eignex.klause.model.IntExpr
 import com.eignex.klause.model.IntLit
 import com.eignex.klause.model.IntRef
 import com.eignex.klause.model.InverseChannel
+import com.eignex.klause.model.LexExpr
 import com.eignex.klause.model.MddExpr
 import com.eignex.klause.model.NValueExprOpt
 import com.eignex.klause.model.NValueMode
@@ -55,6 +57,7 @@ import com.eignex.klause.model.SortExpr
 import com.eignex.klause.model.SubcircuitExpr
 import com.eignex.klause.model.SymmetricAllDifferent
 import com.eignex.klause.model.TableConstraint
+import com.eignex.klause.model.VariableCumulativeExpr
 import com.eignex.klause.model.XorExpr
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
@@ -157,6 +160,12 @@ internal fun Lowering.assertExpr(expr: BoolExpr) {
         is NValueExprOpt -> assertNValueOpt(expr)
 
         is GccExprOpt -> assertGccOpt(expr)
+
+        is LexExpr -> assertLex(expr)
+
+        is VariableCumulativeExpr -> assertVariableCumulative(expr)
+
+        is FactorConstraint -> assertFactorConstraint(expr)
 
         is SetIn -> assertSetIn(expr)
 

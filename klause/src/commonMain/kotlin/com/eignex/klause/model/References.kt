@@ -133,6 +133,17 @@ fun BoolExpr.mapReferences(rename: (String) -> String): BoolExpr = when (this) {
     )
 
     is GccExprOpt -> copy(xs = xs.mapIntReferences(rename), presents = presents.mapBoolReferences(rename))
+
+    is LexExpr -> copy(xs = xs.mapIntReferences(rename), ys = ys.mapIntReferences(rename))
+
+    is VariableCumulativeExpr -> copy(
+        starts = starts.mapIntReferences(rename),
+        durations = durations.mapIntReferences(rename),
+        demands = demands.mapIntReferences(rename),
+        capacity = capacity.mapReferences(rename),
+    )
+
+    is FactorConstraint -> copy(bools = bools.map(rename), ints = ints.map(rename), reals = reals.map(rename))
 }
 
 /** Returns this set expression with every set-variable reference replaced by `rename(name)`. */
@@ -182,7 +193,7 @@ fun SchemaEntry.mapReferences(rename: (String) -> String): SchemaEntry = when (t
 
     is PresenceSpec -> copy(valueName = rename(valueName))
 
-    is BoolSpec, is NominalSpec, is IntSpec, is FloatSpec, is SetSpec, is MultipleSpec -> this
+    is BoolSpec, is NominalSpec, is IntSpec, is IntDomainSpec, is FloatSpec, is SetSpec, is MultipleSpec -> this
 }
 
 /**
