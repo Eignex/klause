@@ -968,6 +968,13 @@ correspondence is unavailable. Prepared slot identifiers cannot be interpreted a
 original source slots. Ordinary `pipeline=true|both` runs retain their separate
 source-admission/publication scope and supply no capture of those worker queries.
 
+`fixedBooleans={"gate":false}` on a request entry selects an explicit original
+Boolean condition in direct or prepared diagnostics. Prepared conditions require
+the captured plan's source identity and its declared Boolean coordinate map;
+`conditionBooleans` records the actual query pins. This uses no real-coordinate
+correspondence and cannot be combined with pipeline observation. The original
+bytes and hash remain unchanged; a conditioned verdict applies only to that branch.
+
 Add `pipeline=true` after the request argument to observe source admission and the same
 MIXED/P1/seed3 satisfaction execution used by default CLI polynomial requests.
 That mode records the common termination reason, native/resource and search

@@ -74,7 +74,8 @@ class PolynomialCoupledSectionsTest {
                 "(= w (+ (* x y) x y)) ${equality("w", 1)}))")
             val required = assertNotNull(PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
                 .forcedAtoms(PolynomialArithmetic()))
-            val direct = PolynomialCoupledSections(QfNraWork(QfNraParams()), PolynomialLimits(), prepareSupports = false)
+            val direct = PolynomialCoupledSections(QfNraWork(QfNraParams()), PolynomialLimits(),
+                prepareSupports = false)
             val prepared = PolynomialCoupledSections(QfNraWork(QfNraParams()), PolynomialLimits())
             val identities = required.indices.map { it.toLong() }
 

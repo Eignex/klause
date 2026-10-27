@@ -57,6 +57,21 @@ class PolynomialPhaseProfileTest {
     }
 
     @Test
+    fun `prepared Boolean conditions retain their original branch identity`() {
+        val source = "(declare-const gate Bool) (declare-const x Real) " +
+            "(assert (or gate (= (* x x) (- 1))))"
+        val access = PolynomialPhaseProfile.PhaseAccess()
+
+        for (value in listOf(false, true)) {
+            val trace = access.measure(source, prepared = true, fixedBooleans = mapOf("gate" to value))
+
+            assertEquals(if (value) "Satisfiable" else "Unsatisfiable", trace.result)
+            assertEquals(mapOf("0" to value.toString()), trace.conditionBooleans)
+            assertEquals(trace.nativeWork, trace.chargeSum)
+        }
+    }
+
+    @Test
     fun `coupled traces retain the first explained conflict and charged work`() {
         val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
         val source = "$declarations (assert (and (= (* x1 x1) 2) (= (* x2 x2) 3) (= (+ (* x1 x2) x1 x2) 1)))"
