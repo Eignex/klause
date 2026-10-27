@@ -91,7 +91,7 @@ class BacktrackSolverRepairTest {
             val sourceObjective = assertNotNull(compiled.objective).toLinearObjective()
             val objective = if (compiled.maximize) sourceObjective.negated() else sourceObjective
             val epsilon = BigFraction.ofLong(1L shl 60).reciprocal()
-            val first = if (compiled.maximize) 1L else 0L
+            val first = if (compiled.maximize) 0L else 1L
             val second = 1L - first
             BacktrackSolver(compiled.model.bake()).openRepair(objective, BacktrackParams()).use { repair ->
                 val cutoff = if (compiled.maximize) epsilon else BigFraction.ofLong(3L).reciprocal() + epsilon
@@ -101,9 +101,9 @@ class BacktrackSolverRepairTest {
                 val b = assertNotNull(repair.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L).sample)
 
                 assertEquals(10L, compiled.objectiveScale)
-                assertEquals(if (compiled.maximize) "0" else "1/30",
-                    compiled.sourceWitness(a.ints, assertNotNull(a.exactReals)).objective.toString())
                 assertEquals(if (compiled.maximize) "1/30" else "0",
+                    compiled.sourceWitness(a.ints, assertNotNull(a.exactReals)).objective.toString())
+                assertEquals(if (compiled.maximize) "0" else "1/30",
                     compiled.sourceWitness(b.ints, assertNotNull(b.exactReals)).objective.toString())
             }
         }
