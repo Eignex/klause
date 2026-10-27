@@ -63,6 +63,7 @@ internal class LinearAuthorityTraversal(
     private val pointCuts: Boolean = false,
     private val onNumericalFeedback: ((SourceNumericalFeedbackResult) -> Unit)? = null,
     aggregateCuts: Boolean = false,
+    latestFeedback: Boolean = true,
 ) : SearchBrancher, SearchBranchProposal, SearchNodePolicy, AutoCloseable {
     override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
 
@@ -85,7 +86,8 @@ internal class LinearAuthorityTraversal(
     private val refutations = if (useRefutationReuse || useRefutationPropagation)
         LinearRefutationReuse(source, budget, cancellation) else null
     private val feedback = if (useSupportBranching || onNumericalFeedback != null) {
-        SourceNumericalFeedback(requireNotNull(budget.funding), cancellation).also { it.attach(authority) }
+        SourceNumericalFeedback(requireNotNull(budget.funding), cancellation, latestFeedback)
+            .also { it.attach(authority) }
     } else null
     private val supportBranching = if (useSupportBranching) LinearSupportBranching(requireNotNull(budget.funding))
         else null
@@ -126,6 +128,7 @@ internal class LinearAuthorityTraversal(
         "numericalLpPreparations" to authority.preparations,
         "numericalLpReuses" to authority.reuses,
     ) + (feedback?.let { mapOf("numericalFeedbackCollections" to it.collections,
+        "numericalFeedbackLateCollections" to it.lateCollections,
         "numericalFeedbackUnavailable" to it.unavailable) } ?: emptyMap()) +
         (supportBranching?.let { mapOf("numericalSupportConsultations" to it.consultations,
             "numericalSupportSelections" to it.selections, "numericalSupportFallbacks" to it.fallbacks) }
@@ -411,7 +414,9 @@ internal class LinearAuthorityTraversal(
         }
         current.pending = false
         linkCapture(branch.scope)
+        val lateBefore = feedback?.lateCollections
         val numericalFeedback = feedback?.consume(branch)?.also { onNumericalFeedback?.invoke(it) }
+        val lateFeedback = feedback != null && feedback.lateCollections != lateBefore
         current.result = if (result.primalStages.isEmpty()) result else result.copy(primalStages = emptyMap())
         observe("numericalChecks")
         result.evidence?.takeIf { it.claim == SourceClaim.Refutation }?.let { refutations?.retain(it) }
@@ -462,6 +467,9 @@ internal class LinearAuthorityTraversal(
                 else result.fractional.firstOrNull()
             val selected = candidate?.floorSplit() ?: (coordinate to threshold)
             if (supportBranching == null && selected != result.split) observe("numericalHistorySelections")
+            if (supportBranching != null && lateFeedback && candidate != result.fractional.firstOrNull()) {
+                observe("numericalSupportLateSelections")
+            }
             current.split = CoverageSplit.Integer(selected.first, selected.second, current.condition, candidate)
             splitCreated()
             observe("numericalFractionalSplits")

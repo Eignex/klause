@@ -198,6 +198,51 @@ class LinearAuthorityCaptureTest {
     }
 
     @Test
+    fun `delivery should keep the latest query after the archive fills`() {
+        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, Cancellation.Never)
+        capture.deliver(10_000L, 1_000_000L)
+        LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
+            authority.capture = capture
+            authority.advance(source, Cancellation.Never, cuts = true, cutMask = emptySet())
+            authority.advance(source, Cancellation.Never, cuts = true)
+        }
+
+        assertEquals(1, capture.records.size)
+        assertTrue(capture.limited)
+        val delivered = assertNotNull(capture.delivered)
+        assertEquals(1, delivered.id)
+        assertEquals(BigFraction.ONE, delivered.point?.get(x))
+    }
+
+    @Test
+    fun `eviction should not lower the cumulative construction ledger`() {
+        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, Cancellation.Never)
+        capture.deliver(10_000L, 1_000_000L)
+        repeat(2) { capture.record(source, null, null, null, LinearAuthorityResult()) }
+        val entries = capture.constructedEntries
+        val bytes = capture.constructedBytes
+
+        capture.stopDelivery()
+
+        assertNull(capture.delivered)
+        assertTrue(entries > capture.entries && bytes > capture.bytes)
+        assertEquals(entries, capture.constructedEntries)
+        assertEquals(bytes, capture.constructedBytes)
+    }
+
+    @Test
+    fun `a query beyond the delivery allowance should be reported as oversized`() {
+        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, Cancellation.Never)
+        capture.deliver(1L, 1_000_000L)
+
+        capture.record(source, null, null, null, LinearAuthorityResult())
+
+        assertTrue(capture.deliveryOverflowed)
+        assertNull(capture.delivered)
+        assertEquals(1, capture.records.size)
+    }
+
+    @Test
     fun `open Boolean capture should not substitute an unknown pin`() {
         val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
         val guarded = SourceProofContext(scope, setOf(x, bool), mapOf(

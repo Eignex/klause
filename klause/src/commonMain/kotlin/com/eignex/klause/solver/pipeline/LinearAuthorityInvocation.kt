@@ -56,6 +56,7 @@ internal class LinearAuthorityInvocation(
     activeRows: Boolean = false,
     supportBranching: Boolean = false,
     onNumericalFeedback: ((SourceNumericalFeedbackResult) -> Unit)? = null,
+    latestFeedback: Boolean = true,
 ) : AutoCloseable {
     init {
         require(borrowedAuthority?.funding == null || borrowedAuthority.funding === funding) {
@@ -102,7 +103,7 @@ internal class LinearAuthorityInvocation(
         useRefutationPropagation = params.sourceRefutationPropagation,
         useSupportBranching = supportBranching,
         pointCuts = boundOrdered && params.sourcePointCuts, onNumericalFeedback = onNumericalFeedback,
-        aggregateCuts = boundOrdered && params.sourceAggregateCuts)
+        aggregateCuts = boundOrdered && params.sourceAggregateCuts, latestFeedback = latestFeedback)
     private val session = SearchComponentSet(listOf(component)).session(params.maxLeaves, stop,
         atoms = if (params.sourceRefutationPropagation) SearchAtomRegistry(context.coordinates.filter {
             it.kind == com.eignex.klause.solver.evidence.SourceCoordinate.Kind.Boolean
