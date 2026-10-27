@@ -64,7 +64,7 @@ data class NonlinearIntegerTheoryParams(
     /** Filter fixed integer tuples using checked mandatory cells of the original source. */
     val reuseSourceCells: Boolean = true,
     /** Alternate ordinary traversal with nearest unvisited tuples outside checked source cells. */
-    val steerSourceCells: Boolean = false,
+    val steerSourceCells: Boolean = true,
 ) {
     init {
         require(maximumCandidates >= 0 && maximumMoves >= 0)
