@@ -2701,6 +2701,7 @@ public final class com/eignex/klause/formats/json/JsonFormatException : com/eign
 
 public final class com/eignex/klause/formats/json/JsonSchema {
 	public static final field INSTANCE Lcom/eignex/klause/formats/json/JsonSchema;
+	public final fun jsonSchema ()Lkotlinx/serialization/json/JsonObject;
 	public final fun parse (Ljava/lang/String;)Lcom/eignex/skema/SchemaDef;
 }
 
@@ -6622,6 +6623,10 @@ public final class com/eignex/klause/model/BoolExpr$DefaultImpls {
 	public static fun toExpr (Lcom/eignex/klause/model/BoolExpr;)Lcom/eignex/klause/model/BoolExpr;
 }
 
+public final class com/eignex/klause/model/BoolExprSerializer : com/eignex/skema/serialization/CompactSerializer {
+	public static final field INSTANCE Lcom/eignex/klause/model/BoolExprSerializer;
+}
+
 public final class com/eignex/klause/model/BoolRef : com/eignex/klause/model/BoolExpr {
 	public static final field Companion Lcom/eignex/klause/model/BoolRef$Companion;
 	public fun <init> (Ljava/lang/String;Z)V
@@ -6852,6 +6857,10 @@ public final synthetic class com/eignex/klause/model/ContinuousRealExpr$Power$$s
 
 public final class com/eignex/klause/model/ContinuousRealExpr$Power$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/eignex/klause/model/ContinuousRealExprSerializer : com/eignex/skema/serialization/CompactSerializer {
+	public static final field INSTANCE Lcom/eignex/klause/model/ContinuousRealExprSerializer;
 }
 
 public final class com/eignex/klause/model/CostMddExpr : com/eignex/klause/model/BoolExpr {
@@ -7452,6 +7461,10 @@ public final class com/eignex/klause/model/IntExpr$DefaultImpls {
 	public static fun toIntExpr (Lcom/eignex/klause/model/IntExpr;)Lcom/eignex/klause/model/IntExpr;
 }
 
+public final class com/eignex/klause/model/IntExprSerializer : com/eignex/skema/serialization/CompactSerializer {
+	public static final field INSTANCE Lcom/eignex/klause/model/IntExprSerializer;
+}
+
 public final class com/eignex/klause/model/IntIfThenElse : com/eignex/klause/model/IntExpr {
 	public static final field Companion Lcom/eignex/klause/model/IntIfThenElse$Companion;
 	public fun <init> (Lcom/eignex/klause/model/BoolExpr;Lcom/eignex/klause/model/IntExpr;Lcom/eignex/klause/model/IntExpr;)V
@@ -7850,6 +7863,12 @@ public final class com/eignex/klause/model/MddExpr$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
+public final class com/eignex/klause/model/ModelJson {
+	public static final field INSTANCE Lcom/eignex/klause/model/ModelJson;
+	public final fun getCatalog ()Lcom/eignex/skema/serialization/JsonNodeCatalog;
+	public final fun getSerializers ()Ljava/util/List;
+}
+
 public final class com/eignex/klause/model/MultipleSpec : com/eignex/klause/model/VarSpec {
 	public static final field Companion Lcom/eignex/klause/model/MultipleSpec$Companion;
 	public fun <init> (Ljava/util/List;)V
@@ -8187,6 +8206,10 @@ public final class com/eignex/klause/model/SchemaEntry$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
+public final class com/eignex/klause/model/SchemaEntrySerializer : com/eignex/skema/serialization/CompactSerializer {
+	public static final field INSTANCE Lcom/eignex/klause/model/SchemaEntrySerializer;
+}
+
 public final class com/eignex/klause/model/SetCard : com/eignex/klause/model/IntExpr {
 	public static final field Companion Lcom/eignex/klause/model/SetCard$Companion;
 	public fun <init> (Lcom/eignex/klause/model/SetExpr;)V
@@ -8316,6 +8339,10 @@ public final class com/eignex/klause/model/SetExpr$Companion {
 
 public final class com/eignex/klause/model/SetExpr$DefaultImpls {
 	public static fun toSetExpr (Lcom/eignex/klause/model/SetExpr;)Lcom/eignex/klause/model/SetExpr;
+}
+
+public final class com/eignex/klause/model/SetExprSerializer : com/eignex/skema/serialization/CompactSerializer {
+	public static final field INSTANCE Lcom/eignex/klause/model/SetExprSerializer;
 }
 
 public final class com/eignex/klause/model/SetIn : com/eignex/klause/model/BoolExpr {
@@ -8714,6 +8741,10 @@ public abstract interface class com/eignex/klause/model/VarSpec : com/eignex/kla
 
 public final class com/eignex/klause/model/VarSpec$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/eignex/klause/model/VarSpecSerializer : com/eignex/skema/serialization/CompactSerializer {
+	public static final field INSTANCE Lcom/eignex/klause/model/VarSpecSerializer;
 }
 
 public final class com/eignex/klause/model/XorExpr : com/eignex/klause/model/BoolExpr {

@@ -10,7 +10,7 @@ interface BoolTerm {
 }
 
 /** A Boolean-valued node in the constraint AST. */
-@Serializable
+@Serializable(with = BoolExprSerializer::class)
 sealed interface BoolExpr : BoolTerm {
     override fun toExpr(): BoolExpr = this
 }

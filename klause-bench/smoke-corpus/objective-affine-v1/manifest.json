@@ -20,7 +20,7 @@
   ],
   "schema": {
     "file": "square.schema.json",
-    "sha256": "b6f4ca78ad4b64dcec953030b7d6ecafaa16c0305dbacb79625b5f19dae371b4",
+    "sha256": "45b7e7f672fa7ce6e824bc32312d2b6f68629d40bc81f21ee8cf3cc573261f61",
     "correspondence": "x*x=y, -1<=x<=1; schema y bounds 0<=y<=1 are implied by these original constraints"
   }
 }
