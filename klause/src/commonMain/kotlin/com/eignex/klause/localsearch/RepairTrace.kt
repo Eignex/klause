@@ -16,7 +16,7 @@ internal class RepairTrace(
 ) {
     init {
         require(descentRule.isNotBlank())
-        require(maxAttempts in 1..64 && maxCoordinates in 1..4096)
+        require(maxAttempts in 1..64 && maxCoordinates in 1..8192)
     }
 
     data class Frame(val stage: String, val sample: Sample, val cost: Long?)

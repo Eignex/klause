@@ -21,6 +21,18 @@ import kotlin.test.assertTrue
 
 class RepairTraceTest {
     @Test
+    fun `an explicit coordinate allowance should capture a large complete frame`() {
+        val trace = RepairTrace("strict source order", maxCoordinates = 8192)
+        val sample = Sample(BooleanArray(4096), LongArray(4096))
+
+        val attempt = trace.begin("control", 7, sample, sample)
+
+        assertNotNull(attempt)
+        assertEquals(sample, attempt.frames.single().sample)
+        assertEquals(8192L, trace.coordinateReads)
+    }
+
+    @Test
     fun `capture bounds should decline a whole oversized attempt`() {
         val trace = RepairTrace("strict source order", 1, 2)
         val tooLarge = Sample(booleanArrayOf(), longArrayOf(0, 1, 2))
