@@ -25,17 +25,19 @@ import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.evidence.integerPinBounds
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.RegisteredTheoryDecision
+import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchBranchKind
 import com.eignex.klause.solver.search.SearchBranchProposal
 import com.eignex.klause.solver.search.SearchBrancher
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchExplanation
+import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchNodeDisposition
 import com.eignex.klause.solver.search.SearchNodePolicy
+import com.eignex.klause.solver.search.SearchTheoryAtom
 import com.eignex.klause.solver.search.SearchTheoryDecision
-import com.eignex.klause.solver.search.RegisteredTheoryDecision
-import com.eignex.klause.solver.search.SearchAtomPremise
-import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundPredicate
 import com.eignex.klause.solver.search.SourceBoundTerm
@@ -229,7 +231,10 @@ internal class LinearAuthorityTraversal(
             val node = current
             val replay = node.unit
             if (replay != null) {
-                if (!applyUnit(context, replay)) return ComponentResult.Indeterminate
+                if (!applyUnit(context, replay)) {
+                    if (cancellation() || budget.funding?.paused == true) break
+                    return ComponentResult.Indeterminate
+                }
                 observe("numericalRefutationUnitReplays")
                 continue
             }
@@ -259,20 +264,18 @@ internal class LinearAuthorityTraversal(
         return ComponentResult.Consistent
     }
 
-    private fun unitExplanation(context: SearchContext, conclusion: RegisteredTheoryDecision):
-        com.eignex.klause.solver.search.SearchExplanation? {
+    private fun unitExplanation(context: SearchContext, conclusion: RegisteredTheoryDecision): SearchExplanation? {
         if (path.size > 4096 || cancellation() || budget.funding?.paused == true) return null
         budget.observe(conflictCertification = 1L + path.size)
         budget.funding?.charge(0L, 256L + 64L * path.size)
         if (cancellation() || budget.funding?.paused == true) return null
-        return context.explainAtoms(
-            SearchAtomPremise.All(path.mapNotNull { it.second.assertion }.map { SearchAtomPremise.Asserted(it) }),
-            SearchDecision.Theory(conclusion),
-        )
+        val premises = path.drop(1).map {
+            SearchAtomPremise.Asserted(it.second.assertion ?: return null)
+        }
+        return context.explainAtoms(SearchAtomPremise.All(premises), SearchDecision.Theory(conclusion))
     }
 
-    private fun integerAtom(context: SearchContext, coordinate: SourceCoordinate, threshold: BigFraction):
-        com.eignex.klause.solver.search.SearchTheoryAtom? {
+    private fun integerAtom(context: SearchContext, coordinate: SourceCoordinate, threshold: BigFraction): SearchTheoryAtom? {
         if (cancellation() || budget.funding?.paused == true) return null
         budget.observe(conflictCertification = 1L)
         budget.funding?.charge(0L, 384L)
@@ -299,6 +302,11 @@ internal class LinearAuthorityTraversal(
     override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
         if (cancellation()) return SearchNodeDisposition.Indeterminate
         if (pause()) return SearchNodeDisposition.Pause
+        if (current.unit != null) {
+            if (propagate(context) !is ComponentResult.Consistent) return SearchNodeDisposition.Indeterminate
+            if (cancellation()) return SearchNodeDisposition.Indeterminate
+            if (pause()) return SearchNodeDisposition.Pause
+        }
         if (current.result?.evidence?.claim == SourceClaim.Refutation) return SearchNodeDisposition.Prune
         if (source.coordinates.any {
                 it.kind == SourceCoordinate.Kind.Boolean && context.boolValue(it.id) == null

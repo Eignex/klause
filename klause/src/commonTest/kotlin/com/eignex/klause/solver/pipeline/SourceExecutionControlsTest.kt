@@ -17,6 +17,23 @@ import kotlin.test.assertTrue
 
 class SourceExecutionControlsTest {
     @Test
+    fun `numerical unit refutations should require explicit opt in`() {
+        val source = SourceAttachment(
+            LinearSourceProblem(listOf(LinearSourceVariable("x", true)), emptyList()), ProblemSettings(),
+        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            source, ExecutionOperation.SATISFY, FiniteEngine.FIXED,
+            linearTraversal = LinearTraversal.NUMERICAL_FRONTIER,
+        ))
+        for ((options, expected) in listOf(emptyList<String>() to false,
+            listOf("source-refutation-propagation=true") to true)) {
+            val request = SourceExecutionRequest(invocation, ExecutionOptions.parse(options))
+
+            assertEquals(expected, request.theory.sourceRefutationPropagation)
+        }
+    }
+
+    @Test
     fun `point cut selection should bind to numerical execution`() {
         val source = SourceAttachment(
             LinearSourceProblem(listOf(LinearSourceVariable("x", false)), emptyList()), ProblemSettings(),

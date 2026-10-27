@@ -21,8 +21,8 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.BooleanBranching
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.HeuristicBooleanBranching
-import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchAtomRegistry
+import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchFrontierRun
 import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchSolveParams
