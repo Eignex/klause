@@ -83,7 +83,7 @@ internal class PolynomialCoupledSections(
             if (equation.variable !in sections) sections[equation.variable] = index
         }
         if (sections.isEmpty()) return null
-        val roots = HashMap<Int, List<AlgebraicReal>>()
+        val roots = HashMap<Int, MutableList<AlgebraicReal>>()
         for ((index, atom) in required.withIndex()) {
             arithmetic.step()
             val variables = atom.polynomial.variables
@@ -98,7 +98,9 @@ internal class PolynomialCoupledSections(
             for (variable in variables) {
                 arithmetic.step()
                 val section = sections.getValue(variable)
-                val values = roots.getOrPut(variable) { algebraic.roots(checkNotNull(equations[section]).polynomial) }
+                val values = roots.getOrPut(variable) {
+                    algebraic.roots(checkNotNull(equations[section]).polynomial).toMutableList()
+                }
                 if (values.isEmpty()) {
                     conflictCount++
                     return listOf(section)
@@ -111,17 +113,16 @@ internal class PolynomialCoupledSections(
         return null
     }
 
-    private fun satisfiable(atom: PolynomialAtom, variables: List<Int>, roots: Map<Int, List<AlgebraicReal>>): Boolean {
+    private fun satisfiable(
+        atom: PolynomialAtom,
+        variables: List<Int>,
+        roots: Map<Int, MutableList<AlgebraicReal>>,
+    ): Boolean {
         val choice = IntArray(variables.size)
         while (true) {
             arithmetic.step()
             combinationCount++
-            val point = HashMap<Int, AlgebraicReal>()
-            for ((position, variable) in variables.withIndex()) {
-                arithmetic.step()
-                point[variable] = roots.getValue(variable)[choice[position]]
-            }
-            if (atom.holds(algebraic.signAt(atom.polynomial, point))) return true
+            if (atom.holds(sign(atom, variables, choice, roots))) return true
             var position = 0
             while (position < variables.size) {
                 arithmetic.step()
@@ -133,7 +134,33 @@ internal class PolynomialCoupledSections(
             if (position == variables.size) return false
         }
     }
+
+    // Bisected isolating intervals usually separate a nonzero value from zero far more cheaply than an exact
+    // algebraic image; refinements stay with their root for every later combination.
+    private fun sign(
+        atom: PolynomialAtom,
+        variables: List<Int>,
+        choice: IntArray,
+        roots: Map<Int, MutableList<AlgebraicReal>>,
+    ): Int {
+        val point = HashMap<Int, AlgebraicReal>()
+        for ((position, variable) in variables.withIndex()) {
+            arithmetic.step()
+            point[variable] = roots.getValue(variable)[choice[position]]
+        }
+        repeat(MAX_COUPLED_REFINEMENTS) {
+            algebraic.enclosedSignAt(atom.polynomial, point)?.let { return it }
+            for ((position, variable) in variables.withIndex()) {
+                arithmetic.step()
+                val refined = algebraic.refine(point.getValue(variable))
+                roots.getValue(variable)[choice[position]] = refined
+                point[variable] = refined
+            }
+        }
+        return algebraic.signAt(atom.polynomial, point)
+    }
 }
 
 private const val MAX_COUPLED_WORK = 16_384L
 private const val MAX_COUPLED_PREMISES = 64
+private const val MAX_COUPLED_REFINEMENTS = 32
