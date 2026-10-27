@@ -15,6 +15,58 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 
 class CorpusDownloadTest {
+    @ParameterizedTest
+    @ValueSource(ints = [408, 429, 500, 502, 503, 504])
+    fun `exhausted transient HTTP failures signal infrastructure unavailability`(status: Int) {
+        val root = Files.createTempDirectory("corpusdownload").toFile()
+        try {
+            var attempts = 0
+            val downloader = CorpusDownload(open = { uri ->
+                attempts++
+                object : HttpURLConnection(uri.toURL()) {
+                    override fun connect() = Unit
+                    override fun disconnect() = Unit
+                    override fun usingProxy() = false
+                    override fun getResponseCode() = status
+                }
+            }, pause = {})
+
+            assertFailsWith<CorpusUnavailable> {
+                downloader.fetch(URI("https://corpus.invalid/archive"), File(root, "archive"))
+            }
+
+            assertEquals(4, attempts)
+            assertEquals(emptyList(), root.list()!!.toList())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `local publication errors are not classified as transient transport failures`() {
+        val root = Files.createTempDirectory("corpusdownload").toFile()
+        try {
+            val destination = File(root, "directory").apply { mkdir() }
+            var attempts = 0
+            val downloader = CorpusDownload(open = { uri ->
+                attempts++
+                object : URLConnection(uri.toURL()) {
+                    override fun connect() = Unit
+                    override fun getInputStream() = "complete".byteInputStream()
+                }
+            }, pause = {})
+
+            val failure = assertFailsWith<IOException> {
+                downloader.fetch(URI("https://corpus.invalid/archive"), destination)
+            }
+
+            assertFalse(failure is CorpusUnavailable)
+            assertEquals(1, attempts)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
     @Test
     fun `an interrupted transfer is retried without publishing or appending its partial bytes`() {
         val root = Files.createTempDirectory("corpusdownload").toFile()
@@ -97,7 +149,9 @@ class CorpusDownloadTest {
                 }
             }, pause = {})
 
-            assertFailsWith<IOException> { downloader.fetch(URI("https://corpus.invalid/archive"), destination) }
+            assertFailsWith<CorpusDownload.HttpFailure> {
+                downloader.fetch(URI("https://corpus.invalid/archive"), destination)
+            }
 
             assertEquals(1, attempts)
             assertFalse(destination.exists())
@@ -122,7 +176,9 @@ class CorpusDownloadTest {
                 }
             }, pause = {})
 
-            assertFailsWith<IOException> { downloader.fetch(URI("https://corpus.invalid/archive"), destination) }
+            assertFailsWith<CorpusUnavailable> {
+                downloader.fetch(URI("https://corpus.invalid/archive"), destination)
+            }
 
             assertEquals(4, attempts)
             assertFalse(destination.exists())

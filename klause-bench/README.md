@@ -41,6 +41,11 @@ launcher uses `klause-bench` as its working directory. From the source tree,
 | `provenance out=<path>` | Capture installed-build and runtime identities |
 | `corpus status`, `corpus gc`, `corpus compress [path]` | Inspect, evict or compress fetched collections |
 
+The bench exits with `75` (`EX_TEMPFAIL`) when corpus transport remains unavailable
+after bounded download retries, or the cache publication service is unavailable.
+The lab treats this preparation outcome as an infrastructure retry. Permanent HTTP
+errors, invalid inputs and solver outcomes retain their ordinary failure semantics.
+
 `bench.profile.DivModConstructionProfile` times XCSP3 parsing and lowering without
 solving. Use `sizes=1024,2048,4096,8192 repeats=3 warmups=1` for generated sources
 that repeat each modular expression twice. Optional `suite=ID problem=NAME sha256=HEX`

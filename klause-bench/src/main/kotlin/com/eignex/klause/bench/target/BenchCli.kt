@@ -16,6 +16,7 @@ import com.eignex.klause.bench.source.CorpusCache
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.bench.source.CorpusSelection
+import com.eignex.klause.bench.source.CorpusUnavailable
 import com.eignex.klause.bench.source.ProblemKind
 import java.io.File
 import java.time.Instant
@@ -25,6 +26,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
+import kotlin.system.exitProcess
 
 /**
  * The bench commands klause-lab runs: `select` names problems, `solve-one` solves one and writes its
@@ -39,6 +41,15 @@ object BenchCli {
     /** CLI entry point dispatching bench subcommands. */
     @JvmStatic
     fun main(args: Array<String>) {
+        try {
+            dispatch(args)
+        } catch (failure: CorpusUnavailable) {
+            System.err.println("${failure.message}: ${failure.cause?.javaClass?.simpleName}")
+            exitProcess(75)
+        }
+    }
+
+    private fun dispatch(args: Array<String>) {
         when (val cmd = args.firstOrNull() ?: "list") {
             "list", "--list", "help", "--help" -> if (args.size > 1) listProblems(args[1]) else printListing()
 
