@@ -39,8 +39,9 @@ Every strategy starts from the same two facts about the source.
 Optional root admission adds the complete integer roots of mandatory unary
 equalities. It expands each conjunctive source equality whose syntax names one
 original integer coordinate into an exact univariate polynomial, isolates its real
-roots with the shared Sturm kernel and keeps the roots that compare equal to their
-integer ceiling. Repeated roots count once, and equalities on one coordinate
+roots with the shared Sturm kernel, and bisects each isolating interval on the
+integer grid by exact signs of the square-free polynomial, so wide roots cost
+logarithmically many evaluations. Repeated roots count once, and equalities on one coordinate
 intersect their sets. An empty set, or one disjoint from the caller's integer
 window, refutes that scope. A nonempty set narrows the window to its extreme roots,
 replaces the coordinate's traversal values, snaps repairs to the nearest root

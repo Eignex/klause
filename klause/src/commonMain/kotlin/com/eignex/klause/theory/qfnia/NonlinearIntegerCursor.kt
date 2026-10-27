@@ -61,6 +61,7 @@ internal class NonlinearIntegerCursor(
     private val rootStore = roots?.also { require(it.problem === problem) { "integer roots of another source" } }
         ?: NonlinearIntegerRootStore(problem)
     private var rootWindows = arrayOfNulls<List<BigInt>>(coordinates.size)
+    private var rooted = false
     private var rootStats = NonlinearIntegerRootCounts()
 
     val stats: NonlinearIntegerStats get() = NonlinearIntegerStats(
@@ -177,7 +178,7 @@ internal class NonlinearIntegerCursor(
                 condition.lower[id]?.let { value < it } == true || condition.upper[id]?.let { value > it } == true
             }
         ) return null
-        if (params.admitIntegerRoots && current.indices.any { index ->
+        if (rooted && current.indices.any { index ->
                 arithmetic.step()
                 rootWindows[index]?.let { current[index] !in it } == true
             }
@@ -264,6 +265,7 @@ internal class NonlinearIntegerCursor(
             }
             if (window.isEmpty()) return false
             rootWindows[index] = window
+            rooted = true
             lower[id] = BigFraction.of(window.first(), BIG_ONE)
             upper[id] = BigFraction.of(window.last(), BIG_ONE)
         }

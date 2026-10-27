@@ -1,21 +1,26 @@
 package com.eignex.klause.theory.qfnia
 
-import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
+import com.eignex.klause.arithmetic.polynomial.RationalInterval
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomialArithmetic
-import com.eignex.klause.arithmetic.polynomial.exactInteger
 import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_TWO
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.minus
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.unaryMinus
 
 internal data class NonlinearIntegerRootCounts(
     val admitted: Long = 0,
@@ -149,8 +154,32 @@ internal class NonlinearIntegerRootStore(val problem: NonlinearIntegerProblem) {
             univariate.scale(expand(atom.right, variable, univariate, expanded), BigFraction.MINUS_ONE),
         )
         if (polynomial.degree <= 0) return null
-        val algebraic = AlgebraicArithmetic(arithmetic)
-        return algebraic.roots(polynomial).mapNotNull(algebraic::exactInteger)
+        val squareFree = univariate.squareFree(polynomial)
+        return univariate.isolate(squareFree).mapNotNull { integerRoot(squareFree, it, univariate) }
+    }
+
+    // A nonpoint isolating interval holds one simple root strictly inside, so its sign change brackets the
+    // root on the integer grid within a number of exact evaluations logarithmic in the interval width.
+    private fun integerRoot(
+        polynomial: RationalPolynomial,
+        interval: RationalInterval,
+        univariate: RationalPolynomialArithmetic,
+    ): BigInt? {
+        if (interval.isPoint) return interval.lower.takeIf { it.den == BIG_ONE }?.num
+        val lowerSign = univariate.evaluate(polynomial, interval.lower).signum()
+        var low = -interval.lower.negated().ceilInteger() + BIG_ONE
+        var high = interval.upper.ceilInteger() - BIG_ONE
+        while (low <= high) {
+            univariate.arithmetic.step()
+            val middle = BigFraction.of(low + high, BIG_TWO).ceilInteger()
+            val sign = univariate.evaluate(polynomial, BigFraction.of(middle, BIG_ONE)).signum()
+            when {
+                sign == 0 -> return middle
+                sign == lowerSign -> low = middle + BIG_ONE
+                else -> high = middle - BIG_ONE
+            }
+        }
+        return null
     }
 
     private fun expand(
