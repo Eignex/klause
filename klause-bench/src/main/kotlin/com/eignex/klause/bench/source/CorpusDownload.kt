@@ -7,6 +7,7 @@ import java.net.HttpURLConnection
 import java.net.URI
 import java.net.URLConnection
 import java.nio.file.Files
+import java.nio.file.Path
 import java.nio.file.StandardCopyOption.ATOMIC_MOVE
 import java.nio.file.StandardCopyOption.REPLACE_EXISTING
 
@@ -45,7 +46,7 @@ internal class CorpusDownload(
 
     private fun exhausted(attempt: Int): Boolean = Thread.currentThread().isInterrupted || attempt == ATTEMPTS - 1
 
-    private fun transfer(connection: URLConnection, partial: java.nio.file.Path) {
+    private fun transfer(connection: URLConnection, partial: Path) {
         if (connection is HttpURLConnection) {
             val status = connection.responseCode
             if (status !in 200..299) throw HttpFailure(status)
