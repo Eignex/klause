@@ -3457,6 +3457,39 @@ all eight captures. These ordered diagnostics support neither unconditional reta
 CP replacement nor mixed admission on these finite globals. Witness acceptance and
 conditioned closures here are native evidence, without independent proof checking.
 
+[Structured inner replay 8735](https://lab.eignex.com/jobs/8735), at `7a1f8a2baa` on
+Mac/aarch64, reruns 8658's eight requests with `ownerRecipes=cbls-plateau/fixed,cbls-extended/fixed`.
+All 940 groups reproduce 8658's centers, freedoms, cutoffs and selectors. Default LS
+and the plateau owner find no gain; the extended walk recipe finds two on 18–19-input
+ClockTriplet Random scopes where both CP owners exhaust their fragments. Cold and
+retained CP keep their ten and eight conflict-scope gains, which no LS owner reaches.
+Every LS owner spends 1,361,600 moves without overspend. LS, plateau and extended
+take 7.7, 8.5 and 11.2 seconds and 4.6, 4.8 and 6.6 GB of thread allocation, against
+23.0/15.4 for cold CP and 10.2/41.1 for retained CP. The extended source offers
+9.7 million compounds and loses 6.0 million to pins; neither gain commits a compound.
+All twenty post-repair declared descents stop at policy-local endpoints without
+further gain.
+
+Owner seeds 101–108 on ClockTriplet separate recipe from trajectory. With walk seed 7
+([8756](https://lab.eignex.com/jobs/8756), `26b725bf17`, Linux/amd64), default LS,
+plateau and extended LS find 12, 9 and 8 gains over 960 matched queries, scattered
+across single seeds; cold and retained CP find 22 and 24, repeating on the same two
+conflict scopes. The extended seed-7 gains do not recur, while one extended seed
+reaches 163 on a scope where both CP owners always exhaust. With walk seed 19
+([8757](https://lab.eignex.com/jobs/8757), Mac/aarch64), the three LS owners find
+0, 1 and 2 gains against 41 and 28 for CP.
+
+[Catalog arms 8764](https://lab.eignex.com/jobs/8764), at `239460eaa0` on Linux/amd64,
+replays the same 940 groups with the implicitly seeded catalog `cbls-implicit/fixed`
+and `cbls-extended/fixed` arms. Neither finds a gain. The scopes conflict with
+implicit ownership: 625 of the 851 supported rows partially free a seed global, and
+280 free exactly one of its coordinates, which ownership locks after a restart.
+CarpetCutting also has 28 pinned definition outputs reading freed inputs. Pins are
+never released to admit a compound. Reject structured inner LS as a stronger repair
+for these captured freedoms: the catalog's definition sweep, structured scoring and
+implicit ownership add cost without consistent gains over default LS, whose own gains
+depend on the owner seed. This is not a general LS-versus-CP ranking.
+
 [Merged-proposal MPS comparison 8697](https://lab.eignex.com/jobs/8697), at
 `c6f1b10a5a`, consumes four actual source-role guided pairs from the checked modglob
 35.1471M center. Each frees x201 with one of x251/x223/x221/x255; original real
