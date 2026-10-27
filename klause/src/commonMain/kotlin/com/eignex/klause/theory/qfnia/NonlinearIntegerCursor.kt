@@ -90,6 +90,9 @@ internal class NonlinearIntegerCursor(
                 }
                 if (strategy == NonlinearIntegerStrategy.SEARCH) current = nextEnumeration()
                 else if (candidates > 0) repair(strategy)
+                if (params.steerSourceCells && candidates % 2 == 0L) {
+                    cells.propose(current, condition, visited, AlgebraicArithmetic(arithmetic))?.let { current = it }
+                }
                 val checked = checkCandidate()
                 if (checked is QfNraResult.Satisfiable || checked is QfNraResult.Unknown) terminal = checked
             }
@@ -151,7 +154,10 @@ internal class NonlinearIntegerCursor(
     private fun checkCandidate(): QfNraResult? {
         arithmetic.step()
         candidates++
-        if (!visited.add(current.toList())) return null
+        if (!visited.add(current.toList())) {
+            cells.recordDuplicate()
+            return null
+        }
         if (current.indices.any { index ->
                 val value = BigFraction.of(current[index], BIG_ONE)
                 val id = coordinates[index]
@@ -159,6 +165,7 @@ internal class NonlinearIntegerCursor(
             }
         ) return null
         if (params.reuseSourceCells && cells.excludes(current, AlgebraicArithmetic(arithmetic))) return null
+        cells.recordAllowed()
         val fixed = coordinates.indices.associate { coordinates[it] to BigFraction.of(current[it], BIG_ONE) }
         return when (val result = completion(fixed)) {
             is QfNraResult.Satisfiable -> {

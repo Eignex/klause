@@ -17,6 +17,52 @@ import kotlin.test.assertTrue
 
 class NonlinearIntegerCursorTest {
     @Test
+    fun `complement steering should preserve charged attempts and reach new allowed tuples`() {
+        val parsed = SmtLibPolynomial.parse(
+            "(declare-const n Int) (declare-const q Int) (assert (= (* n n) 2))", allowIntegers = true,
+        )
+        val source = NonlinearIntegerProblem(parsed.formula, parsed.realCount, parsed.boolCount,
+            parsed.intVarNames, parsed.realVarNames, parsed.boolVarNames)
+        val params = NonlinearIntegerParams(arithmetic = QfNraParams(cellRefinement = true),
+            strategy = NonlinearIntegerStrategy.SEARCH, maximumCandidates = 6, reuseSourceCells = true)
+        val baseline = solveNonlinearIntegers(source, params)
+
+        val steered = solveNonlinearIntegers(source, params.copy(steerSourceCells = true))
+
+        assertIs<QfNraResult.Unknown>(steered.result)
+        assertEquals(baseline.stats.candidates, steered.stats.candidates)
+        assertTrue(steered.stats.cells.steered > 0)
+        assertTrue(steered.stats.cells.allowed > baseline.stats.cells.allowed)
+    }
+
+    @Test
+    fun `steering should preserve slices and disposal for traversal and real repairs`() {
+        val parsed = SmtLibPolynomial.parse(
+            "(declare-const n Int) (declare-const q Int) (declare-const r Real) " +
+                "(assert (= (* n n) 2)) (assert (= (* r r) 0))", allowIntegers = true,
+        )
+        val source = NonlinearIntegerProblem(parsed.formula, parsed.realCount, parsed.boolCount,
+            parsed.intVarNames, parsed.realVarNames, parsed.boolVarNames)
+        for (strategy in NonlinearIntegerStrategy.entries) {
+            val params = NonlinearIntegerParams(arithmetic = QfNraParams(cellRefinement = true),
+                strategy = strategy, maximumCandidates = 4, reuseSourceCells = true, steerSourceCells = true)
+            val whole = solveNonlinearIntegers(source, params)
+            val cursor = NonlinearIntegerCursor(source, params, PolynomialCondition())
+            assertNull(cursor.runSlice(maximumCandidates = 2))
+            val before = cursor.stats
+            assertNull(cursor.runSlice(Cancellation { true }, 2))
+            assertEquals(before, cursor.stats)
+
+            val sliced = requireNotNull(cursor.runSlice(maximumCandidates = 2))
+            cursor.close()
+
+            assertEquals(whole.stats, sliced.stats)
+            assertIs<QfNraResult.Unknown>(sliced.result)
+            assertFailsWith<IllegalStateException> { cursor.runSlice() }
+        }
+    }
+
+    @Test
     fun `source cells should avoid completions of unvisited tuples with repeated support`() {
         val parsed = SmtLibPolynomial.parse(
             "(declare-const n Int) (declare-const q Int) (assert (= (* n n) 2))", allowIntegers = true,

@@ -50,6 +50,13 @@ integer hull, preserving open and closed endpoints at arbitrary precision. A hul
 representation decline removes that cell's authority. These exclusions skip
 completion calls; exhausting them still supplies no whole-source refutation.
 
+An independently enabled proposal policy alternates ordinary attempts with the
+nearest tuple outside those hulls. For each original integer coordinate it crosses
+covering hulls monotonically in both directions, intersects the caller's exact
+integer window and chooses the closer surviving endpoint, preferring the upper
+endpoint on ties. Empty complements, unchanged tuples and visited proposals retain
+ordinary traversal. Selection never rejects a released real repair window.
+
 #### Strategies
 
 Candidate traversal enumerates integer tuples around zero and source constants,
@@ -110,6 +117,13 @@ support-hit counts survive slices and retire on close. Integer hulls never refut
 partial real repair windows. Invocation observations sum private cursor admissions,
 declines, newly excluded tuples, repeated support hits and completion calls; they
 do not authorize cross-cursor proof reuse.
+
+Cell-complement steering is disabled by default and requires the producer and
+consumer. Selection scans and transient proposal coordinates debit the containing
+work allowance. Each selected or fallback tuple consumes one ordinary candidate
+attempt, including duplicate, out-of-window and excluded attempts; caps and slice
+boundaries are unchanged. Counters distinguish selection calls, changed unvisited
+proposals, distinct tuples reaching completion and duplicate attempts.
 
 ### Implementation
 
