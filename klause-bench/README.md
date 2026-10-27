@@ -3765,6 +3765,47 @@ failed completions, repeated proof support or newly excluded tuples. In particul
 its final zero-node aggregate. Guarded exclusion reuse needs a checked source
 explanation and a comparison with visited-tuple filtering under the same producer.
 
+[8674](https://lab.eignex.com/jobs/8674) compares source-cell reuse with visited-tuple
+filtering over those twelve sources and the seventeen frozen
+`nonlinear-integer-cells-v1` controls, at seeds 3/7, P1 and ten seconds. Activation
+builds `6997f69ea7` and `2eeca2840e` share the `c241d008a0` implementation and enable
+the same checked producer; their only difference is the integer reuse default.
+Production defaults remain disabled. Reported pairs match source hashes, host,
+JVM options, runtime and dependency fingerprints. Recovery places pairs on both
+Mac/aarch64 and Linux/amd64; absolute costs across those platforms are separate.
+
+On Mac/aarch64, the four- and eight-coordinate square controls show these native
+work reductions. Exclusions count unvisited, in-window tuples, each avoiding a fixed
+completion; repeated support counts further hits on the same cursor-owned cell.
+
+| Coordinates / seed | Excluded / repeated support | Completion checks, visited / reuse | Native work, visited / reuse |
+|---|---|---|---|
+| 4 / 3 | 1251 / 1201 | 2514 / 1263 | 1615550 / 1116842 |
+| 4 / 7 | 1337 / 1286 | 2580 / 1243 | 1656474 / 1047984 |
+| 8 / 3 | 1258 / 1218 | 2185 / 927 | 2057568 / 996087 |
+| 8 / 7 | 1258 / 1216 | 2325 / 1067 | 2191273 / 1131326 |
+
+Their whole-CLI wall times fall from 1.07/1.09/1.20/1.60 seconds to
+0.93/0.89/0.90/0.96 seconds in table order. Peak RSS changes from
+208272/235760/236896/234496 KiB to 211040/219792/211424/225120 KiB.
+These external, uninstrumented receipts measure the entire CLI JVM; allocation
+was not collected, and they do not isolate the eight-cell store's memory.
+
+Costs are mixed. `open-no-integer-root` excludes 870/868 tuples and records 521/519
+repeated supports, reducing completion checks from 1615/1609 to 745/741 while native
+work rises from 615290/618372 to 623464/626984. The one-coordinate square repeats
+that mathematical control. Two-coordinate squares and degree-four powers also
+spend more work. The mixed singular-real holdout excludes 610/691 tuples, but work
+rises from 2038864/2103521 to 2062041/2114584; its Linux seed-3 wall time rises from
+5.90 to 6.48 seconds. These unresolved cases retain UNKNOWN.
+
+The cubic SAT neighbor excludes 4/26 tuples with 3/23 repeated supports and retains
+both Dolmen-accepted witnesses; native work rises at seed 3 and falls at seed 7.
+The degree-seventeen control produces no cells or exclusions. Boolean, repeated-root,
+rational-window and wide-integer neighbors retain their scope and boundary controls.
+Avoided completions establish guarded reuse beyond visited tuples, while the mixed
+costs and unchanged observed quality retain the disabled defaults.
+
 ### State ownership
 
 Retain concrete buffer owners, separate indexed vector roles and one cursor/cleanup
