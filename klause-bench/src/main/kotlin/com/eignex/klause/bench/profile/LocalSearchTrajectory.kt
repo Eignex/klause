@@ -82,7 +82,7 @@ internal object LocalSearchTrajectory {
         val required = setOf("suite", "problem", "sha256", "recipe", "seed", "moves")
         val optional = setOf(
             "sliceMillis", "sliceWork", "greedy", "repairs", "controls", "center", "source64", "sourceGzip64",
-            "channel", "presolve", "center64", "timeoutMillis",
+            "channel", "presolve", "center64", "timeoutMillis", "traceCoordinates",
             "ownerReplay", "ownerWork", "ownerFragmentWork", "ownerSelectors", "selectorsFromWalk", "ownerConflicts",
             "ownerRecipes", "owners", "ownerSeed",
         )
@@ -132,6 +132,9 @@ internal object LocalSearchTrajectory {
         val sliceWork = options["sliceWork"]?.toLong()?.also { require(it > 0L) } ?: Long.MAX_VALUE
         val repairGreedy = options["greedy"]?.toBooleanStrict() ?: true
         val repairCapture = options["repairs"]?.toBooleanStrict() ?: false
+        val traceCoordinates = options["traceCoordinates"]?.toInt()?.also {
+            require(it in 1..TRAJECTORY_COORDINATE_LIMIT)
+        } ?: 4096
         require(!repairCapture || objective != null)
         val exactControls = options["controls"]?.toBooleanStrict() ?: false
         val selectors = options["selectors"]?.toBooleanStrict() ?: false
@@ -418,7 +421,8 @@ internal object LocalSearchTrajectory {
                         seedImplicitOnRestart = recipe.seedImplicitOnRestart,
                     )
                     val trace = if (mode == "repair") RepairTrajectory.attach(solver,
-                        "${options.getValue("recipe")}; linear shaping 1; seeded tie stream $seed") else null
+                        "${options.getValue("recipe")}; linear shaping 1; seeded tie stream $seed",
+                        traceCoordinates) else null
                     val params = LocalSearchParams(
                         randomSeed = seed, maxFlips = if (walk) moves else 1L, cancellation = walkStop,
                         costShaping = CostShaping.Linear(lambda = 1.0), lsObjective = gradient,
@@ -460,6 +464,7 @@ internal object LocalSearchTrajectory {
                         }
                         val runNanos = System.nanoTime() - started
                         val runBytes = allocation.getThreadAllocatedBytes(thread) - beforeBytes
+                        val runCancelled = walkStop()
                         if (mode == "walk") {
                             walkCenter = result?.assignment
                             walkNanos = runNanos
@@ -474,7 +479,7 @@ internal object LocalSearchTrajectory {
                             put("moves", run.stats.ls.moves.sum)
                             put("restarts", run.stats.search.restarts.sum)
                             put("picks", picks)
-                            put("cancelled", walkStop())
+                            put("cancelled", runCancelled)
                             put("runElapsedNanos", runNanos)
                             put("runAllocatedBytes", runBytes)
                             put("preparationNanos", preparationNanos)
@@ -492,18 +497,21 @@ internal object LocalSearchTrajectory {
                             }
                         }.toString())
                         out.resolve("result-$label.txt").writeText(
-                            "picks=$picks\ncancelled=${walkStop()}\nresult=$result\nstats=${run.stats}\n",
+                            "picks=$picks\ncancelled=$runCancelled\nresult=$result\nstats=${run.stats}\n",
                         )
-                        if (walk && result != null && !walkStop()) {
+                        if (walk && result != null && !runCancelled) {
                             val stats = run.stats.ls
                             val signature = listOf(result.assignment, result.objectiveValue, picks, stats.moves.sum,
                                 run.stats.search.restarts.sum, stats.stalls.sum, stats.boardRestartChanges.sum,
                                 stats.boardRestartDeclines.sum)
                             if (mode == "walk") baseline = signature
-                            if (mode == "repair") {
+                            if (mode == "repair" && baseline != null) {
                                 check(baseline == signature) { "repair observation changed the fixed-work walk" }
                                 out.resolve("parity-$rewrite.txt").writeText(
                                     "witness/objective/picks/work/restarts/stalls/board counts match\n")
+                            } else if (mode == "repair") {
+                                out.resolve("parity-$rewrite.txt").writeText(
+                                    "unavailable: unobserved walk censored or incomplete\n")
                             }
                         }
                     }

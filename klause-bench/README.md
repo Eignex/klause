@@ -1626,7 +1626,11 @@ traces the production greedy pass one coordinate at a time through reflection.
 The diagnostic stop supplies no solver verdict or worker-failure evidence.
 `repairs=true` adds an observed repetition of the same fixed-work walk and checks
 its final witness, objective, pick count and non-timing work/restart/stall counters
-against the unobserved repetition. At most 32 repair/descent attempts retain their
+against the unobserved repetition when both complete without deadline censoring.
+An unavailable unobserved endpoint supplies no parity claim. Native interval
+censoring is latched before post-run source checking and serialization.
+`traceCoordinates=1..8192` sets the capture coordinate limit (default 4096).
+At most 32 repair/descent attempts retain their
 center and each phase's working and reconstructed source assignment. Distance
 counts named source inputs excluding frontend-declared definitions; auxiliary
 changes and approximate real displacement remain separate. Censored endpoints
