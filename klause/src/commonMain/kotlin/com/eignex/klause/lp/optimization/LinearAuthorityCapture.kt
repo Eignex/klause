@@ -212,27 +212,38 @@ internal class LinearAuthorityCapture(
             limitReached = true
             archive = false
         }
+        // Once the archive stops, a delivered record holds references to the immutable source rows, cut
+        // definitions and cited derivations its authority prepared; it spends only on references and owned values.
+        val shared = !archive && live
         if (!spend(1L, 256L)) return
         val open = source.coordinates.any {
             it.kind == SourceCoordinate.Kind.Boolean && it.id !in source.scope.condition.bools
         }
         val numeric = numericSource ?: template?.numeric ?: source
-        for ((id, premise) in source.premises) {
-            if (!spend(1L, 96L + id.length * 2L) || !row(premise.inequality) ||
-                !spend(premise.guards.size.toLong(), premise.guards.size * 48L) ||
-                !premise.integerPins.values.all(::scalar)) return
+        if (shared) {
+            val references = 1L + source.premises.size + numeric.coordinates.size + numeric.objective.size +
+                (if (numeric !== source) numeric.premises.size else 0)
+            if (!spend(references, references * 16L)) return
+        } else {
+            for ((id, premise) in source.premises) {
+                if (!spend(1L, 96L + id.length * 2L) || !row(premise.inequality) ||
+                    !spend(premise.guards.size.toLong(), premise.guards.size * 48L) ||
+                    !premise.integerPins.values.all(::scalar)) return
+            }
+            if (numeric !== source) for (premise in numeric.premises.values) {
+                if (!row(premise.inequality)) return
+            }
+            if (!spend(numeric.coordinates.size.toLong(), numeric.coordinates.size * 48L) ||
+                !numeric.objective.values.all(::scalar) || !scalar(numeric.objectiveConstant)) return
         }
-        if (numeric !== source) for (premise in numeric.premises.values) {
-            if (!row(premise.inequality)) return
-        }
-        if (!spend(numeric.coordinates.size.toLong(), numeric.coordinates.size * 48L) ||
-            !numeric.objective.values.all(::scalar) || !scalar(numeric.objectiveConstant)) return
         val condition = source.scope.condition
         if (!spend(condition.bools.size.toLong(), condition.bools.size * 48L) ||
             !(condition.lower.values + condition.upper.values).all(::scalar)) return
         if (point != null && !point.values.all(::scalar)) return
         val cited = query?.cited.orEmpty()
-        for ((inequality, derivation) in cited) {
+        if (shared) {
+            if (!spend(cited.size.toLong(), cited.size * 16L)) return
+        } else for ((inequality, derivation) in cited) {
             if (!row(inequality) || !proof(derivation)) return
         }
         val candidates = ArrayList<LinearAuthorityCapturedCut>()
@@ -240,7 +251,7 @@ internal class LinearAuthorityCapture(
         for ((id, cut) in definitions.withIndex()) {
             val extraOwners = (cut.owners.size - 1).toLong()
             if (!spend(1L + extraOwners, 128L + extraOwners * 32L) ||
-                !row(cut.inequality) || !proof(cut.derivation)) return
+                !shared && (!row(cut.inequality) || !proof(cut.derivation))) return
             var violation: BigFraction? = null
             if (point != null && cut.inequality.coefficients.keys.all { it in point }) {
                 var activity = BigFraction.ZERO
