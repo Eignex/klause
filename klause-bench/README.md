@@ -3530,6 +3530,15 @@ original columns. Real snapshots without exact values remain unavailable; finite
 domains are never invented by this replay. CP owners consume the exact strict
 working cutoff through `beginExact`, retaining rational equality and direction
 without a floating representability restriction.
+Optional `primalCompletion=true` gives CP owners the original-source point checker
+and its rational objective in working units. An improving primal may accompany
+`Unsupported`; it has no exact completion or cutoff-closure authority. Approximate
+reals retain their declared source qualification and no certified-coordinate label.
+`completionReplay=true` separately records each query's first unresolved leaf and
+replays its unchanged pins through `LeafRealCompletion`. It saves reconstructed
+source rows and point qualifications; diagnostic replay costs are outside the owner
+allowance and reported separately. Owner preparation, search, source checks and
+close costs retain separate records. Control centers still require exact snapshots.
 Reports distinguish completed conditioned optimization from a closed initial
 strict cutoff: an improving point can accompany the former, while only a
 nonimproving working query establishes the latter. Both the working and checked

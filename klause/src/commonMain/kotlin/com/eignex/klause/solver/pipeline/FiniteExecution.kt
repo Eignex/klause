@@ -611,7 +611,7 @@ internal fun FinitePipeline.solve(
                     com.eignex.klause.solver.validation.LinearSourceCheck.Accepted
                 checked?.witness?.objective?.let { value ->
                     val scaled = value * linearSource.view.objectiveScale
-                    if (linearSource.view.source.objective?.sense == com.eignex.klause.ir.ObjectiveSense.MAXIMIZE)
+                    if (linearSource.view.source.objective.sense == com.eignex.klause.ir.ObjectiveSense.MAXIMIZE)
                         scaled.negated() else scaled
                 }
             },

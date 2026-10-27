@@ -13,7 +13,9 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.FinitePipelinePreparation
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
+import com.sun.management.ThreadMXBean
 import java.io.File
+import java.lang.management.ManagementFactory
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
@@ -186,7 +188,7 @@ internal object MpsRepairOwners {
     }
 
     private fun beanAllocation(): Long =
-        (java.lang.management.ManagementFactory.getThreadMXBean() as com.sun.management.ThreadMXBean)
+        (ManagementFactory.getThreadMXBean() as ThreadMXBean)
             .getThreadAllocatedBytes(Thread.currentThread().threadId())
 
     private fun call(owner: Any, name: String, vararg args: Any?): Any? = owner.javaClass.methods
