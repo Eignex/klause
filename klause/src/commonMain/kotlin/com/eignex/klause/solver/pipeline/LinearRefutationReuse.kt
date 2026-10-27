@@ -86,17 +86,21 @@ internal class LinearRefutationReuse(
         if (!resolve) return
         val below = Predicate(coordinate, threshold, true)
         if (below in names) return
-        if (nameBytes + 384L > maximumBytes / 4L) {
+        val aboveValue = threshold + BigFraction.ONE
+        val bits = threshold.num.magnitudeBitLength().toLong() + threshold.den.magnitudeBitLength() +
+            aboveValue.num.magnitudeBitLength() + aboveValue.den.magnitudeBitLength()
+        val bytes = 512L + (bits + 7L) / 8L
+        if (bytes > maximumBytes / 4L - nameBytes) {
             observe("ResolutionNameStops")
             return
         }
-        if (!spend(2L, 384L)) return
-        val above = Predicate(coordinate, threshold + BigFraction.ONE, false)
+        if (!spend(2L, bytes)) return
+        val above = Predicate(coordinate, aboveValue, false)
         names[below] = positive
         names[above] = positive xor 1
         predicates[positive] = below
         predicates[positive xor 1] = above
-        nameBytes += 384L
+        nameBytes += bytes
         while (retainedBytes > maximumBytes - nameBytes) evict()
         peakBytes = maxOf(peakBytes, retainedBytes + nameBytes)
     }
@@ -326,10 +330,12 @@ internal class LinearRefutationReuse(
             val other = entry.clause ?: continue
             if (entry === added || entry.depth >= 32 || added.nodes + entry.nodes + 3 > 4096) continue
             for (pivot in clause) {
-                if (!spend(1L + clause.size + other.size, 64L + 16L * (clause.size + other.size))) return
+                if (!spend(1L + other.size)) return
                 val bound = predicates[pivot xor 1] ?: continue
                 if (pivot xor 1 !in other) continue
                 observe("ResolutionCandidates")
+                if (!spend(clause.size.toLong() + other.size,
+                        256L * (clause.size + other.size + added.restrictions + entry.restrictions))) return
                 val resolved = resolveSearchClauses(clause, other, pivot) ?: continue
                 val required = condition(resolved)
                 if (required in scopes) continue
