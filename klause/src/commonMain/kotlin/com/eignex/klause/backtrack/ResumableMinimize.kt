@@ -73,6 +73,7 @@ import com.eignex.klause.solver.search.SearchTraversalPolicy
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.solver.search.completedSearchSample
 import com.eignex.klause.solver.validation.composedFixpoint
+import com.eignex.klause.solver.validation.FiniteSourceAcceptance
 import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.solver.withSourceSemantics
 import com.eignex.klause.util.Cancellation
@@ -269,8 +270,10 @@ internal class ResumableMinimize(
         return checkedLeafResult(sample, result)
     }
 
-    private fun completionToleranceCheck(): ((Sample) -> Boolean)? =
-        if (exactObjectiveBoundSupplier?.invoke() != null) null else params.toleranceCheck
+    private fun completionToleranceCheck(): ((Sample) -> Boolean)? {
+        val check = params.toleranceCheck ?: return null
+        return if (exactObjectiveBoundSupplier?.invoke() != null) FiniteSourceAcceptance(check, false) else check
+    }
 
     private fun realLeafOwner(): LeafRealSolver = leafSolver ?: LeafRealSolver(
         problem, objective, params.lpPlan.componentSplit, sink.lp, solver.lpSolveContext,
