@@ -18,7 +18,8 @@ internal fun corpusMirrorPublication(
     sha: ByteArray,
     fallback: URI,
 ): MirrorPublication = corpusTransport {
-    val signer = System.getenv("KLAUSE_BENCH_CORPUS_SIGNER") ?: return@corpusTransport MirrorPublication(fallback.toString())
+    val signer = System.getenv("KLAUSE_BENCH_CORPUS_SIGNER")
+        ?: return@corpusTransport MirrorPublication(fallback.toString())
     val uri = URI(signer)
     require(uri.scheme == "http" && uri.host in setOf("127.0.0.1", "localhost", "::1") && uri.userInfo == null)
     val checksum = HexFormat.of().formatHex(sha)
