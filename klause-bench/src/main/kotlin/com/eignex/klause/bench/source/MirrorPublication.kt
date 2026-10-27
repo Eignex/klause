@@ -3,6 +3,7 @@ package com.eignex.klause.bench.source
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URI
+import java.util.HexFormat
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -16,7 +17,7 @@ internal fun corpusMirrorPublication(id: String, sha: ByteArray, fallback: URI):
     val signer = System.getenv("KLAUSE_BENCH_CORPUS_SIGNER") ?: return MirrorPublication(fallback.toString())
     val uri = URI(signer)
     require(uri.scheme == "http" && uri.host in setOf("127.0.0.1", "localhost", "::1") && uri.userInfo == null)
-    val checksum = sha.joinToString("") { "%02x".format(it) }
+    val checksum = HexFormat.of().formatHex(sha)
     val signature = MirrorSignature("PUT", "corpus-packs/$id.tar", checksum)
     val body = Json.encodeToString(MirrorSignature.serializer(), signature).toByteArray()
     val connection = uri.toURL().openConnection() as HttpURLConnection
