@@ -85,7 +85,8 @@ class LinearAuthorityInvocationTest {
 
             val baseline = LinearAuthorityInvocation(source, params, boundOrdered = true,
                 onNumericalFeedback = baselineObserver.takeIf { recordFeedback }).use { it.run { _, _ -> } }
-            val reused = LinearAuthorityInvocation(source, params.copy(sourceRefutationReuse = true),
+            val reused = LinearAuthorityInvocation(source, params.copy(sourceRefutationReuse = true,
+                sourceRefutationPropagation = recordFeedback),
                 boundOrdered = true, onNumericalFeedback = reusedObserver.takeIf { recordFeedback }).use {
                 it.run { _, _ -> }
             }
@@ -99,6 +100,7 @@ class LinearAuthorityInvocationTest {
             assertTrue(stages.getValue("numericalAvoidedQueries") > 0L)
             assertTrue(reused.stats.smt.sourceLp.operations < baseline.stats.smt.sourceLp.operations)
             assertEquals(0L, stages["numericalPendingLeaves"])
+            if (recordFeedback) assertTrue(stages.getValue("numericalRefutationUnitDeductions") > 0L)
             if (recordFeedback) assertTrue(reusedFeedback < baselineFeedback)
         }
     }

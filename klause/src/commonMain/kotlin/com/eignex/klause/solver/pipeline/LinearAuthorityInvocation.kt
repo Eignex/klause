@@ -22,6 +22,7 @@ import com.eignex.klause.solver.search.BooleanBranching
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.HeuristicBooleanBranching
 import com.eignex.klause.solver.search.SearchComponentSet
+import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchFrontierRun
 import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchSolveParams
@@ -98,10 +99,14 @@ internal class LinearAuthorityInvocation(
         useGuidance = boundOrdered || guidance || supportBranching || onNumericalFeedback != null,
         inheritBounds = boundOrdered, useCuts = cuts,
         useActiveRows = activeRows, useRefutationReuse = params.sourceRefutationReuse,
+        useRefutationPropagation = params.sourceRefutationPropagation,
         useSupportBranching = supportBranching,
         pointCuts = boundOrdered && params.sourcePointCuts, onNumericalFeedback = onNumericalFeedback,
         aggregateCuts = boundOrdered && params.sourceAggregateCuts)
-    private val session = SearchComponentSet(listOf(component)).session(params.maxLeaves, stop).also {
+    private val session = SearchComponentSet(listOf(component)).session(params.maxLeaves, stop,
+        atoms = if (params.sourceRefutationPropagation) SearchAtomRegistry(context.coordinates.filter {
+            it.kind == com.eignex.klause.solver.evidence.SourceCoordinate.Kind.Boolean
+        }.maxOfOrNull { it.id + 1 } ?: 0) else null).also {
         it.bindOpenTheoryWork(state.work)
     }
     private var initialized = false

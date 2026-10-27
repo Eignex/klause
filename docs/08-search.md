@@ -62,6 +62,14 @@ partial points supply no model or bound, so complete queries remain required.
 Preparation, numerical work and source checking
 share the containing cumulative source LP allowances.
 
+Opt-in numerical refutation propagation names integer alternatives with source-bound
+atoms. At a Boolean-complete prefix, one missing integral restriction in a retained
+checked refutation can imply its adjacent complement. The shared trail retains a
+clause reason over the established prefix facts; an unnamed premise declines the
+deduction. The coverage tree retains the excluded sibling's checked refutation
+alongside the surviving branch. Retraction removes the implication, and replay
+restores it only after its named antecedents hold again.
+
 A model policy can pause required completion with `SearchModelDisposition.Pause`.
 The run retains the assembled model and its decision trail, and retries that policy
 before node pruning, branching or complete checks. Pausing neither blocks the model

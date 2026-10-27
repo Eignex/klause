@@ -109,6 +109,8 @@ data class TheoryParams(
     val sourceAggregateCuts: Boolean = false,
     /** Reuse checked refutations within one numerical traversal under their proved source restrictions. */
     val sourceRefutationReuse: Boolean = false,
+    /** Imply integral source bounds from checked refutations at unit prefixes in numerical traversal. */
+    val sourceRefutationPropagation: Boolean = false,
 ) {
     init {
         require(sourceLpWorkLimit >= 0 && sourceLpAllocationLimit >= 0 && sourceLpOperations >= 0)

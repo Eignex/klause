@@ -29,6 +29,10 @@ invocation restrictions and complete Boolean substitution remain present. Implie
 integer activation bounds can require restrictions absent from the explicit proof
 support, so an unsuccessful reduction retains only the checked original scope.
 Each compatible import is rechecked before it closes a leaf.
+Unit-prefix reuse checks the import with its one missing integral source bound
+asserted. Its exact integer complement is then justified relative to the established
+prefix and opening restrictions. Both integer alternatives remain in the source
+derivation; the implied literal alone supplies no coverage.
 
 `Problem.sourceProofContext` binds the original IR's declared bounds and rows.
 Guarded premises keep their Boolean pins and integer indicator equalities; open

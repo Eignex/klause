@@ -14,6 +14,7 @@ import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.magnitudeBitLength
 
 internal class LinearRefutationReuse(
@@ -24,6 +25,12 @@ internal class LinearRefutationReuse(
     private val maximumBytes: Long = 1_048_576L,
     maximumAllocation: Long = 67_108_864L,
 ) {
+    class UnitExclusion(
+        val coordinate: SourceCoordinate,
+        val threshold: BigFraction,
+        val upper: Boolean,
+        val evidence: SourceEvidence,
+    )
     private data class Side(val coordinate: SourceCoordinate, val upper: Boolean)
     private class Entry(val evidence: SourceEvidence, val anchor: Side?, val bytes: Long, val restrictions: Long)
     private class Support {
@@ -255,6 +262,51 @@ internal class LinearRefutationReuse(
                     return imported
                 }
                 is SourceEvidenceCheck.Rejected -> observe("Rejected")
+                is SourceEvidenceCheck.Unavailable -> {
+                    observe("Unavailable")
+                    if (retired || cancellation() || budget.funding?.paused == true || proofPolls > 100_000) return null
+                }
+            }
+        }
+        return null
+    }
+
+    fun unit(condition: SourceCondition): UnitExclusion? {
+        if (retired || entries.isEmpty() || cancellation() || budget.funding?.paused == true) return null
+        proofPolls = 0
+        observe("UnitLookups")
+        val lower = condition.lower
+        val upper = condition.upper
+        val bools = condition.bools
+        if (!spend(1L + lower.size + upper.size + bools.size, 48L * (lower.size + upper.size + bools.size)) ||
+            !condition.implies(source.scope.condition) || !(lower.values + upper.values).all(::admitted)) return null
+        for (entry in entries.values) {
+            if (!spend(1L + entry.restrictions, 96L * entry.restrictions)) return null
+            val required = entry.evidence.scope.condition
+            if (!required.bools.all { (id, value) -> bools[id] == value }) continue
+            val missing = required.lower.filter { (id, value) -> lower[id]?.let { it >= value } != true }
+                .map { Triple(it.key, it.value, false) } +
+                required.upper.filter { (id, value) -> upper[id]?.let { it <= value } != true }
+                    .map { Triple(it.key, it.value, true) }
+            if (missing.size != 1) continue
+            val (coordinate, value, isUpper) = missing.single()
+            if (coordinate.kind != SourceCoordinate.Kind.Integer || value.den != BIG_ONE) continue
+            val threshold = if (isUpper) value else value - BigFraction.ONE
+            val complement = if (isUpper) value + BigFraction.ONE else threshold
+            if (!admitted(threshold) || !admitted(complement)) continue
+            val opposite = if (isUpper) lower[coordinate] else upper[coordinate]
+            if (opposite != null && if (isUpper) opposite >= complement else opposite <= complement) continue
+            observe("UnitCandidates")
+            val scoped = condition.bound(coordinate, value, isUpper)
+            val imported = SourceEvidence(source.scope.copy(condition = scoped), SourceClaim.Refutation,
+                SourceDerivation.Import(entry.evidence))
+            when (verify(imported)) {
+                SourceEvidenceCheck.Checked -> {
+                    if (retired || cancellation() || budget.funding?.paused == true) return null
+                    observe("UnitChecks")
+                    return UnitExclusion(coordinate, threshold, isUpper, imported)
+                }
+                is SourceEvidenceCheck.Rejected -> observe("UnitRejected")
                 is SourceEvidenceCheck.Unavailable -> {
                     observe("Unavailable")
                     if (retired || cancellation() || budget.funding?.paused == true || proofPolls > 100_000) return null

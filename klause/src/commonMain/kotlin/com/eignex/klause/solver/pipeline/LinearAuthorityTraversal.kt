@@ -33,6 +33,13 @@ import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchNodeDisposition
 import com.eignex.klause.solver.search.SearchNodePolicy
 import com.eignex.klause.solver.search.SearchTheoryDecision
+import com.eignex.klause.solver.search.RegisteredTheoryDecision
+import com.eignex.klause.solver.search.SearchAtomPremise
+import com.eignex.klause.solver.search.SearchIntValue
+import com.eignex.klause.solver.search.SourceBoundAtom
+import com.eignex.klause.solver.search.SourceBoundPredicate
+import com.eignex.klause.solver.search.SourceBoundTerm
+import com.eignex.klause.solver.search.explainAtoms
 import com.eignex.klause.util.Cancellation
 
 internal class LinearAuthorityTraversal(
@@ -49,6 +56,7 @@ internal class LinearAuthorityTraversal(
     private val useCuts: Boolean = true,
     useActiveRows: Boolean = false,
     useRefutationReuse: Boolean = false,
+    private val useRefutationPropagation: Boolean = false,
     useSupportBranching: Boolean = false,
     private val pointCuts: Boolean = false,
     private val onNumericalFeedback: ((SourceNumericalFeedbackResult) -> Unit)? = null,
@@ -72,7 +80,8 @@ internal class LinearAuthorityTraversal(
     }, retainLp = true, aggregateCuts = aggregateCuts)
     private val initialCutObservations = authority.cutObservations()
     private val activeRows = if (useActiveRows) LinearActiveRows(source, budget) else null
-    private val refutations = if (useRefutationReuse) LinearRefutationReuse(source, budget, cancellation) else null
+    private val refutations = if (useRefutationReuse || useRefutationPropagation)
+        LinearRefutationReuse(source, budget, cancellation) else null
     private val feedback = if (useSupportBranching || onNumericalFeedback != null) {
         SourceNumericalFeedback(requireNotNull(budget.funding), cancellation).also { it.attach(authority) }
     } else null
@@ -176,6 +185,10 @@ internal class LinearAuthorityTraversal(
         val child = when (decision) {
             is SearchDecision.Bool -> {
                 val id = Lit.variable(decision.literal)
+                if (source.coordinates.none { it.kind == SourceCoordinate.Kind.Boolean && it.id == id }) {
+                    return ComponentResult.Consistent
+                }
+                if (current.condition.bools[id] == Lit.isPositive(decision.literal)) return ComponentResult.Consistent
                 val split = current.split ?: CoverageSplit.Boolean(id, current.condition).also {
                     current.split = it
                     splitCreated()
@@ -184,15 +197,98 @@ internal class LinearAuthorityTraversal(
                 if (Lit.isPositive(decision.literal)) split.above else split.below
             }
             is SearchDecision.Theory -> {
-                val bound = decision.decision as? IntegerAlternative ?: return ComponentResult.Indeterminate
+                val registered = decision.decision as? RegisteredTheoryDecision
+                val atom = (registered?.payload as? SourceBoundPredicate)?.sourceBound
+                val bound = if (atom != null) {
+                    if (context.atomLiteral(decision) == null || atom.strict) return ComponentResult.Indeterminate
+                    val term = atom.terms.singleOrNull() ?: return ComponentResult.Indeterminate
+                    val integer = term.source as? SearchIntValue ?: return ComponentResult.Indeterminate
+                    if (term.coefficient != BigFraction.ONE) return ComponentResult.Indeterminate
+                    val coordinate = SourceCoordinate(SourceCoordinate.Kind.Integer, integer.variable)
+                    if (coordinate !in source.coordinates) return ComponentResult.Indeterminate
+                    if (current.condition.implies(SourceCondition().bound(coordinate, atom.threshold, atom.upper))) {
+                        return ComponentResult.Consistent
+                    }
+                    IntegerAlternative(coordinate,
+                        if (atom.upper) atom.threshold else atom.threshold - BigFraction.ONE, atom.upper)
+                } else decision.decision as? IntegerAlternative ?: return ComponentResult.Indeterminate
                 val split = current.split as? CoverageSplit.Integer ?: return ComponentResult.Indeterminate
                 check(split.coordinate == bound.coordinate && split.threshold == bound.threshold)
                 if (bound.upper) split.below else split.above
             }
             else -> return ComponentResult.Indeterminate
         }
+        child.assertion = decision
         path += context.decisionLevel to child
         return ComponentResult.Consistent
+    }
+
+    override fun propagate(context: SearchContext): ComponentResult {
+        if (!useRefutationPropagation) return ComponentResult.Consistent
+        while (!cancellation() && !pause()) {
+            val node = current
+            val replay = node.unit
+            if (replay != null) {
+                if (!applyUnit(context, replay)) return ComponentResult.Indeterminate
+                observe("numericalRefutationUnitReplays")
+                continue
+            }
+            if (node.pending || node.result != null || node.split != null ||
+                source.coordinates.any { it.kind == SourceCoordinate.Kind.Boolean && context.boolValue(it.id) == null }
+            ) break
+            val exclusion = refutations?.unit(node.condition) ?: break
+            val atom = integerAtom(context, exclusion.coordinate, exclusion.threshold) ?: break
+            val survivor = if (exclusion.upper) atom.negative else atom.positive
+            if (context.boolValue(survivor.literal ushr 1) != null) break
+            val explanation = unitExplanation(context, survivor) ?: break
+            val split = CoverageSplit.Integer(exclusion.coordinate, exclusion.threshold, node.condition)
+            val rejected = if (exclusion.upper) split.below else split.above
+            rejected.result = LinearAuthorityResult(evidence = exclusion.evidence)
+            node.split = split
+            node.unit = survivor
+            splitCreated()
+            pending--
+            observe("numericalClosedLeaves")
+            observe("numericalRefutationUnitDeductions")
+            val child = if (exclusion.upper) split.above else split.below
+            child.assertion = SearchDecision.Theory(survivor)
+            path += context.decisionLevel to child
+            val result = context.imply(survivor.literal, explanation)
+            if (result !is ComponentResult.Consistent) return result
+        }
+        return ComponentResult.Consistent
+    }
+
+    private fun unitExplanation(context: SearchContext, conclusion: RegisteredTheoryDecision):
+        com.eignex.klause.solver.search.SearchExplanation? {
+        if (path.size > 4096 || cancellation() || budget.funding?.paused == true) return null
+        budget.observe(conflictCertification = 1L + path.size)
+        budget.funding?.charge(0L, 256L + 64L * path.size)
+        if (cancellation() || budget.funding?.paused == true) return null
+        return context.explainAtoms(
+            SearchAtomPremise.All(path.mapNotNull { it.second.assertion }.map { SearchAtomPremise.Asserted(it) }),
+            SearchDecision.Theory(conclusion),
+        )
+    }
+
+    private fun integerAtom(context: SearchContext, coordinate: SourceCoordinate, threshold: BigFraction):
+        com.eignex.klause.solver.search.SearchTheoryAtom? {
+        if (cancellation() || budget.funding?.paused == true) return null
+        budget.observe(conflictCertification = 1L)
+        budget.funding?.charge(0L, 384L)
+        if (cancellation() || budget.funding?.paused == true) return null
+        return SourceBoundAtom.integerSplit(context,
+            listOf(SourceBoundTerm(SearchIntValue(coordinate.id), BigFraction.ONE)), threshold)
+    }
+
+    private fun applyUnit(context: SearchContext, survivor: RegisteredTheoryDecision): Boolean {
+        val explanation = unitExplanation(context, survivor) ?: return false
+        val split = current.split as? CoverageSplit.Integer ?: return false
+        val atom = (survivor.payload as? SourceBoundPredicate)?.sourceBound ?: return false
+        val child = if (atom.upper) split.below else split.above
+        child.assertion = SearchDecision.Theory(survivor)
+        path += context.decisionLevel to child
+        return context.imply(survivor.literal, explanation) is ComponentResult.Consistent
     }
 
     override fun retract(decisionLevel: Int) {
@@ -371,6 +467,9 @@ internal class LinearAuthorityTraversal(
 
     override fun nextBranch(context: SearchContext): List<SearchDecision>? {
         val split = current.split as? CoverageSplit.Integer ?: return null
+        if (useRefutationPropagation) {
+            return integerAtom(context, split.coordinate, split.threshold)?.alternatives()
+        }
         return listOf(true, false).map {
             SearchDecision.Theory(IntegerAlternative(split.coordinate, split.threshold, it))
         }
@@ -450,6 +549,8 @@ private data class IntegerAlternative(
 ) : SearchTheoryDecision
 
 private class CoverageNode(val condition: SourceCondition) {
+    var assertion: SearchDecision? = null
+    var unit: RegisteredTheoryDecision? = null
     var split: CoverageSplit? = null
     var result: LinearAuthorityResult? = null
     var coveredBound: SourceEvidence? = null
