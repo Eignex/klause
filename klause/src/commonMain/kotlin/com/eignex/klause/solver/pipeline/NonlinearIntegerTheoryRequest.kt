@@ -60,9 +60,9 @@ data class NonlinearIntegerTheoryParams(
     /** Containing decision/move allowance, shared across every strategy. */
     val nodeBudget: NodeBudget? = null,
     /** Enable bounded checked univariate cell production in polynomial completions. */
-    val cellRefinement: Boolean = false,
+    val cellRefinement: Boolean = true,
     /** Filter fixed integer tuples using checked mandatory cells of the original source. */
-    val reuseSourceCells: Boolean = false,
+    val reuseSourceCells: Boolean = true,
     /** Alternate ordinary traversal with nearest unvisited tuples outside checked source cells. */
     val steerSourceCells: Boolean = false,
 ) {
