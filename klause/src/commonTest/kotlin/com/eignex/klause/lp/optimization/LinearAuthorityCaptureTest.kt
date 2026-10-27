@@ -344,6 +344,25 @@ class LinearAuthorityCaptureTest {
     }
 
     @Test
+    fun `queries after an archive allowance overflow should be delivery-only`() {
+        val bounded = source.atScope(scope.copy(condition = SourceCondition(lower = mapOf(x to BigFraction.ZERO),
+            upper = mapOf(x to BigFraction.ONE))))
+        val single = LinearAuthorityCapture(1, 10_000L, 1_000_000L, Cancellation.Never).apply {
+            record(source, null, null, null, LinearAuthorityResult())
+        }.bytes
+        val capture = LinearAuthorityCapture(64, 10_000L, 2 * single + 1, Cancellation.Never).apply {
+            deliver(10_000L, 1_000_000L, installed)
+        }
+
+        for (context in listOf(source, bounded, source)) {
+            capture.record(context, null, null, null, LinearAuthorityResult())
+        }
+
+        assertEquals(1, capture.records.size)
+        assertEquals(installed, assertNotNull(capture.delivered).projection)
+    }
+
+    @Test
     fun `on-demand evaluation should debit the cumulative construction ledger`() {
         val capture = LinearAuthorityCapture(0, 0L, 0L, Cancellation.Never).apply {
             deliver(10_000L, 1_000_000L, installed)

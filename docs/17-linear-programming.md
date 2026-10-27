@@ -413,8 +413,9 @@ authority. Construction, replacement, retention and scoring debit the containing
 source LP funding cumulatively; evicting a delivered query neither refunds that
 ledger nor issues another LP solve. The archive retains at most 64 records, 250,000
 entries and 8 MiB modeled storage, and a delivered query has the same entry and
-byte allowance on its own. Archived records are charged for copies of the source
-rows, cut definitions and cited derivations they reference. Once the archive stops, a
+byte allowance on its own. The archive is a prefix: once a record or allowance fills
+it, every later query is constructed for delivery alone. Archived records are charged
+for copies of the source rows, cut definitions and cited derivations they reference. Once the archive stops, a
 delivered record keeps only references to those immutable structures, which the
 authority prepared and still holds. A full delivered record is charged per referenced
 row, coordinate and objective entry, for its scope, point, cut violations and checked
