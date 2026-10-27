@@ -100,6 +100,7 @@ internal class LinearAuthorityCapture(
     var constructedBytes: Long = 0L
         private set
     private var limitReached = false
+    private var archiveClosed = false
     val limited: Boolean get() = limitReached || attempted > retained.size
     private val archiving: Boolean get() = retained.size < maximumRecords && entries < maximumEntries &&
         bytes < maximumBytes
@@ -163,8 +164,9 @@ internal class LinearAuthorityCapture(
     private fun begin() {
         if (inProgress) return
         inProgress = true
-        // A full archive is known before construction, so a delivery-only query never spends archive allowance.
-        archive = retained.size < maximumRecords
+        // The archive is a prefix: once a record or allowance fills it, later queries are constructed for delivery
+        // alone and never start as archive copies.
+        archive = retained.size < maximumRecords && !archiveClosed
         live = delivering
         liveEntries = 0L
         liveBytes = 0L
@@ -183,6 +185,7 @@ internal class LinearAuthorityCapture(
         }
         if (archive && (count > maximumEntries - entries || allocation > maximumBytes - bytes)) {
             limitReached = true
+            archiveClosed = true
             archive = false
         }
         if (live && (count > deliveryEntries - liveEntries || allocation > deliveryBytes - liveBytes)) {
@@ -217,10 +220,12 @@ internal class LinearAuthorityCapture(
             return null
         }
         val archiving = archive
+        val closed = archiveClosed
         if (values.size != coordinates.size || !spend(values.size.toLong(), values.size * 48L) ||
             !values.all(::scalar)) {
             // An archived record omits a point it cannot afford; delivery reports the oversized query instead.
             archive = archiving
+            archiveClosed = closed
             return null
         }
         return coordinates.indices.associate { coordinates[it] to values[it] }
