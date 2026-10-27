@@ -5358,6 +5358,38 @@ certified bounds, nine closed leaves and 19 pending leaves, spending 458,587 fun
 work and 333,968 modeled bytes. These diagnostic results do not replace ordinary
 held-out qualification.
 
+[Ordinary comparison 8583](https://lab.eignex.com/jobs/8583), at `3a13972fcf`,
+completes 128 ten-second P1 cases: eight arms over eight frozen sources, seeds 1/3
+and default/exact policies. The development sources are rgn, p0033 and pp08aCUTS;
+bell3a, egout, gr4x6, modglob and enigma are held out. Library JAR hashes match
+throughout. Each source/seed block shares a host, launcher and runtime; blocks span
+Linux/amd64 and macOS/ARM. Supported retries preserve all accepted records.
+All 128 whole-CLI resource receipts are available. Of 56 reported witnesses, 54
+pass source validation; two exact modglob controls remain unsupported because
+the decimal-only checker cannot represent their rational values. The 36 native
+optimality claims have no independent proof check.
+
+All p0033 arms retain source-checked objective 3089 and native optimality. Both
+seeds and policies reproduce these numerical ledger costs and coverage counts:
+
+| Separation | Funded work | Modeled bytes | Checks | Closed leaves |
+|---|---:|---:|---:|---:|
+| Selected | 29,965,732 | 14,597,628 | 2,149 | 1,115 |
+| All cuts | 27,600,734 | 5,118,124 | 1,995 | 1,026 |
+| Disabled | 24,599,726 | 5,207,348 | 2,081 | 1,062 |
+
+Rgn selection installs no cuts and closes 101–103 leaves versus 79–82 with all
+cuts and 129 with separation disabled. It uses 65–68% of all-cut funded work
+with 20.4–21.0 times its modeled allocation. On seed 1/default, whole-CLI peak RSS
+is 172,996 versus 175,940 KiB and wall time is 10.31 s for both selected/all arms.
+Pp08aCUTS selection adds 9.9–10.1 times the all-cut modeled allocation without
+a witness or proof gain. No held-out source retains any candidate cuts. Gr4x6
+retains objective 202.35 and native optimality in every arm; automatic defaults
+also retain incumbents on the other sources and prove enigma's objective zero,
+where the fixed-frontier arms remain unknown. Wall-cutoff frontier differences
+without changed masks establish no selection efficacy. The mechanism remains
+opt-in; these observations support neither default promotion nor a throughput claim.
+
 #### Source numerical decision feedback
 
 `MpsProofFrontier supportBranching=true` enables an internal decision consumer of the
