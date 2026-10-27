@@ -110,10 +110,12 @@ internal object MpsRepairOwners {
                             var fixed = BigFraction.ZERO
                             val continuous = ArrayList<JsonObject>()
                             for (term in row.terms) {
-                                val coefficient = BigFraction.of(term.coefficient.numerator, term.coefficient.denominator)
+                                val coefficient = BigFraction.of(term.coefficient.numerator,
+                                    term.coefficient.denominator)
                                 val column = columns[term.column]
                                 if (Term.isInt(column)) {
-                                    fixed += coefficient * BigFraction.of(sample.exactIntValue(Term.intVar(column)), BIG_ONE)
+                                    fixed += coefficient * BigFraction.of(
+                                        sample.exactIntValue(Term.intVar(column)), BIG_ONE)
                                 } else continuous += buildJsonObject {
                                     put("name", source.variables[term.column].name)
                                     put("workingReal", Term.realVar(column))
@@ -123,12 +125,17 @@ internal object MpsRepairOwners {
                             buildJsonObject {
                                 put("row", index)
                                 put("fixedContribution", fixed.toString())
-                                put("lower", row.lower?.let { (BigFraction.of(it.numerator, it.denominator) - fixed).toString() })
-                                put("upper", row.upper?.let { (BigFraction.of(it.numerator, it.denominator) - fixed).toString() })
+                                put("lower", row.lower?.let {
+                                    (BigFraction.of(it.numerator, it.denominator) - fixed).toString()
+                                })
+                                put("upper", row.upper?.let {
+                                    (BigFraction.of(it.numerator, it.denominator) - fixed).toString()
+                                })
                                 put("continuous", JsonArray(continuous))
                             }
                         }))
                         put("floatSourceAccepted", original != null)
+                        put("exactCompletionUnresolved", true)
                         put("floatSourceExactlyFeasible", original?.exact)
                         put("floatSourceObjective", original?.objective?.toString())
                         put("completion", result?.javaClass?.simpleName)
