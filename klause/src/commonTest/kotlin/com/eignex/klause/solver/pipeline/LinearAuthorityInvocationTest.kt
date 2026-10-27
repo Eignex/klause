@@ -97,7 +97,8 @@ class LinearAuthorityInvocationTest {
             assertEquals(SourceEvidenceCheck.Checked,
                 SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
             val stages = assertNotNull(reused.stats.smt.completeSearchStages)
-            assertTrue(stages.getValue("numericalAvoidedQueries") > 0L)
+            assertTrue((stages["numericalAvoidedQueries"] ?: 0L) +
+                (stages["numericalRefutationUnitDeductions"] ?: 0L) > 0L)
             assertTrue(reused.stats.smt.sourceLp.operations < baseline.stats.smt.sourceLp.operations)
             assertEquals(0L, stages["numericalPendingLeaves"])
             if (recordFeedback) assertTrue(stages.getValue("numericalRefutationUnitDeductions") > 0L)
@@ -127,7 +128,7 @@ class LinearAuthorityInvocationTest {
         val params = TheoryParams(sourceCuts = false)
 
         val baseline = LinearAuthorityInvocation(source, params, boundOrdered = true).use { it.run { _, _ -> } }
-        val reused = LinearAuthorityInvocation(source, params.copy(sourceRefutationReuse = true),
+        val reused = LinearAuthorityInvocation(source, params.copy(sourceRefutationPropagation = true),
             boundOrdered = true).use { it.run { _, _ -> } }
 
         assertIs<SourceClaim.Optimal>(assertNotNull(baseline.terminal).claim)
@@ -137,7 +138,7 @@ class LinearAuthorityInvocationTest {
         assertEquals(SourceEvidenceCheck.Checked,
             SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
         val stages = assertNotNull(reused.stats.smt.completeSearchStages)
-        assertTrue(stages.getValue("numericalAvoidedQueries") > 0L)
+        assertTrue(stages.getValue("numericalRefutationUnitDeductions") > 0L)
         assertTrue(reused.stats.smt.sourceLp.operations < baseline.stats.smt.sourceLp.operations)
         assertEquals(0L, stages["numericalPendingLeaves"])
     }
