@@ -12,8 +12,8 @@ import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
-/** Raised when a schema JSON document is malformed or uses an unknown field. */
-class JsonFormatException(msg: String, cause: Throwable? = null) : FormatException("JSON", msg, cause)
+/** Raised when a schema or problem JSON document is malformed or uses an unknown field. */
+open class JsonFormatException(msg: String, cause: Throwable? = null) : FormatException("JSON", msg, cause)
 
 /** Schema JSON parser for `{"entries": {name: entry}}` documents in the [ModelJson] format. */
 object JsonSchema {

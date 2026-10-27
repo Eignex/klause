@@ -94,6 +94,9 @@ internal class RunsDomain(
         return ans
     }
 
+    /** The flattened `lo,hi` run list, copied. */
+    fun copyRuns(): LongArray = runs.copyOf()
+
     override fun contains(value: Long): Boolean = value in min..max && runIndexContaining(value) >= 0
 
     // The interface defaults binary-search positions in `0 until size`; on a saturated count that
