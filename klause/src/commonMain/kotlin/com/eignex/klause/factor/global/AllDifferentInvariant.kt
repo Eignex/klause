@@ -433,13 +433,14 @@ internal class AllDifferentInvariant(
             val (a, b, c) = paths[i]
             val va = movable[a]
             val vb = movable[b]
-            sink.addCompound(if (c < 0) {
-                listOf(Move.IntSet(va, state.assignment.intValue(vb)), Move.IntSet(vb, exits[b]))
+            val first = Move.IntSet(va, state.assignment.intValue(vb))
+            if (c < 0) {
+                sink.addCompound(listOf(first, Move.IntSet(vb, exits[b])))
             } else {
                 val vc = movable[c]
-                listOf(Move.IntSet(va, state.assignment.intValue(vb)),
-                    Move.IntSet(vb, state.assignment.intValue(vc)), Move.IntSet(vc, exits[c]))
-            })
+                val second = Move.IntSet(vb, state.assignment.intValue(vc))
+                sink.addCompound(listOf(first, second, Move.IntSet(vc, exits[c])))
+            }
         }
     }
 
