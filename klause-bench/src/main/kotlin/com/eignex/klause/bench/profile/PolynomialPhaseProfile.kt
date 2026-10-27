@@ -59,9 +59,9 @@ internal object PolynomialPhaseProfile {
         require(!feedback || options["refinement"] == "true")
         val refine = options["refinement"] != null
         val capture = options["capture"] != null
-        require(options["coupled"] == null || options["coupled"] in setOf("true", "both"))
+        require(options["coupled"] == null || options["coupled"] in setOf("true", "both", "matrix"))
         val coupled = options["coupled"] != null
-        require(options["coupled"] != "both" ||
+        require(options["coupled"] !in setOf("both", "matrix") ||
             listOf("refinement", "feedback", "capture").none { options[it] == "both" })
         val maximumWork = options["maximumWork"]?.toLong()?.also { require(it >= 0) }
         val preparedMode = options["prepared"] == "true"
@@ -136,10 +136,21 @@ internal object PolynomialPhaseProfile {
                         refinement = refine, feedback = feedback, coupled = coupled)),
                 )
             }
-            if (options["coupled"] == "both") {
+            if (options["coupled"] in setOf("both", "matrix")) {
                 directory.resolve("coupled-control-trace.json").writeText(Json.encodeToString(
                     access.measure(text, maximumWork, timeoutMs, prepared = preparedMode, capture = capture,
                         fixedIntegers = source.fixedIntegers, refinement = refine, feedback = feedback)))
+            }
+            if (options["coupled"] == "matrix") {
+                for ((name, preparation, joint) in listOf(
+                    Triple("single", false, false), Triple("prepared-support", true, false),
+                    Triple("joint", false, true),
+                )) {
+                    directory.resolve("$name-trace.json").writeText(Json.encodeToString(
+                        access.measure(text, maximumWork, timeoutMs, prepared = preparedMode, capture = capture,
+                            fixedIntegers = source.fixedIntegers, refinement = refine, feedback = feedback,
+                            coupled = true, coupledPreparation = preparation, coupledJoint = joint)))
+                }
             }
             if (options["refinement"] == "both") {
                 directory.resolve("control-trace.json").writeText(Json.encodeToString(
@@ -308,7 +319,8 @@ internal object PolynomialPhaseProfile {
             Int::class.javaPrimitiveType, paramsType, conditionType,
         )
         private val params = paramsType.getConstructor(Cancellation::class.java, Long::class.javaObjectType, limitsType,
-            Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType)
+            Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType,
+            Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType)
         private val coupledStats = queryType.getMethod("getCoupledStats")
         private val coupledObserver = queryType.methods.single { it.name == "setCoupledConflictObserver" }
         private val condition = conditionType.getConstructor(Map::class.java, Map::class.java, Map::class.java)
@@ -376,6 +388,8 @@ internal object PolynomialPhaseProfile {
             refinement: Boolean = false,
             feedback: Boolean = false,
             coupled: Boolean = false,
+            coupledPreparation: Boolean = true,
+            coupledJoint: Boolean = true,
         ): PhaseTrace {
             require(!feedback || refinement)
             val clock = Cancellation.after(timeoutMs.milliseconds)
@@ -442,7 +456,7 @@ internal object PolynomialPhaseProfile {
             val queryStart = System.nanoTime()
             val owner = query.newInstance(original, source.second, source.third,
                 params.newInstance(token, maximumWork, limitsType.getConstructor().newInstance(), refinement, feedback,
-                    coupled),
+                    coupled, coupledPreparation, coupledJoint),
                 condition.newInstance(emptyMap<Int, Boolean>(), fixed, fixed))
             val captured = if (capture) captureType.getConstructor().newInstance().also { setCapture.invoke(owner, it) }
                 else null

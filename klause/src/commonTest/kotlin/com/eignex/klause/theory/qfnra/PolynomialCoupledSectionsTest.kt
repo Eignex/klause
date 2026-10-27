@@ -15,6 +15,63 @@ import kotlin.test.assertTrue
 
 class PolynomialCoupledSectionsTest {
     @Test
+    fun `joint root choices refute an inconsistent cycle that each predicate satisfies`() {
+        for (closing in listOf(-1, 1)) {
+            val source = SmtLibPolynomial.parse("(declare-const x Real) (declare-const y Real) " +
+                "(declare-const z Real) (assert (and (= (* x x) 1) (= (* y y) 1) (= (* z z) 1) " +
+                "(= (* x y) 1) (= (* y z) 1) (= (* x z) $closing)))")
+            val required = assertNotNull(PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+                .forcedAtoms(PolynomialArithmetic()))
+            val single = PolynomialCoupledSections(QfNraWork(QfNraParams()), PolynomialLimits(),
+                prepareSupports = false, joint = false)
+            val joint = PolynomialCoupledSections(QfNraWork(QfNraParams()), PolynomialLimits(),
+                prepareSupports = false)
+            val identities = required.indices.map { it.toLong() }
+
+            assertNull(single.refute(required, identities, HashSet()))
+            val support = joint.refute(required, identities, HashSet())
+
+            assertEquals(closing == -1, support != null)
+            if (support != null) assertEquals(required.indices.toList(), support)
+            assertEquals(1L, joint.stats.jointSupports)
+        }
+    }
+
+    @Test
+    fun `total encoded definitions retain every premise of a recovered support`() {
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (declare-const y Real) " +
+            "(declare-const u Real) (declare-const v Real) (declare-const w Real) " +
+            "(assert (and (= u (* x x)) (= u 2) (= v (* y y)) (= v 3) " +
+            "(= w (+ (* x y) x y)) (= w 1)))")
+        val required = assertNotNull(PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+            .forcedAtoms(PolynomialArithmetic()))
+        val direct = PolynomialCoupledSections(QfNraWork(QfNraParams()), PolynomialLimits(), prepareSupports = false)
+        val prepared = PolynomialCoupledSections(QfNraWork(QfNraParams()), PolynomialLimits())
+        val identities = required.indices.map { it.toLong() }
+
+        assertNull(direct.refute(required, identities, HashSet()))
+        val support = prepared.refute(required, identities, HashSet())
+
+        assertEquals(required.indices.toList(), support)
+        assertEquals(1L, prepared.stats.preparedSupports)
+    }
+
+    @Test
+    fun `a variable coefficient cannot supply a total substitution at its zero fibre`() {
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (declare-const y Real) " +
+            "(declare-const z Real) (assert (and (= (* x x) 1) (= (* y y) 1) " +
+            "(= (* z (- (* x y) 2)) 0)))")
+        val required = assertNotNull(PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+            .forcedAtoms(PolynomialArithmetic()))
+        val sections = PolynomialCoupledSections(QfNraWork(QfNraParams()), PolynomialLimits())
+
+        val support = sections.refute(required, required.indices.map { it.toLong() }, HashSet())
+
+        assertNull(support)
+        assertEquals(0L, sections.stats.conflicts)
+    }
+
+    @Test
     fun `a coupled equation failing at every root combination refutes its whole support`() {
         val source = SmtLibPolynomial.parse("(declare-const x1 Real) (declare-const x2 Real) " +
             "(assert (and (= (* x1 x1) 2) (= (* x2 x2) 3) (= (+ (* x1 x2) x1 x2) 1)))")
