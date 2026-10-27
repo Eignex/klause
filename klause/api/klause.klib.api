@@ -3311,8 +3311,6 @@ sealed interface com.eignex.klause.model/ContinuousRealExpr { // com.eignex.klau
         }
 
         final object Companion { // com.eignex.klause.model/ContinuousRealExpr.Multiply.Companion|null[0]
-            final val $childSerializers // com.eignex.klause.model/ContinuousRealExpr.Multiply.Companion.$childSerializers|{}$childSerializers[0]
-
             final fun serializer(): kotlinx.serialization/KSerializer<com.eignex.klause.model/ContinuousRealExpr.Multiply> // com.eignex.klause.model/ContinuousRealExpr.Multiply.Companion.serializer|serializer(){}[0]
         }
     }
@@ -3342,8 +3340,6 @@ sealed interface com.eignex.klause.model/ContinuousRealExpr { // com.eignex.klau
         }
 
         final object Companion { // com.eignex.klause.model/ContinuousRealExpr.Power.Companion|null[0]
-            final val $childSerializers // com.eignex.klause.model/ContinuousRealExpr.Power.Companion.$childSerializers|{}$childSerializers[0]
-
             final fun serializer(): kotlinx.serialization/KSerializer<com.eignex.klause.model/ContinuousRealExpr.Power> // com.eignex.klause.model/ContinuousRealExpr.Power.Companion.serializer|serializer(){}[0]
         }
     }
@@ -10511,8 +10507,6 @@ final class com.eignex.klause.model/ContinuousRealEquality : com.eignex.klause.m
     }
 
     final object Companion { // com.eignex.klause.model/ContinuousRealEquality.Companion|null[0]
-        final val $childSerializers // com.eignex.klause.model/ContinuousRealEquality.Companion.$childSerializers|{}$childSerializers[0]
-
         final fun serializer(): kotlinx.serialization/KSerializer<com.eignex.klause.model/ContinuousRealEquality> // com.eignex.klause.model/ContinuousRealEquality.Companion.serializer|serializer(){}[0]
     }
 }
@@ -10934,8 +10928,6 @@ final class com.eignex.klause.model/Iff : com.eignex.klause.model/BoolExpr { // 
     }
 
     final object Companion { // com.eignex.klause.model/Iff.Companion|null[0]
-        final val $childSerializers // com.eignex.klause.model/Iff.Companion.$childSerializers|{}$childSerializers[0]
-
         final fun serializer(): kotlinx.serialization/KSerializer<com.eignex.klause.model/Iff> // com.eignex.klause.model/Iff.Companion.serializer|serializer(){}[0]
     }
 }
@@ -10965,8 +10957,6 @@ final class com.eignex.klause.model/Implies : com.eignex.klause.model/BoolExpr {
     }
 
     final object Companion { // com.eignex.klause.model/Implies.Companion|null[0]
-        final val $childSerializers // com.eignex.klause.model/Implies.Companion.$childSerializers|{}$childSerializers[0]
-
         final fun serializer(): kotlinx.serialization/KSerializer<com.eignex.klause.model/Implies> // com.eignex.klause.model/Implies.Companion.serializer|serializer(){}[0]
     }
 }
@@ -11024,8 +11014,6 @@ final class com.eignex.klause.model/IntAbs : com.eignex.klause.model/IntExpr { /
     }
 
     final object Companion { // com.eignex.klause.model/IntAbs.Companion|null[0]
-        final val $childSerializers // com.eignex.klause.model/IntAbs.Companion.$childSerializers|{}$childSerializers[0]
-
         final fun serializer(): kotlinx.serialization/KSerializer<com.eignex.klause.model/IntAbs> // com.eignex.klause.model/IntAbs.Companion.serializer|serializer(){}[0]
     }
 }
@@ -11089,8 +11077,6 @@ final class com.eignex.klause.model/IntDiv : com.eignex.klause.model/IntExpr { /
     }
 
     final object Companion { // com.eignex.klause.model/IntDiv.Companion|null[0]
-        final val $childSerializers // com.eignex.klause.model/IntDiv.Companion.$childSerializers|{}$childSerializers[0]
-
         final fun serializer(): kotlinx.serialization/KSerializer<com.eignex.klause.model/IntDiv> // com.eignex.klause.model/IntDiv.Companion.serializer|serializer(){}[0]
     }
 }
@@ -11154,8 +11140,6 @@ final class com.eignex.klause.model/IntIfThenElse : com.eignex.klause.model/IntE
     }
 
     final object Companion { // com.eignex.klause.model/IntIfThenElse.Companion|null[0]
-        final val $childSerializers // com.eignex.klause.model/IntIfThenElse.Companion.$childSerializers|{}$childSerializers[0]
-
         final fun serializer(): kotlinx.serialization/KSerializer<com.eignex.klause.model/IntIfThenElse> // com.eignex.klause.model/IntIfThenElse.Companion.serializer|serializer(){}[0]
     }
 }
@@ -11267,8 +11251,6 @@ final class com.eignex.klause.model/IntMod : com.eignex.klause.model/IntExpr { /
     }
 
     final object Companion { // com.eignex.klause.model/IntMod.Companion|null[0]
-        final val $childSerializers // com.eignex.klause.model/IntMod.Companion.$childSerializers|{}$childSerializers[0]
-
         final fun serializer(): kotlinx.serialization/KSerializer<com.eignex.klause.model/IntMod> // com.eignex.klause.model/IntMod.Companion.serializer|serializer(){}[0]
     }
 }
@@ -11298,8 +11280,6 @@ final class com.eignex.klause.model/IntMul : com.eignex.klause.model/IntExpr { /
     }
 
     final object Companion { // com.eignex.klause.model/IntMul.Companion|null[0]
-        final val $childSerializers // com.eignex.klause.model/IntMul.Companion.$childSerializers|{}$childSerializers[0]
-
         final fun serializer(): kotlinx.serialization/KSerializer<com.eignex.klause.model/IntMul> // com.eignex.klause.model/IntMul.Companion.serializer|serializer(){}[0]
     }
 }
@@ -11329,8 +11309,6 @@ final class com.eignex.klause.model/IntPower : com.eignex.klause.model/IntExpr {
     }
 
     final object Companion { // com.eignex.klause.model/IntPower.Companion|null[0]
-        final val $childSerializers // com.eignex.klause.model/IntPower.Companion.$childSerializers|{}$childSerializers[0]
-
         final fun serializer(): kotlinx.serialization/KSerializer<com.eignex.klause.model/IntPower> // com.eignex.klause.model/IntPower.Companion.serializer|serializer(){}[0]
     }
 }
@@ -11386,8 +11364,6 @@ final class com.eignex.klause.model/IntScale : com.eignex.klause.model/IntExpr {
     }
 
     final object Companion { // com.eignex.klause.model/IntScale.Companion|null[0]
-        final val $childSerializers // com.eignex.klause.model/IntScale.Companion.$childSerializers|{}$childSerializers[0]
-
         final fun serializer(): kotlinx.serialization/KSerializer<com.eignex.klause.model/IntScale> // com.eignex.klause.model/IntScale.Companion.serializer|serializer(){}[0]
     }
 }
@@ -11616,8 +11592,6 @@ final class com.eignex.klause.model/NamedConstraint : com.eignex.klause.model/Sc
     }
 
     final object Companion { // com.eignex.klause.model/NamedConstraint.Companion|null[0]
-        final val $childSerializers // com.eignex.klause.model/NamedConstraint.Companion.$childSerializers|{}$childSerializers[0]
-
         final fun serializer(): kotlinx.serialization/KSerializer<com.eignex.klause.model/NamedConstraint> // com.eignex.klause.model/NamedConstraint.Companion.serializer|serializer(){}[0]
     }
 }
@@ -11701,8 +11675,6 @@ final class com.eignex.klause.model/Not : com.eignex.klause.model/BoolExpr { // 
     }
 
     final object Companion { // com.eignex.klause.model/Not.Companion|null[0]
-        final val $childSerializers // com.eignex.klause.model/Not.Companion.$childSerializers|{}$childSerializers[0]
-
         final fun serializer(): kotlinx.serialization/KSerializer<com.eignex.klause.model/Not> // com.eignex.klause.model/Not.Companion.serializer|serializer(){}[0]
     }
 }
@@ -11863,8 +11835,6 @@ final class com.eignex.klause.model/SetCard : com.eignex.klause.model/IntExpr { 
     }
 
     final object Companion { // com.eignex.klause.model/SetCard.Companion|null[0]
-        final val $childSerializers // com.eignex.klause.model/SetCard.Companion.$childSerializers|{}$childSerializers[0]
-
         final fun serializer(): kotlinx.serialization/KSerializer<com.eignex.klause.model/SetCard> // com.eignex.klause.model/SetCard.Companion.serializer|serializer(){}[0]
     }
 }
@@ -11894,8 +11864,6 @@ final class com.eignex.klause.model/SetDiff : com.eignex.klause.model/SetExpr { 
     }
 
     final object Companion { // com.eignex.klause.model/SetDiff.Companion|null[0]
-        final val $childSerializers // com.eignex.klause.model/SetDiff.Companion.$childSerializers|{}$childSerializers[0]
-
         final fun serializer(): kotlinx.serialization/KSerializer<com.eignex.klause.model/SetDiff> // com.eignex.klause.model/SetDiff.Companion.serializer|serializer(){}[0]
     }
 }
@@ -11925,8 +11893,6 @@ final class com.eignex.klause.model/SetDisjoint : com.eignex.klause.model/BoolEx
     }
 
     final object Companion { // com.eignex.klause.model/SetDisjoint.Companion|null[0]
-        final val $childSerializers // com.eignex.klause.model/SetDisjoint.Companion.$childSerializers|{}$childSerializers[0]
-
         final fun serializer(): kotlinx.serialization/KSerializer<com.eignex.klause.model/SetDisjoint> // com.eignex.klause.model/SetDisjoint.Companion.serializer|serializer(){}[0]
     }
 }
@@ -11956,8 +11922,6 @@ final class com.eignex.klause.model/SetEq : com.eignex.klause.model/BoolExpr { /
     }
 
     final object Companion { // com.eignex.klause.model/SetEq.Companion|null[0]
-        final val $childSerializers // com.eignex.klause.model/SetEq.Companion.$childSerializers|{}$childSerializers[0]
-
         final fun serializer(): kotlinx.serialization/KSerializer<com.eignex.klause.model/SetEq> // com.eignex.klause.model/SetEq.Companion.serializer|serializer(){}[0]
     }
 }
@@ -11987,8 +11951,6 @@ final class com.eignex.klause.model/SetIn : com.eignex.klause.model/BoolExpr { /
     }
 
     final object Companion { // com.eignex.klause.model/SetIn.Companion|null[0]
-        final val $childSerializers // com.eignex.klause.model/SetIn.Companion.$childSerializers|{}$childSerializers[0]
-
         final fun serializer(): kotlinx.serialization/KSerializer<com.eignex.klause.model/SetIn> // com.eignex.klause.model/SetIn.Companion.serializer|serializer(){}[0]
     }
 }
@@ -12018,8 +11980,6 @@ final class com.eignex.klause.model/SetIntersect : com.eignex.klause.model/SetEx
     }
 
     final object Companion { // com.eignex.klause.model/SetIntersect.Companion|null[0]
-        final val $childSerializers // com.eignex.klause.model/SetIntersect.Companion.$childSerializers|{}$childSerializers[0]
-
         final fun serializer(): kotlinx.serialization/KSerializer<com.eignex.klause.model/SetIntersect> // com.eignex.klause.model/SetIntersect.Companion.serializer|serializer(){}[0]
     }
 }
@@ -12077,8 +12037,6 @@ final class com.eignex.klause.model/SetNominalIn : com.eignex.klause.model/BoolE
     }
 
     final object Companion { // com.eignex.klause.model/SetNominalIn.Companion|null[0]
-        final val $childSerializers // com.eignex.klause.model/SetNominalIn.Companion.$childSerializers|{}$childSerializers[0]
-
         final fun serializer(): kotlinx.serialization/KSerializer<com.eignex.klause.model/SetNominalIn> // com.eignex.klause.model/SetNominalIn.Companion.serializer|serializer(){}[0]
     }
 }
@@ -12190,8 +12148,6 @@ final class com.eignex.klause.model/SetSubsetOf : com.eignex.klause.model/BoolEx
     }
 
     final object Companion { // com.eignex.klause.model/SetSubsetOf.Companion|null[0]
-        final val $childSerializers // com.eignex.klause.model/SetSubsetOf.Companion.$childSerializers|{}$childSerializers[0]
-
         final fun serializer(): kotlinx.serialization/KSerializer<com.eignex.klause.model/SetSubsetOf> // com.eignex.klause.model/SetSubsetOf.Companion.serializer|serializer(){}[0]
     }
 }
@@ -12221,8 +12177,6 @@ final class com.eignex.klause.model/SetUnion : com.eignex.klause.model/SetExpr {
     }
 
     final object Companion { // com.eignex.klause.model/SetUnion.Companion|null[0]
-        final val $childSerializers // com.eignex.klause.model/SetUnion.Companion.$childSerializers|{}$childSerializers[0]
-
         final fun serializer(): kotlinx.serialization/KSerializer<com.eignex.klause.model/SetUnion> // com.eignex.klause.model/SetUnion.Companion.serializer|serializer(){}[0]
     }
 }
