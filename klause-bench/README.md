@@ -3937,3 +3937,35 @@ nodes and 357 LP reuses. The first mixed derivation scales its original row by
 from `50000000/230000001` to `25000000/107499989`. Original bytes, exact rows,
 weights, bound citations and scopes remain in the capture. This instrumented
 inspection supplies neither an independent proof check nor a whole-CLI timing claim.
+
+## Bench SDK adapter
+
+`lab/bench.json` owns the build tasks, main and classpath for the JVM adapter.
+It builds the installed CLI with `installJvmDist` and the bench distribution
+with `installDist`. Only `klause-bench` imports `com.eignex:lab-bench:0.1.0`.
+
+Before an SDK release exists, run
+`./gradlew :lab-bench:stageAdapterRepository -PbenchVersion=0.1.0` in the lab
+checkout, then build this checkout with
+`./gradlew :klause-cli:installJvmDist :klause-bench:installDist -PlabBenchRepository=file:///absolute/eignex-lab/lab-bench/build/adapter-repository`.
+The default repository uses public GitHub Release assets without credentials;
+`-PlabBenchVersion=VERSION` selects a different release.
+
+A lab submission uses `repository: "Eignex/klause"` and
+`bench: {"manifest":"klause-bench/lab/bench.json","request":{"parameters":{"suite":"dimacs-core","name":"php4","timeout-ms":"1000"}}}`.
+The planner accepts the catalog selectors `suite`, `set`, `name`, `category`,
+`tag`, `kind`, `per-family`, `seed`, `max` and `balance`, and expands `engines`,
+`solver-seeds` and `repeats`. Runtime keys are `cpus`, `memory-mib` (at least
+2048), `timeout-ms`, `lp`, `presolve`, `exact` and `param.NAME`.
+
+Plans pin resolved file inputs, their hashes, corpus locations and problem
+metadata. Execution reconstructs the file-backed reference from those frozen
+inputs without repeating corpus selection. MiniZinc companion/include files
+travel with the corpus. In-code problems are unavailable to this subprocess adapter.
+Each case retains its complete solve record, including exact objective text,
+witness, attribution, validation policy, source hashes, compiler identity and
+build/runtime provenance. Generic elapsed/time-to-best metrics supplement that
+record. Unsupported inputs remain domain outcomes; load and process errors fail
+the SDK case. The adapter sizes CLI heap and processor limits from its declared
+resources. The legacy experiment path remains available for reference arms and
+paired A/B comparisons; a bench request names one source revision.

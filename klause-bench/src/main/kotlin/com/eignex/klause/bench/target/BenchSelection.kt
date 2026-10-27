@@ -13,6 +13,7 @@ internal data class SelectedProblem(val suite: String, val ref: ProblemRef, val 
 /** The source collection [ref] comes from, the `collection` klause-lab files its reference results under: the
  *  fetched collection's id, or a path-derived label for a vendored or in-code problem. */
 internal fun collectionOf(ref: ProblemRef): String = when (val s = ref.source) {
+    is ProblemSource.Prepared -> "prepared"
     is ProblemSource.External -> s.collection.id
     is ProblemSource.ExternalIndexed -> s.collection.id
     is ProblemSource.Vendored -> s.workspaceRelPath.substringBeforeLast('/', "vendored")

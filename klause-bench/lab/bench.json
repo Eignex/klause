@@ -1,0 +1,6 @@
+{
+  "main": "com.eignex.klause.bench.lab.LabAdapterKt",
+  "classpath": ["klause-bench/build/install/klause-bench/lib/*"],
+  "buildTasks": [":klause-cli:installJvmDist", ":klause-bench:installDist"],
+  "jvmArgs": ["-Xmx512m", "--enable-native-access=ALL-UNNAMED", "--add-modules=jdk.incubator.vector"]
+}

@@ -128,6 +128,9 @@ internal data class ExternalCollection(
 
 /** Where a problem's bytes come from. Resolved to a concrete file by `source.CorpusFetcher`. */
 internal sealed interface ProblemSource {
+    /** A file resolved and pinned by the lab planner, without corpus discovery during execution. */
+    data class Prepared(val file: java.io.File, val includes: List<java.io.File> = emptyList()) : ProblemSource
+
     /** A file tracked in this repository, path relative to the workspace root. Use [corpus]
      *  for the common case of a file under `klause-bench/smoke-corpus/`. */
     data class Vendored(val workspaceRelPath: String) : ProblemSource
