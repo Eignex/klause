@@ -71,7 +71,8 @@ class NativeFactorsTest {
 
     @Test
     fun `each named builder should post its native factor`() {
-        val (x, y, z, w) = ints
+        val (x, y, z) = ints
+        val w = ints[3]
         val (b, c) = bools
         val (r, s, t) = reals
         val cases: List<Pair<BoolExpr, KClass<out Factor>>> = listOf(
