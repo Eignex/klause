@@ -60,9 +60,9 @@ class NonlinearIntegerCellsTest {
         val algebraic = AlgebraicArithmetic(arithmetic)
         val scope = PolynomialCellScope.Source.prepare(source.formula, arithmetic)
         val cells = NonlinearIntegerCells(source.formula, listOf(0), arithmetic)
-        for (predicate in scope.predicates) {
+        for (predicate in scope.predicates) for (value in listOf(BigFraction.ZERO, BigFraction.ONE)) {
             cells.retain(assertNotNull(CheckedPolynomialCell.rejected(predicate, scope,
-                algebraic.rational(BigFraction.ZERO), arithmetic, algebraic)))
+                algebraic.rational(value), arithmetic, algebraic)))
         }
 
         val proposal = cells.propose(listOf(bigIntOf(0)), PolynomialCondition(), emptySet(), algebraic)
