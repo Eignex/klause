@@ -639,6 +639,7 @@ internal object LocalSearchTrajectory {
         }
     }
 
+    // `cbls-extended/fixed` names the trajectory's plateau-plus-sampled-extended walk; `catalog:` selects the arm.
     private fun trajectoryRecipe(name: String): LocalSearchRecipe = when (name) {
         "source-coordinate-descent" -> LocalSearchRecipe(name,
             SourceDrivenStrategy(sources = listOf(ConfiguredSource(ObjectiveSeed())),
@@ -646,7 +647,7 @@ internal object LocalSearchTrajectory {
         "cbls-extended/fixed" -> LocalSearchCatalog.byLabel("cbls-plateau/fixed").withSources {
             it + ConfiguredSource(SatisfiedStructured.sampledExtended(8))
         }
-        else -> LocalSearchCatalog.byLabel(name)
+        else -> LocalSearchCatalog.byLabel(name.removePrefix("catalog:"))
     }
 
     internal fun getter(owner: Any, name: String): Any? = owner.javaClass.methods.single {
