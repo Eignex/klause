@@ -112,9 +112,21 @@ class ModelJsonTest {
         assertShapes(
             IntExpr.serializer(),
             IntSum(listOf(x, y, IntLit(1))) to """{"add":[{"add":[{"ref":"x"},{"ref":"y"}]},1]}""",
-            IntMin(listOf(x, y, IntLit(1))) to """{"min":[{"min":[{"ref":"x"},{"ref":"y"}]},1]}""",
-            IntMax(listOf(x, y, IntLit(1), IntLit(2))) to
+            IntMin(listOf(IntMin(listOf(x, y)), IntLit(1))) to """{"min":[{"min":[{"ref":"x"},{"ref":"y"}]},1]}""",
+        )
+    }
+
+    @Test
+    fun `n-ary extrema encode as their left nested chains`() {
+        val encoded = listOf(IntMin(listOf(x, y, IntLit(1))), IntMax(listOf(x, y, IntLit(1), IntLit(2))))
+            .map { SchemaJson.encodeToString(IntExpr.serializer(), it) }
+
+        assertEquals(
+            listOf(
+                """{"min":[{"min":[{"ref":"x"},{"ref":"y"}]},1]}""",
                 """{"max":[{"max":[{"max":[{"ref":"x"},{"ref":"y"}]},1]},2]}""",
+            ),
+            encoded,
         )
     }
 

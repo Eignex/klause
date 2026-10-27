@@ -26,9 +26,10 @@ import kotlinx.serialization.json.doubleOrNull
  * two operations: integer division is `truncDiv`/`truncMod`, and `div` stays real division.
  * Encoding writes the profile's two-operand shapes: [IntScale] is `mul` with the coefficient
  * first, and [IntSum], [IntMin], [IntMax], [And] and [Or] over more than two children nest
- * to the left, so `x + 1 + 2` is `{"add": [{"add": [x, 1]}, 2]}`. Decoding merges a chain
- * nested in the first operand back into one node and reads `mul` with a numeric left operand
- * as [IntScale], so trees built by the Kotlin DSL round-trip unchanged.
+ * to the left, so `x + 1 + 2` is `{"add": [{"add": [x, 1]}, 2]}`. Decoding merges an `add`,
+ * `and` or `or` chain nested in the first operand back into one node, as the DSL operators
+ * build them, and reads `mul` with a numeric left operand as [IntScale], so trees built with
+ * the DSL operators and receiver helpers round-trip unchanged.
  */
 object ModelJson {
     /** Every model vocabulary, for composing into another [JsonNodeCatalog]. */
@@ -63,12 +64,12 @@ private fun IntExpr.binaryChain(): IntExpr = when {
     else -> this
 }
 
+// Merging mirrors the DSL, which flattens `+`, `and` and `or` but nests chained `min` and `max`.
 // Children decode first, so a chain nested in the first operand is already merged.
-private fun IntExpr.mergedChain(): IntExpr = when (this) {
-    is IntSum -> (children.first() as? IntSum)?.let { IntSum(it.children + children.drop(1)) } ?: this
-    is IntMin -> (children.first() as? IntMin)?.let { IntMin(it.children + children.drop(1)) } ?: this
-    is IntMax -> (children.first() as? IntMax)?.let { IntMax(it.children + children.drop(1)) } ?: this
-    else -> this
+private fun IntExpr.mergedChain(): IntExpr {
+    if (this !is IntSum) return this
+    val first = children.first() as? IntSum ?: return this
+    return IntSum(first.children + children.drop(1))
 }
 
 private fun BoolExpr.binaryChain(): BoolExpr = when {

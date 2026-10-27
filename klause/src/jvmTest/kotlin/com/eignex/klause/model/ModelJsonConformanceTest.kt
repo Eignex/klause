@@ -173,7 +173,7 @@ class ModelJsonConformanceTest {
             "-a" to -a,
             "a * 2" to a * 2,
             "2 * a - b" to 2 * a - b,
-            "min(a, b, c)" to min(a, b, c),
+            "a.min(b).min(c)" to a.min(b).min(c),
         )
         val BOOL_DSL: Map<String, BoolExpr> = mapOf(
             "(a ge 0) and (a le 9) and (b ge 0)" to ((a ge 0) and (a le 9) and (b ge 0)),
