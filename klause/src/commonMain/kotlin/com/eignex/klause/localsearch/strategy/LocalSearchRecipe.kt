@@ -1,7 +1,7 @@
 package com.eignex.klause.localsearch.strategy
 
-import com.eignex.klause.localsearch.RestartPolicy
 import com.eignex.klause.localsearch.ObjectiveGuidance
+import com.eignex.klause.localsearch.RestartPolicy
 import com.eignex.klause.localsearch.acceptance.AcceptanceRule
 import com.eignex.klause.localsearch.movesource.ConfiguredSource
 import com.eignex.klause.localsearch.schedule.Schedule

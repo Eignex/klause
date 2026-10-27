@@ -90,12 +90,15 @@ class ObjectiveSeed : MoveSource {
             val index = state.shaping.proposalLeafCursor % count
             // Advance before synthesis so an interrupted expensive leaf cannot starve its successors.
             state.shaping.proposalLeafCursor = (index + 1) % count
-            if (index < bools.size) {
-                sink.addBoolFlip(bools[index])
-            } else {
-                generateIntLeaf(state, sink, ints[index - bools.size])
+            try {
+                if (index < bools.size) {
+                    sink.addBoolFlip(bools[index])
+                } else {
+                    generateIntLeaf(state, sink, ints[index - bools.size])
+                }
+            } finally {
+                state.shaping.geometricProposalCandidates += sink.size - before
             }
-            state.shaping.geometricProposalCandidates += sink.size - before
         }
     }
 

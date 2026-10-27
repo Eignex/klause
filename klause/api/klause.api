@@ -4962,8 +4962,8 @@ public final class com/eignex/klause/localsearch/LocalSearchMoveInspection {
 
 public final class com/eignex/klause/localsearch/LocalSearchParams : com/eignex/klause/solver/SolverParams {
 	public fun <init> ()V
-	public fun <init> (JLjava/lang/Long;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/util/Cancellation;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/localsearch/CostShaping;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/incumbent/IncumbentExchange;IZZZ)V
-	public synthetic fun <init> (JLjava/lang/Long;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/util/Cancellation;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/localsearch/CostShaping;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/incumbent/IncumbentExchange;IZZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (JLjava/lang/Long;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/util/Cancellation;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/localsearch/CostShaping;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/incumbent/IncumbentExchange;IZZZLcom/eignex/klause/localsearch/ObjectiveGuidance;)V
+	public synthetic fun <init> (JLjava/lang/Long;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/util/Cancellation;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/localsearch/CostShaping;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/incumbent/IncumbentExchange;IZZZLcom/eignex/klause/localsearch/ObjectiveGuidance;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()J
 	public final fun component10 ()Lcom/eignex/klause/solver/Sample;
 	public final fun component11 ()Lcom/eignex/klause/solver/incumbent/IncumbentExchange;
@@ -4971,6 +4971,7 @@ public final class com/eignex/klause/localsearch/LocalSearchParams : com/eignex/
 	public final fun component13 ()Z
 	public final fun component14 ()Z
 	public final fun component15 ()Z
+	public final fun component16 ()Lcom/eignex/klause/localsearch/ObjectiveGuidance;
 	public final fun component2 ()Ljava/lang/Long;
 	public final fun component3 ()Lcom/eignex/klause/backtrack/NodeBudget;
 	public final fun component4 ()Ljava/lang/Long;
@@ -4979,8 +4980,8 @@ public final class com/eignex/klause/localsearch/LocalSearchParams : com/eignex/
 	public final fun component7 ()Lkotlin/jvm/functions/Function1;
 	public final fun component8 ()Lcom/eignex/klause/localsearch/CostShaping;
 	public final fun component9 ()Lcom/eignex/klause/solver/objective/IncrementalObjective;
-	public final fun copy (JLjava/lang/Long;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/util/Cancellation;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/localsearch/CostShaping;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/incumbent/IncumbentExchange;IZZZ)Lcom/eignex/klause/localsearch/LocalSearchParams;
-	public static synthetic fun copy$default (Lcom/eignex/klause/localsearch/LocalSearchParams;JLjava/lang/Long;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/util/Cancellation;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/localsearch/CostShaping;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/incumbent/IncumbentExchange;IZZZILjava/lang/Object;)Lcom/eignex/klause/localsearch/LocalSearchParams;
+	public final fun copy (JLjava/lang/Long;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/util/Cancellation;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/localsearch/CostShaping;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/incumbent/IncumbentExchange;IZZZLcom/eignex/klause/localsearch/ObjectiveGuidance;)Lcom/eignex/klause/localsearch/LocalSearchParams;
+	public static synthetic fun copy$default (Lcom/eignex/klause/localsearch/LocalSearchParams;JLjava/lang/Long;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/util/Cancellation;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/localsearch/CostShaping;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/incumbent/IncumbentExchange;IZZZLcom/eignex/klause/localsearch/ObjectiveGuidance;ILjava/lang/Object;)Lcom/eignex/klause/localsearch/LocalSearchParams;
 	public fun equals (Ljava/lang/Object;)Z
 	public fun getAssumptions ()Lcom/eignex/klause/propagation/Assumptions;
 	public final fun getCancellation ()Lcom/eignex/klause/util/Cancellation;
@@ -4991,6 +4992,7 @@ public final class com/eignex/klause/localsearch/LocalSearchParams : com/eignex/
 	public final fun getMaxInstructions ()Ljava/lang/Long;
 	public final fun getNodeBudget ()Lcom/eignex/klause/backtrack/NodeBudget;
 	public final fun getNormalizeWeightsByClass ()Z
+	public final fun getObjectiveGuidance ()Lcom/eignex/klause/localsearch/ObjectiveGuidance;
 	public final fun getOnEvent ()Lkotlin/jvm/functions/Function1;
 	public final fun getPooledIncumbents ()Lcom/eignex/klause/solver/incumbent/IncumbentExchange;
 	public final fun getRandomSeed ()Ljava/lang/Long;
@@ -5284,6 +5286,15 @@ public final class com/eignex/klause/localsearch/NoInvariant : com/eignex/klause
 	public fun updateBoolBreakMakeForFlip (Lcom/eignex/klause/localsearch/LocalSearchState;II)V
 	public fun updateIntBreakMakeForIntSet (Lcom/eignex/klause/localsearch/LocalSearchState;IIJ)V
 	public fun violationDegree (Lcom/eignex/klause/localsearch/LocalSearchState;I)I
+}
+
+public final class com/eignex/klause/localsearch/ObjectiveGuidance : java/lang/Enum {
+	public static final field Canonical Lcom/eignex/klause/localsearch/ObjectiveGuidance;
+	public static final field Functional Lcom/eignex/klause/localsearch/ObjectiveGuidance;
+	public static final field Geometric Lcom/eignex/klause/localsearch/ObjectiveGuidance;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/localsearch/ObjectiveGuidance;
+	public static fun values ()[Lcom/eignex/klause/localsearch/ObjectiveGuidance;
 }
 
 public final class com/eignex/klause/localsearch/ObjectiveShaping {
@@ -5961,15 +5972,17 @@ public final class com/eignex/klause/localsearch/strategy/FeasibleDescent : java
 }
 
 public final class com/eignex/klause/localsearch/strategy/LocalSearchRecipe {
-	public fun <init> (Ljava/lang/String;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;ZZ)V
-	public synthetic fun <init> (Ljava/lang/String;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;ZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;ZZLcom/eignex/klause/localsearch/ObjectiveGuidance;)V
+	public synthetic fun <init> (Ljava/lang/String;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;ZZLcom/eignex/klause/localsearch/ObjectiveGuidance;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getFeasibleDescent ()Lcom/eignex/klause/localsearch/strategy/FeasibleDescent;
 	public final fun getLabel ()Ljava/lang/String;
+	public final fun getObjectiveGuidance ()Lcom/eignex/klause/localsearch/ObjectiveGuidance;
 	public final fun getOptimizeStrategy ()Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;
 	public final fun getPerMoveInvariants ()Z
 	public final fun getSeedImplicitOnRestart ()Z
 	public final fun getStrategy ()Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;
 	public final fun withAcceptance (Lcom/eignex/klause/localsearch/acceptance/AcceptanceRule;)Lcom/eignex/klause/localsearch/strategy/LocalSearchRecipe;
+	public final fun withObjectiveGuidance (Lcom/eignex/klause/localsearch/ObjectiveGuidance;)Lcom/eignex/klause/localsearch/strategy/LocalSearchRecipe;
 	public final fun withRestart (Lcom/eignex/klause/localsearch/RestartPolicy;)Lcom/eignex/klause/localsearch/strategy/LocalSearchRecipe;
 	public final fun withScoring (Lcom/eignex/klause/localsearch/scoring/MoveScoring;)Lcom/eignex/klause/localsearch/strategy/LocalSearchRecipe;
 	public final fun withSources (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/localsearch/strategy/LocalSearchRecipe;
@@ -11625,6 +11638,7 @@ public final class com/eignex/klause/solver/pipeline/ExecutionOption$Companion {
 	public final fun getNraDenseCoefficients ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getNraMatrixCells ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getNraWorkLimit ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getObjectiveGuidance ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getObjectiveGuidedValues ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getOpenBranching ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getOpenHintFlips ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
@@ -13432,12 +13446,15 @@ public final class com/eignex/klause/solver/result/LocalSearchResidualFactor {
 
 public final class com/eignex/klause/solver/result/LocalSearchStats {
 	public fun <init> ()V
-	public fun <init> (Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;JDDLcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/klause/solver/result/LocalSearchResidual;Ljava/util/Map;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;)V
-	public synthetic fun <init> (Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;JDDLcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/klause/solver/result/LocalSearchResidual;Ljava/util/Map;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;JDDLcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/klause/solver/result/LocalSearchResidual;Ljava/util/Map;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;)V
+	public synthetic fun <init> (Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;JDDLcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/klause/solver/result/LocalSearchResidual;Ljava/util/Map;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/kumulant/stat/summary/SumResult;
 	public final fun component10 ()Ljava/util/Map;
 	public final fun component11 ()Lcom/eignex/kumulant/stat/summary/SumResult;
 	public final fun component12 ()Lcom/eignex/kumulant/stat/summary/SumResult;
+	public final fun component13 ()Lcom/eignex/kumulant/stat/summary/SumResult;
+	public final fun component14 ()Lcom/eignex/kumulant/stat/summary/SumResult;
+	public final fun component15 ()Lcom/eignex/kumulant/stat/summary/SumResult;
 	public final fun component2 ()Lcom/eignex/kumulant/stat/summary/SumResult;
 	public final fun component3 ()J
 	public final fun component4 ()D
@@ -13446,8 +13463,8 @@ public final class com/eignex/klause/solver/result/LocalSearchStats {
 	public final fun component7 ()Lcom/eignex/kumulant/stat/summary/SumResult;
 	public final fun component8 ()Lcom/eignex/kumulant/stat/summary/SumResult;
 	public final fun component9 ()Lcom/eignex/klause/solver/result/LocalSearchResidual;
-	public final fun copy (Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;JDDLcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/klause/solver/result/LocalSearchResidual;Ljava/util/Map;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;)Lcom/eignex/klause/solver/result/LocalSearchStats;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/LocalSearchStats;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;JDDLcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/klause/solver/result/LocalSearchResidual;Ljava/util/Map;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/LocalSearchStats;
+	public final fun copy (Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;JDDLcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/klause/solver/result/LocalSearchResidual;Ljava/util/Map;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;)Lcom/eignex/klause/solver/result/LocalSearchStats;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/LocalSearchStats;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;JDDLcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/klause/solver/result/LocalSearchResidual;Ljava/util/Map;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/LocalSearchStats;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getBestResidual ()Lcom/eignex/klause/solver/result/LocalSearchResidual;
 	public final fun getBoardRestartChanges ()Lcom/eignex/kumulant/stat/summary/SumResult;
@@ -13455,6 +13472,9 @@ public final class com/eignex/klause/solver/result/LocalSearchStats {
 	public final fun getCompletions ()Lcom/eignex/kumulant/stat/summary/SumResult;
 	public final fun getCompletionsRefuted ()Lcom/eignex/kumulant/stat/summary/SumResult;
 	public final fun getCompletionsUndecided ()Lcom/eignex/kumulant/stat/summary/SumResult;
+	public final fun getGeometricProposalCandidates ()Lcom/eignex/kumulant/stat/summary/SumResult;
+	public final fun getGeometricProposalDeclines ()Lcom/eignex/kumulant/stat/summary/SumResult;
+	public final fun getGeometricProposalRuns ()Lcom/eignex/kumulant/stat/summary/SumResult;
 	public final fun getIncumbentObjective ()D
 	public final fun getIncumbentViolation ()D
 	public final fun getMoves ()Lcom/eignex/kumulant/stat/summary/SumResult;
