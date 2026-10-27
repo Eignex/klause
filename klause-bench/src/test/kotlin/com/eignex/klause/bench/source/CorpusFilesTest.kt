@@ -9,19 +9,22 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 
 class CorpusFilesTest {
-    @Test
-    fun `unpacking replaces compressed storage with original source bytes`() {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `unpacking can retain the original compressed cache object`(keepPacked: Boolean) {
         val root = Files.createTempDirectory("corpusfiles").toFile()
         try {
             val body = "p cnf 2 1\n1 -2 0\n"
             val packed = CorpusFiles.compress(File(root, "inst.cnf").apply { writeText(body) })
 
-            val plain = CorpusFiles.unpack(packed)
+            val plain = CorpusFiles.unpack(packed, keepPacked)
 
             assertEquals(body, plain.readText())
-            assertFalse(packed.exists())
+            assertEquals(keepPacked, packed.exists())
         } finally {
             root.deleteRecursively()
         }

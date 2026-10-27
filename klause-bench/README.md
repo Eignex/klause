@@ -276,6 +276,26 @@ configured by `-Dklause.bench.corpus.maxGb=N` or `KLAUSE_BENCH_CORPUS_MAX_GB=N`;
 before/after fetch. This JVM's used collections stay pinned; parallel bench processes
 sharing a cache should prefetch or disable eviction, as the lab does. Metadata avoids
 full tree scans; `.trash` renames make interrupted deletion resumable.
+
+`-Dklause.bench.corpus.shared=true` reuses the normal XDG/home cache while
+`-Dklause.bench.corpusCache` names an isolated preparation workspace. Only requested
+collections enter that workspace, using hard links on the same filesystem and
+copies across filesystems. Collection fetches hold a process lock and publish by
+rename after completion; interrupted staging is discarded. HTTP downloads use
+10-second connection and 30-second read timeouts, retry transient I/O and HTTP
+failures up to four attempts, and publish only complete responses. Permanent HTTP
+errors fail immediately. Parallel processes using shared storage must disable eviction.
+
+`KLAUSE_BENCH_CORPUS_MIRROR=https://.../corpus-packs` enables a provider-independent
+HTTP read-through cache. A local hit makes no mirror request; a cold collection first
+restores `<collection>.tar` from the mirror, falling back to its original source only
+on HTTP 404. Restored packs are bounded and reject filesystem links and traversal.
+`KLAUSE_BENCH_CORPUS_MIRROR_WRITE=true` publishes newly fetched collections once using
+conditional HTTP PUT. Configure the cloud URL for workers in the store's region;
+native execution should reuse its local corpus cache. `KLAUSE_BENCH_CORPUS_KEEP_PACKED=true`
+retains compressed originals when resolving plain input files, allowing the lab to
+reference existing compressed remote objects rather than uploading plain duplicates.
+
 ZIP collections extract through the JDK with entry checksum and destination checks;
 failed ZIP fetches remove partial collections. LZMA members use XZ for Java;
 XZ, bzip2 and gzip members use `unxz`, `bunzip2` and `gunzip`.

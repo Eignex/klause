@@ -60,6 +60,7 @@ class BuildProvenanceTest {
             "-Dklause.workspace.root=/first -Dklause.bench.cache=false -Xmx3g",
             "'-Dklause.workspace.root=/second path' -Dklause.bench.corpusCache='/corpus path' -Xmx3g",
             "-Dklause.workspace.root=\"/third path\" -Dklause.bench.corpusCache=/corpus -Xmx3g",
+            "-Dklause.bench.corpus.shared=true -Dklause.bench.corpusCache=/attempt/corpus -Xmx3g",
         )
 
         val normalized = options.map { runtimeOptions(mapOf("JAVA_OPTS" to it)) }

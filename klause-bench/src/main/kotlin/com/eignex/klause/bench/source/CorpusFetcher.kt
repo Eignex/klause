@@ -4,6 +4,7 @@ import com.eignex.klause.bench.catalog.ExternalCollection
 import com.eignex.klause.bench.catalog.FetchMethod
 import com.eignex.klause.bench.catalog.ProblemSource
 import java.io.File
+import java.lang.Boolean.getBoolean
 import java.net.URI
 import java.nio.file.Files
 import java.util.zip.CRC32
@@ -46,7 +47,16 @@ internal object CorpusFetcher {
      *  wipe and are shared across worktrees. Overridable via `-Dklause.bench.corpusCache`. */
     val cacheRoot: File
         get() = System.getProperty("klause.bench.corpusCache")?.let { File(it) }
-            ?: File(xdgCacheHome(), "klause-bench/corpus")
+            ?: defaultCacheRoot()
+
+    private fun defaultCacheRoot(): File = File(xdgCacheHome(), "klause-bench/corpus")
+
+    private val storageRoot: File
+        get() = if (getBoolean("klause.bench.corpus.shared")) defaultCacheRoot() else cacheRoot
+
+    private val downloads = CorpusDownload()
+    private val mirror: CorpusMirror?
+        get() = System.getenv("KLAUSE_BENCH_CORPUS_MIRROR")?.takeIf { it.isNotBlank() }?.let { CorpusMirror(URI(it)) }
 
     /** `$XDG_CACHE_HOME` when set, else `~/.cache` (the XDG base-dir default). */
     private fun xdgCacheHome(): File = System.getenv("XDG_CACHE_HOME")?.takeIf { it.isNotBlank() }?.let { File(it) }
@@ -103,31 +113,44 @@ internal object CorpusFetcher {
     private val usedThisRun: MutableSet<String> = HashSet()
 
     /** The size-capped view of [cacheRoot] (see [CorpusCache]), pinning what this run has resolved. */
-    fun cache(): CorpusCache = CorpusCache(cacheRoot, CorpusCache.configuredCapBytes(), usedThisRun, log = ::log)
+    fun cache(): CorpusCache = CorpusCache(storageRoot, CorpusCache.configuredCapBytes(), usedThisRun, log = ::log)
 
     /** The root directory of [collection] in the cache, fetching it if not already present. A fetch first
      *  evicts least recently used collections to fit the cache cap, and again once the new one has landed. */
     fun ensure(collection: ExternalCollection): File {
-        val dir = File(cacheRoot, collection.id)
         val cache = cache()
         cache.markUsed(collection.id)
-        if (cache.isPresent(collection.id)) return dir
-        cacheRoot.mkdirs()
-        cache.enforce()
-        log("fetching '${collection.id}' (${collection.license}) — ${collection.reason}")
-        when (val m = collection.fetch) {
-            is FetchMethod.GitClone -> gitClone(collection, m, dir)
-            FetchMethod.Tarball -> tarball(collection, dir)
-            FetchMethod.Tar -> tar(collection, dir)
-            FetchMethod.TarballZst -> tarballZst(collection, dir)
-            FetchMethod.Zip -> zip(collection, dir)
-            is FetchMethod.Files -> files(collection, m, dir)
-            is FetchMethod.GbdFiles -> gbdFiles(collection, m, dir)
+        var fetched = false
+        val directory = CorpusStore(storageRoot, cacheRoot).ensure(collection.id) { dir ->
+            val remote = mirror
+            if (remote?.restore(collection.id, dir) == true) {
+                fetched = true
+                return@ensure
+            }
+            cache.enforce()
+            log("fetching '${collection.id}' (${collection.license}) — ${collection.reason}")
+            when (val method = collection.fetch) {
+                is FetchMethod.GitClone -> gitClone(collection, method, dir)
+                FetchMethod.Tarball -> tarball(collection, dir)
+                FetchMethod.Tar -> tar(collection, dir)
+                FetchMethod.TarballZst -> tarballZst(collection, dir)
+                FetchMethod.Zip -> zip(collection, dir)
+                is FetchMethod.Files -> files(collection, method, dir)
+                is FetchMethod.GbdFiles -> gbdFiles(collection, method, dir)
+            }
+            collection.extensionless?.let { (marker, ext) -> nameBare(dir, marker, ext) }
+            if (remote != null && System.getenv("KLAUSE_BENCH_CORPUS_MIRROR_WRITE") == "true") {
+                runCatching { remote.publish(collection.id, dir) }.onFailure {
+                    System.err.println("corpus mirror publication deferred: ${it.javaClass.simpleName}")
+                }
+            }
+            fetched = true
         }
-        collection.extensionless?.let { (marker, ext) -> nameBare(dir, marker, ext) }
-        cache.recordSize(collection.id)
-        cache.enforce()
-        return dir
+        if (fetched) {
+            cache.recordSize(collection.id)
+            cache.enforce()
+        }
+        return directory
     }
 
     private fun gitClone(c: ExternalCollection, m: FetchMethod.GitClone, dir: File) {
@@ -151,10 +174,7 @@ internal object CorpusFetcher {
 
     private fun tarball(c: ExternalCollection, dir: File) {
         dir.mkdirs()
-        val tar = File(cacheRoot, "${c.id}.tar.gz")
-        URI(c.url).toURL().openStream().use { input -> tar.outputStream().use { input.copyTo(it) } }
-        run("tar", "xzf", tar.absolutePath, "-C", dir.absolutePath)
-        tar.delete()
+        downloaded(c.url, dir, ".tar.gz") { tar -> run("tar", "xzf", tar.absolutePath, "-C", dir.absolutePath) }
         // MIPLIB 2010 ships `*.mps.gz` inside its tarball, some of them too large to be worth keeping.
         dropOversized(c, dir)
         decompressInPlace(dir)
@@ -163,10 +183,7 @@ internal object CorpusFetcher {
 
     private fun tar(c: ExternalCollection, dir: File) {
         dir.mkdirs()
-        val tar = File(cacheRoot, "${c.id}.tar")
-        URI(c.url).toURL().openStream().use { input -> tar.outputStream().use { input.copyTo(it) } }
-        run("tar", "xf", tar.absolutePath, "-C", dir.absolutePath)
-        tar.delete()
+        downloaded(c.url, dir, ".tar") { tar -> run("tar", "xf", tar.absolutePath, "-C", dir.absolutePath) }
         // PB competition instances ship individually `*.opb.xz`/`*.wbo.xz`; recompress them to zstd.
         decompressInPlace(dir)
         compress(dir)
@@ -174,10 +191,9 @@ internal object CorpusFetcher {
 
     private fun tarballZst(c: ExternalCollection, dir: File) {
         dir.mkdirs()
-        val tar = File(cacheRoot, "${c.id}.tar.zst")
-        URI(c.url).toURL().openStream().use { input -> tar.outputStream().use { input.copyTo(it) } }
-        run("tar", "--zstd", "-xf", tar.absolutePath, "-C", dir.absolutePath)
-        tar.delete()
+        downloaded(c.url, dir, ".tar.zst") { tar ->
+            run("tar", "--zstd", "-xf", tar.absolutePath, "-C", dir.absolutePath)
+        }
         compress(dir)
     }
 
@@ -186,7 +202,7 @@ internal object CorpusFetcher {
         // A failed fetch leaves no directory behind: a partial one would read as a fetched collection.
         runCatching {
             for (name in m.names) {
-                val text = URI(c.url.trimEnd('/') + "/" + name).toURL().readText()
+                val text = downloaded(c.url.trimEnd('/') + "/" + name, dir, ".data") { it.readText() }
                 // A server error or a redirect page comes back as HTML, which no converter should be given.
                 require(!text.trimStart().startsWith("<")) { "${c.id}: $name came back as a web page, not data" }
                 for ((instance, converted) in m.convert(name.substringBefore('.'), text)) {
@@ -206,8 +222,7 @@ internal object CorpusFetcher {
                 val plain = File(dir, instance.relPath)
                 plain.parentFile.mkdirs()
                 val packed = File(plain.path + ".xz")
-                URI(c.url.trimEnd('/') + "/file/" + instance.hash).toURL().openStream()
-                    .use { input -> packed.outputStream().use { input.copyTo(it) } }
+                downloads.fetch(URI(c.url.trimEnd('/') + "/file/" + instance.hash), packed)
                 runCmd(null, listOf("unxz", "-q", "-f", packed.absolutePath))
                 val hash = plain.inputStream().use(GbdHash::of)
                 require(hash == instance.hash) {
@@ -239,18 +254,20 @@ internal object CorpusFetcher {
 
     private fun zip(c: ExternalCollection, dir: File) {
         dir.mkdirs()
-        val zip = File(cacheRoot, "${c.id}.zip")
-        try {
-            runCatching {
-                URI(c.url).toURL().openStream().use { input -> zip.outputStream().use { input.copyTo(it) } }
-                extractZip(zip, dir)
-                dropOversized(c, dir)
-                // Competition archives ship individually compressed instances, which need unpacking before zstd.
-                decompressInPlace(dir)
-                compress(dir)
-            }.onFailure { dir.deleteRecursively() }.getOrThrow()
+        downloaded(c.url, dir, ".zip") { zip -> extractZip(zip, dir) }
+        dropOversized(c, dir)
+        // Competition archives ship individually compressed instances, which need unpacking before zstd.
+        decompressInPlace(dir)
+        compress(dir)
+    }
+
+    private fun <T> downloaded(url: String, directory: File, suffix: String, use: (File) -> T): T {
+        val temporary = Files.createTempFile(directory.parentFile.toPath(), ".archive-", suffix).toFile()
+        return try {
+            downloads.fetch(URI(url), temporary)
+            use(temporary)
         } finally {
-            zip.delete()
+            temporary.delete()
         }
     }
 

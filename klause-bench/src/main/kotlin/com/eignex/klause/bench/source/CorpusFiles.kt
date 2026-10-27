@@ -67,13 +67,14 @@ internal object CorpusFiles {
         }
     }
 
-    fun unpack(file: File): File {
+    fun unpack(file: File, keepPacked: Boolean = System.getenv("KLAUSE_BENCH_CORPUS_KEEP_PACKED") == "true"): File {
         if (!isCompressed(file)) return file
         val plain = File(plainPath(file.path))
+        if (keepPacked && plain.isFile) return plain
         withPlainFile(file) { staged ->
             Files.move(staged.toPath(), plain.toPath(), StandardCopyOption.REPLACE_EXISTING)
         }
-        check(file.delete()) { "cannot remove unpacked instance: $file" }
+        if (!keepPacked) check(file.delete()) { "cannot remove unpacked instance: $file" }
         return plain
     }
 
