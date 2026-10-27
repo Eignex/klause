@@ -82,7 +82,7 @@ internal object LocalSearchTrajectory {
             "sliceMillis", "sliceWork", "greedy", "repairs", "controls", "center", "source64", "sourceGzip64",
             "channel", "presolve",
             "ownerReplay", "ownerWork", "ownerFragmentWork", "ownerSelectors", "selectorsFromWalk", "ownerConflicts",
-            "ownerRecipes", "owners",
+            "ownerRecipes", "owners", "ownerSeed",
         )
         require(options.keys.containsAll(required) && options.keys.all {
             it in required || it in optional || it == "selectors"
@@ -123,6 +123,7 @@ internal object LocalSearchTrajectory {
             ViewSpec("false", false, ChannelView.Maintained), ViewSpec("true", true, ChannelView.Maintained),
         ) else listOf(ViewSpec("maintained", false, ChannelView.Maintained), ViewSpec(channel.name, false, channel))
         val seed = options.getValue("seed").toLong()
+        val ownerSeed = options["ownerSeed"]?.toLong() ?: seed
         val moves = options.getValue("moves").toLong().also { require(it in 1..1_000_000) }
         val sliceMillis = options["sliceMillis"]?.toLong()?.also { require(it > 0L) } ?: Long.MAX_VALUE
         val sliceWork = options["sliceWork"]?.toLong()?.also { require(it > 0L) } ?: Long.MAX_VALUE
@@ -293,7 +294,7 @@ internal object LocalSearchTrajectory {
                 evaluateRepairs = !ownerSelectors)
             if (ownerSelectors && !selectorsFromWalk) RepairOwnerReplay.replay(out.resolve("selectors.jsonl"),
                 problem, checkNotNull(workingObjective),
-                prepared, checkNotNull(sourceCheck), sourceInputs, out.resolve("owners-selectors.jsonl"), seed,
+                prepared, checkNotNull(sourceCheck), sourceInputs, out.resolve("owners-selectors.jsonl"), ownerSeed,
                 options["ownerWork"]?.toLong() ?: 200_000L,
                 options["ownerFragmentWork"]?.toLong() ?: 2_000L,
                 structured = structured, descent = descent, ownerSequence = ownerSequence)
@@ -434,7 +435,7 @@ internal object LocalSearchTrajectory {
                             out.resolve("controls-$rewrite.jsonl"), seed, prepared, checkNotNull(sourceCheck))
                         if (ownerReplay) RepairOwnerReplay.replay(out.resolve("controls-$rewrite.jsonl"),
                             problem, checkNotNull(workingObjective), prepared, checkNotNull(sourceCheck), sourceInputs,
-                            out.resolve("owners-$rewrite.jsonl"), seed,
+                            out.resolve("owners-$rewrite.jsonl"), ownerSeed,
                             options["ownerWork"]?.toLong() ?: 100_000L,
                             options["ownerFragmentWork"]?.toLong() ?: 2_000L,
                             structured = structured, descent = descent, ownerSequence = ownerSequence)
@@ -511,7 +512,7 @@ internal object LocalSearchTrajectory {
                         evaluateRepairs = !ownerSelectors)
                     if (ownerSelectors) RepairOwnerReplay.replay(out.resolve("selectors.jsonl"), problem,
                         repairObjective, prepared, sourceModel, sourceInputs,
-                        out.resolve("owners-selectors.jsonl"), seed,
+                        out.resolve("owners-selectors.jsonl"), ownerSeed,
                         options["ownerWork"]?.toLong() ?: 200_000L,
                         options["ownerFragmentWork"]?.toLong() ?: 2_000L,
                         structured = structured, descent = descent, ownerSequence = ownerSequence)
@@ -524,7 +525,7 @@ internal object LocalSearchTrajectory {
                                 prepared.reconstruct(sample), token)
                         }
                         RepairOwnerReplay.replay(selections, problem, repairObjective, prepared, sourceModel,
-                            sourceInputs, directory.resolve("owners.jsonl"), seed,
+                            sourceInputs, directory.resolve("owners.jsonl"), ownerSeed,
                             options["ownerWork"]?.toLong() ?: 200_000L,
                             options["ownerFragmentWork"]?.toLong() ?: 2_000L,
                             structured = structured, descent = descent, ownerSequence = ownerSequence)
