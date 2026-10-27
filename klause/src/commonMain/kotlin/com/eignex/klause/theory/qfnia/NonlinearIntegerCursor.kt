@@ -35,6 +35,7 @@ internal class NonlinearIntegerCursor(
     private val problem: NonlinearIntegerProblem,
     private val params: NonlinearIntegerParams,
     private var condition: PolynomialCondition,
+    roots: NonlinearIntegerRootStore? = null,
 ) : AutoCloseable {
     private var closed = false
     private var initialized = false
@@ -57,9 +58,14 @@ internal class NonlinearIntegerCursor(
     private var radius = BIG_ONE
     private var enumeration = emptyList<BigInt>()
     private var representationDecline: QfNraResult.Unknown? = null
+    private val rootStore = roots?.also { require(it.problem === problem) { "integer roots of another source" } }
+        ?: NonlinearIntegerRootStore(problem)
+    private var rootWindows = arrayOfNulls<List<BigInt>>(coordinates.size)
+    private var rootStats = NonlinearIntegerRootCounts()
 
-    val stats: NonlinearIntegerStats get() =
-        NonlinearIntegerStats(candidates, moves, repairs, invocation.queries, polynomialStats(), cells.stats)
+    val stats: NonlinearIntegerStats get() = NonlinearIntegerStats(
+        candidates, moves, repairs, invocation.queries, polynomialStats(), cells.stats, rootStats,
+    )
     val isDone: Boolean get() = terminal != null
 
     fun runSlice(
@@ -112,6 +118,10 @@ internal class NonlinearIntegerCursor(
         if (condition.lower.any { (id, value) -> condition.upper[id]?.let { it < value } == true }) {
             return QfNraResult.Unsatisfiable(polynomialStats())
         }
+        if (params.admitIntegerRoots && !admitRoots()) {
+            rootStats = rootStats.copy(refuted = rootStats.refuted + 1)
+            return QfNraResult.Unsatisfiable(polynomialStats())
+        }
         current = current.mapIndexed(::bounded)
         hints = (sourceIntegerHints(problem.formula, arithmetic) +
             (condition.lower.values + condition.upper.values).map { it.ceilInteger() }).distinct()
@@ -129,7 +139,9 @@ internal class NonlinearIntegerCursor(
                     representationDecline = relaxed
                 }
                 is QfNraResult.Satisfiable -> {
-                    current = coordinates.map { integerNear(relaxed.assignment.realValue(it), arithmetic) }
+                    current = coordinates.mapIndexed { index, id ->
+                        nearestRoot(index, integerNear(relaxed.assignment.realValue(id), arithmetic))
+                    }
                     enumeration = (current + enumeration).distinct()
                     if (integral(relaxed.assignment) && checked(relaxed.assignment)) return relaxed
                 }
@@ -148,6 +160,7 @@ internal class NonlinearIntegerCursor(
         enumeration = emptyList()
         current = emptyList()
         cursor = IntArray(0)
+        rootWindows = emptyArray()
         closed = true
     }
 
@@ -164,6 +177,14 @@ internal class NonlinearIntegerCursor(
                 condition.lower[id]?.let { value < it } == true || condition.upper[id]?.let { value > it } == true
             }
         ) return null
+        if (params.admitIntegerRoots && current.indices.any { index ->
+                arithmetic.step()
+                rootWindows[index]?.let { current[index] !in it } == true
+            }
+        ) {
+            rootStats = rootStats.copy(excluded = rootStats.excluded + 1)
+            return null
+        }
         if (params.reuseSourceCells && cells.excludes(current, AlgebraicArithmetic(arithmetic))) return null
         cells.recordAllowed()
         val fixed = coordinates.indices.associate { coordinates[it] to BigFraction.of(current[it], BIG_ONE) }
@@ -225,7 +246,45 @@ internal class NonlinearIntegerCursor(
         }
     }
 
+    private fun admitRoots(): Boolean {
+        val admission = rootStore.admit(work, params.arithmetic.polynomialLimits, arithmetic::step)
+        rootStats = rootStats.copy(
+            admitted = rootStats.admitted + admission.admitted,
+            declined = rootStats.declined + admission.declined,
+            reused = rootStats.reused + if (admission.fresh) 0 else 1,
+        )
+        val lower = condition.lower.toMutableMap()
+        val upper = condition.upper.toMutableMap()
+        for ((index, id) in coordinates.withIndex()) {
+            val roots = admission.roots[id] ?: continue
+            val window = roots.filter { root ->
+                arithmetic.step()
+                val value = BigFraction.of(root, BIG_ONE)
+                condition.lower[id]?.let { value < it } != true && condition.upper[id]?.let { value > it } != true
+            }
+            if (window.isEmpty()) return false
+            rootWindows[index] = window
+            lower[id] = BigFraction.of(window.first(), BIG_ONE)
+            upper[id] = BigFraction.of(window.last(), BIG_ONE)
+        }
+        condition = PolynomialCondition(condition.bools, lower, upper)
+        return true
+    }
+
+    private fun nearestRoot(index: Int, value: BigInt): BigInt {
+        val roots = rootWindows[index] ?: return value
+        var nearest = roots.first()
+        for (root in roots) {
+            arithmetic.step()
+            val distance = if (root < value) value - root else root - value
+            val best = if (nearest < value) value - nearest else nearest - value
+            if (distance <= best) nearest = root
+        }
+        return nearest
+    }
+
     private fun bounded(index: Int, value: BigInt): BigInt {
+        if (rootWindows[index] != null) return nearestRoot(index, value)
         val id = coordinates[index]
         val lower = condition.lower[id]?.ceilInteger()
         val upper = condition.upper[id]?.let { -it.negated().ceilInteger() }
@@ -238,11 +297,11 @@ internal class NonlinearIntegerCursor(
 
     private fun nextEnumeration(): List<BigInt> {
         arithmetic.step()
-        val value = cursor.map { enumeration[it] }
+        val value = cursor.mapIndexed { index, position -> (rootWindows[index] ?: enumeration)[position] }
         var index = cursor.lastIndex
         while (index >= 0) {
             cursor[index]++
-            if (cursor[index] < enumeration.size) break
+            if (cursor[index] < (rootWindows[index] ?: enumeration).size) break
             cursor[index] = 0
             index--
         }

@@ -9,6 +9,7 @@ import com.eignex.klause.solver.result.TerminationReason
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -337,6 +338,23 @@ class SourceExecutionControlsTest {
             assertTrue(params.cellRefinement)
             assertEquals(reuse, params.reuseSourceCells)
             assertEquals(steering, params.steerSourceCells)
+        }
+    }
+
+    @Test
+    fun `nonlinear root admission should stay disabled unless requested`() {
+        for ((arguments, expected) in listOf(emptyList<String>() to false, listOf("nia-integer-roots=true") to true)) {
+            val invocation = SourceSetup.prepare(SourceSetupRequest(
+                SmtLib.parse("(declare-const x Int) (assert (= (* x x) 2))").source,
+                ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+            ))
+
+            val params = assertNotNull(
+                SourceExecutionRequest(invocation, ExecutionOptions.parse(arguments)).nonlinearInteger,
+            )
+
+            assertEquals(expected, params.admitIntegerRoots)
+            assertFalse(params.cellRefinement)
         }
     }
 

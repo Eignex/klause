@@ -408,4 +408,117 @@ class NonlinearIntegerCursorTest {
 
         assertEquals("100000000000000000000", witness.realValue(0).rational.toString())
     }
+
+    @Test
+    fun `an empty integer root set should refute a rootless square despite its real roots`() {
+        val parsed = SmtLibPolynomial.parse(
+            "(declare-const n Int) (declare-const q Int) (assert (= (* n n) 2))", allowIntegers = true,
+        )
+        val source = NonlinearIntegerProblem(parsed.formula, parsed.realCount, parsed.boolCount,
+            parsed.intVarNames, parsed.realVarNames, parsed.boolVarNames)
+        val params = NonlinearIntegerParams(strategy = NonlinearIntegerStrategy.SEARCH, maximumCandidates = 12)
+        val baseline = solveNonlinearIntegers(source, params)
+
+        val admitted = solveNonlinearIntegers(source, params.copy(admitIntegerRoots = true))
+
+        assertIs<QfNraResult.Unknown>(baseline.result)
+        assertIs<QfNraResult.Unsatisfiable>(admitted.result)
+        assertEquals(NonlinearIntegerRootCounts(admitted = 1, refuted = 1), admitted.stats.roots)
+        assertEquals(0L, admitted.stats.checks)
+    }
+
+    @Test
+    fun `an admitted integer root should reach the cubic witness without more completions`() {
+        val parsed = SmtLibPolynomial.parse(
+            "(declare-const n Int) (declare-const q Int) (assert (= (* (- (* n n) 2) (- n 2)) 0))",
+            allowIntegers = true,
+        )
+        val source = NonlinearIntegerProblem(parsed.formula, parsed.realCount, parsed.boolCount,
+            parsed.intVarNames, parsed.realVarNames, parsed.boolVarNames)
+        val params = NonlinearIntegerParams(strategy = NonlinearIntegerStrategy.SEARCH, maximumCandidates = 12)
+        val baseline = solveNonlinearIntegers(source, params)
+
+        val admitted = solveNonlinearIntegers(source, params.copy(admitIntegerRoots = true))
+
+        val witness = assertIs<QfNraResult.Satisfiable>(admitted.result).assignment
+        assertEquals(BigFraction.ofLong(2), witness.realValue(0).rational)
+        assertTrue(admitted.stats.checks <= baseline.stats.checks)
+    }
+
+    @Test
+    fun `changed windows should refute only scopes that miss every admitted root`() {
+        val parsed = SmtLibPolynomial.parse(
+            "(declare-const n Int) (assert (= (* (- n 2) (- (* 2 n) 1)) 0))", allowIntegers = true,
+        )
+        val source = NonlinearIntegerProblem(parsed.formula, parsed.realCount, parsed.boolCount,
+            parsed.intVarNames, parsed.realVarNames, parsed.boolVarNames)
+        val params = NonlinearIntegerParams(strategy = NonlinearIntegerStrategy.SEARCH, maximumCandidates = 4,
+            admitIntegerRoots = true)
+        val roots = NonlinearIntegerRootStore(source)
+        val rational = PolynomialCondition(lower = mapOf(0 to BigFraction.ZERO), upper = mapOf(0 to BigFraction.ONE))
+        val baseline = solveNonlinearIntegers(source, params.copy(admitIntegerRoots = false), rational)
+
+        val narrow = solveNonlinearIntegers(source, params, rational, roots)
+        val widened = solveNonlinearIntegers(source, params,
+            PolynomialCondition(lower = mapOf(0 to BigFraction.ZERO), upper = mapOf(0 to BigFraction.ofLong(3))), roots)
+
+        assertIs<QfNraResult.Unknown>(baseline.result)
+        assertIs<QfNraResult.Unsatisfiable>(narrow.result)
+        assertEquals(NonlinearIntegerRootCounts(admitted = 1, refuted = 1), narrow.stats.roots)
+        val witness = assertIs<QfNraResult.Satisfiable>(widened.result).assignment
+        assertEquals(BigFraction.ofLong(2), witness.realValue(0).rational)
+        assertEquals(NonlinearIntegerRootCounts(reused = 1), widened.stats.roots)
+    }
+
+    @Test
+    fun `guarded equalities should preserve the satisfiable Boolean alternative`() {
+        val parsed = SmtLibPolynomial.parse(
+            "(declare-const n Int) (declare-const b Bool) " +
+                "(assert (or (and b (= (* n n) 2)) (and (not b) (= (* n n) 4))))",
+            allowIntegers = true,
+        )
+        val source = NonlinearIntegerProblem(parsed.formula, parsed.realCount, parsed.boolCount,
+            parsed.intVarNames, parsed.realVarNames, parsed.boolVarNames)
+        val params = NonlinearIntegerParams(strategy = NonlinearIntegerStrategy.SEARCH, maximumCandidates = 8,
+            admitIntegerRoots = true)
+
+        val guarded = solveNonlinearIntegers(source, params, PolynomialCondition(bools = mapOf(0 to true)))
+        val alternative = solveNonlinearIntegers(source, params, PolynomialCondition(bools = mapOf(0 to false)))
+
+        assertIs<QfNraResult.Unknown>(guarded.result)
+        assertEquals(NonlinearIntegerRootCounts(), guarded.stats.roots)
+        val witness = assertIs<QfNraResult.Satisfiable>(alternative.result).assignment
+        val value = requireNotNull(witness.realValue(0).rational)
+        assertEquals(BigFraction.ofLong(4), value * value)
+    }
+
+    @Test
+    fun `root admission should preserve slices and charge the containing meter once`() {
+        val parsed = SmtLibPolynomial.parse(
+            "(declare-const n Int) (declare-const q Int) (assert (= (* n n) 4)) (assert (= (* q q) (+ n 4)))",
+            allowIntegers = true,
+        )
+        val source = NonlinearIntegerProblem(parsed.formula, parsed.realCount, parsed.boolCount,
+            parsed.intVarNames, parsed.realVarNames, parsed.boolVarNames)
+        var charged = 0L
+        val lifetime = object : Cancellation {
+            override fun isCancelled(): Boolean = false
+            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+        }
+        val params = NonlinearIntegerParams(arithmetic = QfNraParams(cancellation = lifetime),
+            strategy = NonlinearIntegerStrategy.SEARCH, maximumCandidates = 6, admitIntegerRoots = true)
+        val whole = solveNonlinearIntegers(source, params)
+        val wholeCharge = charged
+        NonlinearIntegerCursor(source, params, PolynomialCondition()).use { cursor ->
+            assertNull(cursor.runSlice(maximumCandidates = 3))
+
+            val sliced = requireNotNull(cursor.runSlice(maximumCandidates = 3))
+
+            assertIs<QfNraResult.Unknown>(sliced.result)
+            assertEquals(whole.stats, sliced.stats)
+            assertEquals(NonlinearIntegerRootCounts(admitted = 1), sliced.stats.roots)
+            assertEquals(wholeCharge, sliced.stats.polynomial.workSpent)
+            assertEquals(2 * wholeCharge, charged)
+        }
+    }
 }

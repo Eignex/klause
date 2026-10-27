@@ -180,6 +180,9 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** Alternate integer proposals with exact checked source-cell complements. */
         val niaCellSteering: ExecutionOption<Boolean> = ExecutionOption("nia-cell-steering", ValueKind.BOOLEAN)
 
+        /** Admit complete integer root sets of mandatory unary polynomial equalities. */
+        val niaIntegerRoots: ExecutionOption<Boolean> = ExecutionOption("nia-integer-roots", ValueKind.BOOLEAN)
+
         /** Native heuristic proposal cap. */
         val maxFlips: ExecutionOption<Long> = ExecutionOption("max-flips", ValueKind.LONG)
 
@@ -404,7 +407,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 nodeLimit, openWorkLimit, sourceLpWorkLimit, sourceLpAllocationLimit, sourceLpOperations, sourceCuts,
                 sourcePointCuts, sourceAggregateCuts, sourceRefutationReuse, sourceRefutationPropagation,
                 nraWorkLimit, nraDenseCoefficients, nraMatrixCells, niaCandidates, niaMoves,
-                niaCellRefinement, niaCellReuse, niaCellSteering,
+                niaCellRefinement, niaCellReuse, niaCellSteering, niaIntegerRoots,
                 maxFlips, maxInstructions, alnsIterations, sharedRestart, openBranching,
                 openHintFlips, openHintMinSplits,
                 maxDecisions, luby, adaptiveRestart, emaRestart, modeSwitchingRestart,

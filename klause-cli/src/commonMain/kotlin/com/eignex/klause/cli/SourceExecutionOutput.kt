@@ -240,4 +240,14 @@ internal fun reportNativeSatisfaction(
             "niaDuplicateTuples" to cells.duplicateTuples.toString(),
         ))
     }
+    execution.integerRoots?.let { roots ->
+        output.onAllowanceStatistics(listOf(
+            "niaRootEquations" to roots.admittedEquations.toString(),
+            "niaRootDeclines" to roots.declinedEquations.toString(),
+            "niaRootReuses" to roots.reusedAdmissions.toString(),
+            "niaRootRefutedScopes" to roots.refutedScopes.toString(),
+            "niaRootExcludedTuples" to roots.excludedTuples.toString(),
+            "niaRootCompletionChecks" to roots.completionChecks.toString(),
+        ))
+    }
 }

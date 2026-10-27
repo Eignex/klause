@@ -15,6 +15,7 @@ internal data class NonlinearIntegerParams(
     val seed: Long = 1,
     val reuseSourceCells: Boolean = false,
     val steerSourceCells: Boolean = false,
+    val admitIntegerRoots: Boolean = false,
 ) {
     init {
         require(maximumCandidates >= 0)
@@ -29,6 +30,7 @@ internal data class NonlinearIntegerStats(
     val checks: Long,
     val polynomial: QfNraStats,
     val cells: NonlinearIntegerCellStats = NonlinearIntegerCellStats(),
+    val roots: NonlinearIntegerRootCounts = NonlinearIntegerRootCounts(),
 )
 
 internal data class NonlinearIntegerExecution(val result: QfNraResult, val stats: NonlinearIntegerStats)
@@ -37,6 +39,7 @@ internal fun solveNonlinearIntegers(
     problem: NonlinearIntegerProblem,
     params: NonlinearIntegerParams = NonlinearIntegerParams(),
     condition: PolynomialCondition = PolynomialCondition(),
-): NonlinearIntegerExecution = NonlinearIntegerCursor(problem, params, condition).use {
+    roots: NonlinearIntegerRootStore? = null,
+): NonlinearIntegerExecution = NonlinearIntegerCursor(problem, params, condition, roots).use {
     requireNotNull(it.runSlice())
 }

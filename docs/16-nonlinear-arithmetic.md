@@ -36,6 +36,19 @@ Every strategy starts from the same two facts about the source.
   arbitrary precision, including strict integer floor/ceiling semantics. An empty
   intersection refutes its scope. Guarded bounds do not narrow the source.
 
+Optional root admission adds the complete integer roots of mandatory unary
+equalities. It expands each conjunctive source equality whose syntax names one
+original integer coordinate into an exact univariate polynomial, isolates its real
+roots with the shared Sturm kernel and keeps the roots that compare equal to their
+integer ceiling. Repeated roots count once, and equalities on one coordinate
+intersect their sets. An empty set, or one disjoint from the caller's integer
+window, refutes that scope. A nonempty set narrows the window to its extreme roots,
+replaces the coordinate's traversal values, snaps repairs to the nearest root
+(upper on ties) and skips tuples outside it before completion; witnesses still need
+full completion and source checking. Constant differences, representation limits
+and the admission allowance decline an equation without a proof. Guarded, negated,
+multivariate and real equalities are not admitted.
+
 Each candidate fixes every original integer coordinate and asks the
 [conditioned polynomial service](#conditioned-theory-service)
 to complete real coordinates and correlated Booleans. Failure refutes only that
@@ -79,8 +92,10 @@ expression DAG with exact rational and algebraic arithmetic; a stop or
 representation decline withholds the witness. Rounding selects proposals; it never
 replaces an exact coordinate.
 
-Only a completed real-relaxation refutation or an empty intersection of proved
-bounds refutes the whole source. No finite-box exhaustion claims UNSAT.
+Only a completed real-relaxation refutation, an empty intersection of proved
+bounds or an empty admitted integer root set refutes the whole source. Each applies
+within the caller's Boolean and numeric assumptions. No finite-box exhaustion,
+including exhaustion of nonempty root sets, claims UNSAT.
 
 #### Quadratic objectives
 
@@ -124,6 +139,14 @@ work allowance. Each selected or fallback tuple consumes one ordinary candidate
 attempt, including duplicate, out-of-window and excluded attempts; caps and slice
 boundaries are unchanged. Counters distinguish selection calls, changed unvisited
 proposals, distinct tuples reaching completion and duplicate attempts.
+
+Root admission is disabled by default and independent of the cell controls. An
+invocation admits its source once, spending at most 65,536 work units per equation
+and 262,144 overall from the containing allowance; later cursors reuse the completed
+sets for one step per rooted coordinate. A containing stop leaves admission
+incomplete for the next cursor, while an exhausted admission allowance declines
+only the remaining equations. Counters report admitted and declined equations,
+reuses, refuted cursor scopes and skipped tuples.
 
 ### Implementation
 
