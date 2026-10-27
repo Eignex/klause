@@ -170,9 +170,10 @@ class LinearAuthorityInvocationTest {
         ), mapOf(real to BigFraction.ONE, height to BigFraction.ONE))
         val params = TheoryParams(sourceCuts = false, sourceRefutationReuse = true)
 
-        val cached = LinearAuthorityInvocation(source, params, boundOrdered = true).use { it.run { _, _ -> } }
-        val propagated = LinearAuthorityInvocation(source, params.copy(sourceRefutationPropagation = true),
-            boundOrdered = true).use { it.run { _, _ -> } }
+        val cached = LinearAuthorityInvocation(source, params).use { it.run { _, _ -> } }
+        val propagated = LinearAuthorityInvocation(source, params.copy(sourceRefutationPropagation = true)).use {
+            it.run { _, _ -> }
+        }
 
         assertEquals(SourceValue.Rational(BigFraction.ofLong(2)),
             assertIs<SourceClaim.Optimal>(assertNotNull(cached.terminal).claim).value)
