@@ -25,7 +25,7 @@ operator fun Int.plus(t: IntTerm): IntExpr = flattenSum(IntLit(this), t.toIntExp
 operator fun IntTerm.minus(other: IntTerm): IntExpr = flattenSum(this.toIntExpr(), negate(other.toIntExpr()))
 
 /** `this - c`. */
-operator fun IntTerm.minus(c: Int): IntExpr = flattenSum(this.toIntExpr(), IntLit(-c))
+operator fun IntTerm.minus(c: Int): IntExpr = flattenSum(this.toIntExpr(), negate(IntLit(c)))
 
 /** `this - t`. */
 operator fun Int.minus(t: IntTerm): IntExpr = flattenSum(IntLit(this), negate(t.toIntExpr()))
@@ -115,9 +115,11 @@ private fun flattenSum(left: IntExpr, right: IntExpr): IntExpr {
     return IntSum(children)
 }
 
-private fun negate(expr: IntExpr): IntExpr = when (expr) {
-    is IntLit -> IntLit(-expr.value)
-    is IntScale -> IntScale(-expr.coeff, expr.child)
+// `-Int.MIN_VALUE` has no Int representation, so that constant stays under an explicit `-1` scale
+// rather than wrapping back to itself; lowering narrows the exact value or rejects it.
+private fun negate(expr: IntExpr): IntExpr = when {
+    expr is IntLit && expr.value != Int.MIN_VALUE -> IntLit(-expr.value)
+    expr is IntScale && expr.coeff != Int.MIN_VALUE -> IntScale(-expr.coeff, expr.child)
     else -> IntScale(-1, expr)
 }
 
