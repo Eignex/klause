@@ -1,5 +1,6 @@
 package com.eignex.klause.formats.json
 
+import com.eignex.klause.factor.codec.SemanticRationalSerializer
 import com.eignex.klause.ir.DomainStorageSettings
 import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.FloatSemantics

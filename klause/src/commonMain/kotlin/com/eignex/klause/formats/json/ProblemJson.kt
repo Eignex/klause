@@ -1,5 +1,8 @@
 package com.eignex.klause.formats.json
 
+import com.eignex.klause.factor.codec.FactorCodec
+import com.eignex.klause.factor.codec.FactorCodecs
+import com.eignex.klause.factor.codec.MissingFactorCodecException
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
@@ -12,8 +15,6 @@ import com.eignex.klause.ir.intdomain.runBounds
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.LongArrayList
 import com.eignex.skema.schemaJsonConfig
-import com.eignex.skema.serialization.CompactSerializer
-import com.eignex.skema.serialization.JsonNode
 import com.eignex.skema.serialization.JsonNodeCatalog
 import com.eignex.skema.serialization.decodeFromJsonElement
 import com.eignex.skema.serialization.toJsonSchema
@@ -23,7 +24,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * Lossless JSON interchange of [Problem] models, including models built directly through the IR.
@@ -43,19 +43,10 @@ class ProblemJson(
 ) {
     private val json: Json = Json { schemaJsonConfig() }
 
-    private val catalog: JsonNodeCatalog = JsonNodeCatalog { listOf(factorSerializer, FloatSemanticsSerializer) }
+    private val catalog: JsonNodeCatalog = JsonNodeCatalog { listOf(codecs.nodeSerializer, FloatSemanticsSerializer) }
 
-    private val factorSerializer: CompactSerializer<Any> = CompactSerializer(
-        "com.eignex.klause.formats.json.Factor",
-        Any::class,
-        catalog,
-    ) {
-        codecs.codecs.map { codec ->
-            JsonNode(type = codec.payloadType, name = codec.key, serializer = { codec.payloadSerializer })
-        }
-    }
-
-    private val documentSerializer: KSerializer<ProblemDocument<Any>> = ProblemDocument.serializer(factorSerializer)
+    private val documentSerializer: KSerializer<ProblemDocument<Any>> =
+        ProblemDocument.serializer(codecs.nodeSerializer)
 
     /** Encode [problem] as a JSON object. */
     fun encodeToJsonElement(problem: Problem): JsonObject {
@@ -114,26 +105,14 @@ class ProblemJson(
         return withPath(path) { codec.encode(factor) }
     }
 
-    // Unknown keys fail here, before structural decoding, so the error names the missing codec.
     private fun requireKnownFactorKeys(element: JsonElement) {
         val factors = (element as? JsonObject)?.get("factors") as? JsonArray ?: return
-        factors.forEachIndexed { index, factor ->
-            val key = when (factor) {
-                is JsonObject -> factor.keys.singleOrNull()
-                is JsonPrimitive -> factor.content.takeIf { factor.isString }
-                else -> null
-            } ?: return@forEachIndexed
-            if (codecs.forKey(key) == null) {
-                throw MissingFactorCodecException("$.factors[$index].$key", "no factor codec for key '$key'")
-            }
-        }
+        factors.forEachIndexed { index, factor -> codecs.requireKnownKey(factor, "$.factors[$index]") }
     }
 
     private fun toProblem(document: ProblemDocument<Any>): Problem {
         val factors = Array(document.factors.size) { index ->
-            val payload = document.factors[index]
-            val codec = codecs.codecs.single { it.payloadType == payload::class }
-            withPath("$.factors[$index].${codec.key}") { codec.decode(payload) }
+            withPath("$.factors[$index]") { codecs.factor(document.factors[index]) }
         }
         val implied = document.implied?.let { indices ->
             BooleanArray(factors.size).also { mask ->

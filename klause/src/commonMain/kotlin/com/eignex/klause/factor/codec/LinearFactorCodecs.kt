@@ -1,4 +1,4 @@
-package com.eignex.klause.formats.json
+package com.eignex.klause.factor.codec
 
 import com.eignex.klause.factor.arithmetic.ComparisonClause
 import com.eignex.klause.factor.arithmetic.ExactLinear

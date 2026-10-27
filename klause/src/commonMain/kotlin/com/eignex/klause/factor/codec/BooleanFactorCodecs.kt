@@ -1,4 +1,4 @@
-package com.eignex.klause.formats.json
+package com.eignex.klause.factor.codec
 
 import com.eignex.klause.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean

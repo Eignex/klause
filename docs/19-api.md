@@ -19,7 +19,7 @@ define lifetimes; this chapter identifies supported entry points and extension s
 | `theory` protocols | Batch `Theory`, its fragment-check contract and authoritative exact assignment values; incremental participants use `SearchComponent` |
 | `lp` projection protocols | `RelaxationBuilder`, factor relaxation/hull interfaces and typed source/CP/LP mapping handles |
 | Format entry points | Public parsing, compilation and solution-writing facades; meaning follows [input semantics](03-input-semantics.md) |
-| `formats.json` problem documents | `ProblemJson`, `FactorCodec` registration and `MissingFactorCodecException`; see [problem JSON](03-input-semantics.md#problem-json) |
+| `formats.json.ProblemJson`, `factor.codec` | Problem documents, `FactorCodec` registration and `MissingFactorCodecException`; see [problem JSON](03-input-semantics.md#problem-json) |
 | Exported numerical contracts | `BigInt`, `BigFraction`, `AlgebraicReal`, `Cancellation` and `WorkMeter` |
 
 Supported extensions supply the behavior their interfaces document. A custom factor
