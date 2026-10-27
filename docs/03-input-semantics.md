@@ -175,20 +175,52 @@ same serializers.
 | Vocabulary | Keys |
 |---|---|
 | `SchemaEntry` | `bool`, `presence`, `nominal`, `int`, `float`, `set`, `multiple`, `constraint` |
-| `IntExpr` | `ref`, literal, `scale`, `add`, `mul`, `div`, `mod`, `pow`, `abs`, `min`, `max`, `if`, `element`, `card` |
+| `IntExpr` | `ref`, literal, `scale`, `add`, `mul`, `truncDiv`, `truncMod`, `pow`, `abs`, `min`, `max`, `if`, `element`, `card` |
 | `BoolExpr` logic | `ref`, `notRef`, `nominalEq`, `not`, `and`, `or`, `xor`, `implies`, `iff`, `atMost`, `atLeast`, `cardinality`, `pseudoBoolean` |
 | `BoolExpr` relations | `le`, `lt`, `ge`, `gt`, `eq`, `ne`, `floatLinear`, `realEq`, set `in`, `labelIn`, `subset`, `disjoint`, `setEq` |
 | `BoolExpr` globals | `allDifferent`, `symmetricAllDifferent`, `inverse`, `table`, `regular`, `costRegular`, `mdd`, `costMdd`, `circuit`, `subcircuit`, `cumulative`, `disjunctive`, `sort`, `increasing`, `diffn` and the `…Opt` presence forms |
 | `SetExpr` | `ref`, `elements`, `labels`, `union`, `intersect`, `diff` |
 | `ContinuousRealExpr` | `affine`, `mul`, `pow` |
 
-Shared arithmetic and Boolean keys match Kumulant's expressions where the semantics
-agree. Integer vocabularies accept only integer literals and `div`/`mod` truncate;
-`floatLinear` keeps binary64 coefficients, and exact real expressions form their
-own vocabulary. Decoding is strict: unknown keys, wrong operand counts and
-constructor invariants fail at their document path, such as
-`$.entries.size.int[1]`. `ModelJson.catalog` composes the vocabularies into other
-compact formats; non-JSON formats keep the sealed-class representation.
+Integer vocabularies accept only integer literals; `floatLinear` keeps binary64
+coefficients, and exact real expressions form their own vocabulary. Decoding is
+strict: unknown keys, wrong operand counts and constructor invariants fail at their
+document path, such as `$.entries.size.int[1]`. `ModelJson.catalog` composes the
+vocabularies into other compact formats; non-JSON formats keep the sealed-class
+representation.
+
+### Portable expressions
+
+Schema JSON and Kumulant share one expression profile, so a fragment such as
+`{"ge": [{"ref": "value"}, 0]}` is a schema constraint or a statistical filter. The
+host fixes the numeric environment: schema integer expressions evaluate exactly,
+Kumulant scalar expressions in binary64, rounding each node in the nesting given. A
+key names one mathematical operation everywhere; an environment that cannot
+evaluate it rejects the expression rather than reinterpreting it.
+
+| Shape | Keys |
+|---|---|
+| reference | `{"ref": name}` |
+| literal | bare number |
+| single bare operand | `abs`, `not` |
+| two operands, left then right | `add`, `mul`, `min`, `max`, `pow`, `and`, `or`, `lt`, `le`, `eq`, `ge`, `gt` |
+| condition, then, else | `if` |
+
+A schema binds each reference to the declared variable of its operand's sort, and
+compilation fails naming an unbound one. An integer literal is an integer token in
+32-bit range, and `pow` takes a nonnegative integer literal exponent with
+`0^0 = 1`; `2.0`, `1e2`, `2.5` and other exponents are binary64, which integer
+vocabularies reject. Binary64 writes integral values as integer tokens, so integral
+fragments stay portable. Two-operand keys take exactly two operands in binary64,
+where a longer list would hide the rounding order. Integer vocabularies extend
+`add`, `min`, `max`, `and` and `or` to any nonempty list, and name truncating
+division `truncDiv` and `truncMod`, whose remainder takes the dividend's sign.
+`div` is binary64 division with IEEE 754 non-finite results, and integer
+vocabularies reject it. Klause's other keys, and Kumulant's `sub`, `neg` and
+transcendental functions, are extensions of one side. The conformance fixture
+`klause/src/jvmTest/resources/portable-expression/conformance.json`, which Kumulant
+keeps verbatim, records each environment's values, canonical encodings and
+rejections.
 
 ### Integer extrema and selection
 
