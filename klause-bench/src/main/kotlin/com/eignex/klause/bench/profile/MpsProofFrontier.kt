@@ -57,10 +57,18 @@ internal object MpsProofFrontier {
             NumericalActiveRowsControls.run(out)
             return
         }
+        if ("feedbackControls=true" in args) {
+            feedbackControls(args, out)
+            return
+        }
+        capture(args, out)
+    }
+
+    private fun capture(args: Array<String>, out: File) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val supported = setOf("suite", "problem", "sha256", "exact", "probe", "history", "frontier", "cuts",
             "selection", "replay", "operations", "activeRows", "supportBranching", "pointCuts", "aggregate-probe",
-            "aggregate-mixed", "aggregate-replay", "aggregateCuts")
+            "aggregate-mixed", "aggregate-replay", "aggregateCuts", "refutationReuse")
         require(options.keys.containsAll(setOf("suite", "problem", "sha256", "exact")) &&
             (options.keys - supported).isEmpty())
         val probe = options["probe"]?.toBooleanStrict() ?: false
@@ -102,6 +110,7 @@ internal object MpsProofFrontier {
             sourceCuts = options["cuts"]?.toBooleanStrict() ?: true,
             sourcePointCuts = options["pointCuts"]?.toBooleanStrict() ?: false,
             sourceAggregateCuts = options["aggregateCuts"]?.toBooleanStrict() ?: false,
+            sourceRefutationReuse = options["refutationReuse"]?.toBooleanStrict() ?: false,
             sourceLpOperations = options["operations"]?.toInt()?.also { require(it in 1..256) } ?: Int.MAX_VALUE)
         val authority = request.javaClass.declaredMethods.single {
             it.name == "authorityContext" && it.parameterCount == 2
@@ -236,6 +245,7 @@ internal object MpsProofFrontier {
                 put("supportBranching", supportBranching)
                 put("pointCuts", params.sourcePointCuts)
                 put("aggregateCuts", params.sourceAggregateCuts)
+                put("refutationReuse", params.sourceRefutationReuse)
                 put("aggregateProbe", aggregateProbe)
                 put("aggregateMixed", aggregateMixed)
                 put("aggregateReplay", aggregateReplay)
@@ -279,6 +289,31 @@ internal object MpsProofFrontier {
         }
     }
 
+    private data class FeedbackArm(
+        val name: String, val support: Boolean, val selection: Boolean, val reuse: Boolean, val aggregation: Boolean,
+    )
+
+    private fun feedbackControls(args: Array<String>, out: File) {
+        val allowed = setOf("feedbackControls", "suite", "problem", "sha256", "exact", "operations")
+        require(args.all { it.substringBefore('=') in allowed })
+        require(args.any { it.startsWith("operations=") })
+        val base = args.filterNot { it.startsWith("feedbackControls=") } +
+            listOf("frontier=true", "selection=true")
+        val arms = listOf(
+            FeedbackArm("baseline", false, false, false, false),
+            FeedbackArm("full", true, true, true, true),
+            FeedbackArm("no-support", false, true, true, true),
+            FeedbackArm("no-selection", true, false, true, true),
+            FeedbackArm("no-reuse", true, true, false, true),
+            FeedbackArm("no-aggregation", true, true, true, false),
+        )
+        for (arm in arms) {
+            capture((base + listOf("supportBranching=${arm.support}", "pointCuts=${arm.selection}",
+                "refutationReuse=${arm.reuse}", "aggregateCuts=${arm.aggregation}")).toTypedArray(),
+                out.resolve(arm.name).apply { mkdirs() })
+        }
+    }
+
     private fun launch(args: Array<String>, out: File) {
         val command = arrayListOf(
             File(System.getProperty("java.home"), "bin/java").path,
@@ -299,7 +334,8 @@ internal object MpsProofFrontier {
         }.toString() + "\n")
         val process = builder.start()
         try {
-            check(process.waitFor(120, TimeUnit.SECONDS)) { "frontier JVM transport timeout" }
+            val timeoutSeconds = if ("feedbackControls=true" in args) 360L else 120L
+            check(process.waitFor(timeoutSeconds, TimeUnit.SECONDS)) { "frontier JVM transport timeout" }
             check(process.exitValue() == 0) { "frontier JVM failed" }
         } finally {
             if (process.isAlive) {

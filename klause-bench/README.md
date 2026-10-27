@@ -5377,6 +5377,14 @@ Submit through the lab with `profile.runTimeoutSec: 180` for a bounded local Mac
 capture. A child JVM uses one processor, a 3 GiB heap, Serial GC and JFR. This is an
 instrumented owner-state capture; ordinary matched CLI experiments measure cost.
 
+`refutationReuse=true` enables the invocation-local checked cache in this capture.
+`feedbackControls=true operations=N` compares baseline, full feedback and one
+ablation of support ordering, point selection, reuse and aggregation on the same
+hash-matched source. It writes each arm's bounds, incumbents, query journal and
+frontier under its own directory. The lab places this job normally; allow 600
+seconds for the six ordered captures. Their inspection allowances are separate
+from solving, and their ordered JFR timings establish no throughput comparison.
+
 The capture retains the original bytes, native affine system and build/runtime
 identity. `incumbents.jsonl` flushes accepted incumbent values and branch conditions.
 `bounds.jsonl` flushes changed global bounds after cooperative slices, recording
