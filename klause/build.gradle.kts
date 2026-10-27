@@ -31,8 +31,8 @@ eignexPublish {
 // local build/check and CI use the same target set. The release builds every target via -Ptargets.full.
 val fullTargets = providers.gradleProperty("targets.full").isPresent
 
-// Compact model JSON needs Skema's unreleased fixed-field nodes and root path decoding.
-val skemaPin = "0.3.1-20261027.073004-15"
+// Compact model JSON needs Skema's unreleased fixed-field nodes, root path decoding and integral tokens.
+val skemaPin = "0.3.1-20261027.115734-17"
 
 kotlin {
     compilerOptions {
