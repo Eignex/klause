@@ -4356,6 +4356,39 @@ sums balance. Ordered instrumented component timings and allocation records incl
 their actual cold starts and establish no whole-CLI throughput claim. Numeric
 exclusions remain native scoped proofs, without independent certification.
 
+[Ordinary qualification 8806](https://lab.eignex.com/jobs/8806) compares default
+`814aa38899` with one-line composed activation `6020adaf8e`, P1/seed 3/10 s,
+on the frozen seventy sources plus all twelve cycle controls. All 82 paired
+source hashes, outcomes and process exits match. Each arm has 49 SAT, 29 native
+UNSAT, two UNKNOWN and the two unchanged negative-literal admission failures.
+Forty-seven SAT witnesses per arm independently validate: 22 with Dolmen 0.10
+and 25 with Z3 5.1.0. The power-syntax witness stays checker-unknown and DIMACS SAT
+unchecked; native UNSAT has no independent certificate. All 96 checker records
+bind the original hashes and exact published witness bytes.
+
+Across seventy completed arithmetic pairs, `nraWork` changes from 4,042,913 to
+3,803,270 units, with four decreases and 22 increases. Every decrease belongs to
+an authored inconsistent cycle. The existing 58 arithmetic pairs add 31,336 units
+and improve none. Whole-CLI receipts retain preparation, search, native validation
+and close costs; independent checker costs stay separate. Repeated-cycle UNSAT
+changes from 207,971 to 31,869 native units, 2.32 to 1.58 seconds and 110,208 to
+97,276 KiB peak RSS. Its SAT neighbour changes from 133,185 to 150,425 units,
+2.06 to 2.26 seconds and 107,520 to 112,808 KiB. These single ordered physical
+observations establish no throughput claim. All 164 receipts bind their unchanged
+raw solve records. CLI execution uses Linux/amd64, Java 25.0.4.1, a one-CPU and
+4,608 MiB cgroup limit, without OOM events; checker receipts retain their separate
+Darwin execution. The coupled option stays disabled by default.
+
+[Matched original witnesses 8820](https://lab.eignex.com/jobs/8820) compares default
+`a5398c4699` with activation `3df7f4e7f6` on the unchanged three job-8750 SAT
+sources. All six complete-source witnesses independently validate, four with Z3
+and two with Dolmen. No whole-source gain follows from the conditional conflict:
+native work rises 71,756→72,215, 796,188→802,455 and 79,470→79,942. Source hashes
+and outcomes match. Setup failures in diagnostic 8797 and the additional prepared
+family profile 8817 yield no solver observations; both were cancelled. The latter
+adds no claim beyond the completed mapped-branch matrix and whole-family source
+qualification. No local compilation, tests or numerical workloads ran.
+
 ### Polynomial Boolean bookkeeping
 
 The first-region control in `PolynomialBooleanRegionsTest` excludes normalization
