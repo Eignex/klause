@@ -4,6 +4,7 @@ import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
 import com.sun.management.ThreadMXBean
@@ -88,7 +89,9 @@ internal fun projectedSourceCenter(
     sweep: DefinitionalSweep?,
     reconstruct: (Sample) -> Sample,
 ): Pair<Sample?, String?> {
-    val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+    val model = LocalSearchModel.of(problem)
+    val pins = model.pinsUnder(Assumptions.None) ?: return null to "working-root-infeasible"
+    val state = LocalSearchState(model, Random(0), pins)
     state.invariants = sweep?.network(problem.numIntVars, problem.numBoolVars)
     val decline = loadSourceCenter(source, state, coordinates, reconstruct) {
         sweep?.let {

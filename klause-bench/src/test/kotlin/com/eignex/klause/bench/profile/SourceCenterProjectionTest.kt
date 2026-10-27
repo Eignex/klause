@@ -1,6 +1,7 @@
 package com.eignex.klause.bench.profile
 
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.DefinitionHint
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -20,6 +21,17 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class SourceCenterProjectionTest {
+    @Test
+    fun `prepared root Boolean pins are enforced before a warm start`() {
+        val problem = Problem(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, true)))))
+
+        val (projected, decline) = projectedSourceCenter(Sample(booleanArrayOf(false), longArrayOf()),
+            problem.bake(), VarRemap(intArrayOf(0), intArrayOf()), null, { it })
+
+        assertNull(projected)
+        assertEquals("target-pin", decline)
+    }
+
     @Test
     fun `fresh definition networks retain a complete mixed center`() {
         val problem = Problem(1, 1, arrayOf(IntDomain(0, 1)),
