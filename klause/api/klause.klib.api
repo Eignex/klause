@@ -14012,7 +14012,7 @@ final class com.eignex.klause.solver.pipeline/NonlinearIntegerCellReuseStats { /
 }
 
 final class com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams { // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams|null[0]
-    constructor <init>(com.eignex.klause.solver.pipeline/PolynomialTheoryParams = ..., kotlin/Long = ..., kotlin/Long = ..., com.eignex.klause.backtrack/NodeBudget? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ...) // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams.<init>|<init>(com.eignex.klause.solver.pipeline.PolynomialTheoryParams;kotlin.Long;kotlin.Long;com.eignex.klause.backtrack.NodeBudget?;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean){}[0]
+    constructor <init>(com.eignex.klause.solver.pipeline/PolynomialTheoryParams = ..., kotlin/Long = ..., kotlin/Long = ..., com.eignex.klause.backtrack/NodeBudget? = ..., kotlin/Boolean = ..., kotlin/Boolean = ...) // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams.<init>|<init>(com.eignex.klause.solver.pipeline.PolynomialTheoryParams;kotlin.Long;kotlin.Long;com.eignex.klause.backtrack.NodeBudget?;kotlin.Boolean;kotlin.Boolean){}[0]
 
     final val cellRefinement // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams.cellRefinement|{}cellRefinement[0]
         final fun <get-cellRefinement>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams.cellRefinement.<get-cellRefinement>|<get-cellRefinement>(){}[0]
@@ -14033,7 +14033,7 @@ final class com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams { // 
     final fun component4(): com.eignex.klause.backtrack/NodeBudget? // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams.component4|component4(){}[0]
     final fun component5(): kotlin/Boolean // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams.component5|component5(){}[0]
     final fun component6(): kotlin/Boolean // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams.component6|component6(){}[0]
-    final fun copy(com.eignex.klause.solver.pipeline/PolynomialTheoryParams = ..., kotlin/Long = ..., kotlin/Long = ..., com.eignex.klause.backtrack/NodeBudget? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ...): com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams.copy|copy(com.eignex.klause.solver.pipeline.PolynomialTheoryParams;kotlin.Long;kotlin.Long;com.eignex.klause.backtrack.NodeBudget?;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean){}[0]
+    final fun copy(com.eignex.klause.solver.pipeline/PolynomialTheoryParams = ..., kotlin/Long = ..., kotlin/Long = ..., com.eignex.klause.backtrack/NodeBudget? = ..., kotlin/Boolean = ..., kotlin/Boolean = ...): com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams.copy|copy(com.eignex.klause.solver.pipeline.PolynomialTheoryParams;kotlin.Long;kotlin.Long;com.eignex.klause.backtrack.NodeBudget?;kotlin.Boolean;kotlin.Boolean){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams.toString|toString(){}[0]
