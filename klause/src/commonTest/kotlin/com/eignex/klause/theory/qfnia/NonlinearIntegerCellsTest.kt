@@ -156,6 +156,8 @@ class NonlinearIntegerCellsTest {
             assertTrue(excluded)
             assertFalse(cells.excludes(listOf(endpoint), algebraic))
             assertFalse(cells.excludes(listOf(endpoint - direction), algebraic))
+            assertEquals(listOf(endpoint), cells.propose(listOf(endpoint + direction),
+                PolynomialCondition(), emptySet(), algebraic))
         }
     }
 
