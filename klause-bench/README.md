@@ -5503,6 +5503,69 @@ The 16 MiB capture journal retains six of 61 attempted records, leaving later
 point inspection unavailable. This verifies traversal consumption and costs;
 whole-CLI comparisons and held-out qualification are separate measurements.
 
+[Ordinary qualification 8620](https://lab.eignex.com/jobs/8620), at `6feefc72f3`,
+finishes all 128 cases: disabled, individual, aggregate and automatic-default arms,
+exact and default tolerance, seeds 1 and 3, two repeats, four original MPS sources.
+All 87 emitted witnesses pass the same independent checker identified in 8481.
+The 64 proven outcomes are on `gr4x6` (`4047/20`) and `p0033` (`3089`); witness
+checking remains separate from native proof checking. Retries preserve the first
+16 accepted records and complete the unfinished cases under the frozen settings.
+
+Each of the 32 comparison blocks shares its full build fingerprint. All CLI
+JAR and benchmark harness hashes match across the cohort; the platform launcher and
+runtime distinguish Linux/amd64 from macOS/aarch64. Every case requests P1,
+3 GiB SerialGC, debug enabled and a ten-second solver budget. CPU seconds cover
+the whole CLI process; physical RSS is distinct from modeled allocation. The
+external resource receipt binds each raw solve record by SHA-256. Ranges below
+describe the eight runs in each row and span both platform strata. Pairwise outcome
+comparisons use matched runtime blocks. Whole-CLI wall times range from 0.46 to
+10.40 seconds; these timings supply no pooled throughput estimate.
+
+| Source | Arm | Witnesses / proven | Funded work, millions | Modeled allocation, MB | CPU seconds | Peak RSS, MiB |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| rgn | disabled | 4 / 0 | 80.043–160.067 | 2.767–100.198 | 10.21–20.93 | 176.6–373.0 |
+| rgn | individual | 1 / 0 | 104.048–251.043 | 2.063–27.668 | 10.22–20.72 | 166.9–326.0 |
+| rgn | aggregate | 2 / 0 | 120.076–549.544 | 3.478–69.697 | 10.21–21.04 | 165.0–338.3 |
+| rgn | automatic default | 8 / 0 | 3.116–41.579 | 0.440–0.990 | 10.17–22.20 | 184.2–326.9 |
+| gr4x6 | disabled | 8 / 8 | 2.781 | 0.266 | 1.39–1.82 | 101.7–195.5 |
+| gr4x6 | individual | 8 / 8 | 2.786 | 0.266 | 1.13–1.99 | 101.7–197.3 |
+| gr4x6 | aggregate | 8 / 8 | 2.813 | 1.209 | 1.17–2.13 | 103.7–195.7 |
+| gr4x6 | automatic default | 8 / 8 | 2.649–2.781 | 0.243–0.249 | 1.83–6.85 | 148.1–211.2 |
+| p0033 | disabled | 8 / 8 | 24.600 | 5.207 | 4.61–8.53 | 159.2–293.8 |
+| p0033 | individual | 8 / 8 | 27.601 | 5.118 | 4.54–8.82 | 155.1–299.0 |
+| p0033 | aggregate | 8 / 8 | 27.602 | 5.177 | 5.18–9.47 | 159.1–296.9 |
+| p0033 | automatic default | 8 / 8 | — | — | 0.89–4.10 | 123.0–172.0 |
+| pp08aCUTS | disabled | 0 / 0 | 908.824–1000.112 | 2.763–3.098 | 17.92–21.14 | 306.5–336.9 |
+| pp08aCUTS | individual | 0 / 0 | 833.463–1001.080 | 2.785–3.252 | 19.24–21.09 | 284.6–320.9 |
+| pp08aCUTS | aggregate | 0 / 0 | 804.047–1000.005 | 3.773–4.353 | 19.56–21.21 | 289.4–309.3 |
+| pp08aCUTS | automatic default | 8 / 0 | 75.480–220.167 | 0.586–0.966 | 20.99–22.64 | 307.7–329.7 |
+
+Funded totals include discovery, failed attempts, query preparation, numerical
+work and certification. The automatic `p0033` route has no numerical-frontier
+funding ledger. No automatic-default arm enables aggregation.
+
+On `rgn`, the final checked nominal bound is about 67.4–70.8 with aggregation,
+versus 72.2–75.0 for individual and disabled separation. Pending alternatives
+range over 190–579, 288–601 and 396–632 respectively. Aggregation gains one witness
+over individual separation and loses two relative to disabled separation in the
+matched blocks. The stronger same-parent root bound therefore supplies no general
+search or throughput improvement claim.
+
+No held-out source accepts an aggregate from this bounded family. `gr4x6` visits
+48 combinations: 24 have integral right-hand sides and 24 lack residual bounds.
+`p0033` has no eligible projection attempts. Its four individual cuts remain
+available. Aggregate preparation adds 26,336 work and 942,434 modeled bytes on
+`gr4x6`, and 901 work and 59,222 modeled bytes on `p0033`, over individual cuts.
+`pp08aCUTS` visits 231 combinations, including 112 support-limited attempts whose
+applicability remains unknown. Zero retained cuts there establish no broader
+inapplicability result.
+
+The checked producer and explicit frontier option remain available for controlled
+experiments. The 64-proposal traversal policy stays disabled by default: its root
+inference is useful, while this cohort shows higher costs, weaker final bounds and
+lost outcomes relative to disabled separation. Wider aggregates and other bound
+choices remain outside this experiment.
+
 [Infrastructure control 8481](https://lab.eignex.com/jobs/8481) pairs
 `133546fd6f` and `2161236173` with aggregation disabled, across `gr4x6`, `p0033`,
 `rgn` and `pp08aCUTS`, seeds 1 and 3, default and exact policies, and individual,
