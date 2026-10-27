@@ -217,7 +217,7 @@ class CompilerTest {
         // 1_000_000 * [0, 100_000] = [0, 1e11] is past Int; abs() forces the domain computation.
         class S : VariableSchema() {
             val x by intVar(min = 0, max = 100_000)
-            val c by constraint { abs(1_000_000 * x) le 5 }
+            val c by constraint { (1_000_000 * x).abs() le 5 }
         }
         assertFailsWith<IllegalArgumentException> { S().compile() }
     }

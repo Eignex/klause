@@ -41,24 +41,51 @@ import com.eignex.klause.model.SymmetricAllDifferent
 import com.eignex.klause.model.TableConstraint
 import com.eignex.klause.model.XorExpr
 
-/** Minimum of [xs] (at least one argument). */
-fun min(vararg xs: IntTerm): IntExpr {
-    require(xs.isNotEmpty()) { "min(): need at least one argument" }
+/**
+ * Absolute value of this term.
+ *
+ * `abs`, `min`, `max` and `pow` are receiver helpers and conditionals are [ifThenElse], the
+ * spellings Kumulant's binary64 expressions share, so portable fragments read the same in both.
+ */
+fun IntTerm.abs(): IntExpr = IntAbs(toIntExpr())
+
+/** The smaller of this term and [other], as one two-operand node. */
+fun IntTerm.min(other: IntTerm): IntExpr = IntMin(listOf(toIntExpr(), other.toIntExpr()))
+
+/** The smaller of this term and the constant [c]. */
+fun IntTerm.min(c: Int): IntExpr = IntMin(listOf(toIntExpr(), IntLit(c)))
+
+/** The larger of this term and [other], as one two-operand node. */
+fun IntTerm.max(other: IntTerm): IntExpr = IntMax(listOf(toIntExpr(), other.toIntExpr()))
+
+/** The larger of this term and the constant [c]. */
+fun IntTerm.max(c: Int): IntExpr = IntMax(listOf(toIntExpr(), IntLit(c)))
+
+/** Minimum of [xs] (at least one argument) as one n-ary node, an integer-only extension of `min`. */
+fun minOf(vararg xs: IntTerm): IntExpr {
+    require(xs.isNotEmpty()) { "minOf(): need at least one argument" }
     return IntMin(xs.map { it.toIntExpr() })
 }
 
-/** Maximum of [xs] (at least one argument). */
-fun max(vararg xs: IntTerm): IntExpr {
-    require(xs.isNotEmpty()) { "max(): need at least one argument" }
+/** Maximum of [xs] (at least one argument) as one n-ary node, an integer-only extension of `max`. */
+fun maxOf(vararg xs: IntTerm): IntExpr {
+    require(xs.isNotEmpty()) { "maxOf(): need at least one argument" }
     return IntMax(xs.map { it.toIntExpr() })
 }
 
-/** Absolute value of `x`. */
-fun abs(x: IntTerm): IntExpr = IntAbs(x.toIntExpr())
+/** [then] when [cond] holds, else [otherwise], as an integer expression. */
+fun ifThenElse(cond: BoolTerm, then: IntTerm, otherwise: IntTerm): IntExpr =
+    IntIfThenElse(cond.toExpr(), then.toIntExpr(), otherwise.toIntExpr())
 
-/** `if cond then thenE else elseE` as an integer expression. */
-fun ifThenElse(cond: BoolTerm, thenE: IntTerm, elseE: IntTerm): IntExpr =
-    IntIfThenElse(cond.toExpr(), thenE.toIntExpr(), elseE.toIntExpr())
+/** [then] when [cond] holds, else [otherwise], with a constant [then] branch. */
+fun ifThenElse(cond: BoolTerm, then: Int, otherwise: IntTerm): IntExpr = ifThenElse(cond, IntLit(then), otherwise)
+
+/** [then] when [cond] holds, else [otherwise], with a constant [otherwise] branch. */
+fun ifThenElse(cond: BoolTerm, then: IntTerm, otherwise: Int): IntExpr = ifThenElse(cond, then, IntLit(otherwise))
+
+/** [then] when [cond] holds, else [otherwise], with constant branches. */
+fun ifThenElse(cond: BoolTerm, then: Int, otherwise: Int): IntExpr =
+    ifThenElse(cond, IntLit(then), IntLit(otherwise))
 
 /** `items[index]` — array element selection (items must be non-empty). */
 fun element(index: IntTerm, items: List<IntTerm>): IntExpr {

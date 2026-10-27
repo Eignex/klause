@@ -127,4 +127,14 @@ class IntOperatorsTest {
         }
         assertFailsWith<IllegalArgumentException> { S().compile() }
     }
+
+    @Test
+    fun `division and remainder should accept a literal on either side`() {
+        val a = IntHandle("a", 1, 9)
+
+        assertEquals(
+            listOf(a / IntLit(2), IntLit(7) / a, a % IntLit(2), IntLit(7) % a),
+            listOf(a / 2, 7 / a, a % 2, 7 % a),
+        )
+    }
 }

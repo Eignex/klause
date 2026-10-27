@@ -223,6 +223,15 @@ transcendental functions, are extensions of one side. The conformance fixture
 keeps verbatim, records each environment's values, canonical encodings and
 rejections.
 
+The Kotlin builders of both libraries spell the shared operations alike: infix
+`lt`, `le`, `eq`, `ne`, `ge` and `gt` with a literal on either side, arithmetic
+operators with literal operands, the receiver helpers `x.abs()`, `x.min(y)`,
+`x.max(y)` and `x.pow(n)`, and `ifThenElse(cond, then, otherwise)` with literal or
+expression branches. Integer `/` and `%` build `truncDiv` and `truncMod`, and
+`minOf` and `maxOf` build the variadic integer forms. Each library keeps its own
+nodes, so equal spellings can still encode differently: Klause writes `ne` and
+constant multiples with its `ne` and `scale` keys.
+
 ### Integer extrema and selection
 
 Nested integer `min`/`max` expressions retain `ArrayMinMax` factors over their

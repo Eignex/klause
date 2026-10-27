@@ -98,7 +98,7 @@ class CompilerLiftTest {
         class S : VariableSchema() {
             val b by boolVar()
             val x by intVar(-2, 2)
-            val relation by constraint { b iff (abs(x) eq 2) }
+            val relation by constraint { b iff (x.abs() eq 2) }
         }
         val compiled = S().compile()
         assertTrue(compiled.problem.factors.any { it is Abs })

@@ -51,8 +51,20 @@ operator fun IntTerm.times(other: IntTerm): IntExpr {
 /** Integer (truncating) division `this / other`. */
 operator fun IntTerm.div(other: IntTerm): IntExpr = IntDiv(toIntExpr(), other.toIntExpr())
 
+/** Integer (truncating) division `this / c`. */
+operator fun IntTerm.div(c: Int): IntExpr = IntDiv(toIntExpr(), IntLit(c))
+
+/** Integer (truncating) division `this / t`. */
+operator fun Int.div(t: IntTerm): IntExpr = IntDiv(IntLit(this), t.toIntExpr())
+
 /** Integer remainder `this % other`. */
 operator fun IntTerm.rem(other: IntTerm): IntExpr = IntMod(toIntExpr(), other.toIntExpr())
+
+/** Integer remainder `this % c`. */
+operator fun IntTerm.rem(c: Int): IntExpr = IntMod(toIntExpr(), IntLit(c))
+
+/** Integer remainder `this % t`. */
+operator fun Int.rem(t: IntTerm): IntExpr = IntMod(IntLit(this), t.toIntExpr())
 
 /** `this ≤ other`. */
 infix fun IntTerm.le(other: IntTerm): BoolExpr = IntCompare(toIntExpr(), IntCmpOp.LE, other.toIntExpr())
