@@ -29,6 +29,54 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LinearRefutationReuseTest {
+    @Test
+    fun `named complementary conflicts should exclude a region neither proof matches`() {
+        val x = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val y = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
+        val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val scope = SourceScope(SourceRevision("resolution", "exact-affine"))
+        val source = SourceProofContext(scope, setOf(x, y, z), mapOf(
+            "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE,
+                y to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE)),
+            "right" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE,
+                z to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ))
+        val left = SourceEvidence(scope.copy(condition = SourceCondition(upper = mapOf(
+            x to BigFraction.ZERO, y to BigFraction.ZERO))), SourceClaim.Refutation,
+            LinearPinnedRefutation(SourceDerivation.Combination(listOf(
+                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("left")),
+                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(x, true)),
+                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(y, true)),
+            ))))
+        val right = SourceEvidence(scope.copy(condition = SourceCondition(lower = mapOf(x to BigFraction.ONE),
+            upper = mapOf(z to BigFraction.ZERO))), SourceClaim.Refutation,
+            LinearPinnedRefutation(SourceDerivation.Combination(listOf(
+                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("right")),
+                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(x, false)),
+                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(z, true)),
+            ))))
+        val cache = LinearRefutationReuse(source, SourceLpBudget(), Cancellation.Never)
+        val learned = LinearRefutationReuse(source, SourceLpBudget(), Cancellation.Never, resolve = true)
+        learned.name(x, BigFraction.ZERO, 0)
+        learned.name(y, BigFraction.ZERO, 2)
+        learned.name(z, BigFraction.ZERO, 4)
+        for (proof in listOf(left, right)) {
+            cache.retain(proof)
+            learned.retain(proof)
+        }
+        for (endpoint in listOf(BigFraction.ZERO, BigFraction.MINUS_ONE)) {
+            val region = SourceCondition(upper = mapOf(y to endpoint, z to endpoint))
+            assertNull(cache.find(region))
+
+            val excluded = assertNotNull(learned.find(region))
+
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority().atScope(excluded.scope)).verify(excluded))
+        }
+        assertNull(learned.find(SourceCondition(upper = mapOf(y to BigFraction.ONE, z to BigFraction.ZERO))))
+        assertEquals(2L, learned.observations()["numericalRefutationReuseResolutionHits"])
+    }
+
     private val x = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
     private val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
     private val scope = SourceScope(SourceRevision("reuse-source", "exact-affine"),

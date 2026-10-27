@@ -110,6 +110,13 @@ and stores into the native clause database. The shared first-UIP analyzer in
 asserts and backjumps, while a sound resolvent that cannot assert keeps chronological
 fallback. Unexplained component publications cannot supply missing antecedents.
 
+The numerical frontier also uses the shared clause-resolution operation on checked
+source refutations. Each retained resolvent carries an exhaustive integer-split
+derivation over its two input proofs. It enters the numerical coverage tree only
+after a new source check, preserving proof authority independently of clause names
+and queue order. This bounded opt-in policy retains complete Boolean scope and
+opening restrictions; unsupported predicates cannot produce a resolvent.
+
 ## Native SAT lane
 
 A pure-Boolean model whose factors are all clauses runs on a dedicated lane. The

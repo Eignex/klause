@@ -49,7 +49,7 @@ internal fun bindSourceExecutionControls(
     val companions = invocation.requestsFiniteNumericalCompanions
     val finiteOptions = options.withoutPresolve().without("node-limit", "dry-run-presolve").let {
         if (companions) it.without("source-lp-work-limit", "source-lp-allocation-limit", "source-lp-operations",
-            "source-refutation-reuse", "source-refutation-propagation") else it
+            "source-refutation-reuse", "source-refutation-propagation", "source-refutation-resolution") else it
     }
         .overriddenBy(ExecutionOptions(ExecutionOption.seed(seed)))
     val finite: (FiniteSolveShape) -> FiniteSolveRequest = { shape ->
@@ -87,6 +87,8 @@ internal fun bindSourceExecutionControls(
             sourceRefutationReuse = reader[ExecutionOption.sourceRefutationReuse] ?: defaults.sourceRefutationReuse,
             sourceRefutationPropagation = reader[ExecutionOption.sourceRefutationPropagation]
                 ?: defaults.sourceRefutationPropagation,
+            sourceRefutationResolution = reader[ExecutionOption.sourceRefutationResolution]
+                ?: defaults.sourceRefutationResolution,
         ) else defaults
         return SourceExecutionControls(
             theory,
@@ -137,6 +139,8 @@ internal fun bindSourceExecutionControls(
             sourceRefutationReuse = reader[ExecutionOption.sourceRefutationReuse] ?: defaults.sourceRefutationReuse,
             sourceRefutationPropagation = reader[ExecutionOption.sourceRefutationPropagation]
                 ?: defaults.sourceRefutationPropagation,
+            sourceRefutationResolution = reader[ExecutionOption.sourceRefutationResolution]
+                ?: defaults.sourceRefutationResolution,
             maxDecisions = decisions,
             sharedRestart = reader[ExecutionOption.sharedRestart],
             maxLearnedClauses = reader[ExecutionOption.maxLearned],
