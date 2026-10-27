@@ -8,6 +8,8 @@ import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.parseBigInt
+import com.eignex.klause.util.unaryMinus
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -26,6 +28,7 @@ class NonlinearIntegerRootsTest {
             "(= (* (- n 1) (- n 1) (+ n 2)) 0)" to listOf(-2, 1),
             "(= (* n n n) (- 8))" to listOf(-2),
             "(= 0 (* n (- n 5)))" to listOf(0, 5),
+            "(= (* (- n 1000003) (- (* n n) 2)) 0)" to listOf(1000003),
         )
         for ((atom, expected) in cases) {
             val store = NonlinearIntegerRootStore(problem("(declare-const n Int) (declare-const q Int) (assert $atom)"))
@@ -48,6 +51,25 @@ class NonlinearIntegerRootsTest {
 
         assertEquals(mapOf(0 to listOf(bigIntOf(-2))), admission.roots)
         assertEquals(2L, admission.admitted)
+    }
+
+    @Test
+    fun `wide integer roots should be admitted well within the equation allowance`() {
+        val store = NonlinearIntegerRootStore(problem(
+            "(declare-const n Int) (assert (= (* n n) 10000000000000000000000000000000000000000))",
+        ))
+        var charged = 0L
+        val parent = object : Cancellation {
+            override fun isCancelled(): Boolean = false
+            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+        }
+
+        val admission = store.admit(parent, PolynomialLimits()) {}
+
+        val root = parseBigInt("100000000000000000000")
+        assertEquals(mapOf(0 to listOf(-root, root)), admission.roots)
+        assertEquals(1L, admission.admitted)
+        assertTrue(charged < 16_384, "charged $charged")
     }
 
     @Test
