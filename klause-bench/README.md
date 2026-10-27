@@ -1898,6 +1898,50 @@ native incumbents, time and allocation remain the efficacy observations; proposa
 counts alone establish no improvement. Private proposal screening runs outside
 the walk allowance.
 
+The common-center [proposal matrix](https://lab.eignex.com/jobs/8753) at
+`f55a01792b` replays the first retained cost-zero policy-local-optimum centers from
+[GBACP](https://lab.eignex.com/jobs/8660) and the whole-family
+[TestScheduling holdout](https://lab.eignex.com/jobs/8661), seeds 3/7. Source hashes,
+complete centers and runtime/distribution hashes remain in the captures. All seven
+views use `cbls-plateau/ils-basin`, fresh learned state, protected source coordinates,
+5,000 containing moves/restarts and five seconds including preparation/mapping.
+The Linux/amd64 profiles request a 2 GiB heap, SerialGC and one active processor.
+All 7,564 distinct within-view seed-candidate comparisons agree on complete exact
+canonical, cone and source values; all 28 final points pass the native original-source
+check. These checks supply no independent XCSP3 certification or global equivalence.
+Sixteen walks are clock-censored. The retained/substituted controls finish all
+5,000 moves at 691/546 on GBACP and 6205/5249 on TestScheduling. Geometric proposals
+reach fewer moves within the deadline, so their endpoint differences do not isolate
+a matched-work effect or establish a speedup.
+
+The [matched-work follow-up](https://lab.eignex.com/jobs/8762) at `36055880b8`
+holds the same sources, centers, seeds, recipe and proposal axes at 1,000 containing
+moves/restarts with twenty seconds including preparation/mapping. All 28 walks
+complete uncensored and pass native source checking. Each pair of hotspot choices
+has the same complete source endpoint, and canonical geometric leaf proposals
+reproduce the full functional treatment's complete endpoint in all four cases.
+Exact minimization endpoints use seed order 3/7:
+
+| Source | Center | Retained/substituted | Adjacent leaf steps | Geometric leaf steps/full functional |
+| --- | --- | --- | --- | --- |
+| GBACP-UD04 | 1774 / 1624 | 834 / 1121 | 759 / 758 | 687 / 685 |
+| TestScheduling-t020m10r03-1 | 8025 / 6132 | 7541 / 5727 | 7895 / 5708 | 6674 / 5708 |
+
+This cohort supports leaf step generation as the useful proposal mechanism, with
+no independent hotspot benefit observed. The first 32 retained seed candidates
+include one native source-accepted adjacent improvement per TestScheduling seed;
+GBACP has none in that bounded sample. Full seed scans qualify values, not native
+feasibility of every candidate. Geometric GBACP walks cost 11.5–12.0 seconds and
+1.26–1.28 GB of calling-thread allocation versus 0.65–1.93 seconds and 33–37 MB
+for retained/substituted controls. TestScheduling geometric walks cost 1.45–2.38
+seconds and 204–205 MB versus 0.29–0.99 seconds and 29–33 MB. These ordered,
+instrumented walk costs retain preparation (8–497 ms, 2.5–20.8 MB), mapping/native
+checking (1–91 ms, 1.4–8.5 MB) and private seed probing (0.2–602 ms, 0.2–120.2 MB)
+separately and support no throughput or default-admission claim. The stronger
+five-second/5,000-move controls remain part of the comparison.
+Follow-up compression retains all JSONL bytes, reducing 121.6 MB to 4.1 MB after
+capture at a separate 1.56-second cost; it changes no walk allowance.
+
 The frozen worker-seed 3/7 captures at `12be285415` and `356449b93a` retain
 [mixed preparation](https://lab.eignex.com/jobs/8531),
 [local-search preparation](https://lab.eignex.com/jobs/8581), and
