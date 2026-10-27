@@ -55,6 +55,7 @@ internal class LinearAuthorityInvocation(
     activeRows: Boolean = false,
     supportBranching: Boolean = false,
     onNumericalFeedback: ((SourceNumericalFeedbackResult) -> Unit)? = null,
+    latestFeedback: Boolean = true,
 ) : AutoCloseable {
     init {
         require(borrowedAuthority?.funding == null || borrowedAuthority.funding === funding) {
@@ -100,7 +101,7 @@ internal class LinearAuthorityInvocation(
         useActiveRows = activeRows, useRefutationReuse = params.sourceRefutationReuse,
         useSupportBranching = supportBranching,
         pointCuts = boundOrdered && params.sourcePointCuts, onNumericalFeedback = onNumericalFeedback,
-        aggregateCuts = boundOrdered && params.sourceAggregateCuts)
+        aggregateCuts = boundOrdered && params.sourceAggregateCuts, latestFeedback = latestFeedback)
     private val session = SearchComponentSet(listOf(component)).session(params.maxLeaves, stop).also {
         it.bindOpenTheoryWork(state.work)
     }

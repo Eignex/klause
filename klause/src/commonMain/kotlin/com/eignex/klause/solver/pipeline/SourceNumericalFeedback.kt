@@ -90,7 +90,7 @@ internal sealed interface SourceNumericalFeedbackResult {
         val reason: Reason,
     ) : SourceNumericalFeedbackResult
 
-    enum class Reason { Cancelled, Funding, Retention, Paused, MissingQuery, Incompatible }
+    enum class Reason { Cancelled, Funding, Retention, Paused, MissingQuery, Incompatible, Oversized }
 }
 
 internal data class SourceNumericalAcquisition(
@@ -99,9 +99,12 @@ internal data class SourceNumericalAcquisition(
 )
 
 // Exact-valued relaxation coordinates are guidance, including when a bound was certified.
+// Latest delivery reads the journal's delivered query, so archive retention never withholds a later query.
+// Prefix delivery reads only the archive and reports every query after its retention limit as unavailable.
 internal class SourceNumericalFeedback(
     private val funding: SourceLpFunding,
     private val cancellation: Cancellation,
+    private val latest: Boolean = true,
 ) {
     private var journal = LinearAuthorityCapture(64, 250_000L, 8L * 1024 * 1024, cancellation)
     private val owned = journal
@@ -109,6 +112,8 @@ internal class SourceNumericalFeedback(
     private var chargedBytes = 0L
     private var consumed = 0L
     var collections: Long = 0L
+        private set
+    var lateCollections: Long = 0L
         private set
     var unavailable: Long = 0L
         private set
@@ -118,12 +123,15 @@ internal class SourceNumericalFeedback(
         val existing = authority.capture
         if (existing == null) authority.capture = journal
         else if (existing !== journal) {
+            settle()
+            if (latest) journal.stopDelivery()
             journal = existing
-            chargedEntries = journal.entries
-            chargedBytes = journal.bytes
+            chargedEntries = journal.constructedEntries
+            chargedBytes = journal.constructedBytes
             consumed = journal.attempted
         }
         journal.restrict(64, 250_000L, 8L * 1024 * 1024)
+        if (latest) journal.deliver(250_000L, 8L * 1024 * 1024)
     }
 
     fun acquire(
@@ -137,21 +145,28 @@ internal class SourceNumericalFeedback(
         return SourceNumericalAcquisition(result, consume(source, cutoff, result.paused))
     }
 
+    // An external observer keeps its archive; only the delivered query this consumer requested is released.
     fun detach(authority: LinearAuthority) {
+        settle()
+        if (latest) journal.stopDelivery()
         if (authority.capture === owned) authority.capture = null
     }
 
     fun refutationSupport(record: SourceNumericalFeedbackResult.Available): SourceNumericalSupportResult =
         sourceNumericalRefutationSupport(record, funding, cancellation)
 
+    private fun settle() {
+        funding.charge(journal.constructedEntries - chargedEntries, journal.constructedBytes - chargedBytes)
+        chargedEntries = journal.constructedEntries
+        chargedBytes = journal.constructedBytes
+    }
+
     fun consume(
         source: SourceProofContext,
         cutoff: SourceNumericalCutoff? = null,
         paused: Boolean = false,
     ): SourceNumericalFeedbackResult {
-        funding.charge(journal.entries - chargedEntries, journal.bytes - chargedBytes)
-        chargedEntries = journal.entries
-        chargedBytes = journal.bytes
+        settle()
         val previous = consumed
         consumed = journal.attempted
         fun missing(reason: SourceNumericalFeedbackResult.Reason): SourceNumericalFeedbackResult {
@@ -163,14 +178,21 @@ internal class SourceNumericalFeedback(
         if (funding.exhausted) return missing(SourceNumericalFeedbackResult.Reason.Funding)
         if (paused) return missing(SourceNumericalFeedbackResult.Reason.Paused)
         if (consumed == previous) return missing(SourceNumericalFeedbackResult.Reason.MissingQuery)
-        val query = journal.lastRecord
-        if (journal.limited) return missing(SourceNumericalFeedbackResult.Reason.Retention)
+        val query = if (latest) {
+            if (journal.deliveryOverflowed) return missing(SourceNumericalFeedbackResult.Reason.Oversized)
+            journal.delivered
+        } else {
+            val record = journal.lastRecord
+            if (journal.limited) return missing(SourceNumericalFeedbackResult.Reason.Retention)
+            record
+        }
         if (query == null) return missing(SourceNumericalFeedbackResult.Reason.MissingQuery)
         val entries = source.coordinates.size.toLong() + source.premises.size + source.objective.size
         funding.charge(1L + entries, 64L + entries * 48L)
         val result = SourceNumericalFeedbackResult.Available(query, cutoff)
         if (!result.compatible(source, cutoff)) return missing(SourceNumericalFeedbackResult.Reason.Incompatible)
         collections++
+        if (journal.lastRecord?.id != query.id) lateCollections++
         return result
     }
 }

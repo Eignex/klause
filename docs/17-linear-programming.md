@@ -346,15 +346,22 @@ invocations can borrow a retained authority, leaving its cleanup to the caller.
 Borrowers retain that authority's cumulative funding allowance.
 Floating source coordinates are guidance and supply no witness or proof authority.
 
-`solver.pipeline.SourceNumericalFeedback` exposes the bounded query journal to
-decision consumers. It retains exact-valued relaxation coordinates, generating cut
+`solver.pipeline.SourceNumericalFeedback` delivers completed queries to decision
+consumers. The journal keeps two separately bounded channels: an inspection archive
+of the first queries, and a single latest-query slot that each completed query
+replaces. Archive retention therefore never withholds a later query; a prefix-only
+control reads the archive alone and reports later queries as retention-limited.
+Both channels share one record construction. Each record exposes exact-valued
+relaxation coordinates, generating cut
 masks, active source rows and scoped checked bounds/refutations, with independent
 point availability. Such coordinates can contain numerical residuals and require
 full source checking before publication. Compatibility requires the same source
 premises, semantics, objective and exact query restrictions. A cutoff attribution
 requires its actual strict objective premise; an acquisition without that premise
-cannot claim a cutoff-conditioned conflict. Cancellation, missing queries,
-retention and funding exhaustion remain explicit unavailable outcomes.
+cannot claim a cutoff-conditioned conflict. Cancellation, pauses, missing queries,
+oversized queries, retention and funding exhaustion remain explicit unavailable
+outcomes. Detaching a consumer releases its latest slot and leaves an external
+observer's archive in place.
 Acquisition returns the existing authority result alongside feedback, preserving
 recovered incumbents for separate source checking and acquisition credit. A funded
 cutoff helper constructs a query-local strict row in the captured context's
@@ -369,8 +376,11 @@ An internal research consumer orders integer splits by near-tight,
 installed checked cut supports, preferring smaller supports and greater fractional
 distance from an integer, with source-order ties and fallback. Both complementary
 alternatives remain in coverage. Feedback never supplies pruning or parent proof
-authority. Collection, retention and scoring debit the containing source LP funding;
-the journal retains at most 64 records, 250,000 entries and 8 MiB modeled storage.
+authority. Construction, replacement, retention and scoring debit the containing
+source LP funding cumulatively; evicting a delivered query neither refunds that
+ledger nor issues another LP solve. The archive retains at most 64 records, 250,000
+entries and 8 MiB modeled storage, and a delivered query has the same entry and
+byte allowance on its own.
 
 `LinearAuthority.advance` consumes the shared sparse preparation, floating and
 bound-certificate policy through that same scoped owner. One admitted operation
