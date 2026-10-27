@@ -85,7 +85,7 @@ class BacktrackSolverRepairTest {
             val compiled = Mps.parse(
                 "NAME SCALED\nOBJSENSE\n $sense\nROWS\n N COST\n E R\nCOLUMNS\n" +
                     " M0 'MARKER' 'INTORG'\n I R 1\n M1 'MARKER' 'INTEND'\n" +
-                    " X COST 0.1 R 3\nRHS\n RHS R 1\nBOUNDS\n" +
+                    " X COST 0.1 R 3\nRHS\n RHS R 1 COST -0.2\nBOUNDS\n" +
                     " BV B I\n LO B X 0\n UP B X 1\nENDATA",
             ).toExactSourceProblem()
             val sourceObjective = assertNotNull(compiled.objective).toLinearObjective()
@@ -94,16 +94,17 @@ class BacktrackSolverRepairTest {
             val first = if (compiled.maximize) 0L else 1L
             val second = 1L - first
             BacktrackSolver(compiled.model.bake()).openRepair(objective, BacktrackParams()).use { repair ->
-                val cutoff = if (compiled.maximize) epsilon else BigFraction.ofLong(3L).reciprocal() + epsilon
+                val cutoff = if (compiled.maximize) BigFraction.ofLong(-2L) + epsilon
+                    else BigFraction.ofLong(7L) * BigFraction.ofLong(3L).reciprocal() + epsilon
                 repair.beginExact(Assumptions(ints = mapOf(0 to first)), 100L, cutoff, Cancellation.Never)
                 val a = assertNotNull(repair.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L).sample)
                 repair.beginExact(Assumptions(ints = mapOf(0 to second)), 100L, cutoff, Cancellation.Never)
                 val b = assertNotNull(repair.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L).sample)
 
                 assertEquals(10L, compiled.objectiveScale)
-                assertEquals(if (compiled.maximize) "1/30" else "0",
+                assertEquals(if (compiled.maximize) "7/30" else "1/5",
                     compiled.sourceWitness(a.ints, assertNotNull(a.exactReals)).objective.toString())
-                assertEquals(if (compiled.maximize) "0" else "1/30",
+                assertEquals(if (compiled.maximize) "1/5" else "7/30",
                     compiled.sourceWitness(b.ints, assertNotNull(b.exactReals)).objective.toString())
             }
         }
