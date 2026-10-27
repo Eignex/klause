@@ -93,6 +93,7 @@ class LinearRefutationReuseTest {
         assertNull(learned.find(opening.pin(0, false).bound(y, BigFraction.ZERO, true)
             .bound(z, BigFraction.ZERO, true)))
         assertEquals(2L, learned.observations()["numericalRefutationReuseResolutionHits"])
+        assertEquals(2L, learned.observations()["numericalRefutationReuseResolutionUnfixedHits"])
     }
 
     private val x = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
