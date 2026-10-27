@@ -20,6 +20,7 @@ import com.eignex.klause.localsearch.acceptance.AcceptanceRule
 import com.eignex.klause.localsearch.movesource.ConfiguredSource
 import com.eignex.klause.localsearch.movesource.GreedyInit
 import com.eignex.klause.localsearch.movesource.MoveSource
+import com.eignex.klause.localsearch.movesource.MoveSourceCatalog
 import com.eignex.klause.localsearch.movesource.MoveSourceId
 import com.eignex.klause.localsearch.movesource.ObjectiveSeed
 import com.eignex.klause.localsearch.movesource.Phase
@@ -725,12 +726,16 @@ internal object LocalSearchTrajectory {
     }
 
     // `cbls-extended/fixed` names the trajectory's plateau-plus-sampled-extended walk; `catalog:` selects the arm.
+    // `cbls-implicit-unused/fixed` is the implicit catalog arm plus the opt-in unused-value owner moves.
     private fun trajectoryRecipe(name: String): LocalSearchRecipe = when (name) {
         "source-coordinate-descent" -> LocalSearchRecipe(name,
             SourceDrivenStrategy(sources = listOf(ConfiguredSource(ObjectiveSeed())),
                 acceptance = AcceptanceRule.GreedyDescent, feasibleDescent = FeasibleDescent.SelfOwned))
         "cbls-extended/fixed" -> LocalSearchCatalog.byLabel("cbls-plateau/fixed").withSources {
             it + ConfiguredSource(SatisfiedStructured.sampledExtended(8))
+        }
+        "cbls-implicit-unused/fixed" -> LocalSearchCatalog.byLabel("cbls-implicit/fixed").withSources {
+            it + MoveSourceCatalog.configured("unused-values")
         }
         else -> LocalSearchCatalog.byLabel(name.removePrefix("catalog:"))
     }

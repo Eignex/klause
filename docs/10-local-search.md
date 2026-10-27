@@ -90,6 +90,7 @@ objects for primitives. Each declares a **phase** and a **pool**:
 | `flip-propagate` | A Boolean flip plus the literals it forces through the binary implication graph; score-only |
 | `clique-swap` | Atomic exchanges within recognised at-most-one cliques; score-only |
 | `stall-kick` | One flattened perturbation from a random walk over the variable–factor graph |
+| `unused-values` | Opt-in owner moves of a satisfied implicitly seeded plain AllDifferent onto unused values |
 
 The opt-in `extended-*` variants of `violated`, `structured` and `elected` draw
 richer moves that cost more to generate and are not always net-positive, such as a
@@ -298,6 +299,16 @@ coordinates keep their values and an unreachable row produces no partial move.
 Tables reading defined integers decline implicit seeding, because a definition could
 rewrite them outside the chosen row. Built-in random restarts apply implicit seeding
 and the definition sweep before costs are initialized.
+
+An owned AllDifferent's swaps and rotations keep its occupied value set. The opt-in
+`unused-values` source lets a satisfied owner without optional entries or excepted
+values leave it: one owned coordinate takes an unused value of its domain, or an
+alternating path of two or three owned coordinates shifts into held values and ends
+at an unused one. Pinned, defined and foreign-owned coordinates never take part, a
+path is published whole, and the move is scored like any other. The scan is bounded,
+so a miss is not exhaustion; a scope whose domains fit the scan and hold no unused
+value, such as a small closed permutation, draws no random value and leaves the
+trajectory unchanged.
 
 ### Source definition materialization
 
