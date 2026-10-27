@@ -368,7 +368,8 @@ class SourceNumericalFeedbackTest {
 
     @Test
     fun `requested support feedback should reproduce full feedback decisions at lower cost`() {
-        fun run(request: LinearAuthorityFeedbackRequest?) = LinearAuthorityInvocation(source, TheoryParams(),
+        fun run(request: LinearAuthorityFeedbackRequest?) = LinearAuthorityInvocation(source,
+            TheoryParams(sourceCuts = false),
             boundOrdered = true, supportBranching = true, feedbackRequest = request).use {
             it.captureTo(LinearAuthorityCapture(1, 1_000_000L, 16_000_000L, Cancellation.Never))
             it.run { _, _ -> }

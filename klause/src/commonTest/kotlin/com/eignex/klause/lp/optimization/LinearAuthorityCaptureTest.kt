@@ -297,7 +297,9 @@ class LinearAuthorityCaptureTest {
                 assertEquals(expected.refutation.takeIf { request.refutation }, actual.refutation)
                 val kept = if (request.cuts == LinearAuthorityFeedbackRequest.Cuts.None) emptyList()
                     else expected.cuts.filter { it.installed && it.checked && it.ownerActive }
-                assertEquals(kept.map { it.copy(violation = null) }, actual.cuts)
+                assertEquals(kept.map { listOf(it.id, it.inequality, it.installed, it.checked, it.ownerActive) },
+                    actual.cuts.map { listOf(it.id, it.inequality, it.installed, it.checked, it.ownerActive) })
+                assertTrue(actual.cuts.all { it.violation == null })
                 for ((reference, cut) in kept.zip(actual.cuts)) {
                     assertEquals(full.violation(expected, reference), narrow.violation(actual, cut))
                 }
