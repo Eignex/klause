@@ -82,11 +82,47 @@ internal object MpsRepairOwners {
             val checked = source.checkMpsWitness(point, token)
             RepairOwnerReplay.PointCheck(checked != null, checked?.objective)
         }
+        val completionReplay: ((Sample, Cancellation) -> JsonObject)? =
+            if (request["completionReplay"]?.jsonPrimitive?.content?.toBooleanStrict() != true) null else
+                { sample, token ->
+                    val allocation = beanAllocation()
+                    val start = System.nanoTime()
+                    fun checked(point: Sample) = source.checkMpsWitness(columns.map { column ->
+                        if (Term.isInt(column)) BigFraction.of(point.exactIntValue(Term.intVar(column)), BIG_ONE)
+                        else point.exactReals?.get(Term.realVar(column))
+                            ?: checkNotNull(BigFraction.ofDouble(point.approximateRealValue(Term.realVar(column))))
+                    }, token)
+                    val original = checked(sample)
+                    val check: (Sample) -> Boolean = { checked(it) != null }
+                    val type = Class.forName("com.eignex.klause.portfolio.LeafRealCompletion")
+                    val completion = type.constructors.single { it.parameterCount == 4 }.newInstance(
+                        baked, objective, check,
+                        Class.forName("com.eignex.klause.lp.engine.LpSolveContext").getConstructor().newInstance())
+                    val result = call(completion, "complete", sample, token)
+                    val point = result?.takeIf { it.javaClass.simpleName == "Witness" }
+                        ?.let { call(it, "getSample") as? Sample }
+                    val witness = point?.let(::checked)
+                    buildJsonObject {
+                        put("fixedLeaf", RepairOwnerReplay.sample(sample))
+                        put("floatSourceAccepted", original != null)
+                        put("floatSourceExactlyFeasible", original?.exact)
+                        put("floatSourceObjective", original?.objective?.toString())
+                        put("completion", result?.javaClass?.simpleName)
+                        put("witness", point?.let(RepairOwnerReplay::sample))
+                        put("sourceObjective", witness?.objective?.toString())
+                        put("sourceExactlyFeasible", witness?.exact)
+                        put("elapsedNs", System.nanoTime() - start)
+                        put("threadBytes", beanAllocation() - allocation)
+                        put("diagnosticReplayOutsideOwnerAllowance", true)
+                        put("independentWitnessCheck", false)
+                    }
+                }
         RepairOwnerReplay.replay(controls, baked, objective, prepared, baked, inputs,
             out.resolve("owners.jsonl"), request["seed"]?.jsonPrimitive?.content?.toLong() ?: 1L,
             request["ownerWork"]?.jsonPrimitive?.content?.toLong() ?: 100_000L,
             request["ownerFragmentWork"]?.jsonPrimitive?.content?.toLong() ?: 2_000L,
-            verify, context, source.objective?.sense == ObjectiveSense.MAXIMIZE)
+            verify, context, source.objective?.sense == ObjectiveSense.MAXIMIZE,
+            completionReplay = completionReplay)
         out.resolve("owner-overlap.json").writeText(buildJsonObject {
             put("status", "captured")
             put("sourceSha256", request.getValue("sha256").jsonPrimitive.content)
@@ -110,4 +146,12 @@ internal object MpsRepairOwners {
             put("globalProofClaim", false)
         }.toString())
     }
+
+    private fun beanAllocation(): Long =
+        (java.lang.management.ManagementFactory.getThreadMXBean() as com.sun.management.ThreadMXBean)
+            .getThreadAllocatedBytes(Thread.currentThread().threadId())
+
+    private fun call(owner: Any, name: String, vararg args: Any?): Any? = owner.javaClass.methods
+        .single { it.name.substringBefore('$') == name && it.parameterCount == args.size }
+        .apply { isAccessible = true }.invoke(owner, *args)
 }

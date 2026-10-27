@@ -68,6 +68,7 @@ internal object RepairOwnerReplay {
         sourceCheck: ((Sample, Cancellation) -> PointCheck)? = null, mixedContext: SourceProofContext? = null,
         sourceMaximize: Boolean = false, structured: List<StructuredInner> = emptyList(),
         descent: RepairDescent? = null, ownerSequence: List<String>? = null,
+        completionReplay: ((Sample, Cancellation) -> JsonObject)? = null,
     ) {
         val owners = ownerSequence ?: (DEFAULT_OWNERS.take(1) + structured.map(StructuredInner::owner) +
             DEFAULT_OWNERS.drop(1))
@@ -169,6 +170,7 @@ internal object RepairOwnerReplay {
                 }
                 var activeStop: Cancellation = Cancellation.Never
                 var activeCenter: Sample? = null
+                var firstFloat: Sample? = null
                 val dynamic = object : Cancellation {
                     override fun isCancelled(): Boolean = activeStop()
                     override fun deadline() = activeStop.deadline()
@@ -180,6 +182,7 @@ internal object RepairOwnerReplay {
                         val stop = lifetime or Cancellation.after(2000.milliseconds) or funded
                         activeStop = stop
                         activeCenter = scope.center
+                        firstFloat = null
                         val allocationStart = bean.getThreadAllocatedBytes(thread)
                         val start = System.nanoTime()
                         val unavailable = scope.unavailable
@@ -206,7 +209,11 @@ internal object RepairOwnerReplay {
                             kind.startsWith("cp") -> {
                                 val opened = System.nanoTime()
                                 native = retained ?: call(BacktrackSolver(problem), "openRepair", objective,
-                                    BacktrackParams(nodeBudget = budget, randomSeed = seed, cancellation = dynamic))
+                                    BacktrackParams(nodeBudget = budget, randomSeed = seed, cancellation = dynamic,
+                                        toleranceCheck = completionReplay?.let { { sample ->
+                                            if (firstFloat == null) firstFloat = sample
+                                            false
+                                        } }))
                                 val preparation = System.nanoTime() - opened
                                 if (kind == "cp-retained") retained = native
                                 else transient = native as AutoCloseable
@@ -291,6 +298,9 @@ internal object RepairOwnerReplay {
                         val continued = if (!improving) null else
                             descent?.continueFrom(problem, objective, checkNotNull(sample), seed, kind, scope.id,
                                 ::accepted)
+                        val completion = firstFloat?.let { point ->
+                            completionReplay?.invoke(point, Cancellation.after(2000.milliseconds))
+                        }
                         writer.appendLine(buildJsonObject {
                             put("centerId", scope.id)
                             put("owner", kind)
@@ -369,6 +379,7 @@ internal object RepairOwnerReplay {
                             put("statsAfter", NumericalResidualProfile.json(outcome.stats))
                             put("structuredInner", outcome.structured ?: JsonNull)
                             put("postRepairDescent", continued ?: JsonNull)
+                            put("completionReplay", completion ?: JsonNull)
                         }.toString())
                         writer.flush()
                     }
