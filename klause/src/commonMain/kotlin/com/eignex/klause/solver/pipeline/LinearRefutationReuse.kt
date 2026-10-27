@@ -33,6 +33,7 @@ internal class LinearRefutationReuse(
         val upper: Boolean,
         val evidence: SourceEvidence,
         val support: SourceCondition,
+        val resolved: Boolean,
     )
     private data class Side(val coordinate: SourceCoordinate, val upper: Boolean)
     private data class Predicate(val coordinate: SourceCoordinate, val value: BigFraction, val upper: Boolean)
@@ -96,6 +97,8 @@ internal class LinearRefutationReuse(
         predicates[positive] = below
         predicates[positive xor 1] = above
         nameBytes += 384L
+        while (retainedBytes > maximumBytes - nameBytes) evict()
+        peakBytes = maxOf(peakBytes, retainedBytes + nameBytes)
     }
 
     private fun charge(units: Long, bytes: Long = 0L) {
@@ -268,7 +271,7 @@ internal class LinearRefutationReuse(
         if (resolve) scopes[retainedCondition] = id
         if (anchor == null) unconditional += id else indexed.getOrPut(anchor) { linkedSetOf() }.add(id)
         retainedBytes += bytes
-        peakBytes = maxOf(peakBytes, retainedBytes)
+        peakBytes = maxOf(peakBytes, retainedBytes + nameBytes)
         observe("RetainedProofs")
         return entry
     }
@@ -327,7 +330,6 @@ internal class LinearRefutationReuse(
                 val proof = SourceDerivation.IntegerSplit(bound.coordinate, threshold,
                     if (bound.upper) first else second, if (bound.upper) second else first)
                 val evidence = SourceEvidence(source.scope.copy(condition = required), SourceClaim.Refutation, proof)
-                proofPolls = 0
                 when (verify(evidence)) {
                     SourceEvidenceCheck.Checked -> {
                         if (store(evidence, added.bytes + entry.bytes + 256L,
@@ -338,7 +340,7 @@ internal class LinearRefutationReuse(
                     is SourceEvidenceCheck.Rejected -> observe("ResolutionRejected")
                     is SourceEvidenceCheck.Unavailable -> {
                         observe("Unavailable")
-                        if (retired || cancellation() || budget.funding?.paused == true) return
+                        if (retired || cancellation() || budget.funding?.paused == true || proofPolls > 100_000) return
                     }
                 }
             }
@@ -417,7 +419,7 @@ internal class LinearRefutationReuse(
                     if (retired || cancellation() || budget.funding?.paused == true) return null
                     observe("UnitChecks")
                     if (entry.depth > 0) observe("ResolutionUnits")
-                    return UnitExclusion(coordinate, threshold, isUpper, imported, required)
+                    return UnitExclusion(coordinate, threshold, isUpper, imported, required, entry.depth > 0)
                 }
                 is SourceEvidenceCheck.Rejected -> observe("UnitRejected")
                 is SourceEvidenceCheck.Unavailable -> {

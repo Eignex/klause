@@ -17,6 +17,23 @@ import kotlin.test.assertTrue
 
 class SourceExecutionControlsTest {
     @Test
+    fun `numerical refutation resolution should require explicit opt in`() {
+        val source = SourceAttachment(
+            LinearSourceProblem(listOf(LinearSourceVariable("x", true)), emptyList()), ProblemSettings(),
+        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            source, ExecutionOperation.SATISFY, FiniteEngine.FIXED,
+            linearTraversal = LinearTraversal.NUMERICAL_FRONTIER,
+        ))
+        for ((options, expected) in listOf(emptyList<String>() to false,
+            listOf("source-refutation-resolution=true") to true)) {
+            val request = SourceExecutionRequest(invocation, ExecutionOptions.parse(options))
+
+            assertEquals(expected, request.theory.sourceRefutationResolution)
+        }
+    }
+
+    @Test
     fun `numerical unit refutations should require explicit opt in`() {
         val source = SourceAttachment(
             LinearSourceProblem(listOf(LinearSourceVariable("x", true)), emptyList()), ProblemSettings(),
