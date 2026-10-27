@@ -43,7 +43,6 @@ import java.util.Base64
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -76,10 +75,8 @@ internal object ObjectiveViewComparison {
     @JvmStatic
     fun main(args: Array<String>) {
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
-        if (args.size == 1 && args[0].startsWith("batch64=")) {
-            val requests = Json.decodeFromString<List<List<String>>>(
-                Base64.getDecoder().decode(args[0].substringAfter('=')).decodeToString())
-            require(requests.size in 1..8)
+        val requests = trajectoryBatch(args)
+        if (requests != null) {
             for ((index, request) in requests.withIndex()) {
                 capture(request.toTypedArray(), out.resolve("$index").apply { mkdirs() })
             }

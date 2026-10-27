@@ -1677,6 +1677,9 @@ their structured sources. Fixture expectations live beside
 [finite repair controls](smoke-corpus/finite-repair/README.md).
 `batch64=<base64 JSON array of argument arrays>` captures up to eight requests
 in numbered directories under one profile job.
+`batchGzip64` accepts the same JSON compressed with gzip, bounded to 96 KiB encoded
+and 8 MiB inflated, for complete-center matrices that exceed native argument limits.
+Decoding remains outside individual walk allowances and inside full-process costs.
 `ownerReplay=true` consumes those exact `controls=true` records after capture and
 compares LS, cold/retained CP and cold/retained mixed completion. Every owner uses
 the saved center, effective working freedoms, complement pins and strict exact
