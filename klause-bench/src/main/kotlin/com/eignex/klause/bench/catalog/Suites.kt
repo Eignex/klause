@@ -736,7 +736,8 @@ internal object Suites {
         vendored("sum-opt-tiny", Category.OPTIMIZATION, Expected.Unknown, relPath = "xcsp3/sum-opt-tiny.xml")
         vendored("evidence-latin4", Category.OPTIMIZATION, Expected.Unknown,
             relPath = "finite-repair-evidence/latin4.xml")
-        for (name in listOf("linear-exchange", "linear-three-cycle", "linear-four-cycle", "linear-knapsack")) {
+        for (name in listOf("linear-exchange", "linear-three-cycle", "linear-four-cycle", "linear-knapsack",
+            "linear-transport")) {
             vendored("evidence-$name", Category.OPTIMIZATION, Expected.Unknown,
                 relPath = "finite-repair-evidence/$name.xml")
         }
