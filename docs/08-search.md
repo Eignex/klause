@@ -151,6 +151,15 @@ result scope. Exact repair cutoffs remain rational through admission and discret
 dominance. LP pruning may use their rounded-up floating enclosure; equality in the
 displayed objective cannot reject an exact improvement.
 
+An exact repair can retain a primal point accepted by the original source checker
+while its continuous completion still requires certification. The point's rational
+source objective, mapped to the working scale and direction, must strictly improve
+the cutoff. Source tolerance acceptance supplies no nominal exact coordinates or
+optimality authority: missing certification keeps the fragment unresolved, including
+when it publishes a witness. The pending point shares the completion's work and
+cancellation scope, survives slices with that leaf and is discarded on reseeding or
+close. A rejected point supplies no conflict.
+
 ### Leaf-completed columns
 
 Presolve keeps every column slot, so a column whose readers were all reduced away

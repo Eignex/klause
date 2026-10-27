@@ -259,6 +259,7 @@ internal class ResumableMinimize(
     private lateinit var lpEngine: LpEngine
     private var leafSolver: LeafRealSolver? = null
     private var pendingRealLeaf: LpSolveCursor<LeafRealResult>? = null
+    private var pendingRealWitness: Sample? = null
     private val rootLpDutyCycle = RootLpDutyCycle()
 
     private fun completeLeaf(
@@ -266,13 +267,20 @@ internal class ResumableMinimize(
         cancellation: Cancellation,
         workLimit: Long = 0L,
     ): LeafRealResult {
+        pendingRealWitness = null
         val result = realLeafOwner().solve(sample, cancellation, completionToleranceCheck(), workLimit)
         return checkedLeafResult(sample, result)
     }
 
     private fun completionToleranceCheck(): ((Sample) -> Boolean)? {
         val check = params.toleranceCheck ?: return null
-        return if (exactObjectiveBoundSupplier?.invoke() != null) FiniteSourceAcceptance(check, false) else check
+        return if (exactObjectiveBoundSupplier?.invoke() == null) check else FiniteSourceAcceptance(
+            { sample ->
+                if (!params.cancellation() && check(sample) && !params.cancellation()) pendingRealWitness = sample
+                false
+            },
+            false,
+        )
     }
 
     private fun realLeafOwner(): LeafRealSolver = leafSolver ?: LeafRealSolver(
@@ -283,14 +291,17 @@ internal class ResumableMinimize(
         resources.own(AutoCloseable {
             val pending = pendingRealLeaf
             pendingRealLeaf = null
+            pendingRealWitness = null
             pending?.close()
         })
         leafSolver = it
     }
 
     private fun advanceRealLeaf(sample: Sample): LeafRealResult? {
-        val cursor = pendingRealLeaf ?: realLeafOwner().openSolve(sample, runEndToken(), completionToleranceCheck())
-            .also { pendingRealLeaf = it }
+        val cursor = pendingRealLeaf ?: run {
+            pendingRealWitness = null
+            realLeafOwner().openSolve(sample, runEndToken(), completionToleranceCheck()).also { pendingRealLeaf = it }
+        }
         val allowance = slice.remainingLpWork()
         if (allowance == 0L) return null
         return when (val step = cursor.advance(allowance ?: 0L, { !slice.workBounded && sliceExpired() })) {
@@ -629,6 +640,7 @@ internal class ResumableMinimize(
         slice.begin(Long.MAX_VALUE, -1L)
         val pending = pendingRealLeaf
         pendingRealLeaf = null
+        pendingRealWitness = null
         pending?.close()
         searchSession.popTo(0)
         val seeded = session.reseedFrom(assumptions)
@@ -875,7 +887,7 @@ internal class ResumableMinimize(
         o: Double,
         startingWitness: Boolean = false,
     ): MinimizeResult.WithSample? {
-        val exact = exactSourceObjective(objective, sample, completionToleranceCheck())
+        val exact = exactSourceObjective(objective, sample, params.toleranceCheck)
         if (rebindable && exact == null) {
             sawIndeterminateLeaf = true
             return null
@@ -1348,8 +1360,12 @@ internal class ResumableMinimize(
 
                     LpVerdict.INDETERMINATE, LpVerdict.CERTIFIED_BOUND -> {
                         sawIndeterminateLeaf = true
-                        unresolved = true
-                        null
+                        val witness = pendingRealWitness
+                        pendingRealWitness = null
+                        val published = witness?.let { recordIfImproving(it, objective.evaluate(it)) }
+                        incomplete = published != null
+                        unresolved = published == null
+                        published
                     }
 
                     // A checked ray ends the run whatever the incumbent: no objective value bounds the model.
@@ -1373,6 +1389,7 @@ internal class ResumableMinimize(
                     }
                 }
             }
+            pendingRealWitness = null
             pendingIncumbent = incumbent
             return when {
                 unboundedLeaf != null -> SearchModelDisposition.Surface

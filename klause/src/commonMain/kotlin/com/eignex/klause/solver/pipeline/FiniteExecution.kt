@@ -594,7 +594,8 @@ internal fun FinitePipeline.solve(
     } ?: true
     val sourceCheck: ((Sample) -> Boolean)? = if (linearSource == null) {
         request.toleranceCheck?.let { check ->
-            FiniteSourceAcceptance(check, permitsToleranceOptimum && check.permitsToleranceOptimum())
+            FiniteSourceAcceptance(check, permitsToleranceOptimum && check.permitsToleranceOptimum(),
+                (check as? FiniteSourceAcceptance)?.objective)
         }
     } else {
         FiniteSourceAcceptance(
@@ -605,6 +606,15 @@ internal fun FinitePipeline.solve(
             permitsToleranceOptimum =
                 permitsToleranceOptimum &&
                     (request.toleranceCheck == null || request.toleranceCheck.permitsToleranceOptimum()),
+            objective = { sample ->
+                val checked = linearSource.check(sample, stop) as?
+                    com.eignex.klause.solver.validation.LinearSourceCheck.Accepted
+                checked?.witness?.objective?.let { value ->
+                    val scaled = value * linearSource.view.objectiveScale
+                    if (linearSource.view.source.objective?.sense == com.eignex.klause.ir.ObjectiveSense.MAXIMIZE)
+                        scaled.negated() else scaled
+                }
+            },
         )
     }
     val execution = execute(
@@ -637,7 +647,10 @@ internal fun FinitePipeline.solve(
             lpSolveContext = lpSolveContext,
             toleranceCheck = if (gridPublication == null) {
                 sourceCheck?.let { check ->
-                    FiniteSourceAcceptance({ check(preparation.reconstruct(it)) }, check.permitsToleranceOptimum())
+                    FiniteSourceAcceptance({ check(preparation.reconstruct(it)) }, check.permitsToleranceOptimum(),
+                        (check as? FiniteSourceAcceptance)?.objective?.let { score ->
+                            { sample -> score(preparation.reconstruct(sample)) }
+                        })
                 }
             } else null,
             sourceInvocation = request.shape.sourceInvocation,

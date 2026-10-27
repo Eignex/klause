@@ -9,6 +9,7 @@ import com.eignex.klause.solver.incumbent.CandidateVerifier
 import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.validation.FiniteSourceAcceptance
 import com.eignex.klause.util.Cancellation
 import kotlin.math.nextDown
 import kotlin.math.nextUp
@@ -63,6 +64,7 @@ internal fun exactSourceObjective(
     sample: Sample,
     toleranceCheck: ((Sample) -> Boolean)? = null,
 ): BigFraction? {
+    (toleranceCheck as? FiniteSourceAcceptance)?.objective?.let { return it(sample) }
     // Under tolerance semantics the float reals are the values, so the score is their exact sum.
     val floatReals = if (toleranceCheck == null) null else sample.reals.map { BigFraction.ofDouble(it) }
     val exactReals = sample.exactReals ?: floatReals?.filterNotNull()?.takeIf { it.size == sample.numRealVars }
