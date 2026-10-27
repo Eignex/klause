@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.portfolio.BacktrackCatalog
+import com.eignex.klause.localsearch.ObjectiveGuidance
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.Portfolio
@@ -8,10 +9,33 @@ import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.portfolio.editing
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class EngineParamsTest {
+    @Test
+    fun `explicit objective guidance expands one recipe into fresh composition slots`() {
+        val resolved = resolveLocalSearchRecipes(EngineParams(listOf(
+            "arm=cbls-plateau/ils-basin", "objective-guidance=functional,geometric",
+        )))
+
+        val recipes = resolved.pool!!.map { it() }
+
+        assertEquals(listOf(ObjectiveGuidance.Functional, ObjectiveGuidance.Geometric),
+            recipes.map { it.objectiveGuidance })
+        assertEquals(listOf("cbls-plateau/ils-basin/functional", "cbls-plateau/ils-basin/geometric"),
+            recipes.map { it.label })
+        assertTrue(recipes[0].strategy !== recipes[1].strategy)
+    }
+
+    @Test
+    fun `invalid objective guidance is rejected before worker creation`() {
+        assertFailsWith<PipelineConfigException> {
+            resolveLocalSearchRecipes(EngineParams(listOf("objective-guidance=geometirc")))
+        }
+    }
+
 
     private fun scenario(cores: Int, params: List<String> = emptyList(), mix: EngineMix = EngineMix.MIXED) =
         buildPortfolioScenario(

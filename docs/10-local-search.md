@@ -114,6 +114,22 @@ maintained by the live network and its exact term form to match the canonical
 objective. Grading and best-feasible ordering retain that canonical objective;
 proposal controls confer no source feasibility or proof authority.
 
+`ObjectiveGuidance.Geometric` installs canonical grading with geometric leaf
+proposals during search initialization. It reuses the supplied functional cones
+and the live invariant network, checking exact canonical term agreement in
+resumable preparation batches. Unsupported cones keep canonical execution.
+Each pick visits at most eight Boolean/integer leaves through the ordinary sink;
+a retained cursor advances before synthesis so expensive or blocked leaves cannot
+starve later coordinates. Integer proposals use bounded geometric distances and
+domain endpoints, with checked word-range arithmetic. The cursor survives slices
+and assignment restarts. A fresh search rechecks the objective and network and
+discards the old cursor; model replacement requires its own solver state.
+Preparation, candidate synthesis, scoring probes and closure spend the containing
+active deadline. Move/restart allowances retain their existing units and do not
+count candidates as moves. `geometricProposalRuns`, `geometricProposalDeclines`
+and `geometricProposalCandidates` distinguish qualification from sink offers;
+offers are neither distinct source points nor accepted transitions.
+
 ### Scoring
 
 The scoring axis values a candidate, lower being better:

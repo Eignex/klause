@@ -355,6 +355,9 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** The `arm` execution setting. */
         val localSearchArm: ExecutionOption<String> = ExecutionOption("arm", ValueKind.STRING)
 
+        /** Explicit local-search objective policies, cycled across the selected worker slots. */
+        val objectiveGuidance: ExecutionOption<String> = ExecutionOption("objective-guidance", ValueKind.STRING)
+
         /** The `lambda` execution setting. */
         val lambda: ExecutionOption<Double> = ExecutionOption("lambda", ValueKind.DOUBLE)
 
@@ -416,7 +419,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 objectiveGuidedValues, variableSelector, valueSelector, seed, dryRunSolver,
                 noise, cb, skewAlpha, initialTemp, coolingRate,
                 minTemp, smoothProb, smoothFactor, tabuTenure, sources,
-                scoring, acceptance, restart, strategy, localSearchArm,
+                scoring, acceptance, restart, strategy, localSearchArm, objectiveGuidance,
                 lambda, arms, localSearchArms, backtrackArms, clauseShareLbd,
                 clauseShareLen, sliceWork, sliceMaxWork, sliceGrowth, phaseRetention,
                 reseedStaleThreshold, lsResiduals, lsPhaseTimes, backtrackArmsByLabel,

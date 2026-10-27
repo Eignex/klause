@@ -21,6 +21,18 @@ construction; explicit `arms`, `ls` or `bt` settings take precedence. Native
 arithmetic routes reject finite-only explicit policy instead of ignoring it. Recipe
 defaults carry no witness or proof authority.
 
+Explicit `objective-guidance=canonical|functional|geometric` selects local-search
+objective guidance. A comma-separated list expands each selected recipe into
+fresh slots in that order; `arm=cbls-plateau/ils-basin` with
+`objective-guidance=functional,geometric` and two LS arms runs a retained pair.
+Functional guidance is the ordinary default. Canonical guidance retains linear
+grading and proposals; geometric guidance retains linear grading with qualified,
+bounded cone-leaf proposals. It uses the same baked model, source identity and
+checked solution exchange. Unsupported cones retain canonical execution and
+report a decline. Reseeding opens a fresh search, revalidating its live objective,
+network and conditions. These policies grant no bound, terminal, pool or warm-start
+authority beyond the worker's existing source contract.
+
 For default single-core mixed placement optimization, an eliminated affine objective
 coordinate can supply a private protected-coordinate view to the curated full
 local-search slot. This applies to `Diffn` models without `Element` alternatives,

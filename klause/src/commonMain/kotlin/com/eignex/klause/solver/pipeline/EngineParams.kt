@@ -34,6 +34,7 @@ import com.eignex.klause.localsearch.AdaptivePerturbationRestart
 import com.eignex.klause.localsearch.AspirationCriterion
 import com.eignex.klause.localsearch.FixedCadenceRestart
 import com.eignex.klause.localsearch.LubyRestart
+import com.eignex.klause.localsearch.ObjectiveGuidance
 import com.eignex.klause.localsearch.RestartPolicy
 import com.eignex.klause.localsearch.TabuFilter
 import com.eignex.klause.localsearch.acceptance.AcceptanceRule
@@ -438,6 +439,10 @@ fun resolveLocalSearchRecipes(p: EngineParams): LsResolution =
     resolveLocalSearchRecipes(p.reader())
 
 internal fun resolveLocalSearchRecipes(p: ExecutionOptionReader): LsResolution {
+    val guidance = p[ExecutionOption.objectiveGuidance]?.split(',')?.map { raw ->
+        ObjectiveGuidance.entries.firstOrNull { it.name.equals(raw.trim(), ignoreCase = true) }
+            ?: pipelineConfigError("objective-guidance expects canonical|functional|geometric, got `$raw`")
+    }
     val dryRunSolver = p[ExecutionOption.dryRunSolver] ?: false
     val noiseRaw = p[ExecutionOption.noise]
     val cbRaw = p[ExecutionOption.cb]
@@ -522,7 +527,12 @@ internal fun resolveLocalSearchRecipes(p: ExecutionOptionReader): LsResolution {
             listOf({ edit(base()) })
         }
     }
-    return LsResolution(pool, dryRunSolver)
+    val guidedPool = guidance?.let { modes ->
+        (pool ?: LocalSearchCatalog.factories(Kind.COP)).flatMap { factory ->
+            modes.map { mode -> { factory().withObjectiveGuidance(mode) } }
+        }
+    } ?: pool
+    return LsResolution(guidedPool, dryRunSolver)
 }
 
 /** Canonical base name for consumption checks — collapses the `strategy=` aliases. */
