@@ -5699,6 +5699,10 @@ imports and `numericalRefutationResolvedDeductions` as actual unit consumptions.
 `numericalRefutationSupportReasons` counts reasons shortened to established support;
 it does not establish a changed trajectory or saved work. Complete Boolean scope,
 opening restrictions and the existing cumulative source/proof limits remain required.
+`numericalRefutationReuseResolutionUnfixedHits` and
+`numericalRefutationUnfixedDeductions` additionally require the removed pivot to
+remain undecided in the checked exclusion scope, so neither immediate input proof
+matches that scope individually. Their observation work spends the same allowance.
 
 [Pilot 8795](https://lab.eignex.com/jobs/8795), at `7fbb3e59d6` on Mac/aarch64,
 compares exact cache, unit, resolution and automatic controls on captured egout and
