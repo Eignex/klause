@@ -232,7 +232,7 @@ class SourceNumericalFeedbackTest {
     @Test
     fun `an attached observer should not expand runtime feedback retention`() {
         val funding = SourceLpFunding(1_000_000L, 4_000_000L).apply { grant(1_000_000L) }
-        val feedback = SourceNumericalFeedback(funding, Cancellation.Never)
+        val feedback = SourceNumericalFeedback(funding, Cancellation.Never, latest = false)
         val journal = LinearAuthorityCapture(1000, 1_000_000L, 16_000_000L, Cancellation.Never)
         val result = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use { authority ->
             authority.capture = journal
@@ -245,6 +245,97 @@ class SourceNumericalFeedbackTest {
         assertEquals(SourceNumericalFeedbackResult.Reason.Retention,
             assertIs<SourceNumericalFeedbackResult.Unavailable>(result).reason)
         assertTrue(funding.allocated > 0L)
+    }
+
+    @Test
+    fun `latest delivery should expose a retracted scope after the archive fills`() {
+        val funding = SourceLpFunding(1_000_000L, 4_000_000L).apply { grant(1_000_000L) }
+        val feedback = SourceNumericalFeedback(funding, Cancellation.Never)
+        val journal = LinearAuthorityCapture(1, 1_000_000L, 16_000_000L, Cancellation.Never)
+        val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
+        val guarded = SourceProofContext(scope.copy(condition = SourceCondition(bools = mapOf(0 to true))),
+            setOf(x, bool), source.premises.mapValues { (_, premise) ->
+                SourcePremise(premise.inequality, mapOf(0 to true))
+            } + ("zero" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO))),
+            source.objective)
+        val retracted = guarded.atScope(scope.copy(condition = SourceCondition(bools = mapOf(0 to false))))
+        val later = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use { authority ->
+            authority.capture = journal
+            feedback.acquire(authority, guarded, cuts = false)
+            feedback.acquire(authority, retracted, cuts = false).feedback
+        }
+
+        val available = assertIs<SourceNumericalFeedbackResult.Available>(later)
+        assertEquals(1, journal.records.size)
+        assertEquals(BigFraction.ZERO, available.query.point?.get(x))
+        assertTrue(available.compatible(retracted, null))
+        assertFalse(available.compatible(guarded, null))
+        assertEquals(1L, feedback.lateCollections)
+    }
+
+    @Test
+    fun `a query beyond the delivery allowance should be an oversized outcome`() {
+        val funding = SourceLpFunding(1_000_000L, 4_000_000L).apply { grant(1_000_000L) }
+        val feedback = SourceNumericalFeedback(funding, Cancellation.Never)
+        val journal = LinearAuthorityCapture(0, 0L, 0L, Cancellation.Never).apply { deliver(1L, 1L) }
+        val result = LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use { authority ->
+            authority.capture = journal
+            feedback.acquire(authority, source, cuts = false).feedback
+        }
+
+        assertEquals(SourceNumericalFeedbackResult.Reason.Oversized,
+            assertIs<SourceNumericalFeedbackResult.Unavailable>(result).reason)
+    }
+
+    @Test
+    fun `detach should release delivery and keep the external archive charged`() {
+        val funding = SourceLpFunding(1_000_000L, 4_000_000L).apply { grant(1_000_000L) }
+        val feedback = SourceNumericalFeedback(funding, Cancellation.Never)
+        val journal = LinearAuthorityCapture(1, 1_000_000L, 16_000_000L, Cancellation.Never)
+        LinearAuthority(SourceLpBudget(funding = funding), retainLp = true).use { authority ->
+            authority.capture = journal
+            feedback.attach(authority)
+            repeat(2) { journal.record(source, null, null, null, LinearAuthorityResult()) }
+            val allocated = funding.allocated
+
+            feedback.detach(authority)
+
+            assertNull(journal.delivered)
+            assertEquals(1, journal.records.size)
+            assertTrue(authority.capture === journal)
+            assertEquals(allocated + journal.constructedBytes, funding.allocated)
+        }
+    }
+
+    @Test
+    fun `feedback traversal should keep delivering queries after the archive fills`() {
+        val records = arrayListOf<SourceNumericalFeedbackResult>()
+        val result = LinearAuthorityInvocation(source, TheoryParams(sourceCuts = false), boundOrdered = true,
+            supportBranching = true, onNumericalFeedback = records::add).use {
+            it.captureTo(LinearAuthorityCapture(1, 1_000_000L, 16_000_000L, Cancellation.Never))
+            it.run { _, _ -> }
+        }
+
+        assertEquals(BigFraction.ONE, result.value)
+        assertTrue(records.any { (it as? SourceNumericalFeedbackResult.Available)?.query?.refutation != null })
+        assertTrue(assertNotNull(result.stats.smt.completeSearchStages)
+            .getValue("numericalFeedbackLateCollections") > 0L)
+    }
+
+    @Test
+    fun `prefix feedback traversal should report retention after the archive fills`() {
+        val records = arrayListOf<SourceNumericalFeedbackResult>()
+        val result = LinearAuthorityInvocation(source, TheoryParams(sourceCuts = false), boundOrdered = true,
+            supportBranching = true, onNumericalFeedback = records::add, latestFeedback = false).use {
+            it.captureTo(LinearAuthorityCapture(1, 1_000_000L, 16_000_000L, Cancellation.Never))
+            it.run { _, _ -> }
+        }
+
+        assertEquals(BigFraction.ONE, result.value)
+        assertEquals(1, records.count { it is SourceNumericalFeedbackResult.Available })
+        assertTrue(records.any {
+            (it as? SourceNumericalFeedbackResult.Unavailable)?.reason == SourceNumericalFeedbackResult.Reason.Retention
+        })
     }
 
     @Test

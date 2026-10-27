@@ -195,6 +195,7 @@ internal class LinearAuthority(
         source: SourceProofContext, cancellation: Cancellation, cuts: Boolean = false, cutMask: Set<Int>? = null,
     ): LinearAuthorityResult {
         relaxedPoint = emptyMap()
+        capture?.discard()
         capturedPoint = null
         capturedQuery = null
         capturedTemplate = null

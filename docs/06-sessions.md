@@ -305,8 +305,8 @@ allowance retires the cache and leaves ordinary numerical queries available.
 separation in numerical frontier traversal. `source-lp-operations` supplies an independent
 operation ceiling for controlled comparisons. Other source LP clients retain their
 operation-based admission policy.
-Optional numerical decision feedback debits journal collection, retention and
-support scoring to the same cumulative source funding. Exhausted feedback retains
+Optional numerical decision feedback debits journal construction, latest-query
+replacement, retention and support scoring to the same cumulative source funding. Exhausted feedback retains
 source-order branching and every complementary alternative.
 Point-based source separation debits its scoring and projection storage to that
 same ledger; its extra relaxation receives no renewed work or allocation ceiling.

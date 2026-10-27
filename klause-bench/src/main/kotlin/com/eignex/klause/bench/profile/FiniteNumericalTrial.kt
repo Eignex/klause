@@ -96,8 +96,8 @@ internal class FiniteNumericalTrial(
             it.parameterCount == 6 && it.parameterTypes.last().simpleName == "DefaultConstructorMarker"
         }.newInstance(budget, null, true, null, 10, null)
         val publisherType = Class.forName("com.eignex.klause.solver.pipeline.SourceNumericalFeedback")
-        publisher = publisherType.getDeclaredConstructor(fundingType, Cancellation::class.java)
-            .newInstance(funding, stop)
+        publisher = publisherType.getDeclaredConstructor(fundingType, Cancellation::class.java,
+            Boolean::class.javaPrimitiveType).newInstance(funding, stop, true)
         val acquisition = publisherType.methods.single { it.name == "acquire" }
             .invoke(publisher, authority, prepared, cutoff, cuts)
         feedback = field(acquisition, "feedback")

@@ -46,6 +46,9 @@ internal data class LinearAuthorityCapturedQuery(
 )
 
 // Source values and derivations are immutable; numerical owners, queries and their buffers never escape.
+// The archive keeps a bounded inspection prefix. Delivery holds only the latest completed query under a per-query
+// allowance, so a full archive never withholds later queries from a runtime consumer. Archived and delivered
+// records share one construction, which the cumulative constructed ledger counts once; eviction never lowers it.
 internal class LinearAuthorityCapture(
     private var maximumRecords: Int,
     private var maximumEntries: Long,
@@ -62,13 +65,30 @@ internal class LinearAuthorityCapture(
         private set
     var bytes: Long = 0L
         private set
+    var constructedEntries: Long = 0L
+        private set
+    var constructedBytes: Long = 0L
+        private set
     private var limitReached = false
     val limited: Boolean get() = limitReached || attempted > retained.size
-    val accepting: Boolean get() = retained.size < maximumRecords && entries < maximumEntries &&
-        bytes < maximumBytes && !stop()
+    private val archiving: Boolean get() = retained.size < maximumRecords && entries < maximumEntries &&
+        bytes < maximumBytes
+    val accepting: Boolean get() = (archiving || delivering) && !stop()
     var attempted: Long = 0L
         private set
     private var recordedAttempt = 0L
+    private var delivering = false
+    private var deliveryEntries = 0L
+    private var deliveryBytes = 0L
+    var delivered: LinearAuthorityCapturedQuery? = null
+        private set
+    var deliveryOverflowed: Boolean = false
+        private set
+    private var inProgress = false
+    private var archive = true
+    private var live = false
+    private var liveEntries = 0L
+    private var liveBytes = 0L
 
     fun restrict(records: Int, entries: Long, bytes: Long) {
         require(records >= 0 && entries >= 0 && bytes >= 0)
@@ -77,13 +97,61 @@ internal class LinearAuthorityCapture(
         maximumBytes = minOf(maximumBytes, bytes)
     }
 
+    fun deliver(entries: Long, bytes: Long) {
+        require(entries > 0 && bytes > 0)
+        deliveryEntries = if (delivering) minOf(deliveryEntries, entries) else entries
+        deliveryBytes = if (delivering) minOf(deliveryBytes, bytes) else bytes
+        delivering = true
+    }
+
+    fun stopDelivery() {
+        delivering = false
+        delivered = null
+        deliveryOverflowed = false
+        live = false
+    }
+
+    // Drops an attempt whose query never completed, so its partial point spends no later query's allowance.
+    fun discard() {
+        inProgress = false
+    }
+
+    private fun begin() {
+        if (inProgress) return
+        inProgress = true
+        archive = true
+        live = delivering
+        liveEntries = 0L
+        liveBytes = 0L
+        deliveryOverflowed = false
+    }
+
     private fun spend(count: Long, allocation: Long): Boolean {
-        if (stop() || count > maximumEntries - entries || allocation > maximumBytes - bytes) {
+        if (stop()) {
             limitReached = true
+            archive = false
+            live = false
             return false
         }
-        entries += count
-        bytes += allocation
+        if (archive && (count > maximumEntries - entries || allocation > maximumBytes - bytes)) {
+            limitReached = true
+            archive = false
+        }
+        if (live && (count > deliveryEntries - liveEntries || allocation > deliveryBytes - liveBytes)) {
+            deliveryOverflowed = true
+            live = false
+        }
+        if (!archive && !live) return false
+        if (archive) {
+            entries += count
+            bytes += allocation
+        }
+        if (live) {
+            liveEntries += count
+            liveBytes += allocation
+        }
+        constructedEntries += count
+        constructedBytes += allocation
         return true
     }
 
@@ -95,8 +163,14 @@ internal class LinearAuthorityCapture(
         value.coefficients.all { (_, coefficient) -> spend(1L, 48L) && scalar(coefficient) }
 
     fun point(coordinates: List<SourceCoordinate>, values: List<BigFraction>): Map<SourceCoordinate, BigFraction>? {
+        begin()
+        val archiving = archive
         if (values.size != coordinates.size || !spend(values.size.toLong(), values.size * 48L) ||
-            !values.all(::scalar)) return null
+            !values.all(::scalar)) {
+            // An archived record omits a point it cannot afford; delivery reports the oversized query instead.
+            archive = archiving
+            return null
+        }
         return coordinates.indices.associate { coordinates[it] to values[it] }
     }
 
@@ -126,12 +200,19 @@ internal class LinearAuthorityCapture(
         result: LinearAuthorityResult,
         numericSource: SourceProofContext? = null,
     ) {
-        if (result.paused) return
-        attempted++
-        if (retained.size >= maximumRecords || !spend(1L, 256L)) {
-            limitReached = true
+        if (result.paused) {
+            inProgress = false
             return
         }
+        begin()
+        inProgress = false
+        attempted++
+        delivered = null
+        if (archive && retained.size >= maximumRecords) {
+            limitReached = true
+            archive = false
+        }
+        if (!spend(1L, 256L)) return
         val open = source.coordinates.any {
             it.kind == SourceCoordinate.Kind.Boolean && it.id !in source.scope.condition.bools
         }
@@ -185,7 +266,8 @@ internal class LinearAuthorityCapture(
         for (evidence in listOfNotNull(result.bound, refutation)) {
             if (!proof(evidence.derivation)) return
         }
-        retained += LinearAuthorityCapturedQuery(retained.size, source, numeric.atScope(source.scope),
+        val captured = LinearAuthorityCapturedQuery((attempted - 1L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+            source, numeric.atScope(source.scope),
             query?.coordinates.orEmpty().toList(),
             cited.toList(), query?.inactive.orEmpty().toSet(), point?.toMap(), candidates.toList(),
             template?.cuts?.observations.orEmpty().toMap(), result.bound, refutation, when {
@@ -197,14 +279,31 @@ internal class LinearAuthorityCapture(
                 result.bound == null -> "bound-unavailable"
                 else -> "completed"
             })
-        recordedAttempt = attempted
+        if (archive) {
+            retained += captured
+            recordedAttempt = attempted
+        }
+        if (live) {
+            constructedEntries++
+            constructedBytes += 64L
+            delivered = captured
+        }
     }
 
     fun link(scope: SourceScope, parent: SourceScope?, sibling: SourceEvidence?, incumbent: BigFraction?) {
-        if (recordedAttempt != attempted) return
-        val record = retained.lastOrNull()?.takeIf { it.context.scope == scope } ?: return
-        if (sibling != null && !proof(sibling.derivation)) return
-        if (incumbent != null && !scalar(incumbent)) return
+        val archived = retained.lastOrNull()?.takeIf { recordedAttempt == attempted && it.context.scope == scope }
+        val current = delivered?.takeIf { it.context.scope == scope }
+        val record = archived ?: current ?: return
+        // Linking extends the completed query's allowances; a refused delivery keeps the unlinked record.
+        archive = archived != null
+        live = current != null
+        val overflowed = deliveryOverflowed
+        try {
+            if (sibling != null && !proof(sibling.derivation)) return
+            if (incumbent != null && !scalar(incumbent)) return
+        } finally {
+            deliveryOverflowed = overflowed
+        }
         val value = ((record.bound?.claim as? SourceClaim.Bound)?.value as? SourceValue.Rational)?.value
         val disposition = when {
             value == null -> "bound-unavailable"
@@ -213,8 +312,10 @@ internal class LinearAuthorityCapture(
                 "incumbent-dominating"
             else -> "weak-bound"
         }
-        retained[retained.lastIndex] = record.copy(parent = parent, siblingBound = sibling, incumbent = incumbent,
+        val linked = record.copy(parent = parent, siblingBound = sibling, incumbent = incumbent,
             parentQuery = retained.lastOrNull { it.context.scope == parent }?.id, boundDisposition = disposition)
+        if (archive && archived != null) retained[retained.lastIndex] = linked
+        if (live && current != null) delivered = linked
     }
 
     private fun canAdd(left: BigFraction, right: BigFraction): Boolean =

@@ -68,7 +68,7 @@ internal object MpsProofFrontier {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val supported = setOf("suite", "problem", "sha256", "exact", "probe", "history", "frontier", "cuts",
             "selection", "replay", "operations", "activeRows", "supportBranching", "pointCuts", "aggregate-probe",
-            "aggregate-mixed", "aggregate-replay", "aggregateCuts", "refutationReuse")
+            "aggregate-mixed", "aggregate-replay", "aggregateCuts", "refutationReuse", "feedbackDelivery")
         require(options.keys.containsAll(setOf("suite", "problem", "sha256", "exact")) &&
             (options.keys - supported).isEmpty())
         val probe = options["probe"]?.toBooleanStrict() ?: false
@@ -106,6 +106,8 @@ internal object MpsProofFrontier {
         val request = field(execution, "request") as NumericalLinearRequest
         val solveStop = preparationStop or Cancellation.after(10.seconds)
         val supportBranching = options["supportBranching"]?.toBooleanStrict() ?: false
+        val feedbackDelivery = options["feedbackDelivery"] ?: "latest"
+        require(feedbackDelivery in setOf("latest", "prefix"))
         val params = TheoryParams(timeout = solveStop, cancellation = solveStop, randomSeed = 3L,
             sourceCuts = options["cuts"]?.toBooleanStrict() ?: true,
             sourcePointCuts = options["pointCuts"]?.toBooleanStrict() ?: false,
@@ -138,7 +140,7 @@ internal object MpsProofFrontier {
         val system = NumericalFrontierSnapshot.system(context)
         Reports.writeJson(out.resolve("native-system.json").path, system)
         val invocation = NumericalFrontierSnapshot.open(context, params, historyEnabled, frontierEnabled, activeRows,
-            supportBranching)
+            supportBranching, feedbackDelivery == "latest")
         val selection = NumericalSelectionSnapshot(Cancellation.after(30.seconds))
         val journal = if (options["selection"]?.toBooleanStrict() == true || aggregateProbe) {
             selection.attach(invocation)
@@ -243,6 +245,7 @@ internal object MpsProofFrontier {
                 put("boundOrdered", frontierEnabled)
                 put("sourceCuts", params.sourceCuts)
                 put("supportBranching", supportBranching)
+                put("feedbackDelivery", feedbackDelivery)
                 put("pointCuts", params.sourcePointCuts)
                 put("aggregateCuts", params.sourceAggregateCuts)
                 put("refutationReuse", params.sourceRefutationReuse)

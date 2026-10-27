@@ -47,6 +47,8 @@ internal class NumericalSelectionSnapshot(private val stop: Cancellation) {
         put("retainedRecords", records(journal).size)
         put("entries", field(journal, "entries") as Long)
         put("modeledBytes", field(journal, "bytes") as Long)
+        put("constructedEntries", field(journal, "constructedEntries") as Long)
+        put("constructedModeledBytes", field(journal, "constructedBytes") as Long)
         put("limited", journal.javaClass.getDeclaredMethod("getLimited").invoke(journal) as Boolean)
         put("independentProofCheck", false)
         put("records", buildJsonArray { records(journal).forEach { if (!stop()) add(query(it)) } })
