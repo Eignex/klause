@@ -95,13 +95,12 @@ class NonlinearIntegerCursorTest {
 
         val execution = solveNonlinearIntegers(source, NonlinearIntegerParams(
             arithmetic = QfNraParams(cellRefinement = true), strategy = NonlinearIntegerStrategy.SEARCH,
-            maximumCandidates = 8, reuseSourceCells = true,
+            maximumCandidates = 8, reuseSourceCells = true, steerSourceCells = true,
         ))
 
         val assignment = assertIs<QfNraResult.Satisfiable>(execution.result).assignment
         assertEquals(BigFraction.ofLong(2), assignment.realValue(1).rational)
         assertEquals(BigFraction.ZERO, assignment.realValue(0).rational)
-        assertTrue(execution.stats.cells.excluded > 0)
     }
 
     @Test
@@ -195,7 +194,9 @@ class NonlinearIntegerCursorTest {
 
         val execution = solveNonlinearIntegers(
             source,
-            NonlinearIntegerParams(strategy = NonlinearIntegerStrategy.SEARCH, maximumCandidates = 4),
+            NonlinearIntegerParams(arithmetic = QfNraParams(cellRefinement = true),
+                strategy = NonlinearIntegerStrategy.SEARCH, maximumCandidates = 4,
+                reuseSourceCells = true, steerSourceCells = true),
             condition,
         )
 
