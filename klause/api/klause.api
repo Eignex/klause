@@ -1723,6 +1723,35 @@ public final class com/eignex/klause/factor/circuit/Circuit : com/eignex/klause/
 	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
+public final class com/eignex/klause/factor/codec/FactorCodec {
+	public fun <init> (Ljava/lang/String;Lkotlin/reflect/KClass;Lkotlin/reflect/KClass;Lkotlinx/serialization/KSerializer;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)V
+	public final fun getFactorType ()Lkotlin/reflect/KClass;
+	public final fun getKey ()Ljava/lang/String;
+	public final fun getPayloadSerializer ()Lkotlinx/serialization/KSerializer;
+	public final fun getPayloadType ()Lkotlin/reflect/KClass;
+}
+
+public final class com/eignex/klause/factor/codec/FactorCodecs {
+	public static final field Companion Lcom/eignex/klause/factor/codec/FactorCodecs$Companion;
+	public fun <init> (Ljava/util/List;)V
+	public final fun decodeFromJsonElement (Lkotlinx/serialization/json/JsonElement;)Lcom/eignex/klause/ir/Factor;
+	public final fun encodeToJsonElement (Lcom/eignex/klause/ir/Factor;)Lkotlinx/serialization/json/JsonElement;
+	public final fun forFactor (Lcom/eignex/klause/ir/Factor;)Lcom/eignex/klause/factor/codec/FactorCodec;
+	public final fun forKey (Ljava/lang/String;)Lcom/eignex/klause/factor/codec/FactorCodec;
+	public final fun getCodecs ()Ljava/util/List;
+	public final fun plus (Lcom/eignex/klause/factor/codec/FactorCodec;)Lcom/eignex/klause/factor/codec/FactorCodecs;
+	public final fun plus (Lcom/eignex/klause/factor/codec/FactorCodecs;)Lcom/eignex/klause/factor/codec/FactorCodecs;
+}
+
+public final class com/eignex/klause/factor/codec/FactorCodecs$Companion {
+	public final fun getBuiltin ()Lcom/eignex/klause/factor/codec/FactorCodecs;
+}
+
+public final class com/eignex/klause/factor/codec/MissingFactorCodecException : kotlinx/serialization/SerializationException {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun getPath ()Ljava/lang/String;
+}
+
 public final class com/eignex/klause/factor/global/AllDifferent : com/eignex/klause/factor/OptionalFactor, com/eignex/klause/ir/Factor {
 	public fun <init> ([IJI[I[JZ)V
 	public synthetic fun <init> ([IJI[I[JZILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -2694,7 +2723,7 @@ public final class com/eignex/klause/formats/flatzinc/UnsupportedFlatZincExcepti
 	public fun <init> (Ljava/lang/String;II)V
 }
 
-public final class com/eignex/klause/formats/json/JsonFormatException : com/eignex/klause/formats/FormatException {
+public class com/eignex/klause/formats/json/JsonFormatException : com/eignex/klause/formats/FormatException {
 	public fun <init> (Ljava/lang/String;Ljava/lang/Throwable;)V
 	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 }
@@ -2703,6 +2732,23 @@ public final class com/eignex/klause/formats/json/JsonSchema {
 	public static final field INSTANCE Lcom/eignex/klause/formats/json/JsonSchema;
 	public final fun jsonSchema ()Lkotlinx/serialization/json/JsonObject;
 	public final fun parse (Ljava/lang/String;)Lcom/eignex/skema/SchemaDef;
+}
+
+public final class com/eignex/klause/formats/json/ProblemJson {
+	public static final field Companion Lcom/eignex/klause/formats/json/ProblemJson$Companion;
+	public fun <init> ()V
+	public fun <init> (Lcom/eignex/klause/factor/codec/FactorCodecs;)V
+	public synthetic fun <init> (Lcom/eignex/klause/factor/codec/FactorCodecs;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun decodeFromJsonElement (Lkotlinx/serialization/json/JsonElement;)Lcom/eignex/klause/ir/Problem;
+	public final fun decodeFromString (Ljava/lang/String;)Lcom/eignex/klause/ir/Problem;
+	public final fun encodeToJsonElement (Lcom/eignex/klause/ir/Problem;)Lkotlinx/serialization/json/JsonObject;
+	public final fun encodeToString (Lcom/eignex/klause/ir/Problem;)Ljava/lang/String;
+	public final fun getCodecs ()Lcom/eignex/klause/factor/codec/FactorCodecs;
+	public final fun jsonSchema ()Lkotlinx/serialization/json/JsonObject;
+}
+
+public final class com/eignex/klause/formats/json/ProblemJson$Companion {
+	public final fun getDefault ()Lcom/eignex/klause/formats/json/ProblemJson;
 }
 
 public final class com/eignex/klause/formats/minizinc/OznParseException : com/eignex/klause/formats/FormatException {
