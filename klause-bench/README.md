@@ -3445,6 +3445,27 @@ from cumulative thread allocation of 787,605,896 versus 720,080,344 bytes or RSS
 These are ordered instrumented queries with native original-source checks, without
 independent witness/proof certification or a throughput claim.
 
+[Exact-cutoff replay 8731](https://lab.eignex.com/jobs/8731), at `2ce578d797`,
+retains 8580's p0033/rgn and 8697's modglob centers, original source hashes and
+byte-identical control ledgers: 17 conditions across five owners on Linux/amd64,
+debug enabled. Execution receipts enforce one CPU and 4,608 MiB cgroup memory;
+the profile command leaves heap and GC selection to the JVM. Both CP owners enter all
+seven non-binary rational conditions. Cold CP closes two rgn cutoffs and retained
+CP one; the remaining rgn conditions and every modglob CP query return
+`Unsupported` after uncertified continuous completion, without closure authority.
+P0033 retains five checked gains and five cutoff closures per CP owner, spending
+12,770/9,642 cold/retained nodes. Both mixed owners retain two modglob gains.
+All 48 returned points pass native original-source checks; independent witness and
+proof certification remain absent.
+
+Rgn cold/retained CP spends 25,164,472/19,137,664 standalone LP work units and
+254.7/208.0 MB cumulative thread allocation; modglob spends
+191,465,246/52,769,205 units and 502.0/261.2 MB. These include unsuccessful
+completion. CP fragment overspend is at most one decision equivalent. The retained
+small-fragment controls preserve LS/mixed overspends reaching 5,119/915 equivalents;
+no containing allowance is exceeded. These instrumented costs support exact-cutoff
+capability, without an equal-work speedup or owner-replacement qualification.
+
 Keep the existing owner admission. Small finite controls, held-out checked centers,
 ordinary finite execution and these original MPS overlaps support no uniform owner
 replacement. Retained LP state reduces repeated preparation in this MPS overlap;
