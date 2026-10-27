@@ -29,6 +29,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.validation.FiniteSourceAcceptance
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -42,6 +43,34 @@ import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration.Companion.seconds
 
 class ResumableMinimizeRealLeafTest {
+    @Test
+    fun `primal repair should compare the authoritative scaled source objective across rounded ties`() {
+        val epsilon = BigFraction.ofLong(1L shl 60).reciprocal()
+        for (sign in listOf(-1L, 1L)) for (offset in listOf(0L, 1L)) {
+            val fixture = UnresolvedRealLeafFixture(false)
+            fixture.acceptProof = { _, _ -> false }
+            val objective = LinearObjective(realCoefficients = doubleArrayOf(10.0 * sign))
+            val sourceValue = BigFraction.ofLong(5L * sign) + epsilon
+            val params = fixture.params.copy(toleranceCheck = FiniteSourceAcceptance(
+                { it.reals.single() == 0.5 }, false, { sourceValue },
+            ))
+
+            fixture.solver.openRepair(objective, params).use { repair ->
+                repair.beginExact(Assumptions.None, 100L,
+                    sourceValue + epsilon * BigFraction.ofLong(offset), Cancellation.Never)
+                val result = repair.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L)
+
+                assertEquals(TerminationReason.Unsupported, result.reason)
+                if (offset > 0L) {
+                    val sample = assertNotNull(result.sample)
+                    assertEquals(sourceValue, exactSourceObjective(objective, sample, params.toleranceCheck))
+                    assertNull(sample.exactReals)
+                } else assertNull(result.sample)
+            }
+            assertEquals(fixture.opened, fixture.closed)
+        }
+    }
+
     @Test
     fun `exact repair should publish checked primal improvements without closing unresolved leaves`() {
         val epsilon = BigFraction.ofLong(1L shl 60).reciprocal()

@@ -78,10 +78,11 @@ internal object MpsRepairOwners {
         val verify: (Sample, Cancellation) -> RepairOwnerReplay.PointCheck = { sample, token ->
             val point = columns.map { column ->
                 if (Term.isInt(column)) BigFraction.of(sample.exactIntValue(Term.intVar(column)), BIG_ONE)
-                else checkNotNull(sample.exactReals)[Term.realVar(column)]
+                else sample.exactReals?.get(Term.realVar(column))
+                    ?: checkNotNull(BigFraction.ofDouble(sample.approximateRealValue(Term.realVar(column))))
             }
             val checked = source.checkMpsWitness(point, token)
-            RepairOwnerReplay.PointCheck(checked != null, checked?.objective)
+            RepairOwnerReplay.PointCheck(checked != null, checked?.objective, checked?.exact)
         }
         val completionReplay: ((Sample, Cancellation) -> JsonObject)? =
             if (request["completionReplay"]?.jsonPrimitive?.content?.toBooleanStrict() != true) null else
@@ -145,7 +146,14 @@ internal object MpsRepairOwners {
             request["ownerWork"]?.jsonPrimitive?.content?.toLong() ?: 100_000L,
             request["ownerFragmentWork"]?.jsonPrimitive?.content?.toLong() ?: 2_000L,
             verify, context, source.objective?.sense == ObjectiveSense.MAXIMIZE,
-            completionReplay = completionReplay)
+            completionReplay = completionReplay,
+            completionObjective = if (request["primalCompletion"]?.jsonPrimitive?.content?.toBooleanStrict() != true)
+                null else { sample, token ->
+                    verify(sample, token).objective?.let { value ->
+                        val scaled = value * scale
+                        if (source.objective?.sense == ObjectiveSense.MAXIMIZE) scaled.negated() else scaled
+                    }
+                })
         out.resolve("owner-overlap.json").writeText(buildJsonObject {
             put("status", "captured")
             put("sourceSha256", request.getValue("sha256").jsonPrimitive.content)
