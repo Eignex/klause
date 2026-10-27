@@ -238,10 +238,12 @@ left, so `x + 1 + 2` is `{"add": [{"add": [x, 1]}, 2]}`. Subtraction adds the
 negated operand, and negation and constant multiplication are `mul` with the integer
 constant first, so `x - y` is `{"add": [x, {"mul": [-1, y]}]}`. Integer evaluation
 is exact, so the nesting never changes a value. Decoding keeps every grouping except
-a chain nested in the first operand, which merges into its parent, and reads `mul`
-with a numeric left operand as a scaled term. Canonical documents therefore
-re-encode unchanged, and trees built by chaining DSL operators decode to the trees
-that encoded them.
+an `add`, `and` or `or` chain nested in the first operand, which merges into its
+parent as the DSL's `+`, `and` and `or` build it, and reads `mul` with a numeric
+left operand as a scaled term. Canonical documents therefore re-encode unchanged,
+and trees built with the DSL operators and receiver helpers such as `x.min(y)`
+decode to the trees that encoded them; an n-ary `minOf` or `maxOf` decodes as its
+nested chain.
 
 The conformance fixture
 `klause/src/jvmTest/resources/portable-expression/conformance.json`, which Kumulant
