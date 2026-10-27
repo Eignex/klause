@@ -5939,7 +5939,8 @@ The 187 published points retain native exact/tolerance source qualifications.
 Of 70 final witnesses, 56 pass independent solchecker checks. Fourteen modglob
 points remain unsupported because their exact rational objective has no finite
 decimal representation; native source checks remain separate. Native proofs have
-no independent proof check. The Klause, CLI and Koblas JARs match across
+no independent proof check. Its 28 native optimality labels separate 16
+`attained-optimum` from 12 `tolerance-optimum` results. The Klause, CLI and Koblas JARs match across
 Mac/aarch64 and Linux/amd64; each source/seed block retains one worker/runtime.
 Whole-process RSS and external timing receipts remain paired within those blocks,
 without independent timing repetitions or cross-platform throughput comparisons.
@@ -5947,9 +5948,103 @@ The seed-1 default gr4x6 pair changes peak RSS from 105,636 to 112,212 KiB and
 external wall time from 1.91 to 1.81 s; this timing pair establishes no speedup.
 The consumed pilot loss and zero-change held-out costs reject support-ordering
 promotion. The scoped producer and internal comparison remain available. Final
-composition requires the measured selection, reuse and aggregation dispositions;
-these sources overlap their qualification cohorts and are not an untouched
-composed-study holdout.
+composition uses separate held-out families because these sources overlap the
+selection, reuse and aggregation qualification cohorts.
+
+[Composed qualification 8705](https://lab.eignex.com/jobs/8705), at `1b8a73079a`,
+completes 352 ten-second P1 cases with seeds 1/3 and default/exact policies.
+Development sources are rgn, p0033, bell3a and egout. Held-out blend2, pk1,
+stein27 and vpm2 are absent from this candidate's and its current prerequisite
+and repair cohorts; membership and all settings are frozen before their outcomes.
+Eleven modes compare ordinary execution, numerical baseline, the full chain,
+each of four single-mechanism ablations, and independent/shared companions with
+each ordering. The full chain enables accepted experimental point selection,
+capped checked reuse and aggregation alongside the qualification-only support
+control. Their production defaults remain disabled. Partial-row controls with
+zero Boolean alternatives provide no additional promotion credit.
+
+All 44 p0033 cases retain native optimum 3089. Full feedback changes 25 choices
+and consumes 774 checked reuse hits. Removing support ordering consumes 619 hits
+and less work; more hits accompany more search. These bare numerical counts
+repeat across both seeds and policies:
+
+| Arm | LP operations | Retained nodes | Funded work | Modeled bytes |
+| --- | ---: | ---: | ---: | ---: |
+| Baseline | 1,896 | 2,051 | 27,600,734 | 5,118,124 |
+| Full | 1,753 | 2,735 | 25,699,806 | 86,681,461 |
+| Without support ordering | 1,445 | 2,165 | 21,105,645 | 65,060,818 |
+| Without point selection | 1,642 | 2,559 | 23,141,178 | 72,258,109 |
+| Without reuse | 2,723 | 3,081 | 39,638,235 | 28,804,681 |
+| Without aggregation | 1,753 | 2,735 | 25,699,196 | 86,622,239 |
+
+The numerical-owner ledger includes feedback collection, scoring, retention and
+its cut/reuse checks. Logical
+open work for baseline/full/without-support is 12,073/15,333/11,949, in its separate
+currency. On seed 1/default, their whole-CLI peak RSS is
+280,384/262,528/274,896 KiB and external wall time 1.93/2.20/1.88 s.
+Modeled allocation and physical memory give different comparisons.
+
+Both companion recipes preserve p0033's optimum with 25 changed choices, while
+numerical-owner funded work grows from 24,117,840 to 33,508,198 with support ordering.
+Other owners retain separate costs. In seed 1/default's independent pair, native
+CP propagation work grows from 1,877,830 to 5,726,364 and joint-repair funded work
+from 443,880 to 591,324; these are separate components, not additive equivalents.
+Whole-CLI wall time changes from 3.95 to 5.89 s and peak RSS from 318,576 to
+361,264 KiB. Shared-companion costs and imported incumbent credit remain separate
+from ordering credit. These policy seeds are not independent timing repetitions.
+
+Rgn full feedback changes one choice, produces 64 aggregate candidates and selects
+five cuts. Its checked point matches the numerical baseline. It spends
+325,453,703 work units and 536,879,072 modeled bytes at the containing allocation
+boundary. The seed-1 default arm without support ordering retains that point with
+214,977,864 work units and 377,602,510 modeled bytes. Bell3a and egout change no
+choices. Their companion witness differences supply no ordering efficacy evidence.
+
+All 96 support-enabled held-out cases consume zero changed choices across
+397–4,271 consultations each. Later journal states remain unavailable; this does
+not establish general support inapplicability. Blend2 and vpm2 yield no numerical
+or companion point, while ordinary execution publishes four source-qualified
+points per family. Pk1's bare numerical arms yield no point; its companion
+objectives vary with zero ordering changes and earn no ordering credit. Every
+stein27 arm retains objective 18, but only ordinary execution closes its four
+native proofs. Preserve these lost outcomes alongside bounded numerical gains.
+
+[Checked trajectory capture 8707](https://lab.eignex.com/jobs/8707), at `b4b6d1d51b`,
+compares the six bare arms on the declared p0033 development source with exact
+semantics, seed 3, P1 and 256 LP operations. Every arm remains nonterminal and
+produces no incumbent. Their native checked bounds start near 2530.9152; the
+baseline ends at 2926.85, full feedback near 2840.7816 and without-support at
+2940.35. Full feedback consumes 25 changed choices and 37 checked reuse hits.
+Different leaf partitions and cooperative bound-sampling counts establish no
+coverage ordering. All 1,380 serialized cut, bound, sibling-bound and refutation
+instances pass fresh native checks in their recorded scopes, without independent
+proof certification. Full feedback retains 32 of 405 attempted journal records
+under its 8 MiB ceiling; external baseline/without-support observations retain
+64 under 16 MiB. Inspection keeps those actual limits and unavailable states.
+These ordered instrumented captures establish no throughput or whole-CLI cost claim.
+
+All 845 published point records retain native original-source qualifications:
+823 exact and 22 tolerance-qualified. [Checker run 8726](https://lab.eignex.com/jobs/8726)
+checks the final witnesses without rerunning the solver: 190 are independently
+valid, two exact-policy vpm2 witnesses remain unsupported because coordinate
+`4/15` has no finite decimal representation, and none is invalid. The remaining
+160 cases publish no final witness. All 48 native optimality labels are
+`attained-optimum`; none has an independent proof check. All 352 cases use identical
+distribution/runtime identities on Mac/aarch64, and each source/seed block stays
+on one worker. Original hashes match, every whole-CLI resource receipt binds its
+raw solve record, and checker augmentation preserves every solver record.
+Timing and RSS remain descriptive observations without isolated timing repetitions.
+
+The composed evidence rejects promotion of this bounded support-ordering consumer.
+The scoped producer, internal consumer and reusable comparison remain available;
+ordinary execution exposes no support-ordering switch. Accepted experimental
+selection, reuse and aggregation retain their measured dispositions and disabled
+defaults. [Finite rankings](#scoped-finite-numerical-ranking) retain only their
+bounded gains with acquisition separately credited; their checked descents supply
+no basin classification. The [repair-owner qualification](https://github.com/Eignex/klause/pull/3673)
+retains existing admission: retained LP preparation savings and limited finite
+repair gains support no unconditional owner replacement. No conditioned refutation,
+relaxation point or unavailable record gains parent proof authority.
 
 #### Active rows before Boolean completion
 
