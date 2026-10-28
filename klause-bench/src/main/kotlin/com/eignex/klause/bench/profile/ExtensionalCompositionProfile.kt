@@ -28,9 +28,12 @@ internal object ExtensionalCompositionProfile {
     fun main(args: Array<String>) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.keys.containsAll(setOf("suite", "problem", "sha256")))
-        require(options.keys.all { it in setOf("suite", "problem", "sha256", "prepared", "preparationWork") })
+        require(options.keys.all {
+            it in setOf("suite", "problem", "sha256", "prepared", "preparationWork", "sensitive", "cycles")
+        })
         val preparationWorkLimit = options["preparationWork"]?.toLong() ?: 2_000_000_000L
         require(preparationWorkLimit > 0)
+        val sensitive = options["sensitive"] != "false"
         val reference = Catalog.uncapped(options.getValue("suite")).problems
             .single { it.name == options.getValue("problem") }
         val bytes = CorpusFiles.open(CorpusFetcher.resolve(reference.source)).use {
@@ -51,11 +54,12 @@ internal object ExtensionalCompositionProfile {
             override fun workMeter(): WorkMeter = preparationMeter
         }
         val preparation = if (options["prepared"] == "true") {
-            PresolvePipeline.run(source, null, PresolveConfig.DEFAULT, true, preparationToken)
+            PresolvePipeline.run(source, null, PresolveConfig.DEFAULT, sensitive, preparationToken)
         } else null
         val problem = preparation?.problem ?: source
         out.resolve("preparation.json").writeText(buildJsonObject {
             put("requested", preparation != null)
+            put("solutionSetSensitive", sensitive)
             put("cancelled", preparationToken())
             put("work", preparationWork)
             put("workLimit", preparationWorkLimit)
@@ -114,6 +118,7 @@ internal object ExtensionalCompositionProfile {
             })
         }
         out.resolve("shapes.json").writeText(shapes.toString())
+        if (options["cycles"] == "true") ExtensionalCycleProjection.capture(problem, sha256(bytes), out)
         val bean = ManagementFactory.getThreadMXBean() as ThreadMXBean
         check(bean.isThreadAllocatedMemorySupported)
         bean.isThreadAllocatedMemoryEnabled = true
