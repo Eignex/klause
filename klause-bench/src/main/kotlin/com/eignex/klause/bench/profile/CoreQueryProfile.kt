@@ -68,7 +68,7 @@ internal object CoreQueryProfile {
                 out.resolve("source-$unrelated.cnf").writeText(sourceText)
                 out.resolve("objective-$unrelated.txt").writeText(weights.joinToString(","))
                 val identity = sha256((sourceText + weights.joinToString(",")).encodeToByteArray())
-                for (prepared in if (confirmation) listOf(false) else listOf(false, true)) {
+                for (prepared in listOf(false, true)) {
                     val source = Dimacs.parse(sourceText).toProblem()
                     val sourceBaked = source.bake()
                     val preparationStart = System.nanoTime()
