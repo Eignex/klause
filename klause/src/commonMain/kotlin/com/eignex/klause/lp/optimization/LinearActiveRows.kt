@@ -231,15 +231,21 @@ internal fun SourceProofContext.activeNumericContext(
             if (!retainGuardedRows && premise.guards.any { (bool, value) -> booleans[bool] != value }) continue
             if (!scalar(premise.inequality.rhs) || !premise.integerPins.values.all(::scalar)) return null
             val coefficients = linkedMapOf<SourceCoordinate, BigFraction>()
+            val guards = premise.guards.toMutableMap()
             var offset = BigFraction.ZERO
             var established = true
             for ((coordinate, coefficient) in premise.inequality.coefficients) {
                 if (!visit() || !scalar(coefficient)) return null
                 if (coordinate.kind == SourceCoordinate.Kind.Boolean) {
                     val value = booleans[coordinate.id]
-                    if (value == null) established = false else if (value) {
-                        offset += coefficient
-                        if (!scalar(offset)) return null
+                    if (value == null || (coordinate.id in guards && guards[coordinate.id] != value)) {
+                        established = false
+                    } else {
+                        guards[coordinate.id] = value
+                        if (value) {
+                            offset += coefficient
+                            if (!scalar(offset)) return null
+                        }
                     }
                 } else coefficients[coordinate] = coefficient
             }
@@ -247,7 +253,7 @@ internal fun SourceProofContext.activeNumericContext(
                 val rhs = premise.inequality.rhs - offset
                 if (!scalar(rhs)) return null
                 rows[id] = SourcePremise(SourceInequality(coefficients, rhs, premise.inequality.strict),
-                    premise.guards, premise.integerPins)
+                    guards, premise.integerPins)
             }
         }
         if (work >= allowance) return null

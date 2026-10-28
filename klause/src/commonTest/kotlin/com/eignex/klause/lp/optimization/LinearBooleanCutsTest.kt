@@ -210,6 +210,28 @@ class LinearBooleanCutsTest {
     }
 
     @Test
+    fun `an import should not erase a Boolean substitution from its source scope`() {
+        val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
+        val source = SourceProofContext(scope, setOf(x, bool), mapOf(
+            "boolean" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE, bool to BigFraction.ONE),
+                BigFraction.ZERO)),
+            "lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), quarter)),
+        ), mapOf(x to BigFraction.ONE))
+        val branch = scope.copy(condition = SourceCondition(bools = mapOf(0 to true)))
+        val falseGlobal = SourceEvidence(scope, SourceClaim.Consequence(SourceInequality(
+            mapOf(x to BigFraction.ONE), BigFraction.MINUS_ONE)), SourceDerivation.Premise("boolean"))
+        val proof = LinearActiveRefutation(SourceDerivation.Combination(listOf(
+            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Import(falseGlobal)),
+            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("lower")),
+        )))
+
+        val verdict = SourceEvidenceVerifier(source.withLinearAuthority().atScope(branch)).verify(
+            SourceEvidence(branch, SourceClaim.Refutation, proof))
+
+        assertIs<SourceEvidenceCheck.Rejected>(verdict)
+    }
+
+    @Test
     fun `bounded failed preparation should retain its charged work and no authority`() {
         val source = assertNotNull(model().sourceProofContext(scope, objective))
         for (limits in listOf(LinearBooleanCutLimits(work = 1L), LinearBooleanCutLimits(allocation = 1L),
