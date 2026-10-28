@@ -102,7 +102,7 @@ class LinearBooleanCutsTest {
     fun `composition should preserve feasible original points in both alternatives`() {
         val source = assertNotNull(model().sourceProofContext(scope, objective))
         val values = listOf(true to listOf(BigFraction.ZERO, quarter.negated()),
-            false to listOf(quarter / BigFraction.ofLong(2), quarter / BigFraction.ofLong(2)))
+            false to listOf(quarter * BigFraction.ofLong(2).reciprocal(), quarter * BigFraction.ofLong(2).reciprocal()))
         val verifier = SourceEvidenceVerifier(source)
 
         for ((bool, reals) in values) {
@@ -207,6 +207,40 @@ class LinearBooleanCutsTest {
             checker.retract()
             assertNotNull(checker.check(restricted, Cancellation.Never).evidence)
         }
+    }
+
+    @Test
+    fun `a consequence import should preserve invocation bounds and objective identity`() {
+        val source = assertNotNull(model().sourceProofContext(scope, objective))
+        val restricted = scope.copy(condition = SourceCondition(lower = mapOf(x to BigFraction.ZERO)))
+        val conditioned = LinearBooleanCutPreparation.prepare(source.atScope(restricted), Cancellation.Never)
+            .consequences.first()
+        val original = LinearBooleanCutPreparation.prepare(source, Cancellation.Never).consequences.first()
+        val foreign = scope.copy(objective = SourceObjective("other", ObjectiveSense.MAXIMIZE))
+
+        for ((context, evidence) in listOf(source to SourceEvidence(scope, conditioned.claim,
+            SourceDerivation.Import(conditioned)), source.atScope(foreign) to SourceEvidence(foreign,
+            original.claim, SourceDerivation.Import(original)))) {
+            assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(context).verify(evidence))
+        }
+    }
+
+    @Test
+    fun `a stale common row should not survive a real coordinate remap`() {
+        val source = assertNotNull(model().sourceProofContext(scope, objective))
+        val common = LinearBooleanCutPreparation.prepare(source, Cancellation.Never).consequences.single {
+            it.claim == SourceClaim.Consequence(SourceInequality(mapOf(x to BigFraction.ONE,
+                y to BigFraction.MINUS_ONE), quarter))
+        }
+        val remap: (SourceCoordinate) -> SourceCoordinate = { if (it == y) it.copy(id = 2) else it }
+        val mapped = SourceProofContext(scope, source.coordinates.map(remap).toSet(), source.premises.mapValues {
+            (_, premise) -> SourcePremise(SourceInequality(premise.inequality.coefficients.mapKeys { remap(it.key) },
+                premise.inequality.rhs, premise.inequality.strict), premise.guards, premise.integerPins)
+        }, source.objective.mapKeys { remap(it.key) })
+
+        val verdict = SourceEvidenceVerifier(mapped).verify(common)
+
+        assertIs<SourceEvidenceCheck.Rejected>(verdict)
     }
 
     @Test

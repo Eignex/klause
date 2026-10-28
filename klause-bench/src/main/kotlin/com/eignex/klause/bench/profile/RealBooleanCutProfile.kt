@@ -218,8 +218,8 @@ internal object RealBooleanCutProfile {
         }
         val context = SourceProofContext(source.scope.copy(revision = source.scope.revision.copy(
             identity = source.scope.revision.identity + "-hulls")), source.coordinates + b, rows, source.objective)
-        val values = listOf(BigFraction.ofLong(2) / BigFraction.ofLong(5),
-            BigFraction.ofLong(-2) / BigFraction.ofLong(5), BigFraction.ofLong(2).reciprocal())
+        val values = listOf(BigFraction.ofLong(2) * BigFraction.ofLong(5).reciprocal(),
+            BigFraction.ofLong(-2) * BigFraction.ofLong(5).reciprocal(), BigFraction.ofLong(2).reciprocal())
         val point = Sample(booleanArrayOf(false), longArrayOf(), values.map { it.toDouble() }.toDoubleArray(),
             exactReals = values)
         check(SourceEvidenceVerifier(context.withLinearAuthority()).verify(SourceEvidence(context.scope,
