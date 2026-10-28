@@ -45,7 +45,7 @@ internal object CoreQueryProfile {
     private val cores = type.getDeclaredField("completedCores").apply { isAccessible = true }
     private val core = type.getDeclaredField("coreLiterals").apply { isAccessible = true }
     private val softs = type.getDeclaredField("querySofts").apply { isAccessible = true }
-    private val query = type.getDeclaredField("query").apply { isAccessible = true }
+    private val queryModel = type.getDeclaredField("queryModel").apply { isAccessible = true }
     private val deductions = BakedProblem::class.java.getDeclaredField("rootDeductions").apply {
         isAccessible = true
     }
@@ -103,7 +103,8 @@ internal object CoreQueryProfile {
                         val history = ArrayList<JsonObject>()
                         var search: ResumableSearch? = null
                         var observedCores = 0L
-                        var observedQuery: Any? = null
+                        var observedModel: Any? = null
+                        var observedSofts: IntArray? = null
                         fun observe() {
                             val live = search ?: return
                             val count = cores.getLong(live)
@@ -116,13 +117,17 @@ internal object CoreQueryProfile {
                                 }
                                 observedCores = count
                             }
-                            val handle = query.get(live)
-                            if (handle != null && handle !== observedQuery) {
+                            val baked = queryModel.get(live)
+                            val pins = softs.get(live) as IntArray
+                            if (baked != null && (baked !== observedModel ||
+                                    observedSofts?.contentEquals(pins) != true)
+                            ) {
                                 history += buildJsonObject {
                                     put("event", "query")
-                                    put("softs", ints(softs.get(live) as IntArray))
+                                    put("softs", ints(pins))
                                 }
-                                observedQuery = handle
+                                observedModel = baked
+                                observedSofts = pins.copyOf()
                             }
                         }
                         val timeout = Cancellation.after(2.seconds)
