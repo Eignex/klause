@@ -287,6 +287,11 @@ decision atom cascades use the same pending completion and retract with their pi
 Bulk allocations, immutable domain construction and non-interruptible propagator
 internals remain atomic.
 
+Cumulative propagation polls the same token during task, edge-window and start-bound
+scans. Its window scratch belongs to one fire, so interruption discards that scratch
+and leaves the factor queued to rebuild it. Completed deductions and their historical
+reasons survive; an incomplete fixpoint supplies no LP rounding witness or refutation.
+
 Shared CP assertions also poll the search context's containing allowance. A cancelled
 assertion retracts to its completed parent and retains the same alternative for a
 pausing traversal to retry. Retraction clears native incompleteness only after it

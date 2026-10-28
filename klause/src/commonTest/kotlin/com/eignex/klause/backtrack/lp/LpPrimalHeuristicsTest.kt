@@ -2,6 +2,7 @@ package com.eignex.klause.backtrack.lp
 
 import com.eignex.klause.backtrack.ComposedSampleVerifier
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -37,6 +38,30 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpPrimalHeuristicsTest {
+    @Test
+    fun `LP pinning should withhold a proposal when one cumulative fire is interrupted`() {
+        val n = 32
+        val problem = Problem(0, n, Array(n) { IntDomain(0, 100L + it) }, arrayOf<Factor>(
+            Cumulative(IntArray(n) { it }, LongArray(n) { 1L }, LongArray(n) { 1L }, n.toLong()),
+        ))
+        val objective = LinearObjective(intCoefficients = LongArray(n) { 1L })
+        var armed = false
+        var polls = 0
+        val session = PropagationSession(problem, Cancellation { armed && ++polls >= 4 })
+        val relaxation = CpToLpRelaxation(problem, objective).build(session)
+        armed = true
+
+        val proposal = LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)),
+            SolveStatsSink(backend = "interrupted-cumulative-pinning")).use { engine ->
+            engine.pinToward(session, relaxation) { 0.0 }
+        }
+
+        assertNull(proposal)
+        assertTrue(session.fixpointCancelled)
+        assertEquals(4, polls)
+        assertEquals(problem.intDomains[1], session.intDomain(1))
+    }
+
     @Test
     fun `LP pinning should stop before another mutation after an interrupted equality`() {
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 255) }, emptyArray())
