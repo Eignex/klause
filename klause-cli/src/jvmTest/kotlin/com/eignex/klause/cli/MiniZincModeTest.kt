@@ -42,6 +42,62 @@ class MiniZincModeTest(private val direction: String) {
     }
 
     @Test
+    fun `output reconstruction should retain independent scaled costs and original objective units`() {
+        val source = File.createTempFile("scaled-costs", ".fzn").apply {
+            writeText("""
+                var 12811..12811: length_a;
+                var 12811..12811: length_b;
+                var 0..100: scaled_a;
+                var 0..100: scaled_b;
+                var 910..910: cost_a;
+                var 1050..1050: cost_b;
+                var 3000000000..3000014000: total;
+                constraint int_lin_le([1,-1000], [length_a,scaled_a], 0);
+                constraint int_lin_eq([1,-70], [cost_a,scaled_a], 0);
+                constraint int_lin_le([1,-1000], [length_b,scaled_b], 0);
+                constraint int_lin_eq([1,-70], [cost_b,scaled_b], 0);
+                constraint int_lin_eq([1,1,-1], [cost_a,cost_b,total], -3000000000);
+                solve $direction total;
+            """.trimIndent())
+        }
+        val outputModel = File.createTempFile("scaled-costs", ".ozn").apply {
+            writeText("""
+                int: cost_a;
+                int: cost_b;
+                int: total;
+                output ["costs = ", show(array1d(-2..-1, [cost_a,cost_b])), ";\n",
+                        "_objective = ", show(total), ";\n"];
+            """.trimIndent())
+        }
+        val common = CommonOptions().apply {
+            engine = "cp"
+            parallel = 1
+            randomSeed = 17
+        }
+        val session = MiniZincMode.newSession()
+        parseArgs(arrayOf("--ozn", outputModel.absolutePath), session.flags()) {}
+        val bytes = ByteArrayOutputStream()
+        val previous = System.out
+        val stream = PrintStream(bytes)
+
+        try {
+            val solvable = session.load(source.absolutePath, common)
+            System.setOut(stream)
+            SolveCore.solve(solvable, common, session.output(common))
+        } finally {
+            System.setOut(previous)
+            stream.close()
+            source.delete()
+            outputModel.delete()
+        }
+
+        val text = bytes.toString(Charsets.UTF_8.name())
+        assertTrue("910, 1050" in text, text)
+        assertTrue("_objective = 3000001960;" in text.lines(), text)
+        assertTrue("==========" in text.lines(), text)
+    }
+
+    @Test
     fun `automatic complete and mixed loading should solve and render an off grid original optimum`() {
         val source = File.createTempFile("original-off-grid", ".fzn").apply {
             writeText("var 0.0..1.0: x :: output_var; constraint float_eq(x,0.25); solve $direction x;")
