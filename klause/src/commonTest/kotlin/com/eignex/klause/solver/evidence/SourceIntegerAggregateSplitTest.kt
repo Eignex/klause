@@ -89,7 +89,13 @@ class SourceIntegerAggregateSplitTest {
 
     @Test
     fun `aggregate siblings should share the containing proof allowance`() {
-        val result = SourceEvidenceVerifier(source, maximumSteps = 8)
+        for ((condition, proof) in listOf(below to child("lower", below), above to child("upper", above))) {
+            val branch = scope.copy(condition = scope.condition.integerBound(condition))
+            val context = SourceProofContext(branch, source.coordinates, source.premises)
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(context, maximumSteps = 16)
+                .verify(SourceEvidence(branch, SourceClaim.Refutation, proof)))
+        }
+        val result = SourceEvidenceVerifier(source, maximumSteps = 16)
             .verify(SourceEvidence(scope, SourceClaim.Refutation, proof()))
 
         assertIs<SourceEvidenceCheck.Unavailable>(result)
