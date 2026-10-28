@@ -2855,8 +2855,10 @@ cutoff changes, undo, budget-implied PB rows and containing allowances.
 [Source gate 8953](https://lab.eignex.com/jobs/8953), at `870a202eee`, completes
 one frozen auctions source, seed 3, and two seconds per containing arm on Linux/amd64,
 JDK 25.0.4.1, one vCPU and 4608 MiB. The first retained split has no incumbent
-and declines. Sample 270 has four enforcing children of 6,4,4,2 variables, fixed
-cost 68,480 and checked strict cutoff 69,645. Floors 865+300 close that cutoff
+and declines. Sample 270's cutoff joins all 16 live variables in the captured
+enforcing graph. Keeping that cutoff as the exact composition target exposes
+four children of 6,4,4,2 variables under every remaining restriction, fixed cost
+68,480 and checked strict cutoff 69,645. Floors 865+300 close that cutoff
 in three queries and one charged decision. Ordinary learning and both LP controls
 close it with zero charged decisions. Total input-through-check cost is 91 ms for
 composition versus 87 ms for ordinary search; cumulative modeled storage is
