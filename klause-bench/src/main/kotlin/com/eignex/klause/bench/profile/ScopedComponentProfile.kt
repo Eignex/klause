@@ -5,15 +5,20 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.VariableSelector
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.bool.PseudoBoolean
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
+import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.parseBigInt
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -207,22 +212,35 @@ object ScopedComponentProfile {
         seed: Long,
         lp: Boolean,
         biased: Int? = null,
+        cutoff: BigInteger? = null,
+        pbCutoff: Boolean = false,
     ): JsonObject {
         val start = System.nanoTime()
         val allowance = ComponentAllowance(Cancellation.after(millis.milliseconds))
         val clauses = residual.clauses + residual.fixed.map { (v, value) -> listOf(Lit.make(v, value)) }
-        val model = Problem(residual.weights.size, 0, emptyArray(), clauses.map { Clause(it.toIntArray()) }.toTypedArray())
+        val factors = clauses.map { Clause(it.toIntArray()) }.toMutableList<Factor>()
+        if (cutoff != null) factors += PseudoBoolean(
+            residual.weights.map { parseBigInt(it.toString()) }.toTypedArray(),
+            IntArray(residual.weights.size) { Lit.make(it, true) }, PbOp.LE,
+            parseBigInt((cutoff - BigInteger.ONE - residual.constant).toString()),
+        )
+        val model = Problem(residual.weights.size, 0, emptyArray(), factors.toTypedArray())
             .bake(cancellation = allowance.stop)
         val base = BacktrackPresets.satOptimized(randomSeed = seed, cancellation = allowance.stop)
         val decisions = ArrayList<JsonObject>()
         val result = BacktrackSolver(model).minimize(LinearObjective(residual.weights.toLongArray(),
             constant = residual.constant.longValueExact()), base.copy(nodeBudget = allowance.nodes,
             variableSelector = DecisionTrace(base.variableSelector, biased, decisions),
+            pbObjectiveCutoff = pbCutoff,
             lpConfig = if (lp) LpConfig(LpEmphasis.DEFAULT) else null))
         val witness = result.assignment?.let { sample -> List(residual.weights.size) { sample.boolValue(it) } }
         witness?.let { check(residual.accepts(it)) }
         return buildJsonObject {
+            put("authority", "captured-conditions-and-cutoff")
             put("result", result::class.simpleName)
+            put("cutoff", cutoff?.toString())
+            put("cutoffClosed", cutoff != null && result is MinimizeResult.Infeasible)
+            put("pbObjectiveCutoff", pbCutoff)
             put("objective", witness?.let(residual::cost)?.toString())
             put("nativeClauseCheck", witness != null)
             put("decisions", allowance.nodes.spent)

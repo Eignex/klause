@@ -16,6 +16,9 @@ internal object BooleanSeparators {
     ): BooleanSeparator? {
         require(variables >= 0 && maxCandidates >= 0)
         require(fixed.keys.all { it in 0 until variables })
+        val baseline = partition(clauses, variables, fixed, visit, retain) ?: return null
+        if (baseline.conflict) return null
+        val baselineScore = balance(baseline.components)
         var best: BooleanSeparator? = null
         var candidates = 0
         for (v in 0 until variables) {
@@ -28,13 +31,15 @@ internal object BooleanSeparators {
                 branches += SeparatorBranch(value, branch.components, branch.conflict)
             }
             val score = branches.maxOf { branch ->
-                val sizes = branch.components.map { it.size }
-                if (branch.conflict || sizes.size < 2) 0 else sizes.sum() - sizes.max()
-            }
+                if (branch.conflict) 0 else balance(branch.components)
+            } - baselineScore
             if (score > (best?.score ?: 0)) best = BooleanSeparator(v, branches, score)
         }
         return best
     }
+
+    private fun balance(components: List<List<Int>>): Int =
+        if (components.size < 2) 0 else components.sumOf { it.size } - components.maxOf { it.size }
 
     internal data class Partition(val components: List<List<Int>>, val clauses: List<List<Int>>, val conflict: Boolean)
 

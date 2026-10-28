@@ -7,6 +7,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 
 class BooleanSeparatorTest {
     private val cycles = (0 until 2).flatMap { cycle -> (0 until 5).map { i ->
@@ -26,14 +28,14 @@ class BooleanSeparatorTest {
         assertTrue(choice.branches.none { it.conflict })
     }
 
-    @Test
-    fun `discharged bridge should be independent of literal order`() {
-        for (bridge in listOf(listOf(20, 0, 10), listOf(0, 20, 10), listOf(0, 10, 20))) {
-            val partition = assertNotNull(BooleanSeparators.partition(
-                cycles + listOf(bridge), 11, mapOf(10 to true), { true }))
+    @ParameterizedTest
+    @ValueSource(ints = [0, 1, 2])
+    fun `discharged bridge should be independent of literal order`(position: Int) {
+        val bridge = mutableListOf(0, 10).apply { add(position, 20) }
+        val partition = assertNotNull(BooleanSeparators.partition(
+            cycles + listOf(bridge), 11, mapOf(10 to true), { true }))
 
-            assertEquals(listOf((0..4).toList(), (5..9).toList()), partition.components)
-        }
+        assertEquals(listOf((0..4).toList(), (5..9).toList()), partition.components)
     }
 
     @Test
@@ -52,6 +54,13 @@ class BooleanSeparatorTest {
             mapOf(10 to false), { true })
 
         assertFalse(choice?.variable == 10)
+    }
+
+    @Test
+    fun `natural decomposition should not count as a separator improvement`() {
+        val choice = BooleanSeparators.choose(cycles, 10, emptyMap(), { true })
+
+        assertNull(choice)
     }
 
     @Test
