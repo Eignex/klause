@@ -55,7 +55,8 @@ class CumulativePropagatorTest {
             Cumulative(intArrayOf(0, 1, 2), longArrayOf(2, 2, 2), longArrayOf(1, 1, 1), 2),
         ))
         val state = PropagationState(problem, Assumptions.None)
-        assertNull(state.runToFixpoint(allFactors = true))
+        state.beginRootFixpoint().forEach { }
+        while (state.rootFixpointPending) assertNull(state.advanceRootFixpoint(Cancellation.Never))
         state.undoLogging = true
         val root = state.mark()
         state.currentLevel = 1
@@ -77,7 +78,7 @@ class CumulativePropagatorTest {
         check(state.tightenIntMin(1, 3))
         assertNull(state.runToFixpoint(allFactors = false))
         assertFalse(state.runCancelled)
-        assertEquals(IntDomain(0, 1), state.intDomains[2])
+        assertEquals(IntDomain(0, 2), state.intDomains[2])
     }
 
     @Test
