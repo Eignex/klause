@@ -31,10 +31,16 @@ class MakeSetsTest {
         val rows = MakeSets.csvRows(input)
         assertEquals(
             listOf(
-            mapOf("collection" to "c", "problem" to "a,\"b\"", "feasible" to "1", "proven" to "1", "elapsed_ms" to "5"),
-            mapOf("collection" to "c", "problem" to "p", "feasible" to "", "proven" to "0", "elapsed_ms" to "7"),
-        ),
-            rows
+                mapOf(
+                    "collection" to "c", "problem" to "a,\"b\"", "feasible" to "1",
+                    "proven" to "1", "elapsed_ms" to "5",
+                ),
+                mapOf(
+                    "collection" to "c", "problem" to "p", "feasible" to "",
+                    "proven" to "0", "elapsed_ms" to "7",
+                ),
+            ),
+            rows,
         )
     }
 

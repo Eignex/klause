@@ -1,6 +1,8 @@
 package com.eignex.klause.bench.lab
 
 import com.eignex.lab.bench.BenchProtocol
+import com.eignex.lab.bench.BenchCase
+import com.eignex.lab.bench.BenchContext
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.params.ParameterizedTest
@@ -19,6 +21,20 @@ class LabSelectionsTest {
         assertEquals(listOf(mapOf("suite" to "a", "max" to "2"), mapOf("set" to "frozen")), settings.selections)
     }
 
+    @Test
+    fun `input only planner has no solver platform requirements and cannot execute`() {
+        val settings = LabSettings(mapOf("input-only" to "true"))
+        assertEquals(emptySet(), settings.resources().requiredTags)
+        val case = BenchCase("input", settings.caseParameters("default", 1), settings.resources())
+        val output = Files.createTempDirectory("reference-plan")
+        try {
+            assertFailsWith<IllegalStateException> { ReferenceLabSuite.run(case, BenchContext(output)) }
+            assertFailsWith<IllegalArgumentException> { KlauseLabSuite.run(case, BenchContext(output)) }
+        } finally {
+            output.toFile().deleteRecursively()
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(strings = ["[]", "[{}]", "[{\"out\":\"escape\"}]", "not-json"])
     fun `empty malformed and nonselector groups fail validation`(encoded: String) {
@@ -35,7 +51,9 @@ class LabSelectionsTest {
                     .mapValues { it.value.jsonPrimitive.content }
 
                 assertEquals("Eignex/klause", recipe.getValue("repository").jsonPrimitive.content)
-                assertEquals("klause-bench/lab/bench.json", bench.getValue("manifest").jsonPrimitive.content)
+                val reference = recipe["base"]?.jsonObject?.get("backend")?.jsonPrimitive?.content == "reference"
+                val manifest = if (reference) "reference" else "bench"
+                assertEquals("klause-bench/lab/$manifest.json", bench.getValue("manifest").jsonPrimitive.content)
                 LabSettings(parameters)
             }
         }

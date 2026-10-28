@@ -15,6 +15,7 @@ internal data class LabSettings(val parameters: Map<String, String>) {
     val repeats = (parameters["repeats"] ?: "1").toInt().also { require(it in 1..10000) }
     val seeds = (parameters["solver-seeds"] ?: "1").split(',').map { it.trim().toLong() }.distinct()
     val engines = (parameters["engines"] ?: "default").split(',').map { it.trim().lowercase() }.distinct()
+    val inputOnly = parameters["input-only"]?.toBooleanStrict() ?: false
     val debug = parameters["debug"]?.toBooleanStrict() ?: true
     val measurement = parameters["measurement"] ?: "none"
     val heap = (parameters["heap-mib"] ?: (memory - 1536).toString()).toLong()
@@ -50,11 +51,12 @@ internal data class LabSettings(val parameters: Map<String, String>) {
         cpus,
         memory,
         wallTimeout,
-        requiredTags = setOf("platform:linux", "arch:x86_64"),
+        requiredTags = if (inputOnly) emptySet() else setOf("platform:linux", "arch:x86_64"),
     )
 
     fun caseParameters(engine: String, seed: Long): Map<String, String> =
         parameters.filterKeys { it.startsWith("param.") || it in setOf("lp", "presolve", "exact") } + mapOf(
+            "input-only" to inputOnly.toString(),
             "engine" to engine,
             "seed" to seed.toString(),
             "timeout-ms" to timeout.toString(),
@@ -69,7 +71,7 @@ internal data class LabSettings(val parameters: Map<String, String>) {
     companion object {
         val SELECTORS = setOf("suite", "set", "name", "category", "tag", "kind", "per-family", "seed", "max", "balance")
         private val OPTIONS = setOf(
-            "selections", "engines", "solver-seeds", "repeats", "cpus", "memory-mib", "timeout-ms", "lp",
+            "input-only", "selections", "engines", "solver-seeds", "repeats", "cpus", "memory-mib", "timeout-ms", "lp",
             "presolve", "exact", "debug", "measurement", "heap-mib", "gc", "compile-timeout-sec", "complete-assignment",
         )
         private val ENGINES = setOf(

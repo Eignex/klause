@@ -139,7 +139,9 @@ merged without duplicate catalog identities. Paired experiments use lab `configs
 `grid` and `repeats`: `ref` selects a revision and `param.<key>` overrides an adapter
 request key. Single-engine requests publish comparison identities independent of
 engine; multi-engine requests retain engine in that identity. Reference-only recipes
-use the same manifest to prepare inputs for lab-owned reference execution.
+use `lab/reference.json`, a portable input-only planner that requires only the bench
+installation and JDK 25. It omits the Linux CLI and MiniZinc compiler requirements;
+the lab reference backend owns execution and its local toolchain.
 
 These workflows require the agnostic lab coordinator and workers (manifest schema 3).
 Reference filtering runs after planning. This planner owns selection caps; the lab

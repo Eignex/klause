@@ -9,7 +9,7 @@
   "confirm": true,
   "repository": "Eignex/klause",
   "bench": {
-    "manifest": "klause-bench/lab/bench.json",
+    "manifest": "klause-bench/lab/reference.json",
     "sourceValidation": false,
     "request": {
       "parameters": {

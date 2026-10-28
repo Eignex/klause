@@ -23,7 +23,7 @@ jq '
         else . end
       | ($base.backend == "reference") as $reference
       | .repository = "Eignex/klause"
-      | .bench = {manifest:"klause-bench/lab/bench.json", sourceValidation:($reference | not),
+      | .bench = {manifest:(if $reference then "klause-bench/lab/reference.json" else "klause-bench/lab/bench.json" end), sourceValidation:($reference | not),
           request:{parameters:({selections:($selections | map(del(.reference)) | tojson), measurement:(.measurement // "none")} + ($base | parameters))}}
       | if (.seeds // [] | length) > 0 then .bench.request.parameters["solver-seeds"] = (.seeds | map(tostring) | join(",")) else . end
       | .bench.referenceFilters = ($selections | map(select(.suite != null) | {key:.suite,value:(.reference // if $reference then "any" else "decided" end)}) | from_entries)
