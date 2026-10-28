@@ -135,6 +135,7 @@ internal fun PropagationState.addLearnedIntegerRow(row: IntegerConflictRow, lbd:
     learned.origins.add(OWN_ORIGIN)
     refPayloadStore.add(null)
     for (watch in propagator.initialIntEventWatches) intEvents.subscribeMidlife(watch, factor)
+    if (row.guard != Lit.NONE) installLitWatch(row.guard xor 1, factor)
     return factor
 }
 

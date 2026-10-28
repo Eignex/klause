@@ -2,6 +2,7 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.factor.arithmetic.LinearPropagator
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.util.addExact
 import com.eignex.klause.util.mulExact
 import com.eignex.klause.util.subExact
@@ -12,13 +13,14 @@ internal class IntegerConflictRow private constructor(
     val variables: IntArray,
     val coefficients: LongArray,
     val bound: Long,
+    val guard: Int = Lit.NONE,
 ) {
     fun coefficient(variable: Int): Long {
         val index = variables.indexOf(variable)
         return if (index < 0) 0L else coefficients[index]
     }
 
-    fun sameAs(other: IntegerConflictRow): Boolean = bound == other.bound &&
+    fun sameAs(other: IntegerConflictRow): Boolean = guard == other.guard && bound == other.bound &&
         variables.contentEquals(other.variables) && coefficients.contentEquals(other.coefficients)
 
     fun minimum(state: PropagationState, trail: Int? = null): Long = activity(state, trail, maximum = false)
@@ -59,6 +61,7 @@ internal class IntegerConflictRow private constructor(
     }
 
     fun assertsAt(state: PropagationState, trail: Int): Boolean {
+        if (!state.integerGuardTrueAt(guard, trail)) return false
         if (!holeFree(state, trail)) return false
         val minimum = minimum(state, trail)
         if (minimum > bound) return false
@@ -72,6 +75,7 @@ internal class IntegerConflictRow private constructor(
     }
 
     fun resolve(other: IntegerConflictRow, variable: Int): IntegerConflictRow? {
+        if (guard != Lit.NONE && other.guard != Lit.NONE && guard != other.guard) return null
         val a = coefficient(variable)
         val b = other.coefficient(variable)
         if (a == 0L || b == 0L || (a > 0L) == (b > 0L)) return null
@@ -85,11 +89,12 @@ internal class IntegerConflictRow private constructor(
             val next = addExact(terms[v] ?: 0L, mulExact(other.coefficients[i], right))
             if (next == 0L) terms.remove(v) else terms[v] = next
         }
-        return normalized(terms, addExact(mulExact(bound, left), mulExact(other.bound, right)))
+        return normalized(terms, addExact(mulExact(bound, left), mulExact(other.bound, right)),
+            if (guard != Lit.NONE) guard else other.guard)
     }
 
     companion object {
-        fun source(factor: LinearPropagator, useLo: Boolean): IntegerConflictRow? {
+        fun source(factor: LinearPropagator, useLo: Boolean, guard: Int = Lit.NONE): IntegerConflictRow? {
             if (factor.vars.size > INTEGER_LEARNING_TERMS) return null
             val terms = mutableMapOf<Int, Long>()
             for (i in factor.vars.indices) {
@@ -100,10 +105,10 @@ internal class IntegerConflictRow private constructor(
                 if (next == 0L) terms.remove(variable) else terms[variable] = next
             }
             val bound = if (useLo) factor.bound else subExact(0L, factor.bound)
-            return normalized(terms, bound)
+            return normalized(terms, bound, guard)
         }
 
-        private fun normalized(terms: Map<Int, Long>, bound: Long): IntegerConflictRow? {
+        private fun normalized(terms: Map<Int, Long>, bound: Long, guard: Int): IntegerConflictRow? {
             if (terms.isEmpty() || terms.size > INTEGER_LEARNING_TERMS) return null
             var divisor = 0L
             for (coefficient in terms.values) {
@@ -113,7 +118,7 @@ internal class IntegerConflictRow private constructor(
             if (divisor == 0L) return null
             val variables = terms.keys.sorted().toIntArray()
             return IntegerConflictRow(variables, LongArray(variables.size) { terms.getValue(variables[it]) / divisor },
-                floorDivide(bound, divisor))
+                floorDivide(bound, divisor), guard)
         }
 
         private fun domain(state: PropagationState, variable: Int, trail: Int?): IntDomain =

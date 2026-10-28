@@ -152,9 +152,11 @@ Learned pseudo-Boolean constraints share clause retention.
 
 `integerRowLearning` is opt-in and independent of pseudo-Boolean learning. Mandatory
 finite `Linear` inequalities and the explaining half of equalities provide integer
-rows. Each resolved endpoint must name an unextended historical linear reason from
-the same source row; historical holes, reification, disequalities, wide constants
-and unsupported projections retain clause fallback.
+rows. Reified integer rows preserve the signed indicator selecting the inequality
+or equality side, including the strict integer complement of an inequality. Each
+resolved endpoint must name an unextended historical linear reason from the same
+source row, with its exact guard false-literal and historical guard truth. Historical
+holes, disequalities, wide constants and unsupported projections retain clause fallback.
 
 Opposite-sign nonnegative combinations use checked signed arithmetic and integer
 gcd normalization. Each combination must remain conflicting. A retained row must
@@ -162,6 +164,12 @@ propagate against the session's historical domains at its native backjump and th
 mapped shared target; literal counts do not establish assertion. Foreign unavailable
 bound premises retain clause analysis. The producer admits at most 16 terms, 16
 combinations, 64 native levels and 64 stored rows, with bounded duplicate lookup.
+
+Rows retain at most one distinct signed guard; combinations requiring different
+guards retain clause fallback. A guarded row asserts only where its guard already
+holds at both the native and mapped shared target. An inactive guard withholds
+arithmetic propagation, and its activation wakes the row through a literal watch.
+Guard negations remain premises of every retained-row deduction and conflict.
 
 Rows share the learned store and integer bounds propagation. Eager reasons freeze
 the historical clause premises without a compactable lazy factor id. Integer bound
