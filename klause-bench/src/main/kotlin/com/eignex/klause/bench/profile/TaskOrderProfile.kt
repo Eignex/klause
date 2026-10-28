@@ -67,6 +67,10 @@ internal object TaskOrderProfile {
             System.getProperty("os.name"), System.getProperty("os.arch"), System.getProperty("java.version"),
             ManagementFactory.getRuntimeMXBean().inputArguments.toString(),
         ).joinToString("\n"))
+        if (args.firstOrNull() == "mode=source") {
+            inspectSource(args.drop(1).toTypedArray(), out)
+            return
+        }
         val arms = listOf(
             Arm("minimum"), Arm("midpoint", values = IndomainMiddle),
             Arm("impact", values = ProbingSelectors.impact()), Arm("lp", lp = true),
