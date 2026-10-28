@@ -253,7 +253,7 @@ internal object TaskOrderProfile {
         override fun fresh(): VariableSelector = PairFirst(bool)
 
         override fun pick(session: PropagationSession, rng: Random): VarRef? =
-            if (session.needsBoolDecision(bool)) VarRef.Bool(bool) else InputOrder.pick(session, rng)
+            if (session.boolValue(bool) == null) VarRef.Bool(bool) else InputOrder.pick(session, rng)
     }
 
     private fun domains(session: PropagationSession): String =
