@@ -102,7 +102,7 @@ internal object OptionalUnaryProfile {
         val parseStart = System.nanoTime()
         val parsed = try {
             parseFlatZinc(out.resolve("source.fzn").readText())
-        } catch (failure: IllegalArgumentException) {
+        } catch (failure: Exception) {
             out.resolve("load-error.txt").writeText(failure.stackTraceToString())
             return
         }
@@ -162,7 +162,7 @@ internal object OptionalUnaryProfile {
             try {
                 out.resolve("output.txt").writeText(OznApplier(out.parentFile.resolve("source.ozn").readText())
                     .render(program, it))
-            } catch (failure: IllegalArgumentException) {
+            } catch (failure: Exception) {
                 out.resolve("output-error.txt").writeText(failure.stackTraceToString())
             }
         }
