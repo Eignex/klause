@@ -4,6 +4,7 @@ import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.formats.xcsp3.Xcsp3
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.impliedLinearRows
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.movesource.MoveSource
@@ -87,7 +88,18 @@ internal object EqualityMoveReplay {
             put("snapshot", view.snapshot())
             put("domains", JsonArray(state.rootDomains.map { JsonPrimitive(it.toString()) }))
             put("factors", buildJsonArray {
-                for (factor in problem.factors) add(JsonPrimitive(factor.toString()))
+                for (factor in problem.factors) add(buildJsonObject {
+                    put("kind", factor::class.simpleName)
+                    put("rows", buildJsonArray {
+                        for (row in factor.impliedLinearRows) add(buildJsonObject {
+                            put("relation", row.relation.toString())
+                            put("activator", row.activator)
+                            put("strict", row.strict)
+                            put("refs", JsonArray((0 until row.size).map { JsonPrimitive(row.ref(it)) }))
+                            put("constants", row.constants.toString())
+                        })
+                    })
+                })
             })
             put("sourceCheck", "native original lowered source; no independent witness/proof checker")
         }.toString())
@@ -136,6 +148,7 @@ internal object EqualityMoveReplay {
             val controls = out.resolve("controls.jsonl")
             controls.writeText(buildJsonObject {
                 put("center", trajectorySource(state.assignment.snapshot()))
+                put("centerObjective", requireNotNull(prepared.objective).evaluate(state.assignment))
                 put("effectiveInts", JsonArray((0 until problem.numIntVars).map(::JsonPrimitive)))
                 put("selector", "whole-prepared-block")
             }.toString() + "\n")
