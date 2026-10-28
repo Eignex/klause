@@ -11,8 +11,10 @@ import com.eignex.klause.bench.runner.Budget
 import com.eignex.lab.bench.*
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
+import org.junit.jupiter.params.provider.ValueSource
 import java.nio.file.Files
 import kotlin.test.Test
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
@@ -20,6 +22,14 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LabAdapterTest {
+    @ParameterizedTest
+    @ValueSource(strings = ["param.source-validation", "param.source-validation-gzip"])
+    fun `source checks are requested from the lab instead of the solver`(key: String) {
+        val failure = assertFailsWith<IllegalArgumentException> { LabSettings(mapOf(key to "true")) }
+
+        assertContains(failure.message.orEmpty(), "bench.sourceValidation")
+    }
+
     @ParameterizedTest
     @CsvSource(
         "typo,true", "cpus,0", "memory-mib,2047", "repeats,0", "timeout-ms,0", "engines,no-such-engine",

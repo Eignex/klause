@@ -151,6 +151,8 @@ MiniZinc include declarations are rejected. Execution reconstructs the file-back
 reference without catalog discovery. JVM argument files preserve paths containing
 spaces, and CLI processes receive the planned controls without inherited solver or
 instrumentation settings. Version preflight uses separate, uninstrumented options.
+Source and corpus roots are resolved consistently when a configured root is a
+symlink; frozen inputs retain relative paths and checksums on the execution worker.
 
 Each case retains its full solve record: exact objective text, proof/feasibility,
 portfolio attribution, final witness, source hashes, compiler identity, validation
@@ -169,17 +171,41 @@ Compiled FlatZinc, output mappings and exact CLI argv are retained as artifacts.
 A worker cancellation or hard kill can leave these partial files without a terminal
 solve record; the lab's supervisor owns that execution outcome and artifact transfer.
 
+Independent source checks and whole-job active-time limits are lab controls outside
+`bench.request.parameters`:
+
+```json
+{
+  "repository": "Eignex/klause",
+  "name": "checked-smoke",
+  "description": "Check a frozen solve and retain its capture",
+  "base": {"ref": "main"},
+  "bench": {
+    "manifest": "klause-bench/lab/bench.json",
+    "sourceValidation": true,
+    "runTimeoutSec": 600,
+    "request": {"parameters": {"suite": "xcsp3-core", "max": "1", "timeout-ms": "1000"}}
+  }
+}
+```
+
+These optional fields require a coordinator and workers implementing the lab's
+[bench workflow controls](https://github.com/Eignex/eignex-lab/pull/199). They do not
+require a different SDK version. `runTimeoutSec` is a 1–7200 second total active-time
+allowance, including preparation and execution, excluding queue time; `timeout-ms`
+remains the solver's per-case budget. Bench schedules preserve the explicit
+`sourceValidation` choice. The adapter reports `validationPolicy=reported-result-v1`;
+the lab adds its independent verdict alongside the preserved solve record and SDK
+envelope. A witness check does not establish optimality or infeasibility.
+`param.source-validation` and `param.source-validation-gzip` are not solver options;
+use `bench.sourceValidation` instead.
+
 The SDK's one-revision cases do not replace reference arms, paired revision
-comparisons, schedules/sweeps, independent source-witness checks, confirmation or
-specialized profile mains. The generic lab path currently rejects legacy source-check
-controls on bench jobs, so `validationPolicy=reported-result-v1` does not claim an
-independent check. Removing the legacy lab executor requires generic orchestration
-for those workflows, a checker request/result contract, declared JDK/runtime
-prerequisites and cancellation/partial-result semantics. In particular, the
-coordinator accepts run-level deadline receipts only for profile jobs; a forced
-bench run-level deadline retains partial worker files but its receipt is rejected. The lab can already consume
-this manifest for prepared solve execution and ingest its metrics, records and
-artifacts; deployment and capacity pools must advertise the declared platform tags.
+comparisons, regression confirmation or specialized profile mains. Those workflows
+and declared JDK/runtime prerequisites remain lab integration work tracked in
+[Eignex Lab #198](https://github.com/Eignex/eignex-lab/issues/198). Keep the legacy lab
+executor for them. Deployment and capacity pools must advertise the manifest's
+declared platform tags.
 
 ## Selection and named sets
 
