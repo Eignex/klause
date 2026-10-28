@@ -42,6 +42,24 @@ import kotlin.test.assertTrue
 
 class BinaryObjectiveViewTest {
     @Test
+    fun `objective symmetry should consume substituted signed Boolean costs`() {
+        val source = Problem(
+            0, 3, Array(3) { IntDomain(0, 1) },
+            listOf(Linear(longArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.GE, 1)),
+        )
+        val original = LinearObjective(intCoefficients = longArrayOf(-3, -3, -3), constant = 7)
+        val config = PresolveConfig.parse("off,+binary-columns,+objective-symmetry")
+
+        val prepared = PresolvePipeline.run(source, original, config, false)
+        val objective = checkNotNull(prepared.objective)
+        val representatives = BacktrackSolver(prepared.problem.bake()).enumerate().toList()
+
+        assertTrue(objective.boolWeights.any { it != 0L })
+        assertEquals(3, representatives.map { prepared.reconstruct(it).ints.toList() }.toSet().size)
+        for (sample in representatives) prepared.mapping.requireObjectivePreserved(original, objective, sample)
+    }
+
+    @Test
     fun `signed channels should preserve costs without adding literals`() {
         for (bound in listOf(0L, 1L)) {
             val problem = Problem(

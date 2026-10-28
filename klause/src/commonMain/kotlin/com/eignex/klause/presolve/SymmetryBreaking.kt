@@ -59,6 +59,7 @@ internal object SymmetryBreaking {
     fun breakObjectiveSymmetries(problem: BakedProblem, context: PresolveContext): PassDelta {
         val objective = context.linearObjective ?: return PassDelta()
         if (context.solutionSetSensitive || context.modelBreaksSymmetry || problem.numRealVars != 0 ||
+            problem.semantics.isApproximate || objective.realCoefficientValues.any { it != 0.0 } ||
             (context.objectiveIntVars.isEmpty() && context.objectiveBoolVars.isEmpty())
         ) return PassDelta()
         val extra = breakings(
@@ -896,7 +897,7 @@ internal object SymmetryBreaking {
                 // its image's, which the factor check below does not see; the seeds are those values.
                 if ((0 until nInt).any { seedIntBase[it] != seedIntBase[perm.first[it]] }) continue
                 if ((0 until nBool).any { seedBoolBase[it] != seedBoolBase[perm.second[it]] }) continue
-                cancellation.charge(problem.factors.size.toLong() + nInt + nBool)
+                cancellation.charge(problem.factors.size.toLong() + if (objective == null) 0 else nInt + nBool)
                 if (cancellation()) break
                 if (!preservesObjective(objective, perm.first, perm.second)) continue
                 if (!isAutomorphism(problem, base, perm.second, perm.first)) continue
