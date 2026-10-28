@@ -134,8 +134,12 @@ shares the general trail, pins, antecedents and conflict analyzer.
 
 ## Pseudo-Boolean learning
 
-`pbLearning` auto-enables cutting-plane analysis for pure-Boolean models. Integer
-order literals have no pseudo-Boolean reason, so integer models use clause learning.
+`pbLearning` auto-enables cutting-plane analysis for pure-Boolean models. Explicit
+enablement admits Boolean conflicts in mixed models. The seed, each loaded source
+constraint and each reconstructed reason must contain only Boolean coordinates;
+integer order, equality and hole atoms retain clause fallback before Boolean indexing.
+An asserting native PB result takes precedence over shared clause analysis and stays
+in the CP store. Other mixed conflicts keep shared clause analysis.
 
 The resolvent is a linear `≥` nogood seeded from the violated bound. Each step
 rounds the reason up after division by its pivot coefficient, then adds it to cancel

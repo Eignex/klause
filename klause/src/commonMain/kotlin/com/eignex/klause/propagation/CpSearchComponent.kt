@@ -71,7 +71,9 @@ class CpSearchComponent(
     override val resolvesAfterModelBlock: Boolean
         get() = session.problem.numIntVars == 0 && session.problem.factors.isEmpty()
 
-    override val prefersNativeConflictAnalysis: Boolean get() = session.problem.numIntVars == 0
+    override val prefersNativeConflictAnalysis: Boolean
+        get() = session.problem.numIntVars == 0 ||
+            lastConflict?.learnedClause is ConflictAnalyzer.AnalysisResult.LearnedPb
 
     /** Align shared decision level zero with CP's post-seed root. */
     fun rebase() {
