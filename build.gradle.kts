@@ -22,7 +22,7 @@ val koblasPins = mapOf(
 )
 
 val skemaPins = listOf("skema", "skema-jvm", "skema-linuxx64", "skema-linuxarm64", "skema-macosarm64")
-    .associateWith { "0.3.1-20261027.115734-17" }
+    .associateWith { "0.3.1-20261028.100806-19" }
 
 // Koblas, Kumulant and Skema use timestamped snapshots; this endpoint is outside the conventions'
 // default repository set.
