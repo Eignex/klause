@@ -25,7 +25,7 @@ import org.junit.jupiter.params.provider.ValueSource
 
 class RegularPrefixReplayTest {
     @Test
-    fun `an imported state exclusion prunes a different source prefix`() {
+    fun `a retained state exclusion prunes a different source prefix after undo`() {
         val transitions = longArrayOf(1, 2, 2, 3, 3, 1)
         val source = Problem(
             0, 5, Array(5) { IntDomain(1, 2) },
@@ -44,14 +44,15 @@ class RegularPrefixReplayTest {
         val learned = assertIs<SearchConflictResolution.Backjump>(cp.resolveConflict(shared)).conflict
         shared.popTo(learned.decisionLevel)
         assertEquals(SearchLearnedConflictResult.Resume, learned.apply(shared))
-        val receiver = PropagationSession(definitions.problem)
+        assertIs<PropagationResult.Implied>(producer.pinInt(0, 1))
+        assertIs<PropagationResult.Unsat>(producer.pinInt(1, 1))
+        producer.popToLevel(0)
 
-        producer.exportGlueClauses(2, 128).forEach { receiver.importClause(it) }
-        assertIs<PropagationResult.Implied>(receiver.implyIntAtMost(0, receiver.intDomain(0).max))
-        assertIs<PropagationResult.Implied>(receiver.pinInt(0, 2))
-        assertIs<PropagationResult.Implied>(receiver.pinInt(1, 2))
+        assertIs<PropagationResult.Implied>(producer.pinInt(0, 2))
+        assertIs<PropagationResult.Implied>(producer.pinInt(1, 2))
 
-        assertFalse(2L in receiver.intDomain(2))
+        assertEquals(false, producer.boolValue(definitions.booleans[0]))
+        assertFalse(2L in producer.intDomain(2))
     }
 
     @ParameterizedTest
