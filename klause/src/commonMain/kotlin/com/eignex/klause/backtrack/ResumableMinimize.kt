@@ -54,6 +54,7 @@ import com.eignex.klause.solver.search.FiniteFactorEnforcer
 import com.eignex.klause.solver.search.PreparingSearchComponent
 import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchContext
+import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchDecisionBudget
 import com.eignex.klause.solver.search.SearchInvocationResources
 import com.eignex.klause.solver.search.SearchLearnedConflict
@@ -322,7 +323,10 @@ internal class ResumableMinimize(
     // LP-guided branching hints (search-only): owned here so the engine depends only on the record sink.
     // The engine records each node's LP solution into it; the descent reads it for variable/value order.
     private val lpHints: LpHints? =
-        if (params.lpPlan.branching) LpHints(problem.numIntVars, problem.numBoolVars) else null
+        if (params.lpPlan.branching) {
+            LpHints(problem.numIntVars, problem.numBoolVars, params.lpDirectionalGains,
+                sink.lp::observeDirectionalBranch, charge = { lpEngine.noteNodeOverhead(it) })
+        } else null
 
     private lateinit var cp: CpSearchComponent
     private val session: PropagationSession get() = cp.session
@@ -595,6 +599,7 @@ internal class ResumableMinimize(
         if (closed) return
         closed = true
         installation = null
+        lpHints?.resetHistory()
         resources.close()
     }
 
@@ -619,6 +624,7 @@ internal class ResumableMinimize(
         if (closed) return
         closed = true
         installation = null
+        lpHints?.resetHistory()
         resources.closeAfter(failure)
     }
 
@@ -640,6 +646,7 @@ internal class ResumableMinimize(
         searchSession.popTo(0)
         val seeded = session.reseedFrom(assumptions)
         lpEngine.cpAdapter.resetRoot()
+        lpHints?.resetHistory()
         cp.rebase()
         searchSession.resetRootFacts()
         rootIsExhausted = seeded is PropagationResult.Unsat || session.isUnsatAtRoot
@@ -1224,6 +1231,12 @@ internal class ResumableMinimize(
 
     /** LP guidance affects only branch order; the shared runner still owns every frame and retraction. */
     private inner class LpGuidedBranching : BacktrackBranching {
+        override fun onBranch(variable: VarRef) { lpHints?.branch(variable) }
+
+        override fun onCommit(decision: SearchDecision, depth: Int) { lpHints?.commit(decision, depth) }
+
+        override fun onRestart() { lpHints?.resetHistory() }
+
         override fun pick(session: PropagationSession): VarRef? = lpEngine.lpBranchPick(session, lpHints)
 
         override fun orderValues(variable: VarRef, values: Sequence<Long>): Sequence<Long> =
@@ -1251,7 +1264,10 @@ internal class ResumableMinimize(
             }
             // Persistent LP fixings may use only a cutoff that survives every later repair.
             val lpBound = if (rebindable) externalBound else effectiveBound
-            if (!lpEngine.pruneNode(session, lpBound, singleObj?.varId ?: -1, singleObj?.ascending ?: true)) {
+            lpHints?.beginNode(context.decisionLevel, lpBound)
+            val pruned = lpEngine.pruneNode(session, lpBound, singleObj?.varId ?: -1, singleObj?.ascending ?: true)
+            lpHints?.finishNode()
+            if (!pruned) {
                 return SearchNodeDisposition.Expand
             }
             val learned = lpEngine.lastBackjump()

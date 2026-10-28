@@ -288,6 +288,9 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** The `lp-branching` execution setting. */
         val lpBranching: ExecutionOption<Boolean> = ExecutionOption("lp-branching", ValueKind.BOOLEAN)
 
+        /** The `lp-directional-gains` execution setting. */
+        val lpDirectionalGains: ExecutionOption<Boolean> = ExecutionOption("lp-directional-gains", ValueKind.BOOLEAN)
+
         /** The `lp-variable-shaving` execution setting. */
         val lpVariableShaving: ExecutionOption<Boolean> = ExecutionOption("lp-variable-shaving", ValueKind.BOOLEAN)
 
@@ -431,7 +434,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 phaseSaving, targetPhasing, solutionPhasing, rephaseInterval, maxLearned,
                 lbdGlue, tieredDb, midLbd, vivification, vivifyBatch,
                 subsumption, subsumeBatch, inprocessingCadence, lpObjectiveCone, lpAutoOffReprobe,
-                lpKnapsackLagrangian, lpComponentSplit, lpBoundMaxPivots, lpAdaptiveWork, lpBranching,
+                lpKnapsackLagrangian, lpComponentSplit, lpBoundMaxPivots, lpAdaptiveWork, lpBranching, lpDirectionalGains,
                 lpVariableShaving, lpPruneHulls, lpRootCuts, pbLearning, integerRowLearning, pbObjectiveCutoff,
                 objectiveGuidedValues, variableSelector, valueSelector, seed, dryRunSolver,
                 noise, cb, skewAlpha, initialTemp, coolingRate,

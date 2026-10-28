@@ -173,6 +173,29 @@ This witness-only path publishes the point and continues chronologically through
 assignments; it cannot block an unresolved leaf as a proved nogood. Other traversal
 modes stop incomplete when their model continuation would require such a blocker.
 
+### Finite LP directional guidance
+
+Finite optimization records passive immediate parent/child floating LP optimum gains
+in minimized working objective units. Each gain is divided by the fractional movement
+to the actual lower or upper branch. A missing or interrupted optimum, infeasibility,
+negative or nonfinite gain, integral point or mismatched split supplies no numeric
+sample. These advisory observations supply no certified bound or pruning authority.
+
+The finite consumer is opt-in through `BacktrackParams.lpDirectionalGains` or
+`lp-directional-gains=true`, with LP bounding and branching enabled. Two recent samples
+in each direction permit a balanced gain score; otherwise reduced-cost/fractionality
+scoring and the configured selector keep their precedence. Directional scores compete
+with each other before fallback, so objective units are not mixed with reduced costs.
+
+Samples share one retained exact base model, active-row identity, objective mapping
+and incumbent cutoff. Changed rows or cuts, layout or objective rescaling invalidate
+history and pending comparisons. Restart and assumption reseeding clear history.
+Ordinary sibling retraction preserves compatible observations and the immediate
+parent split; a skipped child cannot borrow a deeper descendant's objective.
+Directions expire after 256 node visits without a sample. At most 8,192 variable
+histories and 128 ancestor splits are retained; bookkeeping charges the existing LP
+work allowance and creates no extra LP query. Invocation close releases the scope.
+
 ### Leaf-completed columns
 
 Presolve keeps every column slot, so a column whose readers were all reduced away

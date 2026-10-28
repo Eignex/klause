@@ -5,6 +5,14 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.engine.ExactLpBounds
+import com.eignex.klause.lp.engine.ExactLpColumn
+import com.eignex.klause.lp.engine.ExactLpNumber
+import com.eignex.klause.lp.engine.ExactLpObjective
+import com.eignex.klause.lp.engine.ExactLpSide
+import com.eignex.klause.lp.engine.LpBoundTrail
+import com.eignex.klause.lp.engine.LpScopedRow
+import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
@@ -12,9 +20,12 @@ import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.VarRef
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class LpHintsTest {
 
@@ -81,5 +92,77 @@ class LpHintsTest {
         hints.record(relaxation, doubleArrayOf(3.5), doubleArrayOf(-4.0))
 
         assertEquals(1.0, hints.branchScore(VarRef.IntVar(0)), 1e-6)
+    }
+
+    @Test
+    fun `cutoff row and objective changes reject pending directional gains`() {
+        for (change in listOf("cutoff", "cut", "scale", "objective", "mapping")) {
+            val b = LpBuilder()
+            val x = b.addVar(0, 10, cost = 1)
+            b.addRow(intArrayOf(x), longArrayOf(1), Relation.LE, 10L)
+            val base = b.build(Sense.MINIMIZE)
+            val trail = LpBoundTrail(assertNotNull(base.authoritativeModel()))
+            val observations = ArrayList<String>()
+            val hints = LpHints(1, 0, directionalGains = true, observe = observations::add)
+            fun relaxation() = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+                booleanArrayOf(false), if (change == "mapping" && trail.state.depth > 0) 1L else 0L,
+                intArrayOf(0), IntArray(0))
+            hints.beginNode(0, 100.0)
+            val parent = relaxation()
+            hints.record(parent, doubleArrayOf(2.25), DoubleArray(parent.model.m))
+            hints.recordObjective(parent, 10.0)
+            hints.branch(VarRef.IntVar(0))
+            hints.commit(SearchDecision.IntAtMost(0, 2), 1)
+            assertTrue(trail.push())
+            when (change) {
+                "cut" -> assertTrue(trail.append(
+                    LpScopedRow(1L, listOf(0 to ExactLpNumber.of(1L)), ExactLpNumber.of(2L),
+                        ExactLpColumn(ExactLpBounds(lower = ExactLpSide(ExactLpNumber.of(0L))))),
+                    scoped = true,
+                ))
+                "scale", "objective" -> {
+                    val old = trail.state.model.objective
+                    assertTrue(trail.replaceObjective(ExactLpObjective(
+                        List(old.size) { old.cost(it) },
+                        scale = ExactLpNumber.of(if (change == "scale") 2L else 1L),
+                        externalConstant = ExactLpNumber.of(if (change == "objective") 1L else 0L),
+                    )))
+                }
+            }
+            hints.beginNode(1, if (change == "cutoff") 99.0 else 100.0)
+            val child = relaxation()
+            hints.record(child, doubleArrayOf(2.0), DoubleArray(child.model.m))
+
+            hints.recordObjective(child, 11.0)
+
+            assertEquals(0, observations.count { it == "DOWN" }, change)
+        }
+    }
+
+    @Test
+    fun `compatible bound edits and sibling retraction retain the immediate parent gain`() {
+        val b = LpBuilder()
+        b.addVar(0, 10, cost = 1)
+        val trail = LpBoundTrail(assertNotNull(b.build(Sense.MINIMIZE).authoritativeModel()))
+        val observations = ArrayList<String>()
+        val hints = LpHints(1, 0, directionalGains = true, observe = observations::add)
+        fun relaxation() = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+            booleanArrayOf(false), 0L, intArrayOf(0), IntArray(0))
+        hints.beginNode(0, 100.0)
+        hints.record(relaxation(), doubleArrayOf(2.25), DoubleArray(0))
+        hints.recordObjective(relaxation(), 10.0)
+        hints.branch(VarRef.IntVar(0))
+        for (up in listOf(false, true)) {
+            assertTrue(trail.push())
+            assertTrue(trail.assertBound(0, !up, ExactLpSide(ExactLpNumber.of(if (up) 3L else 2L)), 1L))
+            hints.commit(if (up) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2), 1)
+            hints.beginNode(1, 100.0)
+            hints.record(relaxation(), doubleArrayOf(if (up) 3.0 else 2.0), DoubleArray(0))
+            hints.recordObjective(relaxation(), if (up) 13.0 else 11.0)
+            assertTrue(trail.pop(0))
+        }
+
+        assertEquals(1, observations.count { it == "DOWN" })
+        assertEquals(1, observations.count { it == "UP" })
     }
 }

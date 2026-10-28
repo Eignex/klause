@@ -2,6 +2,7 @@ package com.eignex.klause.backtrack.lp
 
 import com.eignex.klause.lp.bounding.LpHintSink
 import com.eignex.klause.lp.relaxation.LpRelaxation
+import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.VarRef
 import kotlin.math.abs
 import kotlin.math.floor
@@ -17,7 +18,80 @@ import kotlin.math.roundToLong
  * `NaN` means "no current LP value" (the LP has not solved for this variable, or not at this node),
  * in which case ordering is left untouched.
  */
-internal class LpHints(numIntVars: Int, numBoolVars: Int) : LpHintSink {
+internal class LpHints(
+    numIntVars: Int,
+    numBoolVars: Int,
+    private val directionalGains: Boolean = false,
+    private val observe: (String) -> Unit = {},
+    private val charge: (Long) -> Unit = {},
+) : LpHintSink {
+    private val collect = numIntVars.toLong() + numBoolVars <= 8192L
+    private val history = LpDirectionalHistory(observe)
+    private var freshRecord = false
+    private var scopeModel: Any? = null
+    private var scopeRows: Any? = null
+    private var scopeConstant = 0L
+    private var scopeCutoff = Double.NaN
+    private var cutoff = Double.NaN
+
+    fun beginNode(depth: Int, bound: Double) {
+        charge(1L)
+        cutoff = bound
+        freshRecord = false
+        if (collect) history.beginNode(depth)
+    }
+
+    override fun recordObjective(relaxation: LpRelaxation, objective: Double) {
+        if (!collect) return
+        val state = relaxation.model.exactState ?: return
+        if (scopeModel !== state.baseModel || scopeRows !== state.rows ||
+            scopeConstant != relaxation.objectiveConstant || scopeCutoff != cutoff
+        ) {
+            observe("INCOMPATIBLE")
+            history.clear()
+            scopeModel = state.baseModel
+            scopeRows = state.rows
+            scopeConstant = relaxation.objectiveConstant
+            scopeCutoff = cutoff
+        }
+        history.record(objective + relaxation.objectiveConstant)
+    }
+
+    fun finishNode() = history.finishNode()
+
+    fun branch(variable: VarRef) {
+        if (collect) {
+            charge(129L)
+            history.branch(variable, value(variable))
+        }
+    }
+
+    fun commit(decision: SearchDecision, depth: Int) {
+        if (collect) {
+            charge(129L)
+            history.commit(decision, depth)
+        }
+    }
+
+    fun directionalScore(variable: VarRef): Double {
+        if (!collect || !directionalGains) return Double.NaN
+        charge(1L)
+        return history.score(variable, value(variable))
+    }
+
+    fun selected(directional: Boolean) {
+        if (directionalGains) observe(if (directional) "CONSUMED" else "FALLBACK")
+    }
+
+    private fun value(variable: VarRef): Double = if (!freshRecord) Double.NaN else when (variable) {
+        is VarRef.IntVar -> if (intStamp.getOrElse(variable.varId) { -1 } == solveStamp) {
+            intVal.getOrElse(variable.varId) { Double.NaN }
+        } else Double.NaN
+        is VarRef.Bool -> if (boolStamp.getOrElse(variable.varId) { -1 } == solveStamp) {
+            boolVal.getOrElse(variable.varId) { Double.NaN }
+        } else Double.NaN
+    }
+
     private val intVal by lazy(LazyThreadSafetyMode.NONE) { DoubleArray(numIntVars) { Double.NaN } }
     private val boolVal by lazy(LazyThreadSafetyMode.NONE) { DoubleArray(numBoolVars) { Double.NaN } }
 
@@ -36,7 +110,15 @@ internal class LpHints(numIntVars: Int, numBoolVars: Int) : LpHintSink {
 
     private var recorded = false
 
+    fun resetHistory() {
+        history.clear()
+        scopeModel = null
+        scopeRows = null
+        freshRecord = false
+    }
+
     override fun clear() {
+        resetHistory()
         if (!recorded) return
         intVal.fill(Double.NaN)
         boolVal.fill(Double.NaN)
@@ -57,6 +139,7 @@ internal class LpHints(numIntVars: Int, numBoolVars: Int) : LpHintSink {
      */
     override fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray) {
         recorded = true
+        freshRecord = true
         val model = relaxation.model
         solveStamp++
         for (col in relaxation.colVarId.indices) {
