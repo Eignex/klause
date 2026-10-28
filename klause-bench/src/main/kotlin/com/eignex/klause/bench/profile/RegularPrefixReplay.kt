@@ -2,6 +2,7 @@ package com.eignex.klause.bench.profile
 
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.IntDomain
@@ -10,7 +11,11 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.CpBranching
 import com.eignex.klause.propagation.CpSearchComponent
+import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.search.BooleanBranching
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
@@ -18,9 +23,12 @@ import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchBrancher
 import com.eignex.klause.solver.search.SearchContext
+import com.eignex.klause.solver.search.SearchConflictResolution
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.solver.search.SearchModel
+import com.eignex.klause.solver.search.SearchLearnedConflictResult
+import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchRunObserver
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
@@ -30,6 +38,8 @@ import com.sun.management.ThreadMXBean
 import java.io.File
 import java.lang.management.ManagementFactory
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -81,7 +91,7 @@ internal fun regularPrefixDefinitions(source: Problem): RegularPrefixDefinitions
     val target = chosen[boundary]
     val count = domains[target].max.toInt()
     val booleans = IntArray(count) { source.numBoolVars + it }
-    for (q in 1..count) factors.add(ReifiedLinear(booleans[q - 1], intArrayOf(1), intArrayOf(target), LinearOp.EQ,
+    for (q in 1..count) factors.add(ReifiedLinear(booleans[q - 1], longArrayOf(1), intArrayOf(target), LinearOp.EQ,
         q.toLong()))
     val mask = source.impliedFactorMask?.let { original -> BooleanArray(factors.size) { it < original.size && original[it] } }
     return RegularPrefixDefinitions(Problem(source.numBoolVars + count, domains.size, domains.toTypedArray(),
@@ -90,7 +100,7 @@ internal fun regularPrefixDefinitions(source: Problem): RegularPrefixDefinitions
 }
 
 internal object RegularPrefixReplay {
-    fun capture(source: Problem, identity: String, out: File) {
+    fun capture(source: Problem, identity: String, out: File, original: Problem, reconstruct: (Sample) -> Sample) {
         val bean = ManagementFactory.getThreadMXBean() as ThreadMXBean
         bean.isThreadAllocatedMemoryEnabled = true
         val thread = Thread.currentThread().threadId()
@@ -129,6 +139,23 @@ internal object RegularPrefixReplay {
             val result = shared.solve(model.numBoolVars, SearchSolveParams(maxDecisions = 2048),
                 booleanBranching = BooleanBranching.SourceOrder(if (mode == "definitions-branching")
                     model.numBoolVars else source.numBoolVars), observer = observer)
+            val runNs = System.nanoTime() - started
+            val runBytes = bean.getThreadAllocatedBytes(thread) - allocated
+            val checkStarted = System.nanoTime()
+            val checkStop = Cancellation.after(2.seconds)
+            val checked = if (result is SearchResult.Satisfied) {
+                val sample = Sample(BooleanArray(source.numBoolVars) { native.boolValue(it) ?: false },
+                    LongArray(source.numIntVars) { native.intDomain(it).min })
+                FiniteConflictSelection.checkSource(original.bake(checkStop), reconstruct(sample), checkStop)
+            } else null
+            val clauseGetter = native.javaClass.declaredMethods.single {
+                it.name.startsWith("learnedClauseLiterals") && it.parameterCount == 1
+            }
+            val helperClauses = (0 until native.learnedClauseCount).filter { index ->
+                (clauseGetter.invoke(native, index) as IntArray).any {
+                    Lit.variable(it) in source.numBoolVars until model.numBoolVars
+                }
+            }
             val record = buildJsonObject {
                 put("preparedIdentity", identity)
                 put("mode", mode)
@@ -138,12 +165,21 @@ internal object RegularPrefixReplay {
                 put("conflicts", conflicts)
                 put("helperDecisions", helperDecisions)
                 put("nativePropagations", native.propagationCount)
+                put("nativeWork", work(native))
                 put("nativeStored", native.learnedClauseCount)
                 put("sharedStored", shared.learnedClauseCount)
+                put("helperBooleanClauses", helperClauses.size)
+                put("helperBooleanClausesMarkedUsed", helperClauses.count(native::learnedClauseUsedSinceReduction))
+                put("helperClauseSamples", JsonArray(helperClauses.take(16).map { index ->
+                    JsonArray((clauseGetter.invoke(native, index) as IntArray).map(::JsonPrimitive))
+                }))
                 put("definitionNs", if (mode.startsWith("definitions")) definitionNs else 0)
                 put("definitionThreadBytes", if (mode.startsWith("definitions")) definitionBytes else 0)
-                put("runNs", System.nanoTime() - started)
-                put("runThreadBytes", bean.getThreadAllocatedBytes(thread) - allocated)
+                put("runNs", runNs)
+                put("runThreadBytes", runBytes)
+                put("nativeOriginalWitnessAccepted", checked)
+                put("nativeOriginalCheckNs", System.nanoTime() - checkStarted)
+                put("nativeOriginalCheckStopped", checkStop())
                 put("helperIntegers", model.numIntVars - source.numIntVars)
                 put("helperBooleans", model.numBoolVars - source.numBoolVars)
                 put("retainedFactors", model.factors.size)
@@ -154,6 +190,67 @@ internal object RegularPrefixReplay {
             }
             records.appendText("$record\n")
             println(record)
+        }
+        if (source.numIntVars <= 8 && source.factors.filterIsInstance<Regular>().first().accepting.size == 3) {
+            reuse(source, definitions, out)
+        }
+    }
+
+    private fun work(session: PropagationSession): Long {
+        val getter = session.javaClass.declaredMethods.single { it.name.startsWith("getWork") && it.parameterCount == 0 }
+        return getter.invoke(session) as Long
+    }
+
+    private fun reuse(source: Problem, definitions: RegularPrefixDefinitions, out: File) {
+        val boundary = source.numIntVars - 2
+        val native = PropagationSession(definitions.problem)
+        val cp = CpSearchComponent(native)
+        val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(definitions.problem.numBoolVars))
+        check(shared.initialize() is ComponentResult.Consistent)
+        check(shared.push(SearchDecision.Bool(Lit.make(definitions.booleans[0], true))) is ComponentResult.Conflict)
+        val learned = (cp.resolveConflict(shared) as SearchConflictResolution.Backjump).conflict
+        shared.popTo(learned.decisionLevel)
+        check(learned.apply(shared) == SearchLearnedConflictResult.Resume)
+        check(native.boolValue(definitions.booleans[0]) == false)
+        val clauses = native.exportGlueClauses(2, 128)
+        check(clauses.isNotEmpty())
+        val sourceProof = PropagationSession(source)
+        val pins = (0 until boundary).fold(Assumptions.None) { assumptions, v -> assumptions.withInt(v, 1) }
+        check(sourceProof.seed(pins) is PropagationResult.Unsat)
+        val records = out.resolve("reuse.jsonl").apply { writeText("") }
+        for (mode in listOf("native-source-clause", "definitions-source-clause", "definitions-learned-state")) {
+            for (symbol in listOf(1L, 2L)) {
+                val session = PropagationSession(if (mode == "native-source-clause") source else definitions.problem)
+                if (mode == "definitions-learned-state") {
+                    clauses.forEach { session.importClause(it) }
+                    check(session.seed(Assumptions.None) is PropagationResult.Implied)
+                    check(session.boolValue(definitions.booleans[0]) == false)
+                } else {
+                    check(session.addLearnedClause(Clause(IntArray(boundary) { session.boundGeLit(it, 2, true) }),
+                        boundary) is PropagationResult.Implied)
+                }
+                var completed = 0
+                var beforePin = false
+                for (v in 0 until boundary) {
+                    if (symbol !in session.intDomain(v)) { beforePin = true; break }
+                    if (session.pinInt(v, symbol) is PropagationResult.Unsat) break
+                    completed++
+                }
+                check(completed < boundary)
+                val record = buildJsonObject {
+                    put("mode", mode)
+                    put("prefix", List(boundary) { symbol }.joinToString(","))
+                    put("actualPrefixState", 1)
+                    put("successfulPinsBeforeRejection", completed)
+                    put("rejectedByDomainBeforePin", beforePin)
+                    put("nativeWork", work(session))
+                    put("acquisitionWork", work(native) + work(sourceProof))
+                    put("learnedStateFalseAtRoot", native.boolValue(definitions.booleans[0]) == false)
+                    put("independentSourceCheck", false)
+                }
+                records.appendText("$record\n")
+                println(record)
+            }
         }
     }
 

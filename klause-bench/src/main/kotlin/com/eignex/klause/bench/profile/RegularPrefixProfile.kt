@@ -119,7 +119,7 @@ internal object RegularPrefixProfile {
             println("${out.name}/$mode: $report")
             if (replay && mode == "default" && prepared.presolve?.infeasible != true && !stop()) {
                 RegularPrefixReplay.capture(model, com.eignex.klause.bench.metric.sha256(
-                    codec.encodeToJsonElement(model).toString().toByteArray()), out)
+                    codec.encodeToJsonElement(model).toString().toByteArray()), out, source, prepared.reconstruct)
             }
         }
     }
