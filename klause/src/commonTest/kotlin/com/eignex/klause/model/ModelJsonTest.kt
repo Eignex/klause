@@ -225,6 +225,8 @@ class ModelJsonTest {
                 """{"disjunctiveOpt":{"starts":$xs,"durations":[2],"presents":$ps}}""",
             NValueExprOpt(y, listOf(x), NValueMode.AT_MOST, listOf(p)) to
                 """{"nValueOpt":{"n":{"ref":"y"},"xs":$xs,"mode":"AT_MOST","presents":$ps}}""",
+            NValueExpr(y, listOf(x), except = listOf(5_000_000_000L)) to
+                """{"nValue":{"n":{"ref":"y"},"xs":$xs,"except":[5000000000]}}""",
             GccExprOpt(listOf(x), listOf(1), listOf(0), listOf(1), closed = true, presents = listOf(p)) to
                 """{"gccOpt":{"xs":$xs,"cover":[1],"low":[0],"high":[1],"closed":true,"presents":$ps}}""",
         )

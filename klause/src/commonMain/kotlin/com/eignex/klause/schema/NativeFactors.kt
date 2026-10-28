@@ -21,8 +21,11 @@ import com.eignex.klause.model.BoolExpr
 import com.eignex.klause.model.BoolRef
 import com.eignex.klause.model.BoolTerm
 import com.eignex.klause.model.FactorConstraint
+import com.eignex.klause.model.IntLit
 import com.eignex.klause.model.IntRef
 import com.eignex.klause.model.IntTerm
+import com.eignex.klause.model.NValueExpr
+import com.eignex.klause.model.NValueMode
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BigInt
@@ -94,7 +97,24 @@ fun nValue(
     xs: List<IntTerm>,
     mode: NValue.Mode = NValue.Mode.Eq,
     except: Collection<Long> = emptySet(),
-): BoolExpr = factor(NValue(n, localIds(xs.size), mode, exceptSet = except.toLongArray()), ints = xs)
+): BoolExpr = nValue(IntLit(n), xs, mode, except)
+
+/** The number of distinct values of [xs] outside [except] relates to target [n] by [mode]. */
+fun nValue(
+    n: IntTerm,
+    xs: List<IntTerm>,
+    mode: NValue.Mode = NValue.Mode.Eq,
+    except: Collection<Long> = emptySet(),
+): BoolExpr = NValueExpr(
+    n.toIntExpr(),
+    xs.map { it.toIntExpr() },
+    when (mode) {
+        NValue.Mode.Eq -> NValueMode.EQ
+        NValue.Mode.AtLeast -> NValueMode.AT_LEAST
+        NValue.Mode.AtMost -> NValueMode.AT_MOST
+    },
+    except.toList(),
+)
 
 /** One exact affine operand of [distinct]: `Σ coefficient·variable + constant`. */
 class AffineOperand(

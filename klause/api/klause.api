@@ -8074,6 +8074,41 @@ public final class com/eignex/klause/model/MultipleSpec$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
+public final class com/eignex/klause/model/NValueExpr : com/eignex/klause/model/BoolExpr {
+	public static final field Companion Lcom/eignex/klause/model/NValueExpr$Companion;
+	public fun <init> (Lcom/eignex/klause/model/IntExpr;Ljava/util/List;Lcom/eignex/klause/model/NValueMode;Ljava/util/List;)V
+	public synthetic fun <init> (Lcom/eignex/klause/model/IntExpr;Ljava/util/List;Lcom/eignex/klause/model/NValueMode;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/eignex/klause/model/IntExpr;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Lcom/eignex/klause/model/NValueMode;
+	public final fun component4 ()Ljava/util/List;
+	public final fun copy (Lcom/eignex/klause/model/IntExpr;Ljava/util/List;Lcom/eignex/klause/model/NValueMode;Ljava/util/List;)Lcom/eignex/klause/model/NValueExpr;
+	public static synthetic fun copy$default (Lcom/eignex/klause/model/NValueExpr;Lcom/eignex/klause/model/IntExpr;Ljava/util/List;Lcom/eignex/klause/model/NValueMode;Ljava/util/List;ILjava/lang/Object;)Lcom/eignex/klause/model/NValueExpr;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getExcept ()Ljava/util/List;
+	public final fun getMode ()Lcom/eignex/klause/model/NValueMode;
+	public final fun getN ()Lcom/eignex/klause/model/IntExpr;
+	public final fun getXs ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toExpr ()Lcom/eignex/klause/model/BoolExpr;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/eignex/klause/model/NValueExpr$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/eignex/klause/model/NValueExpr$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/eignex/klause/model/NValueExpr;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/eignex/klause/model/NValueExpr;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/eignex/klause/model/NValueExpr$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
 public final class com/eignex/klause/model/NValueExprOpt : com/eignex/klause/model/BoolExpr {
 	public static final field Companion Lcom/eignex/klause/model/NValueExprOpt$Companion;
 	public fun <init> (Lcom/eignex/klause/model/IntExpr;Ljava/util/List;Lcom/eignex/klause/model/NValueMode;Ljava/util/List;)V
@@ -10222,7 +10257,9 @@ public final class com/eignex/klause/schema/NativeFactorsKt {
 	public static final fun inValues (Lcom/eignex/klause/schema/FloatHandle;Ljava/util/Collection;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun linear (Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/ir/LinearOp;Ljava/math/BigInteger;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun nValue (ILjava/util/List;Lcom/eignex/klause/factor/global/NValue$Mode;Ljava/util/Collection;)Lcom/eignex/klause/model/BoolExpr;
+	public static final fun nValue (Lcom/eignex/klause/model/IntTerm;Ljava/util/List;Lcom/eignex/klause/factor/global/NValue$Mode;Ljava/util/Collection;)Lcom/eignex/klause/model/BoolExpr;
 	public static synthetic fun nValue$default (ILjava/util/List;Lcom/eignex/klause/factor/global/NValue$Mode;Ljava/util/Collection;ILjava/lang/Object;)Lcom/eignex/klause/model/BoolExpr;
+	public static synthetic fun nValue$default (Lcom/eignex/klause/model/IntTerm;Ljava/util/List;Lcom/eignex/klause/factor/global/NValue$Mode;Ljava/util/Collection;ILjava/lang/Object;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun pseudoBoolean (Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/model/PbOp;Ljava/math/BigInteger;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun realAbs (Lcom/eignex/klause/schema/FloatHandle;Lcom/eignex/klause/schema/FloatHandle;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun realElement (Lcom/eignex/klause/model/IntTerm;Ljava/util/List;Lcom/eignex/klause/schema/FloatHandle;I)Lcom/eignex/klause/model/BoolExpr;

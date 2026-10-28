@@ -97,6 +97,7 @@ class ReferencesTest {
             CumulativeExprOpt(starts = xs, durations = unit, resources = unit, capacity = 1, presents = lits),
             DisjunctiveExprOpt(starts = xs, durations = unit, presents = lits),
             NValueExprOpt(n = y, xs = xs, presents = lits),
+            NValueExpr(n = y, xs = xs, except = listOf(5_000_000_000L)),
             GccExprOpt(xs = xs, cover = listOf(1), low = listOf(0), high = listOf(1), closed = false, presents = lits),
         )
     }

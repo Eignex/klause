@@ -18,6 +18,7 @@ import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceRealId
+import com.eignex.klause.ir.ceilingOrNull
 import com.eignex.klause.lowering.CnfLowering
 import com.eignex.klause.lowering.ProblemBuilder
 import com.eignex.klause.lowering.SetLayout
@@ -62,6 +63,7 @@ import com.eignex.klause.model.InverseChannel
 import com.eignex.klause.model.LexExpr
 import com.eignex.klause.model.MddExpr
 import com.eignex.klause.model.MultipleSpec
+import com.eignex.klause.model.NValueExpr
 import com.eignex.klause.model.NValueExprOpt
 import com.eignex.klause.model.NamedConstraint
 import com.eignex.klause.model.NominalEq
@@ -281,6 +283,8 @@ internal class Lowering(
         is DisjunctiveExprOpt -> reifyDisjunctiveOpt(expr)
 
         is NValueExprOpt -> reifyNValueOpt(expr)
+
+        is NValueExpr -> error("nValue: reified context not supported (use at top-level)")
 
         is GccExprOpt -> reifyGccOpt(expr)
 
@@ -573,9 +577,12 @@ private fun Lowering.emitOptVarPins(def: SchemaDef<SchemaEntry>) {
             }
 
             intVarIdByName.containsKey(base) -> {
-                val d = intDomains[intVarIdByName.getValue(base)]
-                val default = 0L.coerceIn(d.min, d.max)
-                assertExpr(Implies(absent, IntCompare(IntRef(base), IntCmpOp.EQ, IntLit(default.toInt()))))
+                val id = intVarIdByName.getValue(base)
+                val d = intDomains[id]
+                val default = d.ceilingOrNull(0L) ?: d.max
+                val equality = newBoolVar()
+                factors += ReifiedLinear(equality, longArrayOf(1L), intArrayOf(id), LinearOp.EQ, default)
+                factors += Clause(intArrayOf(Lit.make(boolVarIdByName.getValue(name), true), Lit.make(equality, true)))
             }
 
             nominalIndicators.containsKey(base) -> {

@@ -214,6 +214,11 @@ lexicographic factor at the top level, comparisons when reified), `valuePrecede`
 mixed affine `distinct`, arbitrary-width `linear` and `pseudoBoolean`, rational
 `exactLinear`, `cumulative` with variable durations, demands and capacity, and the
 real relations `realAbs`, `realMin`, `realMax`, `realElement` and `inValues`.
+`nValue` accepts a literal or integer expression as its count target; schema JSON
+retains that expression in its `nValue` node. Absent optional integers use zero
+when declared, the least declared nonnegative value otherwise, or the greatest
+declared negative value when the domain contains no nonnegative value. Their pins
+retain 64-bit values exactly.
 Compiling a schema and writing its `Problem` as problem JSON therefore covers the
 same declarations, factors and options as the problem document itself:
 

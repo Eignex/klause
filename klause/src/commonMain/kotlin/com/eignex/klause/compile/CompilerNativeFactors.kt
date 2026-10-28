@@ -1,7 +1,9 @@
 package com.eignex.klause.compile
 
 import com.eignex.klause.factor.global.LexLess
+import com.eignex.klause.factor.global.NValue
 import com.eignex.klause.factor.scheduling.Cumulative
+import com.eignex.klause.factor.symmetry.SymmetryHandling
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.intdomain.intDomainFromRuns
@@ -14,6 +16,8 @@ import com.eignex.klause.model.IntDomainSpec
 import com.eignex.klause.model.IntExpr
 import com.eignex.klause.model.IntLit
 import com.eignex.klause.model.LexExpr
+import com.eignex.klause.model.NValueExpr
+import com.eignex.klause.model.NValueMode
 import com.eignex.klause.model.Or
 import com.eignex.klause.model.VariableCumulativeExpr
 import com.eignex.klause.util.LongArrayList
@@ -39,6 +43,17 @@ internal fun Lowering.declareIntDomain(spec: IntDomainSpec): Int {
     val id = newIntVar(domain)
     if (spec.lower == null || spec.upper == null) markOpenInt(id, spec.lower == null, spec.upper == null)
     return id
+}
+
+internal fun Lowering.assertNValue(expr: NValueExpr) {
+    val target = varIdOfLifted(expr.n)
+    val xs = IntArray(expr.xs.size) { varIdOfLifted(expr.xs[it]) }
+    val mode = when (expr.mode) {
+        NValueMode.EQ -> NValue.Mode.Eq
+        NValueMode.AT_LEAST -> NValue.Mode.AtLeast
+        NValueMode.AT_MOST -> NValue.Mode.AtMost
+    }
+    factors += NValue(target, xs, mode, exceptSet = expr.except.toLongArray())
 }
 
 internal fun Lowering.assertLex(expr: LexExpr) {
@@ -108,5 +123,13 @@ internal fun Lowering.assertFactorConstraint(expr: FactorConstraint) {
     require(variables.boolVars.all { it in bools.indices }) { "factor: a Boolean id has no bound name" }
     require(variables.ints.all { it in ints.indices }) { "factor: an integer id has no bound name" }
     require(variables.reals.all { it in reals.indices }) { "factor: a real id has no bound name" }
-    factors += local.remap(VarRemap(bools, ints, reals))
+    val mapping = if (local is SymmetryHandling) {
+        // Permutation images need room for the compiled namespaces, including unbound columns.
+        val boolMapping = IntArray(maxOf(bools.size, numBoolVars)) { bools.getOrElse(it) { -1 } }
+        val intMapping = IntArray(maxOf(ints.size, numIntVars)) { ints.getOrElse(it) { -1 } }
+        VarRemap(boolMapping, intMapping, reals)
+    } else {
+        VarRemap(bools, ints, reals)
+    }
+    factors += local.remap(mapping)
 }

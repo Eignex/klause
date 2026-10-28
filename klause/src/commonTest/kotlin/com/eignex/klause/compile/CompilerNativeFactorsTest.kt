@@ -7,6 +7,8 @@ import com.eignex.klause.factor.codec.factorCodec
 import com.eignex.klause.factor.global.LexLess
 import com.eignex.klause.factor.global.ValuePrecede
 import com.eignex.klause.factor.scheduling.Cumulative
+import com.eignex.klause.factor.symmetry.SymmetryHandling
+import com.eignex.klause.formats.json.JsonSchema
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FactorKind
 import com.eignex.klause.ir.IntVars
@@ -136,6 +138,64 @@ class CompilerNativeFactorsTest {
         val marker = compiled.problem.factors.single() as Marker
 
         assertEquals(compiled.intVarIdByName.getValue("y"), marker.x)
+    }
+
+    @Test
+    fun `a symmetry factor should preserve generators bound to higher columns`() {
+        class S : VariableSchema() {
+            val unusedInt by intVar(0, 1)
+            val x by intVar(0, 1)
+            val y by intVar(0, 1)
+            val unusedBool by boolVar()
+            val b by boolVar()
+            val c by boolVar()
+            val symmetry by constraint {
+                factor(
+                    SymmetryHandling(listOf(intArrayOf(1, 0) to intArrayOf(1, 0))),
+                    ints = listOf(x, y),
+                    bools = listOf(b, c),
+                )
+            }
+        }
+
+        val factor = S().compile().problem.factors.single() as SymmetryHandling
+
+        assertEquals(listOf(0, 2, 1), factor.generators.single().first.toList())
+        assertEquals(listOf(0, 2, 1), factor.generators.single().second.toList())
+    }
+
+    @Test
+    fun `an absent wide integer should retain its declared value`() {
+        val definition = JsonSchema.parse(
+            """{"entries":{
+                "x":{"intDomain":{"lower":5000000000,"upper":5000000000}},
+                "p":{"presence":"x"},
+                "absent":{"constraint":{"notRef":"p"}}
+            }}""",
+        )
+        val compiled = definition.compile()
+
+        val sample = BacktrackSolver(compiled.problem.bake()).enumerate().single()
+
+        assertFalse(sample.boolValue(compiled.boolVarIdByName.getValue("p")))
+        assertEquals(5_000_000_000L, sample.intValue(compiled.intVarIdByName.getValue("x")))
+    }
+
+    @Test
+    fun `an absent sparse integer should pin to a declared value`() {
+        val definition = JsonSchema.parse(
+            """{"entries":{
+                "x":{"intDomain":{"lower":-2,"upper":3,"values":[[-2,-2],[3,3]]}},
+                "p":{"presence":"x"},
+                "absent":{"constraint":{"notRef":"p"}}
+            }}""",
+        )
+        val compiled = definition.compile()
+
+        val sample = BacktrackSolver(compiled.problem.bake()).enumerate().single()
+
+        assertFalse(sample.boolValue(compiled.boolVarIdByName.getValue("p")))
+        assertEquals(3L, sample.intValue(compiled.intVarIdByName.getValue("x")))
     }
 }
 
