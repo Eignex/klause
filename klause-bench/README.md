@@ -107,7 +107,7 @@ Arm values are `solve-one` options; `param.<name>` becomes `--param <name>=<valu
 
 `lab/bench.json` owns the adapter's build tasks, classpath and JVM launch options.
 Its tasks install the CLI, bench distribution and a checksum-pinned MiniZinc 2.10.1
-compiler with its standard library. Preparation downloads the compiler anonymously
+compiler with its standard library. Gradle resolves the compiler archive anonymously
 from the public MiniZinc release; execution needs no download or system MiniZinc.
 The manifest targets Linux x86_64 and requires JDK 25, GNU time and the ordinary
 Linux C/C++ runtime libraries. The planner retains its platform requirements.
@@ -164,6 +164,7 @@ UNSAT, UNKNOWN, unsupported models and solver deadlines retain their domain
 semantics. Load errors, crashes and nonzero exits after a published verdict fail the
 SDK case while retaining available records and artifacts. Stdout/stderr are flushed
 to durable files during solving, and compiler failures retain their diagnostics.
+Compiled FlatZinc, output mappings and exact CLI argv are retained as artifacts.
 A worker cancellation or hard kill can leave these partial files without a terminal
 solve record; the lab's supervisor owns that execution outcome and artifact transfer.
 
@@ -173,7 +174,9 @@ specialized profile mains. The generic lab path currently rejects legacy source-
 controls on bench jobs, so `validationPolicy=reported-result-v1` does not claim an
 independent check. Removing the legacy lab executor requires generic orchestration
 for those workflows, a checker request/result contract, declared JDK/runtime
-prerequisites and cancellation/partial-result semantics. The lab can already consume
+prerequisites and cancellation/partial-result semantics. In particular, the
+coordinator accepts run-level deadline receipts only for profile jobs; a forced
+bench run-level deadline retains partial worker files but its receipt is rejected. The lab can already consume
 this manifest for prepared solve execution and ingest its metrics, records and
 artifacts; deployment and capacity pools must advertise the declared platform tags.
 
