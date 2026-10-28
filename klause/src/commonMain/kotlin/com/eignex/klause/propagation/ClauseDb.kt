@@ -411,8 +411,10 @@ internal fun PropagationState.noteLearnedAssertion(fid: Int) {
 }
 
 internal fun PropagationState.recheckRetractedLearning(fid: Int) {
-    val index = fid - baseFactorCount
-    if (index !in 0 until learned.size || learned.store[index] is ClausePropagator) return
+    nativeEngine?.let {
+        it.recheckAfterUndo(fid)
+        return
+    }
     deferLearnedAttachment(fid)
 }
 

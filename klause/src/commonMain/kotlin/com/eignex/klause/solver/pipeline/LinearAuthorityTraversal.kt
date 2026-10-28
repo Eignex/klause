@@ -307,7 +307,7 @@ internal class LinearAuthorityTraversal(
             child.assertion = SearchDecision.Theory(survivor)
             path += context.decisionLevel to child
             val result = context.imply(survivor.literal, explanation)
-            if (result !is ComponentResult.Indeterminate) refutations?.consumed(exclusion.id)
+            if (result !is ComponentResult.Indeterminate) refutations.consumed(exclusion.id)
             if (result !is ComponentResult.Consistent) return result
             if (exclusion.resolved) observe("numericalRefutationResolvedDeductions")
             if (exclusion.unfixedPivot) observe("numericalRefutationUnfixedDeductions")

@@ -35,7 +35,7 @@ internal interface ClauseWatchHost {
  * https://doi.org/10.1145/378239.379017.
  */
 internal class WatchedClauseStore {
-    /** Watch entries inspected by [propagate]. */
+    /** Watch entries and retracted-implication literals inspected by propagation. */
     var watchVisits: Long = 0
         private set
     private val clauses = ArrayList<IntArray>()
@@ -178,6 +178,19 @@ internal class WatchedClauseStore {
         if (watchedTruth == false) return conflictOn(index, host)
         if (literals.size > 1 && host.truth(literals[1]) != false) return ComponentResult.Consistent
         return implyFrom(index, watched, host)
+    }
+
+    fun recheck(index: Int, host: ClauseWatchHost): ComponentResult {
+        var unit = -1
+        for (literal in clauses[index]) {
+            watchVisits++
+            when (host.truth(literal)) {
+                true -> return ComponentResult.Consistent
+                null -> if (unit >= 0) return ComponentResult.Consistent else unit = literal
+                false -> Unit
+            }
+        }
+        return if (unit < 0) conflictOn(index, host) else implyFrom(index, unit, host)
     }
 
     /**

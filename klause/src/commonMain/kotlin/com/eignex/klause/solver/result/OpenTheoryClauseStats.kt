@@ -16,7 +16,7 @@ data class OpenTheoryClauseStats(
     val retained: Long = 0,
     /** Largest number of learned clauses retained at one time. */
     val peakRetained: Long = 0,
-    /** Learned-clause watch entries inspected by propagation. */
+    /** Learned-clause watch entries and retracted-implication literals inspected by propagation. */
     val watchVisits: Long = 0,
     /** Shared conflicts resolved to an asserting first-UIP clause. */
     val assertingConflicts: Long = 0,

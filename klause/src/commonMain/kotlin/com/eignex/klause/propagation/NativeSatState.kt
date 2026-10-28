@@ -54,6 +54,8 @@ internal class NativeSatState(private val state: PropagationState) {
     private val lifecycleStages = IntArrayList()
     private val learnedUnits = IntArrayList()
     private var unitsPending = false
+    private val rechecks = IntArrayList()
+    private var recheckHead = 0
 
     // The origin an imported learned clause came from, parallel to the learned columns; see [OriginCounts].
     private val learnedOrigin = IntArrayList()
@@ -306,8 +308,8 @@ internal class NativeSatState(private val state: PropagationState) {
     fun markUsed(fid: Int) {
         val i = fid - baseCount
         if (i !in 0 until learnedCount) return
-        if (lifecycleStages[i] == 0) {
-            lifecycleStages[i] = 1
+        if (lifecycleStages[i] and 1 == 0) {
+            lifecycleStages[i] = lifecycleStages[i] or 1
             state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Consumed)
         }
         if (learnedUsed[i] == 0) importUses.note(learnedOrigin[i])
@@ -323,6 +325,7 @@ internal class NativeSatState(private val state: PropagationState) {
     fun forget(keep: (learnedIndex: Int, lbd: Int) -> Boolean) {
         // old learned index -> new learned index, or -1 if dropped.
         val referenced = state.referencedLearned(learnedCount)
+        for (i in recheckHead until rechecks.size) referenced[rechecks[i] - baseCount] = true
         val remap = IntArray(learnedCount)
         var survivors = 0
         for (i in 0 until learnedCount) {
@@ -334,6 +337,10 @@ internal class NativeSatState(private val state: PropagationState) {
             state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Retired)
         }
         state.remapReasons(state.boolReason, remap, baseCount)
+        var queued = 0
+        for (i in recheckHead until rechecks.size) rechecks[queued++] = baseCount + remap[rechecks[i] - baseCount]
+        rechecks.truncateTo(queued)
+        recheckHead = 0
 
         for (lit in watchEntries.indices) {
             val entries = watchEntries[lit]
@@ -398,6 +405,46 @@ internal class NativeSatState(private val state: PropagationState) {
         pendingConflict = false
     }
 
+    fun recheckAfterUndo(fid: Int) {
+        val index = fid - baseCount
+        if (index !in 0 until learnedCount || lifecycleStages[index] and 2 != 0) return
+        lifecycleStages[index] = lifecycleStages[index] or 2
+        rechecks.add(fid)
+    }
+
+    private fun recheck(cancellation: Cancellation): Boolean {
+        while (recheckHead < rechecks.size) {
+            if (cancellation !== Cancellation.Never && cancellation()) {
+                state.runCancelled = true
+                return false
+            }
+            val h = rechecks[recheckHead]
+            var unit = -1
+            var open = 0
+            for (k in 0 until clauseLen(h)) {
+                state.work++
+                if (litTrue(litOf(h, k))) {
+                    open = 2
+                    break
+                }
+                if (!litFalse(litOf(h, k))) {
+                    unit = k
+                    if (++open == 2) break
+                }
+            }
+            if (open == 0) {
+                recordConflict(h)
+                return false
+            }
+            lifecycleStages[h - baseCount] = lifecycleStages[h - baseCount] and 2.inv()
+            recheckHead++
+            if (open == 1 && !pinUnit(h, unit)) return false
+        }
+        rechecks.clear()
+        recheckHead = 0
+        return true
+    }
+
     /**
      * Propagate to fixpoint. On the first [allFactors] call (the session bake) the base unit clauses
      * are pinned at root and the sweep starts from the trail head; afterwards each call resumes from
@@ -410,6 +457,7 @@ internal class NativeSatState(private val state: PropagationState) {
             return state.conflictLevels
         }
         state.conflictSeedFactors.clear()
+        if (!recheck(cancellation)) return if (state.runCancelled) null else state.conflictLevels
         if (unitsPending) {
             unitsPending = false
             for (i in 0 until learnedUnits.size) {

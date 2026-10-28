@@ -159,8 +159,9 @@ Clauses attributed to another origin retain it and are not re-exported. PB and
 integer rows are not clause-portable. Shared component clauses remain session-local; source
 refutations import only into conditions that imply their recorded support.
 
-Retraction removes assignments, not admitted deductions. Learned units are examined
-again after undo. Suspension retains stores and pending attachment; cancellation
+Retraction removes assignments, not admitted deductions. Learned units and objects
+whose implications retract are examined again after undo. Pending attachments survive
+earlier conflicts and cancellation. Suspension retains stores and pending attachment; cancellation
 withholds unfinished analysis or checking and grants no refutation. Retiring a
 source cache releases its indexes and names under the containing allowance.
 

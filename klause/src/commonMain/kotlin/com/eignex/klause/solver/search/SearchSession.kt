@@ -66,6 +66,10 @@ class SearchSession(
     private var conflictOwner: SearchComponent? = null
     private var lastPushCreatedLevel = false
     private var unassignListener: SearchUnassignListener? = null
+    private val learnedUnassignments = SearchUnassignListener { variable ->
+        learning.unassigned(variable)
+        unassignListener?.onUnassign(variable)
+    }
     private var checks = 0L
     private var checksExhausted = false
     private var decisionsExhausted = false
@@ -396,7 +400,7 @@ class SearchSession(
 
     private fun retractTo(decisionLevel: Int) {
         if (decisionLevel == this.decisionLevel) return
-        trail.retractTo(decisionLevel, unassignListener)
+        trail.retractTo(decisionLevel, if (learning.hasReasons) learnedUnassignments else unassignListener)
         learning.onRetraction(trail.boolTrail.size)
         singleComponent?.retract(decisionLevel) ?: components.forEach { it.retract(decisionLevel) }
     }
@@ -885,7 +889,7 @@ class SearchSession(
 
     override fun implied(clause: Int, literal: Int): ComponentResult {
         val result = imply(literal, learning.explanationOf(clause))
-        if (result !is ComponentResult.Indeterminate) learning.consumed(clause)
+        if (result !is ComponentResult.Indeterminate) learning.implied(clause, literal)
         return result
     }
 

@@ -78,7 +78,8 @@ internal class LinearRefutationReuse(
 
     init { require(maximumEntries >= 0 && maximumBytes >= 0L && maximumAllocation >= 0L) }
 
-    fun observations(): Map<String, Long> = counts.mapKeys { "numericalRefutationReuse${it.key}" } + lifecycle.snapshot() + mapOf(
+    fun observations(): Map<String, Long> = counts.mapKeys { "numericalRefutationReuse${it.key}" } +
+        lifecycle.snapshot() + mapOf(
         "numericalRefutationReuseRetained" to entries.size.toLong(),
         "numericalRefutationReuseBytes" to retainedBytes,
         "numericalRefutationReuseNameBytes" to nameBytes,
@@ -462,7 +463,8 @@ internal class LinearRefutationReuse(
                     observe("UnitChecks")
                     if (entry.depth > 0) observe("ResolutionUnits")
                     asserted(entry)
-                    return UnitExclusion(id, coordinate, threshold, isUpper, imported, required, entry.depth > 0, unfixed)
+                    return UnitExclusion(id, coordinate, threshold, isUpper, imported, required,
+                        entry.depth > 0, unfixed)
                 }
                 is SourceEvidenceCheck.Rejected -> observe("UnitRejected")
                 is SourceEvidenceCheck.Unavailable -> {
