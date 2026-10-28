@@ -2797,7 +2797,8 @@ first-diagram overlaps use the production root-composition mechanism. Three
 iterations include factor-view construction and cold preparation; these instrumented
 observations establish neither a source verdict nor ordinary search throughput.
 `prepared=true` first runs default solution-set-sensitive preparation under a
-90-second/two-billion-work containing token. `preparation.json` records completion,
+90-second containing token, with `preparationWork=2000000000` by default.
+`preparation.json` records the work limit, completion,
 cost and retained AllDifferent count; `composition.jsonl` records actual removed
 rows and matching original table payloads. A cancelled preparation does not
 establish an ordinary prepared residual. The existing relation and its private

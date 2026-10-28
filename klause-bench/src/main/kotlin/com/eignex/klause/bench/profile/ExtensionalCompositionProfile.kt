@@ -28,7 +28,9 @@ internal object ExtensionalCompositionProfile {
     fun main(args: Array<String>) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.keys.containsAll(setOf("suite", "problem", "sha256")))
-        require(options.keys.all { it in setOf("suite", "problem", "sha256", "prepared") })
+        require(options.keys.all { it in setOf("suite", "problem", "sha256", "prepared", "preparationWork") })
+        val preparationWorkLimit = options["preparationWork"]?.toLong() ?: 2_000_000_000L
+        require(preparationWorkLimit > 0)
         val reference = Catalog.uncapped(options.getValue("suite")).problems
             .single { it.name == options.getValue("problem") }
         val bytes = CorpusFiles.open(CorpusFetcher.resolve(reference.source)).use {
@@ -44,7 +46,7 @@ internal object ExtensionalCompositionProfile {
         var preparationWork = 0L
         val preparationMeter = WorkMeter { preparationWork += it }
         val preparationToken = object : Cancellation {
-            override fun isCancelled(): Boolean = preparationWork >= 2_000_000_000L ||
+            override fun isCancelled(): Boolean = preparationWork >= preparationWorkLimit ||
                 System.nanoTime() - preparationStart >= 90_000_000_000L
             override fun workMeter(): WorkMeter = preparationMeter
         }
@@ -56,6 +58,7 @@ internal object ExtensionalCompositionProfile {
             put("requested", preparation != null)
             put("cancelled", preparationToken())
             put("work", preparationWork)
+            put("workLimit", preparationWorkLimit)
             put("elapsedNs", System.nanoTime() - preparationStart)
             put("infeasible", preparation?.stats?.infeasible ?: false)
             put("sourceIntVars", source.numIntVars)
