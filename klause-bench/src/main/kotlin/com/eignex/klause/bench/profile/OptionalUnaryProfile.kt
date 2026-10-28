@@ -29,6 +29,7 @@ import com.eignex.klause.util.Cancellation
 import java.io.File
 import java.lang.management.ManagementFactory
 import java.net.URI
+import java.util.Base64
 import java.util.concurrent.TimeUnit
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
@@ -37,7 +38,9 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 internal object OptionalUnaryProfile {
@@ -45,7 +48,8 @@ internal object OptionalUnaryProfile {
 
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.isEmpty() || args.singleOrNull() in setOf("mode=control", "mode=semantics"))
+        require(args.isEmpty() || args.singleOrNull() in setOf("mode=control", "mode=semantics") ||
+            args.singleOrNull()?.startsWith("render64=") == true)
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         Reports.writeJson(out.resolve("build.json").path, InstalledBuild.reference)
         Reports.writeJson(out.resolve("compiler.json").path, MiniZincCompatibility.compiler)
@@ -53,6 +57,11 @@ internal object OptionalUnaryProfile {
             System.getProperty("os.name"), System.getProperty("os.arch"), System.getProperty("java.version"),
             ManagementFactory.getRuntimeMXBean().inputArguments.toString(),
         ).joinToString("\n"))
+        if (args.singleOrNull()?.startsWith("render64=") == true) {
+            replay(args.single().substringAfter('='), out)
+            archive(out)
+            return
+        }
         if (args.singleOrNull() == "mode=semantics") {
             for (mode in 1..10) {
                 val directory = out.resolve("mode-$mode").apply { mkdirs() }
@@ -104,6 +113,37 @@ internal object OptionalUnaryProfile {
         }
         for (file in files) check(file.delete())
         out.walkBottomUp().filter { it.isDirectory && it != out }.forEach { check(it.delete()) }
+    }
+
+    private fun replay(encoded: String, out: File) {
+        val bytes = Base64.getDecoder().decode(encoded)
+        require(bytes.size <= 80 * 1024)
+        val request = Reports.json.parseToJsonElement(bytes.decodeToString()).jsonObject
+        require(request.getValue("compilerSha256").jsonPrimitive.content ==
+            MiniZincCompatibility.compiler.executableSha256)
+        require(request.getValue("standardLibrarySha256").jsonPrimitive.content ==
+            MiniZincCompatibility.compiler.standardLibrarySha256)
+        val items = request.getValue("items").jsonArray
+        require(items.size in 1..24)
+        out.resolve("request.json").writeBytes(bytes)
+        for (item in items) {
+            val row = item.jsonObject
+            val id = row.getValue("id").jsonPrimitive.content
+            require(Regex("[a-z][a-z0-9/-]{0,79}").matches(id))
+            val directory = out.resolve(id).apply { mkdirs() }
+            val ozn = directory.resolve("source.ozn").apply { writeText(row.getValue("ozn").jsonPrimitive.content) }
+            val flat = directory.resolve("flat.dzn").apply { writeText(row.getValue("flat").jsonPrimitive.content) }
+            render(directory, ozn, flat)
+        }
+    }
+
+    private fun render(out: File, ozn: File, flat: File) {
+        val renderer = ProcessBuilder(MiniZincCompatibility.compiler.executable, "--ozn-file", ozn.absolutePath)
+            .redirectInput(flat).redirectOutput(out.resolve("compiler-output.txt"))
+            .redirectError(out.resolve("compiler-output.log")).start()
+        val rendered = renderer.waitFor(5, TimeUnit.SECONDS)
+        if (!rendered) renderer.destroyForcibly().waitFor()
+        out.resolve("compiler-output-exit.txt").writeText("completed=$rendered exit=${renderer.exitValue()}\n")
     }
 
     private fun inspectPair(source: File, out: File, prepares: List<String> = listOf("off", "default", "aggressive")) {
@@ -223,15 +263,8 @@ internal object OptionalUnaryProfile {
         val checked = sample?.let { FiniteConflictSelection.checkSource(program.problem.bake(), it, stop) }
         sample?.let {
             out.resolve("assignment.txt").writeText("${it.bools.contentToString()}\n${it.ints.contentToString()}\n")
-            out.resolve("flat.dzn").writeText(writeFlatZincSolution(program, it) + "\n----------\n")
-            val renderer = ProcessBuilder(MiniZincCompatibility.compiler.executable, "--ozn-file",
-                out.parentFile.resolve("source.ozn").absolutePath)
-                .redirectInput(out.resolve("flat.dzn"))
-                .redirectOutput(out.resolve("compiler-output.txt"))
-                .redirectError(out.resolve("compiler-output.log")).start()
-            val rendered = renderer.waitFor(5, TimeUnit.SECONDS)
-            if (!rendered) renderer.destroyForcibly().waitFor()
-            out.resolve("compiler-output-exit.txt").writeText("completed=$rendered exit=${renderer.exitValue()}\n")
+            val flat = out.resolve("flat.dzn").apply { writeText(writeFlatZincSolution(program, it)) }
+            render(out, out.parentFile.resolve("source.ozn"), flat)
             try {
                 out.resolve("output.txt").writeText(OznApplier(out.parentFile.resolve("source.ozn").readText())
                     .render(program, it))
