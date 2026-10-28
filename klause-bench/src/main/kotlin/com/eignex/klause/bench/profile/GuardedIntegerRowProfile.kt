@@ -185,7 +185,7 @@ internal object GuardedIntegerRowProfile {
         val total = Meter()
         val source = source(truth, element)
         val z = if (element) 4 else 2
-        val domains = source.rootIntDomains().also {
+        val domains = Array(source.numIntVars) { requireNotNull(source.intDomainOrNull(it)) }.also {
             it[z] = IntDomain(0, 11)
             if (element) it[5] = IntDomain(0, 0)
         }
@@ -224,14 +224,16 @@ internal object GuardedIntegerRowProfile {
             put("guardTruth", truth)
             put("conditionedRoot", "guard pinned; z<=11; conditional authority only")
             put("preparedFactors", JsonArray(prepared.problem.factors.map { JsonPrimitive(it.javaClass.simpleName) }))
-            put("preparedDomains", JsonArray(prepared.problem.rootIntDomains().map { JsonPrimitive(it.toString()) }))
+            put("preparedDomains", JsonArray((0 until prepared.problem.numIntVars).map {
+                JsonPrimitive(requireNotNull(prepared.problem.intDomainOrNull(it)).toString())
+            }))
             put("preparationWork", budget.spent())
             put("preparationNs", preparationNs)
             put("aggressivePreparedFactors", JsonArray(aggressive.problem.factors.map {
                 JsonPrimitive(it.javaClass.simpleName)
             }))
-            put("aggressivePreparedDomains", JsonArray(aggressive.problem.rootIntDomains().map {
-                JsonPrimitive(it.toString())
+            put("aggressivePreparedDomains", JsonArray((0 until aggressive.problem.numIntVars).map {
+                JsonPrimitive(requireNotNull(aggressive.problem.intDomainOrNull(it)).toString())
             }))
             put("aggressivePreparationWork", aggressiveBudget.spent())
             put("aggressivePreparationNs", aggressiveNs)
