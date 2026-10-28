@@ -12,12 +12,14 @@ import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.dimacs.Dimacs
 import com.eignex.klause.formats.dimacs.toProblem
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
@@ -28,6 +30,7 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.search.BranchingConflict
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.Cancellation
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -43,7 +46,8 @@ import kotlin.time.Duration.Companion.milliseconds
  * Traces the residual structure complete finite search leaves after current preparation, as a lab profile job.
  *
  * Arguments are `source=<suite>:<problem>:<sha256>` (repeatable), `searchMillis=<n>` (default 10,000),
- * `traceMillis=<n>` (default 15,000), `prepareMillis=<n>` (default 60,000) and `seed=<n>` (default 3). The
+ * `traceMillis=<n>` (default 15,000), `prepareMillis=<n>` (default 60,000), `seed=<n>` (default 3),
+ * `probes=<n>` (default 3) and `probeMillis=<n>` (default 2,000). The
  * two-five-cycle controls run first, built from WCNF text: two disjoint five-cycles of hard edge clauses,
  * the bridge `s or x(0) or y(0)` and unit soft costs on every variable, once as stated (optimum 6) and once
  * with `s` hard-true (optimum 7).
@@ -55,16 +59,23 @@ import kotlin.time.Duration.Companion.milliseconds
  * discharged. Components count only live factors, and the objective is treated as additive, so the
  * reported independence is an upper bound for any decomposition that must also respect the incumbent
  * cutoff. A component's key hashes the residual of each of its live factors in factor order; a key seen
- * again after an intervening conflict or restart is a re-encountered child obligation. Learned clauses
- * are added on every eighth trace to count components they would merge. Sampling time and the trace
- * allowance are excluded from the search deadline. Each source writes `<n>-<label>.json` under `$OUT` as
- * soon as it finishes. Witnesses are checked natively against the original clauses only.
+ * again after an intervening retraction, conflict or restart is a re-encountered child obligation. Learned
+ * clauses are added on every eighth trace to count components they would merge. Sampling time and the trace
+ * allowance are excluded from the search deadline.
+ *
+ * Up to `probes` split nodes, at least 256 samples apart, keep their residual clauses. After the search,
+ * [compose] solves each component and the joint residual as fresh models and composes the child optima;
+ * the composed witness is reconstructed and checked against the original clauses. Each source writes
+ * `<n>-<label>.json` under `$OUT` as soon as it finishes. Witnesses are checked natively against the
+ * original clauses only.
  */
 object ConditionalComponentTrace {
     private const val DENSE_PICKS = 4_096L
     private const val SPARSE_STRIDE = 16L
     private const val LEARNED_STRIDE = 8L
     private const val MIN_CHILD_LIVE = 2
+    private const val PROBE_MIN_LIVE = 4
+    private const val PROBE_SPACING = 256L
     private const val MAX_KEYS = 2_000_000
     private const val PRESOLVE_ALLOWANCE = 687_500_000L
     private const val HASH_A = -0x61c8864680b583ebL
@@ -96,18 +107,25 @@ object ConditionalComponentTrace {
             require('=' in arg) { "expected key=value, got '$arg'" }
             arg.substringBefore('=') to arg.substringAfter('=')
         }
-        val unknown = options.keys - setOf("searchMillis", "traceMillis", "prepareMillis", "seed")
+        val known = setOf("searchMillis", "traceMillis", "prepareMillis", "seed", "probes", "probeMillis")
+        val unknown = options.keys - known
         require(unknown.isEmpty()) { "unknown argument(s) $unknown" }
-        val searchMillis = options["searchMillis"]?.toLong() ?: 10_000L
-        val traceMillis = options["traceMillis"]?.toLong() ?: 15_000L
-        val prepareMillis = options["prepareMillis"]?.toLong() ?: 60_000L
-        val seed = options["seed"]?.toLong() ?: 3L
+        val settings = Settings(
+            searchMillis = options["searchMillis"]?.toLong() ?: 10_000L,
+            traceMillis = options["traceMillis"]?.toLong() ?: 15_000L,
+            prepareMillis = options["prepareMillis"]?.toLong() ?: 60_000L,
+            seed = options["seed"]?.toLong() ?: 3L,
+            probes = options["probes"]?.toInt() ?: 3,
+            probeMillis = options["probeMillis"]?.toLong() ?: 2_000L,
+        )
         out.resolve("request.json").writeText(buildJsonObject {
             put("sources", sources.joinToString(","))
-            put("searchMillis", searchMillis)
-            put("traceMillis", traceMillis)
-            put("prepareMillis", prepareMillis)
-            put("seed", seed)
+            put("searchMillis", settings.searchMillis)
+            put("traceMillis", settings.traceMillis)
+            put("prepareMillis", settings.prepareMillis)
+            put("seed", settings.seed)
+            put("probes", settings.probes)
+            put("probeMillis", settings.probeMillis)
             put("javaVersion", System.getProperty("java.version"))
             put("osArch", System.getProperty("os.arch"))
             put("processors", Runtime.getRuntime().availableProcessors())
@@ -117,7 +135,7 @@ object ConditionalComponentTrace {
         val inputs = listOf<() -> Input>({ control(conditioned = false) }, { control(conditioned = true) }) +
             sources.map { spec -> { catalogSource(spec) } }
         inputs.forEachIndexed { index, load ->
-            val record = runCatching { trace(load(), searchMillis, traceMillis, prepareMillis, seed) }.getOrElse {
+            val record = runCatching { trace(load(), settings) }.getOrElse {
                 buildJsonObject { put("failure", it.toString()) }
             }
             val label = record["label"]?.toString()?.trim('"') ?: "input"
@@ -177,19 +195,22 @@ object ConditionalComponentTrace {
         })
     }
 
-    private fun trace(
-        input: Input,
-        searchMillis: Long,
-        traceMillis: Long,
-        prepareMillis: Long,
-        seed: Long,
-    ): JsonObject {
+    private class Settings(
+        val searchMillis: Long,
+        val traceMillis: Long,
+        val prepareMillis: Long,
+        val seed: Long,
+        val probes: Int,
+        val probeMillis: Long,
+    )
+
+    private fun trace(input: Input, settings: Settings): JsonObject {
         val prepareStart = System.nanoTime()
-        val stop = Cancellation.after(prepareMillis.milliseconds)
+        val stop = Cancellation.after(settings.prepareMillis.milliseconds)
         val prepared = FinitePipeline.prepare(FinitePipelineRequest(
             input.problem, FiniteEngine.BACKTRACK, input.objective,
             cancellation = stop, solveCancellation = stop, presolveBudget = PresolveBudget(PRESOLVE_ALLOWANCE),
-            randomSeed = seed,
+            randomSeed = settings.seed,
         ))
         val prepareNanos = System.nanoTime() - prepareStart
         val baked = prepared.problem as? BakedProblem
@@ -211,11 +232,11 @@ object ConditionalComponentTrace {
         if (baked == null || objective == null || stop() || prepared.presolve?.infeasible == true) {
             return JsonObject(header + ("decline" to JsonPrimitive("preparation-terminal")))
         }
-        val recorder = Recorder(baked, traceMillis * 1_000_000)
+        val recorder = Recorder(baked, settings.traceMillis * 1_000_000, settings.probes)
         val start = System.nanoTime()
-        val deadline = searchMillis * 1_000_000
+        val deadline = settings.searchMillis * 1_000_000
         val base = BacktrackPresets.satOptimized(
-            randomSeed = seed,
+            randomSeed = settings.seed,
             cancellation = Cancellation { System.nanoTime() - start - recorder.traceNanos > deadline },
         )
         val params = base.copy(variableSelector = TracingSelector(base.variableSelector, recorder))
@@ -243,7 +264,122 @@ object ConditionalComponentTrace {
                 put("searchMs", (wallNanos - recorder.traceNanos) / 1_000_000)
             }
             put("trace", recorder.summary())
+            put("probes", JsonArray(recorder.probes.map { probe ->
+                val composition = runCatching { compose(probe, objective, prepared.reconstruct, input, settings) }
+                    .getOrElse { buildJsonObject { put("failure", it.toString()) } }
+                val later = recorder.laterSightings(probe)
+                JsonObject(composition + buildJsonObject {
+                    put("captureMs", probe.captureNanos / 1_000_000.0)
+                    put("laterSightings", later.sumOf { it.first })
+                    put("laterReencounters", later.sumOf { it.second })
+                    put("componentsReencounteredLater", later.count { it.second > 0 })
+                })
+            }))
         })
+    }
+
+    /**
+     * Solves each captured component and the joint residual as fresh models, then composes the child optima.
+     *
+     * The children share one containing allowance equal to the joint solve's, so the composition never renews
+     * work. A child that stops without a verdict leaves the composition open; fresh models carry no incumbent
+     * cutoff or learned clause from the traced search, so a child result is unconditional on the node.
+     */
+    private fun compose(
+        probe: Probe,
+        objective: LinearObjective,
+        reconstruct: (Sample) -> Sample,
+        input: Input,
+        settings: Settings,
+    ): JsonObject {
+        val weights = objective.boolWeights
+        val componentVars = probe.clauses.map { clauses ->
+            clauses.flatMap { c -> c.map(Lit::variable) }.distinct().sorted().toIntArray()
+        }
+        val inComponent = BooleanArray(probe.values.size)
+        for (vars in componentVars) for (v in vars) inComponent[v] = true
+        var fixed = objective.constant
+        var isolated = 0L
+        val witness = probe.values.copyOf()
+        for (v in probe.values.indices) {
+            val w = weights.getOrElse(v) { 0L }
+            if (!probe.free[v]) {
+                if (probe.values[v]) fixed += w
+            } else if (!inComponent[v]) {
+                witness[v] = w < 0
+                if (w < 0) isolated += w
+            }
+        }
+        val childStop = Cancellation.after(settings.probeMillis.milliseconds)
+        val children = componentVars.indices.sortedBy { probe.clauses[it].size }.map { i ->
+            solveResidual(componentVars[i], probe.clauses[i], weights, childStop, settings.seed)
+        }
+        val joint = solveResidual(
+            componentVars.flatMap { it.toList() }.sorted().toIntArray(), probe.clauses.flatten(), weights,
+            Cancellation.after(settings.probeMillis.milliseconds), settings.seed,
+        )
+        val childOptima = children.map { (it.result as? MinimizeResult.Optimal)?.objectiveValue?.toLong() }
+        val childSum = if (childOptima.all { it != null }) childOptima.sumOf { it ?: 0L } else null
+        val jointOptimum = (joint.result as? MinimizeResult.Optimal)?.objectiveValue?.toLong()
+        if (childSum != null) {
+            for (child in children) {
+                val sample = requireNotNull(child.result?.assignment)
+                for ((i, v) in child.vars.withIndex()) witness[v] = sample.boolValue(i)
+            }
+        }
+        val composedSource = if (childSum != null) reconstruct(Sample(witness, LongArray(0))) else null
+        return buildJsonObject {
+            put("sample", probe.sample)
+            put("level", probe.level)
+            put("declinedNonClause", probe.declined)
+            put("components", componentVars.size)
+            put("componentLive", probe.clauses.map { it.size }.sortedDescending().take(8).joinToString(","))
+            put("componentVars", componentVars.map { it.size }.sortedDescending().take(8).joinToString(","))
+            put("childVerdicts", children.groupingBy { it.result?.let { r -> r::class.simpleName } ?: "NotRun" }
+                .eachCount().entries.joinToString(",") { "${it.key}=${it.value}" })
+            put("childNodes", children.sumOf { it.result?.stats?.search?.nodes?.sum ?: 0.0 })
+            put("childSolveMs", children.sumOf { it.solveNanos } / 1_000_000.0)
+            put("childBuildMs", children.sumOf { it.buildNanos } / 1_000_000.0)
+            put("jointVerdict", joint.result?.let { it::class.simpleName } ?: "NotRun")
+            put("jointNodes", joint.result?.stats?.search?.nodes?.sum ?: 0.0)
+            put("jointSolveMs", joint.solveNanos / 1_000_000.0)
+            put("jointBuildMs", joint.buildNanos / 1_000_000.0)
+            put("nodeFixedObjective", fixed)
+            put("nodeIsolatedObjective", isolated)
+            put("composedOptimum", childSum?.let { fixed + isolated + it })
+            put("jointOptimum", jointOptimum?.let { fixed + isolated + it })
+            put("composedAgreesWithJoint", jointOptimum?.let { j -> childSum?.let { it == j } })
+            put("childRefuted", children.any { it.result is MinimizeResult.Infeasible })
+            put("jointRefuted", joint.result is MinimizeResult.Infeasible)
+            composedSource?.let {
+                put("composedSourceObjective", sourceObjective(input.objective, it))
+                put("composedSourceClauseViolations", clauseViolations(input.problem, it))
+            }
+        }
+    }
+
+    private fun solveResidual(
+        vars: IntArray,
+        clauses: List<IntArray>,
+        weights: LongArray,
+        stop: Cancellation,
+        seed: Long,
+    ): Residual {
+        if (stop()) return Residual(vars, null, 0L, 0L)
+        val built = System.nanoTime()
+        val local = HashMap<Int, Int>(vars.size * 2)
+        vars.forEachIndexed { i, v -> local[v] = i }
+        val factors: List<Factor> = clauses.map { c ->
+            Clause(IntArray(c.size) { Lit.make(local.getValue(Lit.variable(c[it])), Lit.isPositive(c[it])) })
+        }
+        val baked = Problem(vars.size, 0, emptyArray(), factors.toTypedArray()).bake()
+        val objective = LinearObjective(LongArray(vars.size) { weights.getOrElse(vars[it]) { 0L } })
+        val solving = System.nanoTime()
+        val result = BacktrackSolver(baked).minimize(
+            objective,
+            BacktrackPresets.satOptimized(randomSeed = seed, cancellation = stop),
+        )
+        return Residual(vars, result, solving - built, System.nanoTime() - solving)
     }
 
     private fun sourceObjective(objective: LinearObjective, sample: Sample): Long {
@@ -300,20 +436,42 @@ object ConditionalComponentTrace {
         override fun onUnassign(varRef: VarRef) = delegate.onUnassign(varRef)
     }
 
-    private class Seen(var epoch: Long, var sightings: Int)
+    private class Seen(var epoch: Long, var sightings: Int, var reencounters: Int = 0)
+
+    private class Probe(
+        val sample: Long,
+        val level: Int,
+        val values: BooleanArray,
+        val free: BooleanArray,
+        val clauses: List<List<IntArray>>,
+        val keys: List<Pair<Long, Long>>,
+        val seenAtCapture: List<Pair<Int, Int>>,
+        val declined: Boolean,
+        val captureNanos: Long,
+    )
+
+    private class Residual(val vars: IntArray, val result: MinimizeResult?, val buildNanos: Long, val solveNanos: Long)
 
     private class Component(var live: Int = 0, var free: Int = 0, var h1: Long = 0L, var h2: Long = 0L)
 
     /** Accumulates residual component statistics over sampled branch points. */
-    private class Recorder(private val prepared: Problem, private val traceCapNanos: Long) {
+    private class Recorder(
+        private val prepared: Problem,
+        private val traceCapNanos: Long,
+        private val maxProbes: Int,
+    ) {
         var traceNanos = 0L
         var epoch = 0L
+        val probes = ArrayList<Probe>()
+        private var lastProbe = -PROBE_SPACING
+        private var lastPickLevel = Int.MAX_VALUE
 
         // The search session can rebuild its root model; arrays follow the model each sample reads.
         private var problem: Problem = prepared
         private var numBool = problem.numBoolVars
         private var parent = IntArray(numBool + problem.numIntVars)
         private var liveRep = IntArray(problem.factors.size)
+        private var liveFactor = IntArray(problem.factors.size)
         private var liveH1 = LongArray(problem.factors.size)
         private var liveH2 = LongArray(problem.factors.size)
         private var modelSwitches = 0L
@@ -349,6 +507,10 @@ object ConditionalComponentTrace {
 
         fun observe(session: PropagationSession) {
             picks++
+            // Each pick follows one decision, so a level that did not grow means some branch was retracted.
+            val level = session.decisionLevel
+            if (level <= lastPickLevel) epoch++
+            lastPickLevel = level
             if (traceNanos >= traceCapNanos) {
                 capSkipped++
                 return
@@ -388,6 +550,7 @@ object ConditionalComponentTrace {
                 numBool = problem.numBoolVars
                 parent = IntArray(numBool + problem.numIntVars)
                 liveRep = IntArray(problem.factors.size)
+                liveFactor = IntArray(problem.factors.size)
                 liveH1 = LongArray(problem.factors.size)
                 liveH2 = LongArray(problem.factors.size)
                 modelSwitches++
@@ -449,6 +612,7 @@ object ConditionalComponentTrace {
                     for (v in scope) union(rep, v)
                 }
                 liveRep[live] = rep
+                liveFactor[live] = fi
                 liveH1[live] = h1
                 liveH2[live] = h2
                 live++
@@ -468,7 +632,8 @@ object ConditionalComponentTrace {
             }
             val level = session.decisionLevel
             val sizes = components.values.map { it.live }.sortedDescending()
-            if (root == null && level == 0) root = buildJsonObject {
+            if (root == null) root = buildJsonObject {
+                put("level", level)
                 put("freeVars", freeVars)
                 put("liveFactors", live)
                 put("components", components.size)
@@ -502,6 +667,7 @@ object ConditionalComponentTrace {
                     continue
                 }
                 if (prior.epoch != epoch) {
+                    prior.reencounters++
                     reencounters++
                     reencounteredLive += c.live
                     maxReencounteredLive = maxOf(maxReencounteredLive, c.live)
@@ -512,6 +678,11 @@ object ConditionalComponentTrace {
                 prior.epoch = epoch
                 prior.sightings++
                 maxSightings = maxOf(maxSightings, prior.sightings)
+            }
+            val probeDue = second >= PROBE_MIN_LIVE && probes.size < maxProbes && samples - lastProbe >= PROBE_SPACING
+            if (probeDue && problem === prepared && problem.numIntVars == 0) {
+                lastProbe = samples
+                probes += capture(session, components, live, level)
             }
             if (samples % LEARNED_STRIDE == 0L && second >= MIN_CHILD_LIVE) {
                 learnedSamples++
@@ -525,6 +696,48 @@ object ConditionalComponentTrace {
             } else if (samples % LEARNED_STRIDE == 0L) {
                 learnedSamples++
             }
+        }
+
+        private fun capture(
+            session: PropagationSession,
+            components: Map<Int, Component>,
+            live: Int,
+            level: Int,
+        ): Probe {
+            val started = System.nanoTime()
+            val roots = components.keys.sorted()
+            val index = HashMap<Int, Int>()
+            roots.forEachIndexed { i, r -> index[r] = i }
+            val clauses = List(roots.size) { ArrayList<IntArray>() }
+            var declined = false
+            for (k in 0 until live) {
+                val f = problem.factors[liveFactor[k]]
+                if (f !is Clause || !f.allLiteralsBool(numBool)) {
+                    declined = true
+                    continue
+                }
+                val residual = f.literals.filter { session.litTruth(it) == null }.toIntArray()
+                clauses[index.getValue(find(liveRep[k]))].add(residual)
+            }
+            val keys = roots.map { r -> components.getValue(r).let { it.h1 to it.h2 } }
+            return Probe(
+                sample = samples,
+                level = level,
+                values = BooleanArray(numBool) { session.boolValue(it) == true },
+                free = BooleanArray(numBool) { session.boolValue(it) == null },
+                clauses = clauses,
+                keys = keys,
+                seenAtCapture = keys.map { k -> seen[k]?.let { it.sightings to it.reencounters } ?: (0 to 0) },
+                declined = declined,
+                captureNanos = System.nanoTime() - started,
+            )
+        }
+
+        /** Sightings and re-encounters of each probed component key after its capture. */
+        fun laterSightings(probe: Probe): List<Pair<Int, Int>> = probe.keys.mapIndexed { i, k ->
+            val now = seen[k]
+            val then = probe.seenAtCapture[i]
+            if (now == null) 0 to 0 else (now.sightings - then.first) to (now.reencounters - then.second)
         }
 
         // Permanent entries are incumbent-scoped assertions, so they count only toward the cutoff-inclusive merge.
