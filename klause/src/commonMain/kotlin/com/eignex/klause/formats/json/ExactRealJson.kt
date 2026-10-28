@@ -2,13 +2,21 @@ package com.eignex.klause.formats.json
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
+import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
+import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
+import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.arithmetic.real.ExactRealArithmetic
 import com.eignex.klause.arithmetic.real.ExactRealExpression
 import com.eignex.klause.arithmetic.real.ExactRealFunction
 import com.eignex.klause.arithmetic.real.ExactRealValue
+import com.eignex.klause.arithmetic.real.RealCertificationUnavailable
+import com.eignex.klause.arithmetic.real.RealDomainInvalid
 import com.eignex.klause.arithmetic.transcendental.TranscendentalArithmetic
+import com.eignex.klause.arithmetic.transcendental.TranscendentalInterrupted
+import com.eignex.klause.arithmetic.transcendental.TranscendentalResourceLimit
 import com.eignex.klause.factor.codec.BigFractionSerializer
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.Cancellation
 import kotlinx.serialization.json.*
 
 /**
@@ -26,8 +34,10 @@ object ExactRealJson {
 
     /** Decode and validate every root selection, exponent and analytic function domain. */
     fun decodeFromJsonElement(element: JsonElement): ExactRealValue {
-        val algebraic = AlgebraicArithmetic()
-        val arithmetic = ExactRealArithmetic(TranscendentalArithmetic(maximumWork = 100000), algebraic)
+        var polls = 0
+        val stop = Cancellation { ++polls > 100000 }
+        val algebraic = AlgebraicArithmetic(PolynomialArithmetic(stop))
+        val arithmetic = ExactRealArithmetic(TranscendentalArithmetic(stop, maximumWork = 100000), algebraic)
         fun decode(node: JsonElement, depth: Int): ExactRealValue {
             require(depth <= 128) { "exact real expression is too deep" }
             if (node is JsonPrimitive) {
@@ -78,7 +88,21 @@ object ExactRealJson {
                 else -> throw IllegalArgumentException("unknown exact real operator '$key'")
             }
         }
-        return decode(element, 0)
+        return try {
+            decode(element, 0)
+        } catch (error: RealDomainInvalid) {
+            throw IllegalArgumentException("exact real function domain is invalid", error)
+        } catch (error: RealCertificationUnavailable) {
+            throw IllegalArgumentException("exact real function domain could not be certified", error)
+        } catch (error: PolynomialInterrupted) {
+            throw IllegalArgumentException("exact real decoding allowance exceeded", error)
+        } catch (error: PolynomialResourceLimit) {
+            throw IllegalArgumentException("exact real polynomial representation limit exceeded", error)
+        } catch (error: TranscendentalInterrupted) {
+            throw IllegalArgumentException("exact real decoding allowance exceeded", error)
+        } catch (error: TranscendentalResourceLimit) {
+            throw IllegalArgumentException("exact real analytic representation limit exceeded", error)
+        }
     }
 
     /** Decode JSON text using the same closed expression contract. */

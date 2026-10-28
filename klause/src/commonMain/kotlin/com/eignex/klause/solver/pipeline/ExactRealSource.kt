@@ -11,13 +11,25 @@ import com.eignex.klause.util.bigIntOf
 private class ExactRealSourceUnavailable : RuntimeException()
 
 internal fun prepareExactRealSource(request: SourceSetupRequest, stop: Cancellation): SourceProblemRoute.NativeFormula {
-    val source = request.source.problem
+    if (request.operation != ExecutionOperation.SATISFY) return SourceProblemRoute.NativeFormula(null,
+        com.eignex.klause.solver.result.TerminationReason.Unsupported)
+    val functions = request.source.problem.exactRealSource(request.providers, stop)
+        ?: return SourceProblemRoute.NativeFormula(null, if (stop())
+            com.eignex.klause.solver.result.TerminationReason.Cancelled
+        else com.eignex.klause.solver.result.TerminationReason.Unsupported)
+    return prepareNativeSource(request, AttachedSourceFormula.Functions(functions), stop)
+}
+
+internal fun Problem.exactRealSource(
+    providers: com.eignex.klause.solver.FactorProjectionProviders,
+    stop: Cancellation,
+): TranscendentalProblem? {
+    val source = this
     fun checkpoint() {
         stop.charge(1)
         if (stop()) throw ExactRealSourceUnavailable()
     }
     return try {
-        if (request.operation != ExecutionOperation.SATISFY) throw ExactRealSourceUnavailable()
         val formulas = ArrayList<TranscendentalFormula>()
         fun real(id: Int) = TranscendentalExpression.Variable(SourceRealId(source.numIntVars + id))
         fun integer(id: Int) = TranscendentalExpression.Variable(SourceRealId(id))
@@ -34,7 +46,7 @@ internal fun prepareExactRealSource(request: SourceSetupRequest, stop: Cancellat
                 source.intBounds.lower(id) == source.intBounds.upper(id)
             ) SourceIntId(id) to bigIntOf(source.intBounds.lower(id)) else null
         }.toMap()
-        val projections = request.providers.prepare(source)
+        val projections = providers.prepare(source)
         for ((index, factor) in source.factors.withIndex()) {
             checkpoint()
             if (factor is ExactRealEquality) {
@@ -97,11 +109,9 @@ internal fun prepareExactRealSource(request: SourceSetupRequest, stop: Cancellat
             (0 until source.numIntVars).associate { "ints.$it" to it },
             (0 until source.numRealVars).associate { "reals.$it" to (source.numIntVars + it) },
             (0 until source.numBoolVars).associate { "bools.$it" to it }, semantics = source.semantics)
-        prepareNativeSource(request, AttachedSourceFormula.Functions(functions), stop)
+        functions
     } catch (_: ExactRealSourceUnavailable) {
-        SourceProblemRoute.NativeFormula(null, if (stop())
-            com.eignex.klause.solver.result.TerminationReason.Cancelled
-        else com.eignex.klause.solver.result.TerminationReason.Unsupported)
+        null
     }
 }
 

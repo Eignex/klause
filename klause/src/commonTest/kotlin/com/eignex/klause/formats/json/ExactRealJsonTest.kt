@@ -30,7 +30,7 @@ class ExactRealJsonTest {
     @Test
     fun `malformed exact values should fail without an approximation fallback`() {
         for (text in listOf(
-            "null", "1.4", "\"1/0\"", "\"sqrt(2)\"", "{}",
+            "null", "1.4", "\"1/0\"", "\"sqrt(2)\"", "{}", """{"log":"0"}""", """{"log":"-1"}""",
             """{"root":{"coefficients":["-2","0","1"],"index":0}}""",
             """{"root":{"coefficients":["1","0","1"],"index":1}}""",
             """{"root":{"coefficients":["-2","0","1"],"index":3}}""",
