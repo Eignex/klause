@@ -244,8 +244,12 @@ internal object CoreQueryProfile {
         "com.eignex.klause.meta.coreguided.CoreRefinementMode",
     ).enumConstants.single { (it as Enum<*>).name == name }
 
-    internal fun checkPoint(problem: BakedProblem, sample: Sample): Boolean {
-        val session = PropagationSession(problem)
+    internal fun checkPoint(
+        problem: BakedProblem,
+        sample: Sample,
+        cancellation: Cancellation = Cancellation.Never,
+    ): Boolean {
+        val session = PropagationSession(problem, cancellation)
         val pins = Assumptions(bools = (0 until problem.numBoolVars).associateWith { sample.boolValue(it) })
         return session.seed(pins) !is PropagationResult.Unsat && !session.fixpointCancelled
     }

@@ -508,6 +508,11 @@ threshold scan. Preparation visits and source-verification propagation spend the
 same cumulative worker allowance as query traversal. Augmented queries retain the
 source's established root domains, deductions and captured projections; their
 additional constraints propagate in the query session.
+General query sessions retain projection construction, root propagation and
+assumption seeding across slices. Native clausal opening stays atomic; an
+interrupted opening retains its charges, model and selected pins and retries with
+the retained general preparer. This prevents repeated native construction from
+using every subsequent slice without reaching traversal.
 
 Internal core refinement is default-disabled. Seed-proof projection uses the
 [historical reasons](09-learning.md#explanation-lifetime) of the existing query,

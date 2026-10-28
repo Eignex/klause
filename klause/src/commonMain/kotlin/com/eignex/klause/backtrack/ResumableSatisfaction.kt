@@ -1,5 +1,7 @@
 package com.eignex.klause.backtrack
 
+import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.SolveResult
@@ -25,6 +27,8 @@ internal class ResumableSatisfaction(
     params0: BacktrackParams,
     ownsWorkDebt: Boolean = true,
     projectAssumptionCore: Boolean = false,
+    preparedSession: PropagationSession? = null,
+    preparedSeed: PropagationResult? = null,
 ) : ResumableSolve {
     private val lifetimeToken = params0.cancellation.lifetimeCancellation()
     private var globalToken: Cancellation = params0.cancellation
@@ -47,10 +51,12 @@ internal class ResumableSatisfaction(
         sink,
         solver.lpSolveContext,
         propagationCancellation = Cancellation { globalToken() },
-        projection = solver.propagationProjection(params.nativeSat ?: true),
+        projection = preparedSession?.projection ?: solver.propagationProjection(params.nativeSat ?: true),
         deferredInitialization = true,
         singleModel = true,
         projectAssumptionCore = projectAssumptionCore,
+        preparedSession = preparedSession,
+        preparedSeed = preparedSeed,
         slice = TraversalSlice(pauses = { !globalToken() }, beforeBranch = {
             slice.charge()
             slice.workExpired()

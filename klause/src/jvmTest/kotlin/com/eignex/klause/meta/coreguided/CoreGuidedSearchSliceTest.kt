@@ -17,7 +17,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @RunWith(Parameterized::class)
-class CoreGuidedSearchSliceTest(private val sliceWork: Long) {
+class CoreGuidedSearchSliceTest(private val sliceWork: Long, private val nativeSat: Boolean) {
     @Test
     fun `sliced weight splitting should preserve the exact optimum and cumulative work`() {
         val problem = Problem(
@@ -31,8 +31,8 @@ class CoreGuidedSearchSliceTest(private val sliceWork: Long) {
             ),
         ).bake()
         val objective = LinearObjective(longArrayOf(-7, -2, -1), constant = 10)
-        val fresh = CoreGuidedSearch(problem, objective, BacktrackParams())
-        val sliced = CoreGuidedSearch(problem, objective, BacktrackParams())
+        val fresh = CoreGuidedSearch(problem, objective, BacktrackParams(nativeSat = nativeSat))
+        val sliced = CoreGuidedSearch(problem, objective, BacktrackParams(nativeSat = nativeSat))
         val expected = assertIs<MinimizeResult.Optimal>(fresh.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {})
         var result: MinimizeResult? = null
         var previousWork = 0L
@@ -57,8 +57,8 @@ class CoreGuidedSearchSliceTest(private val sliceWork: Long) {
             arrayOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
         ).bake()
         val objective = LinearObjective(longArrayOf(9_007_199_254_740_993L, Long.MAX_VALUE, Long.MIN_VALUE))
-        val fresh = CoreGuidedSearch(problem, objective, BacktrackParams(), stratify = true)
-        val sliced = CoreGuidedSearch(problem, objective, BacktrackParams(), stratify = true)
+        val fresh = CoreGuidedSearch(problem, objective, BacktrackParams(nativeSat = nativeSat), stratify = true)
+        val sliced = CoreGuidedSearch(problem, objective, BacktrackParams(nativeSat = nativeSat), stratify = true)
         val expected = assertIs<MinimizeResult.Optimal>(fresh.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {})
         var result: MinimizeResult? = null
 
@@ -79,8 +79,8 @@ class CoreGuidedSearchSliceTest(private val sliceWork: Long) {
     fun `query pin preparation should resume without repeating threshold visits`() {
         val problem = Problem(1024, 0, emptyArray(), emptyArray()).bake()
         val objective = LinearObjective(LongArray(1024) { 1L })
-        val search = CoreGuidedSearch(problem, objective, BacktrackParams())
-        val fresh = CoreGuidedSearch(problem, objective, BacktrackParams())
+        val search = CoreGuidedSearch(problem, objective, BacktrackParams(nativeSat = nativeSat))
+        val fresh = CoreGuidedSearch(problem, objective, BacktrackParams(nativeSat = nativeSat))
         val expected = fresh.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {}
 
         val paused = search.runSlice(Cancellation { search.thresholdVisits >= sliceWork }, Long.MAX_VALUE, -1L) {
@@ -100,7 +100,9 @@ class CoreGuidedSearchSliceTest(private val sliceWork: Long) {
 
     companion object {
         @JvmStatic
-        @Parameterized.Parameters(name = "sliceWork={0}")
-        fun parameters(): List<Array<Long>> = listOf(1L, 5L, 200L).map { arrayOf(it) }
+        @Parameterized.Parameters(name = "sliceWork={0}, nativeSat={1}")
+        fun parameters(): List<Array<Any>> = listOf(1L, 5L, 200L).flatMap { work ->
+            listOf(false, true).map { native -> arrayOf(work, native) }
+        }
     }
 }

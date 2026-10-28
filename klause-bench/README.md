@@ -135,6 +135,20 @@ an installation. Without it, each process captures its own installed-build hashe
 
 ## LP capture and replay
 
+`bench.profile.WeightedSearchProfile` qualifies one hash-pinned WCNF/WBO source
+through ordinary finite preparation and retained core search. Arguments are
+`suite=ID problem=NAME sha256=HEX format=wcnf|wbo policy=ordinary|stratified|reasons|deletion
+timeout-ms=10000 work=250000 slice-work=200 seed=3`.
+Run it through the lab with a bounded profile allowance. It writes the original
+source, installed-build provenance, exact floor/core-weight/threshold and accepted
+incumbent trajectories, preparation/threshold/verification visits, query counts,
+traversal work and a summary including source preparation and disposal time.
+The timeout contains source preparation, native point checking and trajectory
+writing; these instrumented observations establish no throughput claim. Native
+Boolean point checks and native bound authority are separate from the lab's
+independent source checks and independently validated proofs. Use ordinary lab
+adapter runs for source-matched admission and primal controls.
+
 The opt-in basis tool uses the [basis corpus](../klause/src/jvmTest/resources/basis-corpus/README.md):
 
 ```sh

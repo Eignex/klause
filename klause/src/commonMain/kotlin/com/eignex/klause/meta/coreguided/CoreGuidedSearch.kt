@@ -3,6 +3,7 @@ package com.eignex.klause.meta.coreguided
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.PROPAGATION_WORK_PER_NODE
+import com.eignex.klause.backtrack.PreparingSatisfaction
 import com.eignex.klause.backtrack.ResumableSatisfaction
 import com.eignex.klause.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
@@ -34,6 +35,7 @@ import com.eignex.klause.solver.result.UnsoundnessException
 import com.eignex.klause.solver.validation.composedFixpoint
 import com.eignex.klause.solver.withLifetime
 import com.eignex.klause.solver.withSourceSemantics
+import com.eignex.klause.solver.isClausal
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.BigInt
@@ -98,6 +100,7 @@ internal class CoreGuidedSearch(
     private var query: ResumableSolve? = null
     private var queryModel: BakedProblem? = null
     private var queryPins: Assumptions? = null
+    private var resumableOpening = false
     private var objectivePreparation: Iterator<Unit>? = null
     private var corePreparation: Iterator<Unit>? = null
     private var queryPreparation: Iterator<Unit>? = null
@@ -158,6 +161,7 @@ internal class CoreGuidedSearch(
     override val preparationPending: Boolean
         get() = !costsPrepared || objectivePreparation != null || initialIndex < objectiveTerms || core != null ||
             transitionPreparation != null ||
+            (query as? PreparingSatisfaction)?.preparationPending == true ||
             (queryPreparation != null || queryModel != null) && query == null
 
     override fun runSlice(
@@ -256,7 +260,7 @@ internal class CoreGuidedSearch(
             if (allowance >= 0L && work - start >= allowance) {
                 return if (allowanceExhausted) finish(stopped(TerminationReason.BudgetExhausted)) else null
             }
-            if (query == null && queryPins == null) {
+            if (query == null && (queryPins == null || queryPreparation != null)) {
                 val builder = queryPreparation ?: prepareQuery().also { queryPreparation = it }
                 if (!advancePreparation(builder, preparation)) continue
                 queryPreparation = null
@@ -486,13 +490,20 @@ internal class CoreGuidedSearch(
             params.assumptions.numInts)
         querySofts = literals.toIntArray()
         queryPins = params.assumptions.mergedWith(Assumptions(bools = pins))
+        if (queryModel == null) {
+            recordPreparation(nextBool.toLong() + base.numIntVars)
+            yield(Unit)
+            for (factor in factors) {
+                recordPreparation(1L + factor.structuralKeyWeight)
+                yield(Unit)
+            }
+        }
     }.iterator()
 
     private fun openQuery(token: Cancellation): ResumableSolve {
         val baked = queryModel ?: bakeQuery().also { queryModel = it }
         return try {
-            ResumableSatisfaction(BacktrackSolver(baked),
-                params.copy(
+            val queryParams = params.copy(
                     assumptions = requireNotNull(queryPins),
                     cancellation = token,
                     propagationCancelFloor = 0,
@@ -502,12 +513,18 @@ internal class CoreGuidedSearch(
                     ).coerceAtLeast(0L),
                     clauseExchange = null,
                     cutExchange = null,
-                ),
-                ownsWorkDebt = false,
-                projectAssumptionCore = coreRefinement == CoreRefinementMode.REASONS,
-            ).also { queryCount = addWork(queryCount, 1L) }
+                )
+            val projected = coreRefinement == CoreRefinementMode.REASONS
+            val solver = BacktrackSolver(baked)
+            if (!resumableOpening && params.nativeSat != false && baked.isClausal()) {
+                ResumableSatisfaction(solver, queryParams, ownsWorkDebt = false, projectAssumptionCore = projected)
+            } else {
+                PreparingSatisfaction(solver, queryParams.copy(nativeSat = false), projectAssumptionCore = projected)
+            }.also { queryCount = addWork(queryCount, 1L) }
         } catch (failure: SearchInitializationCancelled) {
             settleQuery(failure.stats, failure.work)
+            // A native opening is atomic; after a stop the retained general preparer guarantees progress.
+            resumableOpening = true
             throw failure
         }
     }
@@ -538,6 +555,7 @@ internal class CoreGuidedSearch(
         if (!keepModel) {
             queryModel = null
             queryPins = null
+            resumableOpening = false
         }
     }
 
