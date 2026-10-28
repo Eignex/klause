@@ -4277,6 +4277,33 @@ satisfaction projections, with no original-objective, independent MiniZinc
 witness/proof or throughput claim. Explicit annotations remain authoritative;
 the pair-first arm is only a separate diagnostic control.
 
+### Optional unary source admission
+
+`bench.profile.OptionalUnaryProfile` captures the authored three-task optional
+control and the pinned 2026 workforce allocation model with a separately identified
+three-task/two-team data instantiation. The pinned upstream directory supplies no
+data. `mode=control` selects only the authored control; `mode=semantics` selects ten
+small absent-value, shared-guard and fallback controls instead. Run it through the
+lab at a pushed revision with an explicit outer profile budget, including source
+preparation and artifact transfer.
+
+Each source compiles against the installed solver library and a copied library
+with the two optional-disjunctive overrides removed. Both arms retain compiler,
+library, source/data and runtime identities, FlatZinc, output mappings, factor
+payloads and root domains. Preparation uses seed 3, 1.65 billion weighted work
+units and a five-second containing deadline; each satisfaction solve has 128
+decisions under that deadline. Semantic controls use preparation off. The original
+workforce objective is not optimized. Upstream MiniZinc renders each reconstructed
+point through its original output mapping, separately from the existing compiled
+factor checker. Neither operation supplies independent MiniZinc source-witness or
+proof checking. Internal output-renderer declines remain recorded separately.
+
+`capture.zip` retains the complete capture except the separately emitted JFR;
+one archive bounds per-file transfer overhead. Keep raw evidence outside Git under
+`klause-evidence/campaigns/3780-optional-unary/` beside the primary checkout.
+Serial JFR timings and native factor counts establish no throughput or default
+benefit. Source-channel deductions and original output semantics determine admission.
+
 ### Portfolio slice policy
 
 Retain the finite schedule's base 5000, maximum 150000 and growth 1.5; alternatives
