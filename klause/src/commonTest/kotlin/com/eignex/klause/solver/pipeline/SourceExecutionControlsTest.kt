@@ -18,6 +18,22 @@ import kotlin.test.assertTrue
 
 class SourceExecutionControlsTest {
     @Test
+    fun `pure real sources should reject integer residue authority`() {
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SmtLib.parse("(declare-const x Real) (declare-const y Real) " +
+                "(assert (= (+ (* x x) (* y y)) 3))").source,
+            ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+        ))
+
+        val failure = assertFailsWith<PipelineConfigException> {
+            SourceSetup.execute(SourceExecutionRequest(invocation,
+                ExecutionOptions.parse(listOf("nia-residues=true"))))
+        }
+
+        assertTrue("nia-residues" in assertNotNull(failure.message))
+    }
+
+    @Test
     fun `numerical refutation resolution should require explicit opt in`() {
         val source = SourceAttachment(
             LinearSourceProblem(listOf(LinearSourceVariable("x", true)), emptyList()), ProblemSettings(),
