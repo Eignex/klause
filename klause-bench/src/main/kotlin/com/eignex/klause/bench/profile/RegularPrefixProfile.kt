@@ -1,6 +1,7 @@
 package com.eignex.klause.bench.profile
 
 import com.eignex.klause.bench.metric.InstalledBuild
+import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.table.Regular
@@ -18,9 +19,6 @@ import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
 import com.eignex.klause.solver.pipeline.FinitePipelineRequest
 import com.eignex.klause.util.Cancellation
-import java.io.File
-import java.util.Base64
-import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -29,6 +27,9 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import java.io.File
+import java.util.Base64
+import kotlin.time.Duration.Companion.seconds
 
 internal object RegularPrefixProfile {
     @JvmStatic
@@ -42,14 +43,20 @@ internal object RegularPrefixProfile {
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         out.resolve("request.json").writeBytes(request)
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
-        for (k in listOf(3, 6)) for (allowTwo in listOf(false, true)) {
+        for (k in listOf(3, 6)) {
+            for (allowTwo in listOf(false, true)) {
             capture(control(k, allowTwo), out.resolve("control-$k-$allowTwo"), replay)
+        }
         }
         sources.forEachIndexed { index, input ->
             val source = input.jsonObject
             require(source.keys == setOf("suite", "problem", "sha256"))
-            val bytes = trajectorySourceBytes(source.getValue("suite").jsonPrimitive.content,
-                source.getValue("problem").jsonPrimitive.content, source.getValue("sha256").jsonPrimitive.content, null)
+            val bytes = trajectorySourceBytes(
+                source.getValue("suite").jsonPrimitive.content,
+                source.getValue("problem").jsonPrimitive.content,
+                source.getValue("sha256").jsonPrimitive.content,
+                null,
+            )
             val directory = out.resolve("source-$index").apply { mkdirs() }
             directory.resolve("source.xml").writeBytes(bytes)
             capture(Xcsp3.parse(bytes.decodeToString()).problem, directory, replay)
@@ -58,12 +65,21 @@ internal object RegularPrefixProfile {
 
     private fun control(k: Int, allowTwo: Boolean): Problem {
         val transitions = longArrayOf(1, 2, 2, 3, 3, 1)
-        return Problem(0, k + 2, Array(k + 2) { IntDomain(1, 2) }, arrayOf(
-            Regular(IntArray(k) { it }, 3, 2, transitions, 1,
-                if (allowTwo) intArrayOf(1, 2, 3) else intArrayOf(1, 2)),
+        return Problem(
+            0, k + 2, Array(k + 2) { IntDomain(1, 2) },
+            arrayOf(
+            Regular(
+                IntArray(k) { it },
+                3,
+                2,
+                transitions,
+                1,
+                if (allowTwo) intArrayOf(1, 2, 3) else intArrayOf(1, 2),
+            ),
             Regular(IntArray(k + 2) { it }, 3, 2, transitions, 1, intArrayOf(1)),
             Linear(intArrayOf(1, -1), intArrayOf(k, k + 1), LinearOp.NE, 0),
-        ))
+        )
+        )
     }
 
     private fun capture(source: Problem, out: File, replay: Boolean) {
@@ -74,14 +90,29 @@ internal object RegularPrefixProfile {
             val stop = Cancellation.after(12.seconds)
             val budget = PresolveBudget(825_000_000L)
             val started = System.nanoTime()
-            val prepared = FinitePipeline.prepare(FinitePipelineRequest(source, FiniteEngine.BACKTRACK,
-                presolveConfig = PresolveConfig.parse(mode), explicitPresolveConfig = mode != "default",
-                cancellation = stop, solveCancellation = stop, presolveBudget = budget, randomSeed = 3L))
+            val prepared = FinitePipeline.prepare(
+                FinitePipelineRequest(
+                source,
+                FiniteEngine.BACKTRACK,
+                presolveConfig = PresolveConfig.parse(mode),
+                explicitPresolveConfig = mode != "default",
+                cancellation = stop,
+                solveCancellation = stop,
+                presolveBudget = budget,
+                randomSeed = 3L,
+            )
+            )
             val preparationNs = System.nanoTime() - started
             val model = prepared.problem
             out.resolve("$mode-prepared.json").writeText(codec.encodeToJsonElement(model).toString())
-            val root = if (prepared.presolve?.infeasible != true && !stop()) PropagationSession(model,
-                cancellation = stop).seed(Assumptions.None) else null
+            val root = if (prepared.presolve?.infeasible != true && !stop()) {
+                PropagationSession(
+                model,
+                cancellation = stop,
+            ).seed(Assumptions.None)
+            } else {
+                null
+            }
             val report = buildJsonObject {
                 put("revision", Reports.readGitSha())
                 put("mode", mode)
@@ -96,9 +127,13 @@ internal object RegularPrefixProfile {
                 put("preparationNs", preparationNs)
                 put("preparationWork", budget.spent())
                 put("passes", JsonArray(prepared.presolve?.passes.orEmpty().map(::JsonPrimitive)))
-                put("regular", buildJsonArray {
+                put(
+                    "regular",
+                    buildJsonArray {
                     model.factors.forEachIndexed { id, factor ->
-                        if (factor is Regular) add(buildJsonObject {
+                        if (factor is Regular) {
+                            add(
+                                buildJsonObject {
                             put("factor", id)
                             put("length", factor.seq.size)
                             put("states", factor.numStates)
@@ -106,9 +141,12 @@ internal object RegularPrefixProfile {
                             put("deadTransitions", factor.transitions.count { it !in 1L..factor.numStates.toLong() })
                             put("distinctCoordinates", factor.seq.toSet().size == factor.seq.size)
                             put("coordinates", JsonArray(factor.seq.map(::JsonPrimitive)))
-                        })
+                        }
+                            )
+                        }
                     }
-                })
+                }
+                )
                 put("os", System.getProperty("os.name"))
                 put("arch", System.getProperty("os.arch"))
                 put("javaVersion", System.getProperty("java.version"))
@@ -118,8 +156,13 @@ internal object RegularPrefixProfile {
             out.resolve("$mode-report.json").writeText(report.toString())
             println("${out.name}/$mode: $report")
             if (replay && mode == "default" && prepared.presolve?.infeasible != true && !stop()) {
-                RegularPrefixReplay.capture(model, com.eignex.klause.bench.metric.sha256(
-                    codec.encodeToJsonElement(model).toString().toByteArray()), out, source, prepared.reconstruct)
+                RegularPrefixReplay.capture(
+                    model,
+                    sha256(
+                    codec.encodeToJsonElement(model).toString().toByteArray(),
+                ),
+                    out, source, prepared.reconstruct
+                )
             }
         }
     }
