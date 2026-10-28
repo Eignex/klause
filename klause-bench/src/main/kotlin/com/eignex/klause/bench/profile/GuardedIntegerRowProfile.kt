@@ -4,15 +4,16 @@ import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
-import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolveBudget
+import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
@@ -26,7 +27,6 @@ import com.eignex.klause.solver.search.SearchConflictResolution
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchLearnedConflictResult
 import com.eignex.klause.solver.search.SearchSession
-import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.util.Cancellation
 import com.sun.management.ThreadMXBean
 import java.io.File

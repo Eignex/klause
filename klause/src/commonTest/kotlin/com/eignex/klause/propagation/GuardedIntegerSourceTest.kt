@@ -50,11 +50,13 @@ class GuardedIntegerSourceTest {
 
     @Test
     fun `a signed reified row should wake at a sibling endpoint after guard undo`() {
-        for (truth in listOf(true, false)) {
+        for ((op, truth, sign) in listOf(Triple(LinearOp.LE, true, 1), Triple(LinearOp.GE, false, 1),
+            Triple(LinearOp.GE, true, -1), Triple(LinearOp.LE, false, -1), Triple(LinearOp.EQ, true, 1),
+            Triple(LinearOp.NE, false, 1), Triple(LinearOp.EQ, true, -1), Triple(LinearOp.NE, false, -1))) {
             val native = PropagationSession(Problem(1, 3,
                 arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)), arrayOf(
-                    ReifiedLinear(0, intArrayOf(2, 1, -1), intArrayOf(0, 1, 2),
-                        if (truth) LinearOp.LE else LinearOp.GE, if (truth) 0 else 1),
+                    ReifiedLinear(0, intArrayOf(2 * sign, sign, -sign), intArrayOf(0, 1, 2),
+                        op, if (truth || op == LinearOp.NE) 0 else if (op == LinearOp.GE) 1 else -1),
                     Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
                 )), pbLearning = false).apply { enableIntegerRowLearning() }
             val cp = CpSearchComponent(native, intArrayOf(4, 7, 9))

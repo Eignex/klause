@@ -7406,3 +7406,44 @@ Ordinary controls include default and aggressive solution-set-preserving prepara
 with separate one-million-work allowances, and the existing Element LP hull under
 root conditioning. Neither root preparation nor its hull creates an unconditional
 selected equality in the retained search session.
+
+[Element gate 8914](https://lab.eignex.com/jobs/8914) completes fourteen records at
+`13db8c402932298b73d19c8bcce5fa976ca952a8`: four lifecycles including warmups and
+two ordinary conditioned roots. One retained row owns both measured sibling bounds,
+`2` and `3`, versus clause bounds `5` and `6`. Twelve fully fixed source points,
+including the other-index alternative, pass fresh native checks. These are finite
+API controls without independent source-witness or exported-proof checking.
+
+At the second measured sibling, native work is 295 for clauses and 466 for rows;
+stores contain 8 and 11 constraints, including channeling clauses, with one retained
+integer row and no shared clauses. Complete measured lifecycle allocation is
+323,328 versus 338,688 bytes, and elapsed time is 9.82 versus 9.74 ms, including
+construction, acquisition, point checks, record writing and disposal. Disposal leaves
+both stores empty and costs about 0.11–0.12 ms. One ordered sample under JFR supplies
+no timing advantage claim. Default conditioned preparation leaves `x` in
+`{0,1,2,4}`; aggressive preparation reaches `x<=2`, and the existing Element hull
+certifies objective bound `-11/4` for `-x`, hence the same integer bound. Preparation
+spends 163,598 and 403,657 work units. This establishes guarded retained consumption,
+not superiority over ordinary preparation or LP, and keeps defaults unchanged.
+
+[Reified gate 8909](https://lab.eignex.com/jobs/8909) independently completes
+twenty-eight records at the same revision: eight lifecycles including warmups and
+four ordinary conditioned roots. Both signed guards retain one row that owns the
+sibling bounds `2` and `3`, versus clause bounds `5` and `6`. All twenty-four fully
+fixed source points pass native checks, including assignments violating the
+unguarded row when its guard is false. At the second measured sibling, native work
+is 294 for clauses and 395 for rows; native stores contain 7 and 9 constraints and
+shared stores remain empty. Complete lifecycle allocation is about 283 KB versus
+294 KB. Ordered elapsed observations are 6.51–6.71 ms versus 6.04–6.33 ms; disposal
+leaves no stored constraints and costs 0.065–0.090 ms. These observations supply no
+statistical speedup or default-admission claim.
+
+Default conditioned preparation retains `x` in `{0,1,2,4}`; aggressive preparation
+and the exact LP both reach `x<=2`. Preparation spends 148,868–148,888 and
+186,779–186,783 work units. The reified and Element executions both use Linux amd64,
+Temurin `25.0.4.1+1-LTS`, and hard cgroup budgets of one vCPU and 4608 MiB. Source
+bytes, revision/build identities, complete records, JFR and runtime/preparation
+resource receipts remain outside Git in
+`klause-evidence/campaigns/guarded-integer-rows-3752-3755/` beside the primary checkout.
+Job 8899 failed profile compilation before any case ran; no local builds, tests or
+numerical work ran. Neither gate supplies independent source-witness or proof checking.

@@ -58,7 +58,7 @@ internal class GuardedIntegerSource(private val state: PropagationState) {
                 val source = state.factorAt(factorId) as? ElementPropagator ?: return null
                 if (source.idx != original.idx || source.result != original.result ||
                     source.arrIsVars != original.arrIsVars || source.indexOffset != original.indexOffset ||
-                    !source.arr.contentEquals(original.arr)) return null
+                    source.arr !== original.arr) return null
                 val selected = state.domainAt(original.idx, trail)
                 if (selected.min != selected.max) return null
                 val first = original.indexOffset.toLong()
