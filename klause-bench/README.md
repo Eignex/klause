@@ -570,6 +570,51 @@ Use ordinary source-checked lab solve comparisons to qualify consumed exclusions
 The [fixtures](smoke-corpus/table-substitution/README.md) separate interior
 strict-cost replacement from declared-hole and outside-reader rejections.
 
+[Controls 9095](https://lab.eignex.com/jobs/9095), at `e80eece2ca`, complete
+twelve three-second CP/P1, seed-3 cases on Linux/amd64, JDK 25.0.4.1+1-LTS,
+under a hard one-vCPU/4608-MiB cgroup. Ordinary preparation retains all eleven
+integer coordinates, the exact coefficients and all twelve factors of the interior
+source. Nonbinary `x` excludes the all-binary objective view; affine, implication,
+duplicate and symmetry reductions supply no exclusion. Substitution removes `x=1`
+and ordinary structural reduction drops its tuple. Search nodes/failures fall from
+103/50 to 69/33, and finite propagation work from 7,264 to 4,530. Aggressive LP,
+with two installed cuts in each arm, still improves from seven nodes to six and
+702 to 630 propagation units. All twelve original-source witnesses pass the
+independent XCSP3 checker at exact objectives 35/36/35; native optimality labels
+have no independently checked proof here.
+
+The interior source's preparation rises from 81,902 to 104,994 phase units.
+Ordinary whole-CLI wall/user-CPU/peak-RSS observations are
+1.53 s / 1.23 s / 105,716 KiB without substitution and
+1.61 s / 1.36 s / 103,620 KiB with it. The hole and outside-reader controls retain
+their respective 41/19 and 156/76 ordinary nodes/failures and their five/eight
+aggressive-LP nodes. They add 81 and 68 preparation units without a deduction.
+The outside AllDifferent lowers to an enforcing integer disequality and still
+excludes substitution. These single-repeat observations establish consumed pruning,
+with added preparation and negative costs, not a runtime gain.
+
+[Capture 9098](https://lab.eignex.com/jobs/9098) confirms the interior root domain
+changes from `0..2` to `{0,2}` with its single Table reader. All fourteen preparations
+finish within their containing allowance. Warehouse-40-80-00, GBACP-UD04,
+TestScheduling-t020m10r03-1 and BinPacking2-n1c1w1a retain no Table and no exclusion;
+their cost readers include Element, channels/linear rows, ArrayMinMax and NValue.
+Their extra analyses spend respectively 17,003, 11,188, 2,786 and 10,191 phase units.
+[Table-specific capture 9104](https://lab.eignex.com/jobs/9104) retains ten ground
+Tables on AircraftLanding-table-airland01 after normal preparation. Its cost
+coordinates have functional tuple partners; the substitution call reaches its
+262,144-visit ceiling in 94.6 ms and publishes nothing. This is an incomplete
+verification, despite the containing preparation finishing. Ordered JFR time and
+allocation observations supply no throughput or memory-win claim.
+
+These five ordinary-source negatives reject broader/default admission at this gate;
+the option remains disabled by default. Retained WordSquare private indices have
+outside AllDifferent readers in [9058](https://lab.eignex.com/jobs/9058), so their
+Table coverage supplies no substitution evidence. No conditional-search or mixed
+local-search benefit follows. Original sources, exact objectives, all negative
+records, build/runtime fingerprints and resource receipts remain outside Git in
+`klause-evidence/campaigns/table-substitution-3810/`. Superseded 9090 was cancelled
+before execution; the preserved jobs resumed after the external lab hold.
+
 ## Objective-preserving symmetry admission
 
 `bench.profile.SymmetryAdmissionProfile` captures ordinary protected preparation
