@@ -4,10 +4,12 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.IndomainMiddle
 import com.eignex.klause.backtrack.selector.IndomainMin
+import com.eignex.klause.backtrack.selector.IndomainRandom
 import com.eignex.klause.backtrack.selector.InputOrder
 import com.eignex.klause.backtrack.selector.ProbingSelectors
 import com.eignex.klause.backtrack.selector.ValueSelector
 import com.eignex.klause.backtrack.selector.VariableSelector
+import com.eignex.klause.backtrack.selector.Vsids
 import com.eignex.klause.bench.catalog.Catalog
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.sha256
@@ -53,6 +55,7 @@ internal object TaskOrderProfile {
         val orders: Boolean = false,
         val prepare: String = "off",
         val values: ValueSelector = IndomainMin,
+        val variables: VariableSelector = InputOrder,
         val lp: Boolean = false,
     )
 
@@ -68,6 +71,7 @@ internal object TaskOrderProfile {
             Arm("minimum"), Arm("midpoint", values = IndomainMiddle),
             Arm("impact", values = ProbingSelectors.impact()), Arm("lp", lp = true),
             Arm("prepared", prepare = "default"), Arm("probing", prepare = "aggressive"),
+            Arm("default-search", prepare = "default", values = IndomainRandom, variables = Vsids()),
             Arm("orders", orders = true), Arm("orders-prepared", orders = true, prepare = "default"),
         )
         for (equal in listOf(false, true)) {
@@ -101,7 +105,7 @@ internal object TaskOrderProfile {
         val baked = prepared.problem.bake(cancellation = stop)
         val preparationNs = System.nanoTime() - started
         val trace = ArrayList<String>()
-        val base = annotated ?: BacktrackParams(variableSelector = InputOrder, valueSelector = arm.values)
+        val base = annotated ?: BacktrackParams(variableSelector = arm.variables, valueSelector = arm.values)
         val values = TracedValues(base.valueSelector, trace)
         val variables = if (arm.orders && model !== source) PairFirst(source.numBoolVars) else base.variableSelector
         val result = BacktrackSolver(baked).solve(base.copy(
@@ -215,6 +219,7 @@ internal object TaskOrderProfile {
         }.toString())
         capture(source, "original", Arm("annotated", prepare = "default"), out, resolved.searchParams)
         for (arm in listOf(Arm("prepared", prepare = "default"),
+            Arm("default-search", prepare = "default", values = IndomainRandom, variables = Vsids()),
             Arm("orders-prepared", orders = true, prepare = "default"))) {
             capture(source, "original", arm, out)
         }
