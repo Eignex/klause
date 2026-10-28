@@ -163,7 +163,8 @@ internal fun PropagationState.addLearnedClause(
     // The native-SAT lane keeps learned clauses in its own arena-backed store with its own watches
     // and policy columns, not the general learned database.
     nativeEngine?.let { return it.addLearned(clause.literals, lbd, permanent, origin) }
-    return addLearnedClause(clause.propagatorProjection() as ClausePropagator, lbd, permanent, origin)
+    val literals = clause.literals.copyOf()
+    return addLearnedClause(ClausePropagator(literals.litVars(), EmptyIntArray, literals), lbd, permanent, origin)
 }
 
 /** Read-only view of LBDs for tests / introspection. Parallel to [PropagationState.learnedClauses]. */
@@ -344,10 +345,12 @@ internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd
     // fids from before the compaction. Remap them like the watcher lists: a stale fid
     // surviving here indexes past the compacted clause array on the next drain.
     remapQueue(propQueue, remap, refBase)
+    var pending = 0
     for (i in 0 until learned.pendingAttach.size) {
         val old = learned.pendingAttach[i] - refBase
-        learned.pendingAttach[i] = refBase + remap[old]
+        if (remap[old] >= 0) learned.pendingAttach[pending++] = refBase + remap[old]
     }
+    learned.pendingAttach.truncateTo(pending)
     remapQueue(atoms.dirtyFactors, remap, refBase)
     if (learned.integerRows != null) intEvents.remapLearned(remap, refBase)
 
@@ -445,7 +448,10 @@ internal fun PropagationState.referencedLearned(count: Int): BooleanArray {
         protect(undo.minReason[i])
         protect(undo.maxReason[i])
     }
-    for (i in 0 until learned.pendingAttach.size) protect(learned.pendingAttach[i])
+    for (i in 0 until learned.pendingAttach.size) {
+        val fid = learned.pendingAttach[i]
+        if (learned.stages[fid - baseFactorCount] and 2 == 0) protect(fid)
+    }
     return retained
 }
 

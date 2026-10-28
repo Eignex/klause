@@ -164,6 +164,11 @@ whose implications retract are examined again after undo. Pending attachments su
 earlier conflicts and cancellation. Suspension retains stores and pending attachment; cancellation
 withholds unfinished analysis or checking and grants no refutation. Retiring a
 source cache releases its indexes and names under the containing allowance.
+An optional recheck after a consumed implication retracts can retire with its object;
+it does not retain a reason of its own. First assertions and live or historical native
+reasons remain protected. Native fixpoint cancellation stays sticky until its
+component owner retracts the interrupted decision; replacing the token alone does
+not resume that partial state.
 
 The common counters are `learning{Kind}{Stage}`, with kinds `Clause`, `Pb`,
 `Integer` and `SourceRefutation`, and stages `Constructed`, `Admitted`,
