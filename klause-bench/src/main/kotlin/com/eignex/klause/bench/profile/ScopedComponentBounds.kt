@@ -3,13 +3,18 @@ package com.eignex.klause.bench.profile
 import com.eignex.klause.ir.Lit
 import java.math.BigInteger
 
-internal data class ComponentCostScope(
+internal class ComponentCostScope(
     val source: String,
-    val conditions: Map<Int, Boolean>,
-    val variables: List<Int>,
-    val clauses: List<List<Int>>,
-    val weights: List<Long>,
+    conditions: Map<Int, Boolean>,
+    variables: List<Int>,
+    clauses: List<List<Int>>,
+    weights: List<Long>,
 ) {
+    val conditions = conditions.toMap()
+    val variables = variables.toList()
+    val clauses = clauses.map { it.toList() }
+    val weights = weights.toList()
+
     init {
         require(variables.distinct().size == variables.size)
         require(variables.size == weights.size)
@@ -30,6 +35,12 @@ internal data class ComponentCostScope(
     fun trivialFloor(): BigInteger = weights.fold(BigInteger.ZERO) { sum, w ->
         sum + BigInteger.valueOf(minOf(0L, w))
     }
+
+    override fun equals(other: Any?): Boolean = other is ComponentCostScope && source == other.source &&
+        conditions == other.conditions && variables == other.variables && clauses == other.clauses &&
+        weights == other.weights
+
+    override fun hashCode(): Int = listOf(source, conditions, variables, clauses, weights).hashCode()
 }
 
 internal data class ComponentCostBounds private constructor(
