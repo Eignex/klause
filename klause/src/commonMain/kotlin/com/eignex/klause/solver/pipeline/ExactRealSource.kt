@@ -89,10 +89,13 @@ internal fun Problem.exactRealSource(
             val domain = source.intDomainOrNull(id) ?: continue
             if (domain.holeCount != 0L) {
                 val members = domain.spanOrNull(domain.holeCount) ?: throw ExactRealSourceUnavailable()
-                formulas += TranscendentalFormula.Or(members.map {
+                val alternatives = ArrayList<TranscendentalFormula>()
+                members.forEach {
                     checkpoint()
-                    TranscendentalFormula.Atom(integer(id), PolynomialRelation.EQ, constant(BigFraction.ofLong(it)))
-                })
+                    alternatives += TranscendentalFormula.Atom(integer(id), PolynomialRelation.EQ,
+                        constant(BigFraction.ofLong(it)))
+                }
+                formulas += TranscendentalFormula.Or(alternatives)
             }
         }
         for (id in 0 until source.numRealVars) {
@@ -111,6 +114,8 @@ internal fun Problem.exactRealSource(
             (0 until source.numBoolVars).associate { "bools.$it" to it }, semantics = source.semantics)
         functions
     } catch (_: ExactRealSourceUnavailable) {
+        null
+    } catch (_: com.eignex.klause.lowering.PolynomialSourceInterrupted) {
         null
     }
 }

@@ -237,6 +237,7 @@ class SourceStrategy internal constructor(
                     SourceExecutionRequest(invocation, polynomial = scope.polynomial),
                 )) {
                     is SourceExecutionResult.Polynomial -> execution.result.result
+                    is SourceExecutionResult.Transcendental -> execution.result.result
                     is SourceExecutionResult.Declined -> OpenTheoryResult.Unknown(execution.reason, SolveStats.EMPTY)
                     else -> error("native factor satisfaction requires a satisfaction result")
                 }

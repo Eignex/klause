@@ -3,10 +3,13 @@ package com.eignex.klause.solver
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
+import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.arithmetic.real.ExactRealArithmetic
 import com.eignex.klause.arithmetic.real.exactRealValue
 import com.eignex.klause.arithmetic.real.toExactRealValue
 import com.eignex.klause.arithmetic.transcendental.TranscendentalArithmetic
+import com.eignex.klause.arithmetic.transcendental.TranscendentalInterrupted
+import com.eignex.klause.arithmetic.transcendental.TranscendentalResourceLimit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.exactRealSource
@@ -38,6 +41,12 @@ fun Problem.checkExactRealSample(sample: Sample, cancellation: Cancellation = Ca
             SourceTruth.UNKNOWN, SourceTruth.DOMAIN_UNKNOWN -> null
         }
     } catch (_: PolynomialInterrupted) {
+        null
+    } catch (_: PolynomialResourceLimit) {
+        null
+    } catch (_: TranscendentalInterrupted) {
+        null
+    } catch (_: TranscendentalResourceLimit) {
         null
     }
 }

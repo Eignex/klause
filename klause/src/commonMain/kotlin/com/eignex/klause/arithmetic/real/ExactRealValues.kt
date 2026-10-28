@@ -25,6 +25,29 @@ fun Sample.exactRealValue(id: Int): ExactRealValue = symbolicReals?.get(id)
         "real coordinate $id has no exact value"
     }).toExactRealValue()
 
+/** Numerical view for display or learning features; NaN means an enclosure was unavailable. */
+fun ExactRealValue.approximate(): Double {
+    rational?.let { return it.toDouble() }
+    var polls = 0
+    val stop = Cancellation { ++polls > 100000 }
+    return try {
+        val arithmetic = ExactRealArithmetic(TranscendentalArithmetic(stop, maximumWork = 100000),
+            AlgebraicArithmetic(PolynomialArithmetic(stop)))
+        val enclosure = arithmetic.enclose(this, 16)
+        enclosure.lower.toDouble() / 2 + enclosure.upper.toDouble() / 2
+    } catch (_: PolynomialInterrupted) {
+        Double.NaN
+    } catch (_: PolynomialResourceLimit) {
+        Double.NaN
+    } catch (_: TranscendentalInterrupted) {
+        Double.NaN
+    } catch (_: TranscendentalResourceLimit) {
+        Double.NaN
+    } catch (_: RealCertificationUnavailable) {
+        Double.NaN
+    }
+}
+
 /** Certified comparison; null means the available exact identities and enclosures did not decide it. */
 fun ExactRealValue.compareExactly(other: ExactRealValue): Int? {
     var polls = 0
