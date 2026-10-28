@@ -285,7 +285,9 @@ object ConditionalComponentTrace {
             put("trace", recorder.summary())
             put("probes", JsonArray(recorder.probes.map { probe ->
                 val composition = runCatching {
-                    if (probe.declined) buildJsonObject { put("decline", "unsupported-source-factor") } else
+                    if (probe.declined) buildJsonObject {
+                        put("decline", probe.snapshot.decline ?: "unsupported-source-factor")
+                    } else
                         compose(probe, objective, prepared.reconstruct, input, settings)
                 }
                     .getOrElse { buildJsonObject { put("failure", it.toString()) } }
@@ -572,7 +574,7 @@ object ConditionalComponentTrace {
         fun onIncumbent(sample: Sample) {
             val context = captureContext ?: return
             incumbentUnavailable = true
-            if (traceNanos >= traceCapNanos || prepared.numBoolVars > 100_000) return
+            if (traceNanos >= traceCapNanos || prepared.numBoolVars > ResidualSnapshots.MAX_COORDINATES) return
             val started = System.nanoTime()
             try {
                 val weights = context.objective.boolWeights
@@ -792,6 +794,24 @@ object ConditionalComponentTrace {
         ): Probe {
             val started = System.nanoTime()
             val roots = components.keys.sorted()
+            val keys = roots.map { r -> components.getValue(r).let { it.h1 to it.h2 } }
+            val seenAtCapture = keys.map { k -> seen[k]?.let { it.sightings to it.reencounters } ?: (0 to 0) }
+            val snapshot = captureContext?.let { context ->
+                val stop = Cancellation { System.nanoTime() >= observationDeadline }
+                context.budget.retain { remaining ->
+                    when {
+                        numBool > ResidualSnapshots.MAX_COORDINATES -> ResidualCapture(null, "coordinate-limit")
+                        incumbentUnavailable -> ResidualCapture(null, "cutoff-observation-incomplete")
+                        else -> ResidualSnapshots.capture(problem, context.objective,
+                            List(numBool) { session.boolValue(it) }, LearnedResidualRestrictions.inspect(session, stop),
+                            context.sourceIdentity, context.preparationIdentity, incumbent, stop, remaining)
+                    }
+                }
+            } ?: ResidualCapture(null, "capture-not-enabled")
+            if (captureContext != null && snapshot.bytes == null) {
+                return Probe(samples, level, BooleanArray(0), BooleanArray(0), emptyList(), keys, seenAtCapture,
+                    true, System.nanoTime() - started, snapshot)
+            }
             val index = HashMap<Int, Int>()
             roots.forEachIndexed { i, r -> index[r] = i }
             val clauses = List(roots.size) { ArrayList<IntArray>() }
@@ -805,16 +825,6 @@ object ConditionalComponentTrace {
                 val residual = f.literals.filter { session.litTruth(it) == null }.toIntArray()
                 clauses[index.getValue(find(liveRep[k]))].add(residual)
             }
-            val keys = roots.map { r -> components.getValue(r).let { it.h1 to it.h2 } }
-            val snapshot = captureContext?.let { context ->
-                val stop = Cancellation { System.nanoTime() >= observationDeadline }
-                context.budget.retain { remaining ->
-                    if (incumbentUnavailable) ResidualCapture(null, "cutoff-observation-incomplete") else
-                        ResidualSnapshots.capture(problem, context.objective,
-                        List(numBool) { session.boolValue(it) }, LearnedResidualRestrictions.inspect(session, stop),
-                        context.sourceIdentity, context.preparationIdentity, incumbent, stop, remaining)
-                }
-            } ?: ResidualCapture(null, "capture-not-enabled")
             return Probe(
                 sample = samples,
                 level = level,
@@ -822,7 +832,7 @@ object ConditionalComponentTrace {
                 free = BooleanArray(numBool) { session.boolValue(it) == null },
                 clauses = clauses,
                 keys = keys,
-                seenAtCapture = keys.map { k -> seen[k]?.let { it.sightings to it.reencounters } ?: (0 to 0) },
+                seenAtCapture = seenAtCapture,
                 declined = declined,
                 captureNanos = System.nanoTime() - started,
                 snapshot = snapshot,

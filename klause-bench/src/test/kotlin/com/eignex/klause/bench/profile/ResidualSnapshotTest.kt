@@ -153,6 +153,24 @@ class ResidualSnapshotTest {
     }
 
     @Test
+    fun `a declined snapshot should retain no unbounded in memory probe payload`() {
+        val factors = (0 until 2).flatMap { c -> (0 until 5).map { i ->
+            Clause(intArrayOf(Lit.make(c * 5 + i, true), Lit.make(c * 5 + (i + 1) % 5, true)))
+        } }
+        val problem = Problem(10, 0, emptyArray(), factors.toTypedArray())
+        val context = ResidualCaptureContext(LinearObjective(), JsonObject(emptyMap()), JsonObject(emptyMap()),
+            ResidualSnapshotBudget(1, 0))
+        val recorder = ConditionalComponentTrace.Recorder(problem, Long.MAX_VALUE, 1, context)
+
+        recorder.observe(PropagationSession(problem))
+
+        val probe = recorder.probes.single()
+        assertEquals("snapshot-byte-limit", probe.snapshot.decline)
+        assertEquals(0, probe.values.size)
+        assertEquals(emptyList(), probe.clauses)
+    }
+
+    @Test
     fun `fixed objective contributions should remain exact beyond a signed word`() {
         val captured = ResidualSnapshots.capture(
             Problem(3, 0, emptyArray(), emptyArray()),
