@@ -39,7 +39,11 @@ import kotlinx.serialization.json.put
 internal object AssignmentCostProfile {
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.isEmpty())
+        val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
+        require(options.keys.all { it in setOf("order", "seed") })
+        val order = options["order"] ?: "input"
+        require(order in setOf("input", "default"))
+        val seed = options["seed"]?.toLong() ?: 3L
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
         val latin = trajectorySourceBytes("xcsp3-core", "evidence-latin4",
@@ -49,11 +53,12 @@ internal object AssignmentCostProfile {
         out.resolve("screen.jsonl").bufferedWriter().use { output ->
             for ((name, bytes) in controls) {
                 out.resolve("$name.xml").writeBytes(bytes)
-                if (name != "latin4") cutoffControl(bytes, out.resolve("$name-cutoff.json"))
-                for (mode in listOf("off", "default", "aggressive")) {
+                if (name != "latin4" && order == "input") cutoffControl(bytes, out.resolve("$name-cutoff.json"))
+                for (mode in if (order == "input") listOf("off", "default", "aggressive") else listOf("default")) {
                     val stop = Cancellation.after(4.seconds)
                     val parsed = Xcsp3.parse(bytes.decodeToString(), recoveryCancellation = stop)
                     val objective = requireNotNull(parsed.objective).toLinearObjective()
+                    val original = parsed.problem.bake(stop)
                     val budget = PresolveBudget(100_000_000L)
                     val started = System.nanoTime()
                     val prepared = FinitePipeline.prepare(FinitePipelineRequest(
@@ -64,8 +69,10 @@ internal object AssignmentCostProfile {
                     val preparationNs = System.nanoTime() - started
                     val preparationStopped = stop()
                     for (lp in listOf(false, true)) {
+                        val base = BacktrackParams(randomSeed = seed)
+                        val delegate = if (order == "input") InputOrder else base.variableSelector
                         val trace = ArrayList<JsonObject>()
-                        val selector = object : VariableSelector by InputOrder {
+                        val selector = object : VariableSelector by delegate {
                             override fun fresh(): VariableSelector = this
                             override fun pick(session: PropagationSession, rng: Random): VarRef? {
                                 if (trace.size < 32) trace += buildJsonObject {
@@ -74,11 +81,12 @@ internal object AssignmentCostProfile {
                                         JsonPrimitive(session.intDomain(it).toString())
                                     }))
                                 }
-                                return InputOrder.pick(session, rng)
+                                return delegate.pick(session, rng)
                             }
                         }
                         val solveStop = Cancellation.after(2.seconds)
-                        val params = BacktrackParams(variableSelector = selector, valueSelector = IndomainMin,
+                        val params = base.copy(variableSelector = selector,
+                            valueSelector = if (order == "input") IndomainMin else base.valueSelector,
                             cancellation = solveStop, lpConfig = if (lp) LpConfig.AUTO else LpConfig.OFF,
                             lpPlan = LpPlan(bounding = lp, cuts = lp, lagrangian = lp))
                         val solveStart = System.nanoTime()
@@ -90,12 +98,17 @@ internal object AssignmentCostProfile {
                             put("source", name)
                             put("sourceSha256", sha256(bytes))
                             put("presolve", mode)
+                            put("order", order)
+                            put("seed", seed)
                             put("lp", lp)
                             put("preparationNs", preparationNs)
                             put("preparationWork", budget.spent())
                             put("preparationStopped", preparationStopped)
                             put("preparationInfeasible", prepared.presolve?.infeasible)
                             put("preparedObjective", prepared.objective.toString())
+                            put("preparedDomains", JsonArray(prepared.problem.bake().rootIntDomains().map {
+                                JsonPrimitive(it.toString())
+                            }))
                             put("preparedFactors", JsonArray(prepared.problem.factors.map {
                                 JsonPrimitive(it::class.simpleName)
                             }))
@@ -112,6 +125,9 @@ internal object AssignmentCostProfile {
                                 put("lpRootBound", result.stats.lp.rootBound.takeIf { it.isFinite() })
                                 put("lpWork", result.stats.lp.workOps.sum)
                                 result.assignment?.let(prepared.reconstruct)?.let { sample ->
+                                    put("nativeSourceAccepted", FiniteConflictSelection.checkSource(original, sample,
+                                        stop or solveStop))
+                                    put("sourceCheckStopped", stop() || solveStop())
                                     put("sourceObjective", objective.evaluateExact(sample).toString())
                                     put("sourceIntegers", JsonArray((0 until parsed.problem.numIntVars)
                                         .map { JsonPrimitive(sample.intValue(it)) }))
@@ -133,13 +149,13 @@ internal object AssignmentCostProfile {
         val stop = Cancellation.after(2.seconds)
         val source = Xcsp3.parse(bytes.decodeToString(), recoveryCancellation = stop)
         val objective = requireNotNull(source.objective).toLinearObjective()
-        val sourceModel = source.problem.bake()
+        val sourceModel = source.problem.bake(stop)
         val witness = Sample(BooleanArray(0), if (sourceModel.numIntVars == 4) {
             longArrayOf(1, 3, 4, 11)
         } else longArrayOf(1, 3, 4))
         val coefficients = objective.intCoefficients
         val cutoff = Linear(coefficients, IntArray(coefficients.size) { it }, LinearOp.LE, 10L)
-        val query = source.problem.withFactors(source.problem.factors + cutoff).bake()
+        val query = source.problem.withFactors(source.problem.factors + cutoff).bake(stop)
         val root = PropagationSession(query, stop)
         val before = root.intDomain(0).toString()
         val pinned = root.pinInt(0, 1)
