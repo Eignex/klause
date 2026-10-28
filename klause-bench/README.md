@@ -3060,6 +3060,54 @@ the recorded witnesses against the original MiniZinc source.
 
 ## Design evidence
 
+### Assignment value exclusions
+
+[9096](https://lab.eignex.com/jobs/9096), at `3b4a2614d2`, completes 18 input-order,
+minimum-value traversals over the direct and retained-output three-variable
+controls and `evidence-latin4`, after off/default/aggressive preparation with LP
+off or explicit bounding, cuts and Lagrangian pruning. Normal preparation keeps
+the globals, the output equality and every value of `x`. In the explicit improving
+query `f <= 10`, ordinary propagation keeps `x=1`; existing bounded hole probing
+removes it while retaining 0 and 2. The cost-11 source witness passes native source
+checking, so the exclusion belongs to the query rather than source infeasibility.
+
+The current LP stack obtains native objective/root-bound pairs 5/5, 5/5 and 24/24
+before any decision, then closes every traversal. Latin4 records 14 cuts and one
+whole-node Lagrangian prune. Zero node LP solves/fixings reflect the absence of
+node traversal. With LP off, the small controls prove 5 in three decisions;
+Latin4 first finds 24 at seven decisions and proves it after 308. Every
+reconstructed point passes the native original-source verifier. The matching
+Latin4 source hash also has an independently accepted cost-24 witness in
+[8865](https://lab.eignex.com/jobs/8865); that earlier receipt checks neither these
+new points nor their native optimality claims.
+
+The ordered JFR capture runs on Linux/amd64, JDK 25.0.4.1, with hard one-vCPU and
+4,608-MiB limits. Original bytes, installed harness/runtime hashes, preparation
+work, branch states and resource receipts remain with the job. These observations
+establish no throughput or full-cost improvement. [9082](https://lab.eignex.com/jobs/9082)
+contains an earlier harness compilation failure and no solver observations.
+
+[9107](https://lab.eignex.com/jobs/9107), at `8cad5e1cc1`, completes the six
+default-preparation controls with ordinary VSIDS/random-value traversal and seed 3.
+With LP off, the direct and alias controls improve 7 to 5 in six and three
+decisions. After the cost-7 incumbent, existing cutoff propagation through the
+retained output fixes `x=0` before the next decision. Latin4 improves
+48, 35, 34, 26, 24 and proves 24 after 510 decisions; its branch trace is truncated
+at 32 states. All six traversals finish without a stop and all reconstructed points
+pass native source checking. Every enabled LP stack again obtains the matching
+incumbent and root bound before any decision and closes the query. Runtime,
+non-solver distribution hashes and resource limits match 9096; these single-seed
+instrumented observations establish no timing gain.
+
+The mathematical interior-value exclusion survives preparation, but no additional
+consumed exclusion survives the strongest existing consumers on this scope. This
+gate rejects conditional-assignment filtering integration. No sensitivity, atom or
+proof cache, query-scoped clause path, historical-domain reason or sibling replay
+is admitted without that prerequisite. Existing exact assignment, probing, cuts,
+fixings and alias ownership remain unchanged. This is a bounded applicability
+rejection, not a general impossibility result. Raw records remain outside Git in
+`klause-evidence/campaigns/assignment-value-deductions-2026-10-28/`.
+
 ### Unary edge-finding over minimum durations
 
 Unary edge-finding over minimum durations while durations are unfixed (rejected
