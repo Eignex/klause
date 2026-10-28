@@ -127,7 +127,7 @@ Objective changes retract dependent bounds, cuts and clauses, or restore an
 objective-independent region.
 
 The explicit `+sparse-trial` LP option selects a bounded root trial for compact
-unconditional linear sources. Emphasis levels leave it disabled. Admission bounds
+closed unconditional linear sources. Emphasis levels leave it disabled. Admission bounds
 source assembly, then inspects emitted nonzeros, connected-component dimensions,
 exact scalar width and row-intersection fill risk. Custom emitters decline before
 trial assembly because they have no source-size reservation. Sparse storage is reserved

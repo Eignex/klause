@@ -62,6 +62,7 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
     for ((index, factor) in problem.factors.withIndex()) {
         if (cancellation()) return decline("Cancelled")
         inspected++
+        if (factor is ExactLinear && factor.strict) return decline("StrictRow")
         entries += when (factor) {
             is Linear -> if (factor.integerConstants != null && factor.op != LinearOp.NE) factor.vars.size
                 else return decline("Source")
