@@ -1318,8 +1318,15 @@ private fun LpEngine.sparseRootLpRelaxationBound(
     relaxer: CpToLpRelaxation,
     cancellation: Cancellation,
 ): Double {
+    if (sparseTrialRemainingWork() <= 0L || cancellation()) return Double.NaN
     val root = PropagationSession(problem, cancellation)
-    val relaxation = nodeRelaxation(relaxer, root) ?: return Double.NaN
+    val relaxation = nodeRelaxation(relaxer, root) ?: run {
+        sink.lp.sparseTrial = sink.lp.sparseTrial + ("RootSourceLayoutDeclined" to 1L)
+        cpAdapter.reset()
+        if (sparseTrialRemainingWork() <= 0L || cancellation()) return Double.NaN
+        sink.lp.sparseTrial = sink.lp.sparseTrial + ("StandaloneRootFallback" to 1L)
+        return standaloneRootLpRelaxationBound(relaxer, emptyList(), cancellation)
+    }
     if (relaxation.model.n == 0) return Double.NaN
     val attempt = solveNode(relaxation.model, null, cancellation) ?: return Double.NaN
     return try {

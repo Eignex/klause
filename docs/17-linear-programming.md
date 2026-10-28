@@ -136,7 +136,9 @@ bound, fixing and conflict consumers with their existing exact checks; cuts,
 expanded hulls and primal probes stay outside its allowance. The initial root
 bound and subsequent root propagation share the existing scoped numerical owner;
 handoff requires matching source identities and root scopes, and live bound adoption
-rechecks authority before reusing its basis.
+rechecks authority before reusing its basis. A declined retained source layout
+retires that attempt and uses the existing standalone numerical route within the
+same remaining work and storage limits.
 
 Preparation is capped at eight million modeled work units; root and node LP work
 stop at 150 million units or the containing invocation's smaller allowance.
