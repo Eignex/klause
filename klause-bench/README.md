@@ -2396,6 +2396,37 @@ the recorded witnesses against the original MiniZinc source.
 
 ## Design evidence
 
+### Conditional component composition
+
+[Conditional component traces](#conditional-component-traces) cover the eleven
+WCNF sources of status sweep [8846](https://lab.eignex.com/jobs/8846) at `364582ebf`,
+all feasible and unproven at ten seconds, plus the two-five-cycle controls. Jobs
+[8852](https://lab.eignex.com/jobs/8852), [8856](https://lab.eignex.com/jobs/8856) and
+[8858](https://lab.eignex.com/jobs/8858) ran at `f6dc3eca`, `7a315f07` and `891e11ae` on
+one Linux/amd64 vCPU with 4.6 GiB and JDK 25. Every prepared factor is a clause, so no
+enforcing relation is outside the trace.
+
+The conditioned control splits at its root into the two cycles. Children of 3 and 3 plus
+the fixed separator compose to 7 in 20 nodes, against 82 for the joint residual. Across
+the sources, all ten closed node compositions equal the joint optimum, every composed witness
+passes the original clauses, and child and joint refutations agree in four probes.
+
+Independence is narrow. One source never splits. On six others a giant component holds
+the residual: split-off children carry at most 6% of free variables, the giant stops
+without a verdict, or no probe-eligible split appears. Wall-time gains appear only at shallow balanced splits under the
+trivial objective bound: an auctions node solves 161 and 9 clauses in 31,810 nodes and
+59 ms against 137,777 nodes and 235 ms joint, and a preference-planning node closes its
+children where the joint residual stops at two seconds. Elsewhere, per-child model cost
+exceeds the saved nodes. `LpConfig(LpEmphasis.DEFAULT)` left every joint node count
+unchanged. Re-encountered child keys are mostly at most nine clauses solved in at most
+22 nodes, while a full residual scan costs about eight search nodes on auctions and
+milliseconds per sample on the largest sources. Incumbent-scoped learned entries merge
+many splits; non-permanent learned clauses merged splits only on tcp.
+
+The retained scope shows no consumed reuse under containing allowances, so no traversal
+or cache integration follows. Raw records are under
+`klause-evidence/campaigns/conditional-components-3724/`.
+
 ### Bounded retained integer probing
 
 Default metered finite satisfaction preparation funds one retained root, 128 probe
