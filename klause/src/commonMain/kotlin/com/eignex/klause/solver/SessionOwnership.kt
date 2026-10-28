@@ -20,7 +20,7 @@ private class HandleOwnership<T : Any>(private val source: AutoCloseable, privat
             try {
                 close()
             } catch (closeFailure: Throwable) {
-                failure.addSuppressed(closeFailure)
+                if (failure !== closeFailure) failure.addSuppressed(closeFailure)
             }
             throw failure
         }

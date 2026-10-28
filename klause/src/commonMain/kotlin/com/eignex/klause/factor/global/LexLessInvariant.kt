@@ -145,12 +145,12 @@ internal class LexLessInvariant(private val xs: IntArray, private val ys: IntArr
         if (!state.assumptions.isFrozenInt(x0)) state.assignment.setInt(x0, xv)
         if (!state.assumptions.isFrozenInt(y0)) state.assignment.setInt(y0, yv)
         for (i in 1 until xs.size) {
-            if (!state.assumptions.isFrozenInt(xs[i])) {
+            if (xs[i] != x0 && xs[i] != y0 && !state.assumptions.isFrozenInt(xs[i])) {
                 state.assignment.setInt(xs[i], state.rootDomains[xs[i]].min)
             }
         }
         for (i in 1 until ys.size) {
-            if (!state.assumptions.isFrozenInt(ys[i])) {
+            if (ys[i] != x0 && ys[i] != y0 && !state.assumptions.isFrozenInt(ys[i])) {
                 state.assignment.setInt(ys[i], state.rootDomains[ys[i]].min)
             }
         }

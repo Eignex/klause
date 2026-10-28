@@ -97,7 +97,7 @@ internal class Inprocessing(
          * stored as unconditional learned clauses.
          */
         fun from(params: BacktrackParams, stats: SearchStatsSink? = null): Inprocessing? {
-            if (!params.assumptions.isEmpty) return null
+            if (!params.assumptions.isEmpty || !params.assumptions.deductions.isEmpty) return null
             val passes = buildList {
                 // Subsumption first: it only shrinks the database, so vivification's probing works
                 // the surviving clauses instead of ones about to be dropped.

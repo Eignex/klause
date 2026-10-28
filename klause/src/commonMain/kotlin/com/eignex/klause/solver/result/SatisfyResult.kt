@@ -34,7 +34,7 @@ sealed interface SatisfyResult {
         override val semantics: EffectiveSourceSemantics? = sample.semantics,
     ) : SatisfyResult
 
-    /** Subset of the input assumptions that's jointly infeasible against the problem's
+    /** Subset of the explicit and parameter assumptions that's jointly infeasible against the problem's
      *  hard constraints. Sound (always unsat) but not necessarily minimal. For
      *  backends that can't extract a sub-core (local-search) this is the full
      *  input [Assumptions] verbatim. */
@@ -64,7 +64,8 @@ sealed interface SatisfyResult {
 /**
  * Run `solver` with [assumptions] pinned for this call and return a [SatisfyResult].
  *
- * On `Unsat`, the assumption subset returned in [SatisfyResult.UnsatUnderAssumptions.core]
+ * Parameter assumptions merge with [assumptions], with explicit pins taking precedence. On `Unsat`,
+ * the merged assumption subset returned in [SatisfyResult.UnsatUnderAssumptions.core]
  * is sound (jointly infeasible with the hard constraints) but not guaranteed minimal.
  * The [BacktrackSolver] override drives the seed phase manually so seed-time conflicts
  * yield the applied prefix as a core; deeper conflicts use the engine's assumption core, falling
@@ -75,8 +76,14 @@ fun <P : SolverParams> Solver<P>.satisfyUnderAssumptions(
     params: P,
     minimizeCore: Boolean = false,
 ): SatisfyResult {
+    val effectiveAssumptions = params.assumptions.mergedWith(assumptions)
     if (this is BacktrackSolver && params is BacktrackParams) {
-        return satisfyUnderAssumptionsBacktrack(this, assumptions, params, minimizeCore)
+        return satisfyUnderAssumptionsBacktrack(
+            this,
+            effectiveAssumptions,
+            params.copy(assumptions = Assumptions.None),
+            minimizeCore,
+        )
             .withSourceSemantics(problem.semantics)
     }
     val merged = params.withAssumptions(assumptions)
@@ -85,13 +92,13 @@ fun <P : SolverParams> Solver<P>.satisfyUnderAssumptions(
         is SolveResult.Sat -> SatisfyResult.Sat(r.assignment)
 
         is SolveResult.Unsat ->
-            if (assumptions.isEmpty) {
+            if (effectiveAssumptions.isEmpty && effectiveAssumptions.deductions.isEmpty) {
                 SatisfyResult.GloballyUnsat(r.core)
             } else {
-                val core = if (minimizeCore) {
-                    deletionMinimize(this, assumptions, params)
+                val core = if (minimizeCore && params.assumptions.deductions.isEmpty) {
+                    deletionMinimize(this, effectiveAssumptions, params)
                 } else {
-                    assumptions
+                    effectiveAssumptions
                 }
                 SatisfyResult.UnsatUnderAssumptions(core)
             }
@@ -113,7 +120,7 @@ private fun satisfyUnderAssumptionsBacktrack(
     params: BacktrackParams,
     minimizeCore: Boolean,
 ): SatisfyResult {
-    if (assumptions.isEmpty) {
+    if (assumptions.isEmpty && assumptions.deductions.isEmpty) {
         return when (val r = solver.solve(params)) {
             is SolveResult.Sat -> SatisfyResult.Sat(r.assignment)
             is SolveResult.Unsat -> SatisfyResult.GloballyUnsat(r.core)
@@ -145,6 +152,7 @@ private fun satisfyUnderAssumptionsBacktrack(
         is SolveResult.Unsat -> {
             val engineCore = r.assumptionCore
             val core = when {
+                !assumptions.deductions.isEmpty -> assumptions
                 engineCore != null && !engineCore.isEmpty -> engineCore
                 minimizeCore -> deletionMinimize(solver, assumptions, params)
                 else -> assumptions
@@ -161,7 +169,8 @@ private fun satisfyUnderAssumptionsBacktrack(
  * dropping one literal at a time and re-solving. Literals whose removal still leaves
  * the problem unsat are not load-bearing — drop them; literals whose removal makes the
  * problem sat are kept. Result is a minimal unsat subset (any further deletion would
- * make it sat).
+ * make it sat). Parameter pins are retained when the generic parameter contract cannot remove them;
+ * inherited deductions disable generic minimization because deleting a pin can restore a shadowed restriction.
  *
  * O(|assumptions| × solve_cost) — opt-in via the `minimizeCore` flag on
  * [satisfyUnderAssumptions]. Recommended only when callers can tolerate the extra
@@ -176,6 +185,7 @@ private fun <P : SolverParams> deletionMinimize(solver: Solver<P>, assumptions: 
     val candidateInts = assumptions.intKeys.copyOf()
 
     for (id in candidateBools) {
+        if (params.assumptions.isFrozenBool(id)) continue
         if (current.boolValueOrNull(id) == null) continue // already dropped
         val trial = current.dropBool(id)
         if (trial.isEmpty) continue // dropping it leaves nothing — last necessary pin
@@ -189,6 +199,7 @@ private fun <P : SolverParams> deletionMinimize(solver: Solver<P>, assumptions: 
         }
     }
     for (id in candidateInts) {
+        if (params.assumptions.isFrozenInt(id)) continue
         if (current.intValueOrNull(id) == null) continue
         val trial = current.dropInt(id)
         if (trial.isEmpty) continue
@@ -238,6 +249,7 @@ private fun Assumptions.dropInt(id: Int): Assumptions {
  * that the returned [Assumptions] is a subset of the input.
  */
 internal fun projectSeedConflictToAssumptions(input: Assumptions, conflictLevels: IntArray): Assumptions {
+    if (!input.deductions.isEmpty) return input
     val nb = input.boolKeys.size
     val ni = input.intKeys.size
     val boolHit = BooleanArray(nb)

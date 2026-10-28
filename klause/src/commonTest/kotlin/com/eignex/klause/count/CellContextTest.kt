@@ -28,6 +28,16 @@ import kotlin.test.assertTrue
 
 class CellContextTest {
     @Test
+    fun `repeated projection coordinates should contribute once to a cell key`() {
+        val problem = Problem(1, 1, arrayOf(IntDomain(0, 1)), emptyArray()).bake()
+        val context = CellContext.resolve(problem, intArrayOf(0, 0), intArrayOf(0, 0))
+
+        val key = context.projectionKey(Sample(booleanArrayOf(true), longArrayOf(1)))
+
+        assertEquals(listOf(1L, 1L), key)
+    }
+
+    @Test
     fun `decoding should preserve approximate and exact coordinates without an augmented certificate`() {
         val model = Problem(
             1,

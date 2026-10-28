@@ -17,6 +17,12 @@ pins and per-call parameters; popping restores the previous scope. The source mo
 is unchanged. Parameters that cannot enforce assumptions reject non-empty pins
 explicitly, as do custom sessions for scoped operations they cannot implement.
 
+`satisfyUnderAssumptions` includes parameter pins in the operation's scope and in any
+returned assumption core. Bound and hole restrictions also qualify infeasibility;
+an empty exact-pin set does not make that refutation global.
+Finite traversal seeds each domain restriction at a retractable decision level.
+Reseeding a scope containing restrictions rebuilds its seed from the original root.
+
 Reusing a source attachment creates a fresh execution scope. Optional heuristic
 views are requested after admission and presolve under the containing token;
 interrupted construction publishes no partial view.
@@ -91,6 +97,9 @@ completions multiply the count. Cell exhaustion requires complete feasibility
 checks, so an indeterminate real leaf cannot give an exact count. Polynomial
 algebraic assignments belong to the [polynomial pipeline](16-nonlinear-arithmetic.md#polynomial-real-arithmetic),
 outside these entry points.
+
+Repeated coordinates in an explicit counting or accurate-sampling projection
+contribute once, preserving their first occurrence's order.
 
 ## Exact count bounds
 

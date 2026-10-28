@@ -450,6 +450,11 @@ local-search slots lead with fixed-break probSAT.
 
 #### Boolean objective core search
 
+The internal non-retained MaxSAT drivers keep relaxed soft clauses eligible for
+later cores, preserving their blockers through weight splits. The weighted threshold
+driver bisects the bounded cost range using cost-only assumptions; a refutation
+raises the bound only past the tested cutoff.
+
 Curated mixed finite optimization pools append a retained core-guided complete worker
 when every objective term is Boolean, including exact views of 0/1 integer costs,
 and the model has no continuous columns. Other finite integer constraints remain

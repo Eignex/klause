@@ -125,6 +125,32 @@ class NodeBudgetTest {
     }
 
     @Test
+    fun `remaining instructions should include every move covered by the integer charge`() {
+        for (limit in 1L..9L) {
+            val budget = NodeBudget(limit)
+            val instructions = budget.movesLeft()
+
+            budget.spendMoves(instructions)
+
+            assertTrue(budget.spent <= limit)
+            assertEquals(0L, budget.movesLeft())
+            budget.spendMoves(1L)
+            assertTrue(budget.spent > limit)
+        }
+    }
+
+    @Test
+    fun `remaining instructions should retain fractional capacity after decisions`() {
+        val budget = NodeBudget(3L)
+        budget.spendMoves(1L)
+        budget.spend()
+
+        assertEquals(1L, budget.movesLeft())
+        budget.spendMoves(1L)
+        assertEquals(3L, budget.spent)
+    }
+
+    @Test
     fun `large charges should saturate without restoring an allowance`() {
         val budget = NodeBudget(Long.MAX_VALUE)
 

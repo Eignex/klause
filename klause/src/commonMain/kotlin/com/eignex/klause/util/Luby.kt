@@ -15,15 +15,13 @@ package com.eignex.klause.util
  * iteratively so an arbitrary index costs O(log i) without recursion or per-step state.
  */
 internal fun lubyN(index: Long): Long {
+    require(index > 0L) { "Luby index must be positive" }
     var i = index
-    var k = 1
-    while ((1L shl k) <= i) k++
     while (true) {
+        val k = Long.SIZE_BITS - i.countLeadingZeroBits()
         val pow = 1L shl (k - 1)
-        if (i == (pow shl 1) - 1) return pow
+        if (i == pow + (pow - 1)) return pow
         i = i - pow + 1
-        k = 1
-        while ((1L shl k) <= i) k++
     }
 }
 

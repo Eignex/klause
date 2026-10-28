@@ -2,18 +2,88 @@ package com.eignex.klause.solver.result
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.Solver
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class SatisfyResultTest {
+
+    @Test
+    fun `generic core minimization should retain pins shadowing parameter restrictions`() {
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
+            arrayOf(Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 2)),
+        ).bake()
+        val delegate = BacktrackSolver(problem)
+        val solver = object : Solver<BacktrackParams> by delegate {}
+        val assumptions = Assumptions(ints = mapOf(0 to 1L, 1 to 0L))
+        val params = BacktrackParams(assumptions = Assumptions.None.withTightenedMin(0, 3L))
+
+        val result = solver.satisfyUnderAssumptions(assumptions, params, minimizeCore = true)
+
+        val core = assertIs<SatisfyResult.UnsatUnderAssumptions>(result).core
+        assertIs<SolveResult.Unsat>(delegate.solve(BacktrackParams(assumptions = core)))
+    }
+
+    @Test
+    fun `parameter pins should qualify infeasibility without explicit assumptions`() {
+        val problem = Problem(
+            numBoolVars = 1,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf(Clause(intArrayOf(Lit.make(0, true)))),
+        )
+        val pins = Assumptions(bools = mapOf(0 to false))
+
+        val result = BacktrackSolver(problem.bake()).satisfyUnderAssumptions(
+            Assumptions.None,
+            BacktrackParams(assumptions = pins),
+        )
+
+        assertEquals(pins, assertIs<SatisfyResult.UnsatUnderAssumptions>(result).core)
+    }
+
+    @Test
+    fun `assumption cores should include parameter pins needed for the conflict`() {
+        val problem = Problem(
+            numBoolVars = 2,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false)))),
+        )
+        val inherited = Assumptions(bools = mapOf(0 to true))
+        val explicit = Assumptions(bools = mapOf(1 to true))
+
+        val result = BacktrackSolver(problem.bake()).satisfyUnderAssumptions(
+            explicit,
+            BacktrackParams(assumptions = inherited),
+        )
+
+        assertEquals(inherited.mergedWith(explicit), assertIs<SatisfyResult.UnsatUnderAssumptions>(result).core)
+    }
+
+    @Test
+    fun `bounds without exact pins should qualify infeasibility`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+        val assumptions = Assumptions.None.withTightenedMin(0, 2L)
+
+        val result = BacktrackSolver(problem.bake()).satisfyUnderAssumptions(assumptions, BacktrackParams())
+
+        assertEquals(assumptions, assertIs<SatisfyResult.UnsatUnderAssumptions>(result).core)
+    }
 
     @Test
     fun `satisfy should return sat under consistent assumptions`() {

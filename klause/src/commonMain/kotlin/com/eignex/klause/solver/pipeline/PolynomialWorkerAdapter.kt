@@ -52,7 +52,9 @@ internal class PolynomialWorkerAdapter(
         model.finite.bake(selected.forEngineView(model.finite), this.cancellation)
     } ?: model.finite.bake(this.cancellation)
     private val enforcingFactors = model.finiteEnforcingFactors
-    private val fixed = if (params.assumptions.isEmpty) finite.fixedDiscreteSample() else {
+    private val fixed = if (params.assumptions.isEmpty && params.assumptions.deductions.isEmpty) {
+        finite.fixedDiscreteSample()
+    } else {
         finite.conditionedRoot(params.assumptions, this.cancellation).fixedDiscreteSample()
     }
 

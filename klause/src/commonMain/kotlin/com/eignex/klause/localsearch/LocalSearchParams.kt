@@ -112,7 +112,8 @@ data class LocalSearchParams(
     val objectiveGuidance: ObjectiveGuidance = ObjectiveGuidance.Functional,
 ) : SolverParams {
     override fun withAssumptions(assumptions: Assumptions): LocalSearchParams =
-        if (assumptions.isEmpty) this else copy(assumptions = merge(this.assumptions, assumptions))
+        if (assumptions.isEmpty && assumptions.deductions.isEmpty) this
+        else copy(assumptions = merge(this.assumptions, assumptions))
 
     override fun withCancellation(cancellation: Cancellation): LocalSearchParams =
         copy(cancellation = this.cancellation.forInvocation(cancellation))

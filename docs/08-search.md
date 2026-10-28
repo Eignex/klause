@@ -252,7 +252,8 @@ factor identities; static event and delta-consumer indexes retain their source i
 Boolean-only models journal each pin without integer-state padding. Integer undo
 replays saved domains and interior carves. Unconditional root carves are kept in
 state-owned interval runs, so late equality atoms and historical queries still see
-them.
+them. Exact integer pins retain their owning decision level separately from bound
+decisions on the same column.
 
 Integer domain maintenance retains an interrupted history/atom-wakeup cursor. No
 subsequent mutation may start until that cursor completes or retraction discards it.
@@ -264,6 +265,9 @@ cannot certify the requested assumption set.
 Search-time holes keep their reason, level and undo position in trail order, with
 a per-variable value index for lookup. Retraction removes index entries with the
 discarded witness tail. Unconditional root runs remain separate from that index.
+Scoped survivor restrictions retain reversible before/after domains with their level
+and undo position, so late equality atoms recover conditional exclusions without
+enumerating the gaps.
 
 Root snapshot capture compares enumerable survivors with the saturated hole count,
 independently of numeric span. Sparse sets are captured as ascending survivor

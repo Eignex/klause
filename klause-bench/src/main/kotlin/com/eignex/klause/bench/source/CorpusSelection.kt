@@ -252,7 +252,8 @@ internal object CorpusSelection {
         for (pd in families) {
             // The model uses an is_output annotation undefined in MiniZinc.
             if (legacyExclusions && pd.relativeTo(root).path == "2010/depot_placement") continue
-            val candidates = pd.listFiles { f -> f.isFile && f.extension == "mzn" }?.toList()
+            val candidates = pd.listFiles { f -> f.isFile && f.extension == "mzn" }
+                ?.toList()?.takeIf { it.isNotEmpty() }
                 ?: pd.walkTopDown().maxDepth(3).filter { it.isFile && it.extension == "mzn" }.toList()
             if (candidates.isEmpty()) continue
             val primary = pickPrimaryMzn(pd.name, candidates)

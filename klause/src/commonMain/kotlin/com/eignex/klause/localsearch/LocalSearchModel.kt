@@ -129,7 +129,9 @@ private fun BakedProblem.rootPins(assumptions: Assumptions): Assumptions? {
     val root = baked
     if (root is PropagationResult.Unsat) return null
     root as PropagationResult.Implied
-    if (assumptions.isEmpty) return if (root.isEmpty) Assumptions.None else root.toAssumptions()
+    if (assumptions.isEmpty && assumptions.deductions.isEmpty) {
+        return if (root.isEmpty) Assumptions.None else root.toAssumptions()
+    }
     return when (val r = propagate(assumptions)) {
         is PropagationResult.Unsat -> null
         is PropagationResult.Implied -> assumptions.mergedWith(r.toAssumptions())

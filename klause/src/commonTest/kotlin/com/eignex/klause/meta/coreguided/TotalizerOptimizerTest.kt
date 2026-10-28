@@ -12,6 +12,31 @@ import kotlin.test.assertIs
 class TotalizerOptimizerTest {
 
     @Test
+    fun `weighted optimization should account for the cost of replacing earlier relaxations`() {
+        val problem = Problem(
+            numBoolVars = 3,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf(
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, false))),
+                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
+            ),
+        )
+        val softs = listOf(
+            TotalizerOptimizer.WeightedSoft(Lit.make(0, true), weight = 2L),
+            TotalizerOptimizer.WeightedSoft(Lit.make(1, true), weight = 2L),
+            TotalizerOptimizer.WeightedSoft(Lit.make(2, true), weight = 3L),
+        )
+
+        val result = TotalizerOptimizer(problem.bake()).minimizeWeighted(softs, BacktrackParams())
+
+        val optimal = assertIs<TotalizerOptimizer.Result.Optimal>(result)
+        assertEquals(4L, optimal.lowerBound)
+        assertEquals(4L, softs.sumOf { if (optimal.sample.boolValue(Lit.variable(it.lit))) 0L else it.weight })
+    }
+
+    @Test
     fun `weighted optimization should keep the heavier soft over the lighter under a mutex`() {
         val problem = Problem(
             numBoolVars = 2,

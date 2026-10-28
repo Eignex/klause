@@ -68,7 +68,7 @@ internal class NodeAllowance private constructor(
 private fun pricedInstructions(instructions: Long): Long =
     saturatedSum(saturatedProduct(instructions / 4L, 5L), instructions % 4L * 5L / 4L)
 
-private fun instructionsFor(work: Long): Long = work / 5L * 4L + work % 5L * 4L / 5L
+private fun instructionsFor(work: Long): Long = work / 5L * 4L + (work % 5L * 4L + 3L) / 5L
 
 private fun saturatedProduct(value: Long, weight: Long): Long =
     if (value > Long.MAX_VALUE / weight) Long.MAX_VALUE else value * weight

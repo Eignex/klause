@@ -8,12 +8,28 @@ import com.eignex.klause.bench.catalog.corpus
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.formats.flatzinc.UnsupportedFlatZincException
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 class SolveMetricTest {
     private val ref = ProblemRef("fam/inst", Format.MINIZINC, corpus("absent.mzn"), Category.CSP, Expected.Unknown)
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `best incumbent should compare the full signed objective range`(maximize: Boolean) {
+        val attribution = listOf(
+            Attribution("minimum", exactObjective = Long.MIN_VALUE.toString(), elapsedMs = 10),
+            Attribution("middle", exactObjective = "0", elapsedMs = 20),
+            Attribution("maximum", exactObjective = Long.MAX_VALUE.toString(), elapsedMs = 30),
+        )
+
+        val best = SolveMetric.best(attribution, maximize)
+
+        assertEquals(if (maximize) attribution.last() else attribution.first(), best)
+    }
 
     private fun stats(failure: Throwable) = SolveMetric.loadFailureRecord(
         ref,

@@ -1,5 +1,6 @@
 package com.eignex.klause.propagation
 
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableLongIntMap
@@ -12,8 +13,8 @@ import com.eignex.klause.util.MutableLongIntMap
 // [pushHoleHist], truncated on backtrack alongside the carve, read by [holeReasonFor] /
 // [holeLevelFor] / [holeHistHas].
 
-/** Reason for the interior carve of `k` from `v`'s domain, as recorded (possibly lazy, see [reasonOf]); null =
- *  bake-time fact. */
+/** Reason for the interior carve of `k` from `v`'s domain, as recorded (possibly lazy, see [reasonOf]);
+ *  null denotes a reasonless fact or decision. */
 internal fun PropagationState.holeReasonFor(v: Int, k: Long): IntArray? {
     if (rootHoleHist[v]?.contains(k) == true) return null
     val slot = holeHistIndex[v]?.getOrDefault(k, -1) ?: -1
@@ -27,7 +28,31 @@ internal fun PropagationState.holeReasonFor(v: Int, k: Long): IntArray? {
  *  that otherwise cycles for a value far from the live bound. */
 internal fun PropagationState.holeHistHas(v: Int, k: Long): Boolean {
     if (rootHoleHist[v]?.contains(k) == true) return true
-    return (holeHistIndex[v]?.getOrDefault(k, -1) ?: -1) >= 0
+    return (holeHistIndex[v]?.getOrDefault(k, -1) ?: -1) >= 0 || survivorRestrictionFor(v, k) != null
+}
+
+internal class SurvivorRestrictionHistory(
+    val before: IntDomain,
+    val after: IntDomain,
+    val level: Int,
+    val position: Int,
+    val previous: SurvivorRestrictionHistory?,
+)
+
+internal fun PropagationState.recordSurvivorRestriction(v: Int, before: IntDomain, after: IntDomain) {
+    val histories = survivorRestrictionHistory ?: HashMap<Int, RevRef<SurvivorRestrictionHistory?>>()
+        .also { survivorRestrictionHistory = it }
+    val cell = histories.getOrPut(v) { RevRef(this, null) }
+    cell.set(SurvivorRestrictionHistory(before, after, currentLevel, undo.size, cell.value))
+}
+
+private fun PropagationState.survivorRestrictionFor(v: Int, value: Long): SurvivorRestrictionHistory? {
+    var history = survivorRestrictionHistory?.get(v)?.value
+    while (history != null) {
+        if (value in history.before && value !in history.after) return history
+        history = history.previous
+    }
+    return null
 }
 
 internal fun PropagationState.pushHoleHist(v: Int, value: Long, level: Int, ant: IntArray?) {
@@ -55,7 +80,7 @@ internal fun PropagationState.pushHoleHist(v: Int, value: Long, level: Int, ant:
 internal fun PropagationState.carvedAt(v: Int, k: Long): Int {
     if (rootHoleHist[v]?.contains(k) == true) return 0
     val slot = holeHistIndex[v]?.getOrDefault(k, -1) ?: -1
-    return if (slot >= 0) requireNotNull(holeHistPos[v])[slot] else -1
+    return if (slot >= 0) requireNotNull(holeHistPos[v])[slot] else survivorRestrictionFor(v, k)?.position ?: -1
 }
 
 /** Level at which interior value `k` was carved out of `v`'s domain. `0` when no
@@ -64,7 +89,7 @@ internal fun PropagationState.carvedAt(v: Int, k: Long): Int {
 internal fun PropagationState.holeLevelFor(v: Int, k: Long): Int {
     if (rootHoleHist[v]?.contains(k) == true) return 0
     val slot = holeHistIndex[v]?.getOrDefault(k, -1) ?: -1
-    return if (slot >= 0) requireNotNull(holeHistLvl[v])[slot] else 0
+    return if (slot >= 0) requireNotNull(holeHistLvl[v])[slot] else survivorRestrictionFor(v, k)?.level ?: 0
 }
 
 internal fun PropagationState.truncateHoleHistory(v: Int, size: Int) {

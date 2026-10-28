@@ -12,12 +12,129 @@ import com.eignex.klause.solver.*
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertIs
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PropagationSessionTest {
+    @Test
+    fun `popping bound decisions should preserve an earlier exact integer pin`() {
+        for (lower in listOf(false, true)) {
+            val session = PropagationSession(Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray()))
+            session.pinInt(0, 2L)
+            if (lower) session.pinIntAtLeast(0, 1L) else session.pinIntAtMost(0, 3L)
+
+            session.popLast()
+
+            assertEquals(Assumptions(ints = mapOf(0 to 2L)), session.currentAssumptions())
+            if (lower) session.pinIntAtLeast(0, 1L) else session.pinIntAtMost(0, 3L)
+            session.popUntilUnpinned(VarKind.Int, 0)
+            assertEquals(IntDomain(0, 3), session.intDomain(0))
+            assertTrue(session.currentAssumptions().isEmpty)
+            assertEquals(0, session.decisionLevel)
+        }
+    }
+
+    @Test
+    fun `reseeding should discard bound decisions above an exact integer pin`() {
+        val session = PropagationSession(Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray()))
+        val assumptions = Assumptions(ints = mapOf(0 to 2L))
+        session.seed(assumptions)
+        session.pinIntAtLeast(0, 1L)
+
+        session.reseedFrom(assumptions)
+
+        assertEquals(assumptions, session.currentAssumptions())
+        assertEquals(1, session.decisionLevel)
+    }
+
+    @Test
+    fun `survivor restriction exclusions should retain their seed level until reseeding`() {
+        for (maximum in listOf(3L, Long.MAX_VALUE)) {
+            val session = PropagationSession(Problem(0, 1, arrayOf(IntDomain(0, maximum)), emptyArray()))
+            val assumptions = Assumptions(
+                intArrayOf(), booleanArrayOf(), intArrayOf(), longArrayOf(),
+                DeducedRestrictions(intSetKeys = intArrayOf(0), intSetOffsets = intArrayOf(0, 2),
+                    intSetValues = longArrayOf(1, maximum)),
+            )
+            assertIs<PropagationResult.Implied>(session.seed(assumptions))
+
+            val equality = session.equalityLit(0, 2L)
+            val state = session.explanationState
+
+            assertEquals(false, session.litTruth(equality))
+            assertEquals(1, state.atomLevelForConflict(Lit.variable(equality)))
+            assertTrue(state.carvedAt(0, 2L) > 0)
+            assertIs<PropagationResult.Implied>(session.reseedFrom(Assumptions.None))
+            assertNull(session.litTruth(equality))
+            assertFalse(state.holeHistHas(0, 2L))
+            assertEquals(-1, state.carvedAt(0, 2L))
+        }
+    }
+
+    @Test
+    fun `bound restriction snapshots should not fabricate exact integer pins`() {
+        val session = PropagationSession(Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray()))
+        session.seed(Assumptions.None.withTightenedMin(0, 1L))
+
+        val snapshot = session.currentAssumptions()
+
+        assertTrue(snapshot.ints.isEmpty())
+    }
+
+    @Test
+    fun `domain restriction seeds should apply and disappear on reseeding`() {
+        val allowed = Assumptions(
+            intArrayOf(), booleanArrayOf(), intArrayOf(), longArrayOf(),
+            DeducedRestrictions(intSetKeys = intArrayOf(0), intSetOffsets = intArrayOf(0, 2),
+                intSetValues = longArrayOf(1, 3)),
+        )
+        val cases = listOf(
+            Assumptions.None.withTightenedMin(0, 1L) to listOf(1L, 2L, 3L),
+            Assumptions.None.withTightenedMax(0, 2L) to listOf(0L, 1L, 2L),
+            Assumptions.None.withIntHole(0, 1L) to listOf(0L, 2L, 3L),
+            allowed to listOf(1L, 3L),
+        )
+
+        for ((assumptions, values) in cases) {
+            for (prepared in listOf(false, true)) {
+                val session = PropagationSession(Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray()))
+
+                val result = if (prepared) session.prepareSeed(assumptions).asSequence().filterNotNull().last()
+                else session.seed(assumptions)
+
+                assertIs<PropagationResult.Implied>(result)
+                assertEquals(values, (0L..3L).filter { it in session.intDomain(0) })
+                assertIs<PropagationResult.Implied>(session.reseedFrom(Assumptions.None))
+                assertEquals(IntDomain(0, 3), session.intDomain(0))
+                assertEquals(0, session.decisionLevel)
+                assertIs<PropagationResult.Implied>(session.reseedFrom(assumptions))
+                assertEquals(values, (0L..3L).filter { it in session.intDomain(0) })
+            }
+        }
+    }
+
+    @Test
+    fun `cancelled domain restriction reseeding should retry under a fresh invocation`() {
+        var cancelled = false
+        val session = PropagationSession(
+            Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray()),
+            Cancellation { cancelled },
+        )
+        val assumptions = Assumptions.None.withTightenedMin(0, 2L)
+        cancelled = true
+        assertIs<PropagationResult.Implied>(session.reseedFrom(assumptions))
+        assertTrue(session.fixpointCancelled)
+
+        cancelled = false
+        val result = session.reseedFrom(assumptions)
+
+        assertIs<PropagationResult.Implied>(result)
+        assertFalse(session.fixpointCancelled)
+        assertEquals(IntDomain(2, 3), session.intDomain(0))
+    }
+
     @Test
     fun `a factor conflict after external fixing should retain a valid asserting clause`() {
         val session = PropagationSession(Problem(1, 2, Array(2) { IntDomain(0, 10) }, emptyArray()))

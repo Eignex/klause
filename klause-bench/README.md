@@ -393,6 +393,9 @@ its selection. Use `reference=any` in lab specs to preserve frozen membership.
 | `per-family=N`, `max=N`, `seed=N` | Cap and deterministically sample within each suite's own families; unset `per-family` uses the suite default |
 | `balance=format` | Split `max` across present formats, redistributing unused shares |
 
+Challenge layouts prefer a model directly in each family directory, falling back
+to models within two subdirectory levels. Instance data can be nested independently.
+
 `solve-one` takes the identity `select` printed plus these options:
 
 | Option | Meaning |
@@ -949,7 +952,7 @@ from the record.
 | MiniZinc | The last complete DZN solution from its first assignment, then its `% klause-exact:`, `% klause-coordinate:` and `% klause-float-` lines; a Klause solution at model level (below) |
 | XCSP3 | The last complete `<instantiation>`, prefixed once with `v ` |
 | SMT-LIB | The last complete model, from its `(` line to its `)` line, with newline line endings |
-| MPS, OPB, DIMACS, WCNF | The last `v ` line |
+| MPS, OPB, DIMACS, WCNF | The last `v ` line, or bare `v` for an empty assignment |
 
 Klause solves a MiniZinc model's compiled FlatZinc, so its own output names FlatZinc
 variables (`X_INTRODUCED_*`) and prints enums as integers. The bench passes the final

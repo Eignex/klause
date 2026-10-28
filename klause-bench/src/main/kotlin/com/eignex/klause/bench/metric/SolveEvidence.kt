@@ -35,7 +35,7 @@ internal object SolveEvidence {
             Format.XCSP3 -> xcspInstantiation(raw)?.let { "v $it" }
 
             Format.OPB, Format.DIMACS, Format.WCNF, Format.MPS ->
-                raw.lineSequence().lastOrNull { it.startsWith("v ") }
+                raw.lineSequence().lastOrNull { it == "v" || it.startsWith("v ") }
 
             else -> null
         }
@@ -74,10 +74,19 @@ internal object SolveEvidence {
 
     /** The last complete XCSP3 `<instantiation>` of the `v ` lines, without their prefix. */
     private fun xcspInstantiation(raw: String): String? {
-        val lines = raw.lineSequence().filter { it.startsWith("v ") }.map { it.removePrefix("v ") }.toList()
-        val start = lines.indexOfLast { it.trimStart().startsWith("<instantiation") }
-        val witness = lines.drop(start.coerceAtLeast(0)).joinToString("\n").trim()
-        return witness.takeIf { it.endsWith("</instantiation>") }
+        var candidate: StringBuilder? = null
+        var witness: String? = null
+        for (line in raw.lineSequence().filter { it.startsWith("v ") }.map { it.removePrefix("v ") }) {
+            if (line.trimStart().startsWith("<instantiation")) candidate = StringBuilder()
+            val current = candidate ?: continue
+            if (current.isNotEmpty()) current.append('\n')
+            current.append(line)
+            if (line.trimEnd().endsWith("</instantiation>")) {
+                witness = current.toString().trim()
+                candidate = null
+            }
+        }
+        return witness
     }
 
     private fun finalSmtModel(raw: String): String? {

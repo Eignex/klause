@@ -303,12 +303,12 @@ internal object SolveMetric {
      *  compare on it (the whole model-oriented value). Otherwise compare on [Attribution.exactObjective]
      *  as a [Long], lossless past 2^53. */
     internal fun best(attribution: List<Attribution>, maximize: Boolean): Attribution {
-        val sign = if (maximize) 1 else -1
-        return if (attribution.any { it.continuousObjective != null }) {
-            attribution.maxByOrNull { sign * (it.continuousObjective ?: 0.0) } ?: attribution.last()
+        val comparator = if (attribution.any { it.continuousObjective != null }) {
+            compareBy<Attribution> { it.continuousObjective ?: 0.0 }
         } else {
-            attribution.maxByOrNull { sign * (it.exactObjective?.toLongOrNull() ?: 0L) } ?: attribution.last()
+            compareBy<Attribution> { it.exactObjective?.toLongOrNull() ?: 0L }
         }
+        return attribution.maxWithOrNull(if (maximize) comparator else comparator.reversed()) ?: attribution.last()
     }
 
     private fun errorRecord(
