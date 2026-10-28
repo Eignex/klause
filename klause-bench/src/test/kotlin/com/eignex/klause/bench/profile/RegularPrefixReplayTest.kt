@@ -52,11 +52,13 @@ class RegularPrefixReplayTest {
     fun `matching kernels share prefix states across accepting sets`() {
         val transitions = longArrayOf(1, 2, 2, 3, 3, 1)
         val source = Problem(
-            0, 5, Array(5) { IntDomain(1, 2) },
+            0,
+            5,
+            Array(5) { IntDomain(1, 2) },
             arrayOf(
-            Regular(intArrayOf(0, 1, 2), 3, 2, transitions, 1, intArrayOf(1, 2)),
-            Regular(intArrayOf(0, 1, 2, 3, 4), 3, 2, transitions, 1, intArrayOf(1)),
-        )
+                Regular(intArrayOf(0, 1, 2), 3, 2, transitions, 1, intArrayOf(1, 2)),
+                Regular(intArrayOf(0, 1, 2, 3, 4), 3, 2, transitions, 1, intArrayOf(1)),
+            ),
         )
 
         val definitions = regularPrefixDefinitions(source)
@@ -67,10 +69,12 @@ class RegularPrefixReplayTest {
     @Test
     fun `retracting a state decision restores the sibling prefix`() {
         val source = Problem(
-            0, 3, Array(3) { IntDomain(1, 2) },
+            0,
+            3,
+            Array(3) { IntDomain(1, 2) },
             arrayOf(
-            Regular(intArrayOf(0, 1, 2), 3, 2, longArrayOf(1, 2, 2, 3, 3, 1), 1, intArrayOf(1, 2, 3)),
-        )
+                Regular(intArrayOf(0, 1, 2), 3, 2, longArrayOf(1, 2, 2, 3, 3, 1), 1, intArrayOf(1, 2, 3)),
+            ),
         )
         val definitions = regularPrefixDefinitions(source)
         val session = PropagationSession(definitions.problem)

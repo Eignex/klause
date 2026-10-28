@@ -45,8 +45,8 @@ internal object RegularPrefixProfile {
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
         for (k in listOf(3, 6)) {
             for (allowTwo in listOf(false, true)) {
-            capture(control(k, allowTwo), out.resolve("control-$k-$allowTwo"), replay)
-        }
+                capture(control(k, allowTwo), out.resolve("control-$k-$allowTwo"), replay)
+            }
         }
         sources.forEachIndexed { index, input ->
             val source = input.jsonObject
@@ -66,19 +66,21 @@ internal object RegularPrefixProfile {
     private fun control(k: Int, allowTwo: Boolean): Problem {
         val transitions = longArrayOf(1, 2, 2, 3, 3, 1)
         return Problem(
-            0, k + 2, Array(k + 2) { IntDomain(1, 2) },
+            0,
+            k + 2,
+            Array(k + 2) { IntDomain(1, 2) },
             arrayOf(
-            Regular(
-                IntArray(k) { it },
-                3,
-                2,
-                transitions,
-                1,
-                if (allowTwo) intArrayOf(1, 2, 3) else intArrayOf(1, 2),
+                Regular(
+                    IntArray(k) { it },
+                    3,
+                    2,
+                    transitions,
+                    1,
+                    if (allowTwo) intArrayOf(1, 2, 3) else intArrayOf(1, 2),
+                ),
+                Regular(IntArray(k + 2) { it }, 3, 2, transitions, 1, intArrayOf(1)),
+                Linear(intArrayOf(1, -1), intArrayOf(k, k + 1), LinearOp.NE, 0),
             ),
-            Regular(IntArray(k + 2) { it }, 3, 2, transitions, 1, intArrayOf(1)),
-            Linear(intArrayOf(1, -1), intArrayOf(k, k + 1), LinearOp.NE, 0),
-        )
         )
     }
 
@@ -92,24 +94,24 @@ internal object RegularPrefixProfile {
             val started = System.nanoTime()
             val prepared = FinitePipeline.prepare(
                 FinitePipelineRequest(
-                source,
-                FiniteEngine.BACKTRACK,
-                presolveConfig = PresolveConfig.parse(mode),
-                explicitPresolveConfig = mode != "default",
-                cancellation = stop,
-                solveCancellation = stop,
-                presolveBudget = budget,
-                randomSeed = 3L,
-            )
+                    source,
+                    FiniteEngine.BACKTRACK,
+                    presolveConfig = PresolveConfig.parse(mode),
+                    explicitPresolveConfig = mode != "default",
+                    cancellation = stop,
+                    solveCancellation = stop,
+                    presolveBudget = budget,
+                    randomSeed = 3L,
+                ),
             )
             val preparationNs = System.nanoTime() - started
             val model = prepared.problem
             out.resolve("$mode-prepared.json").writeText(codec.encodeToJsonElement(model).toString())
             val root = if (prepared.presolve?.infeasible != true && !stop()) {
                 PropagationSession(
-                model,
-                cancellation = stop,
-            ).seed(Assumptions.None)
+                    model,
+                    cancellation = stop,
+                ).seed(Assumptions.None)
             } else {
                 null
             }
@@ -130,22 +132,25 @@ internal object RegularPrefixProfile {
                 put(
                     "regular",
                     buildJsonArray {
-                    model.factors.forEachIndexed { id, factor ->
-                        if (factor is Regular) {
-                            add(
-                                buildJsonObject {
-                            put("factor", id)
-                            put("length", factor.seq.size)
-                            put("states", factor.numStates)
-                            put("alphabet", factor.alphabetSize)
-                            put("deadTransitions", factor.transitions.count { it !in 1L..factor.numStates.toLong() })
-                            put("distinctCoordinates", factor.seq.toSet().size == factor.seq.size)
-                            put("coordinates", JsonArray(factor.seq.map(::JsonPrimitive)))
+                        model.factors.forEachIndexed { id, factor ->
+                            if (factor is Regular) {
+                                add(
+                                    buildJsonObject {
+                                        put("factor", id)
+                                        put("length", factor.seq.size)
+                                        put("states", factor.numStates)
+                                        put("alphabet", factor.alphabetSize)
+                                        put(
+                                            "deadTransitions",
+                                            factor.transitions.count { it !in 1L..factor.numStates.toLong() },
+                                        )
+                                        put("distinctCoordinates", factor.seq.toSet().size == factor.seq.size)
+                                        put("coordinates", JsonArray(factor.seq.map(::JsonPrimitive)))
+                                    },
+                                )
+                            }
                         }
-                            )
-                        }
-                    }
-                }
+                    },
                 )
                 put("os", System.getProperty("os.name"))
                 put("arch", System.getProperty("os.arch"))
@@ -159,9 +164,11 @@ internal object RegularPrefixProfile {
                 RegularPrefixReplay.capture(
                     model,
                     sha256(
-                    codec.encodeToJsonElement(model).toString().toByteArray(),
-                ),
-                    out, source, prepared.reconstruct
+                        codec.encodeToJsonElement(model).toString().toByteArray(),
+                    ),
+                    out,
+                    source,
+                    prepared.reconstruct,
                 )
             }
         }

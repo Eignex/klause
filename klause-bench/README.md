@@ -2701,6 +2701,37 @@ both separator alternatives share one arm allowance. Root snapshots and full che
 witnesses go under `$OUT`. Checks are native original-Problem clauses and exact costs,
 without an independent source-format proof certificate or a production default change.
 
+### Regular prefix snapshots and replay
+
+`bench.profile.RegularPrefixProfile` takes `request64=<base64 JSON array>` with one
+to four hash-pinned XCSP3 requests containing `suite`, `problem` and `sha256`.
+It retains original bytes, source and prepared models, runtime/build identities,
+default/aggressive preparation costs and four modulo-three controls. Each preparation
+has twelve seconds and an 825-million work allowance; reaching that allowance does
+not establish completion of every optional pass.
+
+`replay=true` compares strong native search, conservative source-decision-prefix
+reasons, exact definitions with those same source-only decisions/reasons, and
+definitions consumed by native learning with and without state branching. The
+conservative reasons retain the complete active source decision prefix; they do
+not claim the best possible projected reason. All modes retain native Regular
+filtering. Exact transition Tables and equality reification define actual run
+states, including an absorbing rejecting state for missing transitions. Matching
+kernels share prefix coordinates independently of accepting sets. Corpus replay
+selects one Regular; the small controls share both chains. Admission caps length
+at 32, states at 64, alphabet at 16 and added transition cells at 32,768.
+
+Each search has two seconds and 2,048 decisions. Reports separate definition
+construction, native work, decisions/conflicts, stored clauses, current-thread
+allocation and native reconstruction checks against the original compiled model.
+The satisfiable modulo controls also replay a learned state exclusion and a
+source-prefix clause against two distinct words reaching the same state.
+Clause counts and use marks alone establish no distinct-prefix reuse. This is a
+satisfaction diagnostic with no online definitions or public assumption, objective,
+counting, enumeration, sampling or proof-export contract. JFR timings establish no
+throughput comparison, and native source checks are separate from independent
+witness/proof checking.
+
 ### Table profiling
 
 `bench.profile.ExtensionalCompositionProfile` accepts `suite=ID problem=NAME
