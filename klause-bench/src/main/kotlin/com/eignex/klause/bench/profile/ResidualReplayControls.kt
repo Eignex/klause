@@ -32,7 +32,6 @@ internal class ResidualRun(
     val solveNanos: Long,
 )
 
-/** Fresh child, joint, objective-ordered and ordinary LP controls over the same retained residual. */
 internal object ResidualReplayControls {
     @Suppress("LongParameterList")
     fun solve(

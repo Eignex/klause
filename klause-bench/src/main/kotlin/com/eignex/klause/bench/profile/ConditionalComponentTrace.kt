@@ -38,6 +38,8 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.HexFormat
 import kotlin.random.Random
@@ -298,7 +300,14 @@ object ConditionalComponentTrace {
                         val stored = System.nanoTime()
                         snapshots.mkdirs()
                         val file = snapshots.resolve("${probe.sample}.residual.json")
-                        file.writeBytes(bytes)
+                        val temporary = File.createTempFile(".capture-", ".tmp", snapshots)
+                        try {
+                            temporary.writeBytes(bytes)
+                            Files.move(temporary.toPath(), file.toPath(), StandardCopyOption.ATOMIC_MOVE,
+                                StandardCopyOption.REPLACE_EXISTING)
+                        } finally {
+                            temporary.delete()
+                        }
                         put("snapshotFile", "${snapshots.name}/${file.name}")
                         put("snapshotBytes", bytes.size)
                         put("snapshotSha256", hex(MessageDigest.getInstance("SHA-256").digest(bytes)))

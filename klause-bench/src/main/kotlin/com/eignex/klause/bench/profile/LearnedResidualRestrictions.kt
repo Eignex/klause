@@ -25,30 +25,9 @@ internal class LearnedResidualInspection(
 ) {
     val complete: Boolean get() = decline == null && entries.size == storeCount && entries.all { it.support != null }
 
-    fun componentCount(sourceComponents: List<List<Int>>): Int? {
-        if (!complete) return null
-        val parent = HashMap<Int, Int>()
-        fun root(v: Int): Int {
-            var r = parent.getOrPut(v) { v }
-            while (parent.getValue(r) != r) r = parent.getValue(r)
-            var x = v
-            while (x != r) {
-                val next = parent.getValue(x)
-                parent[x] = r
-                x = next
-            }
-            return r
-        }
-        for (scope in sourceComponents + entries.filterNot { it.discharged }.map { requireNotNull(it.support) }) {
-            if (scope.isEmpty()) continue
-            val first = root(scope.first())
-            for (v in scope) parent[root(v)] = root(first)
-        }
-        return parent.keys.map(::root).distinct().size
-    }
 }
 
-/** Bounded read-only inspection; store positions identify entries only within this observation. */
+// Store positions identify entries only within one observation, including across compaction.
 internal object LearnedResidualRestrictions {
     private val stateField = PropagationSession::class.java.getDeclaredField("state").apply { isAccessible = true }
     private val clauseLiterals = PropagationSession::class.java.declaredMethods.single {
@@ -57,6 +36,8 @@ internal object LearnedResidualRestrictions {
     private val isClause = PropagationSession::class.java.declaredMethods.single {
         it.name.startsWith("isLearnedClause") && it.parameterCount == 1
     }.apply { isAccessible = true }
+    private val nativeLiteralCount = Class.forName("com.eignex.klause.propagation.NativeSatState")
+        .declaredMethods.single { it.name == "literalCountOf" }.apply { isAccessible = true }
 
     fun inspect(
         session: PropagationSession,
@@ -66,13 +47,18 @@ internal object LearnedResidualRestrictions {
         val count = session.learnedClauseCount
         val entries = ArrayList<LearnedResidualRestriction>()
         var terms = 0L
-        val state = if (session.usesNativeSat) null else stateField.get(session)
-        val store = state?.let {
-            val db = field(it, "learned")
+        val state = stateField.get(session)
+        val native = if (session.usesNativeSat) field(state, "nativeEngine") else null
+        val store = if (native == null) {
+            val db = field(state, "learned")
             field(db, "store") as List<*>
-        }
+        } else null
         for (index in 0 until count) {
             if (stop()) return LearnedResidualInspection(entries, count, "interrupted")
+            if (terms >= maxTerms) return LearnedResidualInspection(entries, count, "term-limit")
+            if (native != null && terms + maxOf(1, nativeLiteralCount.invoke(native, index) as Int) > maxTerms) {
+                return LearnedResidualInspection(entries, count, "term-limit")
+            }
             val permanent = session.learnedClausePermanent(index)
             val clause = isClause.invoke(session, index) == true
             val prop = store?.get(index)
@@ -81,6 +67,7 @@ internal object LearnedResidualRestrictions {
                 clause -> clauseLiterals.invoke(session, index) as IntArray
                 kind == "PseudoBooleanPropagator" -> field(requireNotNull(prop), "literals") as IntArray
                 else -> {
+                    terms++
                     entries += LearnedResidualRestriction(index, kind, permanent, null, null, false)
                     continue
                 }
@@ -113,7 +100,7 @@ internal object LearnedResidualRestrictions {
                 index, kind, permanent, factor, support.sorted(), degree.signum() <= 0,
             )
         }
-        return LearnedResidualInspection(entries, count, null)
+        return LearnedResidualInspection(entries, count, if (stop()) "interrupted" else null)
     }
 
     private fun field(owner: Any, name: String): Any =

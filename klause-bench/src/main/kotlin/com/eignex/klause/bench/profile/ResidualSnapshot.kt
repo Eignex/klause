@@ -63,7 +63,7 @@ internal data class ResidualSnapshot(
 
 internal data class ResidualCapture(val bytes: ByteArray?, val decline: String?)
 
-/** Exact Boolean residual inputs; verification checks structure, not a proof of source equivalence. */
+// Structural verification cannot establish preparation equivalence to the original source.
 internal object ResidualSnapshots {
     const val MAX_BYTES = 8 * 1024 * 1024
     private const val MAX_COORDINATES = 100_000
