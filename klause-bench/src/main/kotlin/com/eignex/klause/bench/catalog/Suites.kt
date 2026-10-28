@@ -656,6 +656,8 @@ internal object Suites {
     private val wcnfCore = suite("wcnf-core", "Curated DIMACS WCNF (MaxSAT)") {
         format = Format.WCNF
         license = "internal"
+        vendored("conditional-cost", Category.OPTIMIZATION, Expected.Opt(1L),
+            relPath = "conditional-symmetry/conditional-cost.wcnf")
         vendored("maxsat-tiny", Category.OPTIMIZATION, Expected.Opt(1L))
         vendored("cover-dominated", Category.OPTIMIZATION, Expected.Opt(1L))
         vendored("cover-tied", Category.OPTIMIZATION, Expected.Opt(1L))
