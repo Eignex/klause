@@ -98,8 +98,10 @@ class TableValueSubstitutionTest {
         )
         for ((index, table) in forms.withIndex()) {
             val problem = Problem(0, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 0)), listOf(table)).bake()
-            val context = PresolveContext.of(LinearObjective(intCoefficients = longArrayOf(if (index == 0) 0 else 1, 0)),
-                transformObjective = true)
+            val context = PresolveContext.of(
+                LinearObjective(intCoefficients = longArrayOf(if (index == 0) 0 else 1, 0)),
+                transformObjective = true,
+            )
 
             assertTrue(TableValueSubstitution.reduce(problem, context).isEmpty)
         }
@@ -191,7 +193,9 @@ class TableValueSubstitutionTest {
 
     @Test
     fun `tuple comparisons should stop at the call work ceiling without publishing exclusions`() {
-        val tuples = LongArray(4096) { cell -> if (cell % 2 == 0) (cell / 2048).toLong() else (cell / 2 % 1024).toLong() }
+        val tuples = LongArray(4096) { cell ->
+            if (cell % 2 == 0) (cell / 2048).toLong() else (cell / 2 % 1024).toLong()
+        }
         val table = Table(intArrayOf(0, 1), tuples)
         val problem = Problem(0, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 1023)), listOf(table)).bake()
         val budget = PresolveBudget(Long.MAX_VALUE)
