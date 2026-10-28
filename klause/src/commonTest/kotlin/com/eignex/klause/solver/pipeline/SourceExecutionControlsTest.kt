@@ -9,6 +9,7 @@ import com.eignex.klause.solver.result.TerminationReason
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -16,6 +17,70 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class SourceExecutionControlsTest {
+    @Test
+    fun `numerical refutation resolution should require explicit opt in`() {
+        val source = SourceAttachment(
+            LinearSourceProblem(listOf(LinearSourceVariable("x", true)), emptyList()), ProblemSettings(),
+        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            source, ExecutionOperation.SATISFY, FiniteEngine.FIXED,
+            linearTraversal = LinearTraversal.NUMERICAL_FRONTIER,
+        ))
+        for ((options, expected) in listOf(emptyList<String>() to false,
+            listOf("source-refutation-resolution=true") to true)) {
+            val request = SourceExecutionRequest(invocation, ExecutionOptions.parse(options))
+
+            assertEquals(expected, request.theory.sourceRefutationResolution)
+        }
+    }
+
+    @Test
+    fun `numerical unit refutations should require explicit opt in`() {
+        val source = SourceAttachment(
+            LinearSourceProblem(listOf(LinearSourceVariable("x", true)), emptyList()), ProblemSettings(),
+        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            source, ExecutionOperation.SATISFY, FiniteEngine.FIXED,
+            linearTraversal = LinearTraversal.NUMERICAL_FRONTIER,
+        ))
+        for ((options, expected) in listOf(emptyList<String>() to false,
+            listOf("source-refutation-propagation=true") to true)) {
+            val request = SourceExecutionRequest(invocation, ExecutionOptions.parse(options))
+
+            assertEquals(expected, request.theory.sourceRefutationPropagation)
+        }
+    }
+
+    @Test
+    fun `point cut selection should bind to numerical execution`() {
+        val source = SourceAttachment(
+            LinearSourceProblem(listOf(LinearSourceVariable("x", false)), emptyList()), ProblemSettings(),
+        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(source, ExecutionOperation.SATISFY, FiniteEngine.FIXED,
+            linearTraversal = LinearTraversal.NUMERICAL_FRONTIER))
+
+        val request = SourceExecutionRequest(invocation, ExecutionOptions.parse(listOf("source-point-cuts=true")))
+
+        assertTrue(request.theory.sourcePointCuts)
+    }
+
+    @Test
+    fun `bounded source aggregation should require explicit opt in`() {
+        val source = SourceAttachment(
+            LinearSourceProblem(listOf(LinearSourceVariable("x", false)), emptyList()), ProblemSettings(),
+        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            source, ExecutionOperation.SATISFY, FiniteEngine.FIXED,
+            linearTraversal = LinearTraversal.NUMERICAL_FRONTIER,
+        ))
+        for ((options, expected) in listOf(emptyList<String>() to false,
+            listOf("source-aggregate-cuts=true") to true)) {
+            val request = SourceExecutionRequest(invocation, ExecutionOptions.parse(options))
+
+            assertEquals(expected, request.theory.sourceAggregateCuts)
+        }
+    }
+
     @Test
     fun `source cut control should bind to numerical execution`() {
         val source = SourceAttachment(
@@ -273,6 +338,41 @@ class SourceExecutionControlsTest {
         assertEquals(7L, params.maximumCandidates)
         assertEquals(11L, params.maximumMoves)
         assertEquals(128L, params.polynomial.maximumWork)
+    }
+
+    @Test
+    fun `nonlinear cell controls should retain independent producer and consumer switches`() {
+        for ((reuse, steering) in listOf(false to false, true to false, true to true)) {
+            val options = ExecutionOptions.parse(listOf("nia-cell-refinement=true", "nia-cell-reuse=$reuse",
+                "nia-cell-steering=$steering"))
+            val invocation = SourceSetup.prepare(SourceSetupRequest(
+                SmtLib.parse("(declare-const x Int) (assert (= (* x x) 2))").source,
+                ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+            ))
+
+            val params = assertNotNull(SourceExecutionRequest(invocation, options).nonlinearInteger)
+
+            assertTrue(params.cellRefinement)
+            assertEquals(reuse, params.reuseSourceCells)
+            assertEquals(steering, params.steerSourceCells)
+        }
+    }
+
+    @Test
+    fun `nonlinear root admission should stay disabled unless requested`() {
+        for ((arguments, expected) in listOf(emptyList<String>() to false, listOf("nia-integer-roots=true") to true)) {
+            val invocation = SourceSetup.prepare(SourceSetupRequest(
+                SmtLib.parse("(declare-const x Int) (assert (= (* x x) 2))").source,
+                ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+            ))
+
+            val params = assertNotNull(
+                SourceExecutionRequest(invocation, ExecutionOptions.parse(arguments)).nonlinearInteger,
+            )
+
+            assertEquals(expected, params.admitIntegerRoots)
+            assertFalse(params.cellRefinement)
+        }
     }
 
     @Test

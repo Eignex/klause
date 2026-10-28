@@ -2,8 +2,8 @@ plugins {
     // Pin the Kotlin plugins once in the root classloader so sibling KMP projects share one
     // instance — the Kotlin/Native bundle build service can't span per-project classloaders.
     // Subprojects apply the kotlin plugins without a version.
-    kotlin("multiplatform") version "2.4.10" apply false
-    kotlin("plugin.serialization") version "2.4.10" apply false
+    kotlin("multiplatform") version "2.4.21" apply false
+    kotlin("plugin.serialization") version "2.4.21" apply false
 }
 
 val koblasJvmArgs = buildList {
@@ -21,13 +21,16 @@ val koblasPins = mapOf(
     "koblas-macosarm64" to "0.1.1-20261023.051354-287",
 )
 
-// Koblas and Kumulant use timestamped snapshots; this endpoint is outside the conventions'
+val skemaPins = listOf("skema", "skema-jvm", "skema-linuxx64", "skema-linuxarm64", "skema-macosarm64")
+    .associateWith { "0.3.1-20261027.115734-17" }
+
+// Koblas, Kumulant and Skema use timestamped snapshots; this endpoint is outside the conventions'
 // default repository set.
 allprojects {
     val targetProject = this
-    // Direct Kumulant consumers need their own constraints to override its published Koblas pins.
+    // Direct Kumulant consumers need their own constraints to override its published Koblas and Skema pins.
     configurations.matching { it.name == "commonMainImplementation" || it.name == "implementation" }.all {
-        for ((module, pinned) in koblasPins) {
+        for ((module, pinned) in koblasPins + skemaPins) {
             targetProject.dependencies.constraints.add(name, "com.eignex:$module:$pinned") {
                 version { strictly(pinned) }
             }

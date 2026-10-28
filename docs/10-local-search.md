@@ -90,6 +90,7 @@ objects for primitives. Each declares a **phase** and a **pool**:
 | `flip-propagate` | A Boolean flip plus the literals it forces through the binary implication graph; score-only |
 | `clique-swap` | Atomic exchanges within recognised at-most-one cliques; score-only |
 | `stall-kick` | One flattened perturbation from a random walk over the variable–factor graph |
+| `unused-values` | Opt-in owner moves of a satisfied implicitly seeded plain AllDifferent onto unused values |
 
 The opt-in `extended-*` variants of `violated`, `structured` and `elected` draw
 richer moves that cost more to generate and are not always net-positive, such as a
@@ -102,8 +103,33 @@ within the existing resample window. The schedule
 axis gates the plateau-escape sources on its stall signal.
 
 Every source closes its candidates through the ordinary move sink, which applies
-pin, definition and implicit-owner filters. The driver then applies configuration
-and tabu filters, scoring and acceptance.
+pin, definition and implicit-owner filters. A compound touching a pin is rejected
+whole; parts on defined or foreign-owned coordinates are dropped. The driver then
+applies configuration and tabu filters, scoring and acceptance. An optional internal
+tally counts offered, pin-rejected, trimmed, admitted and committed compounds for
+diagnostic consumers; it draws no random values and changes no candidate.
+
+Internal objective proposal controls can select term or cone-leaf integer hotspots
+independently of adjacent or geometric leaf steps. They require every cone to be
+maintained by the live network and its exact term form to match the canonical
+objective. Grading and best-feasible ordering retain that canonical objective;
+proposal controls confer no source feasibility or proof authority.
+
+`ObjectiveGuidance.Geometric` installs canonical grading with geometric leaf
+proposals during search initialization. It reuses the supplied functional cones
+and the live invariant network, checking exact canonical term agreement in
+resumable preparation batches. Unsupported cones keep canonical execution.
+Each pick visits at most eight Boolean/integer leaves through the ordinary sink;
+a retained cursor advances before synthesis so expensive or blocked leaves cannot
+starve later coordinates. Integer proposals use bounded geometric distances and
+domain endpoints, with checked word-range arithmetic. The cursor survives slices
+and assignment restarts. A fresh search rechecks the objective and network and
+discards the old cursor; model replacement requires its own solver state.
+Preparation, candidate synthesis, scoring probes and closure spend the containing
+active deadline. Move/restart allowances retain their existing units and do not
+count candidates as moves. `geometricProposalRuns`, `geometricProposalDeclines`
+and `geometricProposalCandidates` distinguish qualification from sink offers;
+offers are neither distinct source points nor accepted transitions.
 
 ### Scoring
 
@@ -274,6 +300,16 @@ Tables reading defined integers decline implicit seeding, because a definition c
 rewrite them outside the chosen row. Built-in random restarts apply implicit seeding
 and the definition sweep before costs are initialized.
 
+An owned AllDifferent's swaps and rotations keep its occupied value set. The opt-in
+`unused-values` source lets a satisfied owner without optional entries or excepted
+values leave it: one owned coordinate takes an unused value of its domain, or an
+alternating path of two or three owned coordinates shifts into held values and ends
+at an unused one. Pinned, defined and foreign-owned coordinates never take part, a
+path is published whole, and the move is scored like any other. The scan is bounded,
+so a miss is not exhaustion; a scope whose domains fit the scan and hold no unused
+value, such as a small closed permutation, draws no random value and leaves the
+trajectory unchanged.
+
 ### Source definition materialization
 
 Definitions come from two places. A source can supply neutral `DefinitionHint`
@@ -297,6 +333,15 @@ when signed-word kernels are safe; wider intermediates use exact evaluation.
 materialized cones that agrees with the canonical objective at every feasible
 assignment. Source factors stay enforced, and hints grant no feasibility or proof
 authority.
+
+Experimental channel views can leave admitted Boolean-value, Element-value or
+predicate outputs searched while retaining the other nodes in dependency order.
+Removing a definition adds no inverse and relaxes no source relation. An inconsistent
+searched output has a maintained counterpart only when the complete source assignment
+survives reconstruction unchanged.
+Native inverse-assignment role views retain both source arrays, their domains and
+index offsets, and transpose the sides read by the existing repair and swap kernel.
+Aliased arrays and competing native channels decline this view.
 
 ### Definitions and repairs
 
@@ -331,6 +376,12 @@ checks. An unchanged intermediate does not prevent repair of an inconsistent
 descendant. Recomputation after external assignment writes clears every evaluation,
 and network replacement discards both caches. Reentrant use throws before mutating
 the workspace.
+
+`LocalSearchState.inspectMove` exposes the ordinary reversible probe for explicit
+diagnostic consumers. It captures the candidate assignment, maintained outputs,
+factor grades and objective delta, then restores the committed state and activity.
+It consumes no random values; assignment and degree copies are charged to the
+caller. Inspection supplies neither source validation nor proof authority.
 
 Boolean-only clause models close native proposals under clause implications before
 ranking: forced literals propagate to a fixpoint, then a newly broken longer clause

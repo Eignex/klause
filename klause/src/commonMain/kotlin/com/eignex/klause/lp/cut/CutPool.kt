@@ -205,12 +205,7 @@ internal class CutPool(
                 ScoredCut(cut, norm, score, entry.origin)
             }
         }.sortedByDescending { it.score }
-        val selected = ArrayList<ScoredCut>()
-        val maxCos = 1.0 - minOrthogonality
-        for (candidate in scored) {
-            if (selected.size >= max) break
-            if (selected.none { cosine(it, candidate) > maxCos }) selected.add(candidate)
-        }
+        val selected = selectNonparallelCuts(scored, max, 1.0 - minOrthogonality, cosine = ::cosine)
         for (s in selected) importUses.note(s.origin)
         return selected.map { it.cut }
     }

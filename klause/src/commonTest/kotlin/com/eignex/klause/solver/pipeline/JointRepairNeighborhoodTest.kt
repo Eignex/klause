@@ -15,6 +15,53 @@ import kotlin.test.assertNull
 
 class JointRepairNeighborhoodTest {
     @Test
+    fun `initial repair should leave integer backed real columns outside the source complement`() {
+        val columns = (0..2).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val source = SourceProofContext(SourceScope(SourceRevision("backings", "exact")), columns.toSet(), emptyMap())
+        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 3, 0, Cancellation.Never,
+            sourceIntegers = intArrayOf(0, 2)))
+
+        val condition = repair.propose(List(3) { BigFraction.ONE }, booleanArrayOf(), 1, 0,
+            BigFraction.ONE, null)
+
+        assertEquals(mapOf(0 to BigFraction.ONE, 2 to BigFraction.ONE), condition.lower)
+        assertEquals(condition.lower, condition.upper)
+    }
+
+    @Test
+    fun `integer backed real bridges should connect source inputs without consuming their quota`() {
+        val columns = (0..2).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val source = SourceProofContext(SourceScope(SourceRevision("backing-bridge", "exact")), columns.toSet(),
+            mapOf("left" to SourcePremise(SourceInequality(mapOf(columns[0] to BigFraction.ONE,
+                columns[1] to BigFraction.ONE), BigFraction.ONE)),
+                "right" to SourcePremise(SourceInequality(mapOf(columns[1] to BigFraction.ONE,
+                    columns[2] to BigFraction.ONE), BigFraction.ONE))))
+        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 3, 0, Cancellation.Never,
+            sourceIntegers = intArrayOf(0, 2)))
+
+        val condition = repair.propose(List(3) { BigFraction.ZERO }, booleanArrayOf(), 2, 1,
+            BigFraction.ONE, null)
+
+        assertEquals(emptyMap(), condition.lower)
+        assertEquals(2L, repair.selectedIntegers)
+    }
+
+    @Test
+    fun `fractional integer backed reals should not displace source input seeds`() {
+        val columns = (0..3).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val source = SourceProofContext(SourceScope(SourceRevision("backing-seeds", "exact")),
+            columns.toSet(), emptyMap())
+        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 4, 0, Cancellation.Never,
+            sourceIntegers = intArrayOf(0, 2, 3)))
+        repair.guide(mapOf(columns[0] to 0.25, columns[1] to 0.5))
+
+        val condition = repair.propose(List(4) { BigFraction.ZERO }, booleanArrayOf(), 2, 1,
+            BigFraction.ONE, null)
+
+        assertEquals(mapOf(2 to BigFraction.ZERO, 3 to BigFraction.ZERO), condition.lower)
+    }
+
+    @Test
     fun `an integer indicator should connect its trigger with the guarded residual`() {
         val trigger = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         val x = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)

@@ -18,6 +18,13 @@ class BoolExprTest {
     }
 
     @Test
+    fun `bounds differing only in zero sign should collapse to one hash key`() {
+        val positive = flc(doubleArrayOf(1.0), listOf("x"), bound = 0.0)
+        val negative = flc(doubleArrayOf(1.0), listOf("x"), bound = -0.0)
+        assertEquals(1, hashSetOf(positive, negative).size)
+    }
+
+    @Test
     fun `constraints differing on any field should not be equal`() {
         val base = flc(doubleArrayOf(1.0), listOf("x"))
         assertNotEquals(base, flc(doubleArrayOf(2.0), listOf("x")))

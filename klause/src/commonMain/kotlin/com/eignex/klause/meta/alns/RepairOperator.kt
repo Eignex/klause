@@ -11,6 +11,7 @@ import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.RepairSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.MinimizeResult
 import kotlin.math.abs
 import kotlin.random.Random
 
@@ -79,6 +80,7 @@ internal data class RepairContext(
      *  fragment against when using [repairSearch] (the reused session needs a monotone cutoff). */
     val bestObjective: Double = Double.POSITIVE_INFINITY,
     val recordInnerWork: ((nodes: Long, moves: Long) -> Unit)? = null,
+    val recordRepairResult: ((MinimizeResult) -> Unit)? = null,
 )
 
 /**
@@ -97,6 +99,7 @@ internal class InnerLsRepair(val label: String = "standard", val flipsOverride: 
         context.recordInnerWork?.invoke(
             result.stats.search.nodes.sum.toLong(), result.stats.ls.moves.sum.toLong(),
         )
+        context.recordRepairResult?.invoke(result)
         return result.assignment
     }
 
@@ -119,11 +122,15 @@ internal class BacktrackRepair(val label: String = "standard", val maxDecisions:
         context.repairSearch?.let {
             val record = context.recordInnerWork
             val before = if (record != null) it.stats.search.nodes.sum.toLong() else 0L
-            val sample = it.repair(
+            val step = it.repairStep(
                 context.pinAssumptions, maxDecisions, context.bestObjective, context.params.cancellation,
             )
             record?.invoke(it.stats.search.nodes.sum.toLong() - before, 0L)
-            return sample
+            context.recordRepairResult?.invoke(step.sample?.let { sample ->
+                MinimizeResult.BestFound(sample, context.objective.evaluate(sample),
+                    checkNotNull(step.reason), it.stats)
+            } ?: MinimizeResult.Unknown(checkNotNull(step.reason), it.stats))
+            return step.sample
         }
         val engine = context.backtrack ?: return null
         val base = context.backtrackParams ?: return null
@@ -139,6 +146,7 @@ internal class BacktrackRepair(val label: String = "standard", val maxDecisions:
         context.recordInnerWork?.invoke(
             result.stats.search.nodes.sum.toLong(), result.stats.ls.moves.sum.toLong(),
         )
+        context.recordRepairResult?.invoke(result)
         return result.assignment
     }
 

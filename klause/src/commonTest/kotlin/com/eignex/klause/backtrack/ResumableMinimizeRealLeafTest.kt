@@ -29,6 +29,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.validation.FiniteSourceAcceptance
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -42,6 +43,155 @@ import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration.Companion.seconds
 
 class ResumableMinimizeRealLeafTest {
+    @Test
+    fun `witness-only repair should continue to a better sibling without closing unresolved coverage`() {
+        val fixture = UnresolvedRealLeafFixture(true)
+        fixture.acceptProof = { _, _ -> false }
+        val offered = ArrayList<Long>()
+        val params = fixture.params.copy(
+            toleranceCheck = { it.ints.single() + 2.0 * it.reals.single() == 2.0 },
+            improvedSolutionSink = { sample, _ -> offered += sample.ints.single() },
+        )
+
+        fixture.solver.openRepair(fixture.objective, params).use { repair ->
+            repair.beginExact(Assumptions.None, 100L, BigFraction.ofLong(2L), Cancellation.Never)
+            val result = repair.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L)
+
+            val sample = assertNotNull(result.sample)
+            assertEquals(1L, sample.ints.single())
+            assertEquals(0.5, sample.reals.single())
+            assertEquals(listOf(0L, 1L), offered)
+            assertEquals(TerminationReason.Unsupported, result.reason)
+        }
+        assertEquals(fixture.opened, fixture.closed)
+    }
+
+    @Test
+    fun `reseed should discard an interrupted primal before completing a sibling`() {
+        val fixture = UnresolvedRealLeafFixture(true)
+        fixture.acceptProof = { _, _ -> false }
+        var interrupt = true
+        var cancelled = false
+        val params = fixture.params.copy(toleranceCheck = {
+            if (interrupt) {
+                interrupt = false
+                cancelled = true
+            }
+            true
+        })
+
+        fixture.solver.openRepair(fixture.objective, params).use { repair ->
+            repair.beginExact(Assumptions.None.withInt(0, 0L), 100L, BigFraction.ofLong(2L),
+                Cancellation { cancelled })
+            val interrupted = repair.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L)
+            assertNull(interrupted.sample)
+            assertEquals(TerminationReason.Cancelled, interrupted.reason)
+
+            cancelled = false
+            repair.beginExact(Assumptions.None.withInt(0, 1L), 100L, BigFraction.ofLong(2L), Cancellation.Never)
+            val sibling = repair.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L)
+
+            assertEquals(1L, assertNotNull(sibling.sample).ints.single())
+            assertEquals(0.5, sibling.sample.reals.single())
+            assertEquals(TerminationReason.Unsupported, sibling.reason)
+        }
+        assertEquals(fixture.opened, fixture.closed)
+    }
+
+    @Test
+    fun `primal repair should compare the authoritative scaled source objective across rounded ties`() {
+        val epsilon = BigFraction.ofLong(1L shl 60).reciprocal()
+        for (sign in listOf(-1L, 1L)) for (offset in listOf(0L, 1L)) {
+            val fixture = UnresolvedRealLeafFixture(false)
+            fixture.acceptProof = { _, _ -> false }
+            val objective = LinearObjective(realCoefficients = doubleArrayOf(10.0 * sign))
+            val sourceValue = BigFraction.ofLong(5L * sign) + epsilon
+            val params = fixture.params.copy(toleranceCheck = FiniteSourceAcceptance(
+                { it.reals.single() == 0.5 }, false, { sourceValue },
+            ))
+
+            fixture.solver.openRepair(objective, params).use { repair ->
+                repair.beginExact(Assumptions.None, 100L,
+                    sourceValue + epsilon * BigFraction.ofLong(offset), Cancellation.Never)
+                val result = repair.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L)
+
+                assertEquals(TerminationReason.Unsupported, result.reason)
+                if (offset > 0L) {
+                    val sample = assertNotNull(result.sample)
+                    assertEquals(sourceValue, exactSourceObjective(objective, sample, params.toleranceCheck))
+                    assertNull(sample.exactReals)
+                } else assertNull(result.sample)
+            }
+            assertEquals(fixture.opened, fixture.closed)
+        }
+    }
+
+    @Test
+    fun `exact repair should publish checked primal improvements without closing unresolved leaves`() {
+        val epsilon = BigFraction.ofLong(1L shl 60).reciprocal()
+        for (offset in listOf(-1L, 0L, 1L)) {
+            val fixture = UnresolvedRealLeafFixture(false)
+            fixture.acceptProof = { _, _ -> false }
+            val cutoff = BigFraction.ofDouble(0.5)!! + epsilon * BigFraction.ofLong(offset)
+            val params = fixture.params.copy(toleranceCheck = { it.reals.single() == 0.5 })
+
+            fixture.solver.openRepair(fixture.objective, params).use { repair ->
+                repair.beginExact(Assumptions.None, 100L, cutoff, Cancellation.Never)
+                val result = repair.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L)
+
+                assertEquals(TerminationReason.Unsupported, result.reason)
+                if (offset > 0L) {
+                    val sample = assertNotNull(result.sample)
+                    assertEquals(0.5, sample.reals.single())
+                    assertNull(sample.exactReals)
+                } else assertNull(result.sample)
+            }
+            assertEquals(fixture.opened, fixture.closed)
+        }
+    }
+
+    @Test
+    fun `source rejection should leave exact repair unresolved without publishing a point`() {
+        val fixture = UnresolvedRealLeafFixture(false)
+        fixture.acceptProof = { _, _ -> false }
+        val params = fixture.params.copy(toleranceCheck = { false })
+
+        fixture.solver.openRepair(fixture.objective, params).use { repair ->
+            repair.beginExact(Assumptions.None, 100L, BigFraction.ONE, Cancellation.Never)
+            val result = repair.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L)
+
+            assertNull(result.sample)
+            assertEquals(TerminationReason.Unsupported, result.reason)
+        }
+        assertEquals(fixture.opened, fixture.closed)
+    }
+
+    @Test
+    fun `checked primal repair should preserve sibling pins across work slices`() {
+        val fixture = UnresolvedRealLeafFixture(true)
+        fixture.acceptProof = { _, _ -> false }
+        val params = fixture.params.copy(toleranceCheck = { it.ints.single() + 2.0 * it.reals.single() == 2.0 })
+
+        fixture.solver.openRepair(fixture.objective, params).use { repair ->
+            for (pin in listOf(0L, 1L, 0L)) {
+                repair.beginExact(Assumptions.None.withInt(0, pin), 100L,
+                    BigFraction.ofLong(2L), Cancellation.Never)
+                var slices = 0
+                var result = repair.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L)
+                while (result.reason == null && slices++ < 128) {
+                    result = repair.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L)
+                }
+
+                val sample = assertNotNull(result.sample)
+                assertEquals(pin, sample.ints.single())
+                assertEquals((2.0 - pin) / 2.0, sample.reals.single())
+                assertNull(sample.exactReals)
+                assertEquals(TerminationReason.Unsupported, result.reason)
+            }
+        }
+        assertEquals(fixture.opened, fixture.closed)
+    }
+
     @Test
     fun `continuous completion should retain its discrete leaf across work slices`() {
         val n = 24

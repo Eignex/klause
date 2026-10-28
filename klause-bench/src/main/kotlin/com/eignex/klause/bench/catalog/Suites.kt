@@ -30,7 +30,8 @@ internal object Suites {
             handwrittenCore, slackAllDifferent, dimacsCore, wcnfCore, opbCore, schemaCore,
             smtlibCore, xcsp3Core, mpsCore, mznSmoke, satCrafted, lpComponentSplit, productAliases,
         ) + QfNraSuites.all + QfNraCanonicalSuite.suite + QfNraPartialConflictSuite.suite +
-            NonlinearIntegerSuite.suite + DivModSuite.suite + AbsSuite.suite +
+            QfNraCoupledSuite.suite + QfNraPreparedSupportSuite.suite +
+            NonlinearIntegerSuite.suite + NonlinearIntegerCellSuite.suite + DivModSuite.suite + AbsSuite.suite +
             ContinuousArithmeticSuite.suite + MpsLinearSourceSuite.suite +
             SourceOwnershipSuite.suite + ExactGlobalsSuite.suite + SourceEqualitySuite.suite
     }
@@ -734,8 +735,21 @@ internal object Suites {
         license = "internal"
         vendored("magic-series-tiny", Category.CSP, Expected.Sat, relPath = "xcsp3/magic-series-tiny.xml")
         vendored("sum-opt-tiny", Category.OPTIMIZATION, Expected.Unknown, relPath = "xcsp3/sum-opt-tiny.xml")
+        vendored("evidence-latin4", Category.OPTIMIZATION, Expected.Unknown,
+            relPath = "finite-repair-evidence/latin4.xml")
+        for (name in listOf("linear-exchange", "linear-three-cycle", "linear-four-cycle", "linear-knapsack",
+            "linear-transport")) {
+            vendored("evidence-$name", Category.OPTIMIZATION, Expected.Unknown,
+                relPath = "finite-repair-evidence/$name.xml")
+        }
         vendored("magic-square-3", Category.CSP, Expected.Sat, relPath = "xcsp3/magic-square-3.xml")
         vendored("graph-coloring-tiny", Category.CSP, Expected.Sat, relPath = "xcsp3/graph-coloring-tiny.xml")
+        vendored("assignment-exchange", Category.OPTIMIZATION, Expected.Unknown,
+            relPath = "finite-repair/assignment-exchange.xml")
+        for (name in listOf("resource-exchange", "placement-exchange", "assignment-cycle", "resource-cycle",
+            "placement-cycle", "assignment-four-cycle", "assignment-unused")) {
+            vendored(name, Category.OPTIMIZATION, Expected.Unknown, relPath = "finite-repair/$name.xml")
+        }
         for (name in listOf("overlap-tables-unsat", "overlap-mdd-unsat", "overlap-mdd-sat")) {
             vendored(name, Category.CSP, if (name.endsWith("unsat")) Expected.Unsat else Expected.Sat,
                 relPath = "extensional-overlap/$name.xml")

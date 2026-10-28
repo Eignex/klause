@@ -11,7 +11,7 @@ interface SetTerm {
 }
 
 /** A set-valued node in the constraint AST. */
-@Serializable
+@Serializable(with = SetExprSerializer::class)
 sealed interface SetExpr : SetTerm {
     override fun toSetExpr(): SetExpr = this
 }

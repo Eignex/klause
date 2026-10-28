@@ -229,6 +229,18 @@ adjacency entries; its index admits at most
 pinned to the current center, while the continuous residual remains free under
 every source row.
 
+Explicit diagnostic callers can identify original integer declarations separately
+from integer backings of original real columns. Backings participate in connectivity
+as bridges, remain free in every residual and consume no discrete seed or freedom
+quota. Ordinary callers retain canonical integer eligibility.
+
+With supplied source roles, the diagnostic source-input pass tries a narrow
+neighborhood for each eligible seed after a checked cutoff changes, before wider
+nonadaptive proposals. Pending candidates and cumulative funding survive each
+slice. Adaptive proposals keep their selected widths; the pass supplies no coverage
+or proof authority. Production callers omit source roles and retain their ordinary
+proposal schedule.
+
 Each candidate runs the shared numerical traversal with a borrowed source LP
 authority. Candidate coverage and compatible LP state survive slice boundaries;
 changed pins retire candidate coverage before opening another query. Search and LP
@@ -241,6 +253,12 @@ nonimproving neighborhood before its remaining alternatives are explored.
 A completed candidate must pass the original-source witness check
 before it can update the center or publish an incumbent. Local bounds, refutations
 and exhausted alternatives never leave the heuristic as global claims.
+
+The mixed repair attempt also retains its termination reason, feasible point and
+conditioned bound independently of the driver's improvement verdict. A feasible
+center can accompany a cutoff closure; a slice pause has no terminal reason, while
+lifetime cancellation, budget exhaustion and unavailable completion remain distinct.
+These observations grant no proof outside the exact candidate pins and cutoff.
 
 ### Restart anchors
 
@@ -272,6 +290,25 @@ destruction grows breadth-first through factor occurrences; repair scopes releas
 both ends of unit Boolean definitions, and caller pins stay in the repair
 assumptions.
 
+The internal opt-in `SemanticBlockRemoval` selects complete mandatory
+AllDifferent scopes, contiguous windows in a resource's current start order, or
+placement contact blocks within two hops. Resource packets include start,
+duration, demand, presence and capacity roles; rectangle packets include both
+positions and variable sizes. Shared mutable roles expand their packets to a
+fixed point. Optional or excepted assignment shapes and non-positive placement
+geometry decline explicitly. The default removal palette is unchanged.
+
+Block closure follows the supplied immutable definition network upstream from
+selected roles to searched inputs, then downstream from those inputs to affected
+outputs. Conservative Element readers retain alternative selections. Downstream
+outputs do not release unrelated inputs of a shared expression. Root-fixed integer
+roles stay fixed; a required caller pin declines the block. Complement pins use
+the existing repair scope, and ordinary CP retains every source constraint.
+Selection charges visits to the caller's work meter and caps visits, searched
+inputs and working coordinates. Cancellation or a limit returns an explicit
+decline without partial freedoms. Selection retains only bounded diagnostics;
+it has no resumable cursor and does not renew an interrupted allowance.
+
 Before and during its bootstrap, ALNS checks a supplied assignment and the latest
 verified shared incumbent. A candidate must cover all coordinates, satisfy the
 current model and assumptions and pass the shared source witness checker; ALNS
@@ -279,6 +316,55 @@ re-evaluates it against its own objective. An interrupted check leaves the candi
 eligible for a later slice, adoption closes the bootstrap handles once, and seed
 acquisition renews no allowance. Imported samples carry no worker state or proof
 authority.
+
+Finite CP conflict-guided removal reads a bounded prefix of the repair's existing
+variable-selection conflict attributions. Its scores name coordinates in the same
+baked model, retaining the originating complement pins and each attribution's
+objective cutoff, including local incumbent tightenings. A hint
+can rank a later freedom at the same center; it cannot assert a clause, prune a repair
+or establish that changing a supported input admits improvement. A changed model,
+objective, caller pins or center, a new repair, cancellation and close retire the snapshot.
+Missing callbacks and captured empty supports are distinct outcomes. Both use the
+ordinary random removal fallback. Capture admits at most 32 conflicts and 4,096
+coordinates; oversized supports decline as a whole.
+Attributions identify activity inputs without a premise-complete branch refutation.
+Invocations with pooled starting witnesses decline capture because their initial
+cutoff tightening need not notify the variable selector.
+
+The pipeline's internal `FiniteNumericalRemoval` consumes scoped numerical
+feedback without owning numerical capture or proof traversal. It ranks finite
+coordinates by exact disagreement with captured relaxation points or membership
+in captured refutation supports, with seeded ties and ordinary random fallback. It admits
+an unchanged complete Boolean/integer coordinate frame and exact caller/query
+pins; unmapped coordinates and additional deduced restrictions decline. It checks
+the normalized objective, original premises, semantic checker and actual cutoff
+row before retaining at most 4,096 scores. Missing feedback, missing points,
+agreement and empty captured support remain distinct outcomes. Each signal requests
+its projection, the point or the refutation, and a delivered query without it is
+unrequested rather than agreement or an empty support. Scoring and
+selection debit the producer's containing funding; cancellation or exhausted
+funding declines selection as a whole. Model, objective, center or caller-pin
+changes retire guidance, and close releases its query scope. These rankings
+neither assert deductions nor establish that a selected repair can improve.
+When supplied, the immutable definition network closes both guided and fallback
+selections through the shared block closure. Required caller pins decline the
+whole block; closure visits and bounded working storage debit the same funding.
+
+The opt-in `SourceRows` completion turns each supported seed into a packet through
+the original source premises. A seed plans one domain step: toward its relaxation
+value for disagreement, in each admissible direction for refutation support. Every
+active row the plan violates admits compensating inputs, supported inputs first and
+then in source order: an input moves just far enough within its root domain, or a
+guard or indicator changes and deactivates the row. Caller-pinned and root-fixed
+inputs never compensate. Each member records the row that added it. A packet whose
+row cannot be restored is unrepairable, a seed without a step is immovable and an
+oversized packet is limited; none of these contributes partial freedoms. Selection
+takes whole complete packets, those covering more supported seeds first, while they
+fit the request, then fills the remaining places by the ordinary ranking. A request
+smaller than every complete packet, or guidance without one, declines with no
+freedoms rather than falling back to random removal. Completion debits the same
+funding and retires with the snapshot. The plan is only a hint: the repair enforces
+every row, pin and definition, and completion asserts no deduction.
 
 ### Handles and exclusive ownership
 
@@ -303,6 +389,20 @@ instruction checkpoint; `LocalSearchProgress` owns warm-state capture and chargi
 Projections and immutable indexes can be shared; run progress cannot.
 
 ### Residual diagnostics
+
+An internal bounded repair trace records immutable centers, restart policy output,
+prepared and repaired assignments, and the following walk's endpoint. A declared
+descent rule and seed accompany each capture. Policy local-optimum announcements,
+feasible stalls, interrupted descents and unresolved repairs remain distinct;
+none grants global proof authority. Pending restart phases survive slices and close
+as censored observations. ALNS records requested and effective scopes through the
+same definition closure and caller-pin filtering used to build its repair pins.
+Its best objective threshold, exact discrete value and immutable best witness remain
+separate from a current center accepted by a non-monotone policy. A cancelled
+closure leaves its effective scope explicitly unavailable.
+Capture has separate coordinate accounting and consumes no search random draws.
+Its default frame limit is 4096 coordinates; an explicit diagnostic allowance can
+retain at most 8192 coordinates per complete frame. Oversized frames decline as a whole.
 
 Optional residual reporting records, at each strict cost improvement, the
 maintained violation degrees per factor kind and up to eight representative

@@ -13,8 +13,14 @@ internal data class NonlinearIntegerParams(
     val maximumCandidates: Long = 1024,
     val strategy: NonlinearIntegerStrategy = NonlinearIntegerStrategy.MIXED,
     val seed: Long = 1,
+    val reuseSourceCells: Boolean = false,
+    val steerSourceCells: Boolean = false,
+    val admitIntegerRoots: Boolean = false,
 ) {
-    init { require(maximumCandidates >= 0) }
+    init {
+        require(maximumCandidates >= 0)
+        require(!steerSourceCells || reuseSourceCells) { "integer cell steering requires cell reuse" }
+    }
 }
 
 internal data class NonlinearIntegerStats(
@@ -23,6 +29,8 @@ internal data class NonlinearIntegerStats(
     val repairs: Long,
     val checks: Long,
     val polynomial: QfNraStats,
+    val cells: NonlinearIntegerCellStats = NonlinearIntegerCellStats(),
+    val roots: NonlinearIntegerRootCounts = NonlinearIntegerRootCounts(),
 )
 
 internal data class NonlinearIntegerExecution(val result: QfNraResult, val stats: NonlinearIntegerStats)
@@ -31,6 +39,7 @@ internal fun solveNonlinearIntegers(
     problem: NonlinearIntegerProblem,
     params: NonlinearIntegerParams = NonlinearIntegerParams(),
     condition: PolynomialCondition = PolynomialCondition(),
-): NonlinearIntegerExecution = NonlinearIntegerCursor(problem, params, condition).use {
+    roots: NonlinearIntegerRootStore? = null,
+): NonlinearIntegerExecution = NonlinearIntegerCursor(problem, params, condition, roots).use {
     requireNotNull(it.runSlice())
 }

@@ -30,6 +30,11 @@ internal data class QfNraParams(
     val cancellation: Cancellation = Cancellation.Never,
     val maximumWork: Long? = null,
     val polynomialLimits: PolynomialLimits = PolynomialLimits(),
+    val cellRefinement: Boolean = false,
+    val cellFeedback: Boolean = false,
+    val coupledSections: Boolean = false,
+    val coupledPreparation: Boolean = true,
+    val coupledJoint: Boolean = true,
 ) {
     init { require(maximumWork == null || maximumWork >= 0) }
 }
@@ -95,6 +100,32 @@ internal class QfNraQuery(
 ) {
     private val work = QfNraWork(params)
     private val arithmetic = PolynomialArithmetic(work, params.polynomialLimits)
+    var failureCapture: PolynomialFailureCapture? = null
+        set(value) {
+            check(work.spentWork == 0L && result == null) { "attach failure capture before query entry" }
+            if (value !== field) value?.attach()
+            field = value
+        }
+    var checkedCellObserver: ((CheckedPolynomialCell) -> Unit)? = null
+    private val cellFeedback = if (params.cellRefinement && params.cellFeedback) {
+        PolynomialCellFeedback(formula, condition, parent = work, limits = params.polynomialLimits)
+    } else null
+    private val cellRefinement = if (params.cellRefinement) {
+        PolynomialCellRefinement(formula, condition, work, params.polynomialLimits, cellFeedback) {
+            checkedCellObserver?.invoke(it)
+        }
+    } else null
+    private val coupledSections = if (params.coupledSections) {
+        PolynomialCoupledSections(work, params.polynomialLimits,
+            prepareSupports = params.coupledPreparation, joint = params.coupledJoint)
+    } else null
+    val coupledStats: PolynomialCoupledStats? get() = coupledSections?.stats
+    var coupledConflictObserver: ((List<PolynomialAtom>) -> Unit)? = null
+    val cellStats: PolynomialCellStats? get() = cellRefinement?.stats
+    val cellFeedbackStats: PolynomialCellFeedbackStats? get() = cellFeedback?.stats
+    val firstCellFeedbackUse: PolynomialCellFeedbackUse? get() = cellFeedback?.firstRegionUse
+    val firstCellFeedbackReuse: PolynomialCellFeedbackUse? get() = cellFeedback?.firstCrossRegionUse
+    val checkedCells: List<CheckedPolynomialCell> get() = cellRefinement?.cells.orEmpty()
     var projectionObserver: ((Int, List<Polynomial>, Polynomial?) -> Unit)? = null
     var reducedRegionObserver: ((List<PolynomialAtom>) -> Unit)? = null
     var partialConflictObserver: ((List<PolynomialAtom>) -> Unit)? = null
@@ -106,6 +137,7 @@ internal class QfNraQuery(
     private val preparation = sequence<QfNraResult?> {
         val algebraic = AlgebraicArithmetic(arithmetic)
         try {
+            failureCapture?.operation("normalization", 0, 0, work.spentWork, arithmetic)
             arithmetic.step()
             val conditioned = condition.apply(formula, boolCount, realCount, arithmetic::step)
             conditioned.requireVariableCounts(boolCount, realCount, arithmetic::step)
@@ -114,6 +146,19 @@ internal class QfNraQuery(
                 condition.upper[id] == value
             }
             val normalized = PolynomialFormula.normalize(conditioned, arithmetic, fixed)
+            failureCapture?.scope(normalized, condition, arithmetic)
+            cellRefinement?.let { refinement ->
+                failureCapture?.operation("cell-refinement", 0, 0, work.spentWork, arithmetic)
+                refinement.prepare(normalized)
+                val witness = refinement.witness(realCount, fixed) { point, checking, scalars ->
+                    checkSample(normalized, point, boolCount, checking, scalars)
+                }
+                if (witness != null) {
+                    arithmetic.step()
+                    yield(QfNraResult.Satisfiable(witness, work.snapshot()))
+                    return@sequence
+                }
+            }
             yield(null)
             work.equationalSections = 0
             val preparingFormula = PolynomialFormulaReduction.stages(normalized, realCount, arithmetic) {
@@ -122,12 +167,18 @@ internal class QfNraQuery(
             }
             var reduction = checkNotNull(preparingFormula.next())
             progress.committed(reduction, work.spentWork)
+            failureCapture?.context(reduction, arithmetic)
+            var rootCapture = failureCapture?.cursorState()
+            var searchCapture: PolynomialFailureCursorState? = null
             var searched = reduction
             var searching: Iterator<QfNraResult?>? = null
             var startedSearch = false
             var declined: QfNraResult.Unknown? = null
             while (true) {
                 if (!reduction.finished && (searching == null || progress.rootWork < progress.searchWork)) {
+                    rootCapture?.let { failureCapture?.restoreCursor(it) }
+                    failureCapture?.operation("root-reduction", progress.snapshots, progress.regions,
+                        work.spentWork, arithmetic)
                     val before = work.spentWork
                     val stage = try {
                         preparingFormula.next()
@@ -136,6 +187,7 @@ internal class QfNraQuery(
                     }
                     if (stage != null) {
                         progress.committed(stage, work.spentWork)
+                        failureCapture?.context(stage, arithmetic)
                         reduction = stage
                         if (stage.inconsistent) {
                             arithmetic.step()
@@ -146,6 +198,7 @@ internal class QfNraQuery(
                             (stage.finished && stage.formula !== searched.formula)
                         ) {
                             searching = search(normalized, stage, fixed, algebraic)
+                            searchCapture = PolynomialFailureCursorState(emptyMap(), emptyMap())
                             searched = stage
                             declined = null
                             progress.started(stage)
@@ -153,13 +206,16 @@ internal class QfNraQuery(
                             startedSearch = true
                         }
                     }
+                    rootCapture = failureCapture?.cursorState()
                 } else if (searching != null) {
+                    searchCapture?.let { failureCapture?.restoreCursor(it) }
                     val before = work.spentWork
                     val completed = try {
                         searching.next()
                     } catch (stop: PolynomialResourceLimit) {
                         QfNraResult.Unknown(QfNraReason.ResourceLimit, work.snapshot(), stop.resource)
                     } finally {
+                        searchCapture = failureCapture?.cursorState()
                         progress.searchWork += work.spentWork - before
                     }
                     if (completed is QfNraResult.Unknown) {
@@ -167,6 +223,7 @@ internal class QfNraQuery(
                         searching = null
                         if (reduction.formula !== searched.formula) {
                             searching = search(normalized, reduction, fixed, algebraic)
+                            searchCapture = PolynomialFailureCursorState(emptyMap(), emptyMap())
                             searched = reduction
                             declined = null
                             progress.started(reduction)
@@ -203,6 +260,8 @@ internal class QfNraQuery(
             return@sequence
         }
         val reducedFormula = formulaReduction.formula
+        failureCapture?.context(formulaReduction, arithmetic)
+        failureCapture?.operation("probe", progress.searchSnapshot, progress.regions, work.spentWork, arithmetic)
         var refuted = false
         val witness = work.probe {
             refuted = realCount <= MAX_WITNESS_REALS && (
@@ -215,6 +274,7 @@ internal class QfNraQuery(
                         MAX_WITNESS_TERMS, MAX_WITNESS_BITS))
                 )
             if (refuted) null else WitnessProbe(reducedFormula, boolCount, arithmetic, algebraic, work)
+                .also { it.failureCapture = failureCapture; it.captureSnapshot = progress.searchSnapshot }
                 .probeWitness(realCount, fixed, work::coupled)
         }
         probeCompleted = true
@@ -236,9 +296,21 @@ internal class QfNraQuery(
         work.booleanTheoryAtoms = work.booleanTheoryAtoms ?: 0
         work.booleanTheoryConstantRefutations = work.booleanTheoryConstantRefutations ?: 0
         work.booleanTheoryResourceRefusals = work.booleanTheoryResourceRefusals ?: 0
-        val regions = reducedFormula.booleanRegions(arithmetic, progress) { partialConflictObserver?.invoke(it) }
+        val regions = reducedFormula.booleanRegions(arithmetic, progress,
+            onPartialCheck = failureCapture?.let { capture -> { owner, premises ->
+                capture.signCheck(owner, premises, progress.searchSnapshot, work.spentWork, arithmetic)
+            } },
+            onConflict = {
+                failureCapture?.signConflict(it, progress.searchSnapshot, work.spentWork, arithmetic)
+                partialConflictObserver?.invoke(it)
+            },
+            coupled = coupledSections,
+            onCoupledConflict = { coupledConflictObserver?.invoke(it) })
         var incomplete: PolynomialResource? = null
-        while (regions.hasNext()) {
+        while (true) {
+            failureCapture?.operation("boolean-region", progress.searchSnapshot, progress.regions,
+                work.spentWork, arithmetic)
+            if (!regions.hasNext()) break
             val region = regions.next()
             if (region == null) {
                 yield(null)
@@ -255,6 +327,9 @@ internal class QfNraQuery(
                     work.booleanTheoryConstantRefutations = constants + minOf(1L, Long.MAX_VALUE - constants)
                     continue
                 }
+                failureCapture?.context(formulaReduction, arithmetic, region)
+                failureCapture?.operation("regional-reduction", progress.searchSnapshot, progress.regions,
+                    work.spentWork, arithmetic)
                 val reducing = PolynomialAffineReduction.prepare(reducedFormula, region, realCount, arithmetic) {
                     val sections = checkNotNull(work.equationalSections)
                     work.equationalSections = sections + minOf(1L, Long.MAX_VALUE - sections)
@@ -265,6 +340,16 @@ internal class QfNraQuery(
                     if (reduction == null) yield(null)
                 }
                 if (reduction.inconsistent) continue
+                failureCapture?.context(formulaReduction, arithmetic, region, reduction)
+                val cellRegion = cellRefinement?.region(reducedFormula, region, reduction)
+                val feedbackScope = cellFeedback?.candidateScope(reducedFormula, region, cellRegion?.scope, arithmetic)
+                val numericFeedback: ((PolynomialAtom, Map<Int, AlgebraicReal>) -> Boolean)? =
+                    feedbackScope?.let { scope ->
+                        val available = { cellRefinement?.cells.orEmpty() }
+                        return@let { atom, point ->
+                            cellFeedback?.candidateRejection(atom, scope, point, available) != null
+                        }
+                    }
                 reducedRegionObserver?.invoke(reduction.atoms)
                 val activeFormula = if (reduction.changed) {
                     PolynomialFormula.conjunction(reduction.atoms, arithmetic)
@@ -317,8 +402,16 @@ internal class QfNraQuery(
                         val selected = family.map { arithmetic.step(); it }
                         val required = equations.filter { arithmetic.step(); it in family }
                         val exclusions = nonzero.filter { arithmetic.step(); it in family }
+                        failureCapture?.operation("projection", progress.searchSnapshot, progress.regions,
+                            work.spentWork, arithmetic, selected, zeroes = required, nonzero = exclusions,
+                            completeFamily = complete)
                         val pending = PolynomialProjection.prepare(selected, realCount, arithmetic,
-                            required, order, nonzeroPolynomials = exclusions, onElimination = projectionObserver,
+                            required, order, nonzeroPolynomials = exclusions,
+                            onElimination = { variable, operands, root ->
+                                failureCapture?.operation("elimination", progress.searchSnapshot, progress.regions,
+                                    work.spentWork, arithmetic, operands, variable, root, completeFamily = complete)
+                                projectionObserver?.invoke(variable, operands, root)
+                            },
                             onRootSection = {
                                 val roots = checkNotNull(work.equationalRootLevels)
                                 work.equationalRootLevels = roots + minOf(1L, Long.MAX_VALUE - roots)
@@ -335,8 +428,11 @@ internal class QfNraQuery(
                         work.projectedPolynomials += minOf(projection.polynomialCount,
                             Long.MAX_VALUE - work.projectedPolynomials)
                         yield(null)
+                        failureCapture?.operation("lifting", progress.searchSnapshot, progress.regions,
+                            work.spentWork, arithmetic, selected, completeFamily = complete)
                         val assignment = searchCells(activeFormula, activeRegion, projection, boolCount,
-                            arithmetic, algebraic, work, fixed, if (complete) null else family)
+                            arithmetic, algebraic, work, fixed, if (complete) null else family,
+                            failureCapture, progress.searchSnapshot, cellRegion, numericFeedback)
                         if (assignment != null) {
                             val regionChecked = if (!reduction.changed) assignment else {
                                 val point = reduction.reconstruct(assignment, arithmetic, algebraic)
@@ -351,6 +447,7 @@ internal class QfNraQuery(
                             return@sequence
                         }
                     } catch (stop: PolynomialResourceLimit) {
+                        failureCapture?.refused(stop.resource.name, arithmetic)
                         if (complete) throw stop
                         // A larger required family can admit a section that avoids the refused projection.
                         finishProjection = true
@@ -359,6 +456,7 @@ internal class QfNraQuery(
                     yield(null)
                 } while (!complete)
             } catch (stop: PolynomialResourceLimit) {
+                failureCapture?.refused(stop.resource.name, arithmetic)
                 // An incomplete region can be skipped for SAT search, but withholds source exhaustion.
                 if (incomplete == null) incomplete = stop.resource
                 val refusals = checkNotNull(work.booleanTheoryResourceRefusals)
@@ -370,7 +468,7 @@ internal class QfNraQuery(
         arithmetic.step()
         yield(if (incomplete == null) QfNraResult.Unsatisfiable(work.snapshot())
             else QfNraResult.Unknown(QfNraReason.ResourceLimit, work.snapshot(), incomplete))
-    }.iterator()
+    }.iterator().also { cellFeedback?.replaceSnapshot(formulaReduction.formula, arithmetic) }
 
     fun next(): QfNraResult? {
         result?.let { return it }
@@ -547,6 +645,8 @@ internal class WitnessProbe(
     private val algebraic: AlgebraicArithmetic,
     private val work: QfNraWork? = null,
 ) {
+    var failureCapture: PolynomialFailureCapture? = null
+    var captureSnapshot: Long = 0
     private var proposals = 0
     private var queries = 0
     private var retentionGuides: Pair<List<PolynomialAtom>, List<Int>>? = null
@@ -828,14 +928,17 @@ internal class WitnessProbe(
         arithmetic.step()
         proposals++
         val context = retentionGuides
-        return checkSample(
+        val result = checkSample(
             formula, point, boolCount, arithmetic, algebraic,
-            if (context == null && rank == null) null else { captured, signs ->
+            if (context == null && rank == null && failureCapture == null) null else { captured, signs ->
                 if (context != null) retainRejectedPoint(captured, signs, context)
                 rank?.invoke(signs)
+                failureCapture?.rejected(formula, null, point, null, captureSnapshot,
+                    work?.spentWork ?: 0, arithmetic, signs)
             },
             reusePowers = true,
         )
+        return result
     }
 
     private fun candidate(point: AffineLineEvaluation.Point): QfNraAssignment? {
@@ -845,7 +948,17 @@ internal class WitnessProbe(
         val context = retentionGuides
         return checkLineSample(
             formula, point, boolCount, arithmetic, algebraic,
-            if (context == null) null else { captured, signs -> retainRejectedPoint(captured, signs, context) },
+            if (context == null && failureCapture == null) null else { captured, signs ->
+                if (context != null) retainRejectedPoint(captured, signs, context)
+                failureCapture?.let { capture ->
+                    val coordinates = (0 until captured.coordinateCount).associateWith {
+                        arithmetic.step()
+                        captured.coordinate(it)
+                    }
+                    capture.rejected(formula, null, coordinates, null, captureSnapshot,
+                        work?.spentWork ?: 0, arithmetic, signs)
+                }
+            },
         )
     }
 
@@ -1644,6 +1757,10 @@ private fun searchCells(
     work: QfNraWork,
     fixed: Map<Int, BigFraction>,
     family: Set<Polynomial>? = null,
+    capture: PolynomialFailureCapture? = null,
+    snapshot: Long = 0,
+    refinement: PolynomialCellRefinement.PolynomialCellRegion? = null,
+    feedback: ((PolynomialAtom, Map<Int, AlgebraicReal>) -> Boolean)? = null,
 ): QfNraAssignment? {
     val coordinates = HashMap<Int, AlgebraicReal>()
     if (projection.variableCount == 0) {
@@ -1651,6 +1768,10 @@ private fun searchCells(
     }
     val independent = if (family == null) emptySet()
     else independentRegionAtoms(formula, region, family, fixed, arithmetic)
+    val projectedVariables = family?.takeIf { refinement != null }?.flatMap { polynomial ->
+        arithmetic.step()
+        polynomial.variables
+    }?.toSet()
     val atomLevels = region.atoms.keys.associateWith { index ->
         var level = -1
         for (variable in formula.atoms[index].polynomial.variables) {
@@ -1671,14 +1792,18 @@ private fun searchCells(
         }
         val cell = frame.nextCell++
         val root = (cell / 2).toInt()
-        val coordinate = frame.point ?: if (frame.rootsOnly) frame.roots[cell.toInt()]
+        var coordinate = frame.point ?: if (frame.rootsOnly) frame.roots[cell.toInt()]
         else if (cell and 1L != 0L) frame.roots[root] else {
             algebraic.rational(algebraic.sampleBetween(frame.roots.getOrNull(root - 1), frame.roots.getOrNull(root)))
         }
+        if (refinement != null && projectedVariables != null &&
+            frame.variable !in projectedVariables && frame.variable !in fixed
+        ) coordinate = refinement.repair(frame.variable, coordinate) ?: coordinate
         coordinates[frame.variable] = coordinate
         if (work.liftedCells < Long.MAX_VALUE) work.liftedCells++
-        val rejected = rejectedRegionAtom(formula, region, coordinates, arithmetic, algebraic, atomLevels)
+        val rejected = rejectedRegionAtom(formula, region, coordinates, arithmetic, algebraic, atomLevels, feedback)
         if (rejected != null) {
+            capture?.rejected(formula, region, coordinates, rejected, snapshot, work.spentWork, arithmetic)
             // Unprojected coordinates have one fixed sector sample throughout this family's CAD.
             if (rejected in independent) return null
             continue
@@ -1778,6 +1903,7 @@ private fun rejectedRegionAtom(
     arithmetic: PolynomialArithmetic,
     algebraic: AlgebraicArithmetic,
     atomLevels: Map<Int, Int>? = null,
+    feedback: ((PolynomialAtom, Map<Int, AlgebraicReal>) -> Boolean)? = null,
 ): Int? {
     for ((index, required) in region.atoms) {
         arithmetic.step()
@@ -1795,6 +1921,7 @@ private fun rejectedRegionAtom(
             }
             continue
         }
+        if (required && feedback?.invoke(atom, coordinates) == true) return index
         val sign = algebraic.signAt(atom.polynomial, coordinates)
         if (atom.holds(sign) != required) return index
     }

@@ -39,6 +39,9 @@ class SourceIntDomains internal constructor(
      */
     fun declaredOrNull(v: Int): IntDomain? = if (isClosed(v)) stated?.get(v) else null
 
+    /** The domain a caller supplied for column [v], fallback box included, or `null` when none was. */
+    internal fun statedOrNull(v: Int): IntDomain? = stated?.get(v)
+
     /**
      * Finite domain of column [v] for a lane that must branch on it: the box a caller supplied, else the
      * closed [bounds] range.

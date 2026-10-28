@@ -841,7 +841,10 @@ internal class LpEngine(
             return lower != Long.MIN_VALUE && lower >= cutoff
         }
 
-        // Long-to-Double rounding at wide cutoffs can turn a strict improvement into equality.
+        return linearBoundDominates(session, checkNotNull(BigFraction.ofDouble(cutoff)))
+    }
+
+    internal fun linearBoundDominates(session: PropagationSession, cutoff: BigFraction): Boolean {
         var lower = BigFraction.ofLong(objective.constant)
         for (b in 0 until minOf(session.problem.numBoolVars, objective.boolWeightValues.size)) {
             val weight = objective.boolWeightValues[b]
@@ -857,7 +860,7 @@ internal class LpEngine(
             val endpoint = if (coefficient > 0L) domain.min else domain.max
             lower += BigFraction.ofLong(coefficient) * BigFraction.ofLong(endpoint)
         }
-        return lower >= checkNotNull(BigFraction.ofDouble(cutoff))
+        return lower >= cutoff
     }
 
     /** Discrete objective lower-bound dominance against the incumbent. */

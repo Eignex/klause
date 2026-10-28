@@ -25,6 +25,7 @@ object MoveSourceCatalog {
         "extended-structured" to { SatisfiedStructured.sampledExtended(DEFAULT_SATISFIED_SAMPLE) },
         "extended-elected" to { SatisfiedStructured.electedExtended(DEFAULT_ELECTED_CAP) },
         "extended-repairs" to { ViolatedRepairs.extended(DEFAULT_VIOLATED_SAMPLE) },
+        "unused-values" to { UnusedValueEntries(DEFAULT_ELECTED_CAP) },
     )
 
     /** Every known source label, in catalog order. */

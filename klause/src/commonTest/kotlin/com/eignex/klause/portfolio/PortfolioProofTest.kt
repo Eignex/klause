@@ -44,7 +44,9 @@ class PortfolioProofTest {
             },
         )
 
-        Portfolio.thompson(workers, seed = 0, reseedStaleThreshold = 0).use {
+        Portfolio.thompson(workers, seed = 0, reseedStaleThreshold = 0).also {
+            it.runTimeSource = TestTimeSource()
+        }.use {
             it.minimize(Cancellation { proofVisits >= 3 || ordinaryVisits >= 32 })
         }
 

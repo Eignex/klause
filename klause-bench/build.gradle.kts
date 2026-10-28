@@ -1,7 +1,7 @@
 import java.io.FileOutputStream
 
 plugins {
-    id("com.eignex.jvm") version "1.3.3"
+    id("com.eignex.jvm") version "1.3.5"
     kotlin("plugin.serialization")
     application
 }
@@ -35,12 +35,15 @@ val labBenchVersion = providers.gradleProperty("labBenchVersion").getOrElse("0.1
 dependencies {
     implementation("com.eignex:lab-bench:$labBenchVersion")
     implementation(project(":klause"))
-    implementation("org.jetbrains.kotlin:kotlin-compiler-embeddable:2.4.10")
+    implementation("org.jetbrains.kotlin:kotlin-compiler-embeddable:2.4.21")
     testImplementation("org.junit.jupiter:junit-jupiter")
     // SolveStats exposes kumulant summary types (SumResult/MaxResult); needed to read them.
     implementation("com.eignex:kumulant:0.3.4-20261013.194059-67")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+    implementation("org.tukaani:xz:1.12")
+    implementation("org.apache.commons:commons-compress:1.28.0")
+    implementation("com.github.luben:zstd-jni:1.5.7-24")
     // runBlocking + Flow.collect bridge for the suspend Portfolio API in the anytime metric.
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
 }

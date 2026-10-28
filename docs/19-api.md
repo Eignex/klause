@@ -9,7 +9,7 @@ define lifetimes; this chapter identifies supported entry points and extension s
 
 | Surface | Contract |
 |---|---|
-| `model`, `schema`, `compile` | Model expressions, schema handles, compilation, captured source-name metadata, typed source locations and decoding |
+| `model`, `schema`, `compile` | Model expressions, their compact JSON serializers, schema handles, compilation, captured source-name metadata, typed source locations and decoding |
 | `config`, `ir` model declarations | Configuration capture, source bounds/value sets, `Problem`, literals and structural factor descriptions |
 | `solver` entry points and results | `Solver`, `Optimizer`, `SolverParams`, `Session`, `SearchStream`, their result/value types and resumable operation contracts |
 | Built-in solver facades | Engine construction, parameters, presets and counting/sampling entry points |
@@ -19,10 +19,12 @@ define lifetimes; this chapter identifies supported entry points and extension s
 | `theory` protocols | Batch `Theory`, its fragment-check contract and authoritative exact assignment values; incremental participants use `SearchComponent` |
 | `lp` projection protocols | `RelaxationBuilder`, factor relaxation/hull interfaces and typed source/CP/LP mapping handles |
 | Format entry points | Public parsing, compilation and solution-writing facades; meaning follows [input semantics](03-input-semantics.md) |
+| `formats.json.ProblemJson`, `factor.codec` | Problem documents, `FactorCodec` registration and `MissingFactorCodecException`; see [problem JSON](03-input-semantics.md#problem-json) |
 | Exported numerical contracts | `BigInt`, `BigFraction`, `AlgebraicReal`, `Cancellation` and `WorkMeter` |
 
 Supported extensions supply the behavior their interfaces document. A custom factor
-keeps borrowed arrays and structural keys stable; a custom component supplies complete
+keeps borrowed arrays and structural keys stable, and registers a `FactorCodec` to be
+written as problem JSON; a custom component supplies complete
 checks and sound explanations; a custom objective agrees at feasible assignments.
 The type system does not certify these obligations. The
 [custom factor publication check](08-search.md#custom-factor-publication-checks)

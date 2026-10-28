@@ -216,6 +216,7 @@ class LocalSearchState private constructor(
         internal set
 
     internal var booleanRepairs: BooleanRepairClosure? = null
+    internal var compoundTally: CompoundTally? = null
 
     /** Soft cap for `compressViolation`: residuals at or below it
      *  keep exact unit resolution, above it a log tail bounds how much one large-magnitude factor
@@ -912,6 +913,31 @@ class LocalSearchState private constructor(
 
             is Move.Compound -> evaluateMove(move).netDelta
         }
+    }
+
+    /**
+     * Capture a candidate's assignment and factor grades through the ordinary reversible probe.
+     * This explicit diagnostic performs one probe, copies the assignment, degrees and violated order, and
+     * consumes no random values. It supplies heuristic grades, not source validation or a proof.
+     */
+    fun inspectMove(move: Move, objective: Objective? = null): LocalSearchMoveInspection {
+        var sample: Sample? = null
+        var degrees: IntArray? = null
+        val violatedOrder = violated.toIntArray()
+        val evaluation = try {
+            evaluateMove(move, objective, capture = {
+                sample = assignment.snapshot()
+                degrees = factorDegree.copyOf()
+            })
+        } finally {
+            // Dense-set order determines which factor a later random index selects.
+            violated.clear()
+            for (id in violatedOrder) violated.add(id)
+        }
+        return LocalSearchMoveInspection(
+            checkNotNull(sample), checkNotNull(degrees), evaluation.netDelta,
+            evaluation.weightedNetDelta, evaluation.objectiveDelta,
+        )
     }
 
     /**

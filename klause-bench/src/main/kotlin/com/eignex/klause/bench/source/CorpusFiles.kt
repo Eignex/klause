@@ -1,8 +1,8 @@
 package com.eignex.klause.bench.source
 
 import java.io.File
-import java.io.FilterInputStream
-import java.io.IOException
+import com.github.luben.zstd.ZstdInputStreamNoFinalizer
+import com.github.luben.zstd.ZstdOutputStreamNoFinalizer
 import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
@@ -10,7 +10,7 @@ import java.security.MessageDigest
 
 /**
  * Corpus file IO for plain and zstd-compressed instances. All readers use [open],
- * [readText] or [withPlainFile]; decompression is included in solve timing.
+ * [readText] or [withPlainFile]; [unpack] materializes original bytes for file consumers.
  */
 internal object CorpusFiles {
 
@@ -43,7 +43,7 @@ internal object CorpusFiles {
     /** The format extension of [file], looking past the compression suffix (`foo.mps.zst` → `mps`). */
     fun formatExtension(file: File): String = plainPath(file.name).substringAfterLast('.', "")
 
-    /** The plain bytes of [file], decompressing a `.zst` through the system `zstd`. */
+    /** The plain bytes of [file], decompressing a `.zst` in the current JVM. */
     fun open(file: File): InputStream = if (isCompressed(file)) decompress(file) else file.inputStream()
 
     fun readText(file: File): String = open(file).bufferedReader().use { it.readText() }
@@ -67,13 +67,26 @@ internal object CorpusFiles {
         }
     }
 
+    fun unpack(file: File, keepPacked: Boolean = System.getenv("KLAUSE_BENCH_CORPUS_KEEP_PACKED") == "true"): File {
+        if (!isCompressed(file)) return file
+        val plain = File(plainPath(file.path))
+        if (keepPacked && plain.isFile) return plain
+        withPlainFile(file) { staged ->
+            Files.move(staged.toPath(), plain.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        }
+        if (!keepPacked) check(file.delete()) { "cannot remove unpacked instance: $file" }
+        return plain
+    }
+
     /** Replace the plain instance [plain] with `<plain>.zst`, returning the compressed file. The archive is
      *  written to a partial file and renamed only once its decompressed bytes hash equal to the original,
      *  and the original is deleted only after that, so an interruption at any point loses nothing. */
     fun compress(plain: File): File {
         val packed = File(plain.path + SUFFIX)
         val partial = File(plain.path + PARTIAL_SUFFIX)
-        exec(listOf("zstd", "-q", "-f", "-$LEVEL", plain.absolutePath, "-o", partial.absolutePath))
+        plain.inputStream().use { input ->
+            ZstdOutputStreamNoFinalizer(partial.outputStream(), LEVEL).setChecksum(true).use { input.copyTo(it) }
+        }
         val expected = sha256 { update(it, plain) }
         val actual = sha256 { digest -> decompress(partial).use { it.feed(digest) } }
         if (!expected.contentEquals(actual)) {
@@ -121,46 +134,5 @@ internal object CorpusFiles {
         }
     }
 
-    private fun decompress(file: File): InputStream {
-        val proc = try {
-            ProcessBuilder("zstd", "-dcq", file.absolutePath)
-                .redirectError(ProcessBuilder.Redirect.INHERIT)
-                .start()
-        } catch (e: IOException) {
-            throw IllegalStateException("cannot run zstd to read $file; is zstd installed?", e)
-        }
-        return ProcessInputStream(proc, file)
-    }
-
-    private fun exec(cmd: List<String>) {
-        val rc = try {
-            ProcessBuilder(cmd).inheritIO().start().waitFor()
-        } catch (e: IOException) {
-            throw IllegalStateException("cannot run ${cmd.first()}; is it installed?", e)
-        }
-        check(rc == 0) { "command failed (exit $rc): ${cmd.joinToString(" ")}" }
-    }
-
-    /** A decompressor's stdout that checks the exit code once fully read, so a corrupt archive fails the
-     *  read instead of yielding truncated text. Closing early stops the decompressor. */
-    private class ProcessInputStream(private val proc: Process, private val file: File) :
-        FilterInputStream(proc.inputStream) {
-        private var drained = false
-
-        override fun read(): Int = super.read().also { if (it < 0) drained = true }
-
-        override fun read(b: ByteArray, off: Int, len: Int): Int =
-            super.read(b, off, len).also { if (it < 0) drained = true }
-
-        override fun close() {
-            super.close()
-            if (!drained) {
-                proc.destroy()
-                proc.waitFor()
-                return
-            }
-            val rc = proc.waitFor()
-            check(rc == 0) { "zstd failed decompressing $file (exit $rc)" }
-        }
-    }
+    private fun decompress(file: File): InputStream = ZstdInputStreamNoFinalizer(file.inputStream())
 }

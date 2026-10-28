@@ -239,6 +239,151 @@ class PolynomialBooleanRegionsTest {
     }
 
     @Test
+    fun `changing the query condition releases a joint refutation of its numeric branch`() {
+        val source = SmtLibPolynomial.parse("(declare-const gate Bool) (declare-const x Real) " +
+            "(declare-const y Real) (declare-const z Real) (assert (or gate (and " +
+            "(= (* x x) 1) (= (* y y) 1) (= (* z z) 1) " +
+            "(= (* x y) 1) (= (* y z) 1) (= (* x z) (- 1)))))")
+        val arithmetic = PolynomialArithmetic()
+        val coupled = PolynomialCoupledSections(QfNraWork(QfNraParams()), PolynomialLimits())
+        val progress = PolynomialQueryProgress()
+        val numeric = PolynomialCondition(bools = mapOf(0 to false))
+            .apply(source.formula, 1, 3, arithmetic::step)
+        val alternative = PolynomialCondition(bools = mapOf(0 to true))
+            .apply(source.formula, 1, 3, arithmetic::step)
+
+        val rejected = PolynomialFormula.normalize(numeric, arithmetic)
+            .booleanRegions(arithmetic, progress, coupled = coupled).asSequence().filterNotNull().toList()
+        val accepted = PolynomialFormula.normalize(alternative, arithmetic)
+            .booleanRegions(arithmetic, coupled = coupled).asSequence().filterNotNull().toList()
+
+        assertTrue(rejected.isEmpty())
+        assertEquals(1L, progress.coupledConflicts)
+        assertTrue(accepted.isNotEmpty())
+    }
+
+    @Test
+    fun `a replacement snapshot cannot reuse a joint exclusion with the same atom indices`() {
+        val declarations = "(declare-const x Real) (declare-const y Real) (declare-const z Real) " +
+            "(declare-const gate Bool) "
+        fun formula(closing: String) = PolynomialFormula.normalize(SmtLibPolynomial.parse(declarations +
+            "(assert (or gate (and (= (* x x) 1) (= (* y y) 1) (= (* z z) 1) " +
+            "(= (* x y) 1) (= (* y z) 1) (= (* x z) $closing))))").formula, PolynomialArithmetic())
+        val progress = PolynomialQueryProgress()
+        val coupled = PolynomialCoupledSections(QfNraWork(QfNraParams()), PolynomialLimits())
+
+        val original = formula("(- 1)").booleanRegions(PolynomialArithmetic(), progress, coupled = coupled)
+            .asSequence().filterNotNull().toList()
+        val replacement = formula("1").booleanRegions(PolynomialArithmetic(), coupled = coupled)
+            .asSequence().filterNotNull().toList()
+
+        assertEquals(1L, progress.coupledConflicts)
+        assertTrue(original.all { it.atoms.isEmpty() && it.bools.getValue(0) })
+        assertTrue(replacement.any { it.atoms.isNotEmpty() })
+    }
+
+    @Test
+    fun `a joint encoded exclusion retains the guarded alternative after retraction`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const gate Bool) (declare-const a Bool) (declare-const b Bool) " +
+                "(declare-const x Real) (declare-const y Real) (declare-const z Real) " +
+                "(declare-const u Real) (declare-const v Real) (declare-const w Real) " +
+                "(assert (and (or a b) (or gate (and (= u (* x x)) (= u 1) " +
+                "(= v (* y y)) (= v 1) (= w (* z z)) (= w 1) " +
+                "(= (* x y) 1) (= (* y z) 1) (= (* x z) (- 1))))))",
+        )
+        val arithmetic = PolynomialArithmetic()
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+        val singleProgress = PolynomialQueryProgress()
+        val single = PolynomialCoupledSections(QfNraWork(QfNraParams()), PolynomialLimits(), joint = false)
+        val progress = PolynomialQueryProgress()
+        val coupled = PolynomialCoupledSections(QfNraWork(QfNraParams()), PolynomialLimits())
+
+        val control = formula.booleanRegions(arithmetic, singleProgress, coupled = single)
+            .asSequence().filterNotNull().toList()
+        val regions = formula.booleanRegions(arithmetic, progress, coupled = coupled)
+            .asSequence().filterNotNull().toList()
+
+        assertTrue(control.any { it.bools[0] != true })
+        assertEquals(0L, singleProgress.coupledConflicts)
+        assertTrue(regions.isNotEmpty())
+        assertTrue(regions.all { it.bools[0] == true })
+        assertEquals(1L, progress.coupledConflicts)
+        assertEquals(9L, progress.coupledConflictPremises)
+        assertTrue(progress.coupledExclusionUses > 0)
+    }
+
+    @Test
+    fun `coupled section exclusions refute every unrelated Boolean prefix before a region`() {
+        for (length in listOf(1, 2, 4)) {
+            val declarations = (0 until length).joinToString(" ") {
+                "(declare-const a$it Bool) (declare-const b$it Bool)"
+            }
+            val prefix = (0 until length).joinToString(" ") { "(or a$it b$it)" }
+            val source = SmtLibPolynomial.parse(
+                "(declare-const x1 Real) (declare-const x2 Real) $declarations " +
+                    "(assert (and $prefix (= (* x1 x1) 2) (= (* x2 x2) 3) (= (+ (* x1 x2) x1 x2) 1)))",
+            )
+            val arithmetic = PolynomialArithmetic()
+            val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+            val progress = PolynomialQueryProgress()
+            val coupled = PolynomialCoupledSections(QfNraWork(QfNraParams()), PolynomialLimits())
+
+            val regions = formula.booleanRegions(arithmetic, progress, coupled = coupled)
+                .asSequence().filterNotNull().toList()
+
+            assertTrue(regions.isEmpty())
+            assertEquals(1L, progress.coupledConflicts)
+            assertEquals(3L, progress.coupledConflictPremises)
+            assertTrue(progress.coupledExclusionReuses > 0)
+        }
+    }
+
+    @Test
+    fun `a coupled section conflict retracts to its satisfiable Boolean alternative`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const gate Bool) (declare-const x1 Real) (declare-const x2 Real) " +
+                "(assert (or gate (and (= (* x1 x1) 2) (= (* x2 x2) 3) (= (+ (* x1 x2) x1 x2) 1))))",
+        )
+        val arithmetic = PolynomialArithmetic()
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+        val progress = PolynomialQueryProgress()
+        val conflicts = ArrayList<List<PolynomialAtom>>()
+        val coupled = PolynomialCoupledSections(QfNraWork(QfNraParams()), PolynomialLimits())
+
+        val regions = formula.booleanRegions(arithmetic, progress, coupled = coupled) { conflicts.add(it) }
+            .asSequence().filterNotNull().toList()
+
+        assertTrue(regions.isNotEmpty())
+        assertTrue(regions.all { it.bools[0] == true && it.atoms.isEmpty() })
+        assertEquals(1L, progress.coupledConflicts)
+        assertTrue(conflicts.isEmpty())
+    }
+
+    @Test
+    fun `replacement snapshots discard exclusions over reused atom identities`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (declare-const y Real) (declare-const gate Bool) " +
+                "(assert (or gate (and (> x 0) (> y 0) (< (* x y) 0))))",
+        )
+        val arithmetic = PolynomialArithmetic()
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+        val progress = PolynomialQueryProgress()
+        val original = formula.booleanRegions(arithmetic, progress).asSequence().filterNotNull().toList()
+        val replacement = formula.withAtoms(formula.atoms.map { atom ->
+            if (atom.relation == PolynomialRelation.LT) atom.copy(relation = PolynomialRelation.GT) else atom
+        }, arithmetic)
+
+        val regions = replacement.booleanRegions(arithmetic).asSequence().filterNotNull().toList()
+
+        assertEquals(1L, progress.partialConflicts)
+        assertTrue(original.all { it.atoms.isEmpty() && it.bools.getValue(0) })
+        assertTrue(regions.any { it.atoms.isNotEmpty() })
+        assertTrue(regions.any { it.bools[0] == true })
+        assertTrue(formula.atoms.any { it.relation == PolynomialRelation.LT })
+    }
+
+    @Test
     fun `partial conflicts can exhaust both numeric guard alternatives`() {
         val source = SmtLibPolynomial.parse(
             "(declare-const x Real) (declare-const y Real) (declare-const gate Bool) " +

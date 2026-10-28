@@ -136,6 +136,19 @@ internal class FunctionalObjective internal constructor(
     internal fun conesMaintained(maintains: (DefinitionalSweep.SweepNode) -> Boolean): Boolean =
         coneMemo.ordered.all { definition -> definition.origin?.let(maintains) == true }
 
+    internal fun coneMaintenanceSteps(
+        maintains: (DefinitionalSweep.SweepNode) -> Boolean,
+    ): Sequence<Boolean?> = sequence {
+        for ((index, definition) in coneMemo.ordered.withIndex()) {
+            if (definition.origin?.let(maintains) != true) {
+                yield(false)
+                return@sequence
+            }
+            if ((index + 1) % 256 == 0) yield(null)
+        }
+        yield(true)
+    }
+
     private fun termForm(
         terms: IntArray,
         termCoeffs: LongArray,
@@ -225,6 +238,9 @@ internal class FunctionalObjective internal constructor(
 
     internal fun evaluateExact(assignment: Assignment): BigInt =
         objValue({ id -> assignment.intValue(id) }, { id -> assignment.boolValue(id) })
+
+    internal fun evaluateExact(sample: Sample): BigInt =
+        objValue({ id -> sample.intValue(id) }, { id -> sample.boolValue(id) })
 
     override fun deltaIfApplied(assignment: Assignment, move: Move): Double {
         val moved = MutableIntLongMap()

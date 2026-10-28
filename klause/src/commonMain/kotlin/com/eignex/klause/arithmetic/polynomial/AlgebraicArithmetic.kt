@@ -381,11 +381,14 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         }
 
     fun signAt(polynomial: Polynomial, coordinates: Map<Int, AlgebraicReal>): Int =
+        enclosedSignAt(polynomial, coordinates) ?: sign(evaluate(polynomial, coordinates))
+
+    fun enclosedSignAt(polynomial: Polynomial, coordinates: Map<Int, AlgebraicReal>): Int? =
         enclosedSign {
             encloseAt(polynomial) { variable, exponent ->
                 intervalPower(coordinates.getValue(variable).interval, exponent)
             }
-        } ?: sign(evaluate(polynomial, coordinates))
+        }
 
     fun pointEvaluation(coordinates: Map<Int, AlgebraicReal>): PointEvaluation = PointEvaluation(coordinates)
 

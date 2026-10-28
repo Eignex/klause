@@ -5,6 +5,8 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.optimization.LinearAuthority
+import com.eignex.klause.lp.optimization.LinearAuthorityCapture
+import com.eignex.klause.lp.optimization.LinearAuthorityFeedbackRequest
 import com.eignex.klause.lp.optimization.linearCoordinatesSupported
 import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.simplex.exact.BigFraction
@@ -20,6 +22,7 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.BooleanBranching
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.HeuristicBooleanBranching
+import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchFrontierRun
 import com.eignex.klause.solver.search.SearchRunEvent
@@ -51,6 +54,11 @@ internal class LinearAuthorityInvocation(
     private val funding: SourceLpFunding = borrowedAuthority?.funding
         ?: SourceLpFunding(params.sourceLpWorkLimit, params.sourceLpAllocationLimit),
     cuts: Boolean = boundOrdered && params.sourceCuts,
+    activeRows: Boolean = false,
+    supportBranching: Boolean = false,
+    onNumericalFeedback: ((SourceNumericalFeedbackResult) -> Unit)? = null,
+    latestFeedback: Boolean = true,
+    feedbackRequest: LinearAuthorityFeedbackRequest? = null,
 ) : AutoCloseable {
     init {
         require(borrowedAuthority?.funding == null || borrowedAuthority.funding === funding) {
@@ -75,6 +83,7 @@ internal class LinearAuthorityInvocation(
     private var importedIncumbents = 0L
     private var result: LinearInvocationResult? = null
     val isDone: Boolean get() = result != null
+    fun captureTo(journal: LinearAuthorityCapture) = component.captureTo(journal)
     val work: Long get() = state.work.spent + funding.spent / LP_WORK_PER_NODE
     val stats: SolveStats get() = SolveStats(
         run = SolveStats.EMPTY.run.copy(backend = "linear-authority",
@@ -90,8 +99,19 @@ internal class LinearAuthorityInvocation(
         SourceLpBudget(maxOperations = params.sourceLpOperations, onWork = state.smt::observeSourceLp,
             funding = funding), stop, ::paused, ::offer,
         { incumbent?.let { sample -> value?.let { sample to it } } }, useBranchHistory, borrowedAuthority,
-        useGuidance = boundOrdered || guidance, inheritBounds = boundOrdered, useCuts = cuts)
-    private val session = SearchComponentSet(listOf(component)).session(params.maxLeaves, stop).also {
+        useGuidance = boundOrdered || guidance || supportBranching || onNumericalFeedback != null,
+        inheritBounds = boundOrdered, useCuts = cuts,
+        useActiveRows = activeRows, useRefutationReuse = params.sourceRefutationReuse,
+        useRefutationPropagation = params.sourceRefutationPropagation,
+        useRefutationResolution = params.sourceRefutationResolution, useSupportBranching = supportBranching,
+        pointCuts = boundOrdered && params.sourcePointCuts, onNumericalFeedback = onNumericalFeedback,
+        aggregateCuts = boundOrdered && params.sourceAggregateCuts, latestFeedback = latestFeedback,
+        feedbackRequest = feedbackRequest)
+    private val session = SearchComponentSet(listOf(component)).session(params.maxLeaves, stop,
+        atoms = if (params.sourceRefutationPropagation || params.sourceRefutationResolution) SearchAtomRegistry(
+            context.coordinates.filter {
+                it.kind == com.eignex.klause.solver.evidence.SourceCoordinate.Kind.Boolean
+            }.maxOfOrNull { it.id + 1 } ?: 0) else null).also {
         it.bindOpenTheoryWork(state.work)
     }
     private var initialized = false

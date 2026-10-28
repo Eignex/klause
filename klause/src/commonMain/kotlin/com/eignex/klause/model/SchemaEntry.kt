@@ -8,11 +8,11 @@ import kotlinx.serialization.Serializable
  * [com.eignex.skema.SchemaDef]'s entries map; the map key is the entry's name, so
  * spec types don't carry a redundant `name` field.
  */
-@Serializable
+@Serializable(with = SchemaEntrySerializer::class)
 sealed interface SchemaEntry
 
 /** A schema entry that declares a decision variable (as opposed to a named constraint). */
-@Serializable
+@Serializable(with = VarSpecSerializer::class)
 sealed interface VarSpec : SchemaEntry
 
 /** A single Boolean decision variable. */
@@ -57,17 +57,51 @@ data class IntSpec(
 }
 
 /**
+ * An integer variable over a 64-bit range, either side of which may be open, optionally restricted to
+ * the sparse value set [values]. An absent [lower] or [upper] leaves that side unbounded; [values]
+ * lists disjoint ascending `[lo, hi]` runs inside a closed range.
+ */
+@Serializable
+@SerialName("intDomain")
+data class IntDomainSpec(
+    /** Inclusive lower bound, or `null` when open below. */
+    val lower: Long? = null,
+    /** Inclusive upper bound, or `null` when open above. */
+    val upper: Long? = null,
+    /** Declared value set as `[lo, hi]` runs, or `null` for the whole range. */
+    val values: List<List<Long>>? = null,
+) : VarSpec {
+    init {
+        require(lower == null || upper == null || lower <= upper) { "IntDomainSpec needs lower <= upper" }
+        if (values != null) {
+            require(lower != null && upper != null) { "IntDomainSpec values need a closed range" }
+            require(values.isNotEmpty()) { "IntDomainSpec values need at least one run" }
+            values.forEachIndexed { i, run ->
+                require(run.size == 2 && run[0] <= run[1]) { "IntDomainSpec run $i must be [lo, hi]" }
+                require(i == 0 || (run[0] > values[i - 1][1] && run[0] - 1 > values[i - 1][1])) {
+                    "IntDomainSpec runs must ascend with gaps"
+                }
+            }
+            require(values.first()[0] >= lower && values.last()[1] <= upper) {
+                "IntDomainSpec values must lie in [lower, upper]"
+            }
+        }
+    }
+}
+
+/**
  * Float declaration with an optional explicit grid of [buckets] values across `[min, max]`.
  * Components requiring a grid use an integer index and a retained decoder. Other supported
- * components retain continuous real coordinates.
+ * components retain continuous real coordinates. An infinite side is open; a grid over it uses the
+ * effective semantics' unranged window.
  */
 @Serializable
 @SerialName("float")
 data class FloatSpec(
-    /** Inclusive lower bound of the real interval. */
-    val min: Double,
-    /** Inclusive upper bound of the real interval. */
-    val max: Double,
+    /** Inclusive lower bound of the real interval, negative infinity when open. */
+    val min: Double = Double.NEGATIVE_INFINITY,
+    /** Inclusive upper bound of the real interval, positive infinity when open. */
+    val max: Double = Double.POSITIVE_INFINITY,
     /** Explicit grid size (at least two), or null to use the compiler's effective source policy. */
     val buckets: Int? = null,
 ) : VarSpec {
@@ -119,4 +153,18 @@ data class MultipleSpec(
 data class NamedConstraint(
     /** The constraint expression. */
     val expr: BoolExpr,
+    /** Whether the model requires this constraint or declares it implied. */
+    val role: ConstraintRole = ConstraintRole.REQUIRED,
 ) : SchemaEntry
+
+/** How a [NamedConstraint] relates to the model's solutions. */
+enum class ConstraintRole {
+    /** Part of the model. */
+    REQUIRED,
+
+    /** Implied by the other constraints; still posted, but local search weighs it lower. */
+    IMPLIED,
+
+    /** Implied and breaking symmetry; presolve skips its own symmetry breaking for the model. */
+    SYMMETRY_BREAKING,
+}

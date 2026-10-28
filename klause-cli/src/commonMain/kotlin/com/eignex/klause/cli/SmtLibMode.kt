@@ -235,6 +235,7 @@ internal class SmtLibOutput(private val sourceObjective: () -> BigFraction? = { 
         private val SMT_SEARCH_KEYS = setOf(
             "lsMoves", "lsCompletions", "lsCompletionsRefuted", "lsCompletionsUndecided",
             "lsBoardRestartChanges", "lsBoardRestartDeclines",
+            "lsGeometricProposalRuns", "lsGeometricProposalDeclines", "lsGeometricProposalCandidates",
             "nodes", "failures", "propagations", "learned", "learnedMeanSize", "learnedMeanLbd", "relearned",
             "openBoolDecisions", "openIntDecisions", "openTheoryDecisions", "openTheoryChecks",
             "openWork", "openLearned", "openRelearned",

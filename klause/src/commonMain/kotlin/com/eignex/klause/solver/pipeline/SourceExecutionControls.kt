@@ -48,7 +48,8 @@ internal fun bindSourceExecutionControls(
     val stop = cancellation or timeout or invocation.cancellation
     val companions = invocation.requestsFiniteNumericalCompanions
     val finiteOptions = options.withoutPresolve().without("node-limit", "dry-run-presolve").let {
-        if (companions) it.without("source-lp-work-limit", "source-lp-allocation-limit", "source-lp-operations") else it
+        if (companions) it.without("source-lp-work-limit", "source-lp-allocation-limit", "source-lp-operations",
+            "source-refutation-reuse", "source-refutation-propagation", "source-refutation-resolution") else it
     }
         .overriddenBy(ExecutionOptions(ExecutionOption.seed(seed)))
     val finite: (FiniteSolveShape) -> FiniteSolveRequest = { shape ->
@@ -83,6 +84,11 @@ internal fun bindSourceExecutionControls(
             sourceLpAllocationLimit = reader.defaulted(ExecutionOption.sourceLpAllocationLimit,
                 defaults.sourceLpAllocationLimit) ?: Long.MAX_VALUE,
             sourceLpOperations = reader[ExecutionOption.sourceLpOperations] ?: defaults.sourceLpOperations,
+            sourceRefutationReuse = reader[ExecutionOption.sourceRefutationReuse] ?: defaults.sourceRefutationReuse,
+            sourceRefutationPropagation = reader[ExecutionOption.sourceRefutationPropagation]
+                ?: defaults.sourceRefutationPropagation,
+            sourceRefutationResolution = reader[ExecutionOption.sourceRefutationResolution]
+                ?: defaults.sourceRefutationResolution,
         ) else defaults
         return SourceExecutionControls(
             theory,
@@ -128,6 +134,13 @@ internal fun bindSourceExecutionControls(
                 defaults.sourceLpAllocationLimit) ?: Long.MAX_VALUE,
             sourceLpOperations = reader[ExecutionOption.sourceLpOperations] ?: defaults.sourceLpOperations,
             sourceCuts = reader[ExecutionOption.sourceCuts] ?: defaults.sourceCuts,
+            sourcePointCuts = reader[ExecutionOption.sourcePointCuts] ?: defaults.sourcePointCuts,
+            sourceAggregateCuts = reader[ExecutionOption.sourceAggregateCuts] ?: defaults.sourceAggregateCuts,
+            sourceRefutationReuse = reader[ExecutionOption.sourceRefutationReuse] ?: defaults.sourceRefutationReuse,
+            sourceRefutationPropagation = reader[ExecutionOption.sourceRefutationPropagation]
+                ?: defaults.sourceRefutationPropagation,
+            sourceRefutationResolution = reader[ExecutionOption.sourceRefutationResolution]
+                ?: defaults.sourceRefutationResolution,
             maxDecisions = decisions,
             sharedRestart = reader[ExecutionOption.sharedRestart],
             maxLearnedClauses = reader[ExecutionOption.maxLearned],
@@ -181,6 +194,10 @@ internal fun bindSourceExecutionControls(
             reader.defaulted(ExecutionOption.niaCandidates, defaults.maximumCandidates) ?: Long.MAX_VALUE,
             reader.defaulted(ExecutionOption.niaMoves, defaults.maximumMoves) ?: Long.MAX_VALUE,
             budget,
+            reader.defaulted(ExecutionOption.niaCellRefinement, defaults.cellRefinement),
+            reader.defaulted(ExecutionOption.niaCellReuse, defaults.reuseSourceCells),
+            reader.defaulted(ExecutionOption.niaCellSteering, defaults.steerSourceCells),
+            reader.defaulted(ExecutionOption.niaIntegerRoots, defaults.admitIntegerRoots),
         )
     } else {
         null

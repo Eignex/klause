@@ -181,6 +181,7 @@ internal fun runtimeOptions(environment: Map<String, String>): Map<String, Strin
                         val option = word.trimStart('\'', '"')
                         option.startsWith("-Dklause.bench.cache=") ||
                             option.startsWith("-Dklause.bench.corpusCache=") ||
+                            option.startsWith("-Dklause.bench.corpus.shared=") ||
                             option.startsWith("-Dklause.workspace.root=")
                     }.joinToString(" ")
             }

@@ -24,7 +24,7 @@ internal class PseudoBooleanPropagator(
     override val boolVars: IntArray,
     override val intVars: IntArray,
     private val weights: LongArray,
-    private val literals: IntArray,
+    val literals: IntArray,
     private val op: PbOp,
     private val bound: Long,
     private val watched: Boolean = false,

@@ -52,6 +52,34 @@ coverage tree. Global bounds combine every remaining alternative, including
 unvisited siblings and refuted regions; a region without a bound or refutation
 withholds a global bound. Queue rank alone supplies no proof authority.
 
+An opt-in sparse source consultation checks fully established active rows before
+Boolean completion, using a zero objective. A source-checked contradiction closes
+the current coverage leaf through ordinary traversal. Unchanged active rows and
+numeric restrictions skip repeated numerical work; changed or retracted states
+invalidate pending queries. Completed no-conflict consultation keys can survive
+retraction and numerical-owner release; they retain no point or proof. Feasible
+partial points supply no model or bound, so complete queries remain required.
+Preparation, numerical work and source checking
+share the containing cumulative source LP allowances.
+
+Opt-in numerical refutation propagation names integer alternatives with source-bound
+atoms. At a Boolean-complete prefix, one missing integral restriction in a retained
+checked refutation can imply its adjacent complement. The shared trail retains a
+clause reason over the established prefix facts; an unnamed premise declines the
+deduction. The coverage tree retains the excluded sibling's checked refutation
+alongside the surviving branch. Retraction removes the implication, and replay
+restores it only after its named antecedents hold again.
+
+Opt-in numerical refutation resolution combines checked clauses across an already
+named complementary integral predicate. Shared clause resolution removes the pivot;
+an exhaustive source integer split checks both imported refutations in the resulting
+scope. Only a fresh checked import can exclude a queued region. Such exclusions and
+unit deductions retain ordinary coverage-tree accounting. Complete Boolean scope and
+opening restrictions remain premises; stopped resolution leaves alternatives open.
+Unit reasons select established support predicates, including stronger endpoints,
+and omit unrelated integer decisions. Clause and proof storage share the bounded
+invocation-local refutation index and cumulative source allowances.
+
 A model policy can pause required completion with `SearchModelDisposition.Pause`.
 The run retains the assembled model and its decision trail, and retries that policy
 before node pruning, branching or complete checks. Pausing neither blocks the model
@@ -129,7 +157,21 @@ above the cutoff do not seed it. This starting witness supplies bounds without
 priming solution guidance or earning incumbent progress. Restarting workers retain
 their discovery and root-primal startup path. Rebindable neighborhood searches retain strict
 improvement admission, and exhaustion under an external cutoff keeps its conditional
-result scope.
+result scope. Exact repair cutoffs remain rational through admission and discrete
+dominance. LP pruning may use their rounded-up floating enclosure; equality in the
+displayed objective cannot reject an exact improvement.
+
+An exact repair can retain a primal point accepted by the original source checker
+while its continuous completion still requires certification. The point's rational
+source objective, mapped to the working scale and direction, must strictly improve
+the cutoff. Source tolerance acceptance supplies no nominal exact coordinates or
+optimality authority: missing certification keeps the fragment unresolved, including
+when it publishes a witness. The pending point shares the completion's work and
+cancellation scope, survives slices with that leaf and is discarded on reseeding or
+close. A rejected point supplies no conflict.
+This witness-only path publishes the point and continues chronologically through sibling
+assignments; it cannot block an unresolved leaf as a proved nogood. Other traversal
+modes stop incomplete when their model continuation would require such a blocker.
 
 ### Leaf-completed columns
 
@@ -244,6 +286,11 @@ their first establishment while a resumed cursor repeats completed wakes. Fresh
 decision atom cascades use the same pending completion and retract with their pin.
 Bulk allocations, immutable domain construction and non-interruptible propagator
 internals remain atomic.
+
+Cumulative propagation polls the same token during task, edge-window and start-bound
+scans. Its window scratch belongs to one fire, so interruption discards that scratch
+and leaves the factor queued to rebuild it. Completed deductions and their historical
+reasons survive; an incomplete fixpoint supplies no LP rounding witness or refutation.
 
 Shared CP assertions also poll the search context's containing allowance. A cancelled
 assertion retracts to its completed parent and retains the same alternative for a
@@ -390,6 +437,14 @@ closing releases the cursor without exposing partial state. See
 Cumulative edge-finding runs in both time directions over fixed durations, demands
 and capacity, declining the reversed pass when its arithmetic is not safely
 representable.
+
+Unary resources also check overload over minimum durations while a duration is
+unfixed or a presence unknown. Present tasks whose minima cannot fit between their
+earliest start and latest completion conflict, and an unknown task whose minimum
+would overload them is ruled absent; any channel over that presence then consumes
+the exclusion. Its reason cites the overloaded set's start bounds, minimum
+durations and member presences, never the excluded presence. Zero minima add no
+load, and unrepresentable completion times decline the check.
 
 Diffn's constant-size sweep filters positive-area compulsory parts. Strict boxes
 with a zero dimension also receive the pairwise separation check, so the sweep's

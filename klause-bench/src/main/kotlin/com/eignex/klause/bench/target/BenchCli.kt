@@ -16,6 +16,7 @@ import com.eignex.klause.bench.source.CorpusCache
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.bench.source.CorpusSelection
+import com.eignex.klause.bench.source.CorpusUnavailable
 import com.eignex.klause.bench.source.ProblemKind
 import java.io.File
 import java.time.Instant
@@ -25,6 +26,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
+import kotlin.system.exitProcess
 
 /**
  * The bench commands klause-lab runs: `select` names problems, `solve-one` solves one and writes its
@@ -39,6 +41,15 @@ object BenchCli {
     /** CLI entry point dispatching bench subcommands. */
     @JvmStatic
     fun main(args: Array<String>) {
+        try {
+            dispatch(args)
+        } catch (failure: CorpusUnavailable) {
+            System.err.println("${failure.message}: ${failure.cause?.javaClass?.simpleName}")
+            exitProcess(75)
+        }
+    }
+
+    private fun dispatch(args: Array<String>) {
         when (val cmd = args.firstOrNull() ?: "list") {
             "list", "--list", "help", "--help" -> if (args.size > 1) listProblems(args[1]) else printListing()
 
@@ -109,12 +120,13 @@ object BenchCli {
     /** Print the [filterArgs] selection one JSON object per line: the suite and problem that name each instance
      *  exactly for `solve-one`, its source collection (`collection`), family, format and category. Resolving
      *  a dynamic suite fetches its collection, so a selection also leaves every instance it names on disk.
-     *  `files=true` adds the absolute `model` and `data` files and MiniZinc `includeDirs`, which lets a runner
+     *  `files=true` materializes plain `model` and `data` files and MiniZinc `includeDirs`, which lets a runner
      *  outside the bench solve the instance. */
     private fun printSelection(filterArgs: List<String>) {
         val f = filterArgs.filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
         val features = f["features"] == "true"
         val files = f["files"] == "true"
+        val changedCollections = HashSet<String>()
         for (selected in selectProblems(f)) {
             val line = buildJsonObject {
                 put("suite", selected.suite)
@@ -128,8 +140,13 @@ object BenchCli {
                     put("compilerIdentity", Reports.json.encodeToJsonElement(MiniZincCompatibility.compiler))
                 }
                 if (files) {
-                    put("model", CorpusFetcher.resolve(selected.ref.source).absolutePath)
-                    selected.ref.data?.let { put("data", CorpusFetcher.resolve(it).absolutePath) }
+                    val model = CorpusFetcher.resolve(selected.ref.source)
+                    val data = selected.ref.data?.let(CorpusFetcher::resolve)
+                    put("model", CorpusFiles.unpack(model).absolutePath)
+                    data?.let { put("data", CorpusFiles.unpack(it).absolutePath) }
+                    if (CorpusFiles.isCompressed(model) || data?.let(CorpusFiles::isCompressed) == true) {
+                        changedCollections += collectionOf(selected.ref)
+                    }
                     putJsonArray("includeDirs") {
                         CorpusFetcher.includeDirs(selected.ref.source).forEach { add(it.absolutePath) }
                     }
@@ -144,6 +161,8 @@ object BenchCli {
             }
             println(line)
         }
+        val cache = CorpusFetcher.cache()
+        for (collection in changedCollections) if (cache.isPresent(collection)) cache.recordSize(collection)
     }
 
     /** Solve exactly one problem, `suite=<id> problem=<name>` as `select` prints it, writing its record to

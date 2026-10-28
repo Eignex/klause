@@ -146,7 +146,8 @@ Preparation visits at most 65,536 modeled row/support operations with
 stay in the retained template, ahead of changing invocation-bound rows. Every
 query rechecks active cuts against the exact numeric source context under one
 shared 100,000-step proof allowance and premise view; inactive
-Boolean guards or integer pins disable the owner and its cuts together. Retraction
+Boolean guards or integer pins disable their source rows and dependent cuts.
+A cut with several source owners requires every owner to be active. Retraction
 restores those activation masks. Unverified cuts remain inactive and require an
 identity row layout. `source-cuts=false` disables this separation in numerical
 frontier traversal. LP certificates cite the nested source rounding
@@ -154,6 +155,32 @@ derivation, and final source checking repeats Boolean substitution independently
 Preparation and proof traversal report separate work observations, including
 interrupted queries. Separation and
 proof policy belong to the adapter, outside `lp.engine`.
+
+Explicit aggregate construction combines two to four source rows with positive
+exact weights and normalizes the integer activity by its rational coefficient gcd.
+Complete continuous cancellation permits integer rounding. Optional mixed rounding
+instead cites an active source bound for each remaining continuous coordinate,
+preferring the side that retains a negative residual.
+The candidate retains every source owner and its nested combination and rounding
+derivation. Construction bounds combined support at 128 coordinates, retained
+scalars at 256 bits and proof references at 16 KiB. Each attempt has 65,536 work
+units and 1 MiB of modeled allocation, with failed attempts charged to the same
+containing observer and cancellation token. These candidates require source
+verification before admission.
+An immutable template can append up to 64 explicit proposals before the shared
+checked-candidate pass. Existing candidate IDs are preserved; appending produces
+a new template identity. Full owner and coordinate indices must belong to that
+template, and copying and indexing costs debit the containing source allowance.
+The proposal producer owns and funds derivation construction separately.
+`source-aggregate-cuts=true` enables a template policy for numerical frontier
+traversal when source separation is enabled. It projects a continuous coordinate by combining its
+source row with the first singleton source bound of opposite coefficient sign.
+It applies checked rounding to the residual, using the first source bound sides
+for the remaining continuous coordinates. The cached family retains at most 64
+proposals under 500,000 preparation work and 8 MiB modeled allocation, with
+per-attempt limits shared with explicit aggregation. Stopped or limited
+preparation reports its decline and leaves only completed proposals available.
+Aggregation is disabled by default.
 
 ### Root preparation
 
@@ -245,6 +272,49 @@ An immutable traversal invocation retains its checked global bound when fresh
 coverage supplies an equal or weaker value, avoiding repeated verification of the
 growing sibling proof. A new repair scope owns a separate invocation.
 
+`source-refutation-reuse=true` enables a traversal-owned index of checked source
+refutations. Exact cited coordinate sides select candidates; full scope implication
+and a fresh source import check authorize closing the matching leaf before its
+numerical query. Reused refutations emit no fresh numerical feedback. Only
+refutations enter the index. Incumbent-bound closures and
+failed improvement queries supply no unconditional conflict. The original source,
+objective, invocation window and complete Boolean substitution remain bound to the
+opening, including when it borrows a numerical owner.
+
+`source-refutation-propagation=true` additionally enables integral unit-prefix
+deductions and the same refutation index. Only a single missing inclusive bound on
+a source integer with an integral endpoint is eligible. Complete Boolean scope,
+opening pins and all other restrictions must already hold. The augmented scope's
+fresh import check proves the excluded sibling; named prefix facts justify its
+complement through shared search. Missing names, unsupported endpoints and stopped
+checks leave the alternatives available. Source-bound registration and clause
+construction spend the containing numerical funding; the session registry admits
+at most 4,096 atom pairs and explanations at most 4,096 references.
+
+`source-refutation-resolution=true` enables the unit consumer and bounded pairwise
+resolution over already named integral predicates. Reduced refutation scopes become
+clauses; shared clause resolution removes a complementary pivot, and a source
+integer-split derivation checks the two imported proofs. Complete Boolean
+substitutions and opening restrictions are retained. A checked resolvent can exclude
+a queued region that neither input refutation covers individually. Unit reasons
+use the named established support rather than the entire decision prefix. Stronger
+endpoints can justify a premise; weaker or unnamed predicates decline. The index
+retains the resolvent and its proof under the same cumulative work/allocation and
+storage limits; unavailable checks supply no exclusion.
+
+The index retains at most 256 entries and 1 MiB of modeled proof/scope storage,
+evicting the oldest entry when either capacity is reached. Support traversal admits
+at most 4,096 nodes and depth 64; each retention or lookup shares at most 100,000
+verification polls across its candidates. Source, restriction and proof scalars
+retain 4,096-bit numerator and denominator limits. Source reconstruction, proof replay,
+indexing, allocation and eviction charge cumulative source LP funding. Unknown or
+cancelled checks close no additional alternative. Metadata visits and scratch
+allocation are charged before their source maps are copied. Ordinary traversal
+keeps reuse disabled. Cumulative reuse allocation has a separate admission limit:
+the smaller of 64 MiB and one eighth of the source funding remaining at opening.
+Reaching that limit clears the cache, stops further reuse work and preserves
+ordinary numerical traversal under its remaining cumulative funding.
+
 ### Leaf completion
 
 Finite optimization keeps a pinned real-leaf request across portfolio slices.
@@ -255,7 +325,10 @@ Source encoding and relaxation assembly are atomic preparation of the request.
 Neither pause consumes the discrete model or records an indeterminate region.
 Reseeding and shared objective-floor imports are deferred while completion is
 pending, and explicit rebind or close discards its numerical owners before changing
-the traversal.
+the traversal. An exact repair query disables tolerance-optimum acceptance and
+compares the certified completion's exact objective with its rational strict
+cutoff. Missing exact coordinates or an unrepresentable result leave coverage
+incomplete; neither a rounded tie nor a declined candidate closes the cutoff.
 
 Mixed witness recovery can submit a connected real residual to `SourceLp` after
 fixing integer guesses, within its `SourceLpBudget`. Only exact primal coordinates
@@ -296,6 +369,61 @@ Auxiliary multiplier searches own separate temporary solvers. Neighborhood
 invocations can borrow a retained authority, leaving its cleanup to the caller.
 Borrowers retain that authority's cumulative funding allowance.
 Floating source coordinates are guidance and supply no witness or proof authority.
+
+`solver.pipeline.SourceNumericalFeedback` delivers completed queries to decision
+consumers. The journal keeps two separately bounded channels: an inspection archive
+of the first queries, and a single latest-query slot that each completed query
+replaces. Archive retention therefore never withholds a later query; a prefix-only
+control reads the archive alone and reports later queries as retention-limited.
+Both channels share one record construction. Each archived record exposes exact-valued
+relaxation coordinates, generating cut
+masks, active source rows and scoped checked bounds/refutations, with independent
+point availability. A consumer names the projection it reads: the point, installed
+cut activity or the refutation. A query delivered after the archive stops holds only
+the requested projection and records it, so a withheld field is explicit rather than
+unavailable, and the query state still reports the actual point outcome. Installed
+cut activity keeps the installed, checked cuts with active owners; their violations
+are evaluated on demand while that query is still delivered, and a replaced,
+released, cancelled or oversized evaluation declines. A callback without a request
+receives the full record, and an external observer keeps its full archive. Such coordinates can contain numerical residuals and require
+full source checking before publication. Compatibility requires the same source
+premises, semantics, objective and exact query restrictions. A cutoff attribution
+requires its actual strict objective premise; an acquisition without that premise
+cannot claim a cutoff-conditioned conflict. Cancellation, pauses, missing queries,
+oversized queries, retention and funding exhaustion remain explicit unavailable
+outcomes. Detaching a consumer releases its latest slot and leaves an external
+observer's archive in place.
+Acquisition returns the existing authority result alongside feedback, preserving
+recovered incumbents for separate source checking and acquisition credit. A funded
+cutoff helper constructs a query-local strict row in the captured context's
+objective units and direction. Callers retain any frontend scale and coordinate
+mapping; the helper does not infer that outer conversion.
+Bounded refutation-support projection visits captured premise and assumption
+references and retains the complete Boolean substitution and query cutoff. An
+unsupported projection declines; it performs neither proof replay nor scope
+reduction. Its coordinate set supplies ranking only.
+
+An internal research consumer orders integer splits by near-tight,
+installed checked cut supports, preferring smaller supports and greater fractional
+distance from an integer, with source-order ties and fallback. It requests the point
+and installed cut activity, and evaluates a cut only when its support holds a
+fractional candidate that could change the choice. Both complementary
+alternatives remain in coverage. Feedback never supplies pruning or parent proof
+authority. Construction, replacement, retention and scoring debit the containing
+source LP funding cumulatively; evicting a delivered query neither refunds that
+ledger nor issues another LP solve. The archive retains at most 64 records, 250,000
+entries and 8 MiB modeled storage, and a delivered query has the same entry and
+byte allowance on its own. The archive is a prefix: once a record or allowance fills
+it, every later query is constructed for delivery alone. Archived records are charged
+for copies of the source rows, cut definitions and cited derivations they reference. Once the archive stops, a
+delivered record keeps only references to those immutable structures, which the
+authority prepared and still holds. A full delivered record is charged per referenced
+row, coordinate and objective entry, for its scope, point, cut violations and checked
+evidence. A requested record is charged for what it allocates: its point once when
+captured, its installed cuts, and one reference each for the source context, scope,
+query lists, evidence, sibling bound and incumbent. An on-demand cut evaluation spends the
+delivered query's remaining allowance and the same cumulative ledger; it issues no LP
+query and renews no allowance.
 
 `LinearAuthority.advance` consumes the shared sparse preparation, floating and
 bound-certificate policy through that same scoped owner. One admitted operation
@@ -629,6 +757,21 @@ Admission applies the existing dimension, entry and scalar limits to the working
 matrix, objective and selected sides; every published claim still checks against
 the complete source context.
 
+The internal active-row consultation uses a zero objective and a separately
+checked partial-scope refutation. Source scanning admits at most 100,000 visits
+within the remaining funded work, with 4,096-bit input and Boolean-substitution
+rationals; incomplete capture declines.
+The shared numerical journal retains the admitted numeric subset and its checked
+refutation in the original partial scope, with no point or objective bound.
+Separately funded active-row consultation can consume a retained delayed state;
+it uses the same production checker and cannot change the captured traversal.
+Boolean substitution precedes independent integer-pin admission. Sparse closure
+conflicts use the existing exact certificate lift; small strict systems can use
+the exact strict-feasibility operation. Preparation, modeled allocation and
+verification debit the traversal's cumulative source allowance. Retraction revokes
+pending numerical work, and feasible partial systems leave complete checking in
+charge of witnesses and optimization.
+
 `OpenTheoryPipeline.optimizeLinear` runs a complete affine context in the shared
 search session. A branch optimum becomes global only after every required Boolean
 and integer alternative has a checked bound or refutation; an improving source ray
@@ -648,6 +791,37 @@ pruning or proof authority. Indicator splits and integral strict-limit proposals
 do not train fractional history.
 `NumericalLinearRequest.solve` serves MPS through the same numerical authority, and
 these adapters never confer source semantics on a rounded or tolerance model.
+
+Internal numerical selection observations retain completed query scopes, exact
+relaxation coordinates before primal recovery, cited rows and the generating cut
+mask. Candidate violations use those coordinates, including satisfied installed
+cuts. An explicit empty mask prepares and checks candidates without inserting
+them. Changing a mask revokes the query's admission and cursor through the ordinary
+active-row compatibility checks. Source guards and integer pins are checked for
+every query; candidate scoring supplies no proof authority.
+
+The optional observer has separate record, entry, modeled byte and cancellation
+allowances. It retains immutable source values and derivations, never a numerical
+owner or live workspace. Incomplete capture and unavailable points remain unknown.
+Observing performs no solve. Explicit replay creates a fresh owner with separate
+cumulative work, allocation, operation and cancellation allowances; it rechecks
+source derivations and cannot publish deductions into the original traversal.
+
+`source-point-cuts=true` opts the retained frontier into point-based separation.
+The first relaxation uses its retained checked mask; a completed point can add
+one selection round at that node. The score combines normalized violation,
+inverse square-root support and objective parallelism. The model-facing cut pool
+and source selector share the greedy parallelism filter. Floating scores guide
+selection; source inequalities and their derivations remain exact rationals.
+Nonfinite projections supply no score. Each call visits at most 8,192 support
+entries with 65,536 modeled scoring work and 1 MiB modeled allocation, within the
+containing cumulative source allowance. A template retains at most 64 selected IDs.
+Changing its source layout clears those IDs; every query rechecks guards, pins and
+derivations. Unselected cut rows are omitted from masked queries, and changed row
+layouts invalidate numerical cursors through the ordinary compatibility checks.
+Completed base bounds survive a paused or declined separation round. Checked base
+incumbents and terminals bypass extra separation. The ordinary default activates
+all accepted source cuts.
 
 ### Tolerance recovery
 

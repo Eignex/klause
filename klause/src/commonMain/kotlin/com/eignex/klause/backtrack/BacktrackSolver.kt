@@ -11,9 +11,11 @@ import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.schema.VariableSchema
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.PullSearchStream
 import com.eignex.klause.solver.RepairSearch
+import com.eignex.klause.solver.RepairSearchStep
 import com.eignex.klause.solver.ResumableOptimizer
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
@@ -35,6 +37,7 @@ import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.UnsoundnessException
 import com.eignex.klause.solver.validation.composedFixpoint
+import com.eignex.klause.solver.withLifetime
 import com.eignex.klause.solver.withSourceSemantics
 import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
@@ -129,43 +132,78 @@ class BacktrackSolver internal constructor(
     @Suppress("TooGenericExceptionCaught") // the repair owner must preserve arbitrary primary and cleanup failures
     internal fun openRepair(objective: LinearObjective, params: BacktrackParams): RepairSearch {
         var activeCutoff = Double.POSITIVE_INFINITY
-        // The handle is non-pausable, so its own token is all that stops a fragment's search and its leaf LP
-        // checks; each repair points it at that repair's caller token.
+        var activeExactCutoff: BigFraction? = null
+        var exactCompletion = false
         var activeCancellation = params.cancellation
         val handleCancellation = object : Cancellation {
             override fun isCancelled(): Boolean = activeCancellation()
             override fun deadline(): ComparableTimeMark? = activeCancellation.deadline()
+            override fun workMeter() = activeCancellation.workMeter()
         }
         val handle = ResumableMinimize(
             this,
             objective,
-            params.copy(objectiveBoundSupplier = { activeCutoff }, cancellation = handleCancellation),
-            pausable = false,
+            params.copy(objectiveBoundSupplier = { activeCutoff },
+                cancellation = handleCancellation.withLifetime(handleCancellation)),
             rebindable = true,
+            exactObjectiveBoundSupplier = { activeExactCutoff.takeIf { exactCompletion } },
         )
         return object : RepairSearch {
+            private var started = false
+            private var closed = false
+            private var best: Sample? = null
+            private var terminal: RepairSearchStep? = null
             override val stats: SolveStats get() = handle.stats
+            override val work: Long get() = handle.work
 
-            override fun repair(
+            override fun begin(
                 assumptions: Assumptions,
                 decisionBudget: Long,
                 cutoff: Double,
                 cancellation: Cancellation,
-            ): Sample? {
+            ) {
+                beginFragment(assumptions, decisionBudget, cutoff, BigFraction.ofDouble(cutoff), false, cancellation)
+            }
+
+            override fun beginExact(
+                assumptions: Assumptions,
+                decisionBudget: Long,
+                cutoff: BigFraction,
+                cancellation: Cancellation,
+            ) {
+                beginFragment(assumptions, decisionBudget,
+                    SourceObjectiveScore(cutoff.toDouble(), cutoff).pruningBound, cutoff, true, cancellation)
+            }
+
+            private fun beginFragment(
+                assumptions: Assumptions,
+                decisionBudget: Long,
+                cutoff: Double,
+                exactCutoff: BigFraction?,
+                requireExactCompletion: Boolean,
+                cancellation: Cancellation,
+            ) {
                 try {
-                    require(!cutoff.isNaN() && cutoff <= activeCutoff) {
+                    check(!closed) { "repair search is closed" }
+                    require(decisionBudget >= 0L)
+                    val monotone = if (exactCutoff != null && activeExactCutoff != null) {
+                        exactCutoff <= checkNotNull(activeExactCutoff)
+                    } else if (exactCutoff == null && cutoff == Double.POSITIVE_INFINITY) {
+                        activeExactCutoff == null && activeCutoff == Double.POSITIVE_INFINITY
+                    } else cutoff <= activeCutoff
+                    require(!cutoff.isNaN() && monotone) {
                         "repair objective cutoff must be non-increasing"
                     }
                     activeCutoff = cutoff
+                    activeExactCutoff = exactCutoff
+                    exactCompletion = requireExactCompletion
                     activeCancellation = params.cancellation or cancellation
                     handle.rebind(assumptions, decisionBudget)
-                    var best: Sample? = null
-                    while (!handle.isDone) {
-                        val terminal = handle.runSlice(Cancellation.Never, Long.MAX_VALUE) { best = it.sample }
-                        if (terminal != null) break
-                    }
-                    return best
+                    best = null
+                    terminal = null
+                    started = true
                 } catch (failure: Throwable) {
+                    closed = true
                     try {
                         handle.close()
                     } catch (closeFailure: Throwable) {
@@ -175,7 +213,30 @@ class BacktrackSolver internal constructor(
                 }
             }
 
-            override fun close() = handle.close()
+            override fun runSlice(cancellation: Cancellation, millis: Long, work: Long): RepairSearchStep {
+                terminal?.let { return it }
+                check(!closed) { "repair search is closed" }
+                check(started) { "no repair fragment has been started" }
+                if (activeCancellation()) {
+                    return RepairSearchStep(best, TerminationReason.Cancelled).also { terminal = it }
+                }
+                val result = handle.runSlice(cancellation, millis, work) { best = it.sample }
+                val reason = when {
+                    activeCancellation() -> TerminationReason.Cancelled
+                    result is MinimizeResult.BestFound -> result.reason
+                    result is MinimizeResult.Unknown -> result.reason
+                    result is MinimizeResult.Unbounded -> TerminationReason.Unsupported
+                    result != null -> TerminationReason.SearchExhausted
+                    else -> null
+                }
+                return RepairSearchStep(best, reason).also { if (reason != null) terminal = it }
+            }
+
+            override fun close() {
+                if (closed) return
+                closed = true
+                handle.close()
+            }
         }
     }
 

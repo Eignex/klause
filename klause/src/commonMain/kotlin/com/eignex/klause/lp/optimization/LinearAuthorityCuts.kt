@@ -22,13 +22,21 @@ internal class LinearAuthorityCut(
     val inequality: SourceInequality,
     val derivation: SourceDerivation,
     val mixed: Boolean = false,
-)
+    owners: Set<Int> = setOf(owner),
+) {
+    val owners: Set<Int> = owners.toSet()
+
+    init { require(owner in this.owners && this.owners.all { it >= 0 }) }
+}
 
 internal class LinearAuthorityCuts private constructor(
     val rows: List<LinearAuthorityCut>,
     val work: Long,
     val observations: Map<String, Long>,
 ) {
+    fun withAdditional(additional: List<LinearAuthorityCut>): LinearAuthorityCuts =
+        if (additional.isEmpty()) this else LinearAuthorityCuts(rows + additional, work, observations)
+
     companion object {
         fun prepare(
             source: SourceProofContext, cancellation: Cancellation, onWork: (Long) -> Unit = {},

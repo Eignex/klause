@@ -24,6 +24,8 @@ class SourcePremise(
 
     private val captured = guards.toMap()
     private val capturedIntegers = integerPins.toMap()
+    internal val guardCount: Int get() = captured.size
+    internal val integerPinCount: Int get() = capturedIntegers.size
     /** Boolean source pins required to use this premise. */
     val guards: Map<Int, Boolean> get() = captured.toMap()
     /** Exact integer source equalities required to use this premise. */
@@ -71,6 +73,8 @@ class SourceProofContext(
     private val capturedCoordinates = coordinates.toSet()
     private val capturedPremises = premises.toMap()
     private val capturedObjective = objective?.filterValues { !it.isZero }?.toMap()
+    internal val coordinateCount: Int get() = capturedCoordinates.size
+    internal val premiseCount: Int get() = capturedPremises.size
     internal val affineObjectiveAvailable: Boolean get() = capturedObjective != null
     /** Declared source coordinates. */
     val coordinates: Set<SourceCoordinate> get() = capturedCoordinates.toSet()
@@ -176,7 +180,10 @@ class SourceEvidenceVerifier(
                         claim is SourceClaim.Extension) {
                         return reject("import does not establish the requested claim")
                     }
-                    val matching = matchSourceClaims(claim, imported.claim, cancellation)
+                    val matching = if (claim is SourceClaim.Bound && imported.claim == SourceClaim.Refutation) {
+                        if (scope.objective == null) return reject("objective bound has no objective scope")
+                        SourceEvidenceCheck.Checked
+                    } else matchSourceClaims(claim, imported.claim, cancellation)
                     if (matching != SourceEvidenceCheck.Checked) return matching
                     return verify(imported, imported.scope, depth + 1)
                 }

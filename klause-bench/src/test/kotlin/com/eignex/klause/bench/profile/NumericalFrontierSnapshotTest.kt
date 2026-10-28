@@ -1,6 +1,7 @@
 package com.eignex.klause.bench.profile
 
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.lp.optimization.LinearPinnedObjective
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCondition
@@ -38,6 +39,40 @@ class NumericalFrontierSnapshotTest {
         SourceClaim.Bound(SourceValue.Rational(half)),
         SourceDerivation.Combination(listOf(SourceDerivation.Combination.Term(half, SourceDerivation.Premise("half")))),
     )
+
+    @Test
+    fun `selection capture should expose empty journal limits`() {
+        val snapshot = NumericalSelectionSnapshot(Cancellation.Never)
+        val journal = snapshot.journal()
+
+        val capture = snapshot.capture(journal)
+
+        assertEquals("false", capture.getValue("limited").jsonPrimitive.content)
+        assertEquals("0", capture.getValue("attempted").jsonPrimitive.content)
+        assertEquals(0, capture.getValue("records").jsonArray.size)
+    }
+
+    @Test
+    fun `selection inspection should check sibling evidence in its original scope`() {
+        val current = SourceProofContext(context.scope.copy(condition = SourceCondition(
+            lower = mapOf(integer to BigFraction.ONE))), context.coordinates, context.premises, context.objective)
+        val sibling = evidence.copy(derivation = LinearPinnedObjective(evidence.derivation))
+
+        val inspected = NumericalSelectionSnapshot(Cancellation.Never).evidence(current, sibling)
+
+        assertEquals("Checked", inspected.getValue("freshNativeCheck").jsonPrimitive.content)
+        assertEquals("1/2", inspected.getValue("value").jsonPrimitive.content)
+    }
+
+    @Test
+    fun `selection inspection should distinguish its stop from journal retention limits`() {
+        val snapshot = NumericalSelectionSnapshot(Cancellation { true })
+
+        val capture = snapshot.capture(snapshot.journal())
+
+        assertEquals("true", capture.getValue("inspectionStopped").jsonPrimitive.content)
+        assertEquals("false", capture.getValue("limited").jsonPrimitive.content)
+    }
 
     @Test
     fun `a captured bound should retain its checked scope and original objective units`() {

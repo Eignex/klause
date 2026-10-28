@@ -739,10 +739,10 @@ public final class com/eignex/klause/compile/CompiledSchema {
 }
 
 public final class com/eignex/klause/compile/CompilerKt {
-	public static final fun compile (Lcom/eignex/klause/schema/VariableSchema;Lcom/eignex/klause/config/KlauseConfig;Lcom/eignex/klause/ir/SemanticOverrides;)Lcom/eignex/klause/compile/CompiledSchema;
-	public static final fun compile (Lcom/eignex/skema/SchemaDef;Lcom/eignex/klause/config/KlauseConfig;Lcom/eignex/klause/ir/SemanticOverrides;)Lcom/eignex/klause/compile/CompiledSchema;
-	public static synthetic fun compile$default (Lcom/eignex/klause/schema/VariableSchema;Lcom/eignex/klause/config/KlauseConfig;Lcom/eignex/klause/ir/SemanticOverrides;ILjava/lang/Object;)Lcom/eignex/klause/compile/CompiledSchema;
-	public static synthetic fun compile$default (Lcom/eignex/skema/SchemaDef;Lcom/eignex/klause/config/KlauseConfig;Lcom/eignex/klause/ir/SemanticOverrides;ILjava/lang/Object;)Lcom/eignex/klause/compile/CompiledSchema;
+	public static final fun compile (Lcom/eignex/klause/schema/VariableSchema;Lcom/eignex/klause/config/KlauseConfig;Lcom/eignex/klause/ir/SemanticOverrides;Lcom/eignex/klause/factor/codec/FactorCodecs;)Lcom/eignex/klause/compile/CompiledSchema;
+	public static final fun compile (Lcom/eignex/skema/SchemaDef;Lcom/eignex/klause/config/KlauseConfig;Lcom/eignex/klause/ir/SemanticOverrides;Lcom/eignex/klause/factor/codec/FactorCodecs;)Lcom/eignex/klause/compile/CompiledSchema;
+	public static synthetic fun compile$default (Lcom/eignex/klause/schema/VariableSchema;Lcom/eignex/klause/config/KlauseConfig;Lcom/eignex/klause/ir/SemanticOverrides;Lcom/eignex/klause/factor/codec/FactorCodecs;ILjava/lang/Object;)Lcom/eignex/klause/compile/CompiledSchema;
+	public static synthetic fun compile$default (Lcom/eignex/skema/SchemaDef;Lcom/eignex/klause/config/KlauseConfig;Lcom/eignex/klause/ir/SemanticOverrides;Lcom/eignex/klause/factor/codec/FactorCodecs;ILjava/lang/Object;)Lcom/eignex/klause/compile/CompiledSchema;
 }
 
 public final class com/eignex/klause/compile/SchemaSemanticsKt {
@@ -1723,6 +1723,35 @@ public final class com/eignex/klause/factor/circuit/Circuit : com/eignex/klause/
 	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
+public final class com/eignex/klause/factor/codec/FactorCodec {
+	public fun <init> (Ljava/lang/String;Lkotlin/reflect/KClass;Lkotlin/reflect/KClass;Lkotlinx/serialization/KSerializer;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)V
+	public final fun getFactorType ()Lkotlin/reflect/KClass;
+	public final fun getKey ()Ljava/lang/String;
+	public final fun getPayloadSerializer ()Lkotlinx/serialization/KSerializer;
+	public final fun getPayloadType ()Lkotlin/reflect/KClass;
+}
+
+public final class com/eignex/klause/factor/codec/FactorCodecs {
+	public static final field Companion Lcom/eignex/klause/factor/codec/FactorCodecs$Companion;
+	public fun <init> (Ljava/util/List;)V
+	public final fun decodeFromJsonElement (Lkotlinx/serialization/json/JsonElement;)Lcom/eignex/klause/ir/Factor;
+	public final fun encodeToJsonElement (Lcom/eignex/klause/ir/Factor;)Lkotlinx/serialization/json/JsonElement;
+	public final fun forFactor (Lcom/eignex/klause/ir/Factor;)Lcom/eignex/klause/factor/codec/FactorCodec;
+	public final fun forKey (Ljava/lang/String;)Lcom/eignex/klause/factor/codec/FactorCodec;
+	public final fun getCodecs ()Ljava/util/List;
+	public final fun plus (Lcom/eignex/klause/factor/codec/FactorCodec;)Lcom/eignex/klause/factor/codec/FactorCodecs;
+	public final fun plus (Lcom/eignex/klause/factor/codec/FactorCodecs;)Lcom/eignex/klause/factor/codec/FactorCodecs;
+}
+
+public final class com/eignex/klause/factor/codec/FactorCodecs$Companion {
+	public final fun getBuiltin ()Lcom/eignex/klause/factor/codec/FactorCodecs;
+}
+
+public final class com/eignex/klause/factor/codec/MissingFactorCodecException : kotlinx/serialization/SerializationException {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun getPath ()Ljava/lang/String;
+}
+
 public final class com/eignex/klause/factor/global/AllDifferent : com/eignex/klause/factor/OptionalFactor, com/eignex/klause/ir/Factor {
 	public fun <init> ([IJI[I[JZ)V
 	public synthetic fun <init> ([IJI[I[JZILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -2694,14 +2723,32 @@ public final class com/eignex/klause/formats/flatzinc/UnsupportedFlatZincExcepti
 	public fun <init> (Ljava/lang/String;II)V
 }
 
-public final class com/eignex/klause/formats/json/JsonFormatException : com/eignex/klause/formats/FormatException {
+public class com/eignex/klause/formats/json/JsonFormatException : com/eignex/klause/formats/FormatException {
 	public fun <init> (Ljava/lang/String;Ljava/lang/Throwable;)V
 	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 }
 
 public final class com/eignex/klause/formats/json/JsonSchema {
 	public static final field INSTANCE Lcom/eignex/klause/formats/json/JsonSchema;
+	public final fun jsonSchema ()Lkotlinx/serialization/json/JsonObject;
 	public final fun parse (Ljava/lang/String;)Lcom/eignex/skema/SchemaDef;
+}
+
+public final class com/eignex/klause/formats/json/ProblemJson {
+	public static final field Companion Lcom/eignex/klause/formats/json/ProblemJson$Companion;
+	public fun <init> ()V
+	public fun <init> (Lcom/eignex/klause/factor/codec/FactorCodecs;)V
+	public synthetic fun <init> (Lcom/eignex/klause/factor/codec/FactorCodecs;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun decodeFromJsonElement (Lkotlinx/serialization/json/JsonElement;)Lcom/eignex/klause/ir/Problem;
+	public final fun decodeFromString (Ljava/lang/String;)Lcom/eignex/klause/ir/Problem;
+	public final fun encodeToJsonElement (Lcom/eignex/klause/ir/Problem;)Lkotlinx/serialization/json/JsonObject;
+	public final fun encodeToString (Lcom/eignex/klause/ir/Problem;)Ljava/lang/String;
+	public final fun getCodecs ()Lcom/eignex/klause/factor/codec/FactorCodecs;
+	public final fun jsonSchema ()Lkotlinx/serialization/json/JsonObject;
+}
+
+public final class com/eignex/klause/formats/json/ProblemJson$Companion {
+	public final fun getDefault ()Lcom/eignex/klause/formats/json/ProblemJson;
 }
 
 public final class com/eignex/klause/formats/minizinc/OznParseException : com/eignex/klause/formats/FormatException {
@@ -4951,10 +4998,18 @@ public final class com/eignex/klause/localsearch/LocalSearchModel$Companion {
 	public static synthetic fun open$default (Lcom/eignex/klause/localsearch/LocalSearchModel$Companion;Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/PreparedFactorProjections;[Lcom/eignex/klause/ir/IntDomain;ILjava/lang/Object;)Lcom/eignex/klause/localsearch/LocalSearchModel;
 }
 
+public final class com/eignex/klause/localsearch/LocalSearchMoveInspection {
+	public final fun getAssignment ()Lcom/eignex/klause/solver/Sample;
+	public final fun getFactorDegrees ()[I
+	public final fun getNetDelta ()J
+	public final fun getObjectiveDelta ()D
+	public final fun getWeightedNetDelta ()D
+}
+
 public final class com/eignex/klause/localsearch/LocalSearchParams : com/eignex/klause/solver/SolverParams {
 	public fun <init> ()V
-	public fun <init> (JLjava/lang/Long;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/util/Cancellation;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/localsearch/CostShaping;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/incumbent/IncumbentExchange;IZZZ)V
-	public synthetic fun <init> (JLjava/lang/Long;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/util/Cancellation;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/localsearch/CostShaping;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/incumbent/IncumbentExchange;IZZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (JLjava/lang/Long;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/util/Cancellation;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/localsearch/CostShaping;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/incumbent/IncumbentExchange;IZZZLcom/eignex/klause/localsearch/ObjectiveGuidance;)V
+	public synthetic fun <init> (JLjava/lang/Long;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/util/Cancellation;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/localsearch/CostShaping;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/incumbent/IncumbentExchange;IZZZLcom/eignex/klause/localsearch/ObjectiveGuidance;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()J
 	public final fun component10 ()Lcom/eignex/klause/solver/Sample;
 	public final fun component11 ()Lcom/eignex/klause/solver/incumbent/IncumbentExchange;
@@ -4962,6 +5017,7 @@ public final class com/eignex/klause/localsearch/LocalSearchParams : com/eignex/
 	public final fun component13 ()Z
 	public final fun component14 ()Z
 	public final fun component15 ()Z
+	public final fun component16 ()Lcom/eignex/klause/localsearch/ObjectiveGuidance;
 	public final fun component2 ()Ljava/lang/Long;
 	public final fun component3 ()Lcom/eignex/klause/backtrack/NodeBudget;
 	public final fun component4 ()Ljava/lang/Long;
@@ -4970,8 +5026,8 @@ public final class com/eignex/klause/localsearch/LocalSearchParams : com/eignex/
 	public final fun component7 ()Lkotlin/jvm/functions/Function1;
 	public final fun component8 ()Lcom/eignex/klause/localsearch/CostShaping;
 	public final fun component9 ()Lcom/eignex/klause/solver/objective/IncrementalObjective;
-	public final fun copy (JLjava/lang/Long;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/util/Cancellation;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/localsearch/CostShaping;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/incumbent/IncumbentExchange;IZZZ)Lcom/eignex/klause/localsearch/LocalSearchParams;
-	public static synthetic fun copy$default (Lcom/eignex/klause/localsearch/LocalSearchParams;JLjava/lang/Long;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/util/Cancellation;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/localsearch/CostShaping;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/incumbent/IncumbentExchange;IZZZILjava/lang/Object;)Lcom/eignex/klause/localsearch/LocalSearchParams;
+	public final fun copy (JLjava/lang/Long;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/util/Cancellation;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/localsearch/CostShaping;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/incumbent/IncumbentExchange;IZZZLcom/eignex/klause/localsearch/ObjectiveGuidance;)Lcom/eignex/klause/localsearch/LocalSearchParams;
+	public static synthetic fun copy$default (Lcom/eignex/klause/localsearch/LocalSearchParams;JLjava/lang/Long;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/util/Cancellation;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/localsearch/CostShaping;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/incumbent/IncumbentExchange;IZZZLcom/eignex/klause/localsearch/ObjectiveGuidance;ILjava/lang/Object;)Lcom/eignex/klause/localsearch/LocalSearchParams;
 	public fun equals (Ljava/lang/Object;)Z
 	public fun getAssumptions ()Lcom/eignex/klause/propagation/Assumptions;
 	public final fun getCancellation ()Lcom/eignex/klause/util/Cancellation;
@@ -4982,6 +5038,7 @@ public final class com/eignex/klause/localsearch/LocalSearchParams : com/eignex/
 	public final fun getMaxInstructions ()Ljava/lang/Long;
 	public final fun getNodeBudget ()Lcom/eignex/klause/backtrack/NodeBudget;
 	public final fun getNormalizeWeightsByClass ()Z
+	public final fun getObjectiveGuidance ()Lcom/eignex/klause/localsearch/ObjectiveGuidance;
 	public final fun getOnEvent ()Lkotlin/jvm/functions/Function1;
 	public final fun getPooledIncumbents ()Lcom/eignex/klause/solver/incumbent/IncumbentExchange;
 	public final fun getRandomSeed ()Ljava/lang/Long;
@@ -5141,6 +5198,8 @@ public final class com/eignex/klause/localsearch/LocalSearchState {
 	public final fun getViolationSoftCap ()I
 	public final fun getWeights ()Lcom/eignex/klause/localsearch/FactorWeightBook;
 	public final fun greedyPickByShapedBreak (Ljava/util/List;)Lcom/eignex/klause/localsearch/Move;
+	public final fun inspectMove (Lcom/eignex/klause/localsearch/Move;Lcom/eignex/klause/solver/objective/Objective;)Lcom/eignex/klause/localsearch/LocalSearchMoveInspection;
+	public static synthetic fun inspectMove$default (Lcom/eignex/klause/localsearch/LocalSearchState;Lcom/eignex/klause/localsearch/Move;Lcom/eignex/klause/solver/objective/Objective;ILjava/lang/Object;)Lcom/eignex/klause/localsearch/LocalSearchMoveInspection;
 	public final fun makeScore (Lcom/eignex/klause/localsearch/Move;)I
 	public final fun netDelta (Lcom/eignex/klause/localsearch/Move;)J
 	public final fun objectiveDelta (Lcom/eignex/klause/solver/objective/Objective;Lcom/eignex/klause/localsearch/Move;)Ljava/lang/Double;
@@ -5273,6 +5332,15 @@ public final class com/eignex/klause/localsearch/NoInvariant : com/eignex/klause
 	public fun updateBoolBreakMakeForFlip (Lcom/eignex/klause/localsearch/LocalSearchState;II)V
 	public fun updateIntBreakMakeForIntSet (Lcom/eignex/klause/localsearch/LocalSearchState;IIJ)V
 	public fun violationDegree (Lcom/eignex/klause/localsearch/LocalSearchState;I)I
+}
+
+public final class com/eignex/klause/localsearch/ObjectiveGuidance : java/lang/Enum {
+	public static final field Canonical Lcom/eignex/klause/localsearch/ObjectiveGuidance;
+	public static final field Functional Lcom/eignex/klause/localsearch/ObjectiveGuidance;
+	public static final field Geometric Lcom/eignex/klause/localsearch/ObjectiveGuidance;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/localsearch/ObjectiveGuidance;
+	public static fun values ()[Lcom/eignex/klause/localsearch/ObjectiveGuidance;
 }
 
 public final class com/eignex/klause/localsearch/ObjectiveShaping {
@@ -5950,15 +6018,17 @@ public final class com/eignex/klause/localsearch/strategy/FeasibleDescent : java
 }
 
 public final class com/eignex/klause/localsearch/strategy/LocalSearchRecipe {
-	public fun <init> (Ljava/lang/String;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;ZZ)V
-	public synthetic fun <init> (Ljava/lang/String;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;ZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;ZZLcom/eignex/klause/localsearch/ObjectiveGuidance;)V
+	public synthetic fun <init> (Ljava/lang/String;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;ZZLcom/eignex/klause/localsearch/ObjectiveGuidance;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getFeasibleDescent ()Lcom/eignex/klause/localsearch/strategy/FeasibleDescent;
 	public final fun getLabel ()Ljava/lang/String;
+	public final fun getObjectiveGuidance ()Lcom/eignex/klause/localsearch/ObjectiveGuidance;
 	public final fun getOptimizeStrategy ()Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;
 	public final fun getPerMoveInvariants ()Z
 	public final fun getSeedImplicitOnRestart ()Z
 	public final fun getStrategy ()Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;
 	public final fun withAcceptance (Lcom/eignex/klause/localsearch/acceptance/AcceptanceRule;)Lcom/eignex/klause/localsearch/strategy/LocalSearchRecipe;
+	public final fun withObjectiveGuidance (Lcom/eignex/klause/localsearch/ObjectiveGuidance;)Lcom/eignex/klause/localsearch/strategy/LocalSearchRecipe;
 	public final fun withRestart (Lcom/eignex/klause/localsearch/RestartPolicy;)Lcom/eignex/klause/localsearch/strategy/LocalSearchRecipe;
 	public final fun withScoring (Lcom/eignex/klause/localsearch/scoring/MoveScoring;)Lcom/eignex/klause/localsearch/strategy/LocalSearchRecipe;
 	public final fun withSources (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/localsearch/strategy/LocalSearchRecipe;
@@ -6612,6 +6682,14 @@ public final class com/eignex/klause/model/BoolExpr$DefaultImpls {
 	public static fun toExpr (Lcom/eignex/klause/model/BoolExpr;)Lcom/eignex/klause/model/BoolExpr;
 }
 
+public final class com/eignex/klause/model/BoolExprSerializer : com/eignex/skema/serialization/CompactSerializer {
+	public static final field INSTANCE Lcom/eignex/klause/model/BoolExprSerializer;
+	public fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/eignex/klause/model/BoolExpr;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/eignex/klause/model/BoolExpr;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+}
+
 public final class com/eignex/klause/model/BoolRef : com/eignex/klause/model/BoolExpr {
 	public static final field Companion Lcom/eignex/klause/model/BoolRef$Companion;
 	public fun <init> (Ljava/lang/String;Z)V
@@ -6716,6 +6794,15 @@ public final synthetic class com/eignex/klause/model/CircuitExpr$$serializer : k
 
 public final class com/eignex/klause/model/CircuitExpr$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/eignex/klause/model/ConstraintRole : java/lang/Enum {
+	public static final field IMPLIED Lcom/eignex/klause/model/ConstraintRole;
+	public static final field REQUIRED Lcom/eignex/klause/model/ConstraintRole;
+	public static final field SYMMETRY_BREAKING Lcom/eignex/klause/model/ConstraintRole;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/model/ConstraintRole;
+	public static fun values ()[Lcom/eignex/klause/model/ConstraintRole;
 }
 
 public final class com/eignex/klause/model/ContinuousRealEquality : com/eignex/klause/model/BoolExpr {
@@ -6842,6 +6929,10 @@ public final synthetic class com/eignex/klause/model/ContinuousRealExpr$Power$$s
 
 public final class com/eignex/klause/model/ContinuousRealExpr$Power$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/eignex/klause/model/ContinuousRealExprSerializer : com/eignex/skema/serialization/CompactSerializer {
+	public static final field INSTANCE Lcom/eignex/klause/model/ContinuousRealExprSerializer;
 }
 
 public final class com/eignex/klause/model/CostMddExpr : com/eignex/klause/model/BoolExpr {
@@ -7095,6 +7186,41 @@ public final class com/eignex/klause/model/DisjunctiveExprOpt$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
+public final class com/eignex/klause/model/FactorConstraint : com/eignex/klause/model/BoolExpr {
+	public static final field Companion Lcom/eignex/klause/model/FactorConstraint$Companion;
+	public fun <init> (Lkotlinx/serialization/json/JsonElement;Ljava/util/List;Ljava/util/List;Ljava/util/List;)V
+	public synthetic fun <init> (Lkotlinx/serialization/json/JsonElement;Ljava/util/List;Ljava/util/List;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lkotlinx/serialization/json/JsonElement;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Ljava/util/List;
+	public final fun component4 ()Ljava/util/List;
+	public final fun copy (Lkotlinx/serialization/json/JsonElement;Ljava/util/List;Ljava/util/List;Ljava/util/List;)Lcom/eignex/klause/model/FactorConstraint;
+	public static synthetic fun copy$default (Lcom/eignex/klause/model/FactorConstraint;Lkotlinx/serialization/json/JsonElement;Ljava/util/List;Ljava/util/List;Ljava/util/List;ILjava/lang/Object;)Lcom/eignex/klause/model/FactorConstraint;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBools ()Ljava/util/List;
+	public final fun getInts ()Ljava/util/List;
+	public final fun getNode ()Lkotlinx/serialization/json/JsonElement;
+	public final fun getReals ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toExpr ()Lcom/eignex/klause/model/BoolExpr;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/eignex/klause/model/FactorConstraint$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/eignex/klause/model/FactorConstraint$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/eignex/klause/model/FactorConstraint;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/eignex/klause/model/FactorConstraint;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/eignex/klause/model/FactorConstraint$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
 public final class com/eignex/klause/model/FloatLinearConstraint : com/eignex/klause/model/BoolExpr {
 	public static final field Companion Lcom/eignex/klause/model/FloatLinearConstraint$Companion;
 	public fun <init> ([DLjava/util/List;Lcom/eignex/klause/model/IntCmpOp;D)V
@@ -7131,6 +7257,7 @@ public final class com/eignex/klause/model/FloatLinearConstraint$Companion {
 
 public final class com/eignex/klause/model/FloatSpec : com/eignex/klause/model/VarSpec {
 	public static final field Companion Lcom/eignex/klause/model/FloatSpec$Companion;
+	public fun <init> ()V
 	public fun <init> (DDLjava/lang/Integer;)V
 	public synthetic fun <init> (DDLjava/lang/Integer;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()D
@@ -7399,6 +7526,39 @@ public final class com/eignex/klause/model/IntDiv$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
+public final class com/eignex/klause/model/IntDomainSpec : com/eignex/klause/model/VarSpec {
+	public static final field Companion Lcom/eignex/klause/model/IntDomainSpec$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/Long;Ljava/lang/Long;Ljava/util/List;)V
+	public synthetic fun <init> (Ljava/lang/Long;Ljava/lang/Long;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/Long;
+	public final fun component2 ()Ljava/lang/Long;
+	public final fun component3 ()Ljava/util/List;
+	public final fun copy (Ljava/lang/Long;Ljava/lang/Long;Ljava/util/List;)Lcom/eignex/klause/model/IntDomainSpec;
+	public static synthetic fun copy$default (Lcom/eignex/klause/model/IntDomainSpec;Ljava/lang/Long;Ljava/lang/Long;Ljava/util/List;ILjava/lang/Object;)Lcom/eignex/klause/model/IntDomainSpec;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLower ()Ljava/lang/Long;
+	public final fun getUpper ()Ljava/lang/Long;
+	public final fun getValues ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/eignex/klause/model/IntDomainSpec$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/eignex/klause/model/IntDomainSpec$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/eignex/klause/model/IntDomainSpec;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/eignex/klause/model/IntDomainSpec;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/eignex/klause/model/IntDomainSpec$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
 public final class com/eignex/klause/model/IntElement : com/eignex/klause/model/IntExpr {
 	public static final field Companion Lcom/eignex/klause/model/IntElement$Companion;
 	public fun <init> (Lcom/eignex/klause/model/IntExpr;Ljava/util/List;)V
@@ -7440,6 +7600,14 @@ public final class com/eignex/klause/model/IntExpr$Companion {
 
 public final class com/eignex/klause/model/IntExpr$DefaultImpls {
 	public static fun toIntExpr (Lcom/eignex/klause/model/IntExpr;)Lcom/eignex/klause/model/IntExpr;
+}
+
+public final class com/eignex/klause/model/IntExprSerializer : com/eignex/skema/serialization/CompactSerializer {
+	public static final field INSTANCE Lcom/eignex/klause/model/IntExprSerializer;
+	public fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/eignex/klause/model/IntExpr;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/eignex/klause/model/IntExpr;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
 }
 
 public final class com/eignex/klause/model/IntIfThenElse : com/eignex/klause/model/IntExpr {
@@ -7802,6 +7970,39 @@ public final class com/eignex/klause/model/InverseChannel$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
+public final class com/eignex/klause/model/LexExpr : com/eignex/klause/model/BoolExpr {
+	public static final field Companion Lcom/eignex/klause/model/LexExpr$Companion;
+	public fun <init> (Ljava/util/List;Ljava/util/List;Z)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/util/List;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Z
+	public final fun copy (Ljava/util/List;Ljava/util/List;Z)Lcom/eignex/klause/model/LexExpr;
+	public static synthetic fun copy$default (Lcom/eignex/klause/model/LexExpr;Ljava/util/List;Ljava/util/List;ZILjava/lang/Object;)Lcom/eignex/klause/model/LexExpr;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getStrict ()Z
+	public final fun getXs ()Ljava/util/List;
+	public final fun getYs ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toExpr ()Lcom/eignex/klause/model/BoolExpr;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/eignex/klause/model/LexExpr$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/eignex/klause/model/LexExpr$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/eignex/klause/model/LexExpr;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/eignex/klause/model/LexExpr;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/eignex/klause/model/LexExpr$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
 public final class com/eignex/klause/model/MddExpr : com/eignex/klause/model/BoolExpr {
 	public static final field Companion Lcom/eignex/klause/model/MddExpr$Companion;
 	public fun <init> (Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;ILjava/util/List;)V
@@ -7840,6 +8041,12 @@ public final class com/eignex/klause/model/MddExpr$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
+public final class com/eignex/klause/model/ModelJson {
+	public static final field INSTANCE Lcom/eignex/klause/model/ModelJson;
+	public final fun getCatalog ()Lcom/eignex/skema/serialization/JsonNodeCatalog;
+	public final fun getSerializers ()Ljava/util/List;
+}
+
 public final class com/eignex/klause/model/MultipleSpec : com/eignex/klause/model/VarSpec {
 	public static final field Companion Lcom/eignex/klause/model/MultipleSpec$Companion;
 	public fun <init> (Ljava/util/List;)V
@@ -7864,6 +8071,41 @@ public final synthetic class com/eignex/klause/model/MultipleSpec$$serializer : 
 }
 
 public final class com/eignex/klause/model/MultipleSpec$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/eignex/klause/model/NValueExpr : com/eignex/klause/model/BoolExpr {
+	public static final field Companion Lcom/eignex/klause/model/NValueExpr$Companion;
+	public fun <init> (Lcom/eignex/klause/model/IntExpr;Ljava/util/List;Lcom/eignex/klause/model/NValueMode;Ljava/util/List;)V
+	public synthetic fun <init> (Lcom/eignex/klause/model/IntExpr;Ljava/util/List;Lcom/eignex/klause/model/NValueMode;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/eignex/klause/model/IntExpr;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Lcom/eignex/klause/model/NValueMode;
+	public final fun component4 ()Ljava/util/List;
+	public final fun copy (Lcom/eignex/klause/model/IntExpr;Ljava/util/List;Lcom/eignex/klause/model/NValueMode;Ljava/util/List;)Lcom/eignex/klause/model/NValueExpr;
+	public static synthetic fun copy$default (Lcom/eignex/klause/model/NValueExpr;Lcom/eignex/klause/model/IntExpr;Ljava/util/List;Lcom/eignex/klause/model/NValueMode;Ljava/util/List;ILjava/lang/Object;)Lcom/eignex/klause/model/NValueExpr;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getExcept ()Ljava/util/List;
+	public final fun getMode ()Lcom/eignex/klause/model/NValueMode;
+	public final fun getN ()Lcom/eignex/klause/model/IntExpr;
+	public final fun getXs ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toExpr ()Lcom/eignex/klause/model/BoolExpr;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/eignex/klause/model/NValueExpr$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/eignex/klause/model/NValueExpr$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/eignex/klause/model/NValueExpr;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/eignex/klause/model/NValueExpr;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/eignex/klause/model/NValueExpr$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
@@ -7918,12 +8160,15 @@ public final class com/eignex/klause/model/NValueMode$Companion {
 
 public final class com/eignex/klause/model/NamedConstraint : com/eignex/klause/model/SchemaEntry {
 	public static final field Companion Lcom/eignex/klause/model/NamedConstraint$Companion;
-	public fun <init> (Lcom/eignex/klause/model/BoolExpr;)V
+	public fun <init> (Lcom/eignex/klause/model/BoolExpr;Lcom/eignex/klause/model/ConstraintRole;)V
+	public synthetic fun <init> (Lcom/eignex/klause/model/BoolExpr;Lcom/eignex/klause/model/ConstraintRole;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/model/BoolExpr;
-	public final fun copy (Lcom/eignex/klause/model/BoolExpr;)Lcom/eignex/klause/model/NamedConstraint;
-	public static synthetic fun copy$default (Lcom/eignex/klause/model/NamedConstraint;Lcom/eignex/klause/model/BoolExpr;ILjava/lang/Object;)Lcom/eignex/klause/model/NamedConstraint;
+	public final fun component2 ()Lcom/eignex/klause/model/ConstraintRole;
+	public final fun copy (Lcom/eignex/klause/model/BoolExpr;Lcom/eignex/klause/model/ConstraintRole;)Lcom/eignex/klause/model/NamedConstraint;
+	public static synthetic fun copy$default (Lcom/eignex/klause/model/NamedConstraint;Lcom/eignex/klause/model/BoolExpr;Lcom/eignex/klause/model/ConstraintRole;ILjava/lang/Object;)Lcom/eignex/klause/model/NamedConstraint;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getExpr ()Lcom/eignex/klause/model/BoolExpr;
+	public final fun getRole ()Lcom/eignex/klause/model/ConstraintRole;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -8131,6 +8376,15 @@ public final class com/eignex/klause/model/PseudoBooleanExpr$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
+public final class com/eignex/klause/model/ReferencesKt {
+	public static final fun mapReferences (Lcom/eignex/klause/model/BoolExpr;Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/model/BoolExpr;
+	public static final fun mapReferences (Lcom/eignex/klause/model/ContinuousRealExpr;Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/model/ContinuousRealExpr;
+	public static final fun mapReferences (Lcom/eignex/klause/model/IntExpr;Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/model/IntExpr;
+	public static final fun mapReferences (Lcom/eignex/klause/model/SchemaEntry;Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/model/SchemaEntry;
+	public static final fun mapReferences (Lcom/eignex/klause/model/SetExpr;Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/model/SetExpr;
+	public static final fun renameDeclarations (Lcom/eignex/skema/SchemaDef;Lkotlin/jvm/functions/Function1;)Lcom/eignex/skema/SchemaDef;
+}
+
 public final class com/eignex/klause/model/RegularExpr : com/eignex/klause/model/BoolExpr {
 	public static final field Companion Lcom/eignex/klause/model/RegularExpr$Companion;
 	public fun <init> (Ljava/util/List;IILjava/util/List;ILjava/util/List;)V
@@ -8175,6 +8429,10 @@ public abstract interface class com/eignex/klause/model/SchemaEntry {
 
 public final class com/eignex/klause/model/SchemaEntry$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/eignex/klause/model/SchemaEntrySerializer : com/eignex/skema/serialization/CompactSerializer {
+	public static final field INSTANCE Lcom/eignex/klause/model/SchemaEntrySerializer;
 }
 
 public final class com/eignex/klause/model/SetCard : com/eignex/klause/model/IntExpr {
@@ -8306,6 +8564,10 @@ public final class com/eignex/klause/model/SetExpr$Companion {
 
 public final class com/eignex/klause/model/SetExpr$DefaultImpls {
 	public static fun toSetExpr (Lcom/eignex/klause/model/SetExpr;)Lcom/eignex/klause/model/SetExpr;
+}
+
+public final class com/eignex/klause/model/SetExprSerializer : com/eignex/skema/serialization/CompactSerializer {
+	public static final field INSTANCE Lcom/eignex/klause/model/SetExprSerializer;
 }
 
 public final class com/eignex/klause/model/SetIn : com/eignex/klause/model/BoolExpr {
@@ -8703,6 +8965,44 @@ public abstract interface class com/eignex/klause/model/VarSpec : com/eignex/kla
 }
 
 public final class com/eignex/klause/model/VarSpec$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/eignex/klause/model/VarSpecSerializer : com/eignex/skema/serialization/CompactSerializer {
+	public static final field INSTANCE Lcom/eignex/klause/model/VarSpecSerializer;
+}
+
+public final class com/eignex/klause/model/VariableCumulativeExpr : com/eignex/klause/model/BoolExpr {
+	public static final field Companion Lcom/eignex/klause/model/VariableCumulativeExpr$Companion;
+	public fun <init> (Ljava/util/List;Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/model/IntExpr;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Ljava/util/List;
+	public final fun component4 ()Lcom/eignex/klause/model/IntExpr;
+	public final fun copy (Ljava/util/List;Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/model/IntExpr;)Lcom/eignex/klause/model/VariableCumulativeExpr;
+	public static synthetic fun copy$default (Lcom/eignex/klause/model/VariableCumulativeExpr;Ljava/util/List;Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/model/IntExpr;ILjava/lang/Object;)Lcom/eignex/klause/model/VariableCumulativeExpr;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCapacity ()Lcom/eignex/klause/model/IntExpr;
+	public final fun getDemands ()Ljava/util/List;
+	public final fun getDurations ()Ljava/util/List;
+	public final fun getStarts ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toExpr ()Lcom/eignex/klause/model/BoolExpr;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/eignex/klause/model/VariableCumulativeExpr$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/eignex/klause/model/VariableCumulativeExpr$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/eignex/klause/model/VariableCumulativeExpr;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/eignex/klause/model/VariableCumulativeExpr;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/eignex/klause/model/VariableCumulativeExpr$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
@@ -9750,6 +10050,16 @@ public final class com/eignex/klause/propagation/VarKind : java/lang/Enum {
 	public static fun values ()[Lcom/eignex/klause/propagation/VarKind;
 }
 
+public final class com/eignex/klause/schema/AffineOperand {
+	public fun <init> ()V
+	public fun <init> (Ljava/util/List;Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/simplex/exact/BigFraction;)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/simplex/exact/BigFraction;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getBools ()Ljava/util/List;
+	public final fun getConstant ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getInts ()Ljava/util/List;
+	public final fun getReals ()Ljava/util/List;
+}
+
 public final class com/eignex/klause/schema/BoolHandle : com/eignex/klause/model/BoolTerm {
 	public fun <init> (Ljava/lang/String;)V
 	public final fun getName ()Ljava/lang/String;
@@ -9769,6 +10079,7 @@ public final class com/eignex/klause/schema/BuildersKt {
 	public static final fun costRegular (Ljava/util/List;IILjava/util/List;Ljava/util/List;ILjava/util/List;Lcom/eignex/klause/model/IntTerm;I)Lcom/eignex/klause/model/BoolExpr;
 	public static synthetic fun costRegular$default (Ljava/util/List;IILjava/util/List;Ljava/util/List;ILjava/util/List;Lcom/eignex/klause/model/IntTerm;IILjava/lang/Object;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun cumulative (Ljava/util/List;Ljava/util/List;Ljava/util/List;I)Lcom/eignex/klause/model/BoolExpr;
+	public static final fun cumulative (Ljava/util/List;Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/model/IntTerm;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun cumulativeOpt (Ljava/util/List;Ljava/util/List;Ljava/util/List;ILjava/util/List;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun decreasing (Ljava/util/List;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun diffn (Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;)Lcom/eignex/klause/model/BoolExpr;
@@ -9778,15 +10089,22 @@ public final class com/eignex/klause/schema/BuildersKt {
 	public static final fun gcc (Ljava/util/List;Ljava/util/Map;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun gccOpt (Ljava/util/List;Ljava/util/Map;Ljava/util/List;Z)Lcom/eignex/klause/model/BoolExpr;
 	public static synthetic fun gccOpt$default (Ljava/util/List;Ljava/util/Map;Ljava/util/List;ZILjava/lang/Object;)Lcom/eignex/klause/model/BoolExpr;
+	public static final fun ifThenElse (Lcom/eignex/klause/model/BoolTerm;II)Lcom/eignex/klause/model/IntExpr;
+	public static final fun ifThenElse (Lcom/eignex/klause/model/BoolTerm;ILcom/eignex/klause/model/IntTerm;)Lcom/eignex/klause/model/IntExpr;
+	public static final fun ifThenElse (Lcom/eignex/klause/model/BoolTerm;Lcom/eignex/klause/model/IntTerm;I)Lcom/eignex/klause/model/IntExpr;
 	public static final fun ifThenElse (Lcom/eignex/klause/model/BoolTerm;Lcom/eignex/klause/model/IntTerm;Lcom/eignex/klause/model/IntTerm;)Lcom/eignex/klause/model/IntExpr;
 	public static final fun increasing (Ljava/util/List;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun inverse (Ljava/util/List;Ljava/util/List;II)Lcom/eignex/klause/model/BoolExpr;
 	public static synthetic fun inverse$default (Ljava/util/List;Ljava/util/List;IIILjava/lang/Object;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun lexLeq (Ljava/util/List;Ljava/util/List;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun lexLt (Ljava/util/List;Ljava/util/List;)Lcom/eignex/klause/model/BoolExpr;
-	public static final fun max ([Lcom/eignex/klause/model/IntTerm;)Lcom/eignex/klause/model/IntExpr;
+	public static final fun max (Lcom/eignex/klause/model/IntTerm;I)Lcom/eignex/klause/model/IntExpr;
+	public static final fun max (Lcom/eignex/klause/model/IntTerm;Lcom/eignex/klause/model/IntTerm;)Lcom/eignex/klause/model/IntExpr;
+	public static final fun maxOf ([Lcom/eignex/klause/model/IntTerm;)Lcom/eignex/klause/model/IntExpr;
 	public static final fun mdd (Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;ILjava/util/List;)Lcom/eignex/klause/model/BoolExpr;
-	public static final fun min ([Lcom/eignex/klause/model/IntTerm;)Lcom/eignex/klause/model/IntExpr;
+	public static final fun min (Lcom/eignex/klause/model/IntTerm;I)Lcom/eignex/klause/model/IntExpr;
+	public static final fun min (Lcom/eignex/klause/model/IntTerm;Lcom/eignex/klause/model/IntTerm;)Lcom/eignex/klause/model/IntExpr;
+	public static final fun minOf ([Lcom/eignex/klause/model/IntTerm;)Lcom/eignex/klause/model/IntExpr;
 	public static final fun nValueOpt (Lcom/eignex/klause/model/IntTerm;Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/model/NValueMode;)Lcom/eignex/klause/model/BoolExpr;
 	public static synthetic fun nValueOpt$default (Lcom/eignex/klause/model/IntTerm;Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/model/NValueMode;ILjava/lang/Object;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun notTable (Ljava/util/List;Ljava/util/List;)Lcom/eignex/klause/model/BoolExpr;
@@ -9836,19 +10154,25 @@ public abstract interface class com/eignex/klause/schema/FloatTerm {
 }
 
 public final class com/eignex/klause/schema/HandlesKt {
+	public static final fun eq (DLcom/eignex/klause/schema/FloatTerm;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun eq (Lcom/eignex/klause/schema/FloatTerm;D)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun eq (Lcom/eignex/klause/schema/FloatTerm;Lcom/eignex/klause/schema/FloatTerm;)Lcom/eignex/klause/model/BoolExpr;
+	public static final fun ge (DLcom/eignex/klause/schema/FloatTerm;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun ge (Lcom/eignex/klause/schema/FloatTerm;D)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun ge (Lcom/eignex/klause/schema/FloatTerm;Lcom/eignex/klause/schema/FloatTerm;)Lcom/eignex/klause/model/BoolExpr;
+	public static final fun gt (DLcom/eignex/klause/schema/FloatTerm;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun gt (Lcom/eignex/klause/schema/FloatTerm;D)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun gt (Lcom/eignex/klause/schema/FloatTerm;Lcom/eignex/klause/schema/FloatTerm;)Lcom/eignex/klause/model/BoolExpr;
+	public static final fun le (DLcom/eignex/klause/schema/FloatTerm;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun le (Lcom/eignex/klause/schema/FloatTerm;D)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun le (Lcom/eignex/klause/schema/FloatTerm;Lcom/eignex/klause/schema/FloatTerm;)Lcom/eignex/klause/model/BoolExpr;
+	public static final fun lt (DLcom/eignex/klause/schema/FloatTerm;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun lt (Lcom/eignex/klause/schema/FloatTerm;D)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun lt (Lcom/eignex/klause/schema/FloatTerm;Lcom/eignex/klause/schema/FloatTerm;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun minus (DLcom/eignex/klause/schema/FloatTerm;)Lcom/eignex/klause/schema/FloatExpr;
 	public static final fun minus (Lcom/eignex/klause/schema/FloatTerm;D)Lcom/eignex/klause/schema/FloatExpr;
 	public static final fun minus (Lcom/eignex/klause/schema/FloatTerm;Lcom/eignex/klause/schema/FloatTerm;)Lcom/eignex/klause/schema/FloatExpr;
+	public static final fun ne (DLcom/eignex/klause/schema/FloatTerm;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun ne (Lcom/eignex/klause/schema/FloatTerm;D)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun ne (Lcom/eignex/klause/schema/FloatTerm;Lcom/eignex/klause/schema/FloatTerm;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun plus (DLcom/eignex/klause/schema/FloatTerm;)Lcom/eignex/klause/schema/FloatExpr;
@@ -9862,14 +10186,16 @@ public final class com/eignex/klause/schema/HandlesKt {
 }
 
 public final class com/eignex/klause/schema/IntHandle : com/eignex/klause/model/IntTerm {
-	public fun <init> (Ljava/lang/String;II)V
-	public final fun getMax ()I
-	public final fun getMin ()I
+	public fun <init> (Ljava/lang/String;JJ)V
+	public final fun getMax ()J
+	public final fun getMin ()J
 	public final fun getName ()Ljava/lang/String;
 	public fun toIntExpr ()Lcom/eignex/klause/model/IntExpr;
 }
 
 public final class com/eignex/klause/schema/IntOperatorsKt {
+	public static final fun div (ILcom/eignex/klause/model/IntTerm;)Lcom/eignex/klause/model/IntExpr;
+	public static final fun div (Lcom/eignex/klause/model/IntTerm;I)Lcom/eignex/klause/model/IntExpr;
 	public static final fun div (Lcom/eignex/klause/model/IntTerm;Lcom/eignex/klause/model/IntTerm;)Lcom/eignex/klause/model/IntExpr;
 	public static final fun eq (ILcom/eignex/klause/model/IntTerm;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun eq (Lcom/eignex/klause/model/IntTerm;I)Lcom/eignex/klause/model/BoolExpr;
@@ -9895,6 +10221,8 @@ public final class com/eignex/klause/schema/IntOperatorsKt {
 	public static final fun plus (ILcom/eignex/klause/model/IntTerm;)Lcom/eignex/klause/model/IntExpr;
 	public static final fun plus (Lcom/eignex/klause/model/IntTerm;I)Lcom/eignex/klause/model/IntExpr;
 	public static final fun plus (Lcom/eignex/klause/model/IntTerm;Lcom/eignex/klause/model/IntTerm;)Lcom/eignex/klause/model/IntExpr;
+	public static final fun rem (ILcom/eignex/klause/model/IntTerm;)Lcom/eignex/klause/model/IntExpr;
+	public static final fun rem (Lcom/eignex/klause/model/IntTerm;I)Lcom/eignex/klause/model/IntExpr;
 	public static final fun rem (Lcom/eignex/klause/model/IntTerm;Lcom/eignex/klause/model/IntTerm;)Lcom/eignex/klause/model/IntExpr;
 	public static final fun times (ILcom/eignex/klause/model/IntTerm;)Lcom/eignex/klause/model/IntExpr;
 	public static final fun times (Lcom/eignex/klause/model/IntTerm;I)Lcom/eignex/klause/model/IntExpr;
@@ -9913,6 +10241,34 @@ public final class com/eignex/klause/schema/IntSetLiteralTerm : com/eignex/klaus
 	public fun <init> (Ljava/util/List;)V
 	public final fun getElements ()Ljava/util/List;
 	public fun toSetExpr ()Lcom/eignex/klause/model/SetExpr;
+}
+
+public final class com/eignex/klause/schema/NativeFactorsKt {
+	public static final fun allDifferentExcept (Ljava/util/List;Ljava/util/Collection;Z)Lcom/eignex/klause/model/BoolExpr;
+	public static synthetic fun allDifferentExcept$default (Ljava/util/List;Ljava/util/Collection;ZILjava/lang/Object;)Lcom/eignex/klause/model/BoolExpr;
+	public static final fun allDifferentTuples (Ljava/util/List;)Lcom/eignex/klause/model/BoolExpr;
+	public static final fun distinct (Ljava/util/List;)Lcom/eignex/klause/model/BoolExpr;
+	public static final fun exactLinear (Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/ir/LinearOp;Lcom/eignex/klause/simplex/exact/BigFraction;Z)Lcom/eignex/klause/model/BoolExpr;
+	public static synthetic fun exactLinear$default (Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/ir/LinearOp;Lcom/eignex/klause/simplex/exact/BigFraction;ZILjava/lang/Object;)Lcom/eignex/klause/model/BoolExpr;
+	public static final fun factor (Lcom/eignex/klause/ir/Factor;Ljava/util/List;Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/factor/codec/FactorCodecs;)Lcom/eignex/klause/model/BoolExpr;
+	public static final fun factor (Lkotlinx/serialization/json/JsonElement;Ljava/util/List;Ljava/util/List;Ljava/util/List;)Lcom/eignex/klause/model/BoolExpr;
+	public static synthetic fun factor$default (Lcom/eignex/klause/ir/Factor;Ljava/util/List;Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/factor/codec/FactorCodecs;ILjava/lang/Object;)Lcom/eignex/klause/model/BoolExpr;
+	public static synthetic fun factor$default (Lkotlinx/serialization/json/JsonElement;Ljava/util/List;Ljava/util/List;Ljava/util/List;ILjava/lang/Object;)Lcom/eignex/klause/model/BoolExpr;
+	public static final fun inValues (Lcom/eignex/klause/schema/FloatHandle;Ljava/util/Collection;)Lcom/eignex/klause/model/BoolExpr;
+	public static final fun linear (Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/ir/LinearOp;Ljava/math/BigInteger;)Lcom/eignex/klause/model/BoolExpr;
+	public static final fun nValue (ILjava/util/List;Lcom/eignex/klause/factor/global/NValue$Mode;Ljava/util/Collection;)Lcom/eignex/klause/model/BoolExpr;
+	public static final fun nValue (Lcom/eignex/klause/model/IntTerm;Ljava/util/List;Lcom/eignex/klause/factor/global/NValue$Mode;Ljava/util/Collection;)Lcom/eignex/klause/model/BoolExpr;
+	public static synthetic fun nValue$default (ILjava/util/List;Lcom/eignex/klause/factor/global/NValue$Mode;Ljava/util/Collection;ILjava/lang/Object;)Lcom/eignex/klause/model/BoolExpr;
+	public static synthetic fun nValue$default (Lcom/eignex/klause/model/IntTerm;Ljava/util/List;Lcom/eignex/klause/factor/global/NValue$Mode;Ljava/util/Collection;ILjava/lang/Object;)Lcom/eignex/klause/model/BoolExpr;
+	public static final fun pseudoBoolean (Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/model/PbOp;Ljava/math/BigInteger;)Lcom/eignex/klause/model/BoolExpr;
+	public static final fun realAbs (Lcom/eignex/klause/schema/FloatHandle;Lcom/eignex/klause/schema/FloatHandle;)Lcom/eignex/klause/model/BoolExpr;
+	public static final fun realElement (Lcom/eignex/klause/model/IntTerm;Ljava/util/List;Lcom/eignex/klause/schema/FloatHandle;I)Lcom/eignex/klause/model/BoolExpr;
+	public static synthetic fun realElement$default (Lcom/eignex/klause/model/IntTerm;Ljava/util/List;Lcom/eignex/klause/schema/FloatHandle;IILjava/lang/Object;)Lcom/eignex/klause/model/BoolExpr;
+	public static final fun realElementOfValues (Lcom/eignex/klause/model/IntTerm;Ljava/util/List;Lcom/eignex/klause/schema/FloatHandle;I)Lcom/eignex/klause/model/BoolExpr;
+	public static synthetic fun realElementOfValues$default (Lcom/eignex/klause/model/IntTerm;Ljava/util/List;Lcom/eignex/klause/schema/FloatHandle;IILjava/lang/Object;)Lcom/eignex/klause/model/BoolExpr;
+	public static final fun realMax (Lcom/eignex/klause/schema/FloatHandle;Ljava/util/List;)Lcom/eignex/klause/model/BoolExpr;
+	public static final fun realMin (Lcom/eignex/klause/schema/FloatHandle;Ljava/util/List;)Lcom/eignex/klause/model/BoolExpr;
+	public static final fun valuePrecede (JJLjava/util/List;)Lcom/eignex/klause/model/BoolExpr;
 }
 
 public final class com/eignex/klause/schema/NominalHandle {
@@ -9991,8 +10347,8 @@ public final class com/eignex/klause/schema/OptIntHandle {
 	public final fun ge (I)Lcom/eignex/klause/model/BoolExpr;
 	public final fun ge (Lcom/eignex/klause/model/IntTerm;)Lcom/eignex/klause/model/BoolExpr;
 	public final fun ge (Lcom/eignex/klause/schema/OptIntHandle;)Lcom/eignex/klause/model/BoolExpr;
-	public final fun getMax ()I
-	public final fun getMin ()I
+	public final fun getMax ()J
+	public final fun getMin ()J
 	public final fun getName ()Ljava/lang/String;
 	public final fun getPresent ()Lcom/eignex/klause/schema/BoolHandle;
 	public final fun getValue ()Lcom/eignex/klause/schema/IntHandle;
@@ -10053,9 +10409,14 @@ public class com/eignex/klause/schema/VariableSchema : com/eignex/skema/Schema {
 	protected final fun constraints (Lkotlin/jvm/functions/Function0;)Lkotlin/properties/PropertyDelegateProvider;
 	protected final fun floatVar (DDLjava/lang/Integer;)Lkotlin/properties/PropertyDelegateProvider;
 	public static synthetic fun floatVar$default (Lcom/eignex/klause/schema/VariableSchema;DDLjava/lang/Integer;ILjava/lang/Object;)Lkotlin/properties/PropertyDelegateProvider;
+	protected final fun impliedConstraint (Lkotlin/jvm/functions/Function0;)Lkotlin/properties/PropertyDelegateProvider;
 	protected final fun intVar (II)Lkotlin/properties/PropertyDelegateProvider;
+	protected final fun intVar (JJ)Lkotlin/properties/PropertyDelegateProvider;
+	protected final fun intVar (Ljava/util/Collection;)Lkotlin/properties/PropertyDelegateProvider;
 	protected final fun multiple ([Ljava/lang/String;)Lkotlin/properties/PropertyDelegateProvider;
 	protected final fun nominal ([Ljava/lang/String;)Lkotlin/properties/PropertyDelegateProvider;
+	protected final fun openIntVar (Ljava/lang/Long;Ljava/lang/Long;)Lkotlin/properties/PropertyDelegateProvider;
+	public static synthetic fun openIntVar$default (Lcom/eignex/klause/schema/VariableSchema;Ljava/lang/Long;Ljava/lang/Long;ILjava/lang/Object;)Lkotlin/properties/PropertyDelegateProvider;
 	protected final fun optBoolVar ()Lkotlin/properties/PropertyDelegateProvider;
 	protected final fun optFloatVar (DDLjava/lang/Integer;)Lkotlin/properties/PropertyDelegateProvider;
 	public static synthetic fun optFloatVar$default (Lcom/eignex/klause/schema/VariableSchema;DDLjava/lang/Integer;ILjava/lang/Object;)Lkotlin/properties/PropertyDelegateProvider;
@@ -10063,6 +10424,7 @@ public class com/eignex/klause/schema/VariableSchema : com/eignex/skema/Schema {
 	protected final fun optNominal ([Ljava/lang/String;)Lkotlin/properties/PropertyDelegateProvider;
 	protected final fun setVar (Ljava/util/List;)Lkotlin/properties/PropertyDelegateProvider;
 	protected final fun setVar (Lkotlin/ranges/IntRange;)Lkotlin/properties/PropertyDelegateProvider;
+	protected final fun symmetryBreakingConstraint (Lkotlin/jvm/functions/Function0;)Lkotlin/properties/PropertyDelegateProvider;
 }
 
 public final class com/eignex/klause/simplex/exact/BigFraction {
@@ -11541,12 +11903,17 @@ public final class com/eignex/klause/solver/pipeline/ExecutionOption$Companion {
 	public final fun getMinTemp ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getModeSwitchingRestart ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getNiaCandidates ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getNiaCellRefinement ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getNiaCellReuse ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getNiaCellSteering ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getNiaIntegerRoots ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getNiaMoves ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getNodeLimit ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getNoise ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getNraDenseCoefficients ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getNraMatrixCells ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getNraWorkLimit ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getObjectiveGuidance ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getObjectiveGuidedValues ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getOpenBranching ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getOpenHintFlips ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
@@ -11573,10 +11940,15 @@ public final class com/eignex/klause/solver/pipeline/ExecutionOption$Companion {
 	public final fun getSmoothFactor ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getSmoothProb ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getSolutionPhasing ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getSourceAggregateCuts ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getSourceCuts ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getSourceLpAllocationLimit ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getSourceLpOperations ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getSourceLpWorkLimit ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getSourcePointCuts ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getSourceRefutationPropagation ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getSourceRefutationResolution ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getSourceRefutationReuse ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getSources ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getStrategy ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getSubsumeBatch ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
@@ -11881,21 +12253,86 @@ public final class com/eignex/klause/solver/pipeline/NativeGridOutcome {
 	public final fun getProjection ()Lcom/eignex/klause/solver/pipeline/SourceFloatProjection;
 }
 
+public final class com/eignex/klause/solver/pipeline/NonlinearIntegerCellReuseStats {
+	public fun <init> (ZZJJJJJJZJJJJ)V
+	public synthetic fun <init> (ZZJJJJJJZJJJJILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Z
+	public final fun component10 ()J
+	public final fun component11 ()J
+	public final fun component12 ()J
+	public final fun component13 ()J
+	public final fun component2 ()Z
+	public final fun component3 ()J
+	public final fun component4 ()J
+	public final fun component5 ()J
+	public final fun component6 ()J
+	public final fun component7 ()J
+	public final fun component8 ()J
+	public final fun component9 ()Z
+	public final fun copy (ZZJJJJJJZJJJJ)Lcom/eignex/klause/solver/pipeline/NonlinearIntegerCellReuseStats;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/NonlinearIntegerCellReuseStats;ZZJJJJJJZJJJJILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/NonlinearIntegerCellReuseStats;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAllowedTuples ()J
+	public final fun getCompletionChecks ()J
+	public final fun getDeclined ()J
+	public final fun getDuplicateTuples ()J
+	public final fun getExcludedTuples ()J
+	public final fun getObserved ()J
+	public final fun getProducerEnabled ()Z
+	public final fun getRepeatedSupports ()J
+	public final fun getRetained ()J
+	public final fun getReuseEnabled ()Z
+	public final fun getSelections ()J
+	public final fun getSteeredTuples ()J
+	public final fun getSteeringEnabled ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/pipeline/NonlinearIntegerRootStats {
+	public fun <init> (JJJJJJ)V
+	public final fun component1 ()J
+	public final fun component2 ()J
+	public final fun component3 ()J
+	public final fun component4 ()J
+	public final fun component5 ()J
+	public final fun component6 ()J
+	public final fun copy (JJJJJJ)Lcom/eignex/klause/solver/pipeline/NonlinearIntegerRootStats;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/NonlinearIntegerRootStats;JJJJJJILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/NonlinearIntegerRootStats;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAdmittedEquations ()J
+	public final fun getCompletionChecks ()J
+	public final fun getDeclinedEquations ()J
+	public final fun getExcludedTuples ()J
+	public final fun getRefutedScopes ()J
+	public final fun getReusedAdmissions ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParams {
 	public fun <init> ()V
-	public fun <init> (Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;JJLcom/eignex/klause/backtrack/NodeBudget;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;JJLcom/eignex/klause/backtrack/NodeBudget;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;JJLcom/eignex/klause/backtrack/NodeBudget;ZZZZ)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;JJLcom/eignex/klause/backtrack/NodeBudget;ZZZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;
 	public final fun component2 ()J
 	public final fun component3 ()J
 	public final fun component4 ()Lcom/eignex/klause/backtrack/NodeBudget;
-	public final fun copy (Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;JJLcom/eignex/klause/backtrack/NodeBudget;)Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParams;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParams;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;JJLcom/eignex/klause/backtrack/NodeBudget;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParams;
+	public final fun component5 ()Z
+	public final fun component6 ()Z
+	public final fun component7 ()Z
+	public final fun component8 ()Z
+	public final fun copy (Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;JJLcom/eignex/klause/backtrack/NodeBudget;ZZZZ)Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParams;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParams;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;JJLcom/eignex/klause/backtrack/NodeBudget;ZZZZILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParams;
 	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAdmitIntegerRoots ()Z
+	public final fun getCellRefinement ()Z
 	public final fun getMaximumCandidates ()J
 	public final fun getMaximumMoves ()J
 	public final fun getNodeBudget ()Lcom/eignex/klause/backtrack/NodeBudget;
 	public final fun getPolynomial ()Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;
+	public final fun getReuseSourceCells ()Z
+	public final fun getSteerSourceCells ()Z
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -12303,16 +12740,20 @@ public final class com/eignex/klause/solver/pipeline/PolynomialStrategyParams {
 }
 
 public final class com/eignex/klause/solver/pipeline/PolynomialTheoryExecution {
-	public fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryResource;Ljava/lang/String;Ljava/lang/String;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryResource;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryResource;Ljava/lang/String;Ljava/lang/String;Lcom/eignex/klause/solver/pipeline/NonlinearIntegerCellReuseStats;Lcom/eignex/klause/solver/pipeline/NonlinearIntegerRootStats;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryResource;Ljava/lang/String;Ljava/lang/String;Lcom/eignex/klause/solver/pipeline/NonlinearIntegerCellReuseStats;Lcom/eignex/klause/solver/pipeline/NonlinearIntegerRootStats;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
 	public final fun component2 ()Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;
 	public final fun component3 ()Lcom/eignex/klause/solver/pipeline/PolynomialTheoryResource;
 	public final fun component4 ()Ljava/lang/String;
 	public final fun component5 ()Ljava/lang/String;
-	public final fun copy (Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryResource;Ljava/lang/String;Ljava/lang/String;)Lcom/eignex/klause/solver/pipeline/PolynomialTheoryExecution;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/PolynomialTheoryExecution;Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryResource;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/PolynomialTheoryExecution;
+	public final fun component6 ()Lcom/eignex/klause/solver/pipeline/NonlinearIntegerCellReuseStats;
+	public final fun component7 ()Lcom/eignex/klause/solver/pipeline/NonlinearIntegerRootStats;
+	public final fun copy (Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryResource;Ljava/lang/String;Ljava/lang/String;Lcom/eignex/klause/solver/pipeline/NonlinearIntegerCellReuseStats;Lcom/eignex/klause/solver/pipeline/NonlinearIntegerRootStats;)Lcom/eignex/klause/solver/pipeline/PolynomialTheoryExecution;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/PolynomialTheoryExecution;Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryResource;Ljava/lang/String;Ljava/lang/String;Lcom/eignex/klause/solver/pipeline/NonlinearIntegerCellReuseStats;Lcom/eignex/klause/solver/pipeline/NonlinearIntegerRootStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/PolynomialTheoryExecution;
 	public fun equals (Ljava/lang/Object;)Z
+	public final fun getIntegerCells ()Lcom/eignex/klause/solver/pipeline/NonlinearIntegerCellReuseStats;
+	public final fun getIntegerRoots ()Lcom/eignex/klause/solver/pipeline/NonlinearIntegerRootStats;
 	public final fun getNativeResource ()Ljava/lang/String;
 	public final fun getNativeWorkScope ()Ljava/lang/String;
 	public final fun getResource ()Lcom/eignex/klause/solver/pipeline/PolynomialTheoryResource;
@@ -12895,8 +13336,8 @@ public final class com/eignex/klause/solver/pipeline/StrategyAdmission {
 
 public final class com/eignex/klause/solver/pipeline/TheoryParams {
 	public fun <init> ()V
-	public fun <init> (JJJLjava/lang/Long;Ljava/lang/Integer;ILjava/lang/Long;Lcom/eignex/klause/solver/pipeline/OpenBranching;JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/backtrack/NodeBudget;IJJLjava/lang/Long;JJIZ)V
-	public synthetic fun <init> (JJJLjava/lang/Long;Ljava/lang/Integer;ILjava/lang/Long;Lcom/eignex/klause/solver/pipeline/OpenBranching;JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/backtrack/NodeBudget;IJJLjava/lang/Long;JJIZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (JJJLjava/lang/Long;Ljava/lang/Integer;ILjava/lang/Long;Lcom/eignex/klause/solver/pipeline/OpenBranching;JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/backtrack/NodeBudget;IJJLjava/lang/Long;JJIZZZZZZ)V
+	public synthetic fun <init> (JJJLjava/lang/Long;Ljava/lang/Integer;ILjava/lang/Long;Lcom/eignex/klause/solver/pipeline/OpenBranching;JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/backtrack/NodeBudget;IJJLjava/lang/Long;JJIZZZZZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()J
 	public final fun component10 ()Lcom/eignex/klause/util/Cancellation;
 	public final fun component11 ()Lcom/eignex/klause/util/Cancellation;
@@ -12910,6 +13351,11 @@ public final class com/eignex/klause/solver/pipeline/TheoryParams {
 	public final fun component19 ()I
 	public final fun component2 ()J
 	public final fun component20 ()Z
+	public final fun component21 ()Z
+	public final fun component22 ()Z
+	public final fun component23 ()Z
+	public final fun component24 ()Z
+	public final fun component25 ()Z
 	public final fun component3 ()J
 	public final fun component4 ()Ljava/lang/Long;
 	public final fun component5 ()Ljava/lang/Integer;
@@ -12917,8 +13363,8 @@ public final class com/eignex/klause/solver/pipeline/TheoryParams {
 	public final fun component7 ()Ljava/lang/Long;
 	public final fun component8 ()Lcom/eignex/klause/solver/pipeline/OpenBranching;
 	public final fun component9 ()J
-	public final fun copy (JJJLjava/lang/Long;Ljava/lang/Integer;ILjava/lang/Long;Lcom/eignex/klause/solver/pipeline/OpenBranching;JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/backtrack/NodeBudget;IJJLjava/lang/Long;JJIZ)Lcom/eignex/klause/solver/pipeline/TheoryParams;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/TheoryParams;JJJLjava/lang/Long;Ljava/lang/Integer;ILjava/lang/Long;Lcom/eignex/klause/solver/pipeline/OpenBranching;JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/backtrack/NodeBudget;IJJLjava/lang/Long;JJIZILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/TheoryParams;
+	public final fun copy (JJJLjava/lang/Long;Ljava/lang/Integer;ILjava/lang/Long;Lcom/eignex/klause/solver/pipeline/OpenBranching;JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/backtrack/NodeBudget;IJJLjava/lang/Long;JJIZZZZZZ)Lcom/eignex/klause/solver/pipeline/TheoryParams;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/TheoryParams;JJJLjava/lang/Long;Ljava/lang/Integer;ILjava/lang/Long;Lcom/eignex/klause/solver/pipeline/OpenBranching;JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/backtrack/NodeBudget;IJJLjava/lang/Long;JJIZZZZZZILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/TheoryParams;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAlnsIterations ()I
 	public final fun getCancellation ()Lcom/eignex/klause/util/Cancellation;
@@ -12935,10 +13381,15 @@ public final class com/eignex/klause/solver/pipeline/TheoryParams {
 	public final fun getOpenWorkLimit ()J
 	public final fun getRandomSeed ()J
 	public final fun getSharedRestart ()Ljava/lang/Long;
+	public final fun getSourceAggregateCuts ()Z
 	public final fun getSourceCuts ()Z
 	public final fun getSourceLpAllocationLimit ()J
 	public final fun getSourceLpOperations ()I
 	public final fun getSourceLpWorkLimit ()J
+	public final fun getSourcePointCuts ()Z
+	public final fun getSourceRefutationPropagation ()Z
+	public final fun getSourceRefutationResolution ()Z
+	public final fun getSourceRefutationReuse ()Z
 	public final fun getTimeout ()Lcom/eignex/klause/util/Cancellation;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -13298,12 +13749,15 @@ public final class com/eignex/klause/solver/result/LocalSearchResidualFactor {
 
 public final class com/eignex/klause/solver/result/LocalSearchStats {
 	public fun <init> ()V
-	public fun <init> (Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;JDDLcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/klause/solver/result/LocalSearchResidual;Ljava/util/Map;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;)V
-	public synthetic fun <init> (Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;JDDLcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/klause/solver/result/LocalSearchResidual;Ljava/util/Map;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;JDDLcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/klause/solver/result/LocalSearchResidual;Ljava/util/Map;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;)V
+	public synthetic fun <init> (Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;JDDLcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/klause/solver/result/LocalSearchResidual;Ljava/util/Map;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/kumulant/stat/summary/SumResult;
 	public final fun component10 ()Ljava/util/Map;
 	public final fun component11 ()Lcom/eignex/kumulant/stat/summary/SumResult;
 	public final fun component12 ()Lcom/eignex/kumulant/stat/summary/SumResult;
+	public final fun component13 ()Lcom/eignex/kumulant/stat/summary/SumResult;
+	public final fun component14 ()Lcom/eignex/kumulant/stat/summary/SumResult;
+	public final fun component15 ()Lcom/eignex/kumulant/stat/summary/SumResult;
 	public final fun component2 ()Lcom/eignex/kumulant/stat/summary/SumResult;
 	public final fun component3 ()J
 	public final fun component4 ()D
@@ -13312,8 +13766,8 @@ public final class com/eignex/klause/solver/result/LocalSearchStats {
 	public final fun component7 ()Lcom/eignex/kumulant/stat/summary/SumResult;
 	public final fun component8 ()Lcom/eignex/kumulant/stat/summary/SumResult;
 	public final fun component9 ()Lcom/eignex/klause/solver/result/LocalSearchResidual;
-	public final fun copy (Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;JDDLcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/klause/solver/result/LocalSearchResidual;Ljava/util/Map;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;)Lcom/eignex/klause/solver/result/LocalSearchStats;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/LocalSearchStats;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;JDDLcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/klause/solver/result/LocalSearchResidual;Ljava/util/Map;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/LocalSearchStats;
+	public final fun copy (Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;JDDLcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/klause/solver/result/LocalSearchResidual;Ljava/util/Map;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;)Lcom/eignex/klause/solver/result/LocalSearchStats;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/LocalSearchStats;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;JDDLcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/klause/solver/result/LocalSearchResidual;Ljava/util/Map;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/LocalSearchStats;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getBestResidual ()Lcom/eignex/klause/solver/result/LocalSearchResidual;
 	public final fun getBoardRestartChanges ()Lcom/eignex/kumulant/stat/summary/SumResult;
@@ -13321,6 +13775,9 @@ public final class com/eignex/klause/solver/result/LocalSearchStats {
 	public final fun getCompletions ()Lcom/eignex/kumulant/stat/summary/SumResult;
 	public final fun getCompletionsRefuted ()Lcom/eignex/kumulant/stat/summary/SumResult;
 	public final fun getCompletionsUndecided ()Lcom/eignex/kumulant/stat/summary/SumResult;
+	public final fun getGeometricProposalCandidates ()Lcom/eignex/kumulant/stat/summary/SumResult;
+	public final fun getGeometricProposalDeclines ()Lcom/eignex/kumulant/stat/summary/SumResult;
+	public final fun getGeometricProposalRuns ()Lcom/eignex/kumulant/stat/summary/SumResult;
 	public final fun getIncumbentObjective ()D
 	public final fun getIncumbentViolation ()D
 	public final fun getMoves ()Lcom/eignex/kumulant/stat/summary/SumResult;
@@ -14158,6 +14615,7 @@ public final class com/eignex/klause/solver/result/PresolveSizeStats {
 }
 
 public final class com/eignex/klause/solver/result/PresolveStats {
+	public fun <init> ()V
 	public synthetic fun <init> (Ljava/util/List;IZLcom/eignex/klause/solver/result/LpHarvestReport;Lcom/eignex/klause/solver/result/LpStats;JLcom/eignex/klause/solver/result/PresolveEffortStats;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public synthetic fun <init> (Ljava/util/List;IZLcom/eignex/klause/solver/result/LpHarvestReport;Lcom/eignex/klause/solver/result/LpStats;JLcom/eignex/klause/solver/result/PresolveEffortStats;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/util/List;

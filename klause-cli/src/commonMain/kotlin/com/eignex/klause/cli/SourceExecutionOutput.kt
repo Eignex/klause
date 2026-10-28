@@ -223,4 +223,31 @@ internal fun reportNativeSatisfaction(
         ) + execution.resource?.let { listOf("nraResource" to it.name) }.orEmpty()
     }
     output.onAllowanceStatistics(pairs)
+    execution.integerCells?.let { cells ->
+        output.onAllowanceStatistics(listOf(
+            "niaCellProducer" to cells.producerEnabled.toString(),
+            "niaCellReuse" to cells.reuseEnabled.toString(),
+            "niaCellObserved" to cells.observed.toString(),
+            "niaCellRetained" to cells.retained.toString(),
+            "niaCellDeclined" to cells.declined.toString(),
+            "niaExcludedTuples" to cells.excludedTuples.toString(),
+            "niaRepeatedSupports" to cells.repeatedSupports.toString(),
+            "niaCompletionChecks" to cells.completionChecks.toString(),
+            "niaCellSteering" to cells.steeringEnabled.toString(),
+            "niaCellSelections" to cells.selections.toString(),
+            "niaSteeredTuples" to cells.steeredTuples.toString(),
+            "niaAllowedTuples" to cells.allowedTuples.toString(),
+            "niaDuplicateTuples" to cells.duplicateTuples.toString(),
+        ))
+    }
+    execution.integerRoots?.let { roots ->
+        output.onAllowanceStatistics(listOf(
+            "niaRootEquations" to roots.admittedEquations.toString(),
+            "niaRootDeclines" to roots.declinedEquations.toString(),
+            "niaRootReuses" to roots.reusedAdmissions.toString(),
+            "niaRootRefutedScopes" to roots.refutedScopes.toString(),
+            "niaRootExcludedTuples" to roots.excludedTuples.toString(),
+            "niaRootCompletionChecks" to roots.completionChecks.toString(),
+        ))
+    }
 }

@@ -11,6 +11,8 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceCoordinate
+import com.eignex.klause.solver.evidence.SourceDerivation
+import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceInequality
@@ -38,6 +40,56 @@ class LinearAuthorityTest {
         SourceRevision("affine-fixture", "exact-affine"),
         objective = SourceObjective("x", ObjectiveSense.MINIMIZE),
     )
+
+    @Test
+    fun `pinned refutation scope reduction should require complete Boolean substitution`() {
+        val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
+        val source = SourceProofContext(scope, setOf(bool), mapOf(
+            "row" to SourcePremise(SourceInequality(mapOf(bool to BigFraction.ONE), BigFraction.ZERO)),
+        ))
+        val proof = LinearPinnedRefutation(SourceDerivation.Premise("row"))
+        val complete = scope.copy(condition = SourceCondition(bools = mapOf(0 to true)))
+        val checked = SourceEvidence(complete, SourceClaim.Refutation, proof)
+
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.atScope(complete).withLinearAuthority()).verify(checked))
+        assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(source.withLinearAuthority()).verify(
+            SourceEvidence(scope, SourceClaim.Refutation, proof)))
+    }
+
+    @Test
+    fun `pinned refutation replay should recompute Boolean coefficients after a polarity change`() {
+        val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
+        val complete = scope.copy(condition = SourceCondition(bools = mapOf(0 to false)))
+        val source = SourceProofContext(complete, setOf(bool), mapOf(
+            "row" to SourcePremise(SourceInequality(mapOf(bool to BigFraction.ONE), BigFraction.ZERO)),
+        ))
+        val proof = LinearPinnedRefutation(SourceDerivation.Premise("row"))
+
+        val check = SourceEvidenceVerifier(source.withLinearAuthority()).verify(
+            SourceEvidence(complete, SourceClaim.Refutation, proof))
+
+        assertIs<SourceEvidenceCheck.Rejected>(check)
+    }
+
+    @Test
+    fun `pinned refutation imports should replay under stronger scopes with the original source checker`() {
+        val source = SourceProofContext(scope, setOf(real), mapOf(
+            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE)),
+        )).withLinearAuthority()
+        val restricted = scope.copy(condition = SourceCondition(upper = mapOf(real to BigFraction.ZERO)))
+        val proof = LinearPinnedRefutation(SourceDerivation.Combination(listOf(
+            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("lower")),
+            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(real, upper = true)),
+        )))
+        val imported = SourceEvidence(restricted, SourceClaim.Refutation, proof)
+        val stronger = scope.copy(condition = SourceCondition(upper = mapOf(real to BigFraction.MINUS_ONE)))
+
+        val check = SourceEvidenceVerifier(source.atScope(stronger)).verify(
+            SourceEvidence(stronger, SourceClaim.Refutation, SourceDerivation.Import(imported)))
+
+        assertEquals(SourceEvidenceCheck.Checked, check)
+    }
 
     @Test
     fun `suspended sparse refutations should lift column sides and charge certificate work once`() {

@@ -1,6 +1,7 @@
 package com.eignex.klause.bench.profile
 
 import com.eignex.klause.bench.catalog.Catalog
+import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.SolverInvocation
 import com.eignex.klause.bench.metric.sha256
@@ -68,16 +69,26 @@ internal object SourceStageProfile {
     }
 
     private fun capture(input: JsonObject, out: File) {
-        require(input.keys == setOf("suite", "problem", "sha256", "engine", "exact"))
+        val required = setOf("suite", "problem", "sha256", "engine", "exact")
+        require(input.keys.containsAll(required) &&
+            input.keys - required - setOf("seed", "timeout") == emptySet<String>())
         val reference = Catalog.uncapped(input.getValue("suite").jsonPrimitive.content).problems
             .single { it.name == input.getValue("problem").jsonPrimitive.content }
         val bytes = CorpusFiles.open(CorpusFetcher.resolve(reference.source)).use {
             it.readNBytes(16 * 1024 * 1024 + 1)
         }
         require(bytes.size <= 16 * 1024 * 1024 && sha256(bytes) == input.getValue("sha256").jsonPrimitive.content)
-        val source = out.resolve("source.mps").apply { writeBytes(bytes) }
+        val format = when (reference.format) {
+            Format.MPS -> "mps"
+            Format.XCSP3 -> "xcsp3"
+            else -> error("stage capture requires MPS or XCSP3")
+        }
+        val source = out.resolve(if (format == "mps") "source.mps" else "source.xml").apply { writeBytes(bytes) }
         val engine = input.getValue("engine").jsonPrimitive.content
-        require(engine in setOf("default", "cp", "ls"))
+        require(engine in setOf("default", "cp", "ls", "mixed"))
+        val timeout = input["timeout"]?.jsonPrimitive?.content?.toLong() ?: 10_000L
+        require(timeout in 1_000L..60_000L)
+        val seed = input["seed"]?.jsonPrimitive?.content?.toLong() ?: 3L
         val exact = input.getValue("exact").jsonPrimitive.content.toBooleanStrict()
         val recording = out.resolve("cli.jfr")
         val settings = out.resolve("profile.jfc")
@@ -89,11 +100,12 @@ internal object SourceStageProfile {
                 "<setting name=\"enabled\">true</setting>")
         })
         val options = "-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=1 " +
-            "-XX:StartFlightRecording=filename=$recording,settings=$settings,dumponexit=true"
+            "-XX:StartFlightRecording=filename=$recording,settings=$settings," +
+            "duration=${timeout + 35_000}ms,dumponexit=true"
         val command = buildList {
             add(SolverInvocation.klauseCliBin().absolutePath)
-            addAll(listOf("--format", "mps", source.absolutePath, "-t", "10000", "-r", "3", "-s",
-                "-a", "--output-objective"))
+            addAll(listOf("--format", format, source.absolutePath, "-t", timeout.toString(), "-r", seed.toString(),
+                "-s", "-a", "--output-objective"))
             if (engine != "default") addAll(listOf("-e", engine))
             if (exact) add("--exact")
         }
@@ -116,8 +128,8 @@ internal object SourceStageProfile {
                 }
             }.start()
         val snapshots = thread(isDaemon = true, name = "source-profile-snapshots") {
-            repeat(3) { index ->
-                Thread.sleep(2000)
+            repeat(4) { index ->
+                Thread.sleep(timeout / 3)
                 if (process.isAlive) {
                     runCatching {
                         val dump = ProcessBuilder(File(System.getProperty("java.home"), "bin/jcmd").absolutePath,
@@ -134,7 +146,7 @@ internal object SourceStageProfile {
                 }
             }
         }
-        val completed = process.waitFor(45, TimeUnit.SECONDS)
+        val completed = process.waitFor(timeout + 50_000, TimeUnit.MILLISECONDS)
         if (process.isAlive) {
             process.destroyForcibly()
             process.waitFor()

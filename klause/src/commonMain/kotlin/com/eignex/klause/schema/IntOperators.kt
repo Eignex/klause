@@ -25,7 +25,7 @@ operator fun Int.plus(t: IntTerm): IntExpr = flattenSum(IntLit(this), t.toIntExp
 operator fun IntTerm.minus(other: IntTerm): IntExpr = flattenSum(this.toIntExpr(), negate(other.toIntExpr()))
 
 /** `this - c`. */
-operator fun IntTerm.minus(c: Int): IntExpr = flattenSum(this.toIntExpr(), IntLit(-c))
+operator fun IntTerm.minus(c: Int): IntExpr = flattenSum(this.toIntExpr(), negate(IntLit(c)))
 
 /** `this - t`. */
 operator fun Int.minus(t: IntTerm): IntExpr = flattenSum(IntLit(this), negate(t.toIntExpr()))
@@ -51,8 +51,20 @@ operator fun IntTerm.times(other: IntTerm): IntExpr {
 /** Integer (truncating) division `this / other`. */
 operator fun IntTerm.div(other: IntTerm): IntExpr = IntDiv(toIntExpr(), other.toIntExpr())
 
+/** Integer (truncating) division `this / c`. */
+operator fun IntTerm.div(c: Int): IntExpr = IntDiv(toIntExpr(), IntLit(c))
+
+/** Integer (truncating) division `this / t`. */
+operator fun Int.div(t: IntTerm): IntExpr = IntDiv(IntLit(this), t.toIntExpr())
+
 /** Integer remainder `this % other`. */
 operator fun IntTerm.rem(other: IntTerm): IntExpr = IntMod(toIntExpr(), other.toIntExpr())
+
+/** Integer remainder `this % c`. */
+operator fun IntTerm.rem(c: Int): IntExpr = IntMod(toIntExpr(), IntLit(c))
+
+/** Integer remainder `this % t`. */
+operator fun Int.rem(t: IntTerm): IntExpr = IntMod(IntLit(this), t.toIntExpr())
 
 /** `this ≤ other`. */
 infix fun IntTerm.le(other: IntTerm): BoolExpr = IntCompare(toIntExpr(), IntCmpOp.LE, other.toIntExpr())
@@ -115,9 +127,11 @@ private fun flattenSum(left: IntExpr, right: IntExpr): IntExpr {
     return IntSum(children)
 }
 
-private fun negate(expr: IntExpr): IntExpr = when (expr) {
-    is IntLit -> IntLit(-expr.value)
-    is IntScale -> IntScale(-expr.coeff, expr.child)
+// `-Int.MIN_VALUE` has no Int representation, so that constant stays under an explicit `-1` scale
+// rather than wrapping back to itself; lowering narrows the exact value or rejects it.
+private fun negate(expr: IntExpr): IntExpr = when {
+    expr is IntLit && expr.value != Int.MIN_VALUE -> IntLit(-expr.value)
+    expr is IntScale && expr.coeff != Int.MIN_VALUE -> IntScale(-expr.coeff, expr.child)
     else -> IntScale(-1, expr)
 }
 

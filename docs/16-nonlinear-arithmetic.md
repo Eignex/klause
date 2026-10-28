@@ -36,11 +36,40 @@ Every strategy starts from the same two facts about the source.
   arbitrary precision, including strict integer floor/ceiling semantics. An empty
   intersection refutes its scope. Guarded bounds do not narrow the source.
 
+Optional root admission adds the complete integer roots of mandatory unary
+equalities. It expands each conjunctive source equality whose syntax names one
+original integer coordinate into an exact univariate polynomial, isolates its real
+roots with the shared Sturm kernel, and bisects each isolating interval on the
+integer grid by exact signs of the square-free polynomial, so wide roots cost
+logarithmically many evaluations. Repeated roots count once, and equalities on one coordinate
+intersect their sets. An empty set, or one disjoint from the caller's integer
+window, refutes that scope. A nonempty set narrows the window to its extreme roots,
+replaces the coordinate's traversal values, snaps repairs to the nearest root
+(upper on ties) and skips tuples outside it before completion; witnesses still need
+full completion and source checking. Constant differences, representation limits
+and the admission allowance decline an equation without a proof. Guarded, negated,
+multivariate and real equalities are not admitted.
+
 Each candidate fixes every original integer coordinate and asks the
 [conditioned polynomial service](#conditioned-theory-service)
 to complete real coordinates and correlated Booleans. Failure refutes only that
 candidate. Wide exponents use compact squaring DAGs, so values such as zero and
 signed units stay checkable without expanding the polynomial degree.
+
+An optional cell consumer filters unvisited, in-window tuples before their fixed
+completion. It admits only checked mandatory predicates of the cursor's identical
+unconditioned source formula, on original integer coordinates. Query and regional
+cells decline. Exact algebraic ceiling and floor convert each admitted cell to its
+integer hull, preserving open and closed endpoints at arbitrary precision. A hull
+representation decline removes that cell's authority. These exclusions skip
+completion calls; exhausting them still supplies no whole-source refutation.
+
+An independently enabled proposal policy alternates ordinary attempts with the
+nearest tuple outside those hulls. For each original integer coordinate it crosses
+covering hulls monotonically in both directions, intersects the caller's exact
+integer window and chooses the closer surviving endpoint, preferring the upper
+endpoint on ties. Empty complements, unchanged tuples and visited proposals retain
+ordinary traversal. Selection never rejects a released real repair window.
 
 #### Strategies
 
@@ -64,8 +93,10 @@ expression DAG with exact rational and algebraic arithmetic; a stop or
 representation decline withholds the witness. Rounding selects proposals; it never
 replaces an exact coordinate.
 
-Only a completed real-relaxation refutation or an empty intersection of proved
-bounds refutes the whole source. No finite-box exhaustion claims UNSAT.
+Only a completed real-relaxation refutation, an empty intersection of proved
+bounds or an empty admitted integer root set refutes the whole source. Each applies
+within the caller's Boolean and numeric assumptions. No finite-box exhaustion,
+including exhaustion of nonempty root sets, claims UNSAT.
 
 #### Quadratic objectives
 
@@ -94,6 +125,29 @@ segments, while cancellation still polls inside arithmetic. One cancellation and
 work scope spans candidate generation, all completion queries and the final source
 check. Conditioned calls keep original Boolean pins and numeric windows; candidate
 fixings never widen them.
+
+The optional producer and integer consumer are independently controlled and disabled
+by default. Each cursor retains at most eight source cells. Admission, integer hull
+conversion and membership use its containing arithmetic allowance; cached hulls and
+support-hit counts survive slices and retire on close. Integer hulls never refute
+partial real repair windows. Invocation observations sum private cursor admissions,
+declines, newly excluded tuples, repeated support hits and completion calls; they
+do not authorize cross-cursor proof reuse.
+
+Cell-complement steering is disabled by default and requires the producer and
+consumer. Selection scans and transient proposal coordinates debit the containing
+work allowance. Each selected or fallback tuple consumes one ordinary candidate
+attempt, including duplicate, out-of-window and excluded attempts; caps and slice
+boundaries are unchanged. Counters distinguish selection calls, changed unvisited
+proposals, distinct tuples reaching completion and duplicate attempts.
+
+Root admission is disabled by default and independent of the cell controls. An
+invocation admits its source once, spending at most 65,536 work units per equation
+and 262,144 overall from the containing allowance; later cursors reuse the completed
+sets for one step per rooted coordinate. A containing stop leaves admission
+incomplete for the next cursor, while an exhausted admission allowance declines
+only the remaining equations. Counters report admitted and declined equations,
+reuses, refuted cursor scopes and skipped tuples.
 
 ### Implementation
 
@@ -285,6 +339,89 @@ exhaustion requires complete CAD or an exact equality contradiction. Representat
 decline advances to the complete family under the same remaining allowance. Region,
 projection and lifting counters record actual attempts across snapshot replacements.
 Only region coverage, projection and lifting are required for completeness.
+
+An internal optional univariate refinement precedes root reduction and partial-family
+lifting. Mandatory predicates seed a bounded coordinate candidate; a violated unary
+predicate isolates all of its roots before certifying the containing section or
+sector as forbidden. The next candidate lies outside retained cells and within the
+query window. A seed checks the entire normalized formula; regional repairs alter
+only unfixed coordinates absent from the selected projection family. Reconstruction
+and full source checking retain witness authority, while complete CAD remains the
+fallback. Optional failure supplies no refutation.
+
+Checked cells retain exact algebraic endpoints, openness and their numeric predicate.
+Source support requires a mandatory predicate of the unconditioned immutable source.
+Source and query intervals retain their captured coordinate meaning. An eliminated
+CAD slot holds a placeholder until reconstruction; reuse needs a checked coordinate
+map or an explicit surviving-predicate match before reading that slot.
+Other cells retain the query condition and snapshot; regional cells additionally keep
+signed source premises and an opaque affine-reduction owner. Such cells cannot cross
+owners without checked source reconstruction. Integer point coverage does not imply
+coverage of a real repair window. The internal option is disabled by default.
+Its query-wide allowance is 16,384 charged units across preparation, candidate checks,
+retries and snapshot replacements, with eight retained cells, degree sixteen,
+64 terms per predicate and 4,096-bit input coefficients. Regional support and seeds
+admit at most 64 premises or coordinates. A private decline preserves CAD; an enclosing
+stop remains terminal. Invocation observers receive completed checked cells only.
+
+An internal regional feedback option consumes checked cells before repeating a
+unary predicate evaluation. A hit requires the active predicate and source identity;
+query facts also require their condition and snapshot, and regional facts require
+their signed premises and opaque reduction owner. The pool keeps at most eight
+references, drops facts after premise retraction and clears on snapshot replacement.
+Eligible immutable producer facts can rebuild it under the current scope. Admission,
+lookup and eviction poll and charge the caller; endpoint comparisons use its exact
+arithmetic. A hit already eligible for the producer's candidate selector establishes
+repeated membership without a second comparison. These numeric filters supply no
+Boolean clause and preserve the producer's candidate traversal, full witness checks
+and complete CAD fallback. Numeric atom checking can also consult retained cells
+after candidate production declines. This read-only path has a separate cumulative
+8,192-unit allowance charged to the same query, retaining the producer's scope or a
+fresh regional owner that admits only eligible Source/query facts. It preserves atom
+order and independent-family bookkeeping; private resource or allowance declines run
+the original atom check, while an enclosing stop remains terminal. Both paths share
+the bounded view. Reuse diagnostics retain at most two scalar snapshots of degree
+sixteen with 4,096-bit coefficients and bounds, without optional image provenance.
+Larger points are marked incomplete. The option is disabled by default.
+
+An internal optional coupled-section refutation runs before a completed Boolean region
+is issued. For each assigned multivariate predicate, the enumerator selects by
+dependency support the first assigned univariate equation of each of its coordinates.
+When every coordinate is covered, the equations' real roots are isolated exactly and the
+signed predicate is evaluated at every root combination, bisecting the isolating
+intervals before any exact algebraic evaluation. Failing at all of them, or a
+covering equation without real roots, refutes that support: the enumerator learns an
+exclusion over exactly those signed premises, valid under every Boolean prefix within
+its query, condition and snapshot. Retraction keeps the remaining Boolean alternatives,
+and the exclusion never enters shared learning. After individual checks, connected
+covered predicates are checked as a conjunction over one streamed product of root
+sets. Each common combination must fail at least one predicate before a joint
+exclusion is learned; individual witnesses need not agree.
+
+If direct predicates expose no refutation, a private support view eliminates total
+equational graphs with nonzero rational pivots. Matching rational multiples of weak
+inequalities can supply an equality only when their signed intersection is exactly
+zero; the support retains every participating inequality. Each rewritten predicate retains
+its original signed premise and all definitions used by its substitutions. Selection,
+rewriting, root isolation and checking share the same containing allowance. The
+view neither mutates the query snapshot nor reconstructs source coordinates; its
+exclusion refers to the active encoded premises, including assigned definitions.
+Activation and frontend attribution remain with the prepared pipeline. Variable
+coefficients cannot supply total substitutions, including on nullified fibres.
+Incomplete coverage, an already attempted support, a representation decline or the
+exhausted query-wide allowance of 16,384 units learns nothing and keeps the complete
+path; an enclosing stop remains terminal. Predicates admit the checked-cell term, degree
+and coefficient limits and at most 64 premises. The option is disabled by default.
+
+Optional query failure capture retains bounded exact observations of rejected probe
+points and CAD prefixes, their signed premises, numeric reconstruction fibres and
+condition/snapshot identity. Projection observations retain the active operands.
+Root, search and partial-sign cursors restore their own bounded operation/context
+records when resumed. Partial-sign observations retain full signed premises within
+the capture limits, including the first completed sign conflict.
+Capture polls and charges the containing allowance; incomplete copies and bounded
+repetition comparisons remain explicitly incomplete. These diagnostic records
+carry no exclusion or source-refutation authority.
 
 #### Objective-image traversal
 

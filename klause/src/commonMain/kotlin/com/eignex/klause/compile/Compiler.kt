@@ -8,6 +8,7 @@ import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.Xor
+import com.eignex.klause.factor.codec.FactorCodecs
 import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.IntDomain
@@ -17,6 +18,7 @@ import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceRealId
+import com.eignex.klause.ir.ceilingOrNull
 import com.eignex.klause.lowering.CnfLowering
 import com.eignex.klause.lowering.ProblemBuilder
 import com.eignex.klause.lowering.SetLayout
@@ -34,6 +36,7 @@ import com.eignex.klause.model.BoolRef
 import com.eignex.klause.model.BoolSpec
 import com.eignex.klause.model.CardinalityExpr
 import com.eignex.klause.model.CircuitExpr
+import com.eignex.klause.model.ConstraintRole
 import com.eignex.klause.model.ContinuousRealEquality
 import com.eignex.klause.model.CostMddExpr
 import com.eignex.klause.model.CostRegularExpr
@@ -42,6 +45,7 @@ import com.eignex.klause.model.CumulativeExprOpt
 import com.eignex.klause.model.DiffnExpr
 import com.eignex.klause.model.DisjunctiveExpr
 import com.eignex.klause.model.DisjunctiveExprOpt
+import com.eignex.klause.model.FactorConstraint
 import com.eignex.klause.model.FloatLinearConstraint
 import com.eignex.klause.model.FloatSpec
 import com.eignex.klause.model.GccExprOpt
@@ -50,13 +54,16 @@ import com.eignex.klause.model.Implies
 import com.eignex.klause.model.IncreasingExpr
 import com.eignex.klause.model.IntCmpOp
 import com.eignex.klause.model.IntCompare
+import com.eignex.klause.model.IntDomainSpec
 import com.eignex.klause.model.IntExpr
 import com.eignex.klause.model.IntLit
 import com.eignex.klause.model.IntRef
 import com.eignex.klause.model.IntSpec
 import com.eignex.klause.model.InverseChannel
+import com.eignex.klause.model.LexExpr
 import com.eignex.klause.model.MddExpr
 import com.eignex.klause.model.MultipleSpec
+import com.eignex.klause.model.NValueExpr
 import com.eignex.klause.model.NValueExprOpt
 import com.eignex.klause.model.NamedConstraint
 import com.eignex.klause.model.NominalEq
@@ -77,6 +84,7 @@ import com.eignex.klause.model.SortExpr
 import com.eignex.klause.model.SubcircuitExpr
 import com.eignex.klause.model.SymmetricAllDifferent
 import com.eignex.klause.model.TableConstraint
+import com.eignex.klause.model.VariableCumulativeExpr
 import com.eignex.klause.model.XorExpr
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.simplex.exact.BigFraction
@@ -86,21 +94,37 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableIntObjectMap
 import com.eignex.skema.SchemaDef
 
-internal class Compiler(config: KlauseConfig, overrides: SemanticOverrides) {
+internal class Compiler(
+    config: KlauseConfig,
+    overrides: SemanticOverrides,
+    private val factorCodecs: FactorCodecs = FactorCodecs.builtin,
+) {
     private val semantics = schemaSemantics(overrides)
     private val settings = config.problemSettings()
 
-    fun compile(def: SchemaDef<SchemaEntry>): CompiledSchema = Lowering(settings, semantics).run(def)
+    fun compile(def: SchemaDef<SchemaEntry>): CompiledSchema = Lowering(settings, semantics, factorCodecs).run(def)
 }
 
-/** Compile this schema definition into a solver-ready [CompiledSchema]. */
+/**
+ * Compile this schema definition into a solver-ready [CompiledSchema]. [factorCodecs] decodes
+ * [FactorConstraint] nodes and must know every factor key they use.
+ */
 fun SchemaDef<SchemaEntry>.compile(
     config: KlauseConfig = KlauseConfig.current,
     semanticOverrides: SemanticOverrides = SemanticOverrides(),
-): CompiledSchema = Compiler(config, semanticOverrides).compile(this)
+    factorCodecs: FactorCodecs = FactorCodecs.builtin,
+): CompiledSchema = Compiler(config, semanticOverrides, factorCodecs).compile(this)
 
-internal class Lowering(settings: ProblemSettings, val semantics: EffectiveSourceSemantics) : CnfLowering {
+internal class Lowering(
+    settings: ProblemSettings,
+    val semantics: EffectiveSourceSemantics,
+    val factorCodecs: FactorCodecs = FactorCodecs.builtin,
+) : CnfLowering {
     private val problemBuilder = ProblemBuilder(settings, semantics)
+
+    /** Factors posted by implied or symmetry-breaking constraints, by index. */
+    val impliedFactors = HashSet<Int>()
+    var hasSymmetryBreaking = false
     val pinAbsentOptVars = checkNotNull(semantics.effective.pinAbsentOptionalValues)
     private val grid = semantics.effective.floats as? FloatSemantics.Grid
     val floatBuckets = grid?.buckets ?: DEFAULT_FLOAT_BUCKETS
@@ -148,12 +172,17 @@ internal class Lowering(settings: ProblemSettings, val semantics: EffectiveSourc
 
     fun newIntVar(domain: IntDomain): Int = problemBuilder.newInt(domain)
 
+    fun markOpenInt(id: Int, lower: Boolean, upper: Boolean) = problemBuilder.markOpen(id, lower, upper)
+
     fun newRealVar(lower: Double, upper: Double, name: String? = null): Int =
         problemBuilder.newReal(lower, upper, name).also { if (name == null) auxiliaryReals += it }
 
     fun continuousProduct(a: Int, b: Int, result: Int) = problemBuilder.continuousProduct(a, b, result)
 
-    fun buildProblem() = problemBuilder.build()
+    fun buildProblem() = problemBuilder.build(
+        impliedFactorMask = if (impliedFactors.isEmpty()) null else BooleanArray(factors.size) { it in impliedFactors },
+        hasSymmetryBreaking = hasSymmetryBreaking,
+    )
 
     /** Register `name → id` for an int/float var and the reverse `id → name`. Every write to
      *  [intVarIdByName] must go through here so [idToIntName] stays consistent. */
@@ -255,7 +284,15 @@ internal class Lowering(settings: ProblemSettings, val semantics: EffectiveSourc
 
         is NValueExprOpt -> reifyNValueOpt(expr)
 
+        is NValueExpr -> error("nValue: reified context not supported (use at top-level)")
+
         is GccExprOpt -> reifyGccOpt(expr)
+
+        is LexExpr -> lowerToLit(lexDecomposition(expr))
+
+        is VariableCumulativeExpr -> error("cumulativeVars: reified context not supported (use at top-level)")
+
+        is FactorConstraint -> error("factor: reified context not supported (use at top-level)")
 
         is SetIn -> reifySetIn(expr)
 
@@ -424,7 +461,8 @@ internal class Lowering(settings: ProblemSettings, val semantics: EffectiveSourc
 fun VariableSchema.compile(
     config: KlauseConfig = KlauseConfig.current,
     semanticOverrides: SemanticOverrides = SemanticOverrides(),
-): CompiledSchema = Compiler(config, semanticOverrides).compile(this.definition())
+    factorCodecs: FactorCodecs = FactorCodecs.builtin,
+): CompiledSchema = Compiler(config, semanticOverrides, factorCodecs).compile(this.definition())
 
 // Schema-entry driver: turns a SchemaDef into a CompiledSchema by declaring variables,
 // asserting constraints, and packaging the engine state. Kept off the Lowering class so the
@@ -448,6 +486,8 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledSchema {
             }
 
             is IntSpec -> bindIntName(name, newIntVar(IntDomain(entry.min.toLong(), entry.max.toLong())))
+
+            is IntDomainSpec -> bindIntName(name, declareIntDomain(entry))
 
             is SetSpec -> {
                 // Set universes are deduplicated and sorted by [setVar].
@@ -476,7 +516,11 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledSchema {
     }
 
     for ((_, entry) in def.entries) {
-        if (entry is NamedConstraint) assertExpr(entry.expr)
+        if (entry !is NamedConstraint) continue
+        val first = factors.size
+        assertExpr(entry.expr)
+        if (entry.role != ConstraintRole.REQUIRED) impliedFactors.addAll(first until factors.size)
+        if (entry.role == ConstraintRole.SYMMETRY_BREAKING) hasSymmetryBreaking = true
     }
 
     // Canonical absent values remove dead-value symmetry.
@@ -533,9 +577,12 @@ private fun Lowering.emitOptVarPins(def: SchemaDef<SchemaEntry>) {
             }
 
             intVarIdByName.containsKey(base) -> {
-                val d = intDomains[intVarIdByName.getValue(base)]
-                val default = 0L.coerceIn(d.min, d.max)
-                assertExpr(Implies(absent, IntCompare(IntRef(base), IntCmpOp.EQ, IntLit(default.toInt()))))
+                val id = intVarIdByName.getValue(base)
+                val d = intDomains[id]
+                val default = d.ceilingOrNull(0L) ?: d.max
+                val equality = newBoolVar()
+                factors += ReifiedLinear(equality, longArrayOf(1L), intArrayOf(id), LinearOp.EQ, default)
+                factors += Clause(intArrayOf(Lit.make(boolVarIdByName.getValue(name), true), Lit.make(equality, true)))
             }
 
             nominalIndicators.containsKey(base) -> {

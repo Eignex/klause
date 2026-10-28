@@ -27,11 +27,13 @@ import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.util.Cancellation
 import com.sun.management.ThreadMXBean
+import java.io.ByteArrayInputStream
 import java.io.File
 import java.lang.management.ManagementFactory
 import java.math.BigDecimal
 import java.math.BigInteger
 import java.util.Base64
+import java.util.zip.GZIPInputStream
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -55,11 +57,9 @@ internal object MpsResidualObjective {
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun inspect(request: JsonObject, out: File) {
+    fun inspect(request: JsonObject, out: File) {
         fun option(key: String) = request.getValue(key).jsonPrimitive.content
-        val selected = Catalog.uncapped(option("suite")).problems.single { it.name == option("problem") }
-        val bytes = CorpusFiles.open(CorpusFetcher.resolve(selected.source)).use { it.readNBytes(16 * 1024 * 1024 + 1) }
-        require(bytes.size <= 16 * 1024 * 1024 && sha256(bytes) == option("sha256"))
+        val bytes = sourceBytes(request)
         out.resolve("source.mps").writeBytes(bytes)
         out.resolve("request.json").writeText(request.toString())
         val stop = Cancellation.after(20.seconds)
@@ -95,6 +95,14 @@ internal object MpsResidualObjective {
                 if (Term.isInt(column)) Term.intVar(column) else Term.realVar(column)) to values[id]
         }
         val point = coordinates.map { mapped[it] ?: (checkNotNull(original.objective) * scale) }
+        if ("jointWalkMillis" in request) {
+            MpsJointWalk.inspect(request, source, numerical, context, columns, mapped, scale, out)
+            return
+        }
+        if ("repairSets" in request) {
+            MpsRepairReplay.inspect(request, source, numerical, context, columns, mapped, scale, out)
+            return
+        }
         val queryType = Class.forName("com.eignex.klause.lp.optimization.LinearAuthorityQuery")
         val companion = queryType.getField("Companion").get(null)
         val query = checkNotNull(call(companion, "prepare", context, null, stop, 100_000, { _: Long -> }))
@@ -172,7 +180,21 @@ internal object MpsResidualObjective {
         println(result)
     }
 
-    private fun rational(text: String): BigFraction {
+    fun sourceBytes(request: JsonObject): ByteArray {
+        fun option(key: String) = request.getValue(key).jsonPrimitive.content
+        val bytes = request["sourceGzip64"]?.jsonPrimitive?.content?.let { encoded ->
+            GZIPInputStream(ByteArrayInputStream(Base64.getDecoder().decode(encoded))).use {
+                it.readNBytes(16 * 1024 * 1024 + 1)
+            }
+        } ?: run {
+            val selected = Catalog.uncapped(option("suite")).problems.single { it.name == option("problem") }
+            CorpusFiles.open(CorpusFetcher.resolve(selected.source)).use { it.readNBytes(16 * 1024 * 1024 + 1) }
+        }
+        require(bytes.size <= 16 * 1024 * 1024 && sha256(bytes) == option("sha256"))
+        return bytes
+    }
+
+    fun rational(text: String): BigFraction {
         val parts = text.split('/')
         if (parts.size == 2) return BigFraction.of(parts[0].toBigInteger(), parts[1].toBigInteger())
         val value = BigDecimal(text)

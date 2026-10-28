@@ -31,6 +31,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
     private var cachedList: List<Move>? = null
     private var elementPreservingProbes: Int = 0
     internal var alternativeRepairs: MoveSink? = null
+    internal var compoundTally: CompoundTally? = null
     internal var absRepairDepth: Int = 0
 
     /** Materialized [Move] view. Stable across reads until the sink is mutated.
@@ -134,8 +135,12 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
      *  frozen variable — a Compound is all-or-nothing. Parts on defined or foreign-owned variables are
      *  dropped individually; a single survivor is added as a primitive move. */
     fun addCompound(parts: List<Move>) {
-        if (touchesFrozen(parts)) return
+        if (touchesFrozen(parts)) {
+            compoundTally?.recordOffer(parts.size, frozen = true, kept = 0)
+            return
+        }
         val kept = withoutRedundantParts(parts)
+        compoundTally?.recordOffer(parts.size, frozen = false, kept = kept.size)
         if (kept.isEmpty()) return
         if (kept.size == 1) {
             // Compound requires two parts; the survivor already passed the frozen/defined filters.

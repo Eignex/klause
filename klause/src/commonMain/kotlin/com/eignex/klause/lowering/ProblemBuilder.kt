@@ -58,6 +58,19 @@ internal class ProblemBuilder(
         return id
     }
 
+    private val openLower = HashSet<Int>()
+    private val openUpper = HashSet<Int>()
+
+    /**
+     * Declare integer column [id] open below and/or above. Its allocated domain on an open side is a
+     * fallback box for finite lanes, not a declaration.
+     */
+    fun markOpen(id: Int, lower: Boolean, upper: Boolean) {
+        require(id in 0 until numIntVars) { "integer column $id has not been allocated" }
+        if (lower) openLower += id
+        if (upper) openUpper += id
+    }
+
     fun newReal(lower: Double, upper: Double, name: String? = null): Int {
         val id = realLowerBounds.size
         realLowerBounds += lower
@@ -91,15 +104,19 @@ internal class ProblemBuilder(
         factors += ContinuousProduct(a, b, result)
     }
 
-    fun build(): Problem = Problem(
+    fun build(impliedFactorMask: BooleanArray? = null, hasSymmetryBreaking: Boolean = false): Problem = Problem(
         settings = settings,
         semantics = semantics,
         numBoolVars = numBoolVars,
         numIntVars = numIntVars,
         intDomains = allocatedIntDomains.toTypedArray(),
         factors = factors.toTypedArray(),
+        impliedFactorMask = impliedFactorMask,
+        hasSymmetryBreaking = hasSymmetryBreaking,
         numRealVars = numRealVars,
         realLower = realLowerBounds.toDoubleArray(),
         realUpper = realUpperBounds.toDoubleArray(),
+        openIntLo = if (openLower.isEmpty()) null else BooleanArray(numIntVars) { it in openLower },
+        openIntHi = if (openUpper.isEmpty()) null else BooleanArray(numIntVars) { it in openUpper },
     )
 }

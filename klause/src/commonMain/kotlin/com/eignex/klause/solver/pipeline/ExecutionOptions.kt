@@ -131,7 +131,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** Cumulative source LP work, including preparation, numerical advances and certificates. */
         val sourceLpWorkLimit: ExecutionOption<Long?> = ExecutionOption("source-lp-work-limit", ValueKind.ALLOWANCE)
 
-        /** Cumulative sparse preparation and modeled retained coverage allocation in bytes. */
+        /** Cumulative source preparation, proof replay and modeled retained coverage allocation in bytes. */
         val sourceLpAllocationLimit: ExecutionOption<Long?> =
             ExecutionOption("source-lp-allocation-limit", ValueKind.ALLOWANCE)
 
@@ -140,6 +140,24 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
 
         /** Checked numerical source-row separation control. */
         val sourceCuts: ExecutionOption<Boolean> = ExecutionOption("source-cuts", ValueKind.BOOLEAN)
+
+        /** Point-based selection of checked numerical source rows. */
+        val sourcePointCuts: ExecutionOption<Boolean> = ExecutionOption("source-point-cuts", ValueKind.BOOLEAN)
+
+        /** Bounded numerical source-bound aggregation control. */
+        val sourceAggregateCuts: ExecutionOption<Boolean> = ExecutionOption("source-aggregate-cuts", ValueKind.BOOLEAN)
+
+        /** Invocation-local checked numerical refutation reuse control. */
+        val sourceRefutationReuse: ExecutionOption<Boolean> =
+            ExecutionOption("source-refutation-reuse", ValueKind.BOOLEAN)
+
+        /** Invocation-local checked numerical unit-prefix deduction control. */
+        val sourceRefutationPropagation: ExecutionOption<Boolean> =
+            ExecutionOption("source-refutation-propagation", ValueKind.BOOLEAN)
+
+        /** Checked resolution over named numerical source-bound predicates. */
+        val sourceRefutationResolution: ExecutionOption<Boolean> =
+            ExecutionOption("source-refutation-resolution", ValueKind.BOOLEAN)
 
         /** Native polynomial or function arithmetic work; null means unlimited. */
         val nraWorkLimit: ExecutionOption<Long?> = ExecutionOption("nra-work-limit", ValueKind.ALLOWANCE)
@@ -156,6 +174,18 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
 
         /** Nonlinear integer heuristic moves; null means unlimited. */
         val niaMoves: ExecutionOption<Long?> = ExecutionOption("nia-moves", ValueKind.ALLOWANCE)
+
+        /** Bounded checked univariate producer for nonlinear integer completions. */
+        val niaCellRefinement: ExecutionOption<Boolean> = ExecutionOption("nia-cell-refinement", ValueKind.BOOLEAN)
+
+        /** Reuse source-scoped cells to filter unvisited fixed integer tuples. */
+        val niaCellReuse: ExecutionOption<Boolean> = ExecutionOption("nia-cell-reuse", ValueKind.BOOLEAN)
+
+        /** Alternate integer proposals with exact checked source-cell complements. */
+        val niaCellSteering: ExecutionOption<Boolean> = ExecutionOption("nia-cell-steering", ValueKind.BOOLEAN)
+
+        /** Admit complete integer root sets of mandatory unary polynomial equalities. */
+        val niaIntegerRoots: ExecutionOption<Boolean> = ExecutionOption("nia-integer-roots", ValueKind.BOOLEAN)
 
         /** Native heuristic proposal cap. */
         val maxFlips: ExecutionOption<Long> = ExecutionOption("max-flips", ValueKind.LONG)
@@ -332,6 +362,9 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** The `arm` execution setting. */
         val localSearchArm: ExecutionOption<String> = ExecutionOption("arm", ValueKind.STRING)
 
+        /** Explicit local-search objective policies, cycled across the selected worker slots. */
+        val objectiveGuidance: ExecutionOption<String> = ExecutionOption("objective-guidance", ValueKind.STRING)
+
         /** The `lambda` execution setting. */
         val lambda: ExecutionOption<Double> = ExecutionOption("lambda", ValueKind.DOUBLE)
 
@@ -379,7 +412,10 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 dryRunPresolve, affinePivotOrder, presolveAbortFraction, presolveMaxRounds,
                 presolveProbePerVar, presolveProbeTotal,
                 nodeLimit, openWorkLimit, sourceLpWorkLimit, sourceLpAllocationLimit, sourceLpOperations, sourceCuts,
+                sourcePointCuts, sourceAggregateCuts, sourceRefutationReuse, sourceRefutationPropagation,
+                sourceRefutationResolution,
                 nraWorkLimit, nraDenseCoefficients, nraMatrixCells, niaCandidates, niaMoves,
+                niaCellRefinement, niaCellReuse, niaCellSteering, niaIntegerRoots,
                 maxFlips, maxInstructions, alnsIterations, sharedRestart, openBranching,
                 openHintFlips, openHintMinSplits,
                 maxDecisions, luby, adaptiveRestart, emaRestart, modeSwitchingRestart,
@@ -391,7 +427,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 objectiveGuidedValues, variableSelector, valueSelector, seed, dryRunSolver,
                 noise, cb, skewAlpha, initialTemp, coolingRate,
                 minTemp, smoothProb, smoothFactor, tabuTenure, sources,
-                scoring, acceptance, restart, strategy, localSearchArm,
+                scoring, acceptance, restart, strategy, localSearchArm, objectiveGuidance,
                 lambda, arms, localSearchArms, backtrackArms, clauseShareLbd,
                 clauseShareLen, sliceWork, sliceMaxWork, sliceGrowth, phaseRetention,
                 reseedStaleThreshold, lsResiduals, lsPhaseTimes, backtrackArmsByLabel,

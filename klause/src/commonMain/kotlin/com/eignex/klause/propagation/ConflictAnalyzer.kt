@@ -40,10 +40,9 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
     /** The clause resolvent — the default, and the sound fallback when PB resolution can't proceed. */
     private val clauseResolvent: ConflictResolvent = ClauseResolvent(state, this)
 
-    /** The pseudo-Boolean cutting-planes resolvent, built only when PB learning is on and
-     *  the problem is pure-Boolean (order-literal atoms carry no PB reason). */
+    /** The pseudo-Boolean resolvent admits only Boolean premises in each analyzed conflict. */
     private val pbResolvent: PbConflictResolvent? =
-        if (state.pbLearning && state.problem.numIntVars == 0) PbConflictResolvent(state, this) else null
+        if (state.pbLearning) PbConflictResolvent(state, this) else null
 
     /** The resolvent that produced the most recent result — its bump sets feed VSIDS. */
     private var lastResolvent: ConflictResolvent = clauseResolvent
@@ -140,6 +139,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
             override val lbd: Int,
             override val decisionLevels: IntArray,
             override val asserting: Boolean = true,
+            val fallbackClause: Learned? = null,
         ) : LearnedConstraint {
             override val guardLiterals: IntArray get() = literals
             override fun equals(other: Any?): Boolean = other is LearnedPb &&
@@ -195,7 +195,9 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
 
     private inline fun boundedAnalysis(analyze: () -> AnalysisResult): AnalysisResult = try {
         state.finiteWork.begin()
+        if (pbResolvent != null) state.finiteWork.checkNow()
         val result = analyze()
+        if (pbResolvent != null) state.finiteWork.checkNow()
         if (state.runCancelled) AnalysisResult.NotApplicable else result
     } catch (_: FinitePropagationInterrupted) {
         state.runCancelled = true
@@ -278,8 +280,14 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
             pb.seedFactorId = seedFactorId
             val r = runResolution(pb, seedReason, currentLevel)
             if (!pb.failed) {
+                val result = if (r is AnalysisResult.LearnedPb && state.problem.numIntVars > 0) {
+                    val fallback = runResolution(clauseResolvent, seedReason, currentLevel) as? AnalysisResult.Learned
+                    r.copy(fallbackClause = fallback)
+                } else {
+                    r
+                }
                 lastResolvent = pb
-                return r
+                return result
             }
         }
         lastResolvent = clauseResolvent

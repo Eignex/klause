@@ -15,6 +15,21 @@ internal class PolynomialAffineReduction private constructor(
 ) {
     val eliminatedCount: Int get() = fibres.size
 
+    fun captureReconstruction(writer: FailureWriter) {
+        for ((index, fibre) in fibres.asReversed().withIndex()) {
+            if (writer.exhausted) break
+            writer.put("regionFibre.$index.variable", fibre.variable.toString())
+            fibre.point?.let { writer.polynomial("regionFibre.$index.point", it) }
+            for ((kind, bounds) in listOf("lower" to fibre.lower, "upper" to fibre.upper)) {
+                for ((bound, value) in bounds.withIndex()) {
+                    if (writer.exhausted) break
+                    writer.put("regionFibre.$index.$kind.$bound.strict", value.strict.toString())
+                    writer.polynomial("regionFibre.$index.$kind.$bound.polynomial", value.polynomial)
+                }
+            }
+        }
+    }
+
     fun reconstruct(
         assignment: QfNraAssignment,
         arithmetic: PolynomialArithmetic,

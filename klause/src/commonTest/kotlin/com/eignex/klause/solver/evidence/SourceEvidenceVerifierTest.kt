@@ -457,6 +457,205 @@ class SourceEvidenceVerifierTest {
     }
 
     @Test
+    fun `a conditional refutation should enter equal and stronger numeric scopes`() {
+        val restricted = scope.copy(condition = SourceCondition(upper = mapOf(x to BigFraction.ZERO)))
+        val proof = SourceDerivation.Combination(listOf(
+            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("lower")),
+            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(x, upper = true)),
+        ))
+        val imported = SourceEvidence(restricted, SourceClaim.Refutation, proof)
+
+        for (upper in listOf(BigFraction.ZERO, BigFraction.MINUS_ONE)) {
+            val consumer = scope.copy(condition = SourceCondition(upper = mapOf(x to upper)))
+            val source = SourceProofContext(consumer, setOf(x), premises)
+            for (claim in listOf(SourceClaim.Refutation, SourceClaim.Bound(BigFraction.ofLong(2)),
+                SourceClaim.Bound(BigFraction.ofLong(2), strict = true))) {
+                val evidence = SourceEvidence(consumer, claim, SourceDerivation.Import(imported))
+
+                assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(evidence))
+            }
+        }
+    }
+
+    @Test
+    fun `an imported refutation should require an objective scope for a bound`() {
+        val unscoped = scope.copy(objective = null)
+        val source = SourceProofContext(unscoped, setOf(x), mapOf(
+            "conflict" to SourcePremise(SourceInequality(emptyMap(), BigFraction.MINUS_ONE))))
+        val refutation = SourceEvidence(unscoped, SourceClaim.Refutation, SourceDerivation.Premise("conflict"))
+
+        val checked = SourceEvidenceVerifier(source).verify(SourceEvidence(unscoped,
+            SourceClaim.Bound(BigFraction.ONE), SourceDerivation.Import(refutation)))
+
+        assertIs<SourceEvidenceCheck.Rejected>(checked)
+    }
+
+    @Test
+    fun `an imported refutation should not establish a witness or attainment`() {
+        val source = SourceProofContext(scope, setOf(x), mapOf(
+            "conflict" to SourcePremise(SourceInequality(emptyMap(), BigFraction.MINUS_ONE))),
+            mapOf(x to BigFraction.ONE))
+        val refutation = SourceEvidence(scope, SourceClaim.Refutation, SourceDerivation.Premise("conflict"))
+        val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0),
+            exactReals = listOf(BigFraction.ONE))
+
+        for (claim in listOf(SourceClaim.Witness(sample),
+            SourceClaim.Optimal(sample, SourceValue.Rational(BigFraction.ONE)))) {
+            val checked = SourceEvidenceVerifier(source).verify(
+                SourceEvidence(scope, claim, SourceDerivation.Import(refutation)))
+
+            assertIs<SourceEvidenceCheck.Rejected>(checked)
+        }
+    }
+
+    @Test
+    fun `an unavailable refutation import should withhold objective bounds`() {
+        val refutation = SourceEvidence(scope, SourceClaim.Refutation,
+            SourceDerivation.Unavailable("contradiction not retained"))
+
+        val checked = SourceEvidenceVerifier(context).verify(SourceEvidence(scope,
+            SourceClaim.Bound(BigFraction.ONE), SourceDerivation.Import(refutation)))
+
+        assertIs<SourceEvidenceCheck.Unavailable>(checked)
+    }
+
+    @Test
+    fun `a refutation should survive fresh checking after an unused restriction is removed`() {
+        val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val restricted = scope.copy(condition = SourceCondition(
+            lower = mapOf(other to BigFraction.ONE), upper = mapOf(x to BigFraction.ZERO)))
+        val proof = SourceDerivation.Combination(listOf(
+            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("lower")),
+            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(x, upper = true)),
+        ))
+        val reduced = scope.copy(condition = SourceCondition(upper = mapOf(x to BigFraction.ZERO)))
+        val original = SourceProofContext(restricted, setOf(x, other), premises)
+        val consumer = SourceProofContext(reduced, setOf(x, other), premises)
+
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(original).verify(
+            SourceEvidence(restricted, SourceClaim.Refutation, proof)))
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(consumer).verify(
+            SourceEvidence(reduced, SourceClaim.Refutation, proof)))
+    }
+
+    @Test
+    fun `fresh refutation checking should reject removal of an implicit integer activation restriction`() {
+        val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val guarded = SourcePremise(SourceInequality(emptyMap(), BigFraction.MINUS_ONE), emptyMap(),
+            mapOf(integer to BigFraction.ZERO))
+        val restricted = scope.copy(condition = SourceCondition(
+            lower = mapOf(integer to BigFraction.ZERO), upper = mapOf(integer to BigFraction.ZERO)))
+        val proof = SourceDerivation.Premise("guarded")
+        val original = SourceProofContext(restricted, setOf(integer), mapOf("guarded" to guarded))
+        val consumer = SourceProofContext(scope, setOf(integer), mapOf("guarded" to guarded))
+
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(original).verify(
+            SourceEvidence(restricted, SourceClaim.Refutation, proof)))
+        assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(consumer).verify(
+            SourceEvidence(scope, SourceClaim.Refutation, proof)))
+    }
+
+    @Test
+    fun `conditional refutation imports should reject weaker and unrelated numeric scopes`() {
+        val restricted = scope.copy(condition = SourceCondition(upper = mapOf(x to BigFraction.ZERO)))
+        val proof = SourceDerivation.Combination(listOf(
+            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("lower")),
+            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(x, upper = true)),
+        ))
+        val imported = SourceEvidence(restricted, SourceClaim.Refutation, proof)
+        val conditions = listOf(
+            SourceCondition(),
+            SourceCondition(upper = mapOf(x to BigFraction.ONE)),
+            SourceCondition(lower = mapOf(x to BigFraction.ofLong(2))),
+        )
+
+        for (condition in conditions) {
+            val consumer = scope.copy(condition = condition)
+            val source = SourceProofContext(consumer, setOf(x), premises)
+            for (claim in listOf(SourceClaim.Refutation, SourceClaim.Bound(BigFraction.ofLong(2)))) {
+                val evidence = SourceEvidence(consumer, claim, SourceDerivation.Import(imported))
+
+                assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(source).verify(evidence))
+            }
+        }
+    }
+
+    @Test
+    fun `refutation imports should reject changed source semantics and objectives`() {
+        val contradiction = SourcePremise(SourceInequality(emptyMap(), BigFraction.MINUS_ONE))
+        val imported = SourceEvidence(scope, SourceClaim.Refutation, SourceDerivation.Premise("conflict"))
+        val consumers = listOf(
+            scope.copy(revision = revision.copy(identity = "edited-source")),
+            scope.copy(revision = revision.copy(semantics = "tolerance")),
+            scope.copy(objective = checkNotNull(scope.objective).copy(identity = "edited-objective")),
+            scope.copy(objective = checkNotNull(scope.objective).copy(sense = ObjectiveSense.MAXIMIZE)),
+            scope.copy(objective = null),
+        )
+
+        for (consumer in consumers) {
+            val source = SourceProofContext(consumer, setOf(x), mapOf("conflict" to contradiction))
+            val evidence = SourceEvidence(consumer, SourceClaim.Refutation, SourceDerivation.Import(imported))
+
+            assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(source).verify(evidence))
+        }
+    }
+
+    @Test
+    fun `refutation imports should recheck rows sharing the same premise identifier`() {
+        val imported = SourceEvidence(scope, SourceClaim.Refutation, SourceDerivation.Premise("conflict"))
+        val changed = SourcePremise(SourceInequality(emptyMap(), BigFraction.ZERO))
+        val source = SourceProofContext(scope, setOf(x), mapOf("conflict" to changed))
+        for (claim in listOf(SourceClaim.Refutation, SourceClaim.Bound(BigFraction.ofLong(2)))) {
+            val evidence = SourceEvidence(scope, claim, SourceDerivation.Import(imported))
+
+            assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(source).verify(evidence))
+        }
+    }
+
+    @Test
+    fun `guarded refutation imports should reject retracted and opposite Boolean pins`() {
+        val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
+        val restricted = scope.copy(condition = SourceCondition(bools = mapOf(0 to true)))
+        val guarded = SourcePremise(SourceInequality(emptyMap(), BigFraction.MINUS_ONE), mapOf(0 to true))
+        val imported = SourceEvidence(restricted, SourceClaim.Refutation, SourceDerivation.Premise("conflict"))
+
+        for (pins in listOf(emptyMap(), mapOf(0 to false))) {
+            val consumer = scope.copy(condition = SourceCondition(bools = pins))
+            val source = SourceProofContext(consumer, setOf(bool), mapOf("conflict" to guarded))
+            val evidence = SourceEvidence(consumer, SourceClaim.Refutation, SourceDerivation.Import(imported))
+
+            assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(source).verify(evidence))
+        }
+    }
+
+    @Test
+    fun `refutation imports should recheck changed integer activation pins`() {
+        val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val restricted = scope.copy(condition = SourceCondition(
+            lower = mapOf(integer to BigFraction.ZERO), upper = mapOf(integer to BigFraction.ZERO)))
+        val changed = SourcePremise(SourceInequality(emptyMap(), BigFraction.MINUS_ONE), emptyMap(),
+            mapOf(integer to BigFraction.ONE))
+        val source = SourceProofContext(restricted, setOf(integer), mapOf("conflict" to changed))
+        val imported = SourceEvidence(restricted, SourceClaim.Refutation, SourceDerivation.Premise("conflict"))
+        val evidence = SourceEvidence(restricted, SourceClaim.Refutation, SourceDerivation.Import(imported))
+
+        assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(source).verify(evidence))
+    }
+
+    @Test
+    fun `cancelled refutation import checking should remain unavailable`() {
+        val contradiction = SourcePremise(SourceInequality(emptyMap(), BigFraction.MINUS_ONE))
+        val source = SourceProofContext(scope, setOf(x), mapOf("conflict" to contradiction))
+        val imported = SourceEvidence(scope, SourceClaim.Refutation, SourceDerivation.Premise("conflict"))
+        val evidence = SourceEvidence(scope, SourceClaim.Refutation, SourceDerivation.Import(imported))
+        var polls = 0
+
+        val result = SourceEvidenceVerifier(source).verify(evidence, Cancellation { ++polls > 3 })
+
+        assertIs<SourceEvidenceCheck.Unavailable>(result)
+    }
+
+    @Test
     fun `an unsupported source checker should not certify a point or ray`() {
         val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0), exactReals = listOf(BigFraction.ONE))
         val claims = listOf(

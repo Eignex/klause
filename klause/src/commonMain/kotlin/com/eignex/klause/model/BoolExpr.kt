@@ -2,6 +2,7 @@ package com.eignex.klause.model
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 /** Anything that can be coerced into a [BoolExpr] inside the constraint DSL. */
 interface BoolTerm {
@@ -10,7 +11,7 @@ interface BoolTerm {
 }
 
 /** A Boolean-valued node in the constraint AST. */
-@Serializable
+@Serializable(with = BoolExprSerializer::class)
 sealed interface BoolExpr : BoolTerm {
     override fun toExpr(): BoolExpr = this
 }
@@ -197,7 +198,8 @@ data class FloatLinearConstraint(
         var h = coeffs.contentHashCode()
         h = 31 * h + varNames.hashCode()
         h = 31 * h + op.hashCode()
-        h = 31 * h + bound.hashCode()
+        // equals compares bound numerically, so 0.0 and -0.0 must share a hash.
+        h = 31 * h + (if (bound == 0.0) 0.0 else bound).hashCode()
         return h
     }
 }
@@ -732,6 +734,24 @@ data class NValueExprOpt(
     }
 }
 
+/** Asserted distinct-value count with an expression target and optional excluded values. */
+@Serializable
+@SerialName("nvalue")
+data class NValueExpr(
+    /** The number-of-distinct-values target. */
+    val n: IntExpr,
+    /** The variables whose distinct values are counted. */
+    val xs: List<IntExpr>,
+    /** How [n] relates to the distinct count. */
+    val mode: NValueMode = NValueMode.EQ,
+    /** Values omitted from the count. */
+    val except: List<Long> = emptyList(),
+) : BoolExpr {
+    init {
+        require(xs.isNotEmpty()) { "NValueExpr: xs must be non-empty" }
+    }
+}
+
 /** How an `nvalue` constraint's target relates to the actual distinct-value count. */
 @Serializable
 enum class NValueMode {
@@ -771,3 +791,66 @@ data class GccExprOpt(
         require(presents.size == xs.size) { "GccExprOpt: presents must match xs arity" }
     }
 }
+
+/**
+ * Lexicographic order: [xs] read left to right is at most [ys], or strictly less when [strict]. Asserted
+ * at the top level it compiles to one native lexicographic factor; a reified use is decomposed.
+ */
+@Serializable
+@SerialName("lexLess")
+data class LexExpr(
+    /** The left sequence. */
+    val xs: List<IntExpr>,
+    /** The right sequence, as long as [xs]. */
+    val ys: List<IntExpr>,
+    /** Whether equal sequences are excluded. */
+    val strict: Boolean = false,
+) : BoolExpr {
+    init {
+        require(xs.size == ys.size) { "LexExpr: xs and ys must have equal length" }
+        require(xs.isNotEmpty()) { "LexExpr: empty sequences" }
+    }
+}
+
+/**
+ * Cumulative scheduling whose durations, demands and capacity may be variables: at every time point the
+ * demands of the tasks running then stay within [capacity]. Asserted at the top level only.
+ */
+@Serializable
+@SerialName("cumulativeVars")
+data class VariableCumulativeExpr(
+    /** Task start times. */
+    val starts: List<IntExpr>,
+    /** Task durations, parallel to [starts]. */
+    val durations: List<IntExpr>,
+    /** Task resource demands, parallel to [starts]. */
+    val demands: List<IntExpr>,
+    /** Resource capacity. */
+    val capacity: IntExpr,
+) : BoolExpr {
+    init {
+        require(starts.size == durations.size && starts.size == demands.size) {
+            "VariableCumulativeExpr: starts, durations and demands must have the same length"
+        }
+    }
+}
+
+/**
+ * One native factor over named variables, written in the factor-codec vocabulary that problem documents
+ * use. [node] is a `{key: payload}` factor node whose variable ids index [bools], [ints] and [reals]:
+ * Boolean id `i` is the Boolean or presence variable `bools[i]`, and so on. Compilation decodes the node
+ * with its factor codecs, renames the ids to the compiled columns and posts the factor unchanged.
+ * Asserted at the top level only.
+ */
+@Serializable
+@SerialName("factor")
+data class FactorConstraint(
+    /** The factor node over local ids. */
+    val node: JsonElement,
+    /** Boolean variables by local id. */
+    val bools: List<String> = emptyList(),
+    /** Integer variables by local id. */
+    val ints: List<String> = emptyList(),
+    /** Float variables by local real id. */
+    val reals: List<String> = emptyList(),
+) : BoolExpr

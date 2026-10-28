@@ -31,7 +31,7 @@ Typical uses are constraint-aware test and fuzz input generation, configuration 
 
 Complete search, local search, LP relaxations and arithmetic theories all work on that same model, alone or together in a portfolio, and every result they publish is checked against the original model before it is returned.
 
-It reads FlatZinc, XCSP3, SMT-LIB, MPS, DIMACS, OPB/WBO and WCNF, and MiniZinc models through the included solver integration.
+It reads FlatZinc, XCSP3, SMT-LIB, MPS, DIMACS, OPB/WBO and WCNF, and MiniZinc models through the included solver integration. Any model, whether built in Kotlin or read from a file, saves to and loads from JSON without loss.
 
 ## The LP engine
 

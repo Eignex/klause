@@ -24,7 +24,8 @@ internal class PreparingMinimize(
     private var globalToken = params.cancellation
     private val propagationToken = cancelledWhen({ globalToken.deadline() }) { globalToken() }
     private var preparation: PropagationPreparation? = PropagationPreparation(
-        solver.problem, propagationToken, params.propagationCancelFloor, params.pbLearning ?: true,
+        solver.problem, propagationToken, params.propagationCancelFloor,
+        params.pbLearning ?: (solver.problem.numIntVars == 0),
     )
     private var search: ResumableMinimize? = null
     private var installing: ResumableMinimize? = null

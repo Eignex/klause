@@ -82,6 +82,7 @@ internal class PolynomialTheoryInvocation(
     private var pending: PolynomialRetainedQuery? = null
     private var witness: QfNraAssignment? = null
     val stats: QfNraStats get() = pending?.stats?.let { combine(completedStats, it) } ?: completedStats
+    var checkedCellObserver: ((CheckedPolynomialCell) -> Unit)? = null
     var lastUnknown: QfNraResult.Unknown? = null
         private set
     var queries: Long = 0
@@ -107,7 +108,7 @@ internal class PolynomialTheoryInvocation(
         val query = PolynomialRetainedQuery(formula, boolCount, realCount,
             params.copy(cancellation = params.cancellation or cancellation, maximumWork = remaining),
             PolynomialCondition(condition.bools, fixedReals + condition.lower, fixedReals + condition.upper),
-            witness.takeIf { condition.lower.isEmpty() && condition.upper.isEmpty() })
+            witness.takeIf { condition.lower.isEmpty() && condition.upper.isEmpty() }, checkedCellObserver)
         pending = query
         queries = sum(queries, 1)
         return object : Iterator<QfNraResult?> {
@@ -198,6 +199,7 @@ private class PolynomialRetainedQuery(
     params: QfNraParams,
     condition: PolynomialCondition,
     witness: QfNraAssignment?,
+    checkedCellObserver: ((CheckedPolynomialCell) -> Unit)?,
 ) {
     private val work = QfNraWork(params)
     private var query: QfNraQuery? = null
@@ -226,6 +228,7 @@ private class PolynomialRetainedQuery(
         }
         val remaining = params.maximumWork?.let { (it - work.snapshot().workSpent).coerceAtLeast(0) }
         val native = QfNraQuery(formula, boolCount, realCount, params.copy(maximumWork = remaining), condition)
+        native.checkedCellObserver = checkedCellObserver
         query = native
         while (true) {
             when (val result = native.next()) {

@@ -1,0 +1,287 @@
+package com.eignex.klause.theory.qfnra
+
+import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
+import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
+import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
+import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
+import com.eignex.klause.formats.smtlib.SmtLibPolynomial
+import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.Cancellation
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+class PolynomialCellRefinementTest {
+    @Test
+    fun `an equality excludes the open interval between its irrational roots`() {
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
+        val arithmetic = PolynomialArithmetic()
+        val algebraic = AlgebraicArithmetic(arithmetic)
+        val scope = PolynomialCellScope.Source.prepare(source.formula, arithmetic)
+
+        val cell = assertNotNull(CheckedPolynomialCell.rejected(scope.predicates.single(), scope,
+            algebraic.rational(BigFraction.ZERO), arithmetic, algebraic))
+
+        assertFalse(cell.lowerClosed)
+        assertFalse(cell.upperClosed)
+        assertTrue(cell.contains(algebraic.rational(BigFraction.ONE), algebraic))
+        assertFalse(cell.contains(assertNotNull(cell.lower), algebraic))
+        assertFalse(cell.contains(assertNotNull(cell.upper), algebraic))
+        assertIs<PolynomialCellScope.Source>(cell.scope)
+    }
+
+    @Test
+    fun `strict and disequal repeated roots exclude their closed section`() {
+        for (predicate in listOf("(> (* x x) 0)", "(distinct (* x x) 0)")) {
+            val source = SmtLibPolynomial.parse("(declare-const x Real) (assert $predicate)")
+            val arithmetic = PolynomialArithmetic()
+            val algebraic = AlgebraicArithmetic(arithmetic)
+            val scope = PolynomialCellScope.Source.prepare(source.formula, arithmetic)
+
+            val cell = assertNotNull(CheckedPolynomialCell.rejected(scope.predicates.single(), scope,
+                algebraic.rational(BigFraction.ZERO), arithmetic, algebraic))
+
+            assertTrue(cell.lowerClosed)
+            assertTrue(cell.upperClosed)
+            assertTrue(cell.contains(algebraic.rational(BigFraction.ZERO), algebraic))
+            assertFalse(cell.contains(algebraic.rational(BigFraction.ONE), algebraic))
+        }
+    }
+
+    @Test
+    fun `an unrelated predicate cannot acquire mandatory source support`() {
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (> x 0))")
+        val other = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
+        val arithmetic = PolynomialArithmetic()
+        val algebraic = AlgebraicArithmetic(arithmetic)
+        val scope = PolynomialCellScope.Source.prepare(source.formula, arithmetic)
+        val predicate = PolynomialFormula.normalize(other.formula, arithmetic).atoms.single()
+
+        val cell = CheckedPolynomialCell.rejected(predicate, scope, algebraic.rational(BigFraction.ZERO),
+            arithmetic, algebraic)
+
+        assertNull(cell)
+    }
+
+    @Test
+    fun `a variable leading coefficient does not yield a unary cell`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (declare-const y Real) (assert (= (* x y) 1))",
+        )
+        val arithmetic = PolynomialArithmetic()
+        val algebraic = AlgebraicArithmetic(arithmetic)
+        val scope = PolynomialCellScope.Source.prepare(source.formula, arithmetic)
+
+        val cell = CheckedPolynomialCell.rejected(scope.predicates.single(), scope,
+            algebraic.rational(BigFraction.ZERO), arithmetic, algebraic)
+
+        assertNull(cell)
+    }
+
+    @Test
+    fun `the seed repairs an irrational equality and its strict sign together`() {
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (and (= (* x x) 2) (> x 0)))")
+        val query = QfNraQuery(source.formula, 0, 1, QfNraParams(cellRefinement = true), PolynomialCondition())
+
+        var result: QfNraResult? = null
+        while (result == null) result = query.next()
+
+        val witness = assertIs<QfNraResult.Satisfiable>(result).assignment.realValue(0)
+        val algebraic = AlgebraicArithmetic()
+        assertTrue(algebraic.sign(witness) > 0)
+        assertEquals(0, algebraic.signAt(PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+            .atoms.first().polynomial, mapOf(0 to witness)))
+        assertTrue(query.checkedCells.isNotEmpty())
+        assertTrue(query.checkedCells.size <= 8)
+        assertTrue(assertNotNull(query.cellStats).work <= 16_384)
+        assertEquals(0L, result.stats.projectedPolynomials)
+    }
+
+    @Test
+    fun `conditional predicates retain the exact requested fixing`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const n Real) (declare-const x Real) (assert (= (* n n x x) 8))",
+        )
+        val condition = PolynomialCondition(lower = mapOf(0 to BigFraction.ofLong(2)),
+            upper = mapOf(0 to BigFraction.ofLong(2)))
+        val query = QfNraQuery(source.formula, 0, 2, QfNraParams(cellRefinement = true), condition)
+
+        var result: QfNraResult? = null
+        while (result == null) result = query.next()
+
+        assertIs<QfNraResult.Satisfiable>(result)
+        val scope = assertIs<PolynomialCellScope.Query>(query.checkedCells.first().scope)
+        assertEquals(condition, scope.condition)
+    }
+
+    @Test
+    fun `an enclosing stop interrupts cell production without a certificate`() {
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
+        var cancelled = false
+        val work = QfNraWork(QfNraParams(Cancellation { cancelled }))
+        val refinement = PolynomialCellRefinement(source.formula, PolynomialCondition(), work,
+            PolynomialLimits()) {}
+        val normalized = PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+        cancelled = true
+
+        assertFailsWith<PolynomialInterrupted> {
+            refinement.prepare(normalized)
+        }
+        assertTrue(refinement.cells.isEmpty())
+    }
+
+    @Test
+    fun `an optional degree decline preserves complete fallback`() {
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (^ x 17) 1))")
+        val query = QfNraQuery(source.formula, 0, 1, QfNraParams(cellRefinement = true), PolynomialCondition())
+
+        var result: QfNraResult? = null
+        while (result == null) result = query.next()
+
+        assertIs<QfNraResult.Satisfiable>(result)
+        assertTrue(query.checkedCells.isEmpty())
+    }
+
+    @Test
+    fun `conditional Boolean premises cannot acquire source global support`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (declare-const gate Bool) (assert (or gate (= (* x x) 2)))",
+        )
+        val condition = PolynomialCondition(bools = mapOf(0 to false))
+        val query = QfNraQuery(source.formula, 1, 1, QfNraParams(cellRefinement = true), condition)
+
+        var result: QfNraResult? = null
+        while (result == null) result = query.next()
+
+        assertIs<QfNraResult.Satisfiable>(result)
+        val scope = assertIs<PolynomialCellScope.Query>(query.checkedCells.first().scope)
+        assertEquals(mapOf(0 to false), scope.condition.bools)
+    }
+
+    @Test
+    fun `zero containing work prevents the optional producer from entering`() {
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
+        val query = QfNraQuery(source.formula, 0, 1,
+            QfNraParams(maximumWork = 0, cellRefinement = true), PolynomialCondition())
+
+        val result = query.next()
+
+        assertEquals(QfNraReason.WorkLimit, assertIs<QfNraResult.Unknown>(result).reason)
+        assertEquals(0L, result.stats.workSpent)
+        assertTrue(query.checkedCells.isEmpty())
+    }
+
+    @Test
+    fun `cancellation after a completed cell preserves only that completed certificate`() {
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
+        var stopped = false
+        val query = QfNraQuery(source.formula, 0, 1,
+            QfNraParams(Cancellation { stopped }, cellRefinement = true), PolynomialCondition())
+        query.checkedCellObserver = { stopped = true }
+
+        var result: QfNraResult? = null
+        while (result == null) result = query.next()
+
+        assertEquals(QfNraReason.Interrupted, assertIs<QfNraResult.Unknown>(result).reason)
+        assertEquals(1, query.checkedCells.size)
+        assertIs<PolynomialCellScope.Source>(query.checkedCells.single().scope)
+    }
+
+    @Test
+    fun `statistics snapshots remain stable while the producer advances`() {
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
+        val work = QfNraWork(QfNraParams())
+        val refinement = PolynomialCellRefinement(source.formula, PolynomialCondition(), work,
+            PolynomialLimits()) {}
+        val before = refinement.stats
+        val normalized = PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+
+        refinement.prepare(normalized)
+
+        assertEquals(0L, before.work)
+        assertTrue(refinement.stats.work > 0)
+    }
+
+    @Test
+    fun `a dense representation refusal publishes no checked cell`() {
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
+        val query = QfNraQuery(source.formula, 0, 1,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxDenseCoefficients = 2), cellRefinement = true),
+            PolynomialCondition())
+
+        var result: QfNraResult? = null
+        while (result == null) result = query.next()
+
+        assertEquals(QfNraReason.ResourceLimit, assertIs<QfNraResult.Unknown>(result).reason)
+        assertTrue(query.checkedCells.isEmpty())
+    }
+
+    @Test
+    fun `exhausting the cell allowance preserves fallback solving`() {
+        val declarations = (0..4).joinToString(" ") { "(declare-const x$it Real)" }
+        val predicates = (0..4).joinToString(" ") { "(> x$it 0)" }
+        val source = SmtLibPolynomial.parse("$declarations (assert (and $predicates))")
+        val query = QfNraQuery(source.formula, 0, 5, QfNraParams(cellRefinement = true), PolynomialCondition())
+
+        var result: QfNraResult? = null
+        while (result == null) result = query.next()
+
+        assertIs<QfNraResult.Satisfiable>(result)
+        assertEquals(8, query.checkedCells.size)
+    }
+
+    @Test
+    fun `conditioned retries retain the containing invocation work ceiling`() {
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
+        val service = PolynomialTheoryService(source.formula, 0, 1)
+        val required = service.invocation(QfNraParams(cellRefinement = true)).use {
+            assertIs<QfNraResult.Satisfiable>(it.check()).stats.workSpent
+        }
+        service.invocation(QfNraParams(maximumWork = required + 1, cellRefinement = true)).use { invocation ->
+            assertIs<QfNraResult.Satisfiable>(invocation.check())
+
+            val result = invocation.check(PolynomialCondition(lower = mapOf(0 to BigFraction.ZERO)))
+
+            assertEquals(QfNraReason.WorkLimit, assertIs<QfNraResult.Unknown>(result).reason)
+            assertEquals(required + 1, invocation.stats.workSpent)
+        }
+    }
+
+    @Test
+    fun `regional cells retain signed premises and their reduction owner`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (declare-const y Real) (declare-const gate Bool) " +
+                "(assert (or gate (and (= x y) (> (* x y) 1))))",
+        )
+        val arithmetic = PolynomialArithmetic()
+        val normalized = PolynomialFormula.normalize(source.formula, arithmetic)
+        val numeric = normalized.booleanRegions(arithmetic).asSequence().filterNotNull()
+            .first { it.atoms.size == normalized.atoms.size }
+        val premises = PolynomialBooleanRegion(numeric.atoms, numeric.bools + mapOf(0 to false))
+        val reduction = PolynomialAffineReduction.prepare(normalized, premises, 2, arithmetic)
+            .asSequence().filterNotNull().first()
+        val variable = reduction.atoms.first { it.polynomial.variables.isNotEmpty() }.polynomial.variables.single()
+        val refinement = PolynomialCellRefinement(source.formula, PolynomialCondition(), QfNraWork(QfNraParams()),
+            PolynomialLimits()) {}
+        refinement.prepare(normalized)
+        val first = assertNotNull(refinement.region(normalized, premises, reduction))
+        assertNotNull(first.repair(variable, AlgebraicArithmetic().rational(BigFraction.ZERO)))
+        val firstCount = refinement.cells.size
+        val second = assertNotNull(refinement.region(normalized, premises, reduction))
+
+        assertNotNull(second.repair(variable, AlgebraicArithmetic().rational(BigFraction.ZERO)))
+
+        val scope = assertIs<PolynomialCellScope.Region>(refinement.cells.first().scope)
+        assertEquals(premises, scope.premises)
+        assertTrue(scope === first.scope)
+        assertTrue(first.scope.reduction !== second.scope.reduction)
+        val appended = refinement.cells.drop(firstCount)
+        assertTrue(appended.isNotEmpty())
+        assertTrue(appended.all { it.scope === second.scope })
+    }
+}

@@ -1,5 +1,5 @@
 plugins {
-    id("com.eignex.kmp") version "1.3.3"
+    id("com.eignex.kmp") version "1.3.5"
     kotlin("plugin.serialization")
 }
 
@@ -31,6 +31,9 @@ eignexPublish {
 // local build/check and CI use the same target set. The release builds every target via -Ptargets.full.
 val fullTargets = providers.gradleProperty("targets.full").isPresent
 
+// Compact model JSON needs Skema's unreleased fixed-field nodes, root path decoding and integral tokens.
+val skemaPin = "0.3.1-20261027.115734-17"
+
 kotlin {
     compilerOptions {
         freeCompilerArgs.add("-Xexpect-actual-classes")
@@ -46,7 +49,9 @@ kotlin {
         commonMain.dependencies {
             compileOnly("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
-            api("com.eignex:skema:0.3.0")
+            api("com.eignex:skema:$skemaPin") {
+                version { strictly(skemaPin) }
+            }
             implementation("com.eignex:koblas:0.1.1-20261023.051622-264") {
                 version { strictly("0.1.1-20261023.051622-264") }
             }
@@ -73,6 +78,11 @@ dependencies {
             val pinned = "0.3.4-20261013.194059-$build"
             add("commonMainImplementation", "com.eignex:kumulant-$module:$pinned") {
                 version { strictly(pinned) }
+            }
+        }
+        for (module in listOf("jvm", "linuxx64", "linuxarm64", "macosarm64")) {
+            add("commonMainApi", "com.eignex:skema-$module:$skemaPin") {
+                version { strictly(skemaPin) }
             }
         }
     }

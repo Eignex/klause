@@ -1,9 +1,11 @@
 package com.eignex.klause.solver
 
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -172,6 +174,15 @@ interface ResumableSolver<P : SolverParams> : Solver<P> {
  */
 internal interface RepairSearch : AutoCloseable {
     val stats: SolveStats get() = SolveStats.EMPTY
+    val work: Long get() = stats.search.nodes.sum.toLong()
+
+    fun begin(assumptions: Assumptions, decisionBudget: Long, cutoff: Double, cancellation: Cancellation)
+
+    fun beginExact(assumptions: Assumptions, decisionBudget: Long, cutoff: BigFraction, cancellation: Cancellation) {
+        throw UnsupportedOperationException("exact repair cutoffs are unavailable")
+    }
+
+    fun runSlice(cancellation: Cancellation, millis: Long, work: Long): RepairSearchStep
 
     /**
      * Solve the fragment pinned by [assumptions] under a [decisionBudget] (decisions), pruning against
@@ -180,10 +191,24 @@ internal interface RepairSearch : AutoCloseable {
      * monotone cutoff keeps every stale bound looser than the current one (never a wrong prune). Returns
      * the best strictly-better completion found, or null.
      */
-    fun repair(assumptions: Assumptions, decisionBudget: Long, cutoff: Double, cancellation: Cancellation): Sample?
+    fun repair(assumptions: Assumptions, decisionBudget: Long, cutoff: Double, cancellation: Cancellation): Sample? {
+        return repairStep(assumptions, decisionBudget, cutoff, cancellation).sample
+    }
+
+    fun repairStep(
+        assumptions: Assumptions, decisionBudget: Long, cutoff: Double, cancellation: Cancellation,
+    ): RepairSearchStep {
+        begin(assumptions, decisionBudget, cutoff, cancellation)
+        while (true) {
+            val step = runSlice(Cancellation.Never, Long.MAX_VALUE, -1L)
+            if (step.reason != null) return step
+        }
+    }
 
     override fun close() {}
 }
+
+internal data class RepairSearchStep(val sample: Sample?, val reason: TerminationReason?)
 
 internal class SearchInitializationCancelled(val stats: SolveStats, val work: Long) :
     CancellationException("search initialization cancelled")

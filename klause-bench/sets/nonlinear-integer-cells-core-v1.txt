@@ -1,0 +1,8 @@
+smtlib-nonlinear-integer-cells-v1/powers/square-1
+smtlib-nonlinear-integer-cells-v1/powers/square-2
+smtlib-nonlinear-integer-cells-v1/powers/square-4
+smtlib-nonlinear-integer-cells-v1/powers/square-8
+smtlib-nonlinear-integer-cells-v1/degree/power-4
+smtlib-nonlinear-integer-cells-v1/degree/power-8
+smtlib-nonlinear-integer-cells-v1/degree/power-16
+smtlib-nonlinear-integer-cells-v1/degree/power-17

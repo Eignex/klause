@@ -560,10 +560,12 @@ class SearchRun internal constructor(
         pendingModel = null
         consumedModel = false
         terminal = null
+        budgetInterrupted = false
         pendingAdvance = false
         pendingCancellation = false
         retryingAssertion = false
         started = false
+        session.beginTraversal()
         cancellationPoller.reset()
         params.restart.beginRun()
     }

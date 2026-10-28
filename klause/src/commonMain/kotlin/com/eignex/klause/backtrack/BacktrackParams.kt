@@ -326,6 +326,8 @@ data class BacktrackParams(
      * certification if this check accepts the completed sample, and an incumbent without exact reals is admitted
      * when it passes the same check. A captured source policy can require exact optimum certification while
      * retaining this point filter. `null` keeps exact semantics.
+     * Exact repair may publish a source-accepted improving primal while leaving the leaf unresolved;
+     * that publication grants no completion certificate or nominal exact coordinates.
      */
     val toleranceCheck: ((Sample) -> Boolean)? = null,
     /** Cooperative cancellation predicate; see [Cancellation]. */
@@ -377,7 +379,8 @@ data class BacktrackParams(
      * planes refute counting structure that resolution cannot (pigeonhole has polynomial cutting-planes
      * proofs but only exponential resolution proofs: A. Haken, "The intractability of resolution",
      * Theor. Comput. Sci. 39, 1985, https://doi.org/10.1016/0304-3975(85)90144-6). `true`/`false` force
-     * it; ignored on problems with integer variables (order-literal atoms carry no PB reason).
+     * it. Explicit enablement also admits Boolean-only conflicts in mixed models; an integer atom
+     * in any reached reason retains clause fallback.
      */
     val pbLearning: Boolean? = null,
     /**

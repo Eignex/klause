@@ -16,6 +16,8 @@ import com.eignex.klause.localsearch.AcceptanceCriterion
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
+import com.eignex.klause.localsearch.RepairEndpoint
+import com.eignex.klause.localsearch.RepairTrace
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.DeducedRestrictions
@@ -25,6 +27,7 @@ import com.eignex.klause.solver.IncumbentBootstrapSearch
 import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.RepairSearch
+import com.eignex.klause.solver.RepairSearchStep
 import com.eignex.klause.solver.ResumableOptimizer
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
@@ -55,6 +58,28 @@ import kotlin.test.assertTrue
 class AlnsTest {
 
     @Test
+    fun `accepted nonbest centers should retain the standing best cutoff`() {
+        val problem = selectProblem()
+        val best = selectOptimum()
+        val worse = Sample(BooleanArray(SELECT_WEIGHTS.size) { true }, LongArray(0))
+        val trace = RepairTrace("ALNS accepted nonbest centers")
+        val alns = Alns(inner = bootstrapAt(problem, best),
+            destroyOperators = listOf(DestroyOperator.Random), repairOperators = listOf(RepairOperator { worse }),
+            acceptance = AcceptanceCriterion.RandomWalk, minDestroyFraction = 1.0, maxDestroyFraction = 1.0,
+            maxIterations = 2, flipsPerIteration = 1)
+        alns.repairTrace = trace
+
+        alns.minimize(selectObjective, LocalSearchParams(initialAssignment = best, randomSeed = 7))
+
+        val attempt = trace.attempts.last()
+        assertEquals(worse, attempt.center)
+        assertEquals(best, attempt.bestSample)
+        assertEquals(selectObjective.evaluate(best), attempt.bestObjectiveCutoff)
+        assertEquals(selectObjective.evaluateExact(best), attempt.exactBestObjective)
+        assertTrue(attempt.scopeComplete)
+    }
+
+    @Test
     fun `available incumbents should start repair without bootstrapping`() {
         val problem = selectProblem()
         val seed = Sample(BooleanArray(SELECT_WEIGHTS.size) { true }, LongArray(0))
@@ -82,6 +107,8 @@ class AlnsTest {
                     flipsPerIteration = 8,
                 )
                 val params = LocalSearchParams(initialAssignment = seed.takeUnless { shared }, maxInstructions = 8)
+                val trace = RepairTrace("ALNS repair return; no descent classification")
+                alns.repairTrace = trace
 
                 val result = if (retained) {
                     alns.resumable(selectObjective, params).use {
@@ -96,6 +123,11 @@ class AlnsTest {
                 assertEquals(0L, result.stats.alns.bootstrapCpNodes)
                 assertEquals(0L, result.stats.alns.bootstrapLsMoves)
                 assertEquals(8L, result.stats.alns.outerAllowance)
+                val attempt = trace.attempts.single()
+                assertEquals(seed, attempt.center)
+                assertEquals(RepairEndpoint.Repaired, attempt.endpoint)
+                assertEquals(improved, attempt.frames.last().sample)
+                assertTrue(attempt.effectiveBools.contentEquals(attempt.requestedBools))
             }
         }
     }
@@ -1138,15 +1170,16 @@ class AlnsTest {
         val retained = object : RepairSearch {
             override val stats: SolveStats
                 get() = SolveStats(search = SearchStats(nodes = SumResult(cumulativeNodes.toDouble())))
-            override fun repair(
+            override fun begin(
                 assumptions: Assumptions,
                 decisionBudget: Long,
                 cutoff: Double,
                 cancellation: Cancellation,
-            ): Sample {
+            ) {
                 cumulativeNodes += 5
-                return incumbent
             }
+            override fun runSlice(cancellation: Cancellation, millis: Long, work: Long) =
+                RepairSearchStep(incumbent, TerminationReason.SearchExhausted)
         }
         val context = RepairContext(
             inner = NoFeasibleLs(problem),
@@ -1166,6 +1199,33 @@ class AlnsTest {
 
         assertEquals(10L, recordedNodes)
         assertEquals(23L, cumulativeNodes)
+    }
+
+    @Test
+    fun `retained repair observations should keep scoped closure separate from a completion`() {
+        val problem = selectProblem()
+        val incumbent = selectOptimum()
+        for (sample in listOf(null, incumbent)) {
+            var observed: MinimizeResult? = null
+            val retained = object : RepairSearch {
+                override fun begin(assumptions: Assumptions, decisionBudget: Long, cutoff: Double,
+                    cancellation: Cancellation) = Unit
+                override fun runSlice(cancellation: Cancellation, millis: Long, work: Long) =
+                    RepairSearchStep(sample, TerminationReason.SearchExhausted)
+            }
+            val context = RepairContext(NoFeasibleLs(problem), LocalSearchParams(), selectObjective,
+                Assumptions.None, incumbent, FreedVars(intArrayOf(0), IntArray(0)), repairSearch = retained,
+                recordRepairResult = { observed = it })
+
+            val repaired = BacktrackRepair().repair(context)
+
+            assertSame(sample, repaired)
+            if (sample == null) {
+                assertEquals(TerminationReason.SearchExhausted, assertIs<MinimizeResult.Unknown>(observed).reason)
+            } else {
+                assertEquals(TerminationReason.SearchExhausted, assertIs<MinimizeResult.BestFound>(observed).reason)
+            }
+        }
     }
 
     // The production deep arm's flipsOverride replaces maxFlips rather than being capped by it.

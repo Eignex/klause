@@ -183,6 +183,10 @@ data class PolynomialTheoryExecution(
     val nativeWorkScope: String? = null,
     /** Required representation decline reported by that native owner, otherwise null. */
     val nativeResource: String? = null,
+    /** Nonlinear integer cell observations, absent when the optional producer is disabled. */
+    val integerCells: NonlinearIntegerCellReuseStats? = null,
+    /** Nonlinear integer root admission observations, absent when admission is disabled. */
+    val integerRoots: NonlinearIntegerRootStats? = null,
 )
 
 /** Finite-objective optimization with exact polynomial witnesses and separately scoped theory work. */

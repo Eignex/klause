@@ -1,0 +1,9 @@
+smtlib-nonlinear-integer-cells-v1/cubic/root-neighbor
+smtlib-nonlinear-integer-cells-v1/repeated/root-neighbor
+smtlib-nonlinear-integer-cells-v1/rational/positive-empty
+smtlib-nonlinear-integer-cells-v1/rational/negative-empty
+smtlib-nonlinear-integer-cells-v1/annulus/strict-empty
+smtlib-nonlinear-integer-cells-v1/annulus/closed-neighbor
+smtlib-nonlinear-integer-cells-v1/boolean/conditional-neighbor
+smtlib-nonlinear-integer-cells-v1/mixed/singular-empty
+smtlib-nonlinear-integer-cells-v1/wide/integer-neighbor

@@ -9,7 +9,7 @@ import com.eignex.klause.propagation.moveBoolWatcher
 internal class CardinalityPropagator(
     val boolVars: IntArray,
     val intVars: IntArray,
-    private val literals: IntArray,
+    val literals: IntArray,
     private val min: Int,
     private val max: Int,
 ) : Propagator {

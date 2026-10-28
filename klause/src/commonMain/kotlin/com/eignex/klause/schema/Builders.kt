@@ -28,10 +28,10 @@ import com.eignex.klause.model.IntMax
 import com.eignex.klause.model.IntMin
 import com.eignex.klause.model.IntTerm
 import com.eignex.klause.model.InverseChannel
+import com.eignex.klause.model.LexExpr
 import com.eignex.klause.model.MddExpr
 import com.eignex.klause.model.NValueExprOpt
 import com.eignex.klause.model.NValueMode
-import com.eignex.klause.model.Or
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.model.PseudoBooleanExpr
 import com.eignex.klause.model.RegularExpr
@@ -39,26 +39,54 @@ import com.eignex.klause.model.SortExpr
 import com.eignex.klause.model.SubcircuitExpr
 import com.eignex.klause.model.SymmetricAllDifferent
 import com.eignex.klause.model.TableConstraint
+import com.eignex.klause.model.VariableCumulativeExpr
 import com.eignex.klause.model.XorExpr
 
-/** Minimum of [xs] (at least one argument). */
-fun min(vararg xs: IntTerm): IntExpr {
-    require(xs.isNotEmpty()) { "min(): need at least one argument" }
+/**
+ * Absolute value of this term.
+ *
+ * `abs`, `min`, `max` and `pow` are receiver helpers and conditionals are [ifThenElse], the
+ * spellings Kumulant's binary64 expressions share, so portable fragments read the same in both.
+ */
+fun IntTerm.abs(): IntExpr = IntAbs(toIntExpr())
+
+/** The smaller of this term and [other], as one two-operand node. */
+fun IntTerm.min(other: IntTerm): IntExpr = IntMin(listOf(toIntExpr(), other.toIntExpr()))
+
+/** The smaller of this term and the constant [c]. */
+fun IntTerm.min(c: Int): IntExpr = IntMin(listOf(toIntExpr(), IntLit(c)))
+
+/** The larger of this term and [other], as one two-operand node. */
+fun IntTerm.max(other: IntTerm): IntExpr = IntMax(listOf(toIntExpr(), other.toIntExpr()))
+
+/** The larger of this term and the constant [c]. */
+fun IntTerm.max(c: Int): IntExpr = IntMax(listOf(toIntExpr(), IntLit(c)))
+
+/** Minimum of [xs] (at least one argument) as one n-ary node, an integer-only extension of `min`. */
+fun minOf(vararg xs: IntTerm): IntExpr {
+    require(xs.isNotEmpty()) { "minOf(): need at least one argument" }
     return IntMin(xs.map { it.toIntExpr() })
 }
 
-/** Maximum of [xs] (at least one argument). */
-fun max(vararg xs: IntTerm): IntExpr {
-    require(xs.isNotEmpty()) { "max(): need at least one argument" }
+/** Maximum of [xs] (at least one argument) as one n-ary node, an integer-only extension of `max`. */
+fun maxOf(vararg xs: IntTerm): IntExpr {
+    require(xs.isNotEmpty()) { "maxOf(): need at least one argument" }
     return IntMax(xs.map { it.toIntExpr() })
 }
 
-/** Absolute value of `x`. */
-fun abs(x: IntTerm): IntExpr = IntAbs(x.toIntExpr())
+/** [then] when [cond] holds, else [otherwise], as an integer expression. */
+fun ifThenElse(cond: BoolTerm, then: IntTerm, otherwise: IntTerm): IntExpr =
+    IntIfThenElse(cond.toExpr(), then.toIntExpr(), otherwise.toIntExpr())
 
-/** `if cond then thenE else elseE` as an integer expression. */
-fun ifThenElse(cond: BoolTerm, thenE: IntTerm, elseE: IntTerm): IntExpr =
-    IntIfThenElse(cond.toExpr(), thenE.toIntExpr(), elseE.toIntExpr())
+/** [then] when [cond] holds, else [otherwise], with a constant [then] branch. */
+fun ifThenElse(cond: BoolTerm, then: Int, otherwise: IntTerm): IntExpr = ifThenElse(cond, IntLit(then), otherwise)
+
+/** [then] when [cond] holds, else [otherwise], with a constant [otherwise] branch. */
+fun ifThenElse(cond: BoolTerm, then: IntTerm, otherwise: Int): IntExpr = ifThenElse(cond, then, IntLit(otherwise))
+
+/** [then] when [cond] holds, else [otherwise], with constant branches. */
+fun ifThenElse(cond: BoolTerm, then: Int, otherwise: Int): IntExpr =
+    ifThenElse(cond, IntLit(then), IntLit(otherwise))
 
 /** `items[index]` — array element selection (items must be non-empty). */
 fun element(index: IntTerm, items: List<IntTerm>): IntExpr {
@@ -114,31 +142,26 @@ fun gcc(vars: List<IntTerm>, valueCounts: Map<Int, IntRange>): BoolExpr {
 
 /**
  * Lexicographic less-or-equal: `a` is no greater than `b` when read left-to-right. Lists must be
- * non-empty and of equal length.
+ * non-empty and of equal length. Asserted directly it posts one native lexicographic factor.
  */
-fun lexLeq(a: List<IntTerm>, b: List<IntTerm>): BoolExpr = lexChain(a, b, strict = false)
+fun lexLeq(a: List<IntTerm>, b: List<IntTerm>): BoolExpr =
+    LexExpr(a.map { it.toIntExpr() }, b.map { it.toIntExpr() }, strict = false)
 
 /** Strict lexicographic less-than. */
-fun lexLt(a: List<IntTerm>, b: List<IntTerm>): BoolExpr = lexChain(a, b, strict = true)
+fun lexLt(a: List<IntTerm>, b: List<IntTerm>): BoolExpr =
+    LexExpr(a.map { it.toIntExpr() }, b.map { it.toIntExpr() }, strict = true)
 
-private fun lexChain(a: List<IntTerm>, b: List<IntTerm>, strict: Boolean): BoolExpr {
-    require(a.size == b.size) { "lex: lists must have equal length, got ${a.size} and ${b.size}" }
-    require(a.isNotEmpty()) { "lex: empty lists are not supported" }
-    val ax = a.map { it.toIntExpr() }
-    val bx = b.map { it.toIntExpr() }
-    // lex(a, b) ⟺ a(0) < b(0) ∨ (a(0) = b(0) ∧ lex(a(1..), b(1..))), built from the last index inward.
-    var result: BoolExpr = if (strict) {
-        IntCompare(ax.last(), IntCmpOp.LT, bx.last())
-    } else {
-        IntCompare(ax.last(), IntCmpOp.LE, bx.last())
-    }
-    for (i in ax.size - 2 downTo 0) {
-        val less = IntCompare(ax[i], IntCmpOp.LT, bx[i])
-        val equal = IntCompare(ax[i], IntCmpOp.EQ, bx[i])
-        result = Or(listOf(less, And(listOf(equal, result))))
-    }
-    return result
-}
+/**
+ * Cumulative scheduling whose [durations], [demands] and [capacity] may be variables: at every time point
+ * the demands of the running tasks stay within [capacity].
+ */
+fun cumulative(starts: List<IntTerm>, durations: List<IntTerm>, demands: List<IntTerm>, capacity: IntTerm): BoolExpr =
+    VariableCumulativeExpr(
+        starts.map { it.toIntExpr() },
+        durations.map { it.toIntExpr() },
+        demands.map { it.toIntExpr() },
+        capacity.toIntExpr(),
+    )
 
 /**
  * Hamiltonian-cycle constraint on a successor array. Default `valueOffset = 0` matches
@@ -429,23 +452,32 @@ fun allDifferent(vararg xs: IntTerm): BoolExpr {
     return AllDifferent(xs.map { it.toIntExpr() })
 }
 
-private fun unionDomainSize(ranges: List<Pair<Int, Int>>): Long {
+// Saturates at Long.MAX_VALUE: 64-bit ranges can hold more values than a Long counts.
+private fun unionDomainSize(ranges: List<Pair<Long, Long>>): Long {
     if (ranges.isEmpty()) return 0L
     val sorted = ranges.sortedBy { it.first }
     var total = 0L
     var curLo = sorted[0].first
     var curHi = sorted[0].second
+    fun addRun() {
+        val width = curHi - curLo
+        total = if (width < 0L || width == Long.MAX_VALUE || total > Long.MAX_VALUE - width - 1) {
+            Long.MAX_VALUE
+        } else {
+            total + width + 1
+        }
+    }
     for (i in 1 until sorted.size) {
         val (lo, hi) = sorted[i]
-        if (lo <= curHi + 1) {
+        if (curHi == Long.MAX_VALUE || lo <= curHi + 1) {
             if (hi > curHi) curHi = hi
         } else {
-            total += (curHi - curLo + 1).toLong()
+            addRun()
             curLo = lo
             curHi = hi
         }
     }
-    total += (curHi - curLo + 1).toLong()
+    addRun()
     return total
 }
 
@@ -471,7 +503,7 @@ private fun validateTableTuples(vars: List<IntTerm>, tuples: List<List<Int>>) {
         val handle = term as? IntHandle ?: continue
         for ((tIdx, tup) in tuples.withIndex()) {
             val v = tup[i]
-            require(v in handle.min..handle.max) {
+            require(v.toLong() in handle.min..handle.max) {
                 "table: tuple #$tIdx value $v at position $i is outside operand " +
                     "${handle.name}'s domain [${handle.min}..${handle.max}]"
             }

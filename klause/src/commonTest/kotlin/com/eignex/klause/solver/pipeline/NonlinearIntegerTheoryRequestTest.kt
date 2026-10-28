@@ -263,4 +263,23 @@ class NonlinearIntegerTheoryRequestTest {
         assertIs<OpenTheoryResult.Sat>(result)
         assertTrue(result.stats.portfolio.arms.isEmpty())
     }
+
+    @Test
+    fun `admitted integer roots should refute a rootless square only through complete search`() {
+        val source = assertIs<NonlinearIntegerProblem>((
+            SmtLib.parse(
+                "(declare-const n Int) (assert (= (* n n) 2))",
+            )).source.originalSource)
+        val params = NonlinearIntegerTheoryParams(maximumCandidates = 4, maximumMoves = 4, admitIntegerRoots = true)
+
+        val complete = OpenTheoryPipeline.execute(source.pipelineRequest(), params, FiniteEngine.BACKTRACK)
+        val neighborhood = OpenTheoryPipeline.execute(source.pipelineRequest(), params, FiniteEngine.LOCAL_SEARCH)
+
+        assertIs<OpenTheoryResult.Unsat>(complete.result)
+        assertEquals(1L, assertNotNull(complete.integerRoots).refutedScopes)
+        assertIs<OpenTheoryResult.Unknown>(neighborhood.result)
+        val roots = assertNotNull(neighborhood.integerRoots)
+        assertEquals(1L, roots.admittedEquations)
+        assertEquals(roots.reusedAdmissions + 1, roots.refutedScopes)
+    }
 }

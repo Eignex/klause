@@ -1,0 +1,11 @@
+<instance format="XCSP3" type="COP">
+  <variables>
+    <array id="x" size="[6]"> 0..1 </array>
+  </variables>
+  <constraints>
+    <allDifferent> x[0] x[1] </allDifferent>
+  </constraints>
+  <objectives>
+    <minimize> x[0] </minimize>
+  </objectives>
+</instance>

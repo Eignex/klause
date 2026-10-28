@@ -157,6 +157,50 @@ class PolynomialTheoryServiceTest {
     }
 
     @Test
+    fun `widening a numeric condition discards its nonlinear refutation`() {
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
+        val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
+        val narrow = PolynomialCondition(lower = mapOf(0 to BigFraction.ZERO),
+            upper = mapOf(0 to BigFraction.ONE))
+        val wide = PolynomialCondition(lower = mapOf(0 to BigFraction.ZERO),
+            upper = mapOf(0 to BigFraction.ofLong(2)))
+
+        service.invocation().use { invocation ->
+            assertIs<QfNraResult.Unsatisfiable>(invocation.check(narrow))
+
+            val witness = assertIs<QfNraResult.Satisfiable>(invocation.check(wide)).assignment
+
+            assertEquals(0, AlgebraicArithmetic().signAt(RationalPolynomial.of(-2, 0, 1), witness.realValue(0)))
+            assertTrue(AlgebraicArithmetic().sign(witness.realValue(0)) > 0)
+        }
+    }
+
+    @Test
+    fun `retracting a strict premise retains a singular nonlinear completion`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (declare-const y Real) (declare-const b Bool) " +
+                "(assert (and (= (* x y) 0) (=> b (> x 0)) (=> (not b) (= x 0))))",
+        )
+        val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
+        val fixed = mapOf(1 to BigFraction.ONE)
+
+        service.invocation().use { invocation ->
+            for (pin in listOf(true, false, true)) {
+                val result = invocation.check(PolynomialCondition(
+                    bools = mapOf(0 to pin), lower = fixed, upper = fixed,
+                ))
+
+                if (pin) assertIs<QfNraResult.Unsatisfiable>(result) else {
+                    val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
+                    assertFalse(witness.boolValue(0))
+                    assertEquals(BigFraction.ZERO, witness.realValue(0).rational)
+                    assertEquals(BigFraction.ONE, witness.realValue(1).rational)
+                }
+            }
+        }
+    }
+
+    @Test
     fun `Boolean query conditions should preserve correlation`() {
         val source = SmtLibPolynomial.parse(
             """

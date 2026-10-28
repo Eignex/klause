@@ -30,8 +30,8 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
         private set
 
     override val bumpBoolVars = IntArrayList()
-    override val bumpIntVars = IntArrayList() // always empty: PB problems have no integer variables
-    override val offTrailFrontier = IntArrayList() // always empty: no order-literal atoms in PB problems
+    override val bumpIntVars = IntArrayList()
+    override val offTrailFrontier = IntArrayList()
 
     override fun reset(universe: Int) {
         acc.clear()
@@ -80,10 +80,14 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
 
     override fun resolve(reason: IntArray, currentLevel: Int) {
         if (failed) return
+        if (!booleanLiterals(reason)) {
+            failed = true
+            return
+        }
         if (!seeded) {
             conflictLevel = currentLevel
             seeded = true
-            if (!loadSeed(reason)) failed = true else bumpAll(acc)
+            if (!loadSeed(reason) || !acc.hasSafeActivity()) failed = true else bumpAll(acc)
             return
         }
         val pivot = pendingPivot
@@ -100,7 +104,7 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
      *  (whose direction is ambiguous without one) fall back to the clause form. */
     private fun loadSeed(reasonLits: IntArray): Boolean {
         if (seedFactorId >= 0 && loadFactor(seedFactorId, acc, forcedLit = Lit.NONE)) return true
-        return acc.loadClause(reasonLits)
+        return !failed && acc.loadClause(reasonLits)
     }
 
     /**
@@ -113,7 +117,7 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
      * LCM-scaling resolution loses. Saturate afterward to keep the constraint canonical.
      */
     private fun cancel(pivot: Int, fallbackReasonLits: IntArray) {
-        if (!loadPivotReason(pivot, fallbackReasonLits)) {
+        if (!loadPivotReason(pivot, fallbackReasonLits) || !reason.hasSafeActivity()) {
             failed = true
             return
         }
@@ -135,7 +139,7 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
         // Divide the reason by its pivot coefficient, rounding up ⇒ its pivot coefficient becomes ±1.
         reason.divideRoundUp(absB)
         // acc + absA·reason cancels the pivot (opposite signs, |reason pivot| now 1). acc is not scaled.
-        if (!acc.addScaled(reason, mulSelf = 1L, mulOther = absA)) {
+        if (!acc.addScaled(reason, mulSelf = 1L, mulOther = absA) || !acc.hasSafeActivity()) {
             failed = true
             return
         }
@@ -149,6 +153,7 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
         val forcingFid = state.boolReason[pivot]
         val forced = Lit.make(pivot, state.boolValueAt(pivot))
         if (loadFactor(forcingFid, reason, forced) && reason.coefOf(pivot) != 0L) return true
+        if (failed) return false
         // Fallback: reconstruct the reason clause. The driver's antecedents omit the forced literal;
         // add it back so the clause mentions the pivot and cancellation can proceed.
         val lits = IntArray(fallbackReasonLits.size + 1)
@@ -165,11 +170,21 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
     private fun loadFactor(fid: Int, target: PbAccumulator, forcedLit: Int): Boolean {
         if (fid < 0 || fid >= state.totalFactorCount) return false
         return when (val f = state.factorAt(fid)) {
-            is PseudoBooleanPropagator -> f.loadReason(target, forcedLit, state)
-            is CardinalityPropagator -> f.loadReason(target, forcedLit, state)
-            is ClausePropagator -> target.loadClause(f.literals)
+            is PseudoBooleanPropagator -> admitSource(f.literals) && f.loadReason(target, forcedLit, state)
+            is CardinalityPropagator -> admitSource(f.literals) && f.loadReason(target, forcedLit, state)
+            is ClausePropagator -> admitSource(f.literals) && target.loadClause(f.literals)
             else -> false
         }
+    }
+
+    private fun booleanLiterals(literals: IntArray): Boolean =
+        literals.all {
+            state.checkFiniteWork()
+            Lit.variable(it) in 0 until state.problem.numBoolVars
+        }
+
+    private fun admitSource(literals: IntArray): Boolean = booleanLiterals(literals).also {
+        if (!it) failed = true
     }
 
     private fun bumpAll(a: PbAccumulator) {
@@ -181,6 +196,10 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
     override fun finalizeResult(currentLevel: Int): ConflictAnalyzer.AnalysisResult {
         if (failed) return ConflictAnalyzer.AnalysisResult.NotApplicable
         val m = acc.materialize() ?: run {
+            failed = true
+            return ConflictAnalyzer.AnalysisResult.NotApplicable
+        }
+        if (m.degree > Long.MAX_VALUE - (m.weights.maxOrNull() ?: 0L)) {
             failed = true
             return ConflictAnalyzer.AnalysisResult.NotApplicable
         }

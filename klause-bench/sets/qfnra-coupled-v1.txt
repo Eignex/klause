@@ -1,0 +1,12 @@
+smtlib-qfnra-coupled-v1/cycle-unsat
+smtlib-qfnra-coupled-v1/cycle-sat
+smtlib-qfnra-coupled-v1/cycle-alternative
+smtlib-qfnra-coupled-v1/shifted-unsat
+smtlib-qfnra-coupled-v1/shifted-sat
+smtlib-qfnra-coupled-v1/shifted-alternative
+smtlib-qfnra-coupled-v1/repeated-unsat
+smtlib-qfnra-coupled-v1/repeated-sat
+smtlib-qfnra-coupled-v1/repeated-alternative
+smtlib-qfnra-coupled-v1/strict-cycle-unsat
+smtlib-qfnra-coupled-v1/weak-cycle-sat
+smtlib-qfnra-coupled-v1/uncovered-singular-sat

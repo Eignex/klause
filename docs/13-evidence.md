@@ -18,6 +18,21 @@ the scope before considering the derivation. Imports must name the same revision
 semantics and objective, may assume only restrictions implied by the importing
 scope, and are rechecked against the same premises. A conditioned refutation cannot
 refute a weaker parent invocation.
+An imported refutation can discharge an objective bound only within that compatible
+scope and after its contradiction is freshly checked. It supplies no witness or
+attainment; an optimum still needs both a source witness and complete bound coverage.
+
+Opt-in numerical refutation reuse belongs to one immutable traversal invocation.
+Its source rows, semantics and objective remain bound to that opening. A proof's
+numeric restrictions can shrink only after a fresh exact check; the original
+invocation restrictions and complete Boolean substitution remain present. Implied
+integer activation bounds can require restrictions absent from the explicit proof
+support, so an unsuccessful reduction retains only the checked original scope.
+Each compatible import is rechecked before it closes a leaf.
+Unit-prefix reuse checks the import with its one missing integral source bound
+asserted. Its exact integer complement is then justified relative to the established
+prefix and opening restrictions. Both integer alternatives remain in the source
+derivation; the implied literal alone supplies no coverage.
 
 `Problem.sourceProofContext` binds the original IR's declared bounds and rows.
 Guarded premises keep their Boolean pins and integer indicator equalities; open
@@ -38,6 +53,14 @@ their guards, and a conditional row cannot establish its own pin. Bounds are che
 in original objective units and direction; refutations must derive an exact
 contradiction. A branch flag, traversal exhaustion or engine identity supplies no
 authority.
+
+An active-linear refutation substitutes only established Boolean coefficients and
+uses rows with established Boolean guards and independently established integer
+pins. Its checker reconstructs that subset from the original source in the claimed
+scope, preserving strictness and bound premises. It establishes only a scoped
+contradiction; omitted rows and unresolved objective terms supply neither a witness
+nor an objective bound. Complete pinned derivations retain their complete-scope
+requirement.
 
 `IntegerRounding` first checks its cited inequality, then requires integral
 coefficients over declared integer coordinates. It rounds a closed right side

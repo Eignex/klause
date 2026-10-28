@@ -38,6 +38,157 @@ class LinearAuthorityInvocationTest {
     )
 
     @Test
+    fun `opt in active rows should close a contradiction before any Boolean decision`() {
+        val source = SourceProofContext(scope, setOf(real, bool), mapOf(
+            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.MINUS_ONE)),
+        ), mapOf(bool to BigFraction.ONE))
+
+        val result = LinearAuthorityInvocation(source, TheoryParams(), activeRows = true).use {
+            it.run { _, _ -> }
+        }
+
+        val terminal = assertNotNull(result.terminal)
+        assertEquals(SourceClaim.Refutation, terminal.claim)
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
+        val stages = assertNotNull(result.stats.smt.completeSearchStages)
+        assertEquals(1L, stages["numericalPartialConflicts"])
+        assertEquals(0L, result.stats.openTheory.openBoolDecisions)
+        assertNull(stages["numericalChecks"])
+        assertNull(result.incumbent)
+    }
+
+    @Test
+    fun `scoped refutation reuse should skip numerical queries while proving every integer alternative`() {
+        val left = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
+        val right = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val half = BigFraction.ofLong(2).reciprocal()
+        val sum = mapOf(left to BigFraction.ONE, right to BigFraction.ONE)
+        val source = SourceProofContext(scope, setOf(integer, left, right, real), mapOf(
+            "left" to SourcePremise(SourceInequality(mapOf(left to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "right" to SourcePremise(SourceInequality(mapOf(right to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "sum-upper" to SourcePremise(SourceInequality(sum, half)),
+            "sum-lower" to SourcePremise(SourceInequality(sum.mapValues { it.value.negated() }, half.negated())),
+            "positive" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ofLong(2),
+                real to BigFraction.MINUS_ONE), BigFraction.ONE)),
+            "negative" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ofLong(-2),
+                real to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE)),
+        ), mapOf(real to BigFraction.ONE))
+        val params = TheoryParams(sourceCuts = false)
+
+        for ((recordFeedback, resolution) in listOf(false to false, true to false, true to true)) {
+            var baselineFeedback = 0
+            var reusedFeedback = 0
+            val baselineObserver: (SourceNumericalFeedbackResult) -> Unit = { baselineFeedback++ }
+            val reusedObserver: (SourceNumericalFeedbackResult) -> Unit = { reusedFeedback++ }
+
+            val baseline = LinearAuthorityInvocation(source, params, boundOrdered = true,
+                onNumericalFeedback = baselineObserver.takeIf { recordFeedback }).use { it.run { _, _ -> } }
+            val reused = LinearAuthorityInvocation(source, params.copy(sourceRefutationReuse = true,
+                sourceRefutationPropagation = recordFeedback, sourceRefutationResolution = resolution),
+                boundOrdered = true, onNumericalFeedback = reusedObserver.takeIf { recordFeedback }).use {
+                if (!recordFeedback) it.run { _, _ -> } else {
+                    var result: LinearInvocationResult? = null
+                    repeat(64) { _ ->
+                        if (result == null) result = it.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) { _, _ -> }
+                    }
+                    assertNotNull(result)
+                }
+            }
+
+            assertEquals(SourceClaim.Refutation, assertNotNull(baseline.terminal).claim)
+            val terminal = assertNotNull(reused.terminal)
+            assertEquals(SourceClaim.Refutation, terminal.claim)
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
+            val stages = assertNotNull(reused.stats.smt.completeSearchStages)
+            assertTrue((stages["numericalAvoidedQueries"] ?: 0L) +
+                (stages["numericalRefutationUnitDeductions"] ?: 0L) > 0L)
+            assertTrue(reused.stats.smt.sourceLp.operations < baseline.stats.smt.sourceLp.operations)
+            assertEquals(0L, stages["numericalPendingLeaves"])
+            if (recordFeedback) assertTrue(reusedFeedback < baselineFeedback)
+        }
+    }
+
+    @Test
+    fun `reused refutations should preserve a checked global optimum`() {
+        val left = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
+        val right = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val half = BigFraction.ofLong(2).reciprocal()
+        val sum = mapOf(left to BigFraction.ONE, right to BigFraction.ONE)
+        val source = SourceProofContext(scope, setOf(integer, left, right, real, bool), mapOf(
+            "left" to SourcePremise(SourceInequality(mapOf(left to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "right" to SourcePremise(SourceInequality(mapOf(right to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "sum-upper" to SourcePremise(SourceInequality(sum, half), mapOf(0 to true)),
+            "sum-lower" to SourcePremise(SourceInequality(sum.mapValues { it.value.negated() }, half.negated()),
+                mapOf(0 to true)),
+            "positive" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ofLong(2),
+                real to BigFraction.MINUS_ONE), BigFraction.ONE)),
+            "negative" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ofLong(-2),
+                real to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE)),
+            "feasible" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE),
+                BigFraction.ofLong(-2)), mapOf(0 to false)),
+        ), mapOf(real to BigFraction.ONE))
+        val params = TheoryParams(sourceCuts = false)
+
+        val baseline = LinearAuthorityInvocation(source, params).use { it.run { _, _ -> } }
+        val reused = LinearAuthorityInvocation(source, params.copy(sourceRefutationPropagation = true)).use {
+            it.run { _, _ -> }
+        }
+
+        assertIs<SourceClaim.Optimal>(assertNotNull(baseline.terminal).claim)
+        val terminal = assertNotNull(reused.terminal)
+        val optimum = assertIs<SourceClaim.Optimal>(terminal.claim)
+        assertEquals(SourceValue.Rational(BigFraction.ofLong(2)), optimum.value)
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
+        val stages = assertNotNull(reused.stats.smt.completeSearchStages)
+        assertTrue(stages.getValue("numericalAvoidedQueries") > 0L)
+        assertTrue(reused.stats.smt.sourceLp.operations < baseline.stats.smt.sourceLp.operations)
+        assertEquals(0L, stages["numericalPendingLeaves"])
+    }
+
+    @Test
+    fun `a unit prefix should avoid a numerical decision while preserving the checked optimum`() {
+        val left = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
+        val right = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val height = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val source = SourceProofContext(scope, setOf(integer, left, right, real, height), mapOf(
+            "left" to SourcePremise(SourceInequality(mapOf(left to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "right" to SourcePremise(SourceInequality(mapOf(right to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "sum" to SourcePremise(SourceInequality(mapOf(left to BigFraction.MINUS_ONE,
+                right to BigFraction.MINUS_ONE), BigFraction.ofLong(2).reciprocal().negated())),
+            "left-height" to SourcePremise(SourceInequality(mapOf(left to BigFraction.ONE,
+                height to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "right-height" to SourcePremise(SourceInequality(mapOf(right to BigFraction.ONE,
+                height to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "positive" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ofLong(2),
+                real to BigFraction.MINUS_ONE), BigFraction.ONE)),
+            "negative" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ofLong(-2),
+                real to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE)),
+        ), mapOf(real to BigFraction.ONE, height to BigFraction.ONE))
+        val params = TheoryParams(sourceCuts = false, sourceRefutationReuse = true)
+
+        val cached = LinearAuthorityInvocation(source, params).use { it.run { _, _ -> } }
+        val propagated = LinearAuthorityInvocation(source, params.copy(sourceRefutationPropagation = true)).use {
+            it.run { _, _ -> }
+        }
+
+        assertEquals(SourceValue.Rational(BigFraction.ofLong(2)),
+            assertIs<SourceClaim.Optimal>(assertNotNull(cached.terminal).claim).value)
+        val terminal = assertNotNull(propagated.terminal)
+        assertEquals(SourceValue.Rational(BigFraction.ofLong(2)), assertIs<SourceClaim.Optimal>(terminal.claim).value)
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
+        val stages = assertNotNull(propagated.stats.smt.completeSearchStages)
+        assertTrue(stages.getValue("numericalRefutationUnitDeductions") > 0L)
+        assertTrue(propagated.stats.smt.sourceLp.operations < cached.stats.smt.sourceLp.operations)
+        assertTrue(propagated.stats.openTheory.openTheoryDecisions < cached.stats.openTheory.openTheoryDecisions)
+        assertEquals(0L, stages["numericalPendingLeaves"])
+    }
+
+    @Test
     fun `retained frontier should consume checked mixed source cuts`() {
         val source = SourceProofContext(scope, setOf(integer, real), mapOf(
             "mixed" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ofLong(-2),
@@ -57,6 +208,34 @@ class LinearAuthorityInvocationTest {
         val stages = assertNotNull(result.stats.smt.completeSearchStages)
         assertEquals(1L, stages["numericalMaxActiveMixedCuts"])
         assertEquals(1L, stages["numericalCutMixedEligibleRows"])
+    }
+
+    @Test
+    fun `retained frontier should consume source bound aggregates within the LP operation budget`() {
+        val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val source = SourceProofContext(scope, setOf(integer, real, residual), mapOf(
+            "row" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ofLong(2),
+                real to BigFraction.MINUS_ONE, residual to BigFraction.ONE), BigFraction.ofLong(3))),
+            "real-lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "real-upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ofLong(2))),
+            "residual-lower" to SourcePremise(SourceInequality(mapOf(residual to BigFraction.MINUS_ONE),
+                BigFraction.ZERO)),
+            "residual-upper" to SourcePremise(SourceInequality(mapOf(residual to BigFraction.ONE),
+                BigFraction.ofLong(100))),
+        ), mapOf(integer to BigFraction.MINUS_ONE, real to BigFraction.ONE))
+
+        for ((pointCuts, operations) in listOf(false to 1, true to 2)) {
+            val result = LinearAuthorityInvocation(source, TheoryParams(sourceAggregateCuts = true,
+                sourcePointCuts = pointCuts, sourceLpOperations = operations), boundOrdered = true).use {
+                it.run { _, _ -> }
+            }
+
+            val terminal = assertNotNull(result.terminal)
+            assertEquals(SourceValue.Rational(BigFraction.MINUS_ONE),
+                assertIs<SourceClaim.Optimal>(terminal.claim).value)
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
+        }
     }
 
     @Test
@@ -272,7 +451,9 @@ class LinearAuthorityInvocationTest {
     @Test
     fun `bound frontier should preserve complete sibling proofs across slices`() {
         val other = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
-        for (sense in ObjectiveSense.entries) {
+        for ((sense, resolution) in ObjectiveSense.entries.flatMap { sense ->
+            listOf(false, true).map { sense to it }
+        }) {
             val direction = if (sense == ObjectiveSense.MINIMIZE) BigFraction.ONE else BigFraction.MINUS_ONE
             val source = SourceProofContext(scope.copy(objective = SourceObjective("sum", sense)),
                 setOf(integer, other), mapOf(
@@ -282,7 +463,9 @@ class LinearAuthorityInvocationTest {
                         BigFraction.MINUS_ONE)),
                 ), mapOf(integer to BigFraction.ONE, other to BigFraction.ONE))
 
-            LinearAuthorityInvocation(source, TheoryParams(), boundOrdered = true).use { invocation ->
+            LinearAuthorityInvocation(source, TheoryParams(sourceRefutationPropagation = true,
+                sourceRefutationResolution = resolution),
+                boundOrdered = true).use { invocation ->
                 var result: LinearInvocationResult? = null
                 repeat(32) {
                     if (result == null) result = invocation.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) { _, _ -> }

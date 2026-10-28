@@ -159,7 +159,8 @@ internal class NumericalFrontierSnapshot(
             nodes++
             val nodeCondition = field(node, "condition") as SourceCondition
             val result = field(node, "result")
-            val own = result?.let { field(it, "bound") as SourceEvidence? }
+            val partial = field(node, "partialBound", optional = true) as SourceEvidence?
+            val own = result?.let { field(it, "bound") as SourceEvidence? } ?: partial
             val best = listOfNotNull(inherited, own).reduceOrNull { left, right ->
                 val before = ((left.claim as SourceClaim.Bound).value as SourceValue.Rational).value
                 val after = ((right.claim as SourceClaim.Bound).value as SourceValue.Rational).value
@@ -201,7 +202,8 @@ internal class NumericalFrontierSnapshot(
                 }
                 result?.let { field(it, "evidence") } == null -> pending += buildJsonObject {
                     put("condition", condition(nodeCondition))
-                    put("state", if (result == null) "unvisited" else "unresolved")
+                    put("state", if (partial != null && result == null) "pending-separation"
+                        else if (result == null) "unvisited" else "unresolved")
                     best?.let {
                         put("bound", bound(it))
                         put("inherited", it.scope.condition != nodeCondition)
@@ -256,6 +258,8 @@ internal class NumericalFrontierSnapshot(
         // Reflection keeps solver ownership and inspection types out of the published API.
         fun open(
             context: SourceProofContext, params: TheoryParams, history: Boolean = false, frontier: Boolean = false,
+            activeRows: Boolean = false, supportBranching: Boolean = false, latestFeedback: Boolean = true,
+            fullFeedback: Boolean = false,
         ): Any {
             val stateType = Class.forName("com.eignex.klause.solver.pipeline.OpenTheorySolveState")
             val state = stateType.getDeclaredConstructor(TheoryParams::class.java).newInstance(params)
@@ -265,12 +269,18 @@ internal class NumericalFrontierSnapshot(
             val funding = fundingType.getDeclaredConstructor(
                 Long::class.javaPrimitiveType, Long::class.javaPrimitiveType,
             ).newInstance(params.sourceLpWorkLimit, params.sourceLpAllocationLimit)
+            val requestType = Class.forName("com.eignex.klause.lp.optimization.LinearAuthorityFeedbackRequest")
+            val request = if (fullFeedback) requestType.getField("Companion").get(null).let { companion ->
+                companion.javaClass.getMethod("getFull").invoke(companion)
+            } else null
             return type.getDeclaredConstructor(SourceProofContext::class.java, TheoryParams::class.java,
                 Function0::class.java, stateType, Boolean::class.javaPrimitiveType, authorityType,
                 Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType, fundingType,
-                Boolean::class.javaPrimitiveType)
+                Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType,
+                Function1::class.java, Boolean::class.javaPrimitiveType, requestType)
                 .newInstance(context, params, { null }, state, history, null, frontier, false,
-                    funding, frontier && params.sourceCuts)
+                    funding, frontier && params.sourceCuts, activeRows, supportBranching, null, latestFeedback,
+                    request)
         }
 
         fun run(

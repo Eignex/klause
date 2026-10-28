@@ -343,6 +343,123 @@ internal class AllDifferentInvariant(
         }
     }
 
+    // Swaps and rotations keep the occupied value set, so an owned scope with spare values needs these to leave it: a
+    // coordinate takes an unused value, or an alternating path `a ← v(b), b ← u` / `a ← v(b), b ← v(c), c ← u` ends
+    // at one. Only coordinates this factor owns and the sink admits take part, so pins, definitions and foreign owners
+    // are never written, and each path is published whole. The scan is bounded, so an empty result proves nothing
+    // locked; a scope whose domains fit the scan and hold no unused value draws no random value.
+    internal fun proposeUnusedValueMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        if (presents.isNotEmpty() || !exceptValues.isEmpty() || isViolated(state, factorId)) return
+        val owners = state.seeding.ownerInt ?: return
+        val previous = sink.proposer
+        try {
+            sink.proposer = factorId
+            val movable = IntArrayList()
+            for (v in vars) {
+                if (owners[v] == factorId && sink.allowsInt(v) && !state.rootDomains[v].isFixed) movable.add(v)
+            }
+            if (movable.isEmpty()) return
+            val counts = (state.refPayload[factorId] as AllDifferentState).counts
+            val share = maxOf(1, MAX_UNUSED_VISITS / movable.size)
+            val exits = LongArray(movable.size)
+            val hasExit = BooleanArray(movable.size)
+            val entryVars = IntArray(MAX_UNUSED_MOVES)
+            val entryValues = LongArray(MAX_UNUSED_MOVES)
+            var entries = 0
+            for (k in 0 until movable.size) {
+                var unused = 0
+                state.rootDomains[movable[k]].forEachUnusedCandidate(state, share) { u ->
+                    if (counts.getOrDefault(u, 0) != 0) return@forEachUnusedCandidate
+                    unused++
+                    if (unused == 1 || state.rng.nextInt(unused) == 0) exits[k] = u
+                    val slot = if (entries < MAX_UNUSED_MOVES) entries else state.rng.nextInt(entries + 1)
+                    entries++
+                    if (slot < MAX_UNUSED_MOVES) {
+                        entryVars[slot] = movable[k]
+                        entryValues[slot] = u
+                    }
+                }
+                hasExit[k] = unused > 0
+            }
+            if (entries == 0) return
+            for (i in 0 until minOf(entries, MAX_UNUSED_MOVES)) sink.addIntSet(entryVars[i], entryValues[i])
+            proposeAlternatingPaths(state, movable, exits, hasExit, sink)
+        } finally {
+            sink.proposer = previous
+        }
+    }
+
+    private fun proposeAlternatingPaths(
+        state: LocalSearchState,
+        movable: IntArrayList,
+        exits: LongArray,
+        hasExit: BooleanArray,
+        sink: MoveSink,
+    ) {
+        val n = movable.size
+        if (n < 2) return
+        val paths = Array(MAX_UNUSED_MOVES) { IntArray(3) }
+        var found = 0
+        var visits = 0
+        val start = state.rng.nextInt(n)
+        fun record(a: Int, b: Int, c: Int) {
+            val slot = if (found < MAX_UNUSED_MOVES) found else state.rng.nextInt(found + 1)
+            found++
+            if (slot < MAX_UNUSED_MOVES) {
+                paths[slot][0] = a
+                paths[slot][1] = b
+                paths[slot][2] = c
+            }
+        }
+        scan@ for (step in 0 until n) {
+            val a = (start + step) % n
+            val domainA = state.rootDomains[movable[a]]
+            for (b in 0 until n) {
+                if (++visits > MAX_UNUSED_VISITS) break@scan
+                if (b == a || state.assignment.intValue(movable[b]) !in domainA) continue
+                if (hasExit[b]) {
+                    record(a, b, -1)
+                    continue
+                }
+                val domainB = state.rootDomains[movable[b]]
+                for (c in 0 until n) {
+                    if (++visits > MAX_UNUSED_VISITS) break@scan
+                    if (c == a || c == b || !hasExit[c]) continue
+                    if (state.assignment.intValue(movable[c]) in domainB) record(a, b, c)
+                }
+            }
+        }
+        for (i in 0 until minOf(found, MAX_UNUSED_MOVES)) {
+            val (a, b, c) = paths[i]
+            val va = movable[a]
+            val vb = movable[b]
+            val first = Move.IntSet(va, state.assignment.intValue(vb))
+            if (c < 0) {
+                sink.addCompound(listOf(first, Move.IntSet(vb, exits[b])))
+            } else {
+                val vc = movable[c]
+                val second = Move.IntSet(vb, state.assignment.intValue(vc))
+                sink.addCompound(listOf(first, second, Move.IntSet(vc, exits[c])))
+            }
+        }
+    }
+
+    // Walks at most [limit] values from a random offset when the domain is larger, so a scope whose domains fit the
+    // limit is scanned in full without drawing a random value.
+    private inline fun IntDomain.forEachUnusedCandidate(state: LocalSearchState, limit: Int, action: (Long) -> Unit) {
+        val span = spanOrNull(DEFAULT_DOMAIN_WALK_CAP)
+        if (span == null) {
+            action(min)
+            action(max)
+            repeat(minOf(limit, WIDE_DOMAIN_DRAWS)) { action(randomValue(state.rng)) }
+            return
+        }
+        val size = span.size
+        val walked = minOf(size, limit)
+        val offset = if (walked < size) state.rng.nextInt(size) else 0
+        for (i in 0 until walked) action(span.valueAt((offset + i) % size))
+    }
+
     private fun IntDomain.forEachRepairValue(state: LocalSearchState, action: (Long) -> Unit) {
         if (spanOrNull(DEFAULT_DOMAIN_WALK_CAP) != null) {
             values.forEach(action)
@@ -373,6 +490,8 @@ internal class AllDifferentInvariant(
         const val SWAP_ATTEMPT_STRIDE: Int = 6
         const val MAX_REPAIR_TARGETS: Int = 4
         const val MAX_SWAP_CANDIDATES: Int = 2
+        const val MAX_UNUSED_MOVES: Int = 4
+        const val MAX_UNUSED_VISITS: Int = 1024
     }
 }
 

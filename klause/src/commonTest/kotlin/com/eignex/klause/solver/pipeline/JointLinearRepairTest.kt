@@ -8,6 +8,7 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.SparseSourceLpPolicy
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceDerivation
@@ -26,6 +27,95 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class JointLinearRepairTest {
+    @Test
+    fun `a freed integer should complete its affine backing at a lower objective`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0),
+            longArrayOf(1, 1), null, null), factors = arrayOf(
+            Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.EQ, 0),
+        ))
+        val objective = LinearObjective(intCoefficients = longArrayOf(0, 1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val center = Sample(BooleanArray(0), longArrayOf(1, 1))
+        val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap(), BigFraction.ONE)
+        JointLinearRepair(model, source, objective, TheoryParams(), external = { center }).use { repair ->
+            var result = repair.check(condition, Cancellation.Never)
+            repeat(64) {
+                if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, Cancellation.Never)
+            }
+
+            val point = assertIs<ExactNeighborhoodResult.Witness>(result).sample
+            assertEquals(0L, point.intValue(0))
+            assertEquals(0L, point.intValue(1))
+        }
+    }
+
+    @Test
+    fun `an unconsumed improving ray should not report conditioned exhaustion`() {
+        val model = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(-1.0))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap(), BigFraction.MINUS_ONE)
+        JointLinearRepair(model, source, objective, TheoryParams(), boundOrdered = true).use { repair ->
+            var attempt = repair.attempt(condition, Cancellation.Never)
+            repeat(64) {
+                if (attempt.result == ExactNeighborhoodResult.Paused) {
+                    attempt = repair.attempt(condition, Cancellation.Never)
+                }
+            }
+
+            assertEquals(ExactNeighborhoodResult.Undecided, attempt.result)
+            assertEquals(TerminationReason.Unsupported, attempt.reason)
+        }
+    }
+
+    @Test
+    fun `attempt should distinguish a slice pause from lifetime budget exhaustion`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
+            factors = emptyArray())
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
+        JointLinearRepair(model, source, objective, TheoryParams(sourceLpWorkLimit = 0)).use { repair ->
+            val result = repair.attempt(condition, Cancellation.Never)
+
+            assertEquals(ExactNeighborhoodResult.Undecided, result.result)
+            assertEquals(TerminationReason.BudgetExhausted, result.reason)
+        }
+        JointLinearRepair(model, source, objective, TheoryParams()).use { repair ->
+            val result = repair.attempt(condition, Cancellation { true })
+
+            assertEquals(ExactNeighborhoodResult.Paused, result.result)
+            assertEquals(null, result.reason)
+            assertEquals(0L, repair.stats.smt.completeSearchStages?.get("jointRepairCandidates") ?: 0L)
+        }
+    }
+
+    @Test
+    fun `attempt should expose a nonimproving feasible center alongside its scoped cutoff closure`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
+            factors = emptyArray())
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val center = Sample(BooleanArray(0), longArrayOf(1))
+        val condition = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ONE),
+            mapOf(0 to BigFraction.ONE), BigFraction.ONE)
+        JointLinearRepair(model, source, objective, TheoryParams(), boundOrdered = true,
+            external = { center }).use { repair ->
+            var attempt = repair.attempt(condition, Cancellation.Never)
+            repeat(64) {
+                if (attempt.result == ExactNeighborhoodResult.Paused) {
+                    attempt = repair.attempt(condition, Cancellation.Never)
+                }
+            }
+
+            assertEquals(ExactNeighborhoodResult.Refuted, attempt.result)
+            assertEquals(TerminationReason.SearchExhausted, attempt.reason)
+            assertEquals(1L, assertNotNull(attempt.feasiblePoint).intValue(0))
+            assertIs<SourceClaim.Bound>(assertNotNull(attempt.bound).claim)
+        }
+    }
+
     @Test
     fun `a publication lifetime should retain a checked point after its query slice expires`() {
         val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(2), null, null),
@@ -198,19 +288,22 @@ class JointLinearRepairTest {
             ), numRealVars = 1, realLower = doubleArrayOf(0.75), realUpper = doubleArrayOf(2.0))
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
-        val repair = JointLinearRepair(model, source, objective, TheoryParams(maxFlips = 2))
+        for (inputPass in listOf(false, true)) {
+            val repair = JointLinearRepair(model, source, objective, TheoryParams(maxFlips = 2),
+                sourceIntegers = intArrayOf(0))
 
-        val result = repair.use {
-            it.search(adaptive = false).use { search ->
-                while (!search.advance(Cancellation.Never, 1_000_000)) Unit
-                search.minimizeResult(TerminationReason.BudgetExhausted)
+            val result = repair.use {
+                it.search(adaptive = false, sourceInputPass = inputPass).use { search ->
+                    while (!search.advance(Cancellation.Never, 1_000_000)) Unit
+                    search.minimizeResult(TerminationReason.BudgetExhausted)
+                }
             }
-        }
 
-        assertIs<MinimizeResult.BestFound>(result)
-        assertEquals(1L, assertNotNull(result.assignment).intValue(0))
-        assertEquals(1.0, result.stats.ls.completionsRefuted.sum)
-        assertEquals(1L, result.stats.smt.completeSearchStages?.get("jointRepairCutoffClosures"))
+            assertIs<MinimizeResult.BestFound>(result)
+            assertEquals(1L, assertNotNull(result.assignment).intValue(0))
+            assertEquals(1.0, result.stats.ls.completionsRefuted.sum)
+            assertEquals(1L, result.stats.smt.completeSearchStages?.get("jointRepairCutoffClosures"))
+        }
     }
 
     @Test

@@ -1,5 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.localsearch.ObjectiveGuidance
+import com.eignex.klause.localsearch.movesource.MoveSourceCatalog
 import com.eignex.klause.portfolio.BacktrackCatalog
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
@@ -8,10 +10,40 @@ import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.portfolio.editing
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class EngineParamsTest {
+    @Test
+    fun `objective guidance must not create an automatic recipe pool`() {
+        assertFailsWith<PipelineConfigException> {
+            resolveLocalSearchRecipes(EngineParams(listOf("objective-guidance=geometric")))
+        }
+    }
+
+    @Test
+    fun `explicit objective guidance expands one recipe into fresh composition slots`() {
+        val resolved = resolveLocalSearchRecipes(EngineParams(listOf(
+            "arm=cbls-plateau/ils-basin", "objective-guidance=functional,geometric",
+        )))
+
+        val recipes = resolved.pool!!.map { it() }
+
+        assertEquals(listOf(ObjectiveGuidance.Functional, ObjectiveGuidance.Geometric),
+            recipes.map { it.objectiveGuidance })
+        assertEquals(listOf("cbls-plateau/ils-basin/functional", "cbls-plateau/ils-basin/geometric"),
+            recipes.map { it.label })
+        assertTrue(recipes[0].strategy !== recipes[1].strategy)
+    }
+
+    @Test
+    fun `invalid objective guidance is rejected before worker creation`() {
+        assertFailsWith<PipelineConfigException> {
+            resolveLocalSearchRecipes(EngineParams(listOf("objective-guidance=geometirc")))
+        }
+    }
+
 
     private fun scenario(cores: Int, params: List<String> = emptyList(), mix: EngineMix = EngineMix.MIXED) =
         buildPortfolioScenario(
@@ -72,5 +104,16 @@ class EngineParamsTest {
         val recipe = resolved.pool!!.single()().editing(resolved.edit)
         assertEquals(anArm, recipe.label)
         assertTrue(!recipe.build(1L, null).lpPlan.branching)
+    }
+
+    @Test
+    fun `a pinned local search arm should accept a sources edit`() {
+        val params = EngineParams(listOf("arm=cbls-implicit/fixed", "sources=+unused-values"))
+
+        val recipe = resolveLocalSearchRecipes(params).pool!!.single()()
+
+        assertEquals("cbls-implicit/fixed", recipe.label)
+        assertTrue(recipe.seedImplicitOnRestart)
+        assertTrue(recipe.strategy.sources.any { it.source.id == MoveSourceCatalog.idOf("unused-values") })
     }
 }

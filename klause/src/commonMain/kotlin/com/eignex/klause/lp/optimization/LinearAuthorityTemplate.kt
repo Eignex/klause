@@ -14,6 +14,26 @@ internal class LinearAuthorityTemplate private constructor(
     val rows: List<ExactRationalInequality>,
     val cuts: LinearAuthorityCuts?,
 ) {
+    fun withAdditional(
+        additional: List<LinearAuthorityCut>, cancellation: Cancellation,
+        onCost: (Long, Long) -> Unit = { _, _ -> },
+    ): LinearAuthorityTemplate? {
+        if (additional.isEmpty()) return this
+        val prepared = cuts ?: return null
+        require(additional.size <= 64)
+        for (cut in additional) {
+            onCost(1L + cut.owners.size + cut.inequality.supportSize,
+                64L + cut.owners.size * 32L + cut.inequality.supportSize * 48L)
+            if (cancellation()) return null
+            require(cut.owners.all { it in rows.indices })
+            require(cut.inequality.coefficients.keys.all { it in indices })
+        }
+        onCost(prepared.rows.size.toLong() + additional.size,
+            64L + (prepared.rows.size.toLong() + additional.size) * 8L)
+        if (cancellation()) return null
+        return LinearAuthorityTemplate(source, numeric, coordinates, indices, rows, prepared.withAdditional(additional))
+    }
+
     fun matches(other: SourceProofContext): Boolean = source.scope.revision == other.scope.revision &&
         source.scope.objective == other.scope.objective &&
         source.scope.condition.bools == other.scope.condition.bools && source.coordinates == other.coordinates &&

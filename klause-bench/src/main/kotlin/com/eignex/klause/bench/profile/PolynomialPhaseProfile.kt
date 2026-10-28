@@ -10,8 +10,8 @@ import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRealProblem
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.localsearch.LocalSearchParams
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
@@ -28,9 +28,12 @@ import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.klause.util.parseBigInt
+import com.sun.management.ThreadMXBean
 import java.io.File
 import java.lang.management.ManagementFactory
 import java.util.Base64
+import java.util.zip.GZIPInputStream
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.serialization.Serializable
@@ -40,26 +43,42 @@ import kotlinx.serialization.json.Json
 internal object PolynomialPhaseProfile {
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.size in 1..4 && args[0].startsWith("request64="))
+        require(args.size in 1..10)
         val options = args.drop(1).associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.size == args.size - 1 && options.keys.all {
-            it in setOf("pipeline", "timeoutMs", "repeats", "prepared")
+            it in setOf("pipeline", "timeoutMs", "repeats", "prepared", "capture",
+                "maximumWork", "refinement", "feedback", "coupled")
         })
         require(options["pipeline"] == null || options["pipeline"] in setOf("true", "both"))
         require(options["prepared"] == null || options["prepared"] == "true")
         require(options["prepared"] == null || options["pipeline"] == null)
+        require(options["capture"] == null || options["capture"] in setOf("true", "both"))
+        require(options["refinement"] == null || options["refinement"] in setOf("true", "both"))
+        require(options["feedback"] == null || options["feedback"] in setOf("true", "both"))
+        val feedback = options["feedback"] != null
+        require(!feedback || options["refinement"] == "true")
+        val refine = options["refinement"] != null
+        val capture = options["capture"] != null
+        require(options["coupled"] == null || options["coupled"] in setOf("true", "both", "matrix"))
+        val coupled = options["coupled"] != null
+        require(options["coupled"] !in setOf("both", "matrix") ||
+            listOf("refinement", "feedback", "capture").none { options[it] == "both" })
+        val maximumWork = options["maximumWork"]?.toLong()?.also { require(it >= 0) }
         val preparedMode = options["prepared"] == "true"
         val pipelineMode = options["pipeline"] != null
         val directMode = options["pipeline"] != "true"
+        require((!capture && !refine && !coupled) || directMode)
         val repeats = options["repeats"]?.toInt() ?: 1
         require(repeats in 1..9 && (repeats == 1 || !directMode))
         val timeoutMs = options["timeoutMs"]?.toLong() ?: 60_000L
         require(timeoutMs > 0)
-        val encoded = args[0].substringAfter('=')
-        require(encoded.length <= 48 * 1024)
-        val request = Base64.getDecoder().decode(encoded)
+        val request = requestBytes(args[0])
         val cases = Json.decodeFromString<List<PhaseSource>>(request.decodeToString())
-        require(cases.size in 1..18 && cases.map { it.suite to it.problem }.distinct().size == cases.size)
+        require(cases.size in 1..18 &&
+            cases.map { listOf(it.suite, it.problem, it.fixedIntegers, it.fixedBooleans) }.distinct().size ==
+                cases.size)
+        require(!preparedMode || cases.all { it.fixedIntegers.isEmpty() })
+        require(!pipelineMode || cases.all { it.fixedBooleans.isEmpty() })
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         if (System.getenv("KLAUSE_POLYNOMIAL_PHASE_CHILD") != "1") {
             launch(args, out)
@@ -74,7 +93,14 @@ internal object PolynomialPhaseProfile {
             "jvmOptions" to ManagementFactory.getRuntimeMXBean().inputArguments.joinToString(" "),
             "containingTimeoutMs" to timeoutMs.toString(),
             "repeats" to repeats.toString(),
-            "maximumWork" to "null",
+            "maximumWork" to maximumWork.toString(),
+            "diagnosticMaximumWork" to maximumWork.toString(),
+            "failureCapture" to options["capture"].toString(),
+            "cellRefinement" to options["refinement"].toString(),
+            "cellFeedback" to options["feedback"].toString(),
+            "coupledSections" to options["coupled"].toString(),
+            "requestEncoding" to args[0].substringBefore('='),
+            "sourceBytes" to if (cases.any { it.gzip64 != null }) "hash-pinned request or catalog" else "catalog",
             "representationLimits" to "default",
             "route" to if (preparedMode) "unconditioned prepared polynomial service; no CP root pins or publication"
                 else if (pipelineMode && directMode) "paired direct query and default MIXED pipeline/P1/seed3"
@@ -84,8 +110,10 @@ internal object PolynomialPhaseProfile {
         val access = PhaseAccess()
         for ((index, source) in cases.withIndex()) {
             require(source.sha256.matches(Regex("[0-9a-f]{64}")))
-            val reference = Catalog.uncapped(source.suite).problems.single { it.name == source.problem }
-            val bytes = CorpusFiles.open(CorpusFetcher.resolve(reference.source)).use { it.readNBytes(1024 * 1024 + 1) }
+            val bytes = source.gzip64?.let(::capturedSource) ?: run {
+                val reference = Catalog.uncapped(source.suite).problems.single { it.name == source.problem }
+                CorpusFiles.open(CorpusFetcher.resolve(reference.source)).use { it.readNBytes(1024 * 1024 + 1) }
+            }
             require(bytes.size <= 1024 * 1024 && sha256(bytes) == source.sha256)
             val directory = out.resolve(index.toString()).apply { mkdirs() }
             directory.resolve("source.smt2").writeBytes(bytes)
@@ -98,15 +126,74 @@ internal object PolynomialPhaseProfile {
             }
             if (preparedMode) {
                 directory.resolve("prepared-trace.json").writeText(
-                    Json.encodeToString(access.measure(text, timeoutMs = timeoutMs, prepared = true)),
+                    Json.encodeToString(access.measure(text, maximumWork, timeoutMs,
+                        prepared = true, capture = capture, fixedBooleans = source.fixedBooleans,
+                        refinement = refine, feedback = feedback,
+                        coupled = coupled)),
                 )
             } else if (directMode) {
                 directory.resolve("gate.json").writeText(Json.encodeToString(access.gate(text, timeoutMs)))
                 directory.resolve("trace.json").writeText(
-                    Json.encodeToString(access.measure(text, timeoutMs = timeoutMs)),
+                    Json.encodeToString(access.measure(text, maximumWork, timeoutMs,
+                        capture = capture, fixedIntegers = source.fixedIntegers, fixedBooleans = source.fixedBooleans,
+                        refinement = refine, feedback = feedback, coupled = coupled)),
                 )
             }
+            if (options["coupled"] in setOf("both", "matrix")) {
+                directory.resolve("coupled-control-trace.json").writeText(Json.encodeToString(
+                    access.measure(text, maximumWork, timeoutMs, prepared = preparedMode, capture = capture,
+                        fixedIntegers = source.fixedIntegers, fixedBooleans = source.fixedBooleans,
+                        refinement = refine, feedback = feedback)))
+            }
+            if (options["coupled"] == "matrix") {
+                for ((name, preparation, joint) in listOf(
+                    Triple("single", false, false), Triple("prepared-support", true, false),
+                    Triple("joint", false, true),
+                )) {
+                    directory.resolve("$name-trace.json").writeText(Json.encodeToString(
+                        access.measure(text, maximumWork, timeoutMs, prepared = preparedMode, capture = capture,
+                            fixedIntegers = source.fixedIntegers, fixedBooleans = source.fixedBooleans,
+                            refinement = refine, feedback = feedback,
+                            coupled = true, coupledPreparation = preparation, coupledJoint = joint)))
+                }
+            }
+            if (options["refinement"] == "both") {
+                directory.resolve("control-trace.json").writeText(Json.encodeToString(
+                    access.measure(text, maximumWork, timeoutMs, prepared = preparedMode, capture = capture,
+                        fixedIntegers = source.fixedIntegers, fixedBooleans = source.fixedBooleans)))
+            }
+            if (options["feedback"] == "both") {
+                directory.resolve("feedback-control-trace.json").writeText(Json.encodeToString(
+                    access.measure(text, maximumWork, timeoutMs, prepared = preparedMode, capture = capture,
+                        fixedIntegers = source.fixedIntegers, fixedBooleans = source.fixedBooleans, refinement = true)))
+            }
+            if (options["capture"] == "both") {
+                directory.resolve("plain-trace.json").writeText(Json.encodeToString(
+                    access.measure(text, maximumWork, timeoutMs, prepared = preparedMode,
+                        fixedIntegers = source.fixedIntegers, fixedBooleans = source.fixedBooleans,
+                        refinement = refine, feedback = feedback,
+                        coupled = coupled)))
+            }
         }
+    }
+
+    internal fun capturedSource(gzip64: String): ByteArray {
+        require(gzip64.length <= 48 * 1024)
+        return gunzip(Base64.getDecoder().decode(gzip64))
+    }
+
+    internal fun requestBytes(argument: String): ByteArray {
+        require(argument.startsWith("request64=") || argument.startsWith("requestz64="))
+        val encoded = argument.substringAfter('=')
+        require(encoded.length <= 96 * 1024)
+        val bytes = Base64.getDecoder().decode(encoded)
+        return if (argument.startsWith("requestz64=")) gunzip(bytes) else bytes
+    }
+
+    private fun gunzip(compressed: ByteArray): ByteArray {
+        val bytes = GZIPInputStream(compressed.inputStream()).use { it.readNBytes(1024 * 1024 + 1) }
+        require(bytes.size <= 1024 * 1024)
+        return bytes
     }
 
     internal fun pipeline(text: String, timeoutMs: Long = 60_000L): PipelinePhaseTrace {
@@ -237,13 +324,22 @@ internal object PolynomialPhaseProfile {
             PolynomialRealFormula::class.java, Int::class.javaPrimitiveType,
             Int::class.javaPrimitiveType, paramsType, conditionType,
         )
-        private val params = paramsType.getConstructor(Cancellation::class.java, Long::class.javaObjectType, limitsType)
+        private val params = paramsType.getConstructor(Cancellation::class.java, Long::class.javaObjectType, limitsType,
+            Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType,
+            Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType)
+        private val coupledStats = queryType.getMethod("getCoupledStats")
+        private val coupledObserver = queryType.methods.single { it.name == "setCoupledConflictObserver" }
         private val condition = conditionType.getConstructor(Map::class.java, Map::class.java, Map::class.java)
         private val next = queryType.getMethod("next")
         private val stats = queryType.getMethod("getStats")
         private val progress = queryType.methods.singleOrNull { it.name == "getProgress" }
+        private val feedbackStats = queryType.getMethod("getCellFeedbackStats")
+        private val feedbackUse = queryType.getMethod("getFirstCellFeedbackUse")
+        private val feedbackReuse = queryType.getMethod("getFirstCellFeedbackReuse")
         private val partialConflicts = progress?.returnType?.methods?.singleOrNull { it.name == "getPartialConflicts" }
         private val conflictObserver = queryType.methods.singleOrNull { it.name == "setPartialConflictObserver" }
+        private val captureType = Class.forName(prefix + "PolynomialFailureCapture")
+        private val setCapture = queryType.getMethod("setFailureCapture", captureType)
         private val atomType = Class.forName(prefix + "PolynomialAtom")
         private val atomPolynomial = atomType.getMethod("getPolynomial")
         private val atomRelation = atomType.getMethod("getRelation")
@@ -256,7 +352,7 @@ internal object PolynomialPhaseProfile {
         }
 
         private fun parsed(text: String, token: Cancellation): Any =
-            parse.invoke(parser.getField("INSTANCE").get(null), text, token, false, false)
+            parse.invoke(parser.getField("INSTANCE").get(null), text, token, true, false)
 
         fun gate(text: String, timeoutMs: Long = 60_000L): PhaseGate {
             var charges = 0L
@@ -293,7 +389,16 @@ internal object PolynomialPhaseProfile {
             maximumWork: Long? = null,
             timeoutMs: Long = 60_000L,
             prepared: Boolean = false,
+            capture: Boolean = false,
+            fixedIntegers: Map<String, String> = emptyMap(),
+            fixedBooleans: Map<String, Boolean> = emptyMap(),
+            refinement: Boolean = false,
+            feedback: Boolean = false,
+            coupled: Boolean = false,
+            coupledPreparation: Boolean = true,
+            coupledJoint: Boolean = true,
         ): PhaseTrace {
+            require(!feedback || refinement)
             val clock = Cancellation.after(timeoutMs.milliseconds)
             var charges = 0L
             var stop: List<String>? = null
@@ -307,14 +412,37 @@ internal object PolynomialPhaseProfile {
                 override fun deadline() = clock.deadline()
                 override fun workMeter(): WorkMeter = meter
             }
+            var names: Map<String, String> = emptyMap()
+            var originalNames: Map<String, String>? = null
+            var integerFixings: Map<Int, BigFraction> = emptyMap()
+            var booleanFixings: Map<Int, Boolean> = emptyMap()
+            fun booleanPins(declarations: Map<String, Int>, coordinate: (Int) -> Int): Map<Int, Boolean> {
+                require(fixedBooleans.size <= 64)
+                return fixedBooleans.map { (name, value) ->
+                    check(!token())
+                    meter.charge(1)
+                    coordinate(declarations.getValue(name)) to value
+                }.toMap()
+            }
             val source = if (prepared) {
                 val parsed = SmtLib.parse(text, cancellation = token)
+                originalNames = (parsed.source.originalSource as? PolynomialRealProblem)?.let { original ->
+                    original.realVarNames.mapKeys { "real.${it.key}" }.mapValues { it.value.toString() } +
+                        original.boolVarNames.mapKeys { "bool.${it.key}" }.mapValues { it.value.toString() }
+                }
                 val invocation = SourceSetup.prepare(SourceSetupRequest(
                     parsed.source, ExecutionOperation.SATISFY, FiniteEngine.MIXED, cancellation = token,
                 ))
                 val problem = (invocation.route as? SourceProblemRoute.PolynomialTheory)?.request?.problem
                     ?: return PhaseTrace(emptyList(), "NotPolynomial", invocation.route.javaClass.simpleName,
                         null, 0, 0, charges, stop)
+                if (fixedBooleans.isNotEmpty()) {
+                    val plan = requireNotNull(invocation.preparedPlan)
+                    require(plan.belongsTo(parsed.source.originalSource))
+                    booleanFixings = booleanPins(parsed.boolVarNames, plan::booleanCoordinate)
+                }
+                names = problem.realVarNames.mapKeys { "real.${it.key}" }.mapValues { it.value.toString() } +
+                    problem.boolVarNames.mapKeys { "bool.${it.key}" }.mapValues { it.value.toString() }
                 Triple(
                     problem.javaClass.getDeclaredField("formula").apply { isAccessible = true }.get(problem),
                     problem.javaClass.getDeclaredField("totalBoolCount").apply { isAccessible = true }.getInt(problem),
@@ -322,14 +450,40 @@ internal object PolynomialPhaseProfile {
                 )
             } else {
                 val parsed = parsed(text, token)
+                @Suppress("UNCHECKED_CAST")
+                val booleans = sourceType.getMethod("getBoolVarNames").invoke(parsed) as Map<String, Int>
+                booleanFixings = booleanPins(booleans) { it }
+                @Suppress("UNCHECKED_CAST")
+                val integers = sourceType.getMethod("getIntVarNames").invoke(parsed) as Map<String, Int>
+                require(integers.keys == fixedIntegers.keys) { "Every integer declaration needs an exact fixing" }
+                integerFixings = fixedIntegers.map { (name, value) ->
+                    require(value.matches(Regex("-?[0-9]{1,256}")))
+                    integers.getValue(name) to BigFraction.of(parseBigInt(value), parseBigInt("1"))
+                }.toMap()
+                names = listOf("real" to "getRealVarNames", "bool" to "getBoolVarNames", "integer" to "getIntVarNames")
+                    .flatMap { (kind, getter) ->
+                        @Suppress("UNCHECKED_CAST")
+                        val mapping = sourceType.getMethod(getter).invoke(parsed) as Map<String, Int>
+                        mapping.map { (name, id) -> "$kind.$name" to id.toString() }
+                    }.toMap()
+                originalNames = names
                 Triple(formula.invoke(parsed), boolCount.invoke(parsed) as Int, realCount.invoke(parsed) as Int)
             }
             val original = source.first
-            val fixed = fixings.invoke(null, original, { check(!token()) })
+            @Suppress("UNCHECKED_CAST")
+            val fixed = (fixings.invoke(null, original, { check(!token()) }) as Map<Int, BigFraction>) + integerFixings
             val preparationCharges = charges
+            val allocationBean = (ManagementFactory.getThreadMXBean() as? ThreadMXBean)
+                ?.takeIf { it.isThreadAllocatedMemorySupported }?.apply { isThreadAllocatedMemoryEnabled = true }
+            val thread = Thread.currentThread().threadId()
+            val allocationStart = allocationBean?.getThreadAllocatedBytes(thread)
+            val queryStart = System.nanoTime()
             val owner = query.newInstance(original, source.second, source.third,
-                params.newInstance(token, maximumWork, limitsType.getConstructor().newInstance()),
-                condition.newInstance(emptyMap<Int, Boolean>(), fixed, fixed))
+                params.newInstance(token, maximumWork, limitsType.getConstructor().newInstance(), refinement, feedback,
+                    coupled, coupledPreparation, coupledJoint),
+                condition.newInstance(booleanFixings, fixed, fixed))
+            val captured = if (capture) captureType.getConstructor().newInstance().also { setCapture.invoke(owner, it) }
+                else null
             var conflictPremises: Int? = null
             var conflictPreview: List<String>? = null
             var conflictPreviewComplete: Boolean? = null
@@ -346,11 +500,29 @@ internal object PolynomialPhaseProfile {
                 }
             }
             conflictObserver?.invoke(owner, observeConflict)
+            var coupledPremises: Int? = null
+            var coupledPreview: List<String>? = null
+            var coupledPreviewComplete: Boolean? = null
+            val observeCoupled: (List<*>) -> Unit = { premises ->
+                if (coupledPremises == null) {
+                    coupledPremises = premises.size
+                    var complete = premises.size <= 16
+                    coupledPreview = premises.take(16).map {
+                        val (rendered, exact) = previewConflictAtom(requireNotNull(it))
+                        complete = complete && exact
+                        rendered
+                    }
+                    coupledPreviewComplete = complete
+                }
+            }
+            if (coupled) coupledObserver.invoke(owner, observeCoupled)
             val checkpoints = ArrayList<PhaseCheckpoint>()
             val start = System.nanoTime()
             var calls = 0L
             var lastProjected = 0L
             var lastStage: Triple<Long, Long, Long>? = null
+            var firstFeedback: Map<String, String>? = null
+            var firstUse: Map<String, String>? = null
             var result: Any?
             do {
                 result = next.invoke(owner)
@@ -358,6 +530,12 @@ internal object PolynomialPhaseProfile {
                 val snapshot = stats.invoke(owner)
                 val projected = snapshot.javaClass.getMethod("getProjectedPolynomials").invoke(snapshot) as Long
                 val observed = progress?.invoke(owner)
+                if (refinement && firstUse == null) {
+                    firstUse = feedbackUse.invoke(owner)?.let(::feedbackTrace)
+                }
+                if (refinement && firstFeedback == null) {
+                    firstFeedback = feedbackReuse.invoke(owner)?.let(::feedbackTrace)
+                }
                 val stage = observed?.let {
                     Triple(it.javaClass.getMethod("getSnapshots").invoke(it) as Long,
                         it.javaClass.getMethod("getRegions").invoke(it) as Long,
@@ -371,6 +549,10 @@ internal object PolynomialPhaseProfile {
                 lastProjected = projected
                 lastStage = stage
             } while (result == null)
+            val queryElapsedNs = System.nanoTime() - queryStart
+            val queryThreadAllocatedBytes = allocationStart?.let {
+                requireNotNull(allocationBean).getThreadAllocatedBytes(thread) - it
+            }
             val snapshot = stats.invoke(owner)
             val nativeWork = snapshot.javaClass.getMethod("getWorkSpent").invoke(snapshot) as Long
             check(charges - preparationCharges == nativeWork) { "Native charge sum differs from snapshot" }
@@ -379,7 +561,139 @@ internal object PolynomialPhaseProfile {
                 result.javaClass.methods.singleOrNull { it.name == "getResource" }?.invoke(result)?.toString(),
                 nativeWork, charges - preparationCharges, preparationCharges, stop, source.second, source.third,
                 partialConflictPremises = conflictPremises, partialConflictPreview = conflictPreview,
-                partialConflictPreviewComplete = conflictPreviewComplete)
+                partialConflictPreviewComplete = conflictPreviewComplete,
+                checkedCells = if (refinement) {
+                    (queryType.getMethod("getCheckedCells").invoke(owner) as List<*>).map {
+                        cellTrace(requireNotNull(it))
+                    }
+                } else null,
+                cellRefinement = queryType.getMethod("getCellStats").invoke(owner)?.let { value ->
+                    listOf("Candidates", "CheckedCells", "RepeatedCandidates",
+                        "RepairedCoordinates", "Declined", "Work")
+                        .associateWith { value.javaClass.getMethod("get$it").invoke(value).toString() }
+                },
+                cellFeedback = feedbackStats.invoke(owner)?.let { value ->
+                    listOf("Admitted", "Lookups", "Uses", "Reuses", "CrossRegionUses", "Evicted",
+                        "SnapshotReplacements", "ScopeDeclines", "MetadataVisits",
+                        "CandidateUses", "CandidateWork", "CandidateDeclines")
+                        .associateWith { value.javaClass.getMethod("get$it").invoke(value).toString() }
+                },
+                firstCellFeedbackReuse = firstFeedback,
+                firstCellFeedbackUse = firstUse,
+                coupledSections = coupledStats.invoke(owner)?.let { value ->
+                    listOf("Supports", "Combinations", "Conflicts", "RepeatedSupports", "Declined", "Work",
+                        "PreparedSupports", "JointSupports")
+                        .associateWith { value.javaClass.getMethod("get$it").invoke(value).toString() }
+                },
+                firstCoupledConflictPremises = coupledPremises,
+                firstCoupledConflictPreview = coupledPreview,
+                firstCoupledConflictPreviewComplete = coupledPreviewComplete,
+                queryElapsedNs = queryElapsedNs,
+                queryThreadAllocatedBytes = queryThreadAllocatedBytes,
+                sourceCoordinates = names,
+                conditionBooleans = booleanFixings.mapKeys { it.key.toString() }.mapValues { it.value.toString() },
+                originalSourceCoordinates = originalNames,
+                coordinateNamespace = if (prepared) "prepared-polynomial-model" else "raw-polynomial-source",
+                coordinateMapping = if (prepared) "original-to-prepared correspondence unavailable"
+                    else "named original declarations; lowering-only slots unnamed",
+                failureCapture = captured?.let { value ->
+                    listOf("Scope", "Context", "Operation", "FirstFailure", "FirstCadFailure",
+                        "FirstRefusal", "FirstSignConflict")
+                        .associateWith { field ->
+                        @Suppress("UNCHECKED_CAST")
+                        (captureType.getMethod("get$field").invoke(value) as? Map<String, String>).orEmpty()
+                    }
+                },
+                failureObservations = captured?.let { value ->
+                    listOf("Failures", "RepeatedFirstFailure", "RepetitionComplete",
+                        "InterruptedCapture", "CompletedCopySteps")
+                        .associateWith { captureType.getMethod("get$it").invoke(value).toString() }
+                })
+        }
+
+        private fun cellTrace(cell: Any): Map<String, String> {
+            fun read(owner: Any, field: String): Any? = owner.javaClass.getMethod("get$field").invoke(owner)
+            val result = linkedMapOf<String, String>()
+            val scope = requireNotNull(read(cell, "Scope"))
+            result["scope"] = scope.javaClass.simpleName
+            result["variable"] = read(cell, "Variable").toString()
+            result["lowerClosed"] = read(cell, "LowerClosed").toString()
+            result["upperClosed"] = read(cell, "UpperClosed").toString()
+            for (end in listOf("Lower", "Upper")) {
+                read(cell, end)?.let { value ->
+                    result["$end.coefficients"] = read(value, "DefiningCoefficients").toString()
+                    result["$end.root"] = read(value, "RootIndex").toString()
+                    result["$end.lower"] = read(value, "LowerBound").toString()
+                    result["$end.upper"] = read(value, "UpperBound").toString()
+                }
+            }
+            val atom = requireNotNull(read(cell, "Predicate"))
+            result["relation"] = atomRelation.invoke(atom).toString()
+            val terms = coefficients.get(atomPolynomial.invoke(atom)) as Map<*, *>
+            for ((index, entry) in terms.entries.withIndex()) {
+                result["term.$index.coefficient"] = entry.value.toString()
+                result["term.$index.powers"] = powers.get(entry.key).toString()
+            }
+            if (scope.javaClass.simpleName != "Source") {
+                val condition = requireNotNull(read(scope, "Condition"))
+                for (field in listOf("Bools", "Lower", "Upper")) {
+                    result["condition.$field"] = read(condition, field).toString()
+                }
+                result["snapshotIdentity"] = System.identityHashCode(read(scope, "Snapshot")).toString()
+            }
+            if (scope.javaClass.simpleName == "Region") {
+                val premises = requireNotNull(read(scope, "Premises"))
+                result["signedPremises"] = read(premises, "Atoms").toString()
+                result["booleans"] = read(premises, "Bools").toString()
+                result["reductionIdentity"] = System.identityHashCode(read(scope, "Reduction")).toString()
+            }
+            return result
+        }
+
+        private fun feedbackTrace(use: Any): Map<String, String> {
+            fun read(owner: Any, field: String): Any? = owner.javaClass.getMethod("get$field").invoke(owner)
+            val cell = requireNotNull(read(use, "Cell"))
+            val result = cellTrace(cell).toMutableMap()
+            var complete = true
+            for (field in listOf("Origin", "Current")) {
+                val scope = requireNotNull(read(use, field))
+                result["$field.sourceIdentity"] = System.identityHashCode(read(scope, "Source")).toString()
+                result["$field.snapshotIdentity"] = System.identityHashCode(read(scope, "Snapshot")).toString()
+                result["$field.reductionIdentity"] = System.identityHashCode(read(scope, "Reduction")).toString()
+                val premises = requireNotNull(read(scope, "Premises"))
+                result["$field.signedPremises"] = read(premises, "Atoms").toString()
+                result["$field.booleans"] = read(premises, "Bools").toString()
+                val condition = requireNotNull(read(scope, "Condition"))
+                result["$field.conditionIdentity"] = System.identityHashCode(condition).toString()
+                for (kind in listOf("Bools", "Lower", "Upper")) {
+                    val values = read(condition, kind) as Map<*, *>
+                    if (values.size > 64) complete = false
+                    result["$field.condition.$kind"] = values.entries.take(64).associate { (id, value) ->
+                        val wide = value is BigFraction && (value.num.magnitudeBitLength() > 4096 ||
+                            value.den.magnitudeBitLength() > 4096)
+                        if (wide) complete = false
+                        id.toString() to if (wide) "[wide coefficient]" else value.toString()
+                    }.toString()
+                }
+            }
+            result["scopePreviewComplete"] = complete.toString()
+            val candidate = read(use, "Value") ?: run {
+                result["candidatePreviewComplete"] = "false"
+                return result
+            }
+            val coefficients = read(candidate, "DefiningCoefficients") as List<*>
+            var candidateComplete = coefficients.size <= 17
+            fun fraction(value: BigFraction): String = if (value.num.magnitudeBitLength() > 4096 ||
+                value.den.magnitudeBitLength() > 4096) {
+                candidateComplete = false
+                "[wide coefficient]"
+            } else value.toString()
+            result["candidate.coefficients"] = coefficients.take(17).map { fraction(it as BigFraction) }.toString()
+            result["candidate.root"] = read(candidate, "RootIndex").toString()
+            result["candidate.lower"] = fraction(read(candidate, "LowerBound") as BigFraction)
+            result["candidate.upper"] = fraction(read(candidate, "UpperBound") as BigFraction)
+            result["candidatePreviewComplete"] = candidateComplete.toString()
+            return result
         }
 
         private fun previewConflictAtom(atom: Any): Pair<String, Boolean> {
@@ -404,7 +718,14 @@ internal object PolynomialPhaseProfile {
 }
 
 @Serializable
-private data class PhaseSource(val suite: String, val problem: String, val sha256: String)
+private data class PhaseSource(
+    val suite: String,
+    val problem: String,
+    val sha256: String,
+    val fixedIntegers: Map<String, String> = emptyMap(),
+    val fixedBooleans: Map<String, Boolean> = emptyMap(),
+    val gzip64: String? = null,
+)
 
 @Serializable
 internal data class PhaseGate(
@@ -440,6 +761,24 @@ internal data class PhaseTrace(
     val partialConflictPremises: Int? = null,
     val partialConflictPreview: List<String>? = null,
     val partialConflictPreviewComplete: Boolean? = null,
+    val checkedCells: List<Map<String, String>>? = null,
+    val cellRefinement: Map<String, String>? = null,
+    val cellFeedback: Map<String, String>? = null,
+    val firstCellFeedbackReuse: Map<String, String>? = null,
+    val firstCellFeedbackUse: Map<String, String>? = null,
+    val coupledSections: Map<String, String>? = null,
+    val firstCoupledConflictPremises: Int? = null,
+    val firstCoupledConflictPreview: List<String>? = null,
+    val firstCoupledConflictPreviewComplete: Boolean? = null,
+    val queryElapsedNs: Long? = null,
+    val queryThreadAllocatedBytes: Long? = null,
+    val sourceCoordinates: Map<String, String>? = null,
+    val originalSourceCoordinates: Map<String, String>? = null,
+    val conditionBooleans: Map<String, String>? = null,
+    val coordinateNamespace: String? = null,
+    val coordinateMapping: String? = null,
+    val failureCapture: Map<String, Map<String, String>>? = null,
+    val failureObservations: Map<String, String>? = null,
 )
 
 @Serializable

@@ -48,7 +48,30 @@ strategy and restart state belong to the solver.
 
 Repair handles are a separate internal contract. Their cutoff must be monotone
 non-increasing because retained objective-bound clauses survive fragment reseeding;
-session push/pop always starts a fresh search.
+session push/pop always starts a fresh search. `RepairSearch.beginExact` accepts a
+strict rational cutoff in minimized working-objective units. Cutoff monotonicity,
+incumbent admission and discrete objective dominance compare exact values, including
+values with identical floating displays. A looser condition requires a fresh handle.
+Floating LP pruning receives an enclosing upper bound, and continuous completion
+requires exact certification instead of a tolerance optimum. Source callers retain
+responsibility for objective scaling and direction.
+
+A retained repair starts an explicit fragment and advances it in slices. Its
+best improving sample and stop reason are independent: a missing reason means a
+pause, `SearchExhausted` completes the conditioned optimization, and cancellation,
+budget exhaustion or unavailable completion prove no closure. A slice cancellation
+can resume; the fragment's lifetime cancellation remains terminal until another
+fragment starts. Starting a sibling retires the old trail and slice while retaining
+compatible learned clauses and LP state. Closing releases both, and terminal
+observations remain readable.
+The traversal reset clears the preceding fragment's stopped-budget marker without
+renewing the containing allowance.
+A completed fragment closes its requested strict cutoff only when no improving
+working point was found; a better point and completed optimization remain distinct.
+
+ALNS records retained repair observations as a best found point or an unknown
+result with that scoped stop reason. The observation carries no unpinned
+infeasibility or optimality claim; an unconsumed improving ray remains unavailable.
 
 ## Counting and sampling
 
@@ -273,10 +296,20 @@ An unfunded query keeps its pending alternative and owner; cumulative exhaustion
 ends the worker without proving exhaustion. Coverage splits debit modeled storage
 for both children and their captured condition maps. Resuming cannot renew either ceiling.
 `source-lp-work-limit` defaults to one billion units and
-`source-lp-allocation-limit` to 512 MiB. `source-cuts` controls checked source-row
+`source-lp-allocation-limit` to 512 MiB. Opt-in checked refutation reuse charges
+support indexing, source reconstruction, proof replay, storage and eviction to
+these same ceilings. Reuse admits at most 64 MiB of cumulative modeled allocation
+and one eighth of the allocation remaining at its opening. Reaching that local
+allowance retires the cache and leaves ordinary numerical queries available.
+`source-cuts` controls checked source-row
 separation in numerical frontier traversal. `source-lp-operations` supplies an independent
 operation ceiling for controlled comparisons. Other source LP clients retain their
 operation-based admission policy.
+Optional numerical decision feedback debits journal construction, latest-query
+replacement, retention and support scoring to the same cumulative source funding. Exhausted feedback retains
+source-order branching and every complementary alternative.
+Point-based source separation debits its scoring and projection storage to that
+same ledger; its extra relaxation receives no renewed work or allocation ceiling.
 
 Each retained sparse query takes its finite numerical lifetime from the caller's
 remaining cumulative work, with a proportional pivot allowance. Slice grants limit

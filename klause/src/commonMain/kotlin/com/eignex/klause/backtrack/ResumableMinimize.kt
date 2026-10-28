@@ -125,6 +125,7 @@ internal class ResumableMinimize(
     private val pausable: Boolean = true,
     // Repair owns the handle across fragment terminals and explicitly closes it after the final fragment.
     private val rebindable: Boolean = false,
+    private val exactObjectiveBoundSupplier: (() -> BigFraction?)? = null,
     // A containing search charges private work and owns its overspend debt.
     private val ownsWorkDebt: Boolean = true,
     initialCandidate: Sample? = null,
@@ -136,7 +137,8 @@ internal class ResumableMinimize(
 ) : ResumableSearch, ReseedGuard {
     private val hasPreparation = preparationBudget != null
     override val canReseed: Boolean
-        get() = !preparationPending && clausePrimal?.isDone != false && !rootRoundingPending && pendingRealLeaf == null
+        get() = !preparationPending && clausePrimal?.isDone != false && !rootRoundingPending &&
+            pendingRealLeaf == null && pendingRealResult == null
     override val canContinuePreparation: Boolean get() = clausePrimal?.isDone == false
     private var initialCandidate = initialCandidate
     private var replaced = false
@@ -238,6 +240,16 @@ internal class ResumableMinimize(
         return exact < checkNotNull(BigFraction.ofDouble(cutoff))
     }
 
+    private fun beatsExternalCutoff(exact: BigFraction?, reported: Double): Boolean {
+        val cutoff = externalCutoff()
+        val exactCutoff = exactObjectiveBoundSupplier?.invoke()
+        return when {
+            exactCutoff != null -> exact != null && exact < exactCutoff
+            exact != null -> beatsCutoff(exact, cutoff)
+            else -> reported < cutoff
+        }
+    }
+
     private val resources = SearchInvocationResources().also { owner ->
         owner.own(AutoCloseable { sink.stop() })
     }
@@ -247,6 +259,7 @@ internal class ResumableMinimize(
     private lateinit var lpEngine: LpEngine
     private var leafSolver: LeafRealSolver? = null
     private var pendingRealLeaf: LpSolveCursor<LeafRealResult>? = null
+    private var pendingRealResult: LeafRealResult? = null
     private val rootLpDutyCycle = RootLpDutyCycle()
 
     private fun completeLeaf(
@@ -254,9 +267,12 @@ internal class ResumableMinimize(
         cancellation: Cancellation,
         workLimit: Long = 0L,
     ): LeafRealResult {
-        val result = realLeafOwner().solve(sample, cancellation, params.toleranceCheck, workLimit)
+        val result = realLeafOwner().solve(sample, cancellation, completionToleranceCheck(), workLimit)
         return checkedLeafResult(sample, result)
     }
+
+    private fun completionToleranceCheck(): ((Sample) -> Boolean)? =
+        if (exactObjectiveBoundSupplier?.invoke() != null) null else params.toleranceCheck
 
     private fun realLeafOwner(): LeafRealSolver = leafSolver ?: LeafRealSolver(
         problem, objective, params.lpPlan.componentSplit, sink.lp, solver.lpSolveContext,
@@ -266,13 +282,15 @@ internal class ResumableMinimize(
         resources.own(AutoCloseable {
             val pending = pendingRealLeaf
             pendingRealLeaf = null
+            pendingRealResult = null
             pending?.close()
         })
         leafSolver = it
     }
 
     private fun advanceRealLeaf(sample: Sample): LeafRealResult? {
-        val cursor = pendingRealLeaf ?: realLeafOwner().openSolve(sample, runEndToken(), params.toleranceCheck)
+        pendingRealResult?.let { return it }
+        val cursor = pendingRealLeaf ?: realLeafOwner().openSolve(sample, runEndToken(), completionToleranceCheck())
             .also { pendingRealLeaf = it }
         val allowance = slice.remainingLpWork()
         if (allowance == 0L) return null
@@ -281,7 +299,7 @@ internal class ResumableMinimize(
             is LpSolveStep.Completed -> {
                 pendingRealLeaf = null
                 cursor.close()
-                checkedLeafResult(sample, step.value)
+                checkedLeafResult(sample, step.value).also { pendingRealResult = it }
             }
         }
     }
@@ -293,7 +311,7 @@ internal class ResumableMinimize(
         ) return result
         val completed = sample.copy(reals = result.reals, exactReals = result.exactReals)
         val tolerated = result.verdict == LpVerdict.TOLERANCE_OPTIMUM &&
-            params.toleranceCheck?.invoke(completed) == true
+            completionToleranceCheck()?.invoke(completed) == true
         return if (tolerated || verifyRealCoordinates(problem, completed) is Verification.Accepted) result
         else LeafRealResult(LpVerdict.INDETERMINATE, doubleArrayOf())
     }
@@ -374,7 +392,7 @@ internal class ResumableMinimize(
                 cancelledWhen(::runDeadline) { solveCancelled() },
                 params.propagationCancelFloor,
                 nativeSat = params.nativeSat ?: true,
-                pbLearning = params.pbLearning ?: true,
+                pbLearning = params.pbLearning ?: (problem.numIntVars == 0),
             ),
             branching = CpBranching.None,
         ).also {
@@ -608,8 +626,11 @@ internal class ResumableMinimize(
     fun rebind(assumptions: Assumptions, decisionBudget: Long) {
         check(rebindable) { "search is not rebindable" }
         check(!closed) { "search is closed" }
+        globalToken = baseCancellation.lifetimeCancellation()
+        slice.begin(Long.MAX_VALUE, -1L)
         val pending = pendingRealLeaf
         pendingRealLeaf = null
+        pendingRealResult = null
         pending?.close()
         searchSession.popTo(0)
         val seeded = session.reseedFrom(assumptions)
@@ -653,7 +674,7 @@ internal class ResumableMinimize(
             done?.let { return StepEvent.Terminal(it) }
             check(!closed) { "search is closed" }
             if (rootIsExhausted) return terminal(terminalExhausted(rootExhausted))
-            if (pendingRealLeaf != null) return traversalEvent()
+            if (pendingRealLeaf != null || pendingRealResult != null) return traversalEvent()
             if (!clausePrimalStarted) {
                 clausePrimalStarted = true
                 if (!rebindable && initialCandidate == null && externalCutoff() == Double.POSITIVE_INFINITY) {
@@ -857,14 +878,21 @@ internal class ResumableMinimize(
         startingWitness: Boolean = false,
     ): MinimizeResult.WithSample? {
         val exact = exactSourceObjective(objective, sample, params.toleranceCheck)
-        if (rebindable && exact == null) return null
+        if (rebindable && exact == null) {
+            sawIndeterminateLeaf = true
+            return null
+        }
         val cutoff = externalCutoff()
         val matchesCutoff = startingWitness && cutoff.isFinite() &&
             (exact?.let { it == BigFraction.ofDouble(cutoff) } ?: (o == cutoff))
-        if (cutoff.isNaN() || (!matchesCutoff && !(exact?.let { beatsCutoff(it, cutoff) } ?: (o < cutoff)))) {
+        if (cutoff.isNaN() || (!matchesCutoff && !beatsExternalCutoff(exact, o))) {
             return null
         }
         val score = SourceObjectiveScore(o, exact)
+        if (rebindable && !score.display.isFinite()) {
+            sawIndeterminateLeaf = true
+            return null
+        }
         if (incumbents.offer(sample, score) !is Publication.Installed) return null
         singleObj?.let { objVarBest = sample.intValue(it.varId) }
         if (!startingWitness) {
@@ -1075,13 +1103,16 @@ internal class ResumableMinimize(
             var outcome = "FAILED"
             try {
                 val accepted = verifiedLpProposal(proposal, rootToken) { outcome = it } ?: return null
-                val cutoff = minOf(bestObj, externalCutoff())
-                if (cutoff.isNaN()) {
+                if (externalCutoff().isNaN()) {
                     outcome = "INVALID_CUTOFF"
                     return null
                 }
-                val exact = exactSourceObjective(objective, accepted.assignment, params.toleranceCheck)
-                val improving = exact?.let { beatsCutoff(it, cutoff) } ?: (accepted.objective < cutoff)
+                val exact = exactSourceObjective(objective, accepted.assignment, completionToleranceCheck())
+                val standing = incumbents.current()?.objective
+                val improvesLocal = if (exact != null && standing?.exact != null) {
+                    exact < standing.exact
+                } else accepted.objective < bestObj
+                val improving = improvesLocal && beatsExternalCutoff(exact, accepted.objective)
                 outcome = when {
                     !improving -> "NON_IMPROVING"
                     rootToken() -> "CANCELLED"
@@ -1199,7 +1230,16 @@ internal class ResumableMinimize(
             val externalBound = externalCutoff()
             val effectiveBound = if (externalBound < bestObj) externalBound else bestObj
             if (rebindable && discreteObjective) {
-                if (lpEngine.linearBoundDominates(session, effectiveBound)) return SearchNodeDisposition.Prune
+                val externalExact = exactObjectiveBoundSupplier?.invoke()
+                val localExact = incumbents.current()?.objective?.exact
+                val exactBound = when {
+                    externalExact == null -> localExact
+                    localExact == null || externalExact < localExact -> externalExact
+                    else -> localExact
+                }
+                val dominated = if (exactBound != null) lpEngine.linearBoundDominates(session, exactBound)
+                    else lpEngine.linearBoundDominates(session, effectiveBound)
+                if (dominated) return SearchNodeDisposition.Prune
             }
             // Persistent LP fixings may use only a cutoff that survives every later repair.
             val lpBound = if (rebindable) externalBound else effectiveBound
@@ -1286,7 +1326,7 @@ internal class ResumableMinimize(
             // The leaf is the engine's own claim, re-derived here from every factor before it can become an
             // incumbent: an assignment the composed fixpoint refutes is an engine defect, never a solution. A check
             // the deadline cut short refutes nothing, so the leaf stands.
-            if (pendingRealLeaf == null) {
+            if (pendingRealLeaf == null && pendingRealResult == null) {
                 val verdict = composedFixpoint(
                     problem, Candidate(sample, Unit), params.cancellation, params.assumptions,
                 )
@@ -1310,8 +1350,15 @@ internal class ResumableMinimize(
 
                     LpVerdict.INDETERMINATE, LpVerdict.CERTIFIED_BOUND -> {
                         sawIndeterminateLeaf = true
-                        unresolved = true
-                        null
+                        val witness = real.uncertifiedReals?.let { sample.copy(reals = it) }
+                        val accepted = witness != null && !params.cancellation() &&
+                            params.toleranceCheck?.invoke(witness) == true && !params.cancellation()
+                        if (pausable && params.cancellation()) return SearchModelDisposition.Pause
+                        val published = if (accepted) recordIfImproving(checkNotNull(witness),
+                            objective.evaluate(witness)) else null
+                        incomplete = published != null && !rebindable
+                        unresolved = published == null
+                        published
                     }
 
                     // A checked ray ends the run whatever the incumbent: no objective value bounds the model.
@@ -1335,6 +1382,7 @@ internal class ResumableMinimize(
                     }
                 }
             }
+            pendingRealResult = null
             pendingIncumbent = incumbent
             return when {
                 unboundedLeaf != null -> SearchModelDisposition.Surface
@@ -1387,7 +1435,7 @@ internal class ResumableMinimize(
         override val lifecycle: SearchRunLifecycle get() = this
 
         override fun onResume(context: SearchContext): SearchRunDisposition {
-            if (pendingRealLeaf != null) return SearchRunDisposition.Continue
+            if (pendingRealLeaf != null || pendingRealResult != null) return SearchRunDisposition.Continue
             boundExchange.applySharedFloor()
             val local = incumbents.current()
             if (params.valueSelector is SolutionGuided && (local != null || lpEngine.params.lpPlan.bounding)) {

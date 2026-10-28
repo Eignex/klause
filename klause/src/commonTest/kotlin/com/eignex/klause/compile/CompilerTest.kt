@@ -27,14 +27,17 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.abs
+import com.eignex.klause.schema.allDifferentExcept
 import com.eignex.klause.schema.eq
 import com.eignex.klause.schema.ge
 import com.eignex.klause.schema.implies
 import com.eignex.klause.schema.le
+import com.eignex.klause.schema.lexLeq
 import com.eignex.klause.schema.minus
 import com.eignex.klause.schema.not
 import com.eignex.klause.schema.plus
 import com.eignex.klause.schema.times
+import com.eignex.klause.schema.valuePrecede
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.SolveResult
 import com.eignex.skema.SchemaDef
@@ -217,7 +220,7 @@ class CompilerTest {
         // 1_000_000 * [0, 100_000] = [0, 1e11] is past Int; abs() forces the domain computation.
         class S : VariableSchema() {
             val x by intVar(min = 0, max = 100_000)
-            val c by constraint { abs(1_000_000 * x) le 5 }
+            val c by constraint { (1_000_000 * x).abs() le 5 }
         }
         assertFailsWith<IllegalArgumentException> { S().compile() }
     }
@@ -240,5 +243,21 @@ class CompilerTest {
             val c by constraint { (100_000 * (100_000 * x)) le 0 }
         }
         assertFailsWith<IllegalArgumentException> { S().compile() }
+    }
+
+    @Test
+    fun `implied and symmetry breaking constraints should mark their factors`() {
+        class S : VariableSchema() {
+            val x by intVar(0, 3)
+            val y by intVar(0, 3)
+            val required by constraint { valuePrecede(1, 2, listOf(x, y)) }
+            val implied by impliedConstraint { allDifferentExcept(listOf(x, y), setOf(0L)) }
+            val symmetry by symmetryBreakingConstraint { lexLeq(listOf(x), listOf(y)) }
+        }
+
+        val problem = S().compile().problem
+
+        assertEquals(listOf(false, true, true), problem.impliedFactorMask?.toList())
+        assertTrue(problem.hasSymmetryBreaking)
     }
 }

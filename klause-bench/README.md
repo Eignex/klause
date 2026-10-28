@@ -41,6 +41,11 @@ launcher uses `klause-bench` as its working directory. From the source tree,
 | `provenance out=<path>` | Capture installed-build and runtime identities |
 | `corpus status`, `corpus gc`, `corpus compress [path]` | Inspect, evict or compress fetched collections |
 
+The bench exits with `75` (`EX_TEMPFAIL`) when corpus transport remains unavailable
+after bounded download retries, or the cache publication service is unavailable.
+The lab treats this preparation outcome as an infrastructure retry. Permanent HTTP
+errors, invalid inputs and solver outcomes retain their ordinary failure semantics.
+
 `bench.profile.DivModConstructionProfile` times XCSP3 parsing and lowering without
 solving. Use `sizes=1024,2048,4096,8192 repeats=3 warmups=1` for generated sources
 that repeat each modular expression twice. Optional `suite=ID problem=NAME sha256=HEX`
@@ -84,6 +89,14 @@ resource-limited or incomplete procedures can return UNKNOWN. The
 [manifest](smoke-corpus/nonlinear-integer-v1/manifest.json) pins original hashes and
 Apache-2.0 attribution.
 
+`nonlinear-integer-cells-v1` fixes seventeen univariate cell-consumer controls,
+with eight core cases and nine cases from held-out families. The matching
+`smtlib-nonlinear-integer-cells-v1` suite separates mathematical expectations from
+bounded integer-search outcomes. The `-core-v1` and `-holdout-v1` named sets retain
+their complete memberships. The [fixture notes](smoke-corpus/nonlinear-integer-cells-v1/README.md)
+describe repeated tuple support, exact endpoints, conditional predicates, mixed
+completion and degree limits; the manifest there pins source hashes and licences.
+
 `continuous-mip-v1` fixes 167 MIPLIB 2017 optimization sources with both integer
 and continuous columns. It includes finite and open routes and selects every member
 without a changing reference filter. It is separate from the smaller `mip` theme set.
@@ -105,6 +118,14 @@ from exclusion reuse across prefixes. SAT alternatives and complete UNSAT inputs
 retain 33 real source coordinates. The [fixture notes](smoke-corpus/qfnra-partial-conflicts-v1/README.md)
 and [manifest](smoke-corpus/qfnra-partial-conflicts-v1/manifest.json) define their
 scope, mathematical expectations and pinned source bytes.
+
+`qfnra-coupled-v1` fixes twelve connected-section controls, selected through
+`smtlib-qfnra-coupled-v1`: inconsistent product cycles, SAT neighbours and guarded
+alternatives, shifted and repeated roots, strict/weak boundaries and an uncovered
+singular fibre. Its [fixture notes](smoke-corpus/qfnra-coupled-v1/README.md) and
+manifest retain the original hashes. `qfnra-prepared-support-v1` separately fixes
+the three SAT sources from job 8750, with [unchanged bytes](smoke-corpus/qfnra-prepared-support-v1/README.md)
+and a matching `smtlib-qfnra-prepared-support-v1` suite.
 
 `qfnra-source-canonical-v1` selects two canonical negative-constant variants under
 `smtlib-qfnra-source-canonical-v1`: `degeneracy/degree-drop` and
@@ -269,9 +290,35 @@ before/after fetch. This JVM's used collections stay pinned; parallel bench proc
 sharing a cache should prefetch or disable eviction, as the lab does. Metadata avoids
 full tree scans; `.trash` renames make interrupted deletion resumable.
 
+`-Dklause.bench.corpus.shared=true` reuses the normal XDG/home cache while
+`-Dklause.bench.corpusCache` names an isolated preparation workspace. Only requested
+collections enter that workspace, using hard links on the same filesystem and
+copies across filesystems. Collection fetches hold a process lock and publish by
+rename after completion; interrupted staging is discarded. HTTP downloads use
+10-second connection and 30-second read timeouts, retry transient I/O and HTTP
+failures up to four attempts, and publish only complete responses. Permanent HTTP
+errors fail immediately. Parallel processes using shared storage must disable eviction.
+
+`KLAUSE_BENCH_CORPUS_MIRROR=https://.../corpus-packs` enables a provider-independent
+HTTP read-through cache. A local hit makes no mirror request; a cold collection first
+restores `<collection>.tar` from the mirror, falling back to its original source only
+on HTTP 404. Restored packs are bounded and reject filesystem links and traversal.
+`KLAUSE_BENCH_CORPUS_MIRROR_WRITE=true` publishes newly fetched collections once using
+conditional HTTP PUT. Configure the cloud URL for workers in the store's region;
+native execution should reuse its local corpus cache. `KLAUSE_BENCH_CORPUS_KEEP_PACKED=true`
+retains compressed originals when resolving plain input files, allowing the lab to
+reference existing compressed remote objects rather than uploading plain duplicates.
+
+ZIP collections extract through the JDK with entry checksum and destination checks;
+failed ZIP fetches remove partial collections. LZMA members use XZ for Java;
+XZ, bzip2 and gzip members use `unxz`, `bunzip2` and `gunzip`.
+
 CNF, WCNF, OPB, WBO, XML, SMT-LIB and MPS collections can use `.zst`; MiniZinc
-source/data and cloned collections stay plain. `zstd` must be on `PATH` and
-CLI decompression is inside measured solve time. Hashes use decompressed bytes.
+source/data and cloned collections stay plain. zstd-jni handles stored frames in
+the bench JVM. `select files=true` replaces selected compressed members with their
+original plain bytes for CLI and checker consumers, and refreshes collection sizes.
+This decoding belongs to selection preparation; ordinary cases use the prepared
+plain inputs. Hashes use decompressed bytes.
 Compression writes beside the original, verifies SHA-256, then replaces it;
 interrupted migration can resume.
 
@@ -657,12 +704,17 @@ The lab runs no shell scripts, so a new measurement is a class in that package.
 
 `SourceStageProfile` accepts `request64=<base64 JSON array>` for stage attribution.
 A source request has `suite`, `problem`, decoded-source `sha256`, `engine`
-(`default`, `cp`, or `ls`) and `exact`. It profiles the installed CLI for ten seconds
-at seed 3 with one active processor, a 3 GiB heap, Serial GC and debug statistics,
+(`default`, `cp`, `ls` or `mixed`) and `exact`. MPS and XCSP3 sources are supported.
+Optional `timeout` (1,000–60,000 milliseconds) and `seed` default to ten seconds
+and seed 3. It profiles the installed CLI with one active processor, a 3 GiB heap, Serial GC and debug statistics,
 then runs the existing JFR phase/caller analyzer. It retains the command, source,
 streams and recording. These instrumented runs diagnose stages without a throughput
-or source-verdict claim. Three spaced `jcmd Thread.print` snapshots provide a
+or source-verdict claim. Four spaced `jcmd Thread.print` snapshots through one third
+beyond the requested deadline provide a
 second view when JFR sampling is sparse; attach can pause the measured process.
+JFR closes 35 seconds after the deadline so a later process kill preserves its
+completed recording. A process still alive 50 seconds after the deadline is killed;
+that failed capture retains its diagnostics and establishes no source verdict.
 A `{job, sha256}` request instead checks and summarizes an
 existing profile job's `cases/0/out/profile.jfr` without executing a solver. An
 optional `recording` selects `cli.jfr` or `profile.jfr`, optionally beneath a
@@ -819,14 +871,26 @@ performance gain. Field/method incompatibility fails the diagnostic explicitly.
 
 `com.eignex.klause.bench.profile.PolynomialPhaseProfile` follows a direct polynomial
 query through its containing stop. Its `request64=<base64>` argument encodes up to
-18 `{suite, problem, sha256}` catalog identities, with at most 48 KiB of encoded
+18 `{suite, problem, sha256}` catalog identities, with at most 96 KiB of encoded
 request and 1 MiB per original source. It requires the frozen original hash before
 parsing and retains those bytes. Submit it as a Lab profile job without host or
 machine placement overrides. The Lab's documented `profile.runTimeoutSec` covers
 active setup, compilation, execution and cleanup; `base.timeout` supplies the
 separate command allowance.
+`requestz64` accepts the same JSON after gzip compression and Base64 encoding, with
+the same 96 KiB encoded ceiling and a 1 MiB expanded JSON ceiling. `request.json`
+retains expanded bytes and settings name the encoding; source hashes and query
+semantics are identical across the two envelopes.
 The measured child uses one active processor, Serial GC and a 3 GiB heap, retaining
 its command, streams, actual exit, installed CLI/harness/runtime hashes and options.
+
+A request entry may carry `gzip64`, a gzip-compressed Base64 copy of its frozen
+source. This bypasses catalog retrieval and verifies the same required original
+SHA-256 before parsing. Decoding retains the 1 MiB source limit and the whole
+request retains its 96 KiB limit. Use bytes from a separately identified source
+record; supplied suite/problem labels alone do not establish catalog provenance.
+The settings distinguish supplied bytes from catalog retrieval. This input changes
+no query, condition, preparation or ordinary CLI semantics.
 
 Each direct query uses default polynomial representation limits, unlimited native
 work and a 60-second containing deadline. Optional `timeoutMs=<positive milliseconds>`
@@ -877,6 +941,52 @@ different prepared owner yields `NotPolynomial`. This option is separate from
 `pipeline=true|both`.
 Use the alternating bounded-probe profile for deterministic observed/plain parity;
 pair phase attribution with source-matched ordinary CLI records.
+
+`capture=true` retains bounded exact nonlinear failure observations in direct or
+prepared traces. `capture=both` also runs the same query without capture and writes
+`plain-trace.json`; completed deterministic controls compare outcomes. The unique
+irrational-root unit control also compares exact witnesses. Charged observation can
+change work-based cursor arbitration and optional-probe trajectories. `maximumWork=N` sets one containing native allowance per query.
+Captured work includes observation and can reach that allowance sooner. Compare
+native work and component duration separately; neither establishes CLI speedup.
+
+Capture keeps the first rejected probe, first rejected CAD prefix and first
+completed sign conflict, exact
+normalized/active predicates, signed regional premises, condition bounds, numeric
+reverse fibres, source coordinate names, snapshot identity and the latest operation
+with its projection operands. The first representation refusal keeps its own
+operation/support record across later attempts. Algebraic coordinates retain defining rational
+coefficients, root index and isolating endpoints. Each copied record part permits
+512 data entries and 16,384 key/value characters before metadata and field prefixes;
+a polynomial permits 128 terms, each
+monomial 64 coordinates, and coefficients 4,096 bits. Incomplete parts say
+`complete=false`; an interrupted copy sets `InterruptedCapture`. Repetition compares
+at most 256 exact representations, with `RepetitionComplete=false` beyond that;
+it does not decide equality of independently represented algebraic numbers.
+Each capture attaches before query entry and belongs to one query. Interleaved
+root/search cursors and suspended partial-sign checks restore their
+own operation and support records before resuming arithmetic. Copies poll and
+charge the containing query. `CompletedCopySteps` counts completed
+serialization steps, excluding other observation costs; interruption can charge a
+final uncompleted step. Paired native totals retain all costs and any changed search
+trajectory. No observation authorizes exclusion.
+
+Request entries may include `fixedIntegers={"name":"integer"}` to measure a raw
+fixed-integer real completion. Every original integer declaration requires a fixing;
+decimal integer strings permit at most 256 digits. These conditions retain their
+original coordinate map and lower/upper equality pins. Prepared traces use their
+own model coordinate namespace. `originalSourceCoordinates` retains original names
+when available; `coordinateMapping` explicitly reports that original-to-prepared
+correspondence is unavailable. Prepared slot identifiers cannot be interpreted as
+original source slots. Ordinary `pipeline=true|both` runs retain their separate
+source-admission/publication scope and supply no capture of those worker queries.
+
+`fixedBooleans={"gate":false}` on a request entry selects an explicit original
+Boolean condition in direct or prepared diagnostics. Prepared conditions require
+the captured plan's source identity and its declared Boolean coordinate map;
+`conditionBooleans` records the actual query pins. This uses no real-coordinate
+correspondence and cannot be combined with pipeline observation. The original
+bytes and hash remain unchanged; a conditioned verdict applies only to that branch.
 
 Add `pipeline=true` after the request argument to observe source admission and the same
 MIXED/P1/seed3 satisfaction execution used by default CLI polynomial requests.
@@ -930,6 +1040,132 @@ DIMACS SAT and one SAT whose power syntax the checker cannot parse. Native UNSAT
 claims have no independent certificates. Single regression samples establish no
 timing comparison. Small-case costs can rise substantially: strict-root
 contradiction spends 826→23,469 units and quartic no-real-root 1462→16,929.
+
+### Exact univariate refinement profiles
+
+`PolynomialPhaseProfile refinement=true|both` enables the internal query option;
+`both` retains `control-trace.json` with refinement disabled at the identical revision,
+source bytes, requested fixing, representation limits and containing allowance.
+`cellRefinement` counts candidate coordinates, completed checked cells, repeated
+candidates, repaired coordinates, private declines and cumulative optional native
+work. The containing native snapshot includes refinement and complete fallback.
+The optional path shares 16,384 units across snapshot replacements, admits degree 16,
+64-term predicates with 4,096-bit coefficients, and retains at most eight cells.
+Seeds and regional support have a 64-coordinate/premise ceiling. A missing cell or
+candidate is a bounded decline, not a source verdict.
+
+`checkedCells` serializes the completed typed facts after the query: numeric predicates,
+exact algebraic endpoints, closure and source/query/regional scope. Source support
+means a mandatory predicate of the original unconditioned polynomial formula.
+Conditional records retain all query bounds/Booleans; regional records also retain
+signed premise IDs and process-local snapshot/reduction identities. Those identities
+are not persistent source mappings. Source/query cells require an active-coordinate
+map or surviving-predicate match when a reduced CAD sample contains eliminated
+placeholder slots. Serialized diagnostics are not a replay or
+independent proof format. Source checking, native UNSAT, component candidate entry,
+projection counts, total cost and physical resource receipts remain separate claims.
+
+Original-source witness checking runs through an ordinary CLI experiment at a pinned
+activation revision, using the existing source reconstruction, model rendering and Lab
+checkers. Component traces keep their native verdict scope; prepared slot arrays have
+no original-source correspondence in this diagnostic.
+
+### Regional checked-cell feedback profiles
+
+`PolynomialPhaseProfile refinement=true feedback=true|both` selects private numeric
+feedback with the same checked producer. `both` adds `feedback-control-trace.json`
+with feedback disabled and refinement enabled at the identical revision and settings.
+The feedback option requires `refinement=true`; it cannot silently compare different
+producers. `cellFeedback` records admissions, lookups, completed uses, repeated uses,
+uses under distinct regional owners, evictions, snapshot replacements and scope declines.
+`MetadataVisits` counts attempted metadata visits, not total feedback work; every visit
+polls/charges the caller, and exact endpoint comparisons also enter the containing
+native and optional refinement work. Compare total costs, actual avoided evaluations
+and region progress alongside outcomes.
+
+`CandidateUses`, `CandidateWork` and `CandidateDeclines` isolate numeric atom checks
+that consult the view outside the producer allowance. Their separate cumulative
+8,192-unit allowance still charges the containing query and survives snapshot changes.
+Regional scope copies and replacement cleanup remain separately charged to the caller.
+These checks may reject a required positive atom at the same point and position as
+its ordinary evaluation; they supply no family or Boolean exclusion. Private stops
+decline the hint and retain the original evaluation. Source/query facts must match
+the active predicate and scope; regional facts retain their original producer owner.
+
+`firstCellFeedbackReuse` retains the first observed use across regional owners,
+including its checked predicate/cell, signed regional premises, numeric conditions
+and process-local source/snapshot/reduction identities. Scope previews cap condition
+maps and wide coefficients and mark incomplete rendering. The engine retains the
+exact guards; these diagnostic strings supply no proof or persistent source mapping.
+An origin is an observed producing regional context or the first successful regional
+lookup; importing a bank fact does not assign it a regional origin.
+An absent trace establishes no cross-region reuse, even when lookup counts are nonzero.
+`firstCellFeedbackUse` also records reuse within one regional owner. Both traces keep
+the actual rejected numeric candidate's defining coefficients, root and isolating
+bounds, with an explicit completeness flag for bounded rendering.
+Retained trace scalars admit degree sixteen and 4,096-bit coefficients and isolating
+bounds, with optional image provenance removed. Larger values keep the scoped cell
+metadata and mark the numeric preview incomplete, without retaining their candidate graph.
+`queryElapsedNs` and `queryThreadAllocatedBytes` cover query construction through its
+terminal return, including reflection and in-loop diagnostic rendering. They exclude
+source parsing/preparation and final trace serialization. Thread allocation is absent
+when unsupported; it measures cumulative Java allocation rather than retained or peak
+physical memory. These instrumented, ordered arms do not establish warmed throughput.
+
+Matched profiles at `ba5b2b7c35` use the merged checked producer, identical hash-pinned
+sources and settings, and feedback as the only per-arm option. All 54 pairs match
+native outcomes and caller charges balance. The 48 completed pairs match projection,
+lifted-cell, regional and partial-sign-exclusion counts. Six deadline pairs retain
+their different search frontiers and are excluded from completed-work comparisons.
+
+| Context | Pairs | Native SAT / UNSAT / stopped per arm | Uses / numeric atom uses / cross-owner uses | Completed work delta |
+| --- | ---: | --- | --- | ---: |
+| [Unrelated-prefix controls 8676](https://lab.eignex.com/jobs/8676) | 16 | 10 / 5 / 1 | 68 / 48 / 28 | +81,620 |
+| [Whole-family holdouts 8677](https://lab.eignex.com/jobs/8677) | 17 | 12 / 5 / 0 | 10 / 10 / 0 | +4,189 |
+| [Raw originals 8678](https://lab.eignex.com/jobs/8678) | 9 | 3 / 4 / 2 | 0 / 0 / 0 | +115 |
+| [Prepared contexts 8679](https://lab.eignex.com/jobs/8679) | 12 | 5 / 4 / 3 | 8 / 8 / 0 | +12,128 |
+
+In the degree-two, four-prefix-pair UNSAT control, a mandatory source predicate
+`x1² = 2` supplies the checked open cell `(-sqrt(2), sqrt(2))`. Candidate zero is
+rejected under distinct regional owners and unrelated Boolean premises, with the
+same source, condition and snapshot. Twelve numeric atom checks consume retained
+cells, nine across owners, while the producer reaches its 16,384-unit allowance.
+Both arms visit sixteen regions, project 368 polynomials and lift 2,512 cells with
+zero partial-sign conflicts or exclusions. The hint avoids the same atom evaluation;
+it creates neither a Boolean clause nor a new certificate or candidate.
+
+The strict irrational-boundary holdout saves 54 charged units, but aggregate cost
+increases in every context. Prepared Economics consumes eight cells and preserves
+native SAT while adding 2,294 units; its ordered query allocations are 16,670,856
+versus 13,381,016 bytes, and elapsed times are 216,774,623 versus 104,457,428 ns.
+All four jobs retain one-core, 4,608-MiB hard resource receipts with no OOM events.
+These instrumented observations establish bounded numeric reuse, without supporting
+default activation or a throughput improvement. Both private options remain off.
+Strict, disequal, singular and degree-decline SAT alternatives retain their outcomes.
+Component SAT assignments lack independent source-check receipts; native UNSAT is
+not an independent certificate, and prepared arrays supply no original-source map.
+
+### Coupled section refutation profiles
+
+`PolynomialPhaseProfile coupled=true|both` enables the internal coupled-section option
+in the direct or prepared query; `both` adds `coupled-control-trace.json` with that
+option disabled at the identical revision, source bytes and refinement/feedback
+settings. It cannot be combined with another `both` comparison. `coupledSections`
+counts attempted supports, evaluated root combinations, conflicts, already attempted
+supports, private declines and optional work, which also enters the containing native
+work. The progress checkpoints add consumed coupled exclusions and their reuses.
+`firstCoupledConflictPreview` renders the first refuted support's signed predicates,
+capped at sixteen premises with a completeness flag. Compare region, projection and
+lifting counts and total work alongside outcomes; supports and combinations alone are
+not efficacy.
+
+`coupled=matrix` also saves `single-trace.json` with both support preparation and
+joint checking disabled, `prepared-support-trace.json` with preparation alone, and
+`joint-trace.json` with joint checking alone. The main trace enables both; the
+coupled control disables the whole option. These controls use the same sources,
+limits and sign checker. `PreparedSupports` and `JointSupports` count attempts,
+not consumed deductions. Explanations preview active encoded premises in their
+current snapshot; prepared identifiers supply no original-coordinate mapping.
 
 ### Element hull admission capture
 
@@ -1369,12 +1605,41 @@ outside source readers requires a separate coordinate channel.
 
 ### Local-search trajectories
 
+`bench.profile.ChannelViewApplicability` accepts `request64=BASE64_JSON` containing
+one to eight `{suite, problem, sha256}` records for XCSP3 sources. It reports the
+source hint kinds, admitted source definition nodes, retained nodes when value or
+predicate channels become searched, and bounded native inverse-role applicability.
+Each source has a thirty-second allowance; cancellation and original bytes remain
+with the report. This source-only screen does not stand in for mapped working-model
+applicability or paired-state grading. Inverse-role experiments transpose only
+disjoint native `Inverse` factors, at most sixteen relations of at most 64 entries,
+retaining every other factor, source domain and implied-factor role.
+Optional `source0=BASE64` through `source7=BASE64` supply the corresponding original
+source bytes directly, at most 96 KiB encoded each, checked against the requested hashes.
+
 `bench.profile.LocalSearchTrajectory` takes `suite=ID problem=NAME sha256=HEX
 recipe=LABEL seed=N moves=N` for a hash-pinned minimizing XCSP3 source. It compares
 protected and substituted objective coordinates through mixed-route preparation,
 then runs the selected local-search recipe alone with a fixed allowance counting
 moves and restarts, and no shared incumbents. The seed is the worker seed,
 including its portfolio index.
+Optional `channel=SearchedValues|SearchedPredicates|SearchedChannels|InverseAssignment`
+compares the maintained view with one bounded channel treatment. Both arms retain
+objective coordinates and the same functional objective view. Value treatments
+leave Boolean-value and Element outputs searched; predicate treatments leave
+comparison and membership outputs searched. Other admitted definitions remain
+maintained. Inverse assignment transposes the roles of admitted native `Inverse`
+factors and reuses their repairs and swaps; it changes proposals while retaining
+both source arrays. Channel comparisons use local-search-route preparation and
+also admit satisfaction sources.
+No general inverse or deterministic extension of an inconsistent channel is supplied.
+Channel probes prioritize named source integer inputs to the maintained definition
+network before other admissible primitives, within the same 32-candidate bound.
+Optional `presolve=off` holds both views before presolve, distinguishing channel
+ownership from representation changes that erase or reconstruct its coordinates.
+The default preserves production preparation; explicit centers also disable presolve.
+Optional `source64=BASE64` supplies at most 96 KiB of base64-encoded original bytes
+without catalog extraction; the source mode and bytes are retained with the capture.
 Optional `sliceMillis=N sliceWork=N` repeatedly resumes the same handle under
 those cooperative allowances; omitted allowances are unbounded. Timed slices
 depend on capture overhead and host speed and do not reproduce portfolio allocation.
@@ -1387,13 +1652,700 @@ retaining the initial assignment and RNG integer fields without extra random dra
 That run stops at the observer before candidate generation; its retained state then
 traces the production greedy pass one coordinate at a time through reflection.
 The diagnostic stop supplies no solver verdict or worker-failure evidence.
+`repairs=true` adds an observed repetition of the same fixed-work walk and checks
+its final witness, objective, pick count and non-timing work/restart/stall counters
+against the unobserved repetition when both complete without deadline censoring.
+An unavailable unobserved endpoint supplies no parity claim. Native interval
+censoring is latched before post-run source checking and serialization.
+`traceCoordinates=1..8192` sets the capture coordinate limit (default 4096).
+At most 32 repair/descent attempts retain their
+center and each phase's working and reconstructed source assignment. Distance
+counts named source inputs excluding frontend-declared definitions; auxiliary
+changes and approximate real displacement remain separate. Censored endpoints
+receive no basin classification. The declared recipe and worker seed bind the
+descent rule, without claiming exhaustive coverage of its sampled moves.
+`controls=true` compares individual freedoms, complete small mandatory
+AllDifferent, Cumulative and Diffn scopes
+and four size-matched samples at up to four feasible endpoints, using ordinary
+CP minimization with the complement pinned. Each repair has 10,000 decisions and
+the control scan shares ten seconds; unfinished scans grant no exhaustion claim.
+Scopes of at most six coordinates also enumerate every nonempty proper subset,
+so completed controls can distinguish a coordinated barrier from missed smaller
+freedoms. `recipe=cbls-extended/fixed` adds the existing extended structured source
+to the catalog's fixed plateau recipe for comparison with richer move controls.
+`selectors=true` requires an explicit center and compares the opt-in semantic
+selector with Random, WorstObjective, AdjacencyRelated and eligible source-input
+samples over sixteen seeds. All arms use the same center, ordinary CP owner,
+10,000 decisions per repair and a shared fifteen-second allowance. Existing
+selectors receive the semantic block's source count as their nominal target;
+definition closure and root-fixed exclusions can change the effective count,
+which is recorded rather than clipped. Eligible samples match source counts on
+the definition-free controls. Selector/closure visits, physical selection and
+repair allocations/times, and shared setup cost remain separate. Ordered cold
+captures establish capability and costs, without a throughput claim.
+The capture reports native original-source checks separately from independent
+witness checking and carries no unpinned proof claim. `center=v0,v1,...` supplies
+an integer-only source center; `center64=BASE64_JSON` carries the complete
+`{bools:[...],ints:[...]}` source assignment, bounded to 512 KiB encoded. Explicit
+centers disable presolve and use the protected objective. The shared center
+projection follows both namespaces through the prepared map, refuses conflicting
+aliases, unmapped searched coordinates, domain/pin mismatches and changed complete
+source round trips after definition reconciliation. Native source and working
+feasibility checks precede the warm start. The first observed state must retain
+that source center; random initialization and greedy replacement are bypassed.
+Channel arms replay the same supplied center with fresh weights, tabu,
+configuration and worker RNG. Implicit-seeding recipes decline explicit-center
+replay because that seeding can replace the center and establish different owners.
+`timeoutMillis=100..60000` contains preparation and
+each walk; `moves` retains the ordinary containing move/restart cap. Mapping and
+checking cost and deadline censoring stay explicit.
+`recipe=source-coordinate-descent`
+selects the strict objective-coordinate control; ordinary catalog recipes retain
+their structured sources. Fixture expectations live beside
+[finite repair controls](smoke-corpus/finite-repair/README.md).
+`batch64=<base64 JSON array of argument arrays>` captures up to eight requests
+in numbered directories under one profile job.
+`batchGzip64` accepts the same JSON compressed with gzip, bounded to 96 KiB encoded
+and 8 MiB inflated, for complete-center matrices that exceed native argument limits.
+Decoding remains outside individual walk allowances and inside full-process costs.
+`ownerReplay=true` consumes those exact `controls=true` records after capture and
+compares LS, cold/retained CP and cold/retained mixed completion. Every owner uses
+the saved center, effective working freedoms, complement pins and strict exact
+center-objective cutoff; real snapshots without exact authority and CP cutoffs
+outside its exact binary64 contract are unavailable. No domain is invented and
+mixed admission retains all rows or declines the overlap. Each owner sequence has
+100,000 containing `NodeBudget` decision equivalents and ten seconds, with two
+seconds and 2,000 decision equivalents per fragment. `ownerWork` and
+`ownerFragmentWork` select the containing and per-fragment work allowances;
+both mixed sequences share the same cumulative LP work/allocation/check limits.
+Looser cutoffs start a fresh retained epoch. Reports separate outcomes, scoped
+closure, source acceptance, CP nodes, LS moves, LP work, preparation, thread
+allocation and before/after counters. Instrumented CP clause flags count a lower
+bound on previously unused retained clauses becoming useful in unit/conflict
+propagation, split by permanent status; flags are never cleared, repeated uses of
+already marked clauses remain unknown. Diagnostic flag visits and their time and
+thread allocation are reported separately from native decision work; elapsed time
+and wall-time limits include the observations. A completed native cutoff closure
+retains its completion classification when a cooperative allowance also runs out.
+These observations supply no global proof or throughput claim.
+Common control loading and source-center checking are recorded separately in
+`owners-*-preparation.json`; per-candidate original-source verification time and
+allocation are separate from each owner's native interval.
+
+[Finite owner replay 8518](https://lab.eignex.com/jobs/8518), at `862c575692`,
+consumes the merged capture on Linux/amd64 across assignment, resource and
+placement exchange controls, with strict coordinate-descent and strong structured
+recipes. All 147 conditions have identical centers, effective freedoms, complement
+pins and exact cutoffs across five owners. Each sequence has 100,000 containing
+decision equivalents, ten seconds, and 2,000 equivalents/two seconds per fragment;
+no fragment overspends. LS and both CP owners find the same fifteen native
+source-accepted improvements. LS retains feasible nonimprovements in the other
+132 conditions; CP closes those conditioned cutoffs. Mixed declines all native
+global shapes rather than dropping a source constraint. Cold CP uses 35 decision
+nodes versus 32 retained, without newly useful retained clause flags in these tiny
+controls. Retained CP allocates 134.6 million cumulative thread bytes versus
+43.2 million cold; LS uses 235,200 moves and 1.067 billion thread bytes.
+These ordered, instrumented observations establish neither a retained throughput
+gain nor independent witness certification, a global proof or ordinary admission.
+The pilots 8479/8489 expose segment-end LS charging and do not qualify per-fragment
+owner costs; native instruction caps enforce the work boundary in 8518.
+
+`ownerSelectors=true` with `selectors=true` replays the merged semantic selector's
+actual effective freedoms at its declared center through the same owners. The
+selector's bounded construction/selection costs stay in the hash-bound
+`selectors.jsonl`; owner replay measures conditioned capability separately, with
+200,000 containing decision equivalents by default so all eighty selected scopes
+can receive their 2,000-equivalent fragment allowance. Declined empty selections
+remain unavailable rather than becoming completed fully pinned repairs. Cold
+fragments start from the specified owner seed; retained fragments keep RNG and
+activity state. These comparisons do not attribute all node differences to clauses
+or charge selection costs as owner repair work.
+
+`ownerRecipes=r1,r2` adds an opt-in `ls:<recipe>` inner owner per named trajectory
+recipe to every owner replay. Each repair builds a fresh recipe with the acquisition
+walk's definition sweep, per-move invariants, implicit-seeding switch, gradient view,
+class-normalized weights and linear shaping, then warm-starts at the captured center
+under the same pins, cutoff, seed and fragment allowance as the default `ls` owner.
+A warm start seeds no implicit owner until a restart. Rows record the internal
+compound tally, restarts, slices, maintained-definition and implicit-seed scope
+mismatches; pins are never released to admit a compound. Shared hint, sweep and
+gradient preparation is reported once in the owner preparation file, outside the
+repair allowances. Every checked improvement from any owner then runs the declared
+unpinned source-coordinate descent with 128 moves, 2,000 decision equivalents and
+two seconds, recorded separately with its native source check. `owners=a,b,...`
+selects the owner sequence; the default places structured owners after `ls`.
+`ownerSeed=N` reseeds only the owners and their descents, keeping the walk,
+selections and captured scopes of `seed`. Recipe `cbls-extended/fixed` names the
+trajectory's plateau walk with sampled extended structured moves; `catalog:<label>`
+selects the catalog arm itself, such as the implicitly seeded `cbls-extended/fixed`.
+Owner replay captures selector sets without a duplicate producer-side CP solve;
+`producerRepairEvaluated` distinguishes this capture from selector-only comparisons
+that also evaluate their own repairs.
+`selectorsFromWalk=true` acquires the center from the bounded walk's actual checked
+incumbent, with presolve and objective rewriting disabled. It requires `selectors=true`
+and omits an explicit `center`. Selection and owner replay start after both walk
+captures, preserving their fixed-work observation comparison. `selector-center.json`
+binds the source hash, recipe, immutable working center, native checked witness file
+and separate acquisition time/allocation. A missing incumbent, changed coordinate
+frame or unsupported relation remains unavailable. Boolean and integer namespaces
+both require the saved source-plan mapping and complete source round trip. Completed
+descent events stay in `repairs-false.jsonl`; an acquired incumbent alone supplies no
+completed-descent claim. These declines concern this diagnostic's supported overlap.
+With `selectorsFromWalk=true`, `ownerConflicts=true` also consumes the merged
+conflict selector at that same checked center in both source-root and
+sampled-fragment acquisition modes. Each mode saves its original acquisition,
+selection and descent records beside a separate hash-bound owner replay. The
+common repair cutoff belongs to the checked center; acquisition outcomes and costs
+remain separate and confer no additional pins or proof authority.
+The merged `FiniteConflictSelection` diagnostic accepts `ownerReplay=true` to
+replay its actual conflict-supported, baseline and acquisition-ablated scopes
+under the same contract. Acquisition costs remain in the hash-bound
+`selections.jsonl`; unmatched source counts, missing scopes and unavailable
+guidance remain distinct. This conditioned replay uses the exact checked center
+cutoff, with the native acquisition threshold retained separately in the selection
+record; it does not combine acquisition and repair into a policy comparison.
+
+[Conflict owner replay 8615](https://lab.eignex.com/jobs/8615), at `725db3a1ce`,
+consumes 160 actual scopes from source-root and sampled-fragment acquisition on
+the weighted Latin, assignment, resource and placement controls. All five owners
+share each center, effective freedoms, pins and exact cutoff. The records preserve
+148 matched source counts, twelve unmatched sets and nine actual consumptions of
+supported conflict guidance, alongside the acquisition-ablated controls. LS and
+both CP owners find the same 39 native source-accepted gains; the other 121 scopes
+retain feasible nonimprovements for LS and closed cutoffs for CP. No fragment
+overspends. Cold CP uses 140 nodes and 110.2 million cumulative thread bytes;
+retained CP uses 88 nodes and 292.9 million bytes, without newly useful retained
+clause flags. Mixed declines every global shape. Acquisition and descent costs
+remain in the original selection records, outside the owner allowance. These
+instrumented controls establish no composite policy or throughput advantage.
+
+[Semantic owner replay 8579](https://lab.eignex.com/jobs/8579), at `02d362ad1f`,
+consumes 640 actual selector scopes across three- and four-input assignment,
+resource and placement controls, with owner seeds 7 and 19. All five owners share
+the center, effective freedoms, pins and exact cutoff in every scope; 603 scopes
+match the selector's source-input count and the remaining 37 retain their actual
+larger or smaller sets. LS and both CP owners find the same 177 native
+source-accepted improvements. The other 463 scopes yield feasible nonimprovements
+for LS and closed conditioned cutoffs for CP; mixed declines every global shape.
+No fragment overspends its 2,000 decision equivalents. Cold CP uses 500 nodes and
+233.2 million cumulative thread bytes; retained CP uses 359 nodes and 940.8 million
+bytes, without newly useful retained clause flags. LS uses 1,024,000 moves and
+2.666 billion thread bytes. Selector construction/selection costs remain outside
+those owner measurements. These tiny controls support neither a repair-quality
+advantage nor a retained throughput or ordinary admission claim; the strong outer
+walk recipe is separate from the replay's default LS owner.
+
+[Initial family capture 8624](https://lab.eignex.com/jobs/8624), at `284cafd9b6`,
+retains eight native source-checked walk centers and 329 matched owner scopes from
+the six centers its diagnostic admits. CarpetCutting's 48 Boolean auxiliaries
+trigger the integer-only capture guard; this is a harness limitation, not an owner
+inapplicability result. Producer-side CP solves consume the selection deadline on
+ClockTriplet before all selector arms are captured. Clause-flag scans also charge
+the native work allowance and relabel 68 completed retained-CP queries as budget
+stops. Those records retain `nativeReason=SearchExhausted`; they earn no retained
+quality or cost conclusion. The capture requires Boolean-frame support and
+separate diagnostic accounting before qualifying these families' repair owners.
+
+[Ordinary family holdouts 8616](https://lab.eignex.com/jobs/8616), at `725db3a1ce`,
+complete 48 cases on three original XCSP3 COP sources and the three exchange
+controls, with 30 seconds, P1 and seeds 7/19. Every final witness passes the
+independent XCSP3 SolutionChecker against its original source hash. Objectives
+below retain both seeds in order:
+
+| Source | Default | CP | Curated LS | Retained-CP ALNS |
+| --- | ---: | ---: | ---: | ---: |
+| ClockTriplet-15-20_c22 | 161 / 161 | 162 / 162 | 161 / 161 | 163 / 164 |
+| RCPSP-j120-01-01_c22 | 112 / 111 | 110 / 111 | 547 / 500 | 662 / 638 |
+| CarpetCutting-test01_c23 | 638 / 640 | 627 / 643 | 622 / 718 | 630 / 641 |
+
+All engines reach zero on the exchange controls. Default and CP report twelve
+native optimum labels there; the independent checker certifies witnesses, not
+proofs. No original holdout receives an optimum label. The whole-engine results
+retain the scheduling losses and seed variation; they support no unconditional
+owner replacement. They measure ordinary execution separately from identical-scope
+repair and do not establish a retained throughput advantage.
+
 Model keys, domains, objectives, source bytes and
 build identity remain alongside the walk. Inputs admit at most 64 MiB,
-1,024 Boolean/integer coordinates and 4,096 factors. Hint construction uses the production
-mapping through reflection and fails on an internal shape mismatch. Each arm has
+8,192 Boolean/integer coordinates and 8,192 factors. Hint construction uses the production
+mapping through reflection and fails on an internal shape mismatch. Paired loading
+uses the same retained-coordinate projection, leaving reconstructed columns to
+the existing source reconstruction. Size and unsupported projection refusals remain
+explicit diagnostic declines. Each arm has
 a sixty-second outer deadline; cancellation is recorded. These instrumented walks
 isolate local trajectories; they establish neither default portfolio equivalence,
 throughput, native proof nor independently checked source feasibility.
+
+`bench.profile.ObjectiveViewComparison` uses the same hash-pinned source and paired
+probe API for retained linear, exactly substituted linear and retained functional
+objectives. It accepts `suite`, `problem`, `sha256`, optional `recipe`, worker `seed`,
+`moves`, `timeoutMillis`, `greedy`, and `screen=true` for a parse-only capability receipt.
+`retainedWorker=true` adds the production canonical-graded geometric consumer,
+installed through search initialization rather than the observation source.
+`preparationEngine=mixed` selects default finite presolve; `preparationEngine=ls`
+selects the source-preserving local-search presolve policy used by sole-arm CLI runs.
+Each view runs alone; preparation counts against its time allowance. Up to six
+initial/post-greedy source boundaries supply at most 32 common admissible primitive
+moves per view pair, with functional input coordinates sampled first. Complete
+source round trips and identical reconstructed destinations determine correspondence;
+equal seeds or recipes do not establish proposal equivalence. When a definition
+network maintains every objective cone, retained linear and functional objectives
+provide a grading control while exposing changed objective hotspot coordinates.
+Private pairings use each view's captured initial class weights; native walk
+histories remain separate.
+Preparation and thread allocations, native incumbent source-expression values,
+RNG boundaries, raw/weighted/objective deltas and model keys remain separate.
+Censored walks retain their last observed native incumbent separately from a terminal verdict.
+`basins=true` adds the existing native repair trace, bounded to 32 attempts and
+4,096 working coordinates. Its source-projected frames and declared integer-input distances separate
+policy local optima, feasible stalls, restarts and censored attempts; they do not
+classify a whole source basin or certify a partition. Trace copies consume the walk
+allowance, while source projection and serialization run after the walk.
+Private initialization/probe diagnostics run outside the walk allowance. Walk time
+includes passive recording overhead; ordinary CLI lab runs with source validation
+supply independent witness checks and whole-process resource measurements.
+Reserved CLI cohorts use `reference=any` on their problem selections to retain
+members without qualifying reference results. Native first-feasibility timestamps
+and independently checked final endpoints remain distinct observations.
+Both runners accept `source64` or `sourceGzip64` containing the original source,
+bounded to 96 KiB encoded and 64 MiB inflated, with the original hash mandatory.
+The objective runner also accepts the same bounded `batch64` request form.
+Both runners accept the JVM property `-Dklause.bench.trajectory.compress=true` to
+gzip every JSONL file after the complete capture. Filenames gain `.gz`; decompressed
+records retain their original content. Compression time and allocation are reported
+in `compression.json` outside the walk allowance and remain part of the full process
+cost. Uncompressed output is the default.
+It accepts the shared `center64` projection for common-center replay and
+`geometry=true` adds four canonical-grading arms: term/leaf hotspots crossed with
+adjacent/geometric leaf steps. Unsupported or incompletely maintained cones
+decline. The ordinary sink retains pins, definitions and ownership; no source
+relation or feasible objective order changes. `proposals.json` separates raw
+templates from sink-emitted moves (channel expansion can add moves), and retains
+up to 32 complete candidate destinations, exact canonical/source values and native
+source checks. Every distinct emitted seed move at that center receives a complete
+value comparison under a ten-second allowance; disagreements or incomplete scans
+decline geometry walks. Domain clamping can make raw cone values differ despite
+live maintenance. Complete candidate value agreement and the structural cone check
+remain distinct from global equivalence inferred from sampled grades. Walk counts,
+native incumbents, time and allocation remain the efficacy observations; proposal
+counts alone establish no improvement. Private proposal screening runs outside
+the walk allowance.
+
+The common-center [proposal matrix](https://lab.eignex.com/jobs/8753) at
+`f55a01792b` replays the first retained cost-zero policy-local-optimum centers from
+[GBACP](https://lab.eignex.com/jobs/8660) and the whole-family
+[TestScheduling holdout](https://lab.eignex.com/jobs/8661), seeds 3/7. Source hashes,
+complete centers and runtime/distribution hashes remain in the captures. All seven
+views use `cbls-plateau/ils-basin`, fresh learned state, protected source coordinates,
+5,000 containing moves/restarts and five seconds including preparation/mapping.
+The Linux/amd64 profiles request a 2 GiB heap, SerialGC and one active processor.
+All 7,564 distinct within-view seed-candidate comparisons agree on complete exact
+canonical, cone and source values; all 28 final points pass the native original-source
+check. These checks supply no independent XCSP3 certification or global equivalence.
+Sixteen walks are clock-censored. The retained/substituted controls finish all
+5,000 moves at 691/546 on GBACP and 6205/5249 on TestScheduling. Geometric proposals
+reach fewer moves within the deadline, so their endpoint differences do not isolate
+a matched-work effect or establish a speedup.
+
+The [matched-work follow-up](https://lab.eignex.com/jobs/8762) at `36055880b8`
+holds the same sources, centers, seeds, recipe and proposal axes at 1,000 containing
+moves/restarts with twenty seconds including preparation/mapping. All 28 walks
+complete uncensored and pass native source checking. Each pair of hotspot choices
+has the same complete source endpoint, and canonical geometric leaf proposals
+reproduce the full functional treatment's complete endpoint in all four cases.
+Exact minimization endpoints use seed order 3/7:
+
+| Source | Center | Retained/substituted | Adjacent leaf steps | Geometric leaf steps/full functional |
+| --- | --- | --- | --- | --- |
+| GBACP-UD04 | 1774 / 1624 | 834 / 1121 | 759 / 758 | 687 / 685 |
+| TestScheduling-t020m10r03-1 | 8025 / 6132 | 7541 / 5727 | 7895 / 5708 | 6674 / 5708 |
+
+This cohort supports leaf step generation as the useful proposal mechanism, with
+no independent hotspot benefit observed. The first 32 retained seed candidates
+include one native source-accepted adjacent improvement per TestScheduling seed;
+GBACP has none in that bounded sample. Full seed scans qualify values, not native
+feasibility of every candidate. Geometric GBACP walks cost 11.5–12.0 seconds and
+1.26–1.28 GB of calling-thread allocation versus 0.65–1.93 seconds and 33–37 MB
+for retained/substituted controls. TestScheduling geometric walks cost 1.45–2.38
+seconds and 204–205 MB versus 0.29–0.99 seconds and 29–33 MB. These ordered,
+instrumented walk costs retain preparation (8–497 ms, 2.5–20.8 MB), mapping/native
+checking (1–91 ms, 1.4–8.5 MB) and private seed probing (0.2–602 ms, 0.2–120.2 MB)
+separately and support no throughput or default-admission claim. The stronger
+five-second/5,000-move controls remain part of the comparison.
+Follow-up compression retains all JSONL bytes, reducing 121.6 MB to 4.1 MB after
+capture at a separate 1.56-second cost; it changes no walk allowance.
+
+Retained-worker comparisons select `param.objective-guidance=canonical`,
+`functional` or `geometric` within an explicit LS recipe pool. With
+`param.arm=cbls-plateau/ils-basin`,
+`param.arms=2` and `param.objective-guidance=functional,geometric`, two private
+retained slots share the containing budget. Compare against `functional,functional`
+at the same total budget to preserve ordinary slot seed offsets and restart
+diversity. `lsGeometricProposalRuns`, `lsGeometricProposalDeclines` and
+`lsGeometricProposalCandidates` distinguish qualified consumption from canonical
+fallback; candidate offers alone establish no useful transition. `param.ls-phase-times=true`
+retains active preparation and search cost. Use lab resource measurements and
+source validation for whole-process cost and independent final-witness checks;
+native source checks and heuristic terminals supply no proof authority.
+
+The retained-consumer [replay 8803](https://lab.eignex.com/jobs/8803), at
+`b5510ecde5`, reuses 8762's original hashes, complete checked centers, seeds 3/7,
+recipe, 1,000 moves/restarts and twenty-second containing walk allowances. The
+production geometric policy initializes through the engine, using the prepared
+cones and live network. All sixteen walks complete uncensored and their endpoints
+pass native original-source checks; these captures have no independent XCSP3
+certification. Exact endpoints use seed order 3/7:
+
+| Source | Center | Canonical | Full functional | Retained geometric |
+| --- | --- | --- | --- | --- |
+| GBACP-UD04 | 1774 / 1624 | 834 / 1121 | 687 / 685 | 543 / 689 |
+| TestScheduling-t020m10r03-1 | 8025 / 6132 | 7541 / 5727 | 6674 / 5708 | 7541 / 6085 |
+
+Geometric GBACP improves one functional endpoint and loses the other; both
+TestScheduling endpoints lose to functional guidance, and seed 7 also loses to
+canonical guidance. Calling-thread walk allocation is 106–109 MB for geometric
+GBACP versus 1.29–1.30 GB functional and 35–37 MB canonical. TestScheduling uses
+90–110 MB versus 218 MB functional and 30–33 MB canonical. Ordered, instrumented
+walk times are 1.14–1.57 / 9.64–11.15 / 0.79–1.80 seconds on GBACP and
+0.77–0.86 / 1.51–3.61 / 0.39–1.46 seconds on TestScheduling, respectively.
+These are changed trajectories, without a general throughput or memory claim.
+
+Geometric preparation costs 20–206 ms and 2.6–12.0 MB; checked center mapping costs
+2.7–14.7 ms and 1.4–4.0 MB. Initial observation costs 8–54 ms and 1.0–2.1 MB;
+private seed probing costs 0.27–1.17 ms and 0.23–0.32 MB. Final native checks cost
+2–8 ms outside the walk timer. The full capture command takes 50.5 seconds,
+including loading, all views, probes, validation, handle closure and serialization;
+compression accounts for 0.735 seconds and 1.91 MB outside walk allowances.
+The Linux/amd64 JVM uses a 2 GiB heap, Serial GC and one active processor, as
+recorded in its command; inherited CLI provenance options describe a separate
+3 GiB CLI configuration. Runtime, compiler and distribution hashes stay in the
+capture. The preparation/upload-inclusive deadline failure in
+[8790](https://lab.eignex.com/jobs/8790), its spent-allowance retry and the
+pre-execution cancellation of 8788 supply no efficacy evidence.
+
+The whole-CLI [consumer matrix 8789](https://lab.eignex.com/jobs/8789), at
+`7ec9a79a17`, fixes seven source identities, seeds 3/7, P1 and ten-second
+containing budgets. GBACP and TestScheduling are mechanism-informed controls;
+the other five selected families are frozen consumer holdouts, separate from
+fresh default admission. C, F and G denote canonical, full-functional and geometric
+guidance with `cbls-plateau/ils-basin`. Pairs are actual retained two-slot races
+under the same total budget, including ordinary slot seed offsets and restarts;
+F+F and C+C supply seed-diversity controls. Ordinary mixed retains its complete
+workers and default source policy. All 112 cases finish without a case failure.
+Original hashes, compiler, distribution and runtime fingerprints match across
+arms on one Mac/aarch64 runtime, with a 3 GiB heap, Serial GC, one active processor
+and debug enabled. All 93 final witnesses pass the independent XCSP3 checker.
+The nineteen missing points remain unresolved. Values are exact minimization
+endpoints in seed order 3/7; `p` is a native optimum label, without independent
+proof certification.
+
+| Source | C | F | G | C+C | F+F | F+G | C+G | Ordinary mixed |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| RCPSP-j120-01-01_c22 | 505 / 539 | 508 / 539 | 505 / 539 | 522 / 530 | 520 / 529 | 521 / 529 | 522 / 529 | 114 / 110 |
+| Warehouse-60-120-01_c22 | 40403 / 44624 | 40403 / 43764 | 38924 / 42318 | 43515 / 44755 | 44791 / 44534 | 38412 / 43794 | 42766 / 48366 | 20859 / 18312 |
+| GBACP-UD04_c23 | 615 / 542 | 615 / 687 | 469 / 469 | 615 / 542 | 618 / 616 | 469 / 469 | 471 / 469 | 689 / 618 |
+| FlexibleJobshopScen-dh-5-16-005_c25 | 4024 / none | 4075 / none | 4024 / none | 3424 / 3696 | 3453 / 3365 | 3669 / 3731 | 3644 / 3617 | 1535 / 1403 |
+| TestScheduling-t020m10r03-1_c24 | 4954 / 4893 | 4972 / 4546 | 5711 / 5040 | 4951 / 4237 | 4916 / 4339 | 4802 / 4749 | 4954 / 3796 | 1876 (p) / 1876 (p) |
+| BinPacking2-n1c1w1a_c24 | 26 / 26 | 26 / 26 | 26 / 26 | 26 / 26 | 26 / 26 | 26 / 26 | 26 / 26 | 25 (p) / 26 |
+| NurseRostering-10_c22 | none / none | none / none | none / none | none / none | none / none | none / none | none / none | none / none |
+
+Only GBACP and TestScheduling qualify geometric proposals: twelve requested cases
+emit candidates after live-cone qualification. The other thirty geometric cases
+decline to canonical execution; their deadline-dependent differences supply no
+geometric-view evidence or family-wide inapplicability result. NurseRostering
+supplies no point in any arm, and the three single-worker FlexibleJobshop seed-7
+runs also supply none. These unavailable outcomes are retained.
+
+GBACP's single geometric and F+G workers reach checked 469 in both seeds, beating
+all canonical, existing functional, equal-budget seed-diversity and ordinary mixed
+controls. TestScheduling's single geometric worker loses both functional endpoint
+comparisons. F+G beats F+F at seed 3 and loses at seed 7; C+G improves seed 7 over
+C+C but loses seed 3. Ordinary mixed proves TestScheduling's 1876 optimum in both
+seeds and BinPacking2's 25 optimum in seed 3; the LS alternatives retain neither
+those proof outcomes nor their quality.
+
+Whole-CLI resource receipts bind by SHA-256 to all 112 solve records. They include
+solver preparation, native validation, search and closure; parent bench/corpus
+work and independent checker time remain separate. Final source checking costs
+106–387 ms per witness. Native first-feasibility timestamps are scalar observations;
+only the final complete instantiations receive independent checking.
+On GBACP, geometric and functional workers both take 10.12/10.11 seconds; peak RSS
+is 240384/222544 versus 242368/239024 KiB, and user CPU time is 13.08/11.79 versus
+13.31/12.61 seconds. Mac CPU reservations permit JIT bursts. F+G takes
+10.12/10.10 seconds and 251184/243632 KiB, versus F+F's 10.21/10.10 seconds and
+232896/241600 KiB: the composition retains its RSS increase. On TestScheduling,
+single geometric takes 10.12/10.12 seconds versus functional 10.12/10.11 seconds;
+RSS is 232240/232560 versus 232656/230992 KiB. Ordinary mixed completes its two
+proofs in 0.76/0.66 seconds at 205520/206432 KiB. Process RSS and calling-thread
+allocation have different scopes; neither the replay nor this deadline matrix
+establishes a general speed or memory improvement.
+
+These checked GBACP transitions and bounded consumption qualify an explicit
+research consumer using one prepared model. Root-start discovery and checked-center
+improvement remain separate observations. The TestScheduling losses, absent
+holdout capabilities and stronger ordinary proofs preserve default routing; the
+[held-out admission](#held-out-objective-guidance-admission) rejects a default.
+
+The frozen worker-seed 3/7 captures at `12be285415` and `356449b93a` retain
+[mixed preparation](https://lab.eignex.com/jobs/8531),
+[local-search preparation](https://lab.eignex.com/jobs/8581), and
+[reserved scheduling](https://lab.eignex.com/jobs/8593) controls. Together with the
+bounded Warehouse and other reserved-source captures, 2,176 paired candidate
+observations have matching complete source destinations and equal raw, weighted
+and objective deltas. These sampled controls establish no grading diversity.
+Prepared functional objectives are available on GBACP-UD04 and
+TestScheduling-t020m10r03-1: integer hotspot sets change from 216 terms to 139 leaves
+and from one output to 20 leaves respectively, while native endpoints and costs
+differ. TestScheduling's functional walks allocate 1.66–1.78 GB on the calling
+thread versus 0.22–0.29 GB for retained linear walks; these ordered, instrumented
+captures measure neither whole-process memory nor a general speedup.
+CarpetCutting points decline the complete round trip. Warehouse-60-120-01 and
+NurseRostering-10 exceed the capture limits; size-selected Warehouse-40-80-00 fits
+and supplies equal-grade retained/substituted controls. Those refusals give no
+family-wide eligibility conclusion. The [frozen Cargo default control](https://lab.eignex.com/jobs/8576)
+returns UNKNOWN in all three 30-second Linux runs; it emits no checked witness.
+Native profile endpoints supply no independent source-witness or portfolio evidence.
+
+The ordinary [reserved comparison](https://lab.eignex.com/jobs/8642) fixes
+`8a850f3c2f`, sole-arm LS, the existing `cbls-plateau/ils-basin` recipe, normalized
+class weights and lambda 1. Discovery families are CarpetCutting, RCPSP,
+SchedulingOS, Warehouse and GBACP; Cargo, FlexibleJobshopScen, TestScheduling,
+BinPacking2 and NurseRostering were reserved as whole holdout families before
+selection. Cargo stays in its separate frozen default control. The other nine
+original sources each receive three views, seeds 3/7/11, a 10,000-move allowance
+with a 30-second deadline, and a separate ten-second allowance. Preparation consumes
+the containing budget. All 162 cases complete: 138 feasible endpoints pass the
+independent original-source XCSP3 checker, six FlexibleJobshopScen seed-7 cases
+and all 18 NurseRostering cases return UNKNOWN. No outcome carries a proof.
+Every original source hash matches its reservation; all 162 external resource
+receipts bind by SHA-256 to their native solve records. Infrastructure failures
+before the accepted recovery supply no solver observations.
+
+Functional-objective availability is true only for GBACP and TestScheduling in
+this cohort. The other seven requested functional treatments fall back to raw
+linear grading and supply no functional-view evidence. Retained and substituted
+views have equal feasibility and exact endpoints in all 27 work-limited groups;
+four time-limited groups differ, without an isolated grading-cause claim. Exact
+checked minimization endpoints below use seed order 3 / 7 / 11. Retained and
+substituted endpoints coincide for both displayed sources.
+
+| Source | Allowance | Retained/substituted | Functional |
+| --- | --- | --- | --- |
+| GBACP-UD04 | 10,000 moves | 687 / 543 / 974 | 614 / 686 / 685, wall-censored |
+| GBACP-UD04 | 10 seconds | 615 / 544 / 833 | 615 / 762 / 759 |
+| TestScheduling-t020m10r03-1 | 10,000 moves | 5060 / 4893 / 5042 | 4944 / 4546 / 4857 |
+| TestScheduling-t020m10r03-1 | 10 seconds | 4954 / 4893 / 4758 | 5090 / 4546 / 4891 |
+
+GBACP functional runs reach only 3,745 / 1,515 / 3,818 moves at the deadline;
+their endpoints are not matched-10,000-move gains. All TestScheduling work runs
+complete 10,000 moves, but whole-CLI wall time rises from 5.71 / 4.38 / 1.53
+seconds to 17.69 / 15.17 / 7.53 seconds, and CPU time from 5.61 / 4.26 / 3.21
+to 17.50 / 14.97 / 9.77 seconds. Peak RSS is 151100 / 139340 / 232608 KiB
+versus 133220 / 132604 / 233248 KiB, so allocation growth in the profiles does
+not imply uniformly higher process memory. GBACP work-run RSS is
+229232 / 133704 / 216336 KiB versus 238320 / 159076 / 238960 KiB.
+Preparation is similar within each source/host: TestScheduling retained
+330 / 294 / 70 ms versus functional 374 / 296 / 71 ms; GBACP retained
+160 / 625 / 157 ms versus functional 171 / 678 / 159 ms. Hint construction
+is common to the treatments before the diagnostic gradient filter.
+
+Native attribution preserves scalar feasible-objective trajectories and first
+feasibility timestamps, while only the final full source instantiation is emitted
+for independent checking. For example, CarpetCutting retained/work seed 3 reports
+first native feasibility at 33 ms, first process-relative feasibility at 310 ms,
+and finishes the CLI at 613 ms with checked objective 1028. CLI completion bounds
+the first available independently checkable witness; the earlier scalar points
+have no independent first-feasibility validation. Whole-process receipts exclude
+the parent bench and independent checker. The JVM uses `-Xmx3g`, Serial GC and
+`ActiveProcessorCount=1`; advisory Mac CPU allowances permit JIT bursts. Every
+source/seed/allowance view triplet shares a host, with Linux and Mac strata kept
+distinct. These observations support within-triplet comparisons, not pooled
+hardware throughput or portfolio claims.
+
+The source-projected endpoint captures at `d1648fa6e9`,
+[GBACP](https://lab.eignex.com/jobs/8660) and
+[reserved TestScheduling](https://lab.eignex.com/jobs/8661), use seeds 3/7 and the
+same bounded profile recipe with `basins=true`. Their 768 matched candidates,
+combined with the earlier 2,176, give 2,944 equal-grade observations at identical
+complete source destinations. Retained and substituted models in these four
+captures have identical prepared linear objectives and factor descriptors, and
+identical source trace prefixes; they supply a coalesced representation control.
+The 367 recorded attempts contain 365 native policy local optima and two censored
+functional GBACP attempts; another 1,629 attempts exceed the trace cap and are
+declined. Trace copies read 2,767,023 coordinates. Distinct declared-input
+endpoints are 25/30 retained versus 15/16 functional for GBACP, and 29/31 versus
+32/27 for TestScheduling. No retained/functional endpoint is shared within these
+bounded prefixes. Integer-input displacement ranges are 0–112 / 5–114 versus
+0–92 / 0–97 for GBACP, and 0–22 / 1–21 versus 1–22 / 1–15 for TestScheduling.
+These are policy-qualified endpoints under changed proposal sets, not exhaustive
+source basins, independently checked profile witnesses or grading diversity.
+
+Retain the existing maintained functional-cone view as a capability-gated
+complementary research candidate: exact closure and complete source correspondence
+admit different searched coordinates, source endpoints and checked quality.
+TestScheduling improves all three work endpoints but loses two of three clock
+comparisons; GBACP has one clock win, one tie and one loss with severe work-run
+censoring. Reject a general substitution-diversity or default/portfolio benefit
+claim. The evidence supports no wider admission, Cargo adjustment or new
+neighborhood, and the diagnostic CLI treatment used by the study is not a
+production selector.
+
+### Held-out objective-guidance admission
+
+The admission protocol was frozen at `d9f127f275` before any outcome. It selects 16
+xcsp3-cop minimization families unexposed to the representation studies, by objective
+text alone: functional expressions (CyclicBandwidth, Filters, LargeScaleScheduling,
+LowAutocorrelation, NursingWorkload, SREFLP, ButtonsScissors, PSP2) or sums over
+declared auxiliaries (CVRP, KMedian, VRP, TSPTW1, TSPTW2, PSP1, MultiAgentPathFinding,
+IHTC). Each family contributes the first two members ordered by `sha256("3621:<name>")`.
+GBACP-UD04, TestScheduling-t020m10r03-1, Warehouse-40-80-00 and Cargo-09-1s-18 are
+reported controls. [8824](https://lab.eignex.com/jobs/8824) runs `f638e5004d`, default
+mixed, P1, 30 seconds, source validation and seeds 3/7/11. Arms are ordinary default,
+single `functional`/`canonical`/`geometric` guidance with
+`arm=cbls-plateau/ils-basin`, the `functional,geometric` composition and the
+`functional,functional` seed control. Every guidance arm replaces the curated LS pool,
+as the explicit-pool contract requires.
+
+All 648 cases run on Linux/amd64, with the six arms of each problem/seed group on one
+host, and every source hash matches the frozen draw. The 263 points all pass the
+independent XCSP3 checker; 372 cases return UNKNOWN. Thirteen
+LargeScaleScheduling-03200 cases, ordinary ones included, are killed at about 80
+seconds without a record ([#3722](https://github.com/Eignex/klause/issues/3722)). No
+holdout arm loses a native proof; TestScheduling proves 1876 in every case. Ordinary
+Cargo returns no point, as in [8576](https://lab.eignex.com/jobs/8576); only the
+composition reaches one, 49497 at seed 3.
+
+Live-cone qualification succeeds on ButtonsScissors, CyclicBandwidth, Filters, IHTC,
+LowAutocorrelation, MultiAgentPathFinding and NursingWorkload, and declines on the
+other holdout families. ButtonsScissors, MultiAgentPathFinding and NursingWorkload,
+like PSP1 and both TSPTW families, have no point in any arm. A declining slot runs
+canonical guidance, so a decline is not neutral against `functional,functional`.
+Net wins minus losses over member/seed pairs, where a checked point beats none, for
+the qualified families with points and GBACP:
+
+| Family | Composition vs ordinary | Composition vs seed control | Geometric vs functional | Functional vs ordinary |
+| --- | --- | --- | --- | --- |
+| CyclicBandwidth | +1 | +2 | +2 | -1 |
+| Filters | 0 | +3 | +2 | -3 |
+| IHTC | +3 | +2 | -1 | +3 |
+| LowAutocorrelation | +1 | +1 | +3 | -2 |
+| GBACP (control) | -1 | +3 | +1 | -1 |
+
+The geometric slot supplies the final checked incumbent in all three LowAutocorrelation
+and GBACP composition runs and two IHTC runs, mostly after a functional-slot first
+witness. These are improvement-phase transitions, so retirement at the first witness
+would discard them. On qualified families, composition median whole-process CPU
+ratios are 0.998–1.000 against both controls at the deadline, and peak RSS ratios
+against ordinary are 0.97–1.08.
+
+The frozen rule rejects default admission. The composition beats both ordinary and seed
+controls in three qualified families and loses in none, at matched cost, but loses five
+checked holdout points against ordinary: all three SREFLP-sko049-1 seeds, CVRP-A-n38-k5
+seed 11 and VRP_LC-09-05-10-s1 seed 11. The explicit functional control loses the same
+SREFLP points, so the loss comes from replacing the curated pool on models where the
+view declines. Objective guidance remains an explicit research option and functional
+guidance the ordinary default. A qualifying rule would leave the curated pool intact
+where cones decline, fall back to functional guidance, and need families this cohort
+has not exposed.
+
+### Finite conflict selection
+
+`bench.profile.FiniteConflictSelection` takes `suite=ID problem=NAME sha256=HEX
+center=v0,v1,... seed=N` for a hash-pinned XCSP3 optimization source with an explicit
+feasible center. It admits an unchanged integer coordinate frame with every coordinate
+named in the source and no frontend-declared definitions, at most 1,024 coordinates
+and 4,096 factors. The source bytes, request and build identity accompany the records.
+A `batch64` JSON array of argument arrays compares several pinned controls in one
+lab profile. The [weighted Latin control](smoke-corpus/finite-repair-evidence/README.md)
+has an exact feasible center and lower-bound witness.
+`acquisition=source-root|sampled-fragment` selects a full-source prefix or a
+count-matched random repair prefix under explicit complement pins. The fragment
+draw uses `seed + 1`; final selector ties use `seed`. Both acquisition arms retain
+their actual origin pins and share the same prefix.
+`semantic=Assignment|Resource|Placement` adds the corresponding
+`SemanticBlockRemoval` control from the selected revision. It retains the complete
+returned packet, including fixed role coordinates, and matches counts using only
+movable source inputs. A size mismatch records a decline without repair; packets
+are neither truncated nor retried to meet the target. Construction and closure
+consume the same containing deadline, with visit and allocation costs retained.
+
+Random, objective and adjacency removal compare with CP-conflict-supported removal
+at the same center and requested count, using 2/3/4/8 movable inputs where admitted.
+A separate acquisition-ablated random arm
+pays for the same 128-decision CP prefix as the guided arm. Acquisition, a repair
+of at most 1,000 decisions and a descent of at most 128 moves share one 2,000-unit
+native search allowance and a five-second deadline; capture, selection and source
+checks consume that deadline. Root-fixed coordinates are
+excluded, and effective definition-closed freedom counts must match before repair.
+Records retain captured support weights, unavailable/empty outcomes, acquisition
+points, repaired objectives, native original-source checks, work, allocation and
+separate acquisition/selection clocks. The shared repair trace records the first
+qualified source-coordinate greedy descent endpoint with the declared tie seed;
+candidates use explicit feasible greedy acceptance, and censored descents remain
+unclassified. Source input distance and checked objective
+after descent stay separate from repair acceptance. These instrumented controls
+establish no independent witness check, global proof, basin classification or
+ordinary portfolio throughput.
+
+`numerical=true` adds captured relaxation-point disagreement, producer-projected refutation
+support and numerical-acquisition-ablated random arms. These admit the unchanged
+integer frame only when its complete affine source context is available.
+`numerical-cuts=true|false` selects the acquisition's existing cut policy. Each
+numerical acquisition advances the real source authority once; context preparation,
+the strict query-local objective cutoff, capture, projection and selection debit
+one containing source funding ledger. Objective cutoffs retain the supplied source
+direction and units. The same acquisition's recovered incumbent is source-checked
+and separately credited; its pre-recovery point remains relaxation guidance.
+Integral complete points also receive the original-source finite check; fractional
+or incomplete integer points are explicitly not source witnesses.
+
+Numerical comparisons give every arm a 2,000,000-unit containing ceiling, the sum
+of native search units and modeled source work, with the same five-second deadline,
+1,000-decision repair and 128-move descent limits. Both work components, source
+allocation, physical time and thread allocation remain separate; their units do
+not imply equal CPU cost. Numerical owners close within acquisition accounting.
+The existing bounded numerical journal retains scopes, points, masks, supports and
+native evidence checks. Whole-packet/count mismatches and unavailable feedback
+remain explicit. Linear [fixture controls](smoke-corpus/finite-repair-evidence/README.md)
+separate coordinated freedoms, fractional guidance and independent recovery.
+
+The `numerical-disagreement-completed` and `numerical-refutation-completed` arms
+consume the same acquisition through source-row completion. They take one draw at
+the requested count; a request smaller than every complete packet declines without
+repair rather than truncating or retrying. Records keep each seed's packet outcome,
+planned values, the row that added every member, the consumed packet inputs and the
+ranked fill count. Each consumed packet member also gets a proper-subset control:
+the same effective freedom without that member, repaired from the same center under
+its own 1,000-decision allowance and the shared deadline. Those controls are not
+charged to the arm; an exhausted subset without improvement shows that the removed
+input was required at that center.
+
+### Conditional component traces
+
+`bench.profile.ConditionalComponentTrace` takes repeatable `source=SUITE:PROBLEM:SHA256`
+and optional `searchMillis` (10,000), `traceMillis` (15,000), `prepareMillis` (60,000)
+`seed` (3), `probes` (3) and `probeMillis` (2,000). Two self-authored two-five-cycle WCNF controls run first: the bridge
+`s or x(0) or y(0)` as stated (optimum 6), then with `s` hard-true (optimum 7, two
+independent cycles). Each hash-checked source goes through finite preparation with the
+CLI's presolve allowance, then `satOptimized` minimization. A wrapping variable selector
+samples every branch point for 4,096 picks, then every sixteenth, until the trace
+allowance is spent; sampling time is excluded from the search deadline. A sample joins
+the free coordinates of every live factor: a clause with a true literal is discharged,
+and every other factor, including clauses with atom literals, connects all its free
+coordinates. The objective is treated as additive, so splits are an upper bound for a
+decomposition that must also respect an incumbent cutoff. A component's key hashes each
+live factor's residual in factor order; a key seen again after an intervening retraction,
+conflict or restart counts as a re-encountered child obligation. Every eighth sample re-joins with
+learned clauses, with and without permanent incumbent-scoped entries. Up to `probes` split
+nodes keep their residual clauses; after the search each component and the joint residual
+are solved as fresh `satOptimized` models, and the joint residual once more with
+`LpConfig(LpEmphasis.DEFAULT)` as the ordinary-bounds control. The children share one allowance equal to the
+joint solve's, carry no incumbent cutoff or learned clause, and an unfinished child leaves
+the composition open. The composed witness is reconstructed and checked against the
+original clauses, and later sightings of each probed key are reported. Records retain
+source hashes, preparation outcome, the solve result, and native original-clause checks
+of the reconstructed witness; non-clause factors are counted as unchecked. A trace
+establishes residual structure only, not reuse savings or portfolio throughput.
 
 ### Table profiling
 
@@ -1443,6 +2395,37 @@ excluded integer value. Run CP/LS arms with default and exact modes; Klause-lab 
 the recorded witnesses against the original MiniZinc source.
 
 ## Design evidence
+
+### Conditional component composition
+
+[Conditional component traces](#conditional-component-traces) cover the eleven
+WCNF sources of status sweep [8846](https://lab.eignex.com/jobs/8846) at `364582ebf`,
+all feasible and unproven at ten seconds, plus the two-five-cycle controls. Jobs
+[8852](https://lab.eignex.com/jobs/8852), [8856](https://lab.eignex.com/jobs/8856) and
+[8858](https://lab.eignex.com/jobs/8858) ran at `f6dc3eca`, `7a315f07` and `891e11ae` on
+one Linux/amd64 vCPU with 4.6 GiB and JDK 25. Every prepared factor is a clause, so no
+enforcing relation is outside the trace.
+
+The conditioned control splits at its root into the two cycles. Children of 3 and 3 plus
+the fixed separator compose to 7 in 20 nodes, against 82 for the joint residual. Across
+the sources, all ten closed node compositions equal the joint optimum, every composed witness
+passes the original clauses, and child and joint refutations agree in four probes.
+
+Independence is narrow. One source never splits. On six others a giant component holds
+the residual: split-off children carry at most 6% of free variables, the giant stops
+without a verdict, or no probe-eligible split appears. Wall-time gains appear only at shallow balanced splits under the
+trivial objective bound: an auctions node solves 161 and 9 clauses in 31,810 nodes and
+59 ms against 137,777 nodes and 235 ms joint, and a preference-planning node closes its
+children where the joint residual stops at two seconds. Elsewhere, per-child model cost
+exceeds the saved nodes. `LpConfig(LpEmphasis.DEFAULT)` left every joint node count
+unchanged. Re-encountered child keys are mostly at most nine clauses solved in at most
+22 nodes, while a full residual scan costs about eight search nodes on auctions and
+milliseconds per sample on the largest sources. Incumbent-scoped learned entries merge
+many splits; non-permanent learned clauses merged splits only on tcp.
+
+The retained scope shows no consumed reuse under containing allowances, so no traversal
+or cache integration follows. Raw records are under
+`klause-evidence/campaigns/conditional-components-3724/`.
 
 ### Bounded retained integer probing
 
@@ -1573,7 +2556,363 @@ unit-weight scheduling normalization. The scheduling failures in
 [8164](https://lab.eignex.com/jobs/8164) are errors and supply no UNKNOWN verdict
 or search evidence.
 
+### Global and extensional scoring comparisons
+
+`bench.profile.GlobalScoringComparison` consumes the paired source-state capture
+with `sets=global-scoring-core-v1,global-scoring-holdout-v1`, optional `seeds`,
+`moves`, `millis` and `captures`. Defaults are seeds 3/7/11,
+2,000 moves, 2 s per walk and three observations per walk, using `cbls/fixed`.
+The core and whole-family holdout sets freeze membership independently.
+Alternatively, supply one original source with `suite`, `problem`, decoded-source
+`sha256` and `source64`, omitting `sets`. This uses the shared trajectory source
+loader: standard Base64 without line breaks, at most 96 KiB encoded, with exact
+decoded hashing before parsing. Embedded mode retains the supplied identity and
+bytes without rechecking catalog membership. It records `sourceMode=embedded`,
+the original XML, request and build/runtime provenance.
+Omitting `source64` with the same identity/hash arguments resolves one catalog
+source instead. Interrupted walks retain their completed observations and
+decline an endpoint while a selected operation may remain private.
+
+The pairwise treatment sums equal present, non-excepted position pairs within
+each admitted `AllDifferent`, retaining repeated coordinates, canonical factor
+weights, native payload maintenance and native proposals. It admits at most 64
+positions and 64 excepted values per factor. Greedy initialization and implicit
+seeding are disabled in both walks. This compares one shared weight per source
+factor; it does not give separate learned weights to individual disequalities.
+Walks normalize weights by factor class and retain allocated learned weights;
+paired shadow probes use unit weights. Completed fixed-work endpoints are budgeted
+trajectory points, without local-exhaustion or basin classifications.
+Other globals, including affine `Distinct`, retain their canonical scores.
+
+Ground tables become tries using only their explicit rows. MDDs become tables
+using only accepted paths: at most 64 columns, 65,536 words per input array or output relation, 1,024
+accepted paths and 262,144 construction visits. Short tables, nondeterministic
+weighted diagrams, overflowing path sums and oversized relations decline without
+publishing partial views. Deterministic weighted paths include their summed cost
+as a relation column; aliases remain repeated columns. These factor substitutions
+are private grading probes and do not change propagation or run alternate walks.
+
+The diagnostic bounds native extensional payload estimates before opening states,
+captures at most eight alternate relations per source, and limits captured
+grade/coordinate cells to 8,388,608. Every decline remains in the output.
+Original source hashes, effective semantics, build/runtime identities, paired
+grades and primitive deltas, RNG boundaries, canonical residuals, endpoints,
+preparation, native work and available thread allocations accompany the capture.
+Fixture captures cover collision ranking, optional/excepted aliases and weighted
+cost grading. Captured points have no independent witness or proof authority;
+instrumented walk timings do not establish ordinary solver throughput.
+
+At `efc74e907e`, [mandatory and weighted controls](https://lab.eignex.com/jobs/8509)
+retain exact source/destination pairing and show changed pairwise collision grades.
+For `[0,0,0,1,1]`, native distinctness gives both tested repairs delta -1;
+pairwise grading gives -2 and -1. The weighted MDD/table fixture reverses some
+adjacent symbol rankings, but the direct cost repair from 2 to 5 is best under
+both grades. That fixture supplies no complementary-witness result.
+
+[Overlap MDD](https://lab.eignex.com/jobs/8510),
+[overlap tables](https://lab.eignex.com/jobs/8511) and eight admitted
+[Eternity tables](https://lab.eignex.com/jobs/8517) retain equal unweighted grades
+and primitive deltas at mapped states. Both representations minimize positional
+Hamming distance over the same accepted words; this rejects grading diversity
+for this unweighted substitution. Each Eternity trie consumes 980 row-cell
+visits and 144,160–144,272 thread-allocated bytes; the other 41 relations retain
+the capture-limit decline. No domain product is constructed.
+
+The same captures and [BlockedQueens](https://lab.eignex.com/jobs/8512),
+[MagicSquare-sum](https://lab.eignex.com/jobs/8513),
+[QuasiGroup](https://lab.eignex.com/jobs/8514),
+[HyperSudoku](https://lab.eignex.com/jobs/8515) and
+[AnotherMagicSquare](https://lab.eignex.com/jobs/8516) compare satisfaction walks
+with seeds 3/7/11, 2,000 moves and a four-second deadline per walk. All admitted
+walks finish within the deadline. Magic-square-3 reaches native SAT under both
+grades, taking 15/8/7 native moves against 15/32/78 pairwise moves. HyperSudoku
+reaches native SAT only under native grading, at 1,471 moves for seed 7.
+The other walks exhaust the move allowance. Their common unit-weight native
+endpoint grades are:
+
+| Source | Native walk, seeds 3/7/11 | Pairwise walk, seeds 3/7/11 |
+| --- | --- | --- |
+| BlockedQueens | 6 / 4 / 5 | 8 / 4 / 5 |
+| MagicSquare-sum | 7 / 7 / 14 | 9 / 14 / 12 |
+| QuasiGroup | 83 / 22 / 47 | 26 / 36 / 106 |
+| HyperSudoku | 11 / 0 / 14 | 6 / 8 / 9 |
+| AnotherMagicSquare | 80 / 145 / 68 | 96 / 120 / 84 |
+| Eternity | 31 / 34 / 30 | 40 / 47 / 47 |
+
+These bounded endpoints have no local-exhaustion claim. Changed grades and
+trajectories add no native witness here; the reserved families include a lost
+HyperSudoku witness and worse Eternity endpoints under the common metric.
+Captures retain preparation, moves, allocations and runtime/dependency hashes
+on Linux/amd64 with Temurin 25.0.4.1. Their ordered, instrumented timings provide
+no ordinary-route speedup or independent source-witness claim.
+
+[WordDesign admission](https://lab.eignex.com/jobs/8526), at `5e403b8b48`, loads
+the original catalog source with decoded SHA-256 `341306d8…bcbeda` and declines
+before opening states: 15 tables and 105 MDDs imply 130,869,060 private extensional
+cells against the 1,048,576-cell diagnostic limit. The remaining factors are 14
+lexicographic constraints. This is an explicit payload boundary, without a search
+or general inapplicability claim. The source remains in the ordinary cohort.
+
+[Source-checked comparison 8533](https://lab.eignex.com/jobs/8533) retains all ten
+frozen sources, seeds 3/7/11 and two repeats. Native and pairwise score-only arms
+use `3514ea77f5`, explicit one-arm `cbls/fixed`, greedy/implicit seeding disabled,
+LP off and presolve off. Ordinary LS recipes and mixed/default-LP/default-presolve
+controls use `133546fd6f`. Each case has P1, 10 s and 2,500 shared work units,
+admitting at most 2,000 LS instructions. The ordinary controls retain their
+configured composition; this allowance need not exercise every configured arm.
+Corpus decoding belongs to selection preparation, and every record retains its
+original decoded-source hash. All 240 cases complete after infrastructure retries;
+the four killed CLI records remain failures.
+
+| Treatment | Independently valid feasible records | Unknown | Native infeasible | Failed CLI |
+| --- | --- | --- | --- | --- |
+| Native score only | 14 | 46 | 0 | 0 |
+| Pairwise score only | 12 | 48 | 0 | 0 |
+| Ordinary LS recipes | 16 | 40 | 0 | 4 |
+| Ordinary mixed defaults | 18 | 36 | 6 | 0 |
+
+Every feasible record passes XCSP3-tools SolutionChecker 2.5.1 at `ca58fc79a4`,
+checker JAR SHA-256 `388d47f7…038b7`; no feasible record remains unchecked.
+The six infeasible mixed results are native proofs on the overlapping-table
+control, without independent proof validation. Both score-only arms cover the two
+small satisfiable controls; native grading additionally covers HyperSudoku seed 7
+in both repeats, while pairwise grading adds no source. Ordinary controls also
+recover QuasiGroup, and mixed covers HyperSudoku seed 11.
+
+For HyperSudoku seed 7/repeat 0, native grading produces its checked witness at
+818 ms process time after 1,142 moves/1,427 work units; pairwise grading consumes
+2,000 moves/2,500 work units without one. Frontend and preparation times are
+110/65 ms native and 167/31 ms pairwise. Whole-CLI GNU time reports 0.89 s wall
+time for each, 0.77/0.80 s user CPU and 98,032/95,936 KiB peak RSS. These runs use
+Temurin 25.0.4.1, `-Xmx3g`, Serial GC and one active processor. Allocation is not
+collected by this external timer. The four WordDesign LS failures have exit 137
+and associated cgroup OOM receipts under the 4,608 MiB group limit; they are not
+unknown solver verdicts or scoring-view gains.
+
+Keep these alternatives in bench tooling. Unweighted Table/MDD substitution
+offers no grading distinction; the weighted fixture establishes semantics and
+grade differences without a useful checked-search result. Pairwise collision
+grading loses checked coverage and adds none against the native and ordinary
+controls at this allowance. This supplies no runtime admission prerequisite for
+#3620 or #3621. Other weighted grades, fragments and budgets remain untested.
+
+### Maintained and searched channel viewpoints
+
+The bounded channel views retain every relation, source domain and pin. Objective
+coordinates are protected and the full functional objective view is fixed across
+maintained, searched-value and searched-predicate treatments. Native inverse-role
+views transpose disjoint bijections and reuse the existing repairs and swaps.
+These capabilities are exposed through diagnostic consumers.
+
+[8527](https://lab.eignex.com/jobs/8527) loads twelve ProgressiveParty states through
+the production retained-coordinate projection and compares 384 common destinations
+with equal raw and weighted deltas. Its empty working definition network makes it
+a no-op control. [8542](https://lab.eignex.com/jobs/8542) holds the initial
+MisteryShopper named assignment and RNG boundary fixed with plain CBLS and no greedy
+initializer; all 384 common primitive destinations have equal deltas. Implicit
+ownership in [8490](https://lab.eignex.com/jobs/8490) admits no primitive candidates,
+so that empty sample establishes no grading equivalence.
+
+Warehouse [8553](https://lab.eignex.com/jobs/8553) and
+[8554](https://lab.eignex.com/jobs/8554) qualify the 8,192-coordinate bound on a
+6,641-coordinate source. Default preparation leaves 3,280 maintained definitions;
+the presolve-off value treatment retains 3,240 of 6,520. Each capture admits six
+paired states and rejects six searched-origin states by the complete source round
+trip. All 192 candidate destinations differ in lowered auxiliaries while their
+named source decisions agree. Their grades cannot isolate a common-destination
+effect. Reserved NurseRostering-01 captures
+[8571](https://lab.eignex.com/jobs/8571) and
+[8572](https://lab.eignex.com/jobs/8572) similarly have six paired states, six
+round-trip rejections, 191 changed complete destinations and one common destination
+with equal raw, weighted and objective deltas. Named decisions agree at all 192
+destinations. The walks sample 238 distinct named assignments with maintained
+channels versus 239 predicate and 241 value assignments, with no intersection.
+Their initial assignments differ despite an equal RNG boundary, so this divergence
+does not isolate grading. Paired diagnostics cost 315 and 226 ms respectively,
+separate from ordinary solve timings.
+
+The frozen ordinary matrices [8574](https://lab.eignex.com/jobs/8574) and
+[8575](https://lab.eignex.com/jobs/8575) run `9cf410f7e8`, P1, seeds 3/17/41,
+10,000 or one billion search-work units, and a ten-second deadline in both cases.
+Each budget starts a separate CLI process. The discovery cohort is ProgressiveParty,
+Warehouse and MisteryShopper; whole reserved families are NurseRostering-01/02 and
+two CoveringArray sources. Original hashes, build/runtime fingerprints, resource
+receipts and final source checks accompany every case. The ownership matrix has
+216 Linux/amd64 and 54 Mac/aarch64 cases; each problem/seed group keeps all eighteen
+treatments on one host and build. The inverse matrix is entirely Linux/amd64.
+Infrastructure retries preserve accepted cases and supply no solver verdicts.
+
+All 270 ownership cases complete without application errors; all 71 published
+points and claimed costs pass the independent XCSP3 checker. Both channel
+treatments add no checked feasibility on ProgressiveParty or MisteryShopper. Mixed
+solves all three ProgressiveParty seeds at either budget; plain CBLS solves two
+work-capped and all three high-work cases. The reserved NurseRostering family has
+zero checked points from every LS treatment at either budget, while mixed checks
+all twelve cases.
+
+Warehouse-40-80-00 objectives, minimized and ordered by seeds 3/17/41, are:
+
+| View | 10,000 units | One billion units |
+| --- | --- | --- |
+| Mixed, default | 36716 / 36810 / 43959 | 19024 / 15160 / 12564 |
+| Plain CBLS, default | 33540 / 34185 / 34553 | 33398 / 34115 / 34500 |
+| Implicit, default | 33440 / 35851 / 34553 | 33406 / 34093 / 34406 |
+| Maintained, default | 33397 / 34801 / 34543 | 33349 / 34114 / 34552 |
+| Searched values, default | 37235 / 37464 / 38520 | 35811 / 37417 / 36908 |
+| Searched predicates, default | 31004 / 33762 / 32854 | 34035 / 32744 / 32833 |
+| Maintained, presolve off | 34032 / 33112 / 35754 | 34032 / 34086 / 34571 |
+| Searched values, presolve off | unknown / unknown / unknown | unknown / unknown / unknown |
+| Searched predicates, presolve off | 32051 / 31430 / 35865 | 33297 / 32297 / 32181 |
+
+Default predicate searching improves checked Warehouse quality in all three
+work-capped seeds, including against the unchanged controls. It performs 8,000
+moves in 6.29–6.47 s of whole-CLI time; maintained performs 5,208–5,344 moves and
+reaches the deadline at 10.29 s. Presolve work is 34.48–34.49 million units, and
+peak RSS ranges overlap: 145,772–147,024 KiB maintained versus 146,372–148,876 KiB
+predicate. The nominal work cap therefore does not imply equal executed work or
+include all preparation. At the high-work deadline, mixed has the best quality in
+every seed. Value searching worsens every default Warehouse objective and loses
+all six presolve-off witnesses. Initialization and changed moves remain part of
+these end-to-end results.
+
+The 126 inverse cases publish 33 independently valid points, all on
+CoveringArray-3-04-2-08. Both plain orientations solve every seed at either budget,
+but inverse requires 2,341/4,871/2,785 search units versus 720/3,621/678 maintained,
+with 15,262,301 presolve units each. Whole-CLI peak RSS ranges overlap
+(103.6–112.3 MiB maintained, 103.1–111.2 MiB inverse). Each plain orientation
+publishes three distinct source instantiations, with no overlap; this endpoint
+diversity does not establish separated attraction basins. Both implicit
+orientations solve zero work-capped and all three high-work cases, with work
+varying in both directions. Neither orientation solves MisteryShopper. The larger
+CoveringArray source has unequal channel arrays and no supported native bijection;
+all twelve inverse cases explicitly decline. One MisteryShopper inverse work-capped
+case also declines before search statistics and is excluded from work comparisons.
+Native first-feasibility times describe discovery; the independent checks certify
+each final published point and its claimed cost.
+
+Retain searched predicates as a bounded experimental option for the demonstrated
+Warehouse work-capped gain. Reject searched values and inverse roles as uniform
+replacements at these allowances. The reserved scheduling result and the stronger
+mixed deadline control leave automatic admission unqualified. Combined-channel
+captures establish correspondence capability; their ordinary solve quality is
+untested. Coordinated repair comparisons require the ownership-aware compound
+correspondence recorded in [#3612](https://github.com/Eignex/klause/issues/3612).
+
+The complete-source [center acquisition](https://lab.eignex.com/jobs/8765) at
+`96cfcb5ebb` uses `cbls-plateau/ils-basin`, seeds 3/7, 5,000 containing moves/restarts,
+five seconds including per-view preparation/mapping, and presolve off. Each
+Warehouse-40-80-00 request supplies its first cost-zero policy-local-optimum endpoint,
+with all 3,200 Boolean and 3,441 integer source coordinates. ProgressiveParty and
+NurseRostering supply only positive-cost restart/censored endpoints in both seeds;
+all four whole-family holdout requests remain unavailable. No replacement center
+or longer acquisition is used. Acquisition runs on Mac/aarch64; it supplies centers,
+not common-center efficacy or timing comparisons.
+
+The [five-second replay](https://lab.eignex.com/jobs/8770) and
+[ten-second replay](https://lab.eignex.com/jobs/8771) at `edb8146dd6` run on
+Linux/amd64 with a 2 GiB heap, SerialGC and one active processor. Both views accept
+the same complete source frames through fresh prepared maps and definition networks,
+retain their first observed source point, and start with fresh weights, tabu,
+configuration and worker RNG. Original source and runtime/distribution hashes remain
+in the captures. Exact minimized objectives use seed order 3/7:
+
+| Allowance | Maintained | Searched predicates |
+| --- | --- | --- |
+| Saved center | 39348 / 38039 | 39348 / 38039 |
+| 5,000 moves, five seconds | 37551 / 27692 | 24156 / 28597 |
+| 20,000 moves, ten seconds | 28587 / 19867 | 12012 / 14116 |
+| 1,000 moves, twenty seconds | 36399 / 34613 | 34253 / 34085 |
+
+The five-second maintained walks execute only 543/3,430 moves versus 5,000/5,000
+predicate moves; ten-second work is 3,794/7,121 versus 18,493/20,000. All maintained
+walks and the 18,493-move predicate walk are clock-censored. Every one of these
+eight endpoints passes native original-source checking and improves its saved
+center. Named source-input changes are 21/83 versus 87/69 at five seconds and
+70/93 versus 94/94 at ten seconds; Boolean auxiliary changes remain separate.
+These are source transitions, without independent XCSP3 certification or an
+exclusive basin claim: the fresh maintained controls also improve the centers.
+At five seconds predicates lose seed 7 despite executing more moves. Observed
+maintained repetitions are also censored, at 35073/27514; completed predicate
+repetitions reproduce 24156/28597. Censored repetitions grant no fixed-work parity.
+
+The [matched-work follow-up](https://lab.eignex.com/jobs/8773) holds the same
+centers, source hashes, seeds, recipe, fresh-state policy and runtime at 1,000
+containing moves/restarts with twenty seconds. All four walks complete uncensored
+and pass native source checking. Maintained/predicate named input changes are
+29/28 versus 44/26, and all paired complete destinations differ. Predicate quality
+is better in both seeds at equal work; this supports a bounded common-center
+transition result without attributing equal grades to different destinations.
+Maintained walks take 4.31/2.13 seconds and 950/888 MB of calling-thread allocation;
+predicates take 2.41/1.58 seconds and 919/903 MB. Per-view preparation/mapping costs
+1.13/0.34 seconds versus 0.42/0.28 seconds and consumes the containing deadline.
+Private initialization/probes and post-run native checks remain in full-process
+costs. Ordered instrumented captures, the five-second seed-7 loss, allocation
+variation and missing holdout centers leave throughput and default admission
+unqualified. They do not overturn the uniform value/inverse rejection.
+
+
 ### Cargo objective-coordinate trajectories
+
+`LocalSearchTrajectory` accepts `suite`, `problem`, decoded-source `sha256`,
+`recipe`, worker `seed` and `moves`, with optional `greedy`, `sliceMillis` and
+`sliceWork`. Optional `source64` supplies at most 96 KiB of base64-encoded original
+bytes instead of resolving the catalog archive; the required decoded-source hash
+still binds the input. It compares protected and substituted minimizing XCSP3 objectives.
+The source is limited to 64 MiB, 8192 finite coordinates and 8192 factors; each
+walk has at most one million moves and a shared sixty-second preparation/walk
+deadline per representation. `provenance.json`, `request.txt`, unchanged
+`source.xml`, `capture-policy.json` and both model descriptions bind the input,
+installed distribution/runtime, effective semantics, settings and slot maps.
+Ordinary solve records remain authoritative for worker seeds, initialization,
+restarts and scheduler allocations.
+
+Passive walk samples copy committed state without candidate probes or random
+draws, and never force lazy weight allocation. RNG boundaries retain the concrete
+JVM implementation and integer fields. Kotlin XorWow's Weyl addend additionally
+identifies underlying 32-bit draws modulo `2^32`; other implementations report
+the counter unsupported. Equal seeds and move counts do not isolate randomness.
+Greedy entries describe the state before the named shuffled coordinate; paired
+captures include initialization, entries 0/49/68/final and the completed pass.
+
+`paired.jsonl` uses private `TrajectoryView` states and `trajectoryPair` for the
+objective, channel and global comparisons. Explicit `VarRemap` tables describe
+source-coordinate correspondence. Every load must reconstruct every source
+Boolean and integer unchanged after definition synchronization; inconsistent
+eliminated or maintained outputs report `source-round-trip`, rather than a
+repaired counterpart. Open or real-valued sources and transformations without a
+retained-coordinate projection are outside this runner. At most twelve source states
+each perform two full loads and 32 candidate pairs. Each accepted primitive runs
+one ordinary reversible `inspectMove` probe, capturing factor grades, raw/weighted
+hard deltas and the selected objective delta; destination equality is reported
+separately. Pins, definitions, domains and implicit owners can reject a candidate.
+Candidate selection scans source slots, prioritizing the current greedy coordinate,
+and keeps common admissible root endpoints and adjacent values without random draws.
+An explicit-center repair capture keeps its single protected representation and
+reports the paired comparison unavailable.
+These bounded diagnostics are additional work, separate from free-walk budgets
+and timing; they grant no source witness or proof authority.
+
+[Paired qualification 8435](https://lab.eignex.com/jobs/8435), at `1b8ca8cd5b`,
+uses the frozen Cargo source hash, worker seed 6, plateau recipe and 30,000 moves on
+Linux/amd64 with JDK `25.0.4.1+1-LTS`. Six substituted-origin boundaries load into
+both representations. Of 192 candidate pairs, 188 reach identical complete source
+destinations: their raw and objective deltas agree, while 115 weighted deltas differ
+under the representations' class-normalized initial weights. Four moves on source
+coordinate 109 have different reconstructed destinations and are not grading controls.
+All six protected-origin boundaries lack a complete substituted counterpart; the
+diagnostic reports that boundary rather than repairing objective aliases silently.
+The 384 explicit native probes preserve their committed snapshots and RNG boundaries.
+Each paired boundary costs 2.7–27.5 ms under instrumentation, separately from the walks.
+
+The greedy trace retains 43439 versus 46194 at coordinate 109 after entry 49, with
+the same random draw boundary. Entry 68 then consumes zero versus sixteen underlying
+draws at inactive slot 315. These native observations preserve the historical
+before-RNG distinction without treating unmatched infeasible assignments as paired
+states. They establish capture capability, not complementary basins, a speedup or
+independent source-witness validation. [8422](https://lab.eignex.com/jobs/8422)
+exposes the rejected original-domain endpoint sampler; [8416](https://lab.eignex.com/jobs/8416)
+fails before parsing because its worker lacks the catalog archive tool and supplies
+no trajectory evidence.
 
 [Confirmation 8203](https://lab.eignex.com/jobs/8203) retains the frozen original
 Cargo-09-1s-18_c24 source at default mixed/P1/30 seconds on Mac/aarch64. Seed 3
@@ -2328,6 +3667,26 @@ returned SAT and passed the independent XCSP3 SolutionChecker. These external-ti
 captures establish source admission and a checked small witness, without a large
 instance verdict or a runtime speedup claim.
 
+### Bounded scheduling deadlines
+
+The bounded scheduling deadline controls reuse the original LargeScaleScheduling
+03200 and 06400 hashes from [8824](https://lab.eignex.com/jobs/8824).
+Ordinary mixed seed 7 on `364582ebfe` in [8849](https://lab.eignex.com/jobs/8849)
+publishes UNKNOWN records at 30.7 and 38.5 seconds, without reproducing the kill.
+The exact 03200 [stage capture](https://lab.eignex.com/jobs/8850) instead reaches
+the 80-second kill: both post-deadline stacks remain in cumulative edge finding
+entered by LP rounding. Its failed child, source, streams and JFR remain retained.
+
+With cumulative scan polling at `56a957019b`,
+[8853](https://lab.eignex.com/jobs/8853) runs ordinary mixed P1 for 30 seconds over
+both sources and seeds 3/7/11 on Linux/amd64. All six hashes match, and all six
+publish exit-0 UNKNOWN records and physical resource receipts at 30.44–30.57
+seconds. The [matched stage capture](https://lab.eignex.com/jobs/8854) also exits
+0 with complete UNKNOWN output. No witness or proof is claimed, so these controls
+establish deadline handling without independent witness or proof validation.
+Instrumented profiles establish no throughput result; charged scheduling visits
+also change the units included in propagation-work totals.
+
 ### Portfolio slice policy
 
 Retain the finite schedule's base 5000, maximum 150000 and growth 1.5; alternatives
@@ -2406,6 +3765,364 @@ and the saved `witness` line. It records the original and refined objective in
 source units, the working objective scale, exact completion work, allocation and
 a fresh `checkMpsWitness` result. Run it through a bounded lab profile job; native
 source checks do not constitute independent witness or proof validation.
+Optional `sourceGzip64` supplies gzip/base64 original MPS bytes from a retained
+capture instead of catalog resolution. Decompression retains the same 16 MiB
+source limit and mandatory `sha256` check; the report saves the uncompressed source.
+
+Optional `repairSets` replays arrays of original integer column names through
+`JointLinearRepair` instead of fixed-pin refinement. Each set frees precisely those
+integers, pins the full discrete complement to the source-checked saved center and
+keeps every source row and the full continuous residual. The special set
+`"comparison-disagreement"` frees the integer differences from a separately
+source-checked `comparisonWitness`; it is a diagnostic control, not an admitted
+selector. No finite domain is added. `repairMillis`, `repairOperations` and
+`repairWork` bound each cold attempt, defaulting to 1,000 ms, 256 LP operations
+and 1 billion cumulative source LP work units. Requests admit at most 128 sets.
+Reports retain exact complement pins, the strict minimized working cutoff,
+conditioned bounds, pause/terminal reasons, checked candidate objectives, native
+work, wall time and thread allocation separately. A conditioned closure can retain
+a feasible nonimproving point and never establishes a source refutation or source
+optimum. The capture is instrumented and makes no whole-CLI speedup claim.
+An entry `{"count":2,"round":1}` instead captures the existing mixed selector's
+freed set with its actual source LP guidance before replaying it at the saved
+center. Root guidance/index/selection work is recorded separately in
+`selection.json` and is excluded from each cold repair allowance; these captures
+compare repair capability at fixed freedoms, not total selector throughput.
+Original real columns with proved integer backings remain free in every replay
+residual. The selection capture distinguishes those working integer coordinates
+from the effective original integer freedoms; they never become complement pins
+solely because lowering gave them integer storage.
+
+With `repairSets`, optional `ownerReplay=true` reuses the captured source freedoms
+for the same five-owner comparison as the finite trajectory diagnostic. This
+overlap requires closed original integer declarations and closed working integer
+bounds, at most 4,096 integer/real coordinates, and an exact checked center.
+Original real backings join every free residual and consume no source integer
+freedom. Missing bounds decline this finite overlap explicitly, retaining the
+mixed cold reports; they establish no whole-family inapplicability. Mixed owners
+use the original authority rows; finite-owner closures refer only to their
+conditioned working model. Every accepted point passes `checkMpsWitness` on the
+original columns. Real snapshots without exact values remain unavailable; finite
+domains are never invented by this replay. CP owners consume the exact strict
+working cutoff through `beginExact`, retaining rational equality and direction
+without a floating representability restriction.
+Optional `primalCompletion=true` gives CP owners the original-source point checker
+and its rational objective in working units. An improving primal may accompany
+`Unsupported`; it has no exact completion or cutoff-closure authority. Approximate
+reals retain their declared source qualification and no certified-coordinate label.
+`completionReplay=true` separately records each query's first unresolved leaf and
+replays its unchanged pins through `LeafRealCompletion`. It saves reconstructed
+source rows and point qualifications; diagnostic replay costs are outside the owner
+allowance and reported separately. Owner preparation, search, source checks and
+close costs retain separate records. Control centers still require exact snapshots.
+Reports distinguish completed conditioned optimization from a closed initial
+strict cutoff: an improving point can accompany the former, while only a
+nonimproving working query establishes the latter. Both the working and checked
+original-source objective predicates must hold before reporting an MPS gain.
+
+[MPS owner replay 8580](https://lab.eignex.com/jobs/8580), at `02d362ad1f`,
+qualifies thirteen matched conditions on original p0033 and rgn hashes. From
+p0033's checked 3302 point, both CP owners improve five of ten scopes, LS four and
+each mixed owner one; every reported gain also improves the checked original
+objective. Cold CP uses 12,770 nodes; retained uses 9,642 and observes at least 31
+previously unused retained nogoods becoming useful. The retained sequence reaches
+its fragment allowance once; later completed fragments retain their proper stop
+reason after reset. Allocation and observation overspend remain separate costs,
+and node differences include retained RNG/activity as well as explanations.
+Rgn's three exact non-binary cutoffs remain unavailable to CP; LS exhausts its
+allowance and both mixed owners retain feasible nonimprovements. No domain is
+invented and no original row is omitted from mixed completion.
+
+[Maximization control 8585](https://lab.eignex.com/jobs/8585), at `cca43a8fe8`,
+checks an exact affine real backing with source objective `0.1*y` and scale ten.
+All five owners find the checked gain from zero to `1/10` when the source integer
+is free; fixed-input queries admit no strict gain. These instrumented native
+checks grant no independent witness certification or unpinned proof authority.
+
+[Modglob owner replay 8628](https://lab.eignex.com/jobs/8628), at `725db3a1ce`,
+captures three identical five-owner conditions without inventing finite domains.
+The containing allowance is one million decision equivalents and each fragment
+has 200,000 equivalents/two seconds, with unchanged native LP funding. No fragment
+or containing allowance overspends. Both mixed owners find the same two checked
+gains to 33.52M and close only the fixed-input cutoff. CP declines the exact
+non-binary cutoff; LS returns no point at the fragment cancellation boundaries.
+Cold mixed uses 53,933,567 funded LP work units and three preparations versus
+31,535,079 and one retained preparation. Cumulative thread allocation is 552.7
+versus 506.5 million bytes. These ordered instrumented observations establish
+neither a repair-quality nor a throughput advantage.
+
+The small-fragment [pilot 8614](https://lab.eignex.com/jobs/8614) gives retained
+mixed repair one gain against cold nonimprovements, but materially overspends its
+5,000-equivalent fragments: LS spends about 74,000 equivalents per attempt and
+mixed overspends by up to 17,781. That pilot earns no equal-work admission credit;
+its repair-quality difference is absent with the adequate quantum in 8628.
+
+[Composed held-out capture 8658](https://lab.eignex.com/jobs/8658), at
+`31228ae7b3`, binds eight checked strong-walk centers across ClockTriplet, RCPSP,
+CarpetCutting and the assignment control, with seeds 7/19. All 640 semantic
+selections complete capture, including packing's Boolean auxiliaries; 397 are
+count-matched and 89 decline explicitly. Both conflict-acquisition modes contribute
+300 further count-matched scopes, with 27 actual supported-guidance consumptions.
+All 940 groups bind the same center, freedoms, complement pins and strict cutoff
+across five owners; every control-file hash matches its owner ledger.
+
+The inner LS repair uses its ordinary repair recipe, distinct from the outer
+`cbls-extended/fixed` acquisition walk. LS finds no strict gain. Cold CP finds ten
+and retained CP eight, all from conflict
+scopes and accepted by the native original-source checker. Retained CP has two
+better final points and two worse ones across the 851 supported matched queries;
+the other 847 tie. Its two deeper ClockTriplet points reach 162 rather than 163,
+while two missed gains retain 164. These four queries exhaust their fragments.
+Cold CP closes 719
+conditioned cutoffs and retained CP 745, with unfinished queries retained separately.
+Their actual node totals are 135,517 and 216,069; cumulative thread allocation is
+10.97 and 41.04 GB. Retained CP records no newly useful old-clause flag.
+Fragment overspend is at most one decision equivalent; containing work stays within
+200,000. Read-only explanation observations take 11.76 seconds across the CP ledgers,
+excluded from decision work but included in wall time. No completed native exhaustion
+is retagged by those observations. Mixed owners decline these global shapes.
+
+Conflict acquisition, selection and the producer's repairs retain separate costs;
+all 300 declared source-coordinate descents reach checked policy-local endpoints,
+which supply no basin or global proof claim. Walk witness/counter parity holds for
+all eight captures. These ordered diagnostics support neither unconditional retained
+CP replacement nor mixed admission on these finite globals. Witness acceptance and
+conditioned closures here are native evidence, without independent proof checking.
+
+[Structured inner replay 8735](https://lab.eignex.com/jobs/8735), at `7a1f8a2baa` on
+Mac/aarch64, reruns 8658's eight requests with `ownerRecipes=cbls-plateau/fixed,cbls-extended/fixed`.
+All 940 groups reproduce 8658's centers, freedoms, cutoffs and selectors. Default LS
+and the plateau owner find no gain; the extended walk recipe finds two on 18–19-input
+ClockTriplet Random scopes where both CP owners exhaust their fragments. Cold and
+retained CP keep their ten and eight conflict-scope gains, which no LS owner reaches.
+Every LS owner spends 1,361,600 moves without overspend. LS, plateau and extended
+take 7.7, 8.5 and 11.2 seconds and 4.6, 4.8 and 6.6 GB of thread allocation, against
+23.0/15.4 for cold CP and 10.2/41.1 for retained CP. The extended source offers
+9.7 million compounds and loses 6.0 million to pins; neither gain commits a compound.
+All twenty post-repair declared descents stop at policy-local endpoints without
+further gain.
+
+Owner seeds 101–108 on ClockTriplet separate recipe from trajectory. With walk seed 7
+([8756](https://lab.eignex.com/jobs/8756), `26b725bf17`, Linux/amd64), default LS,
+plateau and extended LS find 12, 9 and 8 gains over 960 matched queries, scattered
+across single seeds; cold and retained CP find 22 and 24, repeating on the same two
+conflict scopes. The extended seed-7 gains do not recur, while one extended seed
+reaches 163 on a scope where both CP owners always exhaust. With walk seed 19
+([8757](https://lab.eignex.com/jobs/8757), Mac/aarch64), the three LS owners find
+0, 1 and 2 gains against 41 and 28 for CP.
+
+[Catalog arms 8764](https://lab.eignex.com/jobs/8764), at `239460eaa0` on Linux/amd64,
+replays the same 940 groups with the implicitly seeded catalog `cbls-implicit/fixed`
+and `cbls-extended/fixed` arms. Neither finds a gain. The scopes conflict with
+implicit ownership: 625 of the 851 supported rows partially free a seed global, and
+280 free exactly one of its coordinates, which ownership locks after a restart.
+CarpetCutting also has 28 pinned definition outputs reading freed inputs. Pins are
+never released to admit a compound. Reject structured inner LS as a stronger repair
+for these captured freedoms: the catalog's definition sweep, structured scoring and
+implicit ownership add cost without consistent gains over default LS, whose own gains
+depend on the owner seed. This is not a general LS-versus-CP ranking.
+
+Recipe `cbls-implicit-unused/fixed` adds the opt-in `unused-values` owner source to
+the implicit catalog arm. The AllDifferent seed globals behind 8764's partial-owner
+rows are closed permutations: ClockTriplet's 20 inputs over `1..20` and
+assignment-cycle's three inputs over `{0,1,2}`. Every freed coordinate's domain holds
+only occupied values, so those fragments are locked by the constraint itself;
+RCPSP and CarpetCutting seed Cumulative or NoOverlap instead.
+[8809](https://lab.eignex.com/jobs/8809), [8810](https://lab.eignex.com/jobs/8810),
+[8811](https://lab.eignex.com/jobs/8811) and [8821](https://lab.eignex.com/jobs/8821)
+replay identical scopes at `5a017677b6`. On the `assignment-unused` slack control,
+across owner seeds 101–104, the swap-only owner finds none of 16 gains. The unused
+owner finds all 16, like default LS and both CP owners. On closed assignment-exchange
+and ClockTriplet, both owners' rows, tallies and endpoints are identical.
+Assignment-cycle's walk was censored, so it supplied no center.
+On AircraftLanding airland01, CP improves 7 of 40 captured scopes per mode. The
+swap-only owner improves none, and the unused owner improves 6 by moving landing times
+to unoccupied values; one row frees a single seed coordinate. CP reaches the same
+point on three of them and a deeper one on the other three, and improves one scope the
+unused owner misses. All six post-repair descents stop at checked policy-local
+endpoints; both acquisition modes capture the same scopes. KMedian pmed01's scopes are all closed by CP. On pmed02 no owner gains, and
+the unused owner's element-heavy scoring costs about ten times the time per move, so
+its 10-second containing allowance ends after 12 of 80 selector rows. The conflict
+selector's 1,024-coordinate limit stops 8811 at pmed02.
+
+The fixed-work single-arm solve [8825](https://lab.eignex.com/jobs/8825), at
+`9e5809eae7`, uses 100,000 equivalents, 20 seconds and seeds 1–3. All 450 checked
+witnesses are valid. Against the swap-only implicit arm, the source wins 44 of 45
+KMedian runs (mean −1536) while running time-bound at a tenth of the work. It ties
+59 of 66 closed-permutation runs with two wins and five losses; CyclicBandwidth's
+104-input scope exceeds the scan share and draws random offsets. Implicit
+AircraftLanding stays infeasible in 38 of 39 runs, against all 39 without it. Unowned `cbls/fixed` stays as strong
+on KMedian (22 wins, 23 losses) and dominates AircraftLanding and ClockTriplet. The
+source therefore restores value-set mobility without qualifying a catalog change, and
+remains opt-in.
+
+[Merged-proposal MPS comparison 8697](https://lab.eignex.com/jobs/8697), at
+`c6f1b10a5a`, consumes four actual source-role guided pairs from the checked modglob
+35.1471M center. Each frees x201 with one of x251/x223/x221/x255; original real
+backings x1/x3 and the full continuous residual stay free under every source row.
+All four groups match centers, freedoms, complement pins and strict cutoffs across
+five owners, with no overspend at the adequate 200,000-equivalent fragment quantum
+and 1-million containing allowance. Native LP funding retains its existing limits.
+
+Both CP owners decline the exact cutoff because the retained CP double contract
+cannot represent it. LS exhausts all four fragments without a point. Cold and
+retained mixed repair each find two checked gains, to 35.1131M and 33.5240M, and
+close the other two conditioned cutoffs. Gain queries remain incomplete and do not
+refute their initial cutoffs. Cold mixed repair spends 72,987,226 funded LP work
+with four preparations and six reuses; retained repair spends 37,396,124 with one
+preparation and nine reuses. Both perform ten checks, certify ten bounds and close
+seven leaves. Modeled allocation is 204,023,371 versus 151,049,699 bytes, separate
+from cumulative thread allocation of 787,605,896 versus 720,080,344 bytes or RSS.
+These are ordered instrumented queries with native original-source checks, without
+independent witness/proof certification or a throughput claim.
+
+[Exact-cutoff replay 8731](https://lab.eignex.com/jobs/8731), at `2ce578d797`,
+retains 8580's p0033/rgn and 8697's modglob centers, original source hashes and
+byte-identical control ledgers: 17 conditions across five owners on Linux/amd64,
+debug enabled. Execution receipts enforce one CPU and 4,608 MiB cgroup memory;
+the profile command leaves heap and GC selection to the JVM. Both CP owners enter all
+seven non-binary rational conditions. Cold CP closes two rgn cutoffs and retained
+CP one; the remaining rgn conditions and every modglob CP query return
+`Unsupported` after uncertified continuous completion, without closure authority.
+P0033 retains five checked gains and five cutoff closures per CP owner, spending
+12,770/9,642 cold/retained nodes. Both mixed owners retain two modglob gains.
+All 48 returned points pass native original-source checks; independent witness and
+proof certification remain absent.
+
+Rgn cold/retained CP spends 25,164,472/19,137,664 standalone LP work units and
+254.7/208.0 MB cumulative thread allocation; modglob spends
+191,465,246/52,769,205 units and 502.0/261.2 MB. These include unsuccessful
+completion. CP fragment overspend is at most one decision equivalent. The retained
+small-fragment controls preserve LS/mixed overspends reaching 5,119/915 equivalents;
+no containing allowance is exceeded. These instrumented costs support exact-cutoff
+capability, without an equal-work speedup or owner-replacement qualification.
+
+[Primal capture 8796](https://lab.eignex.com/jobs/8796), at `c7082ceb70` on
+Linux/amd64, retains the first unresolved leaf of three rgn and eight modglob CP
+queries, including its fixed discrete assignment and reconstructed residual source
+rows. All eleven numerical proposals pass native original-source tolerance checks;
+unchanged-pin `LeafRealCompletion` returns eleven checked witnesses. None meets
+nominal exact feasibility. The repeated retained modglob leaf declines integer,
+rational and exact-point checks; exact continuation declines its dimension.
+Original-source acceptance supplies no missing completion certificate. Separate
+diagnostic replay costs are 33–108 ms and 11.3–12.3 MB thread allocation on rgn,
+241–369 ms and 50.4–72.7 MB on modglob. These are instrumented completion costs,
+excluded from owner allowances, without independent certification or throughput credit.
+
+[Continuation replay 8819](https://lab.eignex.com/jobs/8819), at `19cd81b0eb`,
+reuses [8804](https://lab.eignex.com/jobs/8804)'s exact-only baseline and the same
+byte-identical 8731 controls. Both captures use Mac/aarch64, identical runtime and
+options, and advisory one-CPU/4,608-MiB budgets. Each CP owner returns three modglob
+strict improvements: two change one original input and reach about 35.1131M and
+33.5240M; the third is a same-input rounding improvement. Every modglob CP query
+remains `Unsupported`, including the two queries without a witness. Rgn gains no
+point and retains its two/one cold/retained native closures. P0033 keeps five gains
+per CP owner at 12,770/9,642 nodes; both mixed owners keep two modglob gains.
+All 54 returned points pass native original-source checks: 48 nominal exact points
+and six tolerance-qualified CP primals, without independent certification.
+
+Early-return 8804 gives retained CP four same-input improvements and no changed-input
+gain; continuation keeps better siblings, with one earlier rounding point absent.
+Both continued CP owners spend 24 modglob nodes and the baseline's
+184,161,945/52,630,634 standalone LP work units. Search, reuse observation and source
+validation allocate 467.5/265.5 MB of thread bytes, versus 432.8/236.5 MB in the
+exact-only baseline. Common center preparation adds 2.8 MB; owner close costs are
+recorded separately. Rgn CP allocation also grows, without a new witness. No
+containing allowance is exceeded; inherited small-fragment LS/mixed overspends
+reach 5,119 equivalents. These ordered instrumented costs qualify primal capability,
+without a speedup, exact-closure or owner-promotion claim.
+
+Keep the existing owner admission. Small finite controls, held-out checked centers,
+ordinary finite execution and these original MPS overlaps support no uniform owner
+replacement. Retained LP state reduces repeated preparation in this MPS overlap;
+retained CP has both better and worse bounded endpoints, and ordinary source-input
+proposal promotion fails qualification. Reject a whole-family winner rule based on
+freedom or auxiliary counts. Unavailable owners, unfinished repairs and conditioned
+closures retain their local scopes and supply no global source proof.
+
+[Scoped baseline 8448](https://lab.eignex.com/jobs/8448) runs `e805182280` on
+Linux/amd64 with the two hash-matched original modglob/rgn sources and refined
+centers from 8339. Runtime and dependency hashes, debug settings and 3 GiB Serial-GC
+options are retained. Each cold repair has five seconds, 256 LP operations and
+1 billion cumulative native LP work units; root guidance and selection are separate.
+All 20 attempts complete their capture and retain a native original-source-checked
+point. No independent witness or proof check is claimed.
+
+Modglob has 98 declared integers and two original real columns with proved integer
+backings. The existing first four pair selections spend one coordinate on a
+backing, leaving one original integer freedom per replay. With the full real
+residual free, x223 and x255 each admit a strict improvement from 35.15M; x255
+reaches about 33.52M in three LP checks, 20,132,800 funded work and 58,331,844
+modeled allocation bytes. Its instrumented wall time is 0.60 seconds and thread
+allocation 224,641,008 bytes. The other two single-input controls close only their
+conditioned cutoffs. Every 30-input broad set and the 55-input finite-disagreement
+control reaches its five-second limit without improvement; their incomplete
+searches establish no neighborhood exhaustion. Broad attempts allocate 5.29–9.79 GB
+cumulatively on the measured thread, distinct from modeled retained allocation or
+peak RSS. Larger freedom counts supply no quality or throughput advantage here.
+
+Rgn retains its 82.2 center throughout. The fixed control and three pair controls
+close their conditioned cutoffs; the remaining pair, four 32-input controls and
+four-input disagreement control return unavailable completion with unresolved
+alternatives. These are neither local infeasibility nor source exhaustion.
+The capture selects source-role-preserving proposal diagnosis, without changing
+production admission, proving a basin, or replacing the stronger 20.78M finite
+modglob controls. Nominal conditioned bounds establish no tolerance-source optimum.
+
+`jointWalkMillis=30000` runs the actual retained mixed driver from the checked
+saved center under one 256-operation, 1-billion-work lifetime. It writes checked
+incumbent trajectories and costs instead of independent cold conditions. Optional
+`sourceInputPass=true` enables an internal nonadaptive proposal-order experiment:
+a source-input seed pass of pair freedoms precedes wider requests after each
+strictly improved cutoff. Adaptive ALNS retains its requested widths. Pending
+conditions and pass position survive slices; the pass supplies no local or global
+exhaustion claim. This option is a diagnostic consumer, not default admission.
+
+[Source-role controls 8455](https://lab.eignex.com/jobs/8455), at `fba60b259a`,
+repeat the twenty conditions with declared inputs eligible as seeds and complement
+pins. Pair scopes contain two original inputs and broad scopes contain 32;
+modglob's two checked improvements and all rgn outcomes match the baseline.
+The extra freedoms alone establish no better basin or quality.
+
+[Retained walks 8474](https://lab.eignex.com/jobs/8474), at `418e3e7fb3`, compare
+the same checked centers with and without the source-input pass. Each has thirty
+seconds, 256 LP operations, one billion LP work units and the existing 512 MiB
+modeled allocation funding limit. On modglob, the unchanged schedule publishes one
+checked improvement to 35.11M before timing out in a broad repair. The pass
+publishes twelve exact original-source-feasible improvements to 24.72M, then ends
+at its modeled allocation funding boundary: 119,301,837 work, 550,068,394 cumulative
+modeled allocation bytes, 46 checks and fifteen candidates. Its instrumented wall
+time is 7.15 seconds and cumulative thread allocation 2,966,698,768 bytes, versus
+30 seconds and 27,475,404,008 thread bytes for the control. These ledgers are
+distinct from retained memory or RSS. Rgn stays at 82.2 in both walks with identical
+native work and selected-coordinate totals. Ordered diagnostic runs establish no
+uniform throughput gain, independent witness certification or source optimality;
+ordinary execution and stronger finite controls remain qualification gates.
+
+[Ordinary qualification 8569](https://lab.eignex.com/jobs/8569) preserves baseline
+`bdc5c225c9`, roles-only `3d5f0d3352` and input-pass `9023451bd9` arms with unchanged
+funding, five sources, both exact policies, default/companion execution and seeds
+1/2/3. Its 36 modglob cases reject production adoption. Ordinary
+default-mode baseline objectives are 20.7846/20.7846/20.7729M; roles-only gives
+21.4092/20.7846/20.7846M and the input pass 20.7846/21.2303/21.1986M. All nine
+finite witnesses pass independent solchecker. Three of six companion pairs improve
+from 35.1471 to 35.1131M; the other three tie, and default exact-mode points tie.
+The 27 refined witnesses have native source acceptance but unsupported independent
+checking of nonterminating rational values. The diagnostic gain from the saved
+center neither reaches the stronger finite controls nor compensates these ordinary
+losses. Source-role eligibility and the narrow pass require explicit diagnostic
+construction; production callers retain their ordinary proposal admission.
+
+The full cohort completes all 180 feasible outcomes: 153 witnesses pass independent
+solchecker and the same 27 refined modglob witnesses remain unsupported. Across
+60 matched pairs per treatment, the input pass has four wins, five losses and 51
+ties; roles alone have one win, six losses and 53 ties, using an absolute objective
+comparison tolerance of 1e-6. Losses include ordinary exact rgn and bell3a as well
+as modglob. All 72 native p0033/gr4x6 optimum labels agree across arms; their proofs
+are not independently certified. Original source hashes, Mac/aarch64 runtime,
+options and non-solver dependency hashes match; each ref has one build fingerprint,
+and compiler identity is unreported. This time-bounded cohort supports the
+production-admission rejection without a uniform throughput or source-optimum claim.
 
 [Fixed-pin replay 8339](https://lab.eignex.com/jobs/8339), at `b738c5d89a` on
 Mac/aarch64, retains four witnesses from [8302](https://lab.eignex.com/jobs/8302).
@@ -2716,6 +4433,249 @@ work falls 73,705→71,744 units; corresponding SAT work rises 76,978→77,278. 
 equivalence refutation rises 76,620→77,539. These charged-work observations and
 single regression samples establish no uniform runtime speedup.
 
+### Scoped nonlinear failure classification
+
+[8494](https://lab.eignex.com/jobs/8494) retains twelve raw queries and
+[8495](https://lab.eignex.com/jobs/8495) nine unconditioned prepared queries at
+`01d160c40e`, with source hashes frozen from the original 7906/7919 records,
+Boolean scaling controls and three fixed-integer completions. Each observed/plain
+pair has the same ten-second query allowance, P1, Serial GC, 3 GiB heap and default
+representation limits. All 21 outcome pairs match: sixteen complete and five stop.
+The recorded caller charge equals native work in every query. Capture is intrusive:
+completed serialization costs range from 248 to 2,783,778 steps, and changed
+work arbitration makes total native differences distinct from copying costs.
+Timed work prefixes establish no speedup.
+
+Prepared Economics first rejects `x11 = 0` against `-x11 < 0` in a partial family;
+its full scoped record is complete. Raw sorting first rejects `x96 = 0` against
+`x96 > 0`, with two repeated first representations among 180 rejections; its
+candidate is complete but the overall source/context record is truncated. The
+fixed-power completion rejects zero against `4*x1^2 - 8 = 0` and repeats once.
+Prepared kissing rejects a prefix against a four-variable sphere equation; seven
+first representations repeat, with incomplete support and repetition coverage.
+Lasso constructs no rejected sample before root-reduction/raw or partial-sign/prepared
+termination. These observations select bounded exact univariate predicate cells
+for the refinement experiment: certified roots and strict endpoints can repair
+free-coordinate samples, with complete CAD retained. They justify neither arbitrary
+multivariate tangents nor lifting diagnostic text into checked exclusions.
+Prepared source correspondence remains unavailable.
+
+[8443](https://lab.eignex.com/jobs/8443) compares the sign/interleaving control
+`1074186d94` with capture-disabled `cdf817e972` on all 68 frozen 7919 identities,
+seed 3, P1, ten-second ordinary CLI budgets and source validation. All source hashes
+and paired feasibility/proof/objective/exit outcomes match. Each arm retains 39 SAT,
+26 native UNSAT, one UNKNOWN and two unchanged source-admission failures. Of the SAT
+witnesses, 16 pass Dolmen 0.10 and 21 pass the Z3 5.1.0 algebraic fallback; one
+power-syntax check is unknown and one DIMACS witness is unchecked. Native UNSAT
+claims have no independent certificates. Hash-bound requests, original bytes,
+traces, runtime/build identities and checker receipts stay outside Git in the Lab
+records and the retained nonlinear-refinement campaign.
+
+### Checked univariate predicate cells
+
+[Raw 8621](https://lab.eignex.com/jobs/8621) compares twelve direct queries at
+`38cff63082`, including fixed integer tuples and Boolean scaling controls. All
+outcome pairs match: five SAT, five native UNSAT and two interrupted queries.
+The fixed power query derives two cells in three coordinate attempts and reaches
+its witness with 1,390 native units against 1,612. Its quadratic cell retains
+`n = 2` as a query condition; its strict-positive cell has mandatory source support.
+Raw Economics derives four source cells but adds 2,142 units without changing the
+fallback trajectory. The large raw cases produce no checked cells. These direct
+component queries do not establish ordinary CLI publication or integer-search gains.
+
+[Prepared 8622](https://lab.eignex.com/jobs/8622) and
+[holdouts 8623](https://lab.eignex.com/jobs/8623) compare the internal producer with
+its disabled control at `38cff63082`, P1, ten-second query budgets, a 3 GiB child
+heap and default representation limits. All nine prepared and seventeen holdout
+outcome pairs match. Prepared Economics derives six checked source cells in
+thirteen coordinate attempts, with five repaired coordinates. Its `x11 > 0`
+support excludes the closed zero section and negative open sector. The producer
+spends its 16,384-unit allowance, then retains the control's seven projected
+polynomials and 38 lifted cells; total native work rises from 218,350 to 234,734.
+Mbo and the three large interrupted prepared cases also exhaust this private
+allowance without a candidate. A zero entry count does not establish that no
+useful predicate exists.
+
+The seventeen holdouts produce 33 checked cells: 31 with direct source support
+and two conditional cells on the canonical degeneracy identities. Their retained
+fixings remain explicit. Negated equality uses 617 native units against 3,735;
+repeated-section uses 314 against 594. Positive-dimensional nullification reaches
+a component witness with zero lifted cells against three, using exclusions
+from independent unary predicates. Strict-root contradiction instead grows from
+181 to 3,069 units. These observations establish bounded capability and mixed costs,
+with the option disabled by default. Native UNSAT is separate from independent
+source proof checking. Coordinate attempts, main rejected representations, complete
+model counts and ordinary published witnesses are distinct observation surfaces.
+
+Matched failure captures [8655](https://lab.eignex.com/jobs/8655) and
+[8656](https://lab.eignex.com/jobs/8656) retain all 21 raw/prepared outcome pairs.
+The fixed power query removes three main rejected representations, including one
+repeat of the first rejection. Raw Economics retains one main rejection per arm;
+prepared Economics retains 28, including one repeat. Raw sorting retains 180 with
+two repeats per arm. Large prepared sorting/kissing captures are incomplete, so
+their differing counts do not establish a reduction. Representation equality is
+bounded diagnostic equality, not semantic algebraic equality; coordinate seed
+attempts are counted separately. Observer copy work is intrusive and excluded from
+the clean total-work comparisons.
+
+The clean raw, prepared and holdout profiles run under Linux/amd64, Java 25.0.4.1,
+one CPU and a 4,608 MiB cgroup limit. Their final `memory.current` observations are
+1,684,279,296, 1,589,030,912 and 1,691,287,552 bytes, with no OOM or limit events.
+These whole-profile readings are neither peak nor per-arm memory measurements.
+
+[Ordinary source checking 8648](https://lab.eignex.com/jobs/8648) compares seventy
+identities at `d05f174ec7` and the one-line activation build `cba0c4f8f4`, on
+Mac/aarch64, P1/seed 3/10s with a 3 GiB heap. All paired source hashes, outcomes and
+CLI exits match. Each arm retains 41 SAT, 26 native UNSAT, one UNKNOWN and two
+unchanged source-admission failures. Of the SAT witnesses, 18 pass Dolmen 0.10 and
+21 pass Z3 5.1.0; one power-syntax check is unknown and one DIMACS witness is
+unchecked. Native UNSAT has no independent certificate. Across 59 completed native
+pairs, recorded `nraWork` totals 5,752,275 in control and 5,903,557 with refinement:
+five decreases and 54 increases. Ordinary mixed power rises from 48,240 to 49,992,
+despite the direct fixed-query reduction. These costs retain the disabled default;
+the activation build is separate from the published implementation.
+
+### Coupled section refutations
+
+Matched `coupled=both` profiles at `d80419eb83` keep identical hash-pinned sources and
+settings, with the coupled option as the only per-arm difference and balanced charges
+in every trace. A pair is completed when both arms reach the same terminal result; a
+control that stops at its five-second deadline while the coupled arm finishes is
+counted separately and supplies no work saving.
+
+| Context | Pairs | Completed | Control stopped | Coupled conflicts / uses | Completed work, on / off |
+| --- | ---: | ---: | ---: | --- | ---: |
+| [Prefix controls 8745](https://lab.eignex.com/jobs/8745) | 16 | 15 | 1 | 16 / 31 | 644,109 / 57,410,906 |
+| [Prefix controls, cells on 8746](https://lab.eignex.com/jobs/8746) | 16 | 14 | 2 | 16 / 31 | 780,380 / 39,305,754 |
+| [Whole-family holdouts 8747](https://lab.eignex.com/jobs/8747) | 17 | 17 | 0 | 0 / 0 | 94,860 / 94,792 |
+| [Coupled-support holdouts 8748](https://lab.eignex.com/jobs/8748) | 12 | 9 | 3 | 9 / 42 | 82,894 / 4,320,173 |
+| [Raw originals 8749](https://lab.eignex.com/jobs/8749) | 9 | 7 | 0 | 0 / 0 | 848,620 / 848,599 |
+| [Prepared contexts 8750](https://lab.eignex.com/jobs/8750) | 12 | 9 | 0 | 0 / 0 | 3,549,519 / 3,548,943 |
+
+The degree-two, four-prefix UNSAT control learns one three-premise exclusion over
+`x1² = 2`, `x2² = 3` and `x1*x2 + x1 + x2 = 1` before its first region; regions,
+projected polynomials and lifted cells fall from 16/368/2,512 to zero, and native work
+from 6,546,367 to 4,661 units. Each SAT prefix control excludes the coupled branch and
+reaches its gate witness through one region instead of two. The checked-cell producer
+and feedback leave these outcomes unchanged.
+
+The twelve coupled holdouts were authored before any coupled result: three-coordinate,
+quartic and degree-sixteen covers, strict and weak rational boundaries, repeated roots,
+an exact singular algebraic zero, a rootless cover, a disjunctive cover that learns two
+exclusions through retraction, a gated strict alternative and an uncovered coordinate.
+Every coupled verdict matches the authored expectation. Quartic, degree-sixteen and
+disjunctive controls stop at their deadline. Feasible supports add work: 569 and 829
+units on the repeated-root and weak-boundary SAT cases, and 7,622 on the singular case,
+whose zero falls back to exact algebraic evaluation. The uncovered case attempts no
+support. Existing holdouts and raw originals contain no covered support; completed
+pairs add 68 and 21 units. Prepared lowering replaces products by auxiliaries, so none
+of the prepared contexts, including the three authored SAT controls, exposes a support.
+Interrupted original pairs keep different deadline frontiers.
+
+The prefix job ran on Mac/arm64 without hard limits; the others ran on Linux/amd64 with
+one CPU and a 4,608 MiB cgroup-v2 limit, final `memory.current` 1.65–1.94 GB and no OOM
+events. The coupled arm runs first in each ordered pair, so its elapsed time includes
+cold compilation and supports no throughput claim; completed prefix queries allocate
+238,711,816 against 21,210,918,248 bytes.
+
+[Ordinary source qualification 8751](https://lab.eignex.com/jobs/8751) compares the 70
+frozen 8675 identities at `d80419eb83` and the one-line activation build `185154fe70`,
+P1/seed 3/10 s with source validation. All paired source hashes, outcomes and CLI exits
+match. Each arm has 41 SAT, 25 native UNSAT, two UNKNOWN and two unchanged
+source-admission failures; 39 SAT witnesses per arm are independently valid (18 Dolmen
+0.10, 21 Z3 5.1.0), with the power-syntax checker gap and one unchecked DIMACS SAT.
+Native UNSAT has no independent certificate. Across 58 completed native pairs, `nraWork`
+rises by 8,820 units in 14 pairs and falls in none, the largest being 7,674 on the
+irrational shared-embedding UNSAT control. No ordinary source exposes the targeted
+support, so the option stays disabled by default; the activation build is not
+published.
+
+### Prepared supports and connected conjunctions
+
+The five-arm matrix separates sign-only, single-predicate, preparation-only,
+joint-only and composed checking. [Direct controls 8785](https://lab.eignex.com/jobs/8785)
+at `1133442d74` cover twelve frozen cycle, shifted-root, repeated-root, strict,
+weak, singular and SAT-alternative sources. All terminal outcomes match their
+authored expectations. The inconsistent three-edge cycle consumes a six-premise
+joint exclusion twice, including one reuse across its unrelated Boolean pair.
+No individual predicate supplies that conflict. Regions, projected polynomials
+and lifted cells fall from 2/52/324 to zero; native work is 3,817 against 77,034 in
+the [literal merged single-predicate control 8818](https://lab.eignex.com/jobs/8818)
+at `d9f127f275`. Sign-only work is 75,528. The same-head single control adds
+37 bookkeeping units. Feasible conjunctions retain CAD and add work.
+
+[Prepared branch comparison 8813](https://lab.eignex.com/jobs/8813), at `ee13e6cb6b`,
+transports the frozen degree-two source's explicit `gate=false` condition through
+its captured plan. [Direct comparison 8812](https://lab.eignex.com/jobs/8812) learns
+the original three-premise conflict in 4,389 units. The prepared view joins three
+opposite weak-row pairs into equalities and completes total graph substitutions.
+Its consumed nine-premise explanation retains all six rows and three product
+definitions, with 3,380 units of private support work inside the native totals:
+
+| Prepared numeric branch | Sign-only | Single | Preparation | Joint | Composed |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Native work | 434,299 | 437,130 | 14,353 | 25,519 | 14,353 |
+| Regions | 2 | 2 | 0 | 1 | 0 |
+| Projected polynomials | 28 | 28 | 0 | 5 | 0 |
+| Lifted cells | 179 | 179 | 0 | 2 | 0 |
+
+Prepared parsing, source setup and condition transport add 769 separately reported
+units in every arm. The mapped `gate=true` alternative stays SAT, with no learned
+exclusion. [Graph capture 8816](https://lab.eignex.com/jobs/8816) explains the
+unconditioned zero-support observation: its free branch takes `gate=true` and
+assigns only one weak row from each conditional comparison. Those assignments
+provide no equality covers. Capture retains the numeric condition, exact graph
+and reconstruction fibres; its extra observation work supplies no cost comparison.
+Prepared slot numbers provide no original-real correspondence.
+
+[Whole-family holdouts 8801](https://lab.eignex.com/jobs/8801), at `814aa38899`,
+retain all seventeen outcomes and expose no support. Composed/single/sign-only
+work is 94,975/94,871/94,792 units. The twelve
+[coupled and singular holdouts 8802](https://lab.eignex.com/jobs/8802) preserve the
+existing individual conflicts and every authored outcome; three sign-only controls
+reach their deadlines. Feasible and uncovered cases add 17–67 units over single
+checking, including 64 on the singular algebraic zero. They supply no additional
+prepared or joint conflict.
+
+Direct, merged-baseline and mapped-branch profiles run on Mac/aarch64; the two
+holdout jobs and graph capture run on Linux/amd64, Java 25.0.4.1. All native charge
+sums balance. Ordered instrumented component timings and allocation records include
+their actual cold starts and establish no whole-CLI throughput claim. Numeric
+exclusions remain native scoped proofs, without independent certification.
+
+[Ordinary qualification 8806](https://lab.eignex.com/jobs/8806) compares default
+`814aa38899` with one-line composed activation `6020adaf8e`, P1/seed 3/10 s,
+on the frozen seventy sources plus all twelve cycle controls. All 82 paired
+source hashes, outcomes and process exits match. Each arm has 49 SAT, 29 native
+UNSAT, two UNKNOWN and the two unchanged negative-literal admission failures.
+Forty-seven SAT witnesses per arm independently validate: 22 with Dolmen 0.10
+and 25 with Z3 5.1.0. The power-syntax witness stays checker-unknown and DIMACS SAT
+unchecked; native UNSAT has no independent certificate. All 96 checker records
+bind the original hashes and exact published witness bytes.
+
+Across seventy completed arithmetic pairs, `nraWork` changes from 4,042,913 to
+3,803,270 units, with four decreases and 22 increases. Every decrease belongs to
+an authored inconsistent cycle. The existing 58 arithmetic pairs add 31,336 units
+and improve none. Whole-CLI receipts retain preparation, search, native validation
+and close costs; independent checker costs stay separate. Repeated-cycle UNSAT
+changes from 207,971 to 31,869 native units, 2.32 to 1.58 seconds and 110,208 to
+97,276 KiB peak RSS. Its SAT neighbour changes from 133,185 to 150,425 units,
+2.06 to 2.26 seconds and 107,520 to 112,808 KiB. These single ordered physical
+observations establish no throughput claim. All 164 receipts bind their unchanged
+raw solve records. CLI execution uses Linux/amd64, Java 25.0.4.1, a one-CPU and
+4,608 MiB cgroup limit, without OOM events; checker receipts retain their separate
+Darwin execution. The coupled option stays disabled by default.
+
+[Matched original witnesses 8820](https://lab.eignex.com/jobs/8820) compares default
+`a5398c4699` with activation `3df7f4e7f6` on the unchanged three job-8750 SAT
+sources. All six complete-source witnesses independently validate, four with Z3
+and two with Dolmen. No whole-source gain follows from the conditional conflict:
+native work rises 71,756→72,215, 796,188→802,455 and 79,470→79,942. Source hashes
+and outcomes match. Setup failures in diagnostic 8797 and the additional prepared
+family profile 8817 yield no solver observations; both were cancelled. The latter
+adds no claim beyond the completed mapped-branch matrix and whole-family source
+qualification. No local compilation, tests or numerical workloads ran.
+
 ### Polynomial Boolean bookkeeping
 
 The first-region control in `PolynomialBooleanRegionsTest` excludes normalization
@@ -2728,6 +4688,166 @@ twice the preceding family work plus 32 units at each doubling, and fewer than
 retraction, numeric alternatives, negative premises, support ties, leaf order and
 interruption. These controls isolate Boolean bookkeeping; whole-source quality and hard-source
 throughput remain unmeasured.
+
+### Nonlinear integer completion controls
+
+[8425](https://lab.eignex.com/jobs/8425) runs all twelve `nonlinear-integer-v1`
+sources at `1c297c2502`, ordinary defaults, P1, seed 3, ten seconds and debug
+disabled on Linux/amd64. All original hashes match the fixture manifest. Six
+sources select nonlinear-integer execution, five finite CP and one polynomial-real
+execution. Nine SAT results include seven models accepted by Dolmen 0.10 and two
+power-syntax cases the checker cannot admit. The two native UNSAT claims have no
+independent proof certificate; `open-no-integer-root` returns UNKNOWN at fixed-work
+exhaustion.
+
+That UNKNOWN records 768 nodes, 517,381 native units, twelve projected polynomials
+and twelve lifted cells. Its whole-CLI external-time receipt records 3.77 seconds
+and peak RSS of 124,248 KiB; allocation was not collected. Its neighborhood counters
+report 178 completions, four refuted and 174 undecided. These single-arm records
+supply routing and cost controls. Aggregate counters do not identify per-cursor
+failed completions, repeated proof support or newly excluded tuples. In particular,
+`open-integer-product` records both backtracking and local-search segments despite
+its final zero-node aggregate. Guarded exclusion reuse needs a checked source
+explanation and a comparison with visited-tuple filtering under the same producer.
+
+[8674](https://lab.eignex.com/jobs/8674) compares source-cell reuse with visited-tuple
+filtering over those twelve sources and the seventeen frozen
+`nonlinear-integer-cells-v1` controls, at seeds 3/7, P1 and ten seconds. Activation
+builds `6997f69ea7` and `2eeca2840e` share the `c241d008a0` implementation and enable
+the same checked producer; their only difference is the integer reuse default.
+Production defaults remain disabled. Reported pairs match source hashes, host,
+JVM options, runtime and dependency fingerprints. Recovery places pairs on both
+Mac/aarch64 and Linux/amd64; absolute costs across those platforms are separate.
+
+On Mac/aarch64, the four- and eight-coordinate square controls show these native
+work reductions. Exclusions count unvisited, in-window tuples, each avoiding a fixed
+completion; repeated support counts further hits on the same cursor-owned cell.
+
+| Coordinates / seed | Excluded / repeated support | Completion checks, visited / reuse | Native work, visited / reuse |
+|---|---|---|---|
+| 4 / 3 | 1251 / 1201 | 2514 / 1263 | 1615550 / 1116842 |
+| 4 / 7 | 1337 / 1286 | 2580 / 1243 | 1656474 / 1047984 |
+| 8 / 3 | 1258 / 1218 | 2185 / 927 | 2057568 / 996087 |
+| 8 / 7 | 1258 / 1216 | 2325 / 1067 | 2191273 / 1131326 |
+
+Their whole-CLI wall times fall from 1.07/1.09/1.20/1.60 seconds to
+0.93/0.89/0.90/0.96 seconds in table order. Peak RSS changes from
+208272/235760/236896/234496 KiB to 211040/219792/211424/225120 KiB.
+These external, uninstrumented receipts measure the entire CLI JVM; allocation
+was not collected, and they do not isolate the eight-cell store's memory.
+
+Costs are mixed. `open-no-integer-root` excludes 870/868 tuples and records 521/519
+repeated supports, reducing completion checks from 1615/1609 to 745/741 while native
+work rises from 615290/618372 to 623464/626984. The one-coordinate square repeats
+that mathematical control. Two-coordinate squares and degree-four powers also
+spend more work. The mixed singular-real holdout excludes 610/691 tuples, but work
+rises from 2038864/2103521 to 2062041/2114584; its Linux seed-3 wall time rises from
+5.90 to 6.48 seconds. These unresolved cases retain UNKNOWN.
+
+The cubic SAT neighbor excludes 4/26 tuples with 3/23 repeated supports and retains
+both Dolmen-accepted witnesses; native work rises at seed 3 and falls at seed 7.
+The degree-seventeen control produces no cells or exclusions. Boolean, repeated-root,
+rational-window and wide-integer neighbors retain their scope and boundary controls.
+Avoided completions establish guarded reuse beyond visited tuples, while the mixed
+costs and unchanged observed quality retain the disabled defaults.
+
+[8732](https://lab.eignex.com/jobs/8732) compares nearest integer-cell complement
+proposals with filtering alone and ordinary defaults over the same twelve original
+and seventeen cell controls. The eight square/power core cases and nine whole-family
+holdouts retain their frozen membership. All 174 cases use seeds 3/7, P1, ten seconds
+and debug disabled on Mac/aarch64. All 58 source/seed triples match original manifest
+hashes, host, runtime, non-solver dependencies and the 3 GiB Serial-GC options.
+Activation builds `b24e966420` and `c3bd7f671b` share the `52d0038215` implementation
+and producer; only the steering default differs. The third arm keeps ordinary
+defaults. Production producer, filtering and steering defaults remain disabled.
+
+Every triple retains its reported SAT/UNSAT/UNKNOWN outcome. Of 84 reported models,
+72 pass Dolmen 0.10 or Z3 5.1.0 source checking; twelve checks on the power-chain and
+conditional-product sources remain UNKNOWN with `E:unbound-id`. Native refutations
+have no independent proof certificate. Cancelled [8725](https://lab.eignex.com/jobs/8725)
+retains a setup error: finite routes reject nonlinear-only CLI flags. The activation
+builds preserve ordinary routing; infrastructure retries reuse the full selection.
+
+The policy jointly projects ordinary proposals into the caller window and the
+retained-cell complement. Allowed tuples count distinct in-window tuples reaching
+fixed completion within each private cursor. On the held-out cubic SAT neighbor,
+each seed reports one changed proposal and earlier checked witness access with
+fewer completion queries. Repeated
+support hits before that witness fall from 3/24 to zero. These are useful proposal
+transitions with unchanged candidate caps and full original-source checks.
+
+| Cubic seed | Allowed tuples, filter / steer | Completion checks, filter / steer | Native work, filter / steer | CLI wall seconds, filter / steer | Peak RSS KiB, filter / steer |
+|---|---|---|---|---|---|
+| 3 | 2 / 2 | 11 / 8 | 69094 / 31062 | 0.58 / 0.57 | 141664 / 126160 |
+| 7 | 14 / 1 | 34 / 4 | 602170 / 29581 | 1.19 / 0.56 | 206208 / 126048 |
+
+Ordinary cubic defaults spend 33393/550748 native units, 0.46/1.13 CLI seconds and
+125904/214304 KiB. The seed-3 default remains faster in physical wall time despite
+the steering arm's lower native work. External-time receipts measure the entire
+uninstrumented CLI JVM; allocation was not collected.
+
+The square controls expose the cost of leaving a known forbidden hull: more allowed
+tuples can mean more failed completions. Both square-8 seeds retain UNKNOWN.
+
+| Square-8 seed | Allowed tuples, filter / steer | Completion checks, filter / steer | Native work, filter / steer | CLI wall seconds, filter / steer | Peak RSS KiB, filter / steer |
+|---|---|---|---|---|---|
+| 3 | 118 / 916 | 927 / 1725 | 996087 / 1793974 | 0.86 / 1.27 | 235520 / 221696 |
+| 7 | 160 / 959 | 1067 / 1866 | 1131326 / 1934238 | 1.17 / 1.45 | 230864 / 214016 |
+
+Square-8 ordinary defaults spend 1674203/1777577 native units. Square-2, square-4
+and degree-four powers also spend more work under steering. On
+`open-no-integer-root`, allowed tuples and completion checks stay at 566/745 and
+562/741 while work rises from 623464/626984 to 644806/648322. Changed proposals alone
+establish no improvement on that source.
+
+The mixed singular-real holdout remains UNKNOWN. Allowed tuples rise from 599/560
+to 726/746, checks from 1590/1607 to 1717/1793 and work from 2062041/2114584 to
+2169998/2255906. Peak RSS changes from 233424/219728 to 227120/229824 KiB; CLI wall
+time changes from 1.44/2.05 to 1.67/1.80 seconds. The degree-seventeen control has no
+cells or changed proposals; its ten-second stops and varying completion prefixes
+supply no steering gain. Repeated-root and wide-integer neighbors retain checked
+witnesses without entering selection; Boolean, rational-window and endpoint
+controls retain their scope outcomes. Fast cursor controls separately cover caller
+conditions, exact signed/wide endpoints, cancellation, slicing, charging and disposal.
+
+The checked cubic gain supports the bounded optional mechanism. Additional failed
+completions and mixed costs retain the disabled defaults and provide no general
+throughput or memory improvement claim. Proposal exhaustion supplies no source proof.
+
+[8805](https://lab.eignex.com/jobs/8805) compares integer-root admission with ordinary
+defaults, filtering and steering over the same 29 frozen sources, seeds 3/7, P1, ten
+seconds, source validation and CLI resources. Activation builds share the
+`50066736c6` implementation and differ only in defaults. All 232 cases ran on one
+Mac/aarch64 host with matching source hashes. Every triple keeps its SAT outcome, and
+no arm loses an UNSAT result. Only the root arm turns ten rootless controls from
+UNKNOWN into native UNSAT: the four squares, four powers, `mixed/singular-empty` and
+`open-no-integer-root`. It spends no completion queries on them. The cubic witness
+takes one completion and 3,033 native units, against 8/4 steered checks and
+33,393/550,748 ordinary units.
+
+That run exposed one cost: `wide-integer-square` exhausted the 65,536-unit equation
+allowance in an algebraic ceiling search, declining `n*n = 10^40` at 66,107 units
+against 498. Bracketing roots on the integer grid fixes it.
+[8835](https://lab.eignex.com/jobs/8835) reruns ordinary defaults and the root arm at
+`32d0b5f978` on the same host, 116 cases with unchanged outcomes.
+
+| Source / seed | Native work, ordinary / roots | CLI wall seconds | Peak RSS KiB |
+|---|---|---|---|
+| `powers/square-8` / 3 | 1674203 / 316 | 1.01 / 0.21 | 202480 / 106848 |
+| `degree/power-17` / 3 | 20174126 / 1065 | 10.10 / 0.21 | 216032 / 106784 |
+| `mixed/singular-empty` / 3 | 7193251 / 318 | 4.00 / 0.23 | 234464 / 107344 |
+| `cubic/root-neighbor` / 7 | 550748 / 1501 | 0.59 / 0.22 | 206736 / 112320 |
+| `wide-integer-square` / 3 | 498 / 2999 | 0.22 / 0.23 | 111504 / 113488 |
+
+Other refuted controls spend 309–1,332 units. Sources without an admissible equality
+spend at most 16 more units on the scan, with unchanged trajectories and witnesses.
+`overflow-cancellation` declines its zero difference. Guarded, rational-window,
+annulus, repeated-root and finite-routed controls keep their outcomes. The twenty
+native refutations have no independent certificate and no lab reference row; they
+match the manifests' mathematical expectations. In both jobs each arm reports 28
+models: 24 pass Dolmen 0.10 and four power-syntax checks remain UNKNOWN with
+`E:unbound-id`. These self-authored fixtures are built around unary equalities, so
+the disabled default stays until a held-out corpus qualifies it.
 
 ### State ownership
 
@@ -2970,6 +5090,262 @@ solve seconds change from 2.760/2.789 to 2.677/2.815 on the small source and fro
 7.399/8.179 to 7.806/8.115 on the large source. The large-source default gain
 coexists with a small-source mean loss; this is not uniform optimization recovery
 or a general speedup.
+
+### Source repair distance and exact freedoms
+
+[Capture 8427](https://lab.eignex.com/jobs/8427), at `30c3d4b7f7`, runs the three
+self-authored finite repair controls on Linux/amd64 with seed 7 and 128 counted
+moves per walk. Objective-coordinate and existing structured descent each have
+an unobserved and observed repetition. Two additional assignment captures use
+instruction slices; their phase records match the unsliced records byte for byte.
+All eight final-witness/objective/pick/work/restart/stall comparisons pass.
+Original source hashes, runtime, dependency and solver/CLI identities
+remain in the capture. All 196 bounded CP completions pass native original-source
+checks; those checks establish no independently checked proof or unpinned optimum.
+
+For each relation, complete two-coordinate freedoms admit strict improvements at
+three of four coordinate-descent endpoints. Eight individual freedoms admit none;
+sixteen size-matched samples find two improvements. Existing structured descent
+reaches objective zero on every source, and complete blocks admit no improvement
+at its three recorded feasible endpoints. This separates a missed coordinated
+completion from exhaustion at a stronger endpoint. It supplies no reason to replace
+the existing structured sources or admit a removal policy into default routing.
+
+Assignment and resource blocks spend one CP node per completion; placement blocks
+spend two. Individual controls spend zero or one. These units remain separate from
+physical time. The trace retains at most 32 attempts, with 942/1,256 modeled
+coordinate reads on the coordinate-descent controls and 102/136 on structured
+controls; 97 further coordinate-descent attempts decline capture. Censored records
+receive no basin label. Per-walk thread allocations and elapsed time are retained,
+but the cold ordered instrumented repetitions establish no overhead or speedup claim.
+
+[Source checks 8434](https://lab.eignex.com/jobs/8434), at `272a5fea2a`, retain
+all three original hashes and run CP, mixed and structured LS with seeds 7/19,
+P1, two seconds and presolve disabled. All 18 final witnesses have objective zero
+and pass XCSP3-tools SolutionChecker 2.5.1 at `ca58fc79a4`. Native proof claims
+remain separate from those independent witness checks. The small controls select
+the observation contract.
+
+[Coordinated barriers 8468](https://lab.eignex.com/jobs/8468), at `e110d0dff2`,
+retains four hash-pinned sources, seed 7 and 128 counted moves with ordinary and
+extended structured recipes. All eight observation-parity checks and 312 native
+source checks pass. Every proper subset of each three- or four-input block fails
+to improve at the recorded centers. Complete blocks improve two ordinary
+assignment-three endpoints, two/three ordinary/extended resource endpoints,
+one placement endpoint under either recipe, and two/one assignment-four
+endpoints. Each comparison visits three endpoints. Extended assignment-three
+already reaches zero at its first endpoint and admits no further block gain.
+This retains the stronger existing remedy and selects resource, placement and
+four-input assignment barriers for bounded selector comparisons. These small
+capability controls establish no default-route admission or general speedup.
+
+[Selector comparison 8497](https://lab.eignex.com/jobs/8497), at `e8d10688c6`,
+uses those four explicit centers on Linux/amd64 under JFR, with seeds 7–22.
+All 320 CP repairs complete and pass native original-source checks. Semantic
+removal reaches objective zero in every trial. The effective freedoms contain
+three source inputs, or four for the larger assignment control.
+
+| Source | Semantic improvements | Adjacency improvements, matched trials |
+| --- | ---: | ---: |
+| Assignment three | 16/16 | 6/16 |
+| Resource three | 16/16 | 6/16 |
+| Placement three | 16/16 | 4/6 |
+| Assignment four | 16/16 | 6/16 |
+
+Random, WorstObjective and eligible count-matched samples find no improvements.
+On placement, ten Random and ten Adjacency requests include a root-fixed role
+and leave only two effective inputs; those unmatched trials are retained and
+find no improvement. Every other request matches the semantic source count.
+The assignment-three result is redundant with extended structured descent's
+already observed zero endpoint; it supplies no additional remedy there.
+
+Complete assignment/resource repairs spend one CP node; placement spends two
+to five. Median repair thread allocation is 179,656–223,008 bytes for semantic
+blocks versus 121,560–142,952 for Random. Semantic construction and closure
+spend 12/24/50–53/15 modeled visits in table order. Control visits cover closure
+only; physical selection measurements include their full existing acquisition.
+Semantic selection allocates median 1,760–2,216 bytes and takes 37–74 microseconds.
+Shared reflection/network/selector setup takes 11.4 ms on the first source and
+0.10–0.14 ms thereafter. These ordered instrumented captures retain construction
+and repair costs without establishing a speedup. The bounded opt-in mechanism
+admits complete improving freedoms; default-route family admission remains in
+[#3630](https://github.com/Eignex/klause/issues/3630).
+
+### Scoped finite conflict ranking
+
+[8465](https://lab.eignex.com/jobs/8465), at `2c304f8a10`, compares root CP
+attributions on assignment, resource, placement and weighted Latin controls with
+seeds 1/3/17 and effective freedom counts 2/4/8 where admitted. Its 135 repairs
+match counts. Acquisition improves all 27 guided trials, reaching the controls'
+known optima; those points cannot be credited to ranking. Placement ranking
+improves 6/6 repairs against acquisition-ablated random's 1/6 and objective
+removal's 6/6. Assignment/resource callbacks are unavailable. Latin ranking and
+ablated random improve 0/9 against objective removal's 3/9. Its 45 linear-shaped
+Latin descents are censored and receive no endpoint classification.
+
+[8498](https://lab.eignex.com/jobs/8498), at `fe34f18ae9`, adds count-matched
+random-fragment acquisition and explicit feasible greedy acceptance in descent.
+All 135 root selections, attributions and acquisition/repair outcomes reproduce
+8465. Across both origins, all 270 effective counts match; 56 acquired points,
+99 repaired points and 270 descent points pass native original-source checks.
+Every descent reaches a qualified coordinate-policy endpoint, without a basin
+claim. Each trial shares 2,000 native work units and five seconds across
+acquisition, selection, repair and descent; no trial exhausts either allowance.
+
+Fragment placement consumes attributions in 2/6 trials and improves 3/6 repairs
+against ablated random's 1/6, adjacency's 4/6 and objective removal's 6/6.
+Acquisition finds no improving placement point. Guided/ablated native work totals
+are 9/7 and thread allocations 6.00/5.88 MB. All three guided improvements survive
+the declared descent. Fragment assignment/resource guidance remains unavailable.
+Latin consumes guidance in 1/9 trials but repairs improve 0/9; its acquisition
+finds objective 47, which the selected repair loses, while objective removal
+improves 3/9. This qualifies bounded CP attribution consumption, not replacement
+of existing selectors or independent acquisition. Defaults remain unchanged.
+Both Linux/amd64 captures retain original hashes, identity mappings, settings,
+cutoffs/pins and JAR/runtime identities. Ordered JFR-instrumented timings establish
+no throughput claim; native checks establish no independent witness or proof claim.
+
+[8540](https://lab.eignex.com/jobs/8540) and [8541](https://lab.eignex.com/jobs/8541),
+at `8fedad8329`, add the actual semantic selectors, three-input targets and the
+three-/four-input cycle controls. Both use identical JAR/runtime identities and
+the same allowance, owner, centers and seeds. Across 936 attempts, 102 semantic
+packet sizes mismatch their target and decline without repair or truncation.
+All 834 admitted counts match, with 164 acquired, 229 repaired and 834 descent
+points passing native original-source checks. Every admitted descent reaches a
+qualified coordinate-policy endpoint; all improvements survive it. Source hashes
+match all 48 requests. The 135 earlier root CP selections and outcomes reproduce.
+
+Matched fragment-origin improvements are:
+
+| Source | Movable counts | Trials | Conflict | Ablated random | Semantic | Adjacency | Objective |
+|---|---|---:|---:|---:|---:|---:|---:|
+| Assignment cycle | 3 | 3 | 0 | 0 | 3 | 1 | 0 |
+| Resource cycle | 2/3 | 6 | 0 | 0 | 3 | 1 | 0 |
+| Placement cycle | 3 | 3 | 1 | 0 | 3 | 3 | 0 |
+| Assignment four-cycle | 4 | 3 | 0 | 0 | 3 | 1 | 0 |
+
+The placement gain uses 9 native units and 3.01 MB thread allocation against
+ablated random's 5 units/2.91 MB and semantic removal's 13 units/2.80 MB.
+Its acquisition finds no improvement at this matched target. Assignment/resource
+attributions remain unavailable. Root acquisition reaches every cycle's optimum;
+its points remain separately credited. Complete semantic scopes equal or exceed
+conflict repairs on the two-input controls. Neither signal nor row-sized semantic
+freedoms improve Latin at the matched four-input target. Retain bounded conflict
+ranking for opt-in comparisons; these results reject promoting it over the existing
+selectors or acquisition companions. They do not decide numerical feedback or
+establish broad finite-source performance.
+
+### Scoped finite numerical ranking
+
+[8644](https://lab.eignex.com/jobs/8644) and [8645](https://lab.eignex.com/jobs/8645),
+at `9084692daf`, recover the cut-disabled/enabled comparisons after preparation
+and upload failures. Four original linear sources use seeds 1/3/17, root or
+random-fragment acquisition, and effective counts 2/3/4/8 where admitted. Each
+trial shares five seconds and 2,000,000 containing units across acquisition,
+selection, cold CP repair and declared feasible descent. Native search and
+modeled source work remain separate cost components. Semantic packet shapes
+are absent from this linear cohort; the preceding CP study retains those controls.
+
+All 1,344 freedom counts match. The 444 acquired, 476 repaired and 1,344 descent
+points pass native original-source checks. All repairs survive the qualified
+descent, without cancellation or allowance overrun. All 48 original hashes match;
+both Mac/aarch64 captures retain identical JAR/runtime identities, mappings,
+settings, actual query pins and strict objective rows. These native checks and
+ordered JFR timings establish neither independent proof nor production throughput.
+
+At the two-/three-/four-input root targets, disagreement repairs all nine cycle
+trials against numerical-acquisition-ablated random's zero. Both acquisitions
+already supply objective zero, as does the cheaper CP prefix. Root ranking gains
+therefore add no incumbent beyond the independent acquisition companion.
+
+Fragment exchange at two inputs supplies no improving acquisition: refutation
+ranking repairs 1/3 against ablated random's 0/3 and adjacency's 2/3. Every arm's
+descent reaches zero there. Neither numerical ranking improves the matched
+three-/four-cycle targets. At eight inputs on the four-cycle, refutation ranking
+repairs 1/3 against ablated random's 0/3, with no acquisition gain; its zero
+objective survives descent. Adjacency repairs 3/3. Median containing work is
+36,750/36,570/2 and thread allocation 3.06/3.02/0.91 MB for
+refutation/ablated/adjacency. Captured supports name only one to three of the four
+required coordinated inputs; one conditioned refutation need not identify the
+complete improving freedom set.
+
+At two inputs on the root knapsack, disagreement repairs 3/3 against ablated
+random's 2/3, but objective removal also repairs 3/3. Numerical acquisition supplies
+no improving integer point, and every arm descends to objective two. The captured
+fractional coordinate near one third is retained as its exact binary rational;
+it receives no integer-witness credit. The declared-row relaxation optimum 4/3
+does not make that numerical point an exact feasible certificate.
+
+Each cut policy consumes 54 disagreement and 30 refutation rankings. The remaining
+refutation trials report `NoRefutation`; 30 disagreement trials report agreement
+with cuts disabled and no point with cuts enabled. All 672 paired selections and
+acquisition/repair/descent objectives match across cut policies. Enabled captures
+retain one installed, natively checked cut in each of 252 numerical trials;
+disabled captures retain none. Maximum charged source work is 36,906/6,273 and
+modeled allocation 97,584/69,364 bytes for disabled/enabled cuts. Those observed
+costs do not equate native search units with source work or establish a general
+cut-policy speedup.
+
+[8652](https://lab.eignex.com/jobs/8652) and [8653](https://lab.eignex.com/jobs/8653),
+at integrated code `0a0d85b82c`, reproduce all 1,344 selections, acquired/repaired
+objectives, projected supports and descent outcomes. All counts, source checks,
+allowances and 48 source hashes pass again. Both use identical JARs; the
+Mac/aarch64 and Linux/amd64 runtime identities remain separate. This confirms
+integration with the merged producer and preserves the measured decision,
+without pooling repeated controls or comparing physical time across platforms.
+
+Retain the bounded opt-in rankings for comparisons. The recovered controls reject
+promoting either over existing selectors or independent acquisition: surviving
+gains remain narrower than the stronger controls and require additional numerical
+cost. They establish no broad finite-family advantage or basin classification.
+
+#### Source-row seed completion
+
+[8781](https://lab.eignex.com/jobs/8781), at `3e242c1a40`, repeats the cut-disabled
+8644 requests with both completed arms and adds the held-out
+[transport](smoke-corpus/finite-repair-evidence/README.md) family: 30 requests and
+1,080 trials on Mac/aarch64, with one JAR/runtime identity and all 30 source hashes
+matching. All 403 acquired, 388 repaired and 1,047 descent points pass native
+original-source checks. No improvement is lost in descent, and no trial is
+cancelled or overruns its allowance.
+
+Fragment refutation completion consumes 24 packets and improves 23. No consumed
+trial's acquisition improves, so the gains belong to the completed freedom. At each
+control's exact packet size, the improvements are:
+
+| Source | Inputs | Completed | Raw refutation | Adjacency | Ablated, random, objective |
+|---|---:|---:|---:|---:|---:|
+| Exchange | 2 | 3/3 | 1/3 | 2/3 | 0/3 |
+| Three-cycle | 3 | 3/3 | 0/3 | 1/3 | 0/3 |
+| Four-cycle | 4 | 3/3 | 0/3 | 1/3 | 0/3 |
+| Transport, held out | 4 | 2/3 | 0/3 | 0/3 | 0/3 |
+
+Supports naming one to three of the four-cycle inputs complete to the whole chain.
+Every proper subset of the 21 improving chain and transport packets, each missing one
+member, exhausts without improvement, so the full freedom was required at those
+centers. The non-improving transport packet closes a zero-cost cycle. Transport
+supports name all nine inputs; completion supplies the cycle structure, not a missing
+coordinate. Its 27 unrepairable packets stop at a column row whose remaining
+compensators were already planned in the opposite direction. Knapsack packets
+improve, but so do their proper subsets: row slack needs no coordinated freedom.
+
+Paired with raw refutation over 108 request counts, completion has 18 wins and no
+losses. Its 15 declines are requests smaller than every packet, and raw ranking
+improved none of them. Completion adds no LP operation. Median extra modeled source
+work is 68, 105, 142 and 1,371 units on exchange, three-cycle, four-cycle and
+transport. Both numerical arms spend a median containing total near 36,000 units,
+against adjacency's one native unit.
+Disagreement completion matches raw disagreement in every trial: root points already
+disagree on whole chains, and 90 of 108 sets are identical. Root refutation is
+unavailable because acquisition reaches each optimum, so completion adds no incumbent
+beyond that companion. Semantic blocks do not apply to these linear shapes.
+
+Retain completion as a bounded opt-in consumer of refutation supports. These
+self-authored controls establish a consumed coordinated freedom, not a default,
+throughput, basin or broad-family claim. Adjacency remains far cheaper where it
+succeeds. [8780](https://lab.eignex.com/jobs/8780) stopped at the first numerical arm
+on a stale reflective constructor lookup, and the 8742 submission named an
+unresolvable abbreviated ref. Neither supplied a comparison.
 
 ### Prepared board-restart outcomes
 
@@ -3598,6 +5974,223 @@ incumbent acquisition remain limits; automatic routing is unchanged. This
 qualification supports consumed scoped refutations, not a general runtime or
 optimization improvement.
 
+#### Scoped refutation reuse
+
+[Accepted-API egout capture 8476](https://lab.eignex.com/jobs/8476) uses
+`c12bbb5677`, exact semantics, frontier traversal, source cuts, seed 3 and P1,
+with a 32-operation numerical allowance. Its original MPS SHA-256 is
+`351ed046eb56e07662b3c2dba35800f5d2cee3fac18c1bd7fbc8dea4a0dcd8db`,
+enforced against the retained 8087 source. It retains 18 of 45 attempted
+observations with six refutations under the 16 MiB modeled observation limit. Omitted
+states remain unknown. This instrumented capture establishes no throughput comparison.
+
+Egout queries 7 and 11 retain identical exact refutation derivations, including
+four source premise IDs, rational weights and upper restrictions on integer
+coordinates 2 and 3. Their restrictions on coordinates 0 and 1 differ. Original
+scopes pass fresh native checks; reducing those scopes needs its own check.
+The capture establishes recurrence, without a reduced-scope proof or an independent
+exported-proof check. The consumer freshly checks each support reduction and import
+before closing a compatible leaf.
+
+`param.source-refutation-reuse=true` enables the experimental invocation-local
+consumer for ordinary numerical traversals. The default keeps it disabled.
+Stage observations distinguish candidates, scope reductions, checked imports,
+avoided numerical queries, verification work, cumulative modeled allocation,
+retained bytes and evictions. Modeled allocation is separate from physical RSS.
+Reuse work, including its verification subset, is already included in source LP
+conflict-certification work and cumulative funded work; these counters are not additive.
+
+`param.source-refutation-propagation=true` additionally consumes checked integral
+unit-prefix exclusions through named source-bound atoms; it enables the same reuse
+index and remains disabled by default. Compare it with cache-only reuse on the same
+revision and whole-family holdouts, retaining ordinary automatic controls.
+`numericalRefutationUnitDeductions` counts first implications and
+`numericalRefutationUnitReplays` counts restoration under active antecedents.
+Record actual shared decisions, numerical queries, complete sibling coverage,
+incumbents, total funded work/allocation and whole-CLI resources. Cache lookup and
+verification counters are subsets of that work; atom naming and clause construction
+also spend the containing allowance. Lower query counts in an incomplete run alone
+establish no benefit.
+
+[Qualification 8696](https://lab.eignex.com/jobs/8696), at `81220267c6`, completes
+162 cases: the nine frozen original sources, reuse disabled/enabled and automatic
+controls under default/exact semantics, three policy seeds, P1/10 s and external
+whole-CLI resource recording. All original hashes match. Each source/seed keeps
+all six arms on one host/build/runtime; 126 cases run on Linux/amd64 and 36 on
+Mac/aarch64. Distribution jars match across platforms. The runtime options are
+3 GiB, Serial GC and `ActiveProcessorCount=1`; command intervals overlap at most
+one case per host. These are policy seeds with one repetition each.
+
+All 54 paired frontier comparisons preserve feasibility, exact objective and
+native/source proof outcome. All 70 feasible points pass the lab's independent
+MPS solchecker; native proofs have no independent exported-proof check. Every
+reused `p0033` run proves 3089, every `gr4x6` run proves 4047/20, and every
+`flugplinf` run proves infeasibility. The Mac `rgn` seed retains its witness in
+both policies; its Linux seeds remain unknown. Other numerical outcomes remain
+unknown. Automatic controls also prove `enigma` optimal at zero.
+
+The default-tolerance Linux strata below report medians over the indicated
+number of policy seeds. A one-seed stratum is one observation. Closed/pending
+leaf counts describe different partitions and establish no coverage ordering.
+
+| Source (seeds) | LP operations, off → on | Checked imports | Closed/pending, off → on | Funded work, million units, off → on |
+| --- | ---: | ---: | --- | ---: |
+| bell3a (2) | 818 → 817.5 | 232 | 322/304 → 385/326.5 | 99.57 → 98.46 |
+| bell5 (2) | 1062 → 978 | 175 | 180/724 → 199/759.5 | 100.12 → 99.41 |
+| dcmulti (3) | 166 → 151 | 23 | 31/115 → 33/112 | 285.94 → 278.38 |
+| egout (2) | 930.5 → 638 | 275 | 357/228 → 359.5/198.5 | 192.64 → 146.70 |
+| enigma (3) | 1100 → 1091 | 156 | 506/248 → 577/215 | 155.99 → 151.68 |
+| flugplinf (3) | 1104 → 1021 | 88 | 552/0 → 555/0 | 23.12 → 22.50 |
+| gr4x6 (3) | 45 → 45 | 0 | 33/0 → 33/0 | 2.7862 → 2.7885 |
+| p0033 (1) | 1896 → 1324 | 576 | 1026/0 → 1003/0 | 27.60 → 18.80 |
+| rgn (2) | 408.5 → 403.5 | 16.5 | 80/284 → 80/283 | 102.23 → 101.62 |
+
+The complete `p0033` counts repeat in both semantics and all three seeds.
+Its pool spends 779,675 work units, including 382,802 verification units,
+48,090,660 modeled allocation bytes, including 44,462,192 verification bytes,
+and peaks at 707,548 retained bytes. Total funded allocation grows from
+5,118,124 to 53,016,528 bytes despite lower total funded work. Linux CLI wall
+times are 8.09 → 6.92 s and 8.48 → 7.04 s for default/exact; peak RSS is
+160,112 → 151,980 KiB and 162,976 → 156,268 KiB. The two Mac seeds have median
+times 2.28 → 1.75 s and 2.17 → 1.90 s, with RSS 261,472 → 248,656 KiB and
+260,632 → 251,776 KiB. Timings stay within their platform strata.
+
+Local allocation admission retires 22 of the 54 enabled caches. Maximum pool
+allocation is 67,094,459 bytes, within 64 MiB; maximum source funded allocation
+is 152,120,890 bytes. `enigma` retires at 66,934,014 pool bytes, continues
+numerical queries through the deadline and remains unknown. Its peak retained
+storage is 1,047,419 bytes; charged evictions include retirement cleanup.
+`gr4x6` gains no hits and adds 2,305 work units and 261,406 modeled bytes.
+`flugplinf` saves operations but Linux median wall time increases
+4.81 → 5.02 s and 4.73 → 5.02 s. The time-limited Mac `bell3a`, `bell5` and
+`egout` runs complete fewer LP operations with reuse and retain unknown outcomes.
+These costs support keeping reuse opt-in and automatic routing unchanged.
+
+[8657](https://lab.eignex.com/jobs/8657) retains the rejected 85524cc2b1
+certificate-loss control; freshly checked imported refutations must also discharge
+objective-bound coverage. [8671](https://lab.eignex.com/jobs/8671) retains the
+127fc9dd2a control where `enigma` exhausts 512 MiB of cumulative allocation.
+The invocation-local admission limit preserves ordinary numerical funding.
+
+##### Unit-prefix exclusions
+
+[8741](https://lab.eignex.com/jobs/8741), at `1101fa4693`, completes 162 matched
+cache-only, prefix and automatic runs over the same nine source hashes, default/exact
+semantics, three policy seeds and P1/10 s. Egout and p0033 supply the captured cases;
+the other whole families are held out. All 27 source/seed groups retain one
+host/build/runtime across their six arms: 78 cases on Mac/aarch64 and 84 on
+Linux/amd64, with 3 GiB, Serial GC and `ActiveProcessorCount=1`. Command intervals
+overlap at most one case per host. All 69 feasible points pass independent original
+MPS solchecker checks; native proofs have no independent exported-proof check.
+All 162 whole-CLI resource receipts are retained, including after worker replacement.
+
+Every source consumes prefix deductions. Completed flugplinf refutations save
+38 queries and 405 decisions, with higher allocation. Gr4x6 retains optimum
+4047/20 but its five implications save neither queries nor decisions. The completed
+native coverage costs below repeat across source policies; p0033 uses the separate
+completion control described below. Allocation is cumulative modeled bytes.
+
+| Source | Prefix implications | LP operations, cache → prefix | Decisions, cache → prefix | Funded work, million units | Allocation, decimal MB |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| flugplinf | 307 | 1021 → 983 | 5745 → 5340 | 22.500 → 21.370 | 24.804 → 71.874 |
+| gr4x6 | 5 | 45 → 45 | 156 → 156 | 2.788 → 2.792 | 0.528 → 0.959 |
+| p0033 completion | 755 | 1324 → 1425 | 9495 → 6882 | 18.799 → 20.968 | 53.017 → 83.102 |
+
+The ten-second p0033 comparison loses three cache-only optimum proofs; neither
+policy loses feasibility, but one exact prefix run retains 3095 instead of 3089.
+One default rgn prefix run loses the cache-only witness. All other paired
+feasibility, objective and proof outcomes agree. Automatic controls prove p0033
+optimal at 3089 in all six runs. These losses remain part of the qualification.
+
+[8755](https://lab.eignex.com/jobs/8755) allows 30 seconds for one p0033 policy
+seed on Mac/aarch64 at the same revision. Both cache and prefix policies complete
+optimum 3089 under both source policies; all six witnesses pass solchecker.
+The prefix retains complete checked sibling coverage with 3147 nodes instead of
+2005. Default whole-CLI wall time is 1.95 → 2.87 s, CPU time 4.45 → 6.47 s and
+peak RSS 260208 → 279440 KiB. These are single observations, separate from the
+Linux ten-second cohort. Default flugplinf RSS also rises: 237136 → 252624 KiB
+over two Mac seeds and 140656 → 154072 KiB for one Linux seed; Linux wall time
+is 7.04 → 7.59 s. Whole-CLI costs include lookup, naming, replay and verification.
+
+[8730](https://lab.eignex.com/jobs/8730) and
+[8739](https://lab.eignex.com/jobs/8739) retain stopped prototypes where naming
+after a spent source grant ended traversal early; those lower work counts are not
+gains. The consumer pauses before naming the retained split. Unit-prefix exclusion
+is a checked opt-in capability with a finished-proof work reduction on flugplinf,
+captured-case regressions and memory costs; automatic routing and heuristic
+ordering retain their defaults.
+
+##### Named refutation resolution
+
+`param.source-refutation-resolution=true` enables checked pairwise resolution over
+already named integral source-bound predicates, together with unit propagation.
+It remains disabled by default. `numericalRefutationReuseResolutionProofs` counts
+retained proofs, `numericalRefutationReuseResolutionHits` checked region imports,
+and `numericalRefutationResolvedDeductions` actual unit consumptions.
+`numericalRefutationSupportReasons` counts shortened reasons, without establishing
+a changed trajectory. `numericalRefutationReuseResolutionUnfixedHits` and
+`numericalRefutationUnfixedDeductions` additionally require the removed pivot to
+remain undecided in the checked exclusion scope: neither immediate input proof
+matches individually. Observation work spends the same cumulative allowance.
+
+[Pilot 8795](https://lab.eignex.com/jobs/8795), at `7fbb3e59d6` on Mac/aarch64,
+returns seven independently checked original MPS witnesses across eight exact-policy
+cases. P0033 consumes 22 resolved deductions and one region import, preserving
+native optimum 3089 at higher work/time. Unit to resolution whole-CLI wall time is
+2.85 to 3.32 s and peak RSS 287,696 to 300,880 KiB. Egout has no complementary
+candidates before pool retirement; shortening 5,911 reasons leaves its checks and
+pending leaves unchanged. A mistaken miplib3 flugplinf selector admits no case and
+supplies no holdout evidence. The pilot precedes support/scalar/scratch metering
+corrections; use the qualification revision for current cost comparisons.
+
+[Qualification 8799](https://lab.eignex.com/jobs/8799), at `9fb998f3fd`, completes
+72 Linux/amd64 cases on the same nine original hashes as 8741: captured egout/p0033
+and seven whole-family holdouts, cache/unit/resolution/ordinary controls under both
+semantic policies, seed 3 and P1/30 s. Each source keeps one host/build/runtime for
+its eight arms, with 3 GiB, Serial GC and one active processor. All 72 whole-CLI
+resource receipts are retained and all 28 returned witnesses pass independent
+original MPS solchecker checks. Native proofs have no independent exported-proof
+check. These are single trajectories, not timing repetitions.
+
+All paired numerical policies preserve feasibility, exact objective and native
+proof outcome. P0033 proves 3089, gr4x6 proves 4047/20 and flugplinf proves
+infeasibility, with zero pending leaves. Other numerical cases remain unknown and
+have no witness. Ordinary controls find witnesses on every feasible family and
+also prove enigma optimal at zero. The complete-proof costs below repeat in both
+semantic policies; each cell gives cache / unit / resolution. Allocation is
+cumulative modeled source bytes in decimal MB.
+
+| Source | Numerical checks | LP operations | Decisions | Funded work, million | Allocation, MB |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| p0033 | 1343 / 1456 / 1998 | 1324 / 1425 / 1899 | 9495 / 6882 / 10095 | 18.799 / 20.968 / 28.450 | 53.017 / 83.102 / 76.180 |
+| flugplinf | 1021 / 983 / 1165 | 1021 / 983 / 1166 | 5745 / 5340 / 5707 | 22.500 / 21.370 / 25.378 | 24.804 / 71.874 / 69.726 |
+| gr4x6 | 45 / 45 / 45 | 45 / 45 / 45 | 156 / 156 / 156 | 2.7885 / 2.7924 / 2.7925 | 0.528 / 0.959 / 0.972 |
+
+Per semantic policy, resolved imports/deductions are bell3a 10/1, bell5 2/0,
+flugplinf 0/2 and p0033 1/22; the other five sources consume none. Fewer retained
+nodes describe different coverage partitions, not a coverage ordering or gain.
+Peak index storage is 1,048,538 bytes, pool allocation 67,108,826 bytes and source
+allocation 97,399,189 bytes, within their existing cumulative limits.
+
+[Unfixed-pivot replay 8808](https://lab.eignex.com/jobs/8808), at `df8972371e`
+on Linux/amd64, completes all eight p0033 controls and independently checks all
+eight witnesses. Ten of the 22 resolved deductions per semantic policy retain an
+undecided pivot in their exclusion scope, beyond individual input matching/unit
+checks. The resolved-region import itself has a decided pivot. Every policy
+preserves native optimum 3089. Observation charges preserve 1,899 LP operations,
+1,998 checks and 10,095 decisions, at 28,450,217 funded work and 76,201,275 modeled
+bytes. Unit to resolution whole-CLI wall time is 14.75 to 15.92 s in default
+semantics and 14.00 to 17.67 s in exact semantics; peak RSS is 168,556 to 168,080
+and 159,976 to 165,456 KiB. Ordinary controls take 2.88/2.79 s. Whole-CLI costs
+include frontend preparation, native checking and cleanup; independent solchecker
+checks add 6–9 ms. No efficiency or default-admission claim follows.
+
+Both qualification jobs retain server-managed infrastructure losses and repeated
+uncommitted groups before successful receipts. Interrupted attempts supply no
+solver outcome or throughput evidence; they are not imputed as completed coverage.
+The retained capability is checked support-based learning at a cost. Automatic
+routing and all refutation-consumer defaults stay unchanged.
+
 #### Checked source rounding cuts
 
 [Qualification 8117](https://lab.eignex.com/jobs/8117) compares `f59091a21a` with
@@ -3791,6 +6384,14 @@ Submit through the lab with `profile.runTimeoutSec: 180` for a bounded local Mac
 capture. A child JVM uses one processor, a 3 GiB heap, Serial GC and JFR. This is an
 instrumented owner-state capture; ordinary matched CLI experiments measure cost.
 
+`refutationReuse=true` enables the invocation-local checked cache in this capture.
+`feedbackControls=true operations=N` compares baseline, full feedback and one
+ablation of support ordering, point selection, reuse and aggregation on the same
+hash-matched source. It writes each arm's bounds, incumbents, query journal and
+frontier under its own directory. The lab places this job normally; allow 600
+seconds for the six ordered captures. Their inspection allowances are separate
+from solving, and their ordered JFR timings establish no throughput comparison.
+
 The capture retains the original bytes, native affine system and build/runtime
 identity. `incumbents.jsonl` flushes accepted incumbent values and branch conditions.
 `bounds.jsonl` flushes changed global bounds after cooperative slices, recording
@@ -3812,6 +6413,27 @@ Optional `history=true` enables the internal directional-gain prototype for that
 capture. It requires two nonnegative finite gain observations per direction,
 normalized by movement, before ranking a coordinate. Missing, unusable or all-zero
 estimates retain source order. The production default uses source order.
+Optional `activeRows=true` consults fully established active source rows before
+Boolean completion. It is a feasibility-only opt-in under the same cumulative
+source LP limits; partial checks, unchanged-state skips, pauses and checked
+conflicts have separate `numericalPartial` counters. Partial points give neither
+incumbents nor objective bounds. Complete-check counts remain separate.
+Incomplete active-row captures retain unknown applicability.
+`activeControls=true` instead runs seven self-authored native exact-affine controls
+with delayed and active-row consultations. One warmup and three measured rounds
+alternate arm order, preserving the exact source JSON/hash, objective units, full
+owner lifecycle time, decisions, complete checks and separate work counters. These
+controls establish native scope behavior and cost; they are neither ordinary MPS
+performance measurements nor independent proof checks.
+Warmups also retain the shared numerical journal in `*-states.json`. Delayed
+open states receive separately funded feasibility consultations in
+`*-active-consultations.jsonl`, with at most two operations, 20M work and 64 MiB
+modeled allocation per state under a shared ten-second inspection deadline.
+These counterfactual queries publish no point or bound and do not guide traversal.
+Measured rounds disable observation. Stops and omitted observations remain unknown.
+For an original MPS request, `activeRows=compare` applies the same paired lifecycle
+comparison to one shared prepared source context. Original bytes/hash, effective
+semantics, objective scale and tolerance coverage accompany the native results.
 Optional `frontier=true` selects bound-ordered traversal and retained sparse
 guidance. Wider contexts use the sparse preparation policy rather than the small
 exact-primal admission; unresolved alternatives retain the same capture checks.
@@ -3938,18 +6560,677 @@ from `50000000/230000001` to `25000000/107499989`. Original bytes, exact rows,
 weights, bound citations and scopes remain in the capture. This instrumented
 inspection supplies neither an independent proof check nor a whole-CLI timing claim.
 
+`MpsProofFrontier frontier=true selection=true` retains up to 64 completed same-parent query
+records in `selection.json`, within one million modeled entries, 16 MiB modeled
+retention and a separate 30-second observation/inspection allowance. Records keep
+exact points before primal recovery, original and Boolean-substituted source
+systems, generating inactive-row masks, installed candidate status and signed
+exact violations (`activity - rhs`). Positive violation identifies a cut excluding
+the point; a satisfied installed cut remains a candidate. Records also retain
+checked bounds/refutations, parent scopes, available sibling bounds, incumbent
+values and visited-row eligibility limits. Missing values are unknown.
+`retainedRecords` and `inspectionStopped` distinguish journal retention from
+inspection that stops before every retained record is emitted or checked.
+`operations=N` optionally caps the diagnostic traversal at 1–256 source LP
+operations so observation-on/off controls can stop before the wall deadline.
+
+Optional `replay=true` separately replays at most four retained point states with
+empty and all-candidate masks, twice per mask, flushing `selection-replays.jsonl`.
+Each fixed-mask replay has one source operation, 20M cumulative work and 64 MiB modeled allocation under a
+shared ten-second diagnostic deadline. Replay creates fresh owners; its work and
+native checks are separate from traversal accounting and independent witness
+validation. The capture's existing original bytes, hash, native-system identity,
+objective scale, revision, settings and platform bind both files. Neither diagnostic
+establishes whole-CLI timing or a source verdict.
+Replay prepares a fresh basis; a retained warm-start child can therefore have a
+different point or certified bound. Repeated fresh replays test determinism for
+one exact query and mask. The original captured point remains the scoring state.
+
+`aggregate-probe=true` attaches the same journal and writes its parent records to
+`aggregate-parents.json` through the maintained serializer. `aggregate-pairs.jsonl`
+examines pairs of active source rows that can cancel all continuous activity,
+including a continuous-only cancelling row, before checked integer rounding.
+It retains exact weights, owner indices, positive violations and fresh native
+checks separately from the input source-row residuals. This bounded family excludes
+mixed residual rounding and aggregates of three or more rows.
+`aggregate-mixed=true` adds every shared opposite-sign continuous pivot and applies
+checked mixed rounding to the remaining residuals. Its bound index keeps the first
+active singleton source side, preferring a negative residual; each cited side
+retains its activation premises. This mode also includes continuous bound rows as
+aggregation sources. It does not enumerate other bound choices or wider aggregates.
+Inspection has 20M cumulative work, 64 MiB modeled allocation, 256-bit retained
+scalars, 128-coordinate combined support, 16 KiB proof references and at most 64
+positive candidates per parent. Native proof verification shares 100,000 steps per
+parent. Parent serialization and pair inspection each have a separate 20-second
+diagnostic deadline and issue no LP queries. Complete pair scans, unavailable
+points, stopped proof checks and retention limits retain distinct observations;
+zero candidates in an incomplete report establish no applicability result.
+
+`aggregate-replay=true` retains the first parent with fresh source-checked
+aggregate proposals and writes `aggregate-replays.jsonl`. Four fresh-basis arms
+disable separation, enable individual cuts, and append the accepted aggregates to
+the individual family before native admission. The fourth arm prepares bounded
+opposite-bound projections directly from the same source, including discovery
+in its query costs. Each arm has one LP operation, 20M work and 64 MiB modeled
+allocation; all four share a 30-second deadline.
+Discovery costs remain in the pair report. The replay reports installed and
+checked candidate IDs, exact bounds, native checks and per-arm costs. These
+diagnostic replays establish neither warm-basis parity nor whole-CLI throughput.
+`aggregateCuts=true` enables cached source-bound projections in the measured
+frontier traversal itself. Ordinary CLI experiments use
+`param=source-aggregate-cuts=true`; the default is false and `source-cuts=false`
+disables both individual and aggregate separation.
+
+[Mixed-pair probe 8519](https://lab.eignex.com/jobs/8519), at `6f92f17c4b`, uses
+the same original `rgn` source hash and traversal settings as 8478. Root query 0
+completes 20,301 pairs and 820 pivot combinations, producing five positively
+violated mixed cuts; all five pass fresh native checks. The largest exact
+violation is `11748520715972943/36028797018963968`. Each combines a singleton
+continuous bound and a mixed source row, then cites three residual bound sides.
+None of the 40 individual cuts has positive violation at that captured point.
+Root discovery and proof checks spend 1,042,668 modeled work and 35,367,372 modeled
+allocation bytes. Query 1 reaches the shared allocation limit, leaving its proof
+checks and all later states unknown. These are separation observations; checked
+bound improvement requires an inserted-cut comparison.
+
+[Root insertion replay 8577](https://lab.eignex.com/jobs/8577), at `179b91e487`,
+uses the same original `rgn` hash and Linux/amd64 settings. All three fresh-basis
+arms finish within one operation, with fresh native bound checks. The individual
+bound is `921805910255297432406579/18889465931478580854784` (about 48.8).
+Appending the five checked proposals raises it to
+`2070285411688286118435853/37778931862957161709568` (about 54.8).
+Individual query work/allocation are 956,585/421,164 bytes; the aggregate arm uses
+1,073,195/441,568, excluding the separately reported discovery cost. Disabled
+separation uses 420,964/262,364 and certifies about 48.8. All 45 aggregate-arm
+candidates pass native admission. This motivates a bounded cached source-bound
+projection family; it does not establish whole-frontier throughput.
+
+[Cached-family replay 8590](https://lab.eignex.com/jobs/8590), at `8e8f150523`,
+repeats those three arms and adds template-owned opposite-bound projection.
+It retains 64 aggregate proposals and admits all 104 individual/aggregate cuts.
+The freshly checked bound is
+`641788481763964810311511928787631/11711468953074583855880403419136`
+(about 54.8). Its 1,760,975 work and 2,454,257 modeled allocation bytes include
+projection preparation and LP certification. This is a useful retained subset;
+the proposal cap leaves the rest of the source-projection family unexamined.
+It does not establish a universal candidate ceiling or whole-frontier benefit.
+
+[Frontier integration 8610](https://lab.eignex.com/jobs/8610), at `e2622b92d8`,
+enables the cached family in the retained traversal on the same original `rgn`
+source, default tolerance, seed 3, Linux/amd64, P1 and 32 LP operations. The root
+installs 40 individual cuts and 64 aggregates and reproduces 8590's checked bound.
+All 104 cuts and the bound pass fresh native checks in each of the six retained
+query records. The traversal prepares once and reuses the owner 31 times, reaching
+a checked root bound of about 63 with 30 checked bounds, 61 retained nodes and
+28 pending alternatives. It publishes no incumbent or terminal source verdict.
+Total funded work is 14,081,025 and modeled allocation is 2,524,401 bytes, including
+73,674 cut-preparation work and 546,560 cut-verification work. Floating work is
+10,684,978; bound and conflict certification spend 2,853,848 and 164,378 respectively.
+The 16 MiB capture journal retains six of 61 attempted records, leaving later
+point inspection unavailable. This verifies traversal consumption and costs;
+whole-CLI comparisons and held-out qualification are separate measurements.
+
+[Ordinary qualification 8620](https://lab.eignex.com/jobs/8620), at `6feefc72f3`,
+finishes all 128 cases: disabled, individual, aggregate and automatic-default arms,
+exact and default tolerance, seeds 1 and 3, two repeats, four original MPS sources.
+All 87 emitted witnesses pass the same independent checker identified in 8481.
+The 64 proven outcomes are on `gr4x6` (`4047/20`) and `p0033` (`3089`); witness
+checking remains separate from native proof checking. Retries preserve the first
+16 accepted records and complete the unfinished cases under the frozen settings.
+
+Each of the 32 comparison blocks shares its full build fingerprint. All CLI
+JAR and benchmark harness hashes match across the cohort; the platform launcher and
+runtime distinguish Linux/amd64 from macOS/aarch64. Every case requests P1,
+3 GiB SerialGC, debug enabled and a ten-second solver budget. CPU seconds cover
+the whole CLI process; physical RSS is distinct from modeled allocation. The
+external resource receipt binds each raw solve record by SHA-256. Ranges below
+describe the eight runs in each row and span both platform strata. Pairwise outcome
+comparisons use matched runtime blocks. Whole-CLI wall times range from 0.46 to
+10.40 seconds; these timings supply no pooled throughput estimate.
+
+| Source | Arm | Witnesses / proven | Funded work, millions | Modeled allocation, MB | CPU seconds | Peak RSS, MiB |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| rgn | disabled | 4 / 0 | 80.043–160.067 | 2.767–100.198 | 10.21–20.93 | 176.6–373.0 |
+| rgn | individual | 1 / 0 | 104.048–251.043 | 2.063–27.668 | 10.22–20.72 | 166.9–326.0 |
+| rgn | aggregate | 2 / 0 | 120.076–549.544 | 3.478–69.697 | 10.21–21.04 | 165.0–338.3 |
+| rgn | automatic default | 8 / 0 | 3.116–41.579 | 0.440–0.990 | 10.17–22.20 | 184.2–326.9 |
+| gr4x6 | disabled | 8 / 8 | 2.781 | 0.266 | 1.39–1.82 | 101.7–195.5 |
+| gr4x6 | individual | 8 / 8 | 2.786 | 0.266 | 1.13–1.99 | 101.7–197.3 |
+| gr4x6 | aggregate | 8 / 8 | 2.813 | 1.209 | 1.17–2.13 | 103.7–195.7 |
+| gr4x6 | automatic default | 8 / 8 | 2.649–2.781 | 0.243–0.249 | 1.83–6.85 | 148.1–211.2 |
+| p0033 | disabled | 8 / 8 | 24.600 | 5.207 | 4.61–8.53 | 159.2–293.8 |
+| p0033 | individual | 8 / 8 | 27.601 | 5.118 | 4.54–8.82 | 155.1–299.0 |
+| p0033 | aggregate | 8 / 8 | 27.602 | 5.177 | 5.18–9.47 | 159.1–296.9 |
+| p0033 | automatic default | 8 / 8 | — | — | 0.89–4.10 | 123.0–172.0 |
+| pp08aCUTS | disabled | 0 / 0 | 908.824–1000.112 | 2.763–3.098 | 17.92–21.14 | 306.5–336.9 |
+| pp08aCUTS | individual | 0 / 0 | 833.463–1001.080 | 2.785–3.252 | 19.24–21.09 | 284.6–320.9 |
+| pp08aCUTS | aggregate | 0 / 0 | 804.047–1000.005 | 3.773–4.353 | 19.56–21.21 | 289.4–309.3 |
+| pp08aCUTS | automatic default | 8 / 0 | 75.480–220.167 | 0.586–0.966 | 20.99–22.64 | 307.7–329.7 |
+
+Funded totals include discovery, failed attempts, query preparation, numerical
+work and certification. The automatic `p0033` route has no numerical-frontier
+funding ledger. No automatic-default arm enables aggregation.
+
+On `rgn`, the final checked nominal bound is about 67.4–70.8 with aggregation,
+versus 72.2–75.0 for individual and disabled separation. Pending alternatives
+range over 190–579, 288–601 and 396–632 respectively. Aggregation gains one witness
+over individual separation and loses two relative to disabled separation in the
+matched blocks. The stronger same-parent root bound therefore supplies no general
+search or throughput improvement claim.
+
+No held-out source accepts an aggregate from this bounded family. `gr4x6` visits
+48 combinations: 24 have integral right-hand sides and 24 lack residual bounds.
+`p0033` has no eligible projection attempts. Its four individual cuts remain
+available. Aggregate preparation adds 26,336 work and 942,434 modeled bytes on
+`gr4x6`, and 901 work and 59,222 modeled bytes on `p0033`, over individual cuts.
+`pp08aCUTS` visits 231 combinations, including 112 support-limited attempts whose
+applicability remains unknown. Zero retained cuts there establish no broader
+inapplicability result.
+
+The checked producer and explicit frontier option remain available for controlled
+experiments. The 64-proposal traversal policy stays disabled by default: its root
+inference is useful, while this cohort shows higher costs, weaker final bounds and
+lost outcomes relative to disabled separation. Wider aggregates and other bound
+choices remain outside this experiment.
+
+[Infrastructure control 8481](https://lab.eignex.com/jobs/8481) pairs
+`133546fd6f` and `2161236173` with aggregation disabled, across `gr4x6`, `p0033`,
+`rgn` and `pp08aCUTS`, seeds 1 and 3, default and exact policies, and individual,
+disabled and default traversal arms. All 96 cases finish on Mac/aarch64 with the
+same original source hashes per problem, 10-second budgets, P1, 3 GiB SerialGC and
+debug enabled. All 48 base/candidate pairs retain verdict coverage. Fixed-frontier
+arms reproduce exact objectives and modeled work; timed default searches vary in
+incumbents and work and support no throughput claim. Both revisions prove
+`gr4x6` and `p0033`. The 80 emitted witnesses pass MIPLIB solchecker
+`1.0.4+eignex-lab-longnum-1`, executable SHA-256
+`2292d8dd2e14d43dd7c4962069dc278e216a7143eff4e1ce3c42278043c4c0c8`.
+The 16 frontier `pp08aCUTS` cases emit no witness. Independent feasibility checks
+do not validate the native optimality certificates. This control qualifies the
+inactive infrastructure, before aggregate policy is enabled.
+
+[Pure-pair probe 8478](https://lab.eignex.com/jobs/8478), at `f7a11d71cd`, retains
+the original `rgn` hash, default tolerance, seed 3 and a 32-operation traversal on
+Linux/amd64. All nine retained parents complete their 20,301 pair visits and 40
+explicit combinations: 20 combinations eliminate integer activity and 20 leave
+continuous residuals. No positive pure-cancellation cut is found. The diagnostic
+spends 597,879 modeled work and 13,657,142 modeled allocation bytes, with zero LP
+queries. Exact input-row residuals are recorded separately from cut efficacy, and
+the retention-limited journal leaves later states unknown. This result selects
+mixed-residual inspection rather than a general aggregation rejection.
+
+[Observation-on 8431](https://lab.eignex.com/jobs/8431) and
+[observation-off 8432](https://lab.eignex.com/jobs/8432), at `06e1a59e3b`, use the
+same original `rgn` hash as 8265, one Linux/amd64 host, matching installed bytes,
+runtime and options, seed 3 and default tolerance. Both stop at 32 LP operations
+with identical stage counters: 63 checks and retained nodes, 5,482,611 floating
+work, 230,751 preparation work, 1,841,250 bound-certificate work and 54,861
+conflict-certificate work. Physical observation overhead is not a throughput claim.
+The journal retains nine states before its conservative modeled byte allowance;
+360 candidate checks, nine local bounds and four available sibling bounds pass
+fresh native verification. Later missing observations remain unknown.
+
+[Exact p0033 capture 8433](https://lab.eignex.com/jobs/8433) uses that revision and
+host with its 8265 original hash. All 57 states fit: ten checked refutations,
+28 completed points and 19 unavailable points. All 228 candidate checks pass.
+For each of the first four parents, all-cuts replay gives a stronger checked bound
+than empty-mask replay. Root work is 28,679 versus 32,019, respectively, within
+one operation each. In the four `rgn` replay parents, no candidate has positive
+violation at the uncut point and empty/all masks give identical checked bounds.
+These states support point-based selection experiments while preserving useful
+rounding controls. Native derivation checks are separate from independent witness
+or exported-proof validation; the diagnostic establishes no source verdict.
+
+[Repeated replay 8445](https://lab.eignex.com/jobs/8445), at `7f5c1aec09`, reproduces
+the exact point, scope, bound and modeled work in both fresh repetitions of all
+eight `rgn` parent/mask pairs. All 16 bounds and 640 candidate derivations pass
+fresh native checks; no replay reaches its allowance. The original source hash
+and Linux/amd64 platform match 8431.
+
+
+`--param source-point-cuts=true` enables point-based selection only in the retained
+numerical frontier; `--param source-cuts=false` disables separation. The ordinary
+all-cuts policy remains the default. `MpsProofFrontier pointCuts=true` selects this
+consumer, and replay includes a `selected` arm alongside `all` and `disabled`.
+Each selected replay funds both its base query and at most one separation query
+from the same 20M work/64 MiB allocation envelope, with two source operations;
+the other arms keep one operation. Both generating masks and the strongest checked
+completed bound are retained. A fresh selected arm starts with an empty pool.
+Replay uses the first four distinct source scopes with captured points.
+
+Selection retains at most 64 source cut IDs per compatible template and considers
+at most 8,192 support entries, 65,536 scoring work and 1 MiB modeled allocation per
+consultation. Projection/scoring work and allocation debit the containing ledger;
+LP preparation, exact proof checks and numerical work retain their existing costs.
+`numericalCutSelection*` observations distinguish visited/selected rows, unavailable
+scores/points, incomplete scans, pool limits, separation rounds, work and modeled
+allocation. A satisfied installed cut remains available, with its original exact
+source derivation; no score admits or validates a cut. Pending separation retains
+its completed base bound, and a declined round keeps the base split. Checked base
+incumbents and terminals bypass extra separation. These are bounded policy controls,
+not default-admission or throughput claims.
+
+The selection work counter is part of preparation work, and selection allocation
+is part of funded allocation; these counters must not be added to their totals.
+
+[Point-selection rgn 8547](https://lab.eignex.com/jobs/8547) and
+[p0033 8549](https://lab.eignex.com/jobs/8549), at `21c8b56c12` on Linux/amd64,
+compare fresh disabled/all/selected queries twice under identical source scopes.
+All 48 replay bounds and 1,088 candidate checks pass fresh native verification;
+every repeated scope/arm pair reproduces its exact point, bound and modeled costs,
+and none reaches its allowance. The p0033 sample contains three distinct scopes
+because its base and selected root queries both occupy journal records.
+
+At the p0033 root, selected IDs 0/1/2 preserve the four-cut bound while disabled
+separation is weaker. The two-query selected round costs 52,375 work units and
+82,320 modeled bytes, versus 28,679 and 39,084 with all cuts and 27,284 and 33,332
+with separation disabled. On rgn, none of the forty cuts excludes the replayed
+points. Selection omits all forty physical rows and uses one operation. Root work
+is 450,500 versus 956,585 with all cuts, but selection allocation is 359,900 bytes
+versus 262,364 when disabled. The all-cut exact bound is slightly stronger than
+the identical selected/disabled bound; excluding satisfied rows does not establish
+exact certificate parity. These are same-parent work and capability results, not
+ordinary solve speedups or grounds for default promotion.
+
+[Rebased p0033 8570](https://lab.eignex.com/jobs/8570), at `f37b058b74`, reproduces
+all 24 replay operation counts, masks, exact bounds, work and modeled allocation
+after integration with active-row capture. All available replay bounds recheck.
+
+[Integration p0033 8639](https://lab.eignex.com/jobs/8639), at `94d416a07f`,
+checks composition with the funded numerical-feedback journal on Linux/amd64.
+Its four distinct source scopes produce 24 replay bounds and 128 cut derivations
+that pass fresh native checks. Both repetitions reproduce points, masks, exact
+bounds and modeled costs without reaching an allowance. Selected separation
+preserves every all-cut bound with two operations and higher work and allocation
+than the one-operation all-cut queries. The 32-operation capture retains 27
+certified bounds, nine closed leaves and 19 pending leaves, spending 458,587 funded
+work and 333,968 modeled bytes. These diagnostic results do not replace ordinary
+held-out qualification.
+
+[Ordinary comparison 8583](https://lab.eignex.com/jobs/8583), at `3a13972fcf`,
+completes 128 ten-second P1 cases: eight arms over eight frozen sources, seeds 1/3
+and default/exact policies. The development sources are rgn, p0033 and pp08aCUTS;
+bell3a, egout, gr4x6, modglob and enigma are held out. Library JAR hashes match
+throughout. Each source/seed block shares a host, launcher and runtime; blocks span
+Linux/amd64 and macOS/ARM. Supported retries preserve all accepted records.
+All 128 whole-CLI resource receipts are available. Of 56 reported witnesses, 54
+pass source validation; two exact modglob controls remain unsupported because
+the decimal-only checker cannot represent their rational values. The 36 native
+optimality claims have no independent proof check.
+
+All p0033 arms retain source-checked objective 3089 and native optimality. Both
+seeds and policies reproduce these numerical ledger costs and coverage counts:
+
+| Separation | Funded work | Modeled bytes | Checks | Closed leaves |
+|---|---:|---:|---:|---:|
+| Selected | 29,965,732 | 14,597,628 | 2,149 | 1,115 |
+| All cuts | 27,600,734 | 5,118,124 | 1,995 | 1,026 |
+| Disabled | 24,599,726 | 5,207,348 | 2,081 | 1,062 |
+
+Rgn selection installs no cuts and closes 101–103 leaves versus 79–82 with all
+cuts and 129 with separation disabled. It uses 65–68% of all-cut funded work
+with 20.4–21.0 times its modeled allocation. On seed 1/default, whole-CLI peak RSS
+is 172,996 versus 175,940 KiB and wall time is 10.31 s for both selected/all arms.
+Pp08aCUTS selection adds 9.9–10.1 times the all-cut modeled allocation without
+a witness or proof gain. No held-out source retains any candidate cuts. Gr4x6
+retains objective 202.35 and native optimality in every arm; automatic defaults
+also retain incumbents on the other sources and prove enigma's objective zero,
+where the fixed-frontier arms remain unknown. Wall-cutoff frontier differences
+without changed masks establish no selection efficacy. The mechanism remains
+opt-in; these observations support neither default promotion nor a throughput claim.
+
+#### Source numerical decision feedback
+
+`MpsProofFrontier supportBranching=true` enables an internal decision consumer of the
+same-parent journal. Installed checked cuts close to their LP-point boundary
+rank fractional integer coordinates by support size and fractional distance.
+The p0033 capture 8433 retains three nearly tight rounding rows at its root;
+these exact-valued coordinates are pre-recovery guidance with numerical residuals.
+This motivates a comparison of checked coverage and cumulative work against
+source order, without reactivating gain history, probing or refutation priority.
+The runtime adapter exposes actual query scopes, cut masks, points, source rows,
+checked bound/refutation records and unavailable states to repair consumers.
+Cutoff attribution requires the actual strict objective premise.
+Collection and scoring debit the containing source funding. Qualification must
+separate consumed choices, checked outcomes, total work, modeled allocation and
+whole-process memory. Ordinary execution exposes no support-ordering option.
+The frozen `codex/source-feedback-qualification` revision retains the experimental
+CLI control used by the ordinary comparisons; its existence does not admit the policy.
+
+[Pilot 8586](https://lab.eignex.com/jobs/8586), at `3fb3878bb6`, completes 48
+ten-second P1 cases on four frozen MPS sources, seeds 1/3 and default/exact
+policies. Installed distribution, runtime/options and build fingerprint match on
+Linux/amd64; workers differ. All 23 reported witnesses pass the independent
+source checker. Native proofs have no independent proof check.
+
+On p0033 the consumer changes 26 choices and retains checked objective 3089.
+Checks grow from 1,995 to 2,433, retained nodes from 2,051 to 2,579, funded work
+from 27,600,734 to 32,951,173 and modeled allocation from 5,118,124 to 14,885,779
+bytes. Source order completes all four native proofs; the consumer completes
+three, with one final proof lost at the containing deadline despite zero pending
+leaves. More conflicts accompany more search and establish no efficiency gain.
+Rgn, bell3a and egout consume no changed choices and produce no numerical
+incumbents. Their finite controls retain stronger source-checked outcomes.
+Bounded retention leaves later support states unknown. These observations oppose
+policy promotion; changed wall-cutoff frontiers establish no throughput benefit.
+On seed 1's shared worker, whole-CLI peak RSS changes from 159,332 to 168,504
+KiB under default policy and 161,792 to 165,592 KiB under exact policy. External
+wall times change from 8.36 to 10.00 s and 8.49 to 9.80 s, respectively.
+Seed 3's RSS changes from 155,156 to 172,628 KiB under default policy and
+160,780 to 165,432 KiB under exact policy; wall times change from 8.55 to 10.39 s
+and 8.67 to 10.09 s. These pairs are not independent timing repetitions.
+All 23 artifacts missing from the original HTTP 502 fetch, including four resource
+receipts, are recovered at their recorded byte sizes; the missing-file manifest is retained.
+
+[Fixed-operation capture 8589](https://lab.eignex.com/jobs/8589), at `dd4ac66bbc`,
+retains 32 states before the 8 MiB journal limit, with 26 changed choices.
+All 128 cut derivations, 29 available bounds and three refutations pass fresh
+native checks in their recorded scopes. Inspection completes; later records remain
+unavailable. Its separate inspection allowance supplies neither an independent
+witness/proof check nor a whole-process timing claim.
+
+[Held-out comparison 8625](https://lab.eignex.com/jobs/8625), at `e43ed4c2ea`,
+completes all 96 ten-second P1 cases on pp08aCUTS, gr4x6, modglob and enigma,
+seeds 1/3 and default/exact policies. Arms compare numerical support/source order,
+ordinary execution, equal-budget independent companions, and shared companions
+with each ordering. The recovered retry preserves all 84 accepted records and
+runs only the remaining 12 cases. All 32 support arms consume zero changed
+choices; bounded unavailable records do not establish general inapplicability.
+On gr4x6 all arms retain the native optimum and independently valid witnesses.
+The support consumer preserves 45 LP operations and 65 nodes while funded work
+grows from 2,786,191 to 2,919,225 and modeled allocation from 266,250 to 8,929,427
+bytes. Shared-companion outcome changes with zero changed choices supply no
+support-ordering credit. Ordinary execution closes all four enigma native proofs;
+none of its numerical or companion controls closes one.
+
+The 187 published points retain native exact/tolerance source qualifications.
+Of 70 final witnesses, 56 pass independent solchecker checks. Fourteen modglob
+points remain unsupported because their exact rational objective has no finite
+decimal representation; native source checks remain separate. Native proofs have
+no independent proof check. Its 28 native optimality labels separate 16
+`attained-optimum` from 12 `tolerance-optimum` results. The Klause, CLI and Koblas JARs match across
+Mac/aarch64 and Linux/amd64; each source/seed block retains one worker/runtime.
+Whole-process RSS and external timing receipts remain paired within those blocks,
+without independent timing repetitions or cross-platform throughput comparisons.
+The seed-1 default gr4x6 pair changes peak RSS from 105,636 to 112,212 KiB and
+external wall time from 1.91 to 1.81 s; this timing pair establishes no speedup.
+The consumed pilot loss and zero-change held-out costs reject support-ordering
+promotion. The scoped producer and internal comparison remain available. Final
+composition uses separate held-out families because these sources overlap the
+selection, reuse and aggregation qualification cohorts.
+
+[Composed qualification 8705](https://lab.eignex.com/jobs/8705), at `1b8a73079a`,
+completes 352 ten-second P1 cases with seeds 1/3 and default/exact policies.
+Development sources are rgn, p0033, bell3a and egout. Held-out blend2, pk1,
+stein27 and vpm2 are absent from this candidate's and its current prerequisite
+and repair cohorts; membership and all settings are frozen before their outcomes.
+Eleven modes compare ordinary execution, numerical baseline, the full chain,
+each of four single-mechanism ablations, and independent/shared companions with
+each ordering. The full chain enables accepted experimental point selection,
+capped checked reuse and aggregation alongside the qualification-only support
+control. Their production defaults remain disabled. Partial-row controls with
+zero Boolean alternatives provide no additional promotion credit.
+
+All 44 p0033 cases retain native optimum 3089. Full feedback changes 25 choices
+and consumes 774 checked reuse hits. Removing support ordering consumes 619 hits
+and less work; more hits accompany more search. These bare numerical counts
+repeat across both seeds and policies:
+
+| Arm | LP operations | Retained nodes | Funded work | Modeled bytes |
+| --- | ---: | ---: | ---: | ---: |
+| Baseline | 1,896 | 2,051 | 27,600,734 | 5,118,124 |
+| Full | 1,753 | 2,735 | 25,699,806 | 86,681,461 |
+| Without support ordering | 1,445 | 2,165 | 21,105,645 | 65,060,818 |
+| Without point selection | 1,642 | 2,559 | 23,141,178 | 72,258,109 |
+| Without reuse | 2,723 | 3,081 | 39,638,235 | 28,804,681 |
+| Without aggregation | 1,753 | 2,735 | 25,699,196 | 86,622,239 |
+
+The numerical-owner ledger includes feedback collection, scoring, retention and
+its cut/reuse checks. Logical
+open work for baseline/full/without-support is 12,073/15,333/11,949, in its separate
+currency. On seed 1/default, their whole-CLI peak RSS is
+280,384/262,528/274,896 KiB and external wall time 1.93/2.20/1.88 s.
+Modeled allocation and physical memory give different comparisons.
+
+Both companion recipes preserve p0033's optimum with 25 changed choices, while
+numerical-owner funded work grows from 24,117,840 to 33,508,198 with support ordering.
+Other owners retain separate costs. In seed 1/default's independent pair, native
+CP propagation work grows from 1,877,830 to 5,726,364 and joint-repair funded work
+from 443,880 to 591,324; these are separate components, not additive equivalents.
+Whole-CLI wall time changes from 3.95 to 5.89 s and peak RSS from 318,576 to
+361,264 KiB. Shared-companion costs and imported incumbent credit remain separate
+from ordering credit. These policy seeds are not independent timing repetitions.
+
+Rgn full feedback changes one choice, produces 64 aggregate candidates and selects
+five cuts. Its checked point matches the numerical baseline. It spends
+325,453,703 work units and 536,879,072 modeled bytes at the containing allocation
+boundary. The seed-1 default arm without support ordering retains that point with
+214,977,864 work units and 377,602,510 modeled bytes. Bell3a and egout change no
+choices. Their companion witness differences supply no ordering efficacy evidence.
+
+All 96 support-enabled held-out cases consume zero changed choices across
+397–4,271 consultations each. Later journal states remain unavailable; this does
+not establish general support inapplicability. Blend2 and vpm2 yield no numerical
+or companion point, while ordinary execution publishes four source-qualified
+points per family. Pk1's bare numerical arms yield no point; its companion
+objectives vary with zero ordering changes and earn no ordering credit. Every
+stein27 arm retains objective 18, but only ordinary execution closes its four
+native proofs. Preserve these lost outcomes alongside bounded numerical gains.
+
+[Checked trajectory capture 8707](https://lab.eignex.com/jobs/8707), at `b4b6d1d51b`,
+compares the six bare arms on the declared p0033 development source with exact
+semantics, seed 3, P1 and 256 LP operations. Every arm remains nonterminal and
+produces no incumbent. Their native checked bounds start near 2530.9152; the
+baseline ends at 2926.85, full feedback near 2840.7816 and without-support at
+2940.35. Full feedback consumes 25 changed choices and 37 checked reuse hits.
+Different leaf partitions and cooperative bound-sampling counts establish no
+coverage ordering. All 1,380 serialized cut, bound, sibling-bound and refutation
+instances pass fresh native checks in their recorded scopes, without independent
+proof certification. Full feedback retains 32 of 405 attempted journal records
+under its 8 MiB ceiling; external baseline/without-support observations retain
+64 under 16 MiB. Inspection keeps those actual limits and unavailable states.
+These ordered instrumented captures establish no throughput or whole-CLI cost claim.
+
+All 845 published point records retain native original-source qualifications:
+823 exact and 22 tolerance-qualified. [Checker run 8726](https://lab.eignex.com/jobs/8726)
+checks the final witnesses without rerunning the solver: 190 are independently
+valid, two exact-policy vpm2 witnesses remain unsupported because coordinate
+`4/15` has no finite decimal representation, and none is invalid. The remaining
+160 cases publish no final witness. All 48 native optimality labels are
+`attained-optimum`; none has an independent proof check. All 352 cases use identical
+distribution/runtime identities on Mac/aarch64, and each source/seed block stays
+on one worker. Original hashes match, every whole-CLI resource receipt binds its
+raw solve record, and checker augmentation preserves every solver record.
+Timing and RSS remain descriptive observations without isolated timing repetitions.
+
+The composed evidence rejects promotion of this bounded support-ordering consumer.
+The scoped producer, internal consumer and reusable comparison remain available;
+ordinary execution exposes no support-ordering switch. Accepted experimental
+selection, reuse and aggregation retain their measured dispositions and disabled
+defaults. [Finite rankings](#scoped-finite-numerical-ranking) retain only their
+bounded gains with acquisition separately credited; their checked descents supply
+no basin classification. The [repair-owner qualification](https://github.com/Eignex/klause/pull/3673)
+retains existing admission: retained LP preparation savings and limited finite
+repair gains support no unconditional owner replacement. No conditioned refutation,
+relaxation point or unavailable record gains parent proof authority.
+
+`feedbackDelivery=latest|prefix` selects the journal channel the support consumer
+reads: the latest completed query, or the archive alone. `batch64=<base64 JSON array
+of argument arrays>` runs up to 64 frontier requests, each in a fresh one-processor
+JVM under `OUT/<index>`; a snapshot past its inspection allowance keeps the solve record.
+Stages add `numericalFeedbackLateCollections` and `numericalSupportLateSelections`
+for queries consumed after the archive stops.
+`feedbackRequest=requested|full` selects whether queries delivered after the archive
+stops hold only the support consumer's requested projection (the default) or the full
+record. Stages add `numericalFeedbackCutEvaluations` and
+`numericalFeedbackArithmeticTerms` for exact cut-violation visits, and the record adds
+the solve thread's elapsed time and allocated bytes. `solveSeconds=<n>` replaces the
+ten-second deadline, which includes preparation, with one that starts at the solve, so an
+`operations=<n>` cap rather than the wall clock ends the query stream.
+
+Requested projections use 8763's 20 hash-matched sources with fixed query streams
+(`operations=192 solveSeconds=90`) before the ordinary ten-second frontier. Arms are
+compared only within one job. [8814](https://lab.eignex.com/jobs/8814) (`3ac95ae9dc`,
+Linux/amd64) gives identical splits, closed leaves, checks and support selections under
+full and requested delivery wherever funding lasts. Exact cut arithmetic falls by 8–26% on
+lseu, p0033, pp08aCUTS and rgn, while the other sources evaluate no cut. Funded
+allocation falls only 1–4%, and full and requested latest delivery both exhaust 512 MiB
+funding on fixnet6, khb05250 and p0282, full also on modglob. The no-feedback control
+[8826](https://lab.eignex.com/jobs/8826) funds 0.3–2.5 MB against 25–540 MB with
+feedback, so delivery construction, not cut arithmetic, carries 8763's cost.
+[8829](https://lab.eignex.com/jobs/8829) charges requested records only for what they
+allocate and saves just 3–8%. Once the archive filled its byte allowance, every later
+query still started as an archive copy, overflowed and was delivered whole.
+
+With the archive closed at its first overflow, [8833](https://lab.eignex.com/jobs/8833)
+(`5d0a368f97`, Mac/aarch64) has no funding exhaustion: every source except misc07
+completes its stream, and full and requested delivery make identical decisions.
+Requested funded allocation is 1.1–9.4 times the prefix arm (9–11 MB), full 1.3–21
+times, and requested is 43–87% of full. Solve-thread allocation stays within 5% between
+the two latest arms. In the ordinary [8834](https://lab.eignex.com/jobs/8834) run on the
+same revision and host, requested allocation is 41–64% of full, and gt2 exhausts funding
+only under full. Flugpl reaches SearchExhausted at 1201500 in every arm, and pp08aCUTS
+exhausts work in every arm. P0033 still loses the source-order incumbent 3089 under both
+feedback arms. No witness or proof is independently checked, support ordering remains
+an internal comparison, and a callback without a request keeps the full record.
+
+[Delivery comparison 8737](https://lab.eignex.com/jobs/8737), at `2a3f3b564c` on
+Mac/aarch64, runs source order, prefix and latest delivery on 21 exact ten-second
+frontier sources (p0033 development, the rest held out). Latest delivery reaches
+later states: p0033 consumes 379 late records with 353 changed choices, lseu 357 with
+348. With every delivered record charged as a full copy, its modeled allocation reaches
+0.18 to 0.54 GB against about 10 MB for prefix delivery. It exhausts the 512 MiB
+source funding on six matched sources where the other arms do not, and on three
+unmatched ones; pp08aCUTS exhausts work in every arm. Checks fall, and p0033 loses
+the native incumbent 3095 that both other arms keep. Post-solve snapshot limits
+discard nine records and gr4x6 times out in every arm.
+
+[Delivery comparison 8763](https://lab.eignex.com/jobs/8763), at `c28758a1e1` on
+Linux/amd64, repeats the comparison on the remaining 20 sources after delivery-only
+records charge references and owned values. All 60 records complete and no arm
+exhausts funding. Latest-delivery allocation remains 2.5 to 25 times prefix (25 to
+272 MB against 9 to 11 MB), mostly cut-violation arithmetic per delivered query.
+Only p0033 (149 late changed choices) and lseu (141) change decisions. Neither gains a
+checked outcome: source order alone finds p0033's native incumbent 3095, and lseu closes
+no leaves against prefix's 11. The other sources consume late records without changed
+choices; their check counts differ by up to about a fifth in both directions under
+the wall cutoff. No arm publishes an
+independently checked witness or proof. Later availability establishes no
+support-ordering benefit; the consumer stays an internal comparison.
+
+#### Active rows before Boolean completion
+
+[8424](https://lab.eignex.com/jobs/8424) and
+[8437](https://lab.eignex.com/jobs/8437) compare seven self-authored native exact
+contexts at `568f18115b` and `ce420b9e2e`. One warmup and three measured rounds
+alternate arm order on Linux/amd64, P1/seed 3, with unchanged source LP allowances.
+All 112 terminal claims recheck natively. Job receipts and installed-byte hashes
+bind the gitless distributions; these are neither independent proof checks nor
+ordinary CLI throughput measurements.
+
+Closed, strict and independently pinned integer contradictions use zero Boolean
+alternatives and one partial conflict, versus fourteen alternatives and eight
+complete queries with delayed checking. The initially established guard avoids
+six alternatives and four complete queries. Unresolved guard and Boolean-term
+controls retain the checked optimum of 3 while alternatives fall fourteen to
+eight and complete queries eight to four. Inactive guards preserve all required
+complete checks. Partial points establish no witness or objective bound.
+
+Keeping completed no-conflict keys across numerical-owner release reduces partial
+queries from two to one on the inactive control, three to two on the unresolved
+guard and four to three on the Boolean-term control, preserving every native
+outcome. This retains neither points nor derivations. Costs still oppose blanket
+activation: inactive-guard funded work grows from 4,219 to 6,525 units and modeled
+allocation from 4,352 to 11,741 bytes. Boolean-term work grows from 8,659 to 8,755
+and allocation from 9,728 to 18,937 bytes despite avoided decisions. These ledger
+units are not machine instructions or physical memory. The capability remains an
+internal opt-in; automatic early checking is disabled.
+
+[Merged-capture qualification 8480](https://lab.eignex.com/jobs/8480), at
+`a2e618f54b` on the merged numerical journal, preserves all 56 native terminal
+checks and the decisions/complete-query outcomes above. Direct consultation of
+41 retained delayed states produces 30 freshly checked refutations, with no points,
+objective bounds, retention limits or inspection stops. Actual active-query
+records retain their admitted zero-objective numeric subset and original scope.
+Measured traversal rounds disable the observer. The inactive control still costs
+6,525 funded units versus 4,219 and 11,741 modeled bytes versus 4,352; useful early
+conflicts do not justify indiscriminate consultation.
+
+Original-source [rgn 8482](https://lab.eignex.com/jobs/8482) and
+[p0033 8483](https://lab.eignex.com/jobs/8483) complete sixteen ten-second paired
+runs on shared prepared contexts with default and exact source policies,
+respectively. No partial query executes: MPS lowering declares integer and real
+coordinates, including binary columns and indicators. Both p0033 arms retain
+native incumbent 3095; neither rgn arm finds one. Available native bounds recheck.
+Different wall-cutoff frontiers give unmatched check/work counts, so these runs
+establish no numerical throughput or fixed-work parity claim. The gr4x6 acquisition
+in [8484](https://lab.eignex.com/jobs/8484) stops before solving because its worker
+lacks `unzip`; it supplies no mechanism or applicability result.
+
+Fixed 32-operation controls [rgn 8500](https://lab.eignex.com/jobs/8500),
+[p0033 8501](https://lab.eignex.com/jobs/8501) and
+[flugpl 8502](https://lab.eignex.com/jobs/8502) at the same revision preserve exact
+accounting across both arms and every repeat. Complete checks are 63, 57 and 45;
+funded work is 7,675,009, 456,528 and 635,153; modeled allocation is 496,940,
+108,460 and 72,340 bytes, respectively. All available native bounds recheck, no
+run stops, and no partial query executes. These zero-Boolean original sources
+support unchanged complete-check accounting, with no partial-policy benefit or
+throughput claim. Useful captured conflicts qualify the bounded internal consumer;
+inactive-state cost and original-source applicability keep automatic activation
+disabled.
+
+### Boolean conflict locality
+
+`MixedPbLocalityProfile` runs twelve tiny retained-projection controls for
+`!b0+b2+b3+b4 >= 2`, `b2 <= b1` and `b3 <= b1`: two first-Boolean
+polarities, pure Boolean/unrelated finite integer/connected finite integer, and
+clause/PB learning. The connection is `b0 iff x0 <= 5` with `x0` in `0..10`.
+Choosing `b0=true` then `b1=false` reaches the counting conflict. Resolving the
+two gated inputs retains `!b0+2*b1+b4 >= 2`, which asserts `b1=true` after undo.
+Direct finite construction excludes presolve, binary substitution and LP preparation.
+The profile reports stored PB constraints and later pins with a stored PB reason,
+decisions, backjumps, finite work, elapsed time and current-thread allocations.
+Reflection reads existing reason identities without changing propagation. Pin
+observations can repeat across commits and do not count distinct deductions.
+A fresh native session rechecks each feasible point; there is no independent proof
+or witness check and no corpus speedup estimate. Run once as a bounded lab profile;
+broader/default admission needs a separately authorized matched study.
+
+The initial five-pigeon/four-hole source-order test produced no stored PB on native
+CI and was rejected as a consumption control. Lab 8851 failed in source compilation
+before executing that control. These outcomes establish no locality rejection.
+
+[Lab 8857](https://lab.eignex.com/jobs/8857) completes all twelve controls at
+`02b9fe7ab2bd2672ec8246a71cf23ef711f208cf` on Linux amd64, Temurin
+`25.0.4.1+1-LTS`, with a hard cgroup budget of one vCPU and 4608 MiB. All twelve
+feasible points pass fresh native-session checks. Each conflict-triggering PB arm
+stores one PB and observes its reason after backjump; the clause arms store none.
+Decisions and backjumps match within each projection. Finite work rises from
+76 to 111 (Boolean), 76 to 121 (retained integer) and 106 to 151 (connected integer).
+The two mixed triggering pairs allocate roughly 150–166 KiB per solve including
+preparation and native point recheck; the first Boolean arm includes class loading.
+These single ordered runs supply no timing advantage or practical-admission result.
+Mixed automatic admission remains disabled. Raw records, JFR, distribution hashes,
+resource receipts and the failed attempt are retained outside Git under
+`klause-evidence/campaigns/finite-conflict-learning-3727-3728/` beside the primary checkout.
+
 ## Bench SDK adapter
 
 `lab/bench.json` owns the build tasks, main and classpath for the JVM adapter.
 It builds the installed CLI with `installJvmDist` and the bench distribution
 with `installDist`. Only `klause-bench` imports `com.eignex:lab-bench:0.1.0`.
 
-Before an SDK release exists, run
-`./gradlew :lab-bench:stageAdapterRepository -PbenchVersion=0.1.0` in the lab
-checkout, then build this checkout with
-`./gradlew :klause-cli:installJvmDist :klause-bench:installDist -PlabBenchRepository=file:///absolute/eignex-lab/lab-bench/build/adapter-repository`.
-The default repository uses public GitHub Release assets without credentials;
-`-PlabBenchVersion=VERSION` selects a different release.
+The default dependency resolves [Lab Bench 0.1.0](https://github.com/Eignex/eignex-lab/releases/tag/lab-bench-v0.1.0)
+from public GitHub Release assets without a GitHub login or token. Prepare the adapter with:
+
+```sh
+./gradlew :klause-cli:installJvmDist :klause-bench:installDist
+```
+
+`-PlabBenchVersion=VERSION` selects a different SDK release. To develop against a
+local SDK checkout, run `./gradlew :lab-bench:stageAdapterRepository -PbenchVersion=0.1.0`
+in that checkout, then add
+`-PlabBenchRepository=file:///absolute/eignex-lab/lab-bench/build/adapter-repository`
+to the consumer build. Refresh dependencies when restaging the same version.
 
 A lab submission uses `repository: "Eignex/klause"` and
 `bench: {"manifest":"klause-bench/lab/bench.json","request":{"parameters":{"suite":"dimacs-core","name":"php4","timeout-ms":"1000"}}}`.

@@ -29,6 +29,13 @@ import com.eignex.klause.util.WorkMeter
 import kotlin.math.round
 import kotlin.time.TimeSource
 
+internal data class JointRepairAttempt(
+    val result: ExactNeighborhoodResult,
+    val reason: TerminationReason? = null,
+    val feasiblePoint: Sample? = null,
+    val bound: SourceEvidence? = null,
+)
+
 internal class JointLinearRepair(
     private val model: Problem,
     private val source: SourceProofContext,
@@ -38,7 +45,9 @@ internal class JointLinearRepair(
     private val boundOrdered: Boolean = false,
     private val external: () -> Sample? = { null },
     private val publicationLifetime: Cancellation? = null,
+    sourceIntegers: IntArray? = null,
 ) : ExactNeighborhoodCompletion, AutoCloseable {
+    private val sourceIntegers = sourceIntegers?.copyOf()
     private val stop = params.timeout or params.cancellation
     private val state = OpenTheorySolveState(params)
     private val funding = SourceLpFunding(params.sourceLpWorkLimit, params.sourceLpAllocationLimit)
@@ -97,35 +106,52 @@ internal class JointLinearRepair(
         return (stages.keys + current.keys).associateWith { combine(it, stages[it] ?: 0, current[it] ?: 0) }
     }
 
-    fun search(adaptive: Boolean, seed: Long = params.randomSeed): ExactNeighborhood = ExactNeighborhood(
-        model.numBoolVars, List(model.numIntVars + model.numRealVars) { BigFraction.ZERO }, this, objective,
-        coordinateValues = { sample ->
-            List(model.numIntVars) { BigFraction.of(sample.exactIntValue(it), BIG_ONE) } + sample.exactReals.orEmpty()
-        }, adaptive = adaptive, seed = seed, nodeBudget = params.nodeBudget?.allowance,
-        maximumMoves = params.maxFlips, maximumInstructions = params.maxInstructions ?: Long.MAX_VALUE,
-        maximumImprovementMoves = if (adaptive) params.alnsIterations.toLong() else null,
-        nativeWork = { work }, completionStats = { stats }, onClose = ::close,
-        prepareBooleanCenter = ::prepare, rootCoordinateValue = ::center,
-        completionExhausted = { exhausted },
-        centerPreparationPending = { rootPreparationPending },
-        proposal = ExactNeighborhoodProposal { centers, bools, count, round, radius, cutoff ->
-            val pooled = external()?.takeIf { sample ->
-                val value = objective?.evaluateExact(sample)
-                (model.numRealVars == 0 || sample.exactReals?.size == model.numRealVars) &&
-                    (cutoff == null || (value != null && value < cutoff)) &&
-                    SourceEvidenceVerifier(source.withLinearAuthority()).verify(SourceEvidence(source.scope,
-                        SourceClaim.Witness(sample), SourceDerivation.SourceWitness), stop) ==
-                    SourceEvidenceCheck.Checked
-            }
-            val from = pooled?.let { sample ->
-                observe("jointRepairImportedCenters")
+    fun search(
+        adaptive: Boolean, seed: Long = params.randomSeed, sourceInputPass: Boolean = sourceIntegers != null,
+    ): ExactNeighborhood {
+        var focusedCutoff: BigFraction? = null
+        var focusedRemaining = 0
+        return ExactNeighborhood(
+            model.numBoolVars, List(model.numIntVars + model.numRealVars) { BigFraction.ZERO }, this, objective,
+            coordinateValues = { sample ->
                 List(model.numIntVars) { BigFraction.of(sample.exactIntValue(it), BIG_ONE) } +
                     sample.exactReals.orEmpty()
-            } ?: centers
-            requireNotNull(selection).propose(from, pooled?.bools ?: bools, count, round, radius,
-                pooled?.let { objective?.evaluateExact(it) } ?: cutoff)
-        },
-    )
+            }, adaptive = adaptive, seed = seed, nodeBudget = params.nodeBudget?.allowance,
+            maximumMoves = params.maxFlips, maximumInstructions = params.maxInstructions ?: Long.MAX_VALUE,
+            maximumImprovementMoves = if (adaptive) params.alnsIterations.toLong() else null,
+            nativeWork = { work }, completionStats = { stats }, onClose = ::close,
+            prepareBooleanCenter = ::prepare, rootCoordinateValue = ::center,
+            completionExhausted = { exhausted },
+            centerPreparationPending = { rootPreparationPending },
+            proposal = ExactNeighborhoodProposal { centers, bools, count, round, radius, cutoff ->
+                val pooled = external()?.takeIf { sample ->
+                    val value = objective?.evaluateExact(sample)
+                    (model.numRealVars == 0 || sample.exactReals?.size == model.numRealVars) &&
+                        (cutoff == null || (value != null && value < cutoff)) &&
+                        SourceEvidenceVerifier(source.withLinearAuthority()).verify(SourceEvidence(source.scope,
+                            SourceClaim.Witness(sample), SourceDerivation.SourceWitness), stop) ==
+                        SourceEvidenceCheck.Checked
+                }
+                val from = pooled?.let { sample ->
+                    observe("jointRepairImportedCenters")
+                    List(model.numIntVars) { BigFraction.of(sample.exactIntValue(it), BIG_ONE) } +
+                        sample.exactReals.orEmpty()
+                } ?: centers
+                val limit = pooled?.let { objective?.evaluateExact(it) } ?: cutoff
+                if (sourceInputPass && !adaptive && limit != null && limit != focusedCutoff) {
+                    focusedCutoff = limit
+                    focusedRemaining = sourceIntegers?.size ?: model.numIntVars
+                    observe("jointRepairSourceInputPasses")
+                }
+                val width = if (sourceInputPass && !adaptive && round > 0L && focusedRemaining > 0) {
+                    focusedRemaining--
+                    observe("jointRepairSourceInputProposals")
+                    minOf(count, 2)
+                } else count
+                requireNotNull(selection).propose(from, pooled?.bools ?: bools, width, round, radius, limit)
+            },
+        )
+    }
 
     private fun prepare(cancellation: Cancellation): Boolean {
         check(!closed)
@@ -140,7 +166,8 @@ internal class JointLinearRepair(
                     token.charge(units)
                 }
             }
-            selection = JointRepairNeighborhood.prepare(source, model.numIntVars, model.numRealVars, construction)
+            selection = JointRepairNeighborhood.prepare(source, model.numIntVars, model.numRealVars, construction,
+                sourceIntegers)
             if (selection == null) {
                 declined = !stop() && !cancellation()
                 return false
@@ -192,10 +219,17 @@ internal class JointLinearRepair(
         return value
     }
 
-    override fun check(condition: ExactNeighborhoodCondition, cancellation: Cancellation): ExactNeighborhoodResult {
+    override fun check(condition: ExactNeighborhoodCondition, cancellation: Cancellation): ExactNeighborhoodResult =
+        attempt(condition, cancellation).result
+
+    fun attempt(condition: ExactNeighborhoodCondition, cancellation: Cancellation): JointRepairAttempt {
         check(!closed)
-        if (stop() || exhausted) return ExactNeighborhoodResult.Undecided
-        if (cancellation()) return ExactNeighborhoodResult.Paused
+        if (stop() || exhausted) return JointRepairAttempt(ExactNeighborhoodResult.Undecided, when {
+            params.timeout() -> TerminationReason.Timeout
+            stop() -> TerminationReason.Cancelled
+            else -> TerminationReason.BudgetExhausted
+        })
+        if (cancellation()) return JointRepairAttempt(ExactNeighborhoodResult.Paused)
         if (pending != condition) {
             retire()
             var bounds = source.scope.condition
@@ -232,15 +266,22 @@ internal class JointLinearRepair(
                 mark.elapsedNow().inWholeNanoseconds
             if (publicationLifetime == null && cancellation() && !stop()) {
                 observe("jointRepairPublicationPauses")
-                return ExactNeighborhoodResult.Paused
+                return JointRepairAttempt(ExactNeighborhoodResult.Paused, feasiblePoint = sample,
+                    bound = snapshot.bound)
             }
             retire()
             if (checked == SourceEvidenceCheck.Checked) {
                 anchor = sample
                 observe("jointRepairCheckedIncumbents")
-                return ExactNeighborhoodResult.Witness(sample)
+                return JointRepairAttempt(ExactNeighborhoodResult.Witness(sample),
+                    feasiblePoint = sample, bound = snapshot.bound)
             }
-            return ExactNeighborhoodResult.Undecided
+            return JointRepairAttempt(ExactNeighborhoodResult.Undecided, when {
+                params.timeout() -> TerminationReason.Timeout
+                stop() -> TerminationReason.Cancelled
+                else -> TerminationReason.Unsupported
+            },
+                bound = snapshot.bound)
         }
         if (condition.cutoff != null) {
             val bound = ((snapshot.bound?.claim as? SourceClaim.Bound)?.value as? SourceValue.Rational)?.value
@@ -248,16 +289,21 @@ internal class JointLinearRepair(
             if (minimized != null && minimized >= condition.cutoff) {
                 observe("jointRepairCutoffClosures")
                 retire()
-                return ExactNeighborhoodResult.Refuted
+                return JointRepairAttempt(ExactNeighborhoodResult.Refuted, TerminationReason.SearchExhausted,
+                    snapshot.incumbent, snapshot.bound)
             }
         }
         if (result == null) {
             observe("jointRepairPauses")
-            return ExactNeighborhoodResult.Paused
+            return JointRepairAttempt(ExactNeighborhoodResult.Paused, feasiblePoint = snapshot.incumbent,
+                bound = snapshot.bound)
         }
         retire()
-        return if (result.terminal?.claim == SourceClaim.Refutation) ExactNeighborhoodResult.Refuted
-            else ExactNeighborhoodResult.Undecided
+        return JointRepairAttempt(
+            if (result.terminal?.claim == SourceClaim.Refutation) ExactNeighborhoodResult.Refuted
+            else ExactNeighborhoodResult.Undecided,
+            if (result.terminal?.claim is SourceClaim.Ray) TerminationReason.Unsupported else result.reason,
+            result.incumbent, result.bound)
     }
 
     private fun retire() {

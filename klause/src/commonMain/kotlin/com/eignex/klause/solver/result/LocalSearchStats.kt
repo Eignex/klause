@@ -33,6 +33,12 @@ data class LocalSearchStats(
     val boardRestartChanges: SumResult = ZERO_COUNT,
     /** Retained ILS board restarts explicitly declined because prepared searched inputs did not change. */
     val boardRestartDeclines: SumResult = ZERO_COUNT,
+    /** Searches whose geometric proposals bind to maintained cones of their canonical objective. */
+    val geometricProposalRuns: SumResult = ZERO_COUNT,
+    /** Searches declining geometric proposals and retaining canonical execution. */
+    val geometricProposalDeclines: SumResult = ZERO_COUNT,
+    /** Sink-emitted geometric candidates before driver sampling; neither commits nor distinct points. */
+    val geometricProposalCandidates: SumResult = ZERO_COUNT,
 ) {
     /** Combine two workers: moves/stalls add, earliest time-to-best wins, incumbent from the lower violation. */
     fun mergedWith(o: LocalSearchStats): LocalSearchStats = LocalSearchStats(
@@ -66,6 +72,9 @@ data class LocalSearchStats(
         },
         boardRestartChanges = SumResult(boardRestartChanges.sum + o.boardRestartChanges.sum),
         boardRestartDeclines = SumResult(boardRestartDeclines.sum + o.boardRestartDeclines.sum),
+        geometricProposalRuns = SumResult(geometricProposalRuns.sum + o.geometricProposalRuns.sum),
+        geometricProposalDeclines = SumResult(geometricProposalDeclines.sum + o.geometricProposalDeclines.sum),
+        geometricProposalCandidates = SumResult(geometricProposalCandidates.sum + o.geometricProposalCandidates.sum),
     )
 }
 
@@ -87,6 +96,9 @@ internal class LocalSearchStatsSink {
     private var completionsUndecided: Long = 0L
     private var boardRestartChanges = 0L
     private var boardRestartDeclines = 0L
+    private var geometricProposalRuns = 0L
+    private var geometricProposalDeclines = 0L
+    private var geometricProposalCandidates = 0L
     var bestResidual: LocalSearchResidual? = null
     var phaseNanos: (() -> Map<String, Long>)? = null
 
@@ -107,6 +119,12 @@ internal class LocalSearchStatsSink {
     fun recordBoardRestarts(changes: Long, declines: Long) {
         boardRestartChanges = changes
         boardRestartDeclines = declines
+    }
+
+    fun recordGeometricProposals(qualified: Boolean, candidates: Long) {
+        geometricProposalRuns = if (qualified) 1L else 0L
+        geometricProposalDeclines = if (qualified) 0L else 1L
+        geometricProposalCandidates = candidates
     }
 
     /** Record the incumbent fingerprint: objective (NaN if never feasible), residual violation, and the
@@ -130,5 +148,8 @@ internal class LocalSearchStatsSink {
         phaseNanos = phaseNanos?.invoke() ?: emptyMap(),
         boardRestartChanges = SumResult(boardRestartChanges.toDouble()),
         boardRestartDeclines = SumResult(boardRestartDeclines.toDouble()),
+        geometricProposalRuns = SumResult(geometricProposalRuns.toDouble()),
+        geometricProposalDeclines = SumResult(geometricProposalDeclines.toDouble()),
+        geometricProposalCandidates = SumResult(geometricProposalCandidates.toDouble()),
     )
 }

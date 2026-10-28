@@ -110,6 +110,13 @@ and stores into the native clause database. The shared first-UIP analyzer in
 asserts and backjumps, while a sound resolvent that cannot assert keeps chronological
 fallback. Unexplained component publications cannot supply missing antecedents.
 
+The numerical frontier also uses the shared clause-resolution operation on checked
+source refutations. Each retained resolvent carries an exhaustive integer-split
+derivation over its two input proofs. It enters the numerical coverage tree only
+after a new source check, preserving proof authority independently of clause names
+and queue order. This bounded opt-in policy retains complete Boolean scope and
+opening restrictions; unsupported predicates cannot produce a resolvent.
+
 ## Native SAT lane
 
 A pure-Boolean model whose factors are all clauses runs on a dedicated lane. The
@@ -127,8 +134,12 @@ shares the general trail, pins, antecedents and conflict analyzer.
 
 ## Pseudo-Boolean learning
 
-`pbLearning` auto-enables cutting-plane analysis for pure-Boolean models. Integer
-order literals have no pseudo-Boolean reason, so integer models use clause learning.
+`pbLearning` auto-enables cutting-plane analysis for pure-Boolean models. Explicit
+enablement admits Boolean conflicts in mixed models. The seed, each loaded source
+constraint and each reconstructed reason must contain only Boolean coordinates;
+integer order, equality and hole atoms retain clause fallback before Boolean indexing.
+An asserting native PB result takes precedence over shared clause analysis and stays
+in the CP store. Other mixed conflicts keep shared clause analysis.
 
 The resolvent is a linear `≥` nogood seeded from the violated bound. Each step
 rounds the reason up after division by its pivot coefficient, then adds it to cancel
@@ -303,7 +314,7 @@ most half the remaining time and 5 seconds.
 
 Counters describe observed work, never proof coverage.
 `propagations` counts deductions from completed finite fixpoints, excluding decision
-and root pins; `propagationWork` also counts dispatch, watcher and reason visits
+and root pins; `propagationWork` also counts dispatch, watcher, scheduling and reason visits
 across undo. Root figures are subsets of totals. Fixpoint time excludes some counted
 reason scans.
 
@@ -318,7 +329,7 @@ and [CLI statistics](20-cli.md#statistics) define the exported fields.
 | `propagations` | Finite Boolean, singleton, bound, hole and survivor-set deductions reported by completed search fixpoints; excludes decision and root pins |
 | `learned` | Learned consequences observed by the traversal, including native CP learning |
 | `caNotApplicable`, `caNonAsserting` | Native CP analyses declining a usable or asserting consequence; exported by every CLI format |
-| `propagationWork` | Monotonic dispatch, literal, watcher, level and linear-term/reason visits, including work across undo |
+| `propagationWork` | Monotonic dispatch, literal, watcher, level, scheduling and linear-term/reason visits, including work across undo |
 | `rootPropagationWork`, `rootPropagationMs` | Initialization root-fixpoint work and time, including private preparation |
 | `propagationMs` | Fixpoint elapsed time; some counted reason scans are outside it |
 | `openAssertingConflicts` | Shared first-UIP analyses yielding an asserting backjump |

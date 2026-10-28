@@ -34,7 +34,7 @@
   ],
   "schema": {
     "file": "scope.schema.json",
-    "sha256": "8af640b5f4420da222dc522c045327036d730dc649c5a7b763fb05fef2312321"
+    "sha256": "1f45008ac05fe3e83e4723c658a5dd017bb7b4273fc07e8e6158bcdaf30c5b8f"
   },
   "conditions": {
     "file": "conditions.json",

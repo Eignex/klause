@@ -141,6 +141,7 @@ internal class LocalSearchWorkerConfig private constructor(
             costShaping = CostShaping.Linear(lambda = lsLambda),
             // The per-move gradient view of the objective, when the model provides one.
             lsObjective = lsObjective,
+            objectiveGuidance = recipe.objectiveGuidance,
             onEvent = onEvent?.let { sink -> { e -> sink(workerLabel, e) } },
             // Keep a single over-populated constraint kind from steering the initial descent; a
             // no-op for the pool's weight-blind arms.

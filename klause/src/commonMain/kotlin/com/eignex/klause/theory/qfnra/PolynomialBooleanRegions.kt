@@ -16,6 +16,9 @@ internal class PolynomialBooleanRegions(
     private val arithmetic: PolynomialArithmetic,
     private val progress: PolynomialQueryProgress? = null,
     private val onConflict: ((List<PolynomialAtom>) -> Unit)? = null,
+    private val onPartialCheck: ((Any, List<PolynomialAtom>) -> Unit)? = null,
+    private val coupled: PolynomialCoupledSections? = null,
+    private val onCoupledConflict: ((List<PolynomialAtom>) -> Unit)? = null,
 ) {
     private val state = PolynomialBooleanPropagation(nodes, root, arithmetic,
         skipConfirmedParents = true, trackWitnesses = true)
@@ -24,6 +27,8 @@ internal class PolynomialBooleanRegions(
     private var partialAvailable = true
     private var partialSigns: PolynomialSignPropagation? = null
     private val partialValues = HashMap<Int, Int>()
+    private var coupledChanges = -1L
+    private val coupledSupports = HashSet<List<Long>>()
 
     fun prepare(): Iterator<PolynomialBooleanRegion?> = sequence<PolynomialBooleanRegion?> {
         if (!initialize()) return@sequence
@@ -52,11 +57,11 @@ internal class PolynomialBooleanRegions(
             val proof = proof()
             if (proof == null) {
                 check(state.decide())
-            } else {
+            } else if (!refuteCoupled()) {
                 yield(proof.region)
                 arithmetic.step()
                 // Exclusions record visited regions; only the numeric caller can certify their exhaustion.
-                exclusions.add(Exclusion(proof.literals, numeric = false))
+                exclusions.add(Exclusion(proof.literals, ExclusionKind.Region))
             }
             yield(null)
         }
@@ -113,35 +118,67 @@ internal class PolynomialBooleanRegions(
     }
 
     private fun used(exclusion: Exclusion) {
-        if (!exclusion.numeric) return
+        if (exclusion.kind == ExclusionKind.Region) return
         arithmetic.step()
         progress?.let {
-            it.partialExclusionUses++
-            if (exclusion.uses > 0) it.partialExclusionReuses++
+            if (exclusion.kind == ExclusionKind.Sign) {
+                it.partialExclusionUses++
+                if (exclusion.uses > 0) it.partialExclusionReuses++
+            } else {
+                it.coupledExclusionUses++
+                if (exclusion.uses > 0) it.coupledExclusionReuses++
+            }
         }
         exclusion.uses++
+    }
+
+    private fun assignedPremises(required: MutableList<PolynomialAtom>, premises: MutableList<Literal>) {
+        for ((index, node) in nodes.withIndex()) {
+            arithmetic.step()
+            if (node !is FormulaNode.Atom) continue
+            val value = state.value(index)
+            if (value == UNASSIGNED) continue
+            val atom = atoms[node.atom]
+            required.add(if (value == TRUE) atom else PolynomialAtom(atom.polynomial, when (atom.relation) {
+                PolynomialRelation.EQ -> PolynomialRelation.NE
+                PolynomialRelation.NE -> PolynomialRelation.EQ
+                PolynomialRelation.LT -> PolynomialRelation.GE
+                PolynomialRelation.LE -> PolynomialRelation.GT
+                PolynomialRelation.GT -> PolynomialRelation.LE
+                PolynomialRelation.GE -> PolynomialRelation.LT
+            }))
+            premises.add(Literal(index, value))
+        }
+    }
+
+    private fun refuteCoupled(): Boolean {
+        val sections = coupled ?: return false
+        arithmetic.step()
+        if (!sections.available || state.numericChanges == coupledChanges) return false
+        coupledChanges = state.numericChanges
+        val required = ArrayList<PolynomialAtom>()
+        val premises = ArrayList<Literal>()
+        assignedPremises(required, premises)
+        val identities = premises.map {
+            arithmetic.step()
+            2L * it.node + if (it.value == TRUE) 1 else 0
+        }
+        val support = sections.refute(required, identities, coupledSupports) ?: return false
+        // The support's signed predicates have no common real point, so the exclusion holds under every prefix.
+        exclusions.add(Exclusion(support.map { arithmetic.step(); premises[it] }, ExclusionKind.Coupled))
+        progress?.let {
+            it.coupledConflicts++
+            it.coupledConflictPremises += support.size
+        }
+        onCoupledConflict?.invoke(support.map { required[it] })
+        return true
     }
 
     private fun checkPartial(): Iterator<Boolean?> = sequence {
         try {
             val required = ArrayList<PolynomialAtom>()
             val premises = ArrayList<Literal>()
-            for ((index, node) in nodes.withIndex()) {
-                arithmetic.step()
-                if (node !is FormulaNode.Atom) continue
-                val value = state.value(index)
-                if (value == UNASSIGNED) continue
-                val atom = atoms[node.atom]
-                required.add(if (value == TRUE) atom else PolynomialAtom(atom.polynomial, when (atom.relation) {
-                    PolynomialRelation.EQ -> PolynomialRelation.NE
-                    PolynomialRelation.NE -> PolynomialRelation.EQ
-                    PolynomialRelation.LT -> PolynomialRelation.GE
-                    PolynomialRelation.LE -> PolynomialRelation.GT
-                    PolynomialRelation.GT -> PolynomialRelation.LE
-                    PolynomialRelation.GE -> PolynomialRelation.LT
-                }))
-                premises.add(Literal(index, value))
-            }
+            assignedPremises(required, premises)
             if (premises.isEmpty()) {
                 discardPartial()
                 yield(true)
@@ -171,9 +208,11 @@ internal class PolynomialBooleanRegions(
                 if (retained != null) it.partialExtensions++
                 it.partialInputAtoms += added.size
             }
+            val checkOwner = onPartialCheck?.let { Any() }
             val checking = propagation.prepare(added)
             var conflict: Boolean? = null
             while (conflict == null) {
+                checkOwner?.let { onPartialCheck?.invoke(it, required) }
                 conflict = checking.next()
                 if (conflict == null) yield(null)
             }
@@ -181,7 +220,7 @@ internal class PolynomialBooleanRegions(
             if (conflict) {
                 discardPartial()
                 // A completed arithmetic contradiction excludes these signed predicates under every Boolean prefix.
-                exclusions.add(Exclusion(premises, numeric = true))
+                exclusions.add(Exclusion(premises, ExclusionKind.Sign))
                 progress?.let {
                     it.partialConflicts++
                     it.partialConflictPremises += premises.size
@@ -263,6 +302,7 @@ internal class PolynomialBooleanRegions(
     }
 
     private class Literal(val node: Int, val value: Int)
-    private class Exclusion(val literals: List<Literal>, val numeric: Boolean, var uses: Long = 0)
+    private enum class ExclusionKind { Region, Sign, Coupled }
+    private class Exclusion(val literals: List<Literal>, val kind: ExclusionKind, var uses: Long = 0)
     private class Proof(val region: PolynomialBooleanRegion, val literals: List<Literal>)
 }

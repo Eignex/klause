@@ -50,4 +50,21 @@ class MoveSinkTest {
         sink.addCompound(listOf(Move.IntSet(0, 10), Move.IntSet(1, 20)))
         assertEquals(listOf(Move.IntSet(0, 10)), sink.list)
     }
+
+    @Test
+    fun `a compound tally should separate pinned rejections from collapsed trims and admissions`() {
+        val tally = CompoundTally()
+        val sink = MoveSink(Assumptions(ints = mapOf(3 to 5)))
+        sink.setOwners(intArrayOf(-1, 7, -1, -1))
+        sink.compoundTally = tally
+
+        sink.addCompound(listOf(Move.IntSet(2, 10), Move.IntSet(3, 20)))
+        sink.addCompound(listOf(Move.IntSet(0, 10), Move.IntSet(1, 20)))
+        sink.addCompound(listOf(Move.IntSet(0, 30), Move.IntSet(2, 40)))
+
+        assertEquals(
+            listOf(3L, 1L, 1L, 1L, 1L),
+            listOf(tally.offered, tally.pinRejected, tally.trimmed, tally.collapsed, tally.admitted),
+        )
+    }
 }

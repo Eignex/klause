@@ -2,11 +2,12 @@ package com.eignex.klause.meta.alns
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.AcceptanceCriterion
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSession
+import com.eignex.klause.localsearch.RepairEndpoint
+import com.eignex.klause.localsearch.RepairTrace
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.IncumbentBootstrapSearch
@@ -29,7 +30,6 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.validation.finiteWitnessVerifier
 import com.eignex.klause.solver.withSourceSemantics
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.cancelledWhen
 import com.eignex.kumulant.bandit.UnivariateBandit
 import com.eignex.kumulant.bandit.univariate.RouletteWheelBandit
@@ -169,6 +169,7 @@ internal class Alns(
     )
 
     internal var incumbentToleranceCheck: ((Sample) -> Boolean)? = backtrackParams?.toleranceCheck
+    internal var repairTrace: RepairTrace? = null
 
     private var activeSearch = false
 
@@ -271,6 +272,7 @@ internal class Alns(
         private var incumbentObj = bestObj
         private val acceptancePolicy = acceptanceFor?.invoke(bestObj) ?: acceptance
         private var repairSearch: RepairSearch? = null
+        private var tracedRepair: RepairTrace.Attempt? = null
         private var repairOpened = false
         private var closed = false
         private var currentCancellation = params.cancellation
@@ -354,26 +356,33 @@ internal class Alns(
                     minDestroyFraction
                 }
                 val destroyed = destroyOperators[destroyIdx]
-                    .destroy(rng, inner.problem, incumbent, objective, destroyFraction)
-                val booleanScope = if (literalSweep == null) destroyed.bools else {
-                    literalSweep.expandUnitBooleanScope(destroyed.bools, params.cancellation)
+                    .destroy(rng, inner.problem, incumbent, objective, destroyFraction,
+                        params.assumptions, params.cancellation)
+                val freed = RepairScope.effective(destroyed, params.assumptions, literalSweep, params.cancellation)
+                val attempt = repairTrace?.begin(
+                    "alns:$destroyIdx:$repairIdx", params.randomSeed, incumbent, incumbent,
+                    destroyed.bools, destroyed.ints, freed?.bools ?: intArrayOf(), freed?.ints ?: intArrayOf(),
+                )
+                tracedRepair = attempt
+                if (attempt != null) {
+                    attempt.scopeComplete = freed != null
+                    val exact = if (problem.numRealVars == 0) objective.evaluateExact(bestSample) else null
+                    repairTrace?.recordBest(attempt, bestObj, bestSample, exact)
                 }
-                if (booleanScope == null) {
+                if (freed == null) {
+                    repairTrace?.finish(attempt, RepairEndpoint.Censored)
                     iter++
                     break
                 }
-                val freed = FreedVars(
-                    booleanScope.filterNot(params.assumptions::isFrozenBool).toIntArray(),
-                    destroyed.ints.filterNot(params.assumptions::isFrozenInt).toIntArray(),
-                )
                 if (freed.isEmpty) {
+                    repairTrace?.finish(attempt, RepairEndpoint.Unresolved)
                     destroyBandit.update(destroyIdx, rejectedReward)
                     repairBandit.update(repairIdx, rejectedReward)
                     iter++
                     continue
                 }
 
-                val pinAssumptions = buildPin(inner.problem, incumbent, freed).mergedWith(params.assumptions)
+                val pinAssumptions = RepairScope.pins(inner.problem, incumbent, freed).mergedWith(params.assumptions)
                 val context = RepairContext(
                     inner, perIterParams, objective, pinAssumptions, incumbent, freed, rng, session,
                     backtrack = backtrack, backtrackParams = backtrackParams,
@@ -382,17 +391,23 @@ internal class Alns(
                         telemetry.repairCpNodes += nodes
                         telemetry.repairLsMoves += moves
                     },
+                    recordRepairResult = attempt?.let { entry ->
+                        { result -> repairTrace?.recordResult(entry, result) }
+                    },
                 )
                 val repairStarted = TimeSource.Monotonic.markNow()
                 val repaired = repairOperators[repairIdx].repair(context)
                 telemetry.repairNanos += repairStarted.elapsedNow().inWholeNanoseconds
                 if (repaired == null) {
+                    repairTrace?.finish(attempt, RepairEndpoint.Unresolved)
                     destroyBandit.update(destroyIdx, rejectedReward)
                     repairBandit.update(repairIdx, rejectedReward)
                     iter++
                     continue
                 }
                 val repairedObj = objective.evaluate(repaired)
+                repairTrace?.record(attempt, "repaired", repaired)
+                repairTrace?.finish(attempt, RepairEndpoint.Repaired)
 
                 val isNewBest = objective.evaluateExact(repaired) < objective.evaluateExact(bestSample)
                 val accept = isNewBest || acceptancePolicy.accept(repairedObj, incumbentObj, rng)
@@ -442,6 +457,8 @@ internal class Alns(
         override fun close() {
             if (closed) return
             closed = true
+            repairTrace?.finish(tracedRepair, RepairEndpoint.Censored)
+            tracedRepair = null
             repairSearch?.close()
         }
     }
@@ -759,38 +776,6 @@ internal class Alns(
             bootstrapCpNodes, bootstrapLsMoves, repairCpNodes, repairLsMoves, outerAllowance,
             bootstrapCpMillis, bootstrapLsMillis, repairNanos / 1_000_000,
         )
-    }
-
-    /**
-     * Pin every variable *not* in [freed] to its incumbent value, written straight into the sorted
-     * primitive arrays [Assumptions] holds — no per-iteration boxing map. The complement is still most
-     * of the problem, but the reused repair session re-seeds it by diff
-     * ([com.eignex.klause.propagation.PropagationSession.reseedFrom]),
-     * so only the pins that actually changed between fragments cost propagation.
-     */
-    private fun buildPin(problem: Problem, incumbent: Sample, freed: FreedVars): Assumptions {
-        val freedBoolSet = IntHashSet().apply { for (b in freed.bools) add(b) }
-        val freedIntSet = IntHashSet().apply { for (i in freed.ints) add(i) }
-        val boolKeys = IntArray(problem.numBoolVars - freedBoolSet.size)
-        val boolValues = BooleanArray(boolKeys.size)
-        var bi = 0
-        for (b in 0 until problem.numBoolVars) {
-            if (b in freedBoolSet) continue
-            boolKeys[bi] = b
-            boolValues[bi] = incumbent.boolValue(b)
-            bi++
-        }
-        val intKeys = IntArray(problem.numIntVars - freedIntSet.size)
-        val intValues = LongArray(intKeys.size)
-        var ii = 0
-        for (i in 0 until problem.numIntVars) {
-            if (i in freedIntSet) continue
-            intKeys[ii] = i
-            intValues[ii] = incumbent.intValue(i)
-            ii++
-        }
-        // Keys emerge ascending from the 0..n scan — exactly the sorted order the array constructor wants.
-        return Assumptions(boolKeys, boolValues, intKeys, intValues)
     }
 
     private companion object {

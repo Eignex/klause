@@ -440,7 +440,11 @@ internal fun LpRelaxation.leafResult(
     if (certified.verdict == LpVerdict.INFEASIBLE) {
         return LeafRealResult(LpVerdict.INFEASIBLE, EmptyDoubleArray, refutingFactors = factorsOf(certified))
     }
-    return exactLeafResult(certified, problem, objective, sample)
+    val exact = exactLeafResult(certified, problem, objective, sample)
+    return if (exact.verdict in setOf(LpVerdict.INDETERMINATE, LpVerdict.CERTIFIED_BOUND)) {
+        LeafRealResult(exact.verdict, exact.reals, exact.exactReals,
+            uncertifiedReals = certified.float?.let { floatReals(it.primal, problem) })
+    } else exact
 }
 
 /** The factors behind the rows [certified]'s infeasibility proof combines: its exact conflict, else its Farkas ray. */
@@ -552,6 +556,8 @@ internal class LeafRealResult(
     /** On [LpVerdict.INFEASIBLE], the factors whose rows the exact infeasibility proof combines; empty when the proof
      *  names no rows. */
     val refutingFactors: IntArray = EmptyIntArray,
+    // A private numerical proposal; only an original-source point check may give it witness authority.
+    val uncertifiedReals: DoubleArray? = null,
 )
 
 /**
@@ -1706,9 +1712,9 @@ internal fun LeafRealResult.checkedEncoding(
     val point = sample.copy(reals = reals, exactReals = exactReals)
     if (encoded.encodingSourceRealCount != encoded.numRealVars) {
         return if (privateLinearCompletion(encoded, point, cancellation) == true) this
-        else LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+        else LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray, uncertifiedReals = reals)
     }
     val checked = verifyRealCoordinates(encoded, point)
     return if (!cancellation() && checked is Verification.Accepted) this
-    else LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+    else LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray, uncertifiedReals = reals)
 }

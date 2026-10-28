@@ -1,12 +1,124 @@
 package com.eignex.klause.bench.profile
 
+import java.io.ByteArrayOutputStream
+import java.util.Base64
+import java.util.zip.GZIPOutputStream
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 
 class PolynomialPhaseProfileTest {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `request encodings retain identical JSON bytes`(compressed: Boolean) {
+        val json = "[{\"suite\":\"control\",\"problem\":\"constant\"}]".encodeToByteArray()
+        val prefix = if (compressed) "requestz64=" else "request64="
+        val bytes = if (compressed) ByteArrayOutputStream().also { out ->
+            GZIPOutputStream(out).use { it.write(json) }
+        }.toByteArray() else json
+
+        val decoded = PolynomialPhaseProfile.requestBytes(prefix + Base64.getEncoder().encodeToString(bytes))
+
+        assertContentEquals(json, decoded)
+    }
+
+    @Test
+    fun `univariate refinement retains a checked closed section and charged work`() {
+        val source = "(declare-const x Real) (assert (> (* x x) 0))"
+
+        val trace = PolynomialPhaseProfile.PhaseAccess().measure(source, refinement = true)
+
+        assertEquals("Satisfiable", trace.result)
+        assertEquals(trace.nativeWork, trace.chargeSum)
+        val cell = requireNotNull(trace.checkedCells).first()
+        assertEquals("Source", cell["scope"])
+        assertEquals("true", cell["lowerClosed"])
+        assertEquals("true", cell["upperClosed"])
+        assertEquals("[0, 1]", cell["Lower.coefficients"])
+        assertEquals("[0, 1]", cell["Upper.coefficients"])
+        assertTrue(requireNotNull(trace.cellRefinement)["Work"]!!.toLong() <= 16_384)
+    }
+
+    @Test
+    fun `feedback traces retain charged numeric lookup activity`() {
+        val source = "(declare-const x Real) (assert (= (* x x) 2))"
+
+        val trace = PolynomialPhaseProfile.PhaseAccess().measure(source, refinement = true, feedback = true)
+
+        assertEquals("Satisfiable", trace.result)
+        assertEquals(trace.nativeWork, trace.chargeSum)
+        assertTrue(requireNotNull(trace.cellFeedback)["Lookups"]!!.toLong() > 0)
+    }
+
+    @Test
+    fun `prepared Boolean conditions retain their original branch identity`() {
+        val source = "(declare-const gate Bool) (declare-const x Real) " +
+            "(assert (or gate (= (* x x) (- 1))))"
+        val access = PolynomialPhaseProfile.PhaseAccess()
+
+        for (value in listOf(false, true)) {
+            val trace = access.measure(source, prepared = true, fixedBooleans = mapOf("gate" to value))
+
+            assertEquals(if (value) "Satisfiable" else "Unsatisfiable", trace.result)
+            assertEquals(mapOf("0" to value.toString()), trace.conditionBooleans)
+            assertEquals(trace.nativeWork, trace.chargeSum)
+        }
+    }
+
+    @Test
+    fun `coupled traces retain the first explained conflict and charged work`() {
+        val declarations = (0..32).joinToString(" ") { "(declare-const x$it Real)" }
+        val source = "$declarations (assert (and (= (* x1 x1) 2) (= (* x2 x2) 3) (= (+ (* x1 x2) x1 x2) 1)))"
+
+        val trace = PolynomialPhaseProfile.PhaseAccess().measure(source, coupled = true)
+
+        assertEquals("Unsatisfiable", trace.result)
+        assertEquals(trace.nativeWork, trace.chargeSum)
+        assertEquals(3, trace.firstCoupledConflictPremises)
+        assertEquals(true, trace.firstCoupledConflictPreviewComplete)
+        assertEquals("1", requireNotNull(trace.coupledSections)["Conflicts"])
+    }
+
+    @Test
+    fun `a retained source is decoded without catalog resolution`() {
+        val source = "(assert false)".encodeToByteArray()
+        val compressed = ByteArrayOutputStream()
+        GZIPOutputStream(compressed).use { it.write(source) }
+
+        val bytes = PolynomialPhaseProfile.capturedSource(Base64.getEncoder().encodeToString(compressed.toByteArray()))
+
+        assertContentEquals(source, bytes)
+    }
+
+    @Test
+    fun `retained source decompression respects the source byte limit`() {
+        val compressed = ByteArrayOutputStream()
+        GZIPOutputStream(compressed).use { it.write(ByteArray(1024 * 1024 + 1)) }
+
+        assertFailsWith<IllegalArgumentException> {
+            PolynomialPhaseProfile.capturedSource(Base64.getEncoder().encodeToString(compressed.toByteArray()))
+        }
+    }
+
+    @Test
+    fun `fixed integer completion retains its original coordinate map`() {
+        val source = "(declare-const i Int) (declare-const x Real) (assert (= (* x x) i))"
+
+        val trace = PolynomialPhaseProfile.PhaseAccess().measure(source, capture = true,
+            fixedIntegers = mapOf("i" to "2"))
+
+        assertEquals("Satisfiable", trace.result)
+        assertEquals("0", requireNotNull(trace.sourceCoordinates)["integer.i"])
+        assertEquals("2", requireNotNull(trace.failureCapture)["Scope"]?.get("condition.lower.0"))
+        assertEquals(trace.nativeWork, trace.chargeSum)
+    }
+
     @Test
     fun `pipeline dimensions distinguish declarations from product lowering coordinates`() {
         val source = "(declare-const x Real) (assert (= (* x x) 2))"

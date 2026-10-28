@@ -11,8 +11,12 @@ internal class JointRepairNeighborhood private constructor(
     private val integers: Int,
     private val rows: List<IntArray>,
     private val occurrences: Array<IntArray>,
+    private val inputs: IntArray?,
 ) : ExactNeighborhoodProposal {
-    private var seeds = (0 until integers).toList()
+    private val eligible = inputs?.let { indices ->
+        BooleanArray(integers).also { mask -> indices.forEach { mask[it] = true } }
+    }
+    private var seeds = inputs?.toList() ?: (0 until integers).toList()
     var selectedIntegers: Long = 0
         private set
     var visitedEntries: Long = 0
@@ -31,10 +35,10 @@ internal class JointRepairNeighborhood private constructor(
     ): ExactNeighborhoodCondition {
         val freed = if (round == 0L || seeds.isEmpty()) emptySet() else {
             val seed = seeds[((round - 1) % seeds.size).toInt()]
-            connected(seed, minOf(integers, maxOf(2, count), MAX_FREE_INTEGERS))
+            connected(seed, minOf(inputs?.size ?: integers, maxOf(2, count), MAX_FREE_INTEGERS))
         }
         selectedIntegers += freed.size
-        val pins = (0 until integers).filter { it !in freed }.associateWith { centers[it] }
+        val pins = (inputs?.asIterable() ?: (0 until integers)).filter { it !in freed }.associateWith { centers[it] }
         // The full continuous residual stays free: an omitted boundary row could invalidate a local repair.
         return ExactNeighborhoodCondition(bools.indices.associateWith { bools[it] }, pins, pins, cutoff)
     }
@@ -54,7 +58,7 @@ internal class JointRepairNeighborhood private constructor(
                     if (++visits > MAX_SELECTION_VISITS) break
                     if (!seenColumns.add(peer)) continue
                     queue.addLast(peer)
-                    if (peer < integers) selected += peer
+                    if (peer < integers && (eligible == null || eligible[peer])) selected += peer
                     if (selected.size == count) break
                 }
                 if (selected.size == count) break
@@ -67,10 +71,18 @@ internal class JointRepairNeighborhood private constructor(
     companion object {
         fun prepare(
             source: SourceProofContext, integers: Int, reals: Int, cancellation: Cancellation,
+            sourceIntegers: IntArray? = null,
         ): JointRepairNeighborhood? {
             if (cancellation() || integers.toLong() + reals > MAX_INDEX_ENTRIES) return null
             cancellation.charge(integers.toLong() + reals)
             if (cancellation()) return null
+            val inputs = sourceIntegers?.copyOf()
+            if (inputs != null) {
+                cancellation.charge(inputs.size.toLong())
+                if (cancellation()) return null
+                require(inputs.size <= integers && inputs.all { it in 0 until integers } &&
+                    inputs.distinct().size == inputs.size)
+            }
             val rows = ArrayList<IntArray>()
             val occurrences = Array(integers + reals) { ArrayList<Int>() }
             var entries = integers + reals
@@ -96,7 +108,8 @@ internal class JointRepairNeighborhood private constructor(
                 rows += columns.toIntArray()
             }
             return if (cancellation()) null else
-                JointRepairNeighborhood(integers, rows, Array(occurrences.size) { occurrences[it].toIntArray() })
+                JointRepairNeighborhood(integers, rows,
+                    Array(occurrences.size) { occurrences[it].toIntArray() }, inputs)
         }
     }
 }

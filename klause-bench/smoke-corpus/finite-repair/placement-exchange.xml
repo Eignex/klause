@@ -1,0 +1,16 @@
+<instance format="XCSP3" type="COP">
+  <variables>
+    <array id="x" size="[6]"> 0..1 </array>
+    <var id="y"> 0 </var>
+    <var id="one"> 1 </var>
+  </variables>
+  <constraints>
+    <noOverlap>
+      <origins> (x[0],y)(x[1],y) </origins>
+      <lengths> (one,one)(one,one) </lengths>
+    </noOverlap>
+  </constraints>
+  <objectives>
+    <minimize> x[0] </minimize>
+  </objectives>
+</instance>

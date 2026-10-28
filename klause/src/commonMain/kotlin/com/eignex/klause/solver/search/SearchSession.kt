@@ -102,6 +102,12 @@ class SearchSession(
     /** Clause-form reason for the current assignment of [variable], or null when it is a decision. */
     fun reasonFor(variable: Int): SearchExplanation? = trail.reasonFor(variable)
 
+    internal fun supportsNativeBooleanAnalysis(variable: Int, owner: SearchComponent, booleanCount: Int): Boolean {
+        val publisher = trail.publisherOf(variable)
+        if (publisher != null && publisher !== owner) return false
+        return trail.reasonFor(variable)?.literals?.all { (it ushr 1) < booleanCount } != false
+    }
+
     override fun imply(literal: Int, explanation: SearchExplanation): ComponentResult =
         assignImplied(literal, explanation)
 
@@ -221,6 +227,11 @@ class SearchSession(
     internal fun markDecisionBudgetExhausted() {
         decisionsExhausted = true
         executionControls.reportStop(SearchStopCause.DecisionAllowance)
+    }
+
+    internal fun beginTraversal() {
+        decisionsExhausted = false
+        executionControls.beginTraversal()
     }
 
     private var controlsAttached = false
@@ -543,17 +554,9 @@ class SearchSession(
     }
 
     private fun resolve(clause: List<Int>, pivot: Int, reason: SearchExplanation): List<Int>? {
-        val implied = pivot xor 1
-        if (implied !in reason.literals) return null
-        val resolvent = LinkedHashSet<Int>(clause.size + reason.literals.size)
-        for (literal in clause) if (literal != pivot && !addFalseLiteral(resolvent, literal)) return null
-        for (literal in reason.literals) if (literal != implied && !addFalseLiteral(resolvent, literal)) return null
-        if (pivot in resolvent) return null
-        return resolvent.toList()
+        val resolvent = resolveSearchClauses(clause.toIntArray(), reason.literals, pivot) ?: return null
+        return resolvent.takeIf { it.all(::isFalseLiteral) }?.toList()
     }
-
-    private fun addFalseLiteral(clause: MutableSet<Int>, literal: Int): Boolean =
-        isFalseLiteral(literal) && literal xor 1 !in clause && (literal in clause || clause.add(literal))
 
     private var coordinateOwners: Map<SearchComponent, SearchCoordinateOwnership>? = null
 
@@ -747,8 +750,7 @@ class SearchSession(
         require(minimumDecisionLevel == 0 || modelContinuation == SearchModelContinuation.Chronological) {
             "scoped runs require chronological model continuation"
         }
-        decisionsExhausted = false
-        executionControls.beginTraversal()
+        beginTraversal()
         val listener = booleanBranching as? SearchUnassignListener
         observeUnassignments(
             if (atoms != null && listener != null) {
