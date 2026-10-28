@@ -64,7 +64,7 @@ internal class CoreGuidedWorkerConfig(
             CoreGuidedSolver(problem, maximumWork, maximumMillis).session(),
             params,
             sourceObjective,
-        ).bindEvidence(identity, provesResults = CoreGuidedSearch.scalarProofs(sourceObjective)).also {
+        ).bindEvidence(identity, provesResults = CoreGuidedSearch.scalarProofs(problem, sourceObjective)).also {
             it.auxiliaryProof = maximumWork != null || maximumMillis != null
             it.sharedPools = matched
             it.sharingMeter = meter

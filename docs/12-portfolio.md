@@ -461,6 +461,15 @@ and relaxes the core with a reified cardinality, replacing its violation count `
 `1 + sum(k = 2..n, s >= k)`; only the first unspent threshold of each count is
 materialized. Weights and the bound use arbitrary-precision integers.
 
+Selecting `core-guided` directly also accepts exact integer costs over columns whose
+source bounds are closed on both sides; curated pools still admit it only for Boolean
+objectives. A cost `c·x` starts at its cheapest root value and becomes the gaps between
+consecutive root values crossed away from it: each gap is a threshold `[x ≥ v]`, or
+`[x ≤ v]` when `c < 0`, weighted by `|c|` times the gap. Only the first unspent
+threshold of each column is materialized, so a wide contiguous column can still spend
+the worker's whole allowance one value at a time. Scalar proofs count the full integer
+cost magnitude.
+
 Published incumbents project away auxiliary selectors and pass the source check, and
 optimality requires exact equality between the original objective and the
 accumulated bound. Auxiliary clauses never enter shared channels. On a single lane
