@@ -8,6 +8,7 @@ import com.eignex.klause.bench.runner.MiniZincRunner
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.scheduling.Cumulative
+import com.eignex.klause.formats.flatzinc.linearObjective
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
@@ -59,7 +60,7 @@ internal object CumulativeChoiceProfile {
             val budget = PresolveBudget(500_000_000L)
             val preparation = emphasis?.let {
                 FinitePipeline.prepare(FinitePipelineRequest(
-                    parsed.problem, FiniteEngine.BACKTRACK, presolveConfig = PresolveConfig(it),
+                    parsed.problem, FiniteEngine.BACKTRACK, parsed.linearObjective(), presolveConfig = PresolveConfig(it),
                     explicitPresolveConfig = true, cancellation = stop, solveCancellation = stop,
                     presolveBudget = budget, randomSeed = 3L,
                 ))
@@ -79,6 +80,8 @@ internal object CumulativeChoiceProfile {
                 put("os", System.getProperty("os.name"))
                 put("arch", System.getProperty("os.arch"))
                 put("preparationWork", budget.spent())
+                put("preparationWorkAllowance", budget.allowance)
+                put("objectiveSupplied", parsed.linearObjective() != null)
                 put("elapsedNs", System.nanoTime() - started)
                 put("threadAllocatedBytes", bean.getThreadAllocatedBytes(thread) - before)
                 put("integers", problem.numIntVars)
