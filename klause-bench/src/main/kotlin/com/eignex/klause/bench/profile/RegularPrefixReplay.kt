@@ -225,6 +225,7 @@ internal object RegularPrefixReplay {
             } else {
                 null
             }
+            val checkNs = System.nanoTime() - checkStarted
             val clauseGetter = native.javaClass.declaredMethods.single {
                 it.name.startsWith("learnedClauseLiterals") && it.parameterCount == 1
             }
@@ -282,7 +283,7 @@ internal object RegularPrefixReplay {
                 put("runNs", runNs)
                 put("runThreadBytes", runBytes)
                 put("nativeOriginalWitnessAccepted", checked)
-                put("nativeOriginalCheckNs", System.nanoTime() - checkStarted)
+                put("nativeOriginalCheckNs", checkNs)
                 put("nativeOriginalCheckStopped", checkStop())
                 put("helperIntegers", model.numIntVars - source.numIntVars)
                 put("helperBooleans", model.numBoolVars - source.numBoolVars)
