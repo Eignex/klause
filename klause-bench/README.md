@@ -102,6 +102,21 @@ provenance with the traces. Compare logical events separately from physical timi
 and report an emergency-interrupted last segment as partial. Default scheduling,
 parallel deterministic batches and throughput qualification remain separate controls.
 
+[9140](https://lab.eignex.com/jobs/9140) repeats `php4`, `random3sat-50-200` and
+`sporttournament06` three times at seed 17 on `75aaf8357d`, with one Linux/amd64
+processor, matching installed-build/runtime hashes, presolve and LP off, 2,000 work
+units and a ten-second emergency deadline. Each source reproduces its complete
+logical trace. Two-unit slices repeatedly reseed workers on the optimization source
+and do not exercise imports.
+[9150](https://lab.eignex.com/jobs/9150) keeps the same source/build identities for
+`php4` and `sporttournament06`, with 4,000 work units, slices growing from 8 to 64,
+reseeding off and Luby-2 restarts. All three repeats reproduce selections, imports,
+rewards and termination. `php4` imports 17 peer clauses and credits 19 downstream
+uses; the optimization worker observes incumbent versions 3, 4 and 5 before the work
+limit. No emergency deadline fires. These are mechanism observations: source-check
+receipts are absent, native verdicts remain unverified, and no default activation or
+throughput improvement follows.
+
 ## Corpus and build identity
 
 `corpus status` lists cached collections, `corpus gc` applies the cache cap and
