@@ -36,7 +36,8 @@ internal object Suites {
             NonlinearIntegerBooleanResidueSuite.suite +
             DivModSuite.suite + AbsSuite.suite +
             ContinuousArithmeticSuite.suite + MpsLinearSourceSuite.suite +
-            SourceOwnershipSuite.suite + ExactGlobalsSuite.suite + SourceEqualitySuite.suite
+            SourceOwnershipSuite.suite + ExactGlobalsSuite.suite + SourceEqualitySuite.suite +
+            IntegerAggregateSuite.suite
     }
 
     /** Discovered-on-demand suites over fetched external corpora. The provider runs the
