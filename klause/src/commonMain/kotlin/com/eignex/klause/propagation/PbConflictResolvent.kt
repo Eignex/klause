@@ -6,7 +6,6 @@ import com.eignex.klause.factor.bool.PseudoBooleanPropagator
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.addExact
 
 // Resolves pseudo-Boolean conflicts with coefficient-carrying reasons. If a sound PB derivation is not
 // available, [failed] sends the conflict through [ClauseResolvent].
@@ -200,7 +199,7 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
             failed = true
             return ConflictAnalyzer.AnalysisResult.NotApplicable
         }
-        if (addExact(m.degree, m.weights.maxOrNull() ?: 0L) == null) {
+        if (m.degree > Long.MAX_VALUE - (m.weights.maxOrNull() ?: 0L)) {
             failed = true
             return ConflictAnalyzer.AnalysisResult.NotApplicable
         }

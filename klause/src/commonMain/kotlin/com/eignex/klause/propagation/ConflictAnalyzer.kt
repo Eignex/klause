@@ -195,9 +195,9 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
 
     private inline fun boundedAnalysis(analyze: () -> AnalysisResult): AnalysisResult = try {
         state.finiteWork.begin()
-        state.finiteWork.checkNow()
+        if (pbResolvent != null) state.finiteWork.checkNow()
         val result = analyze()
-        state.finiteWork.checkNow()
+        if (pbResolvent != null) state.finiteWork.checkNow()
         if (state.runCancelled) AnalysisResult.NotApplicable else result
     } catch (_: FinitePropagationInterrupted) {
         state.runCancelled = true
@@ -281,7 +281,8 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
             val r = runResolution(pb, seedReason, currentLevel)
             if (!pb.failed) {
                 val result = if (r is AnalysisResult.LearnedPb && state.problem.numIntVars > 0) {
-                    r.copy(fallbackClause = runResolution(clauseResolvent, seedReason, currentLevel) as? AnalysisResult.Learned)
+                    val fallback = runResolution(clauseResolvent, seedReason, currentLevel) as? AnalysisResult.Learned
+                    r.copy(fallbackClause = fallback)
                 } else {
                     r
                 }

@@ -37,6 +37,21 @@ import kotlin.test.assertSame
 
 class CpSearchComponentTest {
     @Test
+    fun `an externally owned publication should not become a native Boolean decision leaf`() {
+        val cp = CpSearchComponent(PropagationSession(Problem(1, 1, arrayOf(IntDomain(0, 10)), emptyArray())))
+        val peer = object : SearchComponent {
+            override fun initialize(context: SearchContext): ComponentResult = context.publish(Lit.make(0, true))
+        }
+        val shared = SearchSession(listOf(cp, peer))
+        assertIs<ComponentResult.Consistent>(shared.initialize())
+
+        val available = shared.supportsNativeBooleanAnalysis(0, cp, 1)
+
+        assertEquals(false, available)
+        assertEquals(true, cp.session.boolValue(0))
+    }
+
+    @Test
     fun `a rejected publication should stop before later facts`() {
         for (mode in listOf("initial", "prepared", "fixpoint")) {
             for (rejection in listOf(ComponentResult.Indeterminate, ComponentResult.Conflict())) {
