@@ -276,7 +276,7 @@ object ScopedComponentProfile {
         override fun fresh(): VariableSelector = DecisionTrace(delegate.fresh(), biased, trace)
 
         override fun pick(session: PropagationSession, rng: Random): VarRef? {
-            val choice = if (biased != null && session.needsBoolDecision(biased)) VarRef.Bool(biased)
+            val choice = if (biased != null && session.boolValue(biased) == null) VarRef.Bool(biased)
                 else delegate.pick(session, rng)
             if (trace.size < 32) trace += buildJsonObject {
                 put("level", session.decisionLevel)
