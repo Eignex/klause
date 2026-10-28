@@ -33,8 +33,9 @@ import kotlinx.serialization.json.put
 internal object RegularPrefixProfile {
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.size == 1 && args.single().startsWith("request64="))
-        val request = Base64.getDecoder().decode(args.single().substringAfter('='))
+        require(args.size in 1..2 && args.first().startsWith("request64="))
+        val replay = args.size == 2 && args.last() == "replay=true"
+        val request = Base64.getDecoder().decode(args.first().substringAfter('='))
         require(request.size <= 16 * 1024)
         val sources = Reports.json.parseToJsonElement(request.decodeToString()).jsonArray
         require(sources.size in 1..4)
@@ -42,7 +43,7 @@ internal object RegularPrefixProfile {
         out.resolve("request.json").writeBytes(request)
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
         for (k in listOf(3, 6)) for (allowTwo in listOf(false, true)) {
-            capture(control(k, allowTwo), out.resolve("control-$k-$allowTwo"))
+            capture(control(k, allowTwo), out.resolve("control-$k-$allowTwo"), replay)
         }
         sources.forEachIndexed { index, input ->
             val source = input.jsonObject
@@ -51,7 +52,7 @@ internal object RegularPrefixProfile {
                 source.getValue("problem").jsonPrimitive.content, source.getValue("sha256").jsonPrimitive.content, null)
             val directory = out.resolve("source-$index").apply { mkdirs() }
             directory.resolve("source.xml").writeBytes(bytes)
-            capture(Xcsp3.parse(bytes.decodeToString()).problem, directory)
+            capture(Xcsp3.parse(bytes.decodeToString()).problem, directory, replay)
         }
     }
 
@@ -65,7 +66,7 @@ internal object RegularPrefixProfile {
         ))
     }
 
-    private fun capture(source: Problem, out: File) {
+    private fun capture(source: Problem, out: File, replay: Boolean) {
         out.mkdirs()
         val codec = ProblemJson()
         out.resolve("source.json").writeText(codec.encodeToJsonElement(source).toString())
@@ -116,6 +117,10 @@ internal object RegularPrefixProfile {
             }
             out.resolve("$mode-report.json").writeText(report.toString())
             println("${out.name}/$mode: $report")
+            if (replay && mode == "default" && prepared.presolve?.infeasible != true && !stop()) {
+                RegularPrefixReplay.capture(model, com.eignex.klause.bench.metric.sha256(
+                    codec.encodeToJsonElement(model).toString().toByteArray()), out)
+            }
         }
     }
 
