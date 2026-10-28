@@ -27,7 +27,8 @@ internal class NonlinearIntegerResidueReduction(
                 is PolynomialRealFormula.Not -> 1
                 else -> 0
             }
-            reserve(count + 2)
+            reserve(count)
+            reserve(count * 3 + 4)
             val children = when (formula) {
                 is PolynomialRealFormula.And -> formula.operands
                 is PolynomialRealFormula.Or -> formula.operands

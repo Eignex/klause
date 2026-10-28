@@ -2,13 +2,13 @@ package com.eignex.klause.solver.pipeline
 
 /** Invocation-wide observations of bounded integer residue evaluation. */
 data class NonlinearIntegerResidueStats(
-    /** Rings with a found support or a completely exhausted support space. */
+    /** Rings with a support or a completed image or tuple refutation. */
     val completedRings: Long,
     /** Shared-coordinate residue tuples evaluated, including unfinished rings. */
     val tuples: Long,
     /** Completed residue steps, included in the containing polynomial work counter. */
     val workSpent: Long,
-    /** Completed empty residue systems consumed as refutations. */
+    /** Completed empty residue systems or Boolean coverage consumed as source refutations. */
     val refutedScopes: Long,
     /** Checks declined for unsupported source support or private work, storage and representation ceilings. */
     val declinedChecks: Long,
