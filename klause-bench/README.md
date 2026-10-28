@@ -2796,6 +2796,12 @@ current-thread allocation and resulting diagram records. Full-source and isolate
 first-diagram overlaps use the production root-composition mechanism. Three
 iterations include factor-view construction and cold preparation; these instrumented
 observations establish neither a source verdict nor ordinary search throughput.
+`prepared=true` first runs default solution-set-sensitive preparation under a
+90-second/two-billion-work containing token. `preparation.json` records completion,
+cost and retained AllDifferent count; `composition.jsonl` records actual removed
+rows and matching original table payloads. A cancelled preparation does not
+establish an ordinary prepared residual. The existing relation and its private
+columns remain the authority for each projected restriction.
 Use `presolve=off,+extensional` for isolated CLI comparisons and
 `presolve=default,+extensional` alongside the default presolve passes.
 
