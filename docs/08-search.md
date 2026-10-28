@@ -457,6 +457,13 @@ the shared literal. Only identical literals are grouped: complementary and disti
 literals are checked separately. Groups are fixed when the propagator is built, so
 a factor without a repeated literal does no extra work.
 
+Until every duration is fixed, unary edge-finding bounds starts over minimum
+durations in both time directions. Shortening each task to its minimum keeps every
+start and every non-overlap, so those bounds hold for the original tasks. Their
+reasons cite the minimum-duration bounds they used and retract with them.
+Time-tabling and detectable precedences still wait for fixed durations. Windows
+outside a quarter of the integer range decline the pass.
+
 Diffn's constant-size sweep filters positive-area compulsory parts. Strict boxes
 with a zero dimension also receive the pairwise separation check, so the sweep's
 empty-area shortcut cannot admit an invalid complete assignment. Non-strict boxes

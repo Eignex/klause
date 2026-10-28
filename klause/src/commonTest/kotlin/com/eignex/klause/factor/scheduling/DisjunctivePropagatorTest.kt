@@ -2,9 +2,11 @@ package com.eignex.klause.factor.scheduling
 
 import com.eignex.klause.factor.ConflictReasonOracle
 import com.eignex.klause.factor.PropagationReasonOracle
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
@@ -124,6 +126,28 @@ class DisjunctivePropagatorTest {
                         shape.starts.all { state.tightenIntMax(it, 1L + rng.nextInt(2)) } &&
                         shape.durationVars.all { rng.nextBoolean() || state.tightenIntMin(it, 2) } &&
                         (rng.nextBoolean() || state.excludeIntValue(shape.starts[0], 1))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `start bounds over minimum durations should be implied by their reasons`() {
+        for ((index, shape) in overloadShapes.withIndex()) {
+            val problem = shape.problem()
+            val rng = Random(0xD18 + index)
+            repeat(5) { iter ->
+                PropagationReasonOracle.assertReasonsImply(problem, "${shape.label} starts#$iter") { state ->
+                    (0 until 3).all { b -> rng.nextInt(4) == 0 || state.pinBool(b, rng.nextInt(4) != 0) } &&
+                        shape.starts.all {
+                            if (rng.nextBoolean()) {
+                                state.tightenIntMin(it, rng.nextInt(2).toLong())
+                            } else {
+                                state.tightenIntMax(it, 1L + rng.nextInt(3))
+                            }
+                        } &&
+                        shape.durationVars.all { rng.nextInt(3) != 0 || state.tightenIntMin(it, 2) } &&
+                        (rng.nextBoolean() || state.excludeIntValue(shape.starts[1], 1))
                 }
             }
         }
@@ -277,6 +301,84 @@ class DisjunctivePropagatorTest {
         durations = longArrayOf(2, 2),
         presents = IntArray(2) { Lit.make(0, positive) },
     )
+
+    @Test
+    fun `minimum durations should bound a start against a task it cannot pass`() {
+        // A at 0 must finish by 2 at the earliest before B starts; A at 3 leaves B only the room before it.
+        for ((aStart, expected) in listOf(0L to (2L to 3L), 3L to (0L to 1L))) {
+            val problem = minimumPair(IntDomain(aStart, aStart))
+
+            val result = problem.propagate(Assumptions.None)
+
+            assertTrue(result is PropagationResult.Implied, "$result")
+            assertEquals(expected, (result.intMinOrNullCompat(1) ?: 0L) to (result.intMaxOrNullCompat(1) ?: 3L))
+        }
+    }
+
+    @Test
+    fun `a minimum-duration start bound should reach a linked row`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 5,
+            intDomains = arrayOf(IntDomain(0, 0), IntDomain(0, 3), IntDomain(2, 3), IntDomain(2, 3), IntDomain(1, 5)),
+            factors = arrayOf(minimumUnary(), Linear(longArrayOf(1, 1), intArrayOf(1, 4), LinearOp.LE, 3)),
+        )
+
+        val result = problem.propagate(Assumptions.None)
+
+        assertTrue(result is PropagationResult.Implied, "$result")
+        assertEquals(1L, result.intValueOrNull(4))
+    }
+
+    @Test
+    fun `a minimum-duration start bound should cite the minima as they stood`() {
+        val problem = minimumPair(IntDomain(0, 9), durations = IntDomain(1, 3))
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        state.currentLevel = 1
+        check(state.tightenIntMax(0, 0) && state.tightenIntMin(2, 2) && state.tightenIntMin(3, 2))
+        state.currentFactor = 0
+        check(state.factorAt(0).propagate(state, 0) && state.intDomains[1].min == 2L)
+        val recorded = state.intMinAntecedents[1]
+        state.currentFactor = -1
+        state.currentLevel = 2
+        check(state.tightenIntMin(3, 3))
+
+        val reason = requireNotNull(state.reasonOf(recorded))
+
+        val cited = reason.map { lit ->
+            val atom = Lit.variable(lit)
+            "x${state.atoms.intVar[atom]} ${state.atoms.kind[atom]} ${state.atoms.threshold[atom]}"
+        }.toSet()
+        assertEquals(setOf("x0 LE 0", "x2 GE 2", "x3 GE 2"), cited)
+    }
+
+    @Test
+    fun `a minimum-duration start bound should retract with its premises`() {
+        val problem = minimumPair(IntDomain(0, 9))
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        val mark = state.mark()
+        state.currentLevel = 1
+        check(state.tightenIntMax(0, 0))
+        state.currentFactor = 0
+        check(state.factorAt(0).propagate(state, 0) && state.intDomains[1].min == 2L)
+
+        state.undoTo(mark)
+
+        assertEquals(0L, state.intDomains[1].min)
+    }
+
+    // Start A in [aStart], start B in 0..3, both durations in [durations].
+    private fun minimumPair(aStart: IntDomain, durations: IntDomain = IntDomain(2, 3)) = Problem(
+        numBoolVars = 0,
+        numIntVars = 4,
+        intDomains = arrayOf(aStart, IntDomain(0, 3), durations, durations),
+        factors = arrayOf<Factor>(minimumUnary()),
+    )
+
+    private fun minimumUnary() =
+        Cumulative.unary(starts = intArrayOf(0, 1), durations = longArrayOf(3, 3), durationVars = intArrayOf(2, 3))
 
     @Test
     fun `minimum durations should refute three tasks that cannot share a window`() {

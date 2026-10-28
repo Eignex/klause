@@ -26,12 +26,13 @@ import com.eignex.klause.util.subExact
  * "O(n log n) Filtering Algorithms for Unary Resource Constraint", CPAIOR 2004,
  * https://doi.org/10.1007/978-3-540-24664-0_23).
  *
- * Those passes wait for every duration to be fixed. Before them, a Θ-tree overload check over minimum durations
- * runs while a duration is unfixed or a presence unknown: every solution shortens to one where each task runs
- * exactly its minimum, so present tasks whose minima cannot fit between their earliest start and latest
- * completion conflict, and an unknown task whose minimum would overload them is absent. Tasks sharing one exact
- * signed presence literal are present together, so an unknown literal is ruled out when its tasks' minima would
- * together overload the present tasks.
+ * Time-tabling and detectable precedences wait for every duration to be fixed. Every solution shortens to one
+ * where each task runs exactly its minimum duration and starts where it did, so until then edge-finding bounds
+ * starts over minimum durations. Before these passes, a Θ-tree overload check over minimum durations runs while a
+ * duration is unfixed or a presence unknown: present tasks whose minima cannot fit between their earliest start
+ * and latest completion conflict, and an unknown task whose minimum would overload them is absent. Tasks sharing
+ * one exact signed presence literal are present together, so an unknown literal is ruled out when its tasks'
+ * minima would together overload the present tasks.
  *
  * Each deduction cites only the tasks it rests on: a detectable precedence its pair, a time-table shave the
  * tasks whose compulsory parts block the shaved starts, an edge-finding bound the tasks of the overloaded set
@@ -107,7 +108,7 @@ internal class DisjunctivePropagator(
         if (n == 0) return true
         if (!overloadCheck(state)) return false
         if (!guardOverloadCheck(state)) return false
-        val effDur = effDurOrNull(state) ?: return true
+        val effDur = effDurOrNull(state) ?: return edgeFindingOverMinima(state)
         if (!timeTable(state, effDur)) return false
         if (!detectablePrecedences(state, effDur)) return false
         if (!edgeFinding(state, effDur)) return false
@@ -452,6 +453,34 @@ internal class DisjunctivePropagator(
     private fun edgeFinding(state: PropagationState, effDur: LongArray): Boolean {
         if (n < 2) return true
         return forwardPass(state, effDur, reversed = false) && forwardPass(state, effDur, reversed = true)
+    }
+
+    // Edge-finding's start bounds hold for the schedule shortened to minimum durations, which keeps every start, so
+    // they hold for the original. Its reasons cite each task's minimum, so they stay valid as durations grow.
+    private fun edgeFindingOverMinima(state: PropagationState): Boolean {
+        val minima = LongArray(n) { minDuration(state, it) }
+        if (!windowsRepresentable(state, minima)) return true
+        return edgeFinding(state, minima)
+    }
+
+    // Both directions negate the windows edge-finding reads and add their summed durations to them, and the tree's
+    // empty-subtree sentinel must stay below every envelope: keep each window within a quarter of the Long range.
+    // Bounds only shrink while the passes run, so the check covers them throughout.
+    private fun windowsRepresentable(state: PropagationState, durs: LongArray): Boolean = try {
+        var energy = 0L
+        for (i in 0 until n) {
+            if (durs[i] > 0L && OptionalPresence.isDefinitelyPresent(presents, i, state)) {
+                energy = addExact(energy, durs[i])
+            }
+        }
+        val limit = Long.MAX_VALUE / 4 - energy
+        (0 until n).all { i ->
+            val dom = state.intDomains[starts[i]]
+            durs[i] <= 0L || !OptionalPresence.isDefinitelyPresent(presents, i, state) ||
+                (dom.min >= -limit && addExact(dom.max, durs[i]) <= limit)
+        }
+    } catch (_: CheckedLongOverflowException) {
+        false
     }
 
     @Suppress("ReturnCount")
