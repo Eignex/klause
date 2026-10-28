@@ -8995,3 +8995,24 @@ alternatives, cancellation, shared allowances and backjump/restart replay.
 The root checks are native original-IR derivation checks; there is no exported or
 independently checked UNSAT certificate. Raw receipts remain outside Git under
 `klause-evidence/campaigns/integer-aggregate-3793/`.
+
+### Population anchor retention control
+
+`bench.profile.PopulationAnchors` compares the existing three-slot ILS policy with
+an ingress filter for exact equality of named source inputs. It accepts the
+trajectory runner's `suite`, `problem`, `sha256`, `source64`/`sourceGzip64` and
+optional `seed` arguments. `offers64` supplies a base64 JSON array of complete
+`{"bools":[],"ints":[]}` source assignments for a bounded restart replay; omitting
+it runs 1600 moves of the existing plateau recipe. Replay uses 64 draws each from
+uniform crossover, factor-scope crossover and basin-hopping perturbation, followed
+by a bounded whole-source CP control. Source preparation, reconstruction, native
+source verification, exact objective agreement, input comparisons and allocations
+are included in the diagnostic's containing deadline. Each invocation owns its
+policy and clears the three samples on exit. Unsupported projections decline.
+
+The report distinguishes retained samples, duplicate offers, consumed restarts,
+source-checked improving children and final search results. Native finite witness
+checks are not independent XCSP3 checking. Exact source-input equality excludes
+auxiliary-only changes; unequal inputs do not establish distinct symmetry classes
+or whole-recipe basins. This diagnostic changes no production policy, canonical
+best admission, global cutoff, proof authority or solution-set operation.
