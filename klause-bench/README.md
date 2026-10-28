@@ -389,8 +389,41 @@ so the explicit bound control is distinct from ordinary configuration.
 Snapshots retain immutable factors and Boolean values. They omit learned constraints
 and do not certify the complete enforcing residual, authorize pruning, or supply an
 independent source check. Fresh opening preparation is distinct from decisions in a
-retained search. The profile installs no conditional symmetry consumer. Original
-WCNF witness validation belongs to ordinary lab solve cases.
+retained search. The profile installs no conditional symmetry consumer. Ordinary
+lab solve cases retain original WCNF bytes and witnesses; the lab has no independent
+WCNF checking adapter, so these cases receive only native checking credit.
+
+[Lab 8891](https://lab.eignex.com/jobs/8891), at `357d4e4885`, completes all four
+preparations and ten searches on Linux/amd64, JDK 25.0.4.1+1-LTS, with a hard
+one-vCPU/4608-MiB cgroup. Preparation retains all three original clauses and exact
+coefficients `[1,1,-1,-2]` with constant 3. Both admission modes have zero generators;
+fresh opening pins retain all five clauses and also expose no generator. The
+retained session reaches `???? -> ??1? -> ??11` and undo restores `????`, in source
+order `a,b,s,t`. Thus the connected source residual exists without a root generator
+or a preparation reduction.
+
+All ten searches return native optimum 1. Both preparation views give the same
+counts: ordinary, LP-off and PB-cutoff use nine nodes/four failures; prefix-first
+uses eight/four; explicit LP uses four/one with root bound 1 and 978 LP work units.
+Ordinary branch traces never leave both `a,b` free at `s=t=true`. Prefix-first does,
+finds `0111`, and revisits that prefix after root model blocking. That blocker is an
+enforcing relation, so the original three clauses alone cannot certify the later
+residual swap. Even without LP, the incumbent's cheap linear bound closes the
+`a=true` sibling. The source inequality `a+b >= s+t-1` gives the stronger root bound
+`C >= 2-t >= 1`, attained by either exchanged point. These controls reject adding a
+dynamic consumer at this gate; they do not reject conditional symmetries generally.
+No broader screen or mixed-local-search/default admission follows.
+
+[Lab 8884](https://lab.eignex.com/jobs/8884), at `38d6ff2e8f`, completes two whole-CLI
+controls on the same source hash, P1 and seed 3. Ordinary and LP-off both report
+native optimum 1, witness `1011`, seven nodes and two propagations. Both spend 4,670
+preparation units; preparation is 136/116 ms, CLI wall time 1.40/1.37 s, user CPU
+1.17/1.17 s and peak RSS 115,456/115,296 KiB. They run concurrently under a hard
+two-vCPU/8704-MiB cgroup. These single-repeat costs and ordered JFR captures are not
+speedup evidence. Neither witnesses nor proofs receive independent checker credit.
+Raw states, timings, source/build/runtime hashes and resource receipts remain in
+`klause-evidence/campaigns/conditional-symmetry-3760/` outside Git. Queued profile
+8883 was cancelled before execution when the explicit LP control was added.
 
 ## Fixture provenance
 
