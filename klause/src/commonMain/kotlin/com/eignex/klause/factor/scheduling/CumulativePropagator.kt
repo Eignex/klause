@@ -45,6 +45,10 @@ internal class CumulativePropagator(
     private val capacityVar: Int,
     private val n: Int,
 ) : InterruptiblePropagator {
+    // Private, opt-in admission instrumentation; the bench attaches it after the search root.
+    private var subwindowMode = 1
+    private var subwindowMetrics: LongArray? = null
+    private var subwindowWitness: ((Int, Long, Long, Long) -> Unit)? = null
 
     override fun interrupted(state: PropagationState, factorId: Int) {
         state.propagatorFailures.remove(this)
@@ -76,6 +80,7 @@ internal class CumulativePropagator(
                 for (i in 0 until n) if (present(i)) task(i)
             }
             ENERGY -> energyReason(p[1], kind = p[2], xMin = unpack(p, 3), xMax = unpack(p, 5))
+            SUBWINDOW -> subwindowReason(p[1], unpack(p, 2), unpack(p, 4))
             else -> heightReason(p[1])
         }
     }
@@ -151,10 +156,10 @@ internal class CumulativePropagator(
         state.finiteWork.checkNow()
         state.propagatorFailures.remove(this)
         if (n == 0) return true
-        // The energetic and profile-height passes do not need a fixed duration/demand/capacity snapshot, so
-        // they are the only filtering that fires while those are still ranges.
+        // Range-aware passes precede the fixed snapshot required by edge-finding and time-tabling.
         if (!energeticNaivePass(state)) return false
         if (!profileHeightPass(state)) return false
+        if (!subwindowDemandPass(state)) return false
         val eff = effectiveSnapshot(state) ?: return true
         val effDur = eff.dur
         val effRes = eff.res
@@ -234,6 +239,78 @@ internal class CumulativePropagator(
     private fun capMax(state: PropagationState): Long =
         if (capacityVar < 0) capacity else state.intDomains[capacityVar].max
 
+    private fun subwindowDemandPass(state: PropagationState): Boolean {
+        if (subwindowMode == 0) return true
+        val metrics = subwindowMetrics
+        metrics?.let { it[0]++ }
+        if (resourceVars.isEmpty() || durationVars.isNotEmpty() || n > SUBWINDOW_TASK_LIMIT) return true
+        val active = IntArrayList()
+        var variableDemand = false
+        var positiveMinimum = false
+        var demandAboveCapacity = false
+        for (i in 0 until n) {
+            state.checkFiniteWork()
+            if (!OptionalPresence.isDefinitelyPresent(presents, i, state) || durations[i] == 0L) continue
+            val demand = state.intDomains[resourceVars[i]]
+            if (demand.min < 0L) return true
+            variableDemand = variableDemand || demand.min != demand.max
+            positiveMinimum = positiveMinimum || demand.min > 0L
+            demandAboveCapacity = demandAboveCapacity || demand.max > capMax(state)
+            active.add(i)
+        }
+        if (!variableDemand || capMax(state) < 0L) return true
+        if (!positiveMinimum && !demandAboveCapacity) {
+            metrics?.let { it[1]++ }
+            // Every containing window is at least the target's duration, so its bound is >= capacity.
+            if (subwindowMode == 2) return true
+        }
+        metrics?.let { it[2]++ }
+        return try {
+            val ids = active.toIntArray()
+            val est = LongArray(ids.size) { state.intDomains[starts[ids[it]]].min }
+            val lct = LongArray(ids.size) { addExact(state.intDomains[starts[ids[it]]].max, durations[ids[it]]) }
+            val lefts = est.distinct()
+            val rights = lct.distinct()
+            for (left in lefts) {
+                for (right in rights) {
+                    state.checkFiniteWork()
+                    if (right <= left) continue
+                    metrics?.let { it[3]++ }
+                    val budget = mulExact(subExact(right, left), capMax(state))
+                    var energy = 0L
+                    for (k in ids.indices) {
+                        metrics?.let { it[4]++ }
+                        state.checkFiniteWork()
+                        if (est[k] >= left && lct[k] <= right) {
+                            energy = addExact(energy, mulExact(durations[ids[k]], minHeight(state, ids[k])))
+                        }
+                    }
+                    if (energy > budget) {
+                        metrics?.let { it[7]++ }
+                        return fail(state) { subwindowReason(-1, left, right) }
+                    }
+                    for (k in ids.indices) {
+                        metrics?.let { it[5]++ }
+                        state.checkFiniteWork()
+                        if (est[k] < left || lct[k] > right) continue
+                        val i = ids[k]
+                        val demand = state.intDomains[resourceVars[i]]
+                        if (demand.min == demand.max) continue
+                        val bound = addExact((budget - energy) / durations[i], demand.min)
+                        if (bound < demand.max) {
+                            metrics?.let { it[6]++ }
+                            subwindowWitness?.invoke(i, left, right, bound)
+                            if (!tightenMax(state, resourceVars[i], bound, packed(SUBWINDOW, i, left, right))) return false
+                        }
+                    }
+                }
+            }
+            true
+        } catch (_: CheckedLongOverflowException) {
+            true
+        }
+    }
+
     /**
      * Naive energetic reasoning (after P. Baptiste, C. Le Pape and W. Nuijten, "Constraint-Based
      * Scheduling", Springer 2001, https://doi.org/10.1007/978-1-4615-1479-4). For
@@ -243,8 +320,14 @@ internal class CumulativePropagator(
      * and duration and lower-bounds the capacity, and an exceeded budget is a contradiction. Sound
      * for any task order; unlike the time-tabling pass it reasons over variable demands/durations.
      */
+    private fun energeticNaivePass(state: PropagationState): Boolean = try {
+        energeticPrefixPass(state)
+    } catch (_: CheckedLongOverflowException) {
+        true
+    }
+
     @Suppress("ReturnCount")
-    private fun energeticNaivePass(state: PropagationState): Boolean {
+    private fun energeticPrefixPass(state: PropagationState): Boolean {
         val act = IntArrayList()
         for (i in 0 until n) {
             state.checkFiniteWork()
@@ -255,7 +338,7 @@ internal class CumulativePropagator(
         if (m == 0) return true
         val ids = IntArray(m) { act[it] }
         val est = LongArray(m) { state.intDomains[starts[ids[it]]].min }
-        val lct = LongArray(m) { state.intDomains[starts[ids[it]]].max + maxDur(state, ids[it]) }
+        val lct = LongArray(m) { addExact(state.intDomains[starts[ids[it]]].max, maxDur(state, ids[it])) }
         val order = argsortBy(m) { a, b -> lct[a].compareTo(lct[b]) }
         val camax = capMax(state)
         var xMin = Long.MAX_VALUE
@@ -267,9 +350,9 @@ internal class CumulativePropagator(
             val i = ids[k]
             if (est[k] < xMin) xMin = est[k]
             if (lct[k] > xMax) xMax = lct[k]
-            val len = xMax - xMin
+            val len = subExact(xMax, xMin)
             if (len > 0L) {
-                val availSurf = len * camax - surface
+                val availSurf = subExact(mulExact(len, camax), surface)
                 if (availSurf < 0L) return fail(state) { energyReason(-1, OVERLOAD, xMin, xMax) }
                 val md = minDur(state, i)
                 if (resourceVars.isNotEmpty() && md > 0) {
@@ -283,11 +366,14 @@ internal class CumulativePropagator(
                 }
                 if (capacityVar >= 0) {
                     val payload = packed(ENERGY, -1, CAPACITY, xMin, xMax)
-                    if (!tightenMin(state, capacityVar, (surface + len - 1L) / len, payload)) return false
+                    val required = surface / len + if (surface % len == 0L) 0L else 1L
+                    if (!tightenMin(state, capacityVar, required, payload)) return false
                 }
             }
-            surface += minDur(state, i) * minHeight(state, i)
-            if (surface > (xMax - xMin) * camax) return fail(state) { energyReason(-1, OVERLOAD, xMin, xMax) }
+            surface = addExact(surface, mulExact(minDur(state, i), minHeight(state, i)))
+            if (surface > mulExact(subExact(xMax, xMin), camax)) {
+                return fail(state) { energyReason(-1, OVERLOAD, xMin, xMax) }
+            }
         }
         return true
     }
@@ -687,6 +773,23 @@ internal class CumulativePropagator(
             if (kind == RESOURCE) durGe(i, durMin(i)) else resGe(i, resMin(i))
         }
 
+        fun subwindowReason(i: Int, from: Long, until: Long) {
+            for (k in 0 until n) {
+                if (!present(k) || durations[k] == 0L || (k != i && resMin(k) <= 0L)) continue
+                val latest = try {
+                    subExact(until, durations[k])
+                } catch (_: CheckedLongOverflowException) {
+                    continue
+                }
+                if (est(k) < from || lst(k) > latest) continue
+                task(k)
+                startGe(k, from)
+                startLe(k, latest)
+                if (k != i) resGe(k, resMin(k))
+            }
+            capLe(capMax())
+        }
+
         /** [i]'s height is bounded by the tallest stack of compulsory parts over its own compulsory part. */
         fun heightReason(i: Int) {
             val lo = lst(i)
@@ -719,6 +822,8 @@ internal class CumulativePropagator(
         const val ENERGY = 2
         const val HEIGHT = 3
         const val REVERSE_EDGE = 4
+        const val SUBWINDOW = 5
+        const val SUBWINDOW_TASK_LIMIT = 32
 
         const val RESOURCE = 0
         const val DURATION = 1
@@ -729,6 +834,9 @@ internal class CumulativePropagator(
             intArrayOf(kind, a, b, (value ushr 32).toInt(), value.toInt())
 
         fun packed(kind: Int, a: Int, value: Long) = intArrayOf(kind, a, (value ushr 32).toInt(), value.toInt())
+
+        fun packed(kind: Int, a: Int, x: Long, y: Long) =
+            intArrayOf(kind, a, (x ushr 32).toInt(), x.toInt(), (y ushr 32).toInt(), y.toInt())
 
         fun packed(kind: Int, a: Int, b: Int, x: Long, y: Long) =
             intArrayOf(kind, a, b, (x ushr 32).toInt(), x.toInt(), (y ushr 32).toInt(), y.toInt())
