@@ -67,6 +67,7 @@ internal class ResumableSatisfaction(
     private var closed = false
 
     override val isDone: Boolean get() = done != null
+    internal val preparationPending: Boolean get() = traversal.preparationPending
 
     override val stats: SolveStats get() = sink.snapshot()
 

@@ -162,7 +162,8 @@ internal class CoreGuidedSearch(
         get() = !costsPrepared || objectivePreparation != null || initialIndex < objectiveTerms || core != null ||
             transitionPreparation != null ||
             (query as? PreparingSatisfaction)?.preparationPending == true ||
-            (queryPreparation != null || queryModel != null) && query == null
+            (query as? ResumableSatisfaction)?.preparationPending == true ||
+            ((queryPreparation != null || queryModel != null || queryPins != null) && query == null)
 
     override fun runSlice(
         global: Cancellation,

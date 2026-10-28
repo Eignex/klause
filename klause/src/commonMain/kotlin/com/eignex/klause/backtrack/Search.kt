@@ -214,6 +214,7 @@ internal class CpSatisfactionTraversal(
     // The verdict the root reached before any search, handed out by the first [next].
     private var rootOutcome: SearchOutcome? = null
     val hasRootOutcome: Boolean get() = rootOutcome != null
+    val preparationPending: Boolean get() = sharedSession != null && run == null && rootOutcome == null
     private var closed = false
 
     init {
@@ -240,7 +241,8 @@ internal class CpSatisfactionTraversal(
             components.forEach(resources::ownComponent)
             cp.useEnforcingPeers(components.filterIsInstance<FiniteFactorEnforcer>()
                 .flatMap { it.enforcingFiniteFactors(problem) }.toSet())
-            deferredRoot = deferredInitialization
+            deferredRoot = deferredInitialization &&
+                (preparedSession != null || components.any { it is PreparingSearchComponent })
             val session = SearchComponentSet(components, branchers = listOf(traversal.brancher)).session(
                 cancellation = if (deferredRoot) cancelledWhen({
                     if (run == null) propagationCancellation.deadline() else params.cancellation.deadline()
