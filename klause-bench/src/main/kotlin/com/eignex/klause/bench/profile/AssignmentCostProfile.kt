@@ -15,6 +15,7 @@ import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
@@ -55,6 +56,7 @@ internal object AssignmentCostProfile {
                         presolveBudget = budget, randomSeed = 3,
                     ))
                     val preparationNs = System.nanoTime() - started
+                    val preparationStopped = stop()
                     for (lp in listOf(false, true)) {
                         val trace = ArrayList<JsonObject>()
                         val selector = object : VariableSelector by InputOrder {
@@ -74,7 +76,7 @@ internal object AssignmentCostProfile {
                             cancellation = solveStop, lpConfig = if (lp) LpConfig.AUTO else LpConfig.OFF,
                             lpPlan = LpPlan(bounding = lp, cuts = lp, lagrangian = lp))
                         val solveStart = System.nanoTime()
-                        val improvements = BacktrackSolver(prepared.problem)
+                        val improvements = BacktrackSolver(prepared.problem.bake())
                             .improvements(requireNotNull(prepared.objective), params).toList()
                         val solveNs = System.nanoTime() - solveStart
                         val report = buildJsonObject {
@@ -85,7 +87,7 @@ internal object AssignmentCostProfile {
                             put("lp", lp)
                             put("preparationNs", preparationNs)
                             put("preparationWork", budget.spent())
-                            put("preparationStopped", stop())
+                            put("preparationStopped", preparationStopped)
                             put("preparationInfeasible", prepared.presolve?.infeasible)
                             put("preparedObjective", prepared.objective.toString())
                             put("preparedFactors", JsonArray(prepared.problem.factors.map {
