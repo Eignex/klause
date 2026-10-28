@@ -1,12 +1,15 @@
 package com.eignex.klause.bench.profile
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.ir.DefinitionHint
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
@@ -176,5 +179,52 @@ class EqualityKernelReplayTest {
         val report = Json.parseToJsonElement(file.readText()).jsonObject
         assertTrue(report.getValue("records").jsonArray.isEmpty())
         assertEquals("true", report.getValue("interrupted").jsonPrimitive.content)
+    }
+
+    @Test
+    fun `maintained outputs cannot be dropped from an equality direction`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 2) }, listOf(
+            Linear(longArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0)))
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        val sweep = requireNotNull(DefinitionalSweep.fromSource(problem, listOf(
+            DefinitionHint.Linear(1, longArrayOf(1, -1), arrayOf(
+                DefinitionHint.Operand.Variable(0), DefinitionHint.Operand.Variable(1)), 0))))
+        state.invariants = sweep.network(2, 0)
+        val objective = LinearObjective(intCoefficients = longArrayOf(-1, 0))
+        val view = TrajectoryView("defined", state, VarRemap(intArrayOf(), intArrayOf(0, 1)), objective,
+            synchronize = { sweep.sweep(state.assignment, state.rootDomains) })
+        assertEquals(null, view.load(Sample(booleanArrayOf(), longArrayOf(0, 0))))
+        val file = directory.resolve("defined.json")
+
+        EqualityKernelReplay.capture(view, file, objective::evaluateExact) { _, _ -> true }
+
+        val records = Json.parseToJsonElement(file.readText()).jsonObject.getValue("records").jsonArray
+        assertTrue(records.flatMap { it.jsonObject.getValue("directions").jsonArray }.all {
+            it.jsonObject.getValue("candidates").jsonArray.isEmpty()
+        })
+    }
+
+    @Test
+    fun `retained globals reject a colliding unit step and keep the complete exchange`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 2) }, listOf(
+            Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 2), AllDifferent(intArrayOf(0, 1))))
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(-1, 0))
+        val view = TrajectoryView("global", state, VarRemap(intArrayOf(), intArrayOf(0, 1)), objective)
+        assertEquals(null, view.load(Sample(booleanArrayOf(), longArrayOf(0, 2))))
+        val source = problem.bake()
+        val file = directory.resolve("global.json")
+
+        EqualityKernelReplay.capture(view, file, objective::evaluateExact) { sample, stop ->
+            FiniteConflictSelection.checkSource(source, sample, stop)
+        }
+
+        val records = Json.parseToJsonElement(file.readText()).jsonObject.getValue("records").jsonArray
+        val candidates = records.flatMap { it.jsonObject.getValue("directions").jsonArray }.flatMap {
+            it.jsonObject.getValue("candidates").jsonArray
+        }
+        assertTrue(candidates.filter { it.jsonObject.getValue("step").jsonPrimitive.content.removePrefix("-") == "1" }
+            .all { it.jsonObject.getValue("nativeSourceCheck").jsonPrimitive.content == "false" })
+        assertTrue(records.any { it.jsonObject.getValue("consumed") != JsonNull })
     }
 }

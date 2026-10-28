@@ -752,7 +752,7 @@ internal object Suites {
         vendored("equality-cost-symmetry", Category.OPTIMIZATION, Expected.Opt(90L),
             relPath = "cost-symmetry/equality-cost.xml", license = "Apache-2.0")
         for (name in listOf("linear-exchange", "linear-three-cycle", "linear-four-cycle", "linear-knapsack",
-            "linear-transport")) {
+            "linear-transport", "linear-kernel-weighted", "linear-kernel-ring33")) {
             vendored("evidence-$name", Category.OPTIMIZATION, Expected.Unknown,
                 relPath = "finite-repair-evidence/$name.xml")
         }
