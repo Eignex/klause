@@ -1066,6 +1066,7 @@ final enum class com.eignex.klause.theory/EncoderSupport : kotlin/Enum<com.eigne
 
 open enum class com.eignex.klause.presolve/PresolvePass : kotlin/Enum<com.eignex.klause.presolve/PresolvePass> { // com.eignex.klause.presolve/PresolvePass|null[0]
     enum entry AGGREGATE_SUB_SUMS // com.eignex.klause.presolve/PresolvePass.AGGREGATE_SUB_SUMS|null[0]
+    enum entry BREAK_OBJECTIVE_SYMMETRIES // com.eignex.klause.presolve/PresolvePass.BREAK_OBJECTIVE_SYMMETRIES|null[0]
     enum entry BREAK_SYMMETRIES // com.eignex.klause.presolve/PresolvePass.BREAK_SYMMETRIES|null[0]
     enum entry COMPOSE_EXTENSIONAL // com.eignex.klause.presolve/PresolvePass.COMPOSE_EXTENSIONAL|null[0]
     enum entry DERIVE_XOR_UNITS // com.eignex.klause.presolve/PresolvePass.DERIVE_XOR_UNITS|null[0]

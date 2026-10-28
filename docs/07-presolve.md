@@ -428,6 +428,18 @@ readers. Value orbits intersecting an active objective column's domain stay fixe
 Active-column scans charge and poll the pass token; an interrupted scan
 posts no break. Both passes stay off for solution-set-sensitive queries.
 
+The opt-in finite `objective-symmetry` pass runs before `symmetry` and admits
+variable permutations under the exact current replacement objective. Candidate
+colors combine root domains or Boolean fixings with signed objective coefficients;
+verification checks those declarations, every coefficient and the complete factor
+multiset. Constant offsets are invariant. Scalar orders additionally require each
+adjacent single transposition to pass verification, so a lockstep matrix orbit
+receives only the existing generator lex and stabilizer propagation. Value symmetry
+still protects objective domains. Protection-only contexts, real coordinates,
+source symmetry annotations and solution-sensitive operations decline this pass;
+pure local-search plans disable it. Default admission retains objective-column
+protection. Discovery and verification share the preparation allowance.
+
 Boolean probing retains failed-literal units and bounds implied by both polarities;
 integer and open-range probing extend this to bounds and holes. Compilation, incidence,
 row and graph visits charge and poll the pass token. An interruption retains completed
