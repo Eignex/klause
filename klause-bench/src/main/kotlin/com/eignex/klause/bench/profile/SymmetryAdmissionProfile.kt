@@ -10,6 +10,7 @@ import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.impliedLinearRows
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
@@ -67,6 +68,7 @@ internal object SymmetryAdmissionProfile {
                 val ints = cost.intCoefficients
                 val bools = cost.boolWeights
                 val model = prepared.problem
+                val bakedModel = model as? BakedProblem
                 val report = buildJsonObject {
                     put("input", input)
                     put("revision", Reports.readGitSha())
@@ -79,9 +81,12 @@ internal object SymmetryAdmissionProfile {
                     put("preparedIntegers", model.numIntVars)
                     put("preparedBooleans", model.numBoolVars)
                     put("preparedFactors", model.factors.size)
-                    put("rootIntegerDomains", JsonArray((0 until model.numIntVars).map {
-                        JsonPrimitive(model.rootIntDomain(it).toString())
-                    }))
+                    put("rootDomainsAvailable", bakedModel != null)
+                    put("rootIntegerDomains", buildJsonArray {
+                        if (bakedModel != null) for (v in 0 until bakedModel.numIntVars) {
+                            add(JsonPrimitive(bakedModel.rootIntDomain(v).toString()))
+                        }
+                    })
                     put("preparedIntegralRows", buildJsonArray {
                         model.factors.forEachIndexed { factorId, factor ->
                             for (row in factor.impliedLinearRows) {
