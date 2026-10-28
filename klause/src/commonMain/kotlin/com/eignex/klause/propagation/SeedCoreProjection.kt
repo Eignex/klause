@@ -3,6 +3,7 @@ package com.eignex.klause.propagation
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.solver.search.resolveSearchClauses
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.binarySearchInt
 
 internal fun PropagationSession.projectSeedCore(
     assumptions: Assumptions,
@@ -46,7 +47,7 @@ internal fun PropagationSession.projectSeedCore(
         for (literal in resolvent) {
             val variable = Lit.variable(literal)
             if (variable >= problem.numBoolVars) return conflict
-            val index = assumptions.boolKeys.binarySearch(variable)
+            val index = assumptions.boolKeys.binarySearchInt(variable)
             if (index in 0 until applied && assumptions.boolValues[index] == !Lit.isPositive(literal)) {
                 needed.add(index + 1)
             } else {
