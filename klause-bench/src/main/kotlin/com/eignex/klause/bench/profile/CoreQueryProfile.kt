@@ -73,7 +73,28 @@ internal object CoreQueryProfile {
                     val preparationBytes = bean.getThreadAllocatedBytes(thread) - beforePreparation
                     val model = ordinary?.problem as? BakedProblem ?: sourceBaked
                     val cost = ordinary?.objective ?: objective
-                    for (repeat in 0..2) for (policy in listOf("ordinary", "stratified", "refined")) {
+                    for (repeat in 0..2) for (policy in listOf("ordinary", "stratified", "root-fixed", "refined")) {
+                        val rootCostStart = System.nanoTime()
+                        val rootCostBytes = bean.getThreadAllocatedBytes(thread)
+                        val root = model.rootDeductions as? PropagationResult.Implied
+                        val coefficients = cost.boolWeights
+                        var offset = cost.constant
+                        var removed = 0
+                        for (variable in coefficients.indices) {
+                            val weight = coefficients[variable]
+                            val fixed = root?.boolValueOrNull(variable)
+                            if (weight != 0L && fixed == (weight < 0L)) {
+                                if (fixed == true) offset += weight
+                                coefficients[variable] = 0L
+                                removed++
+                            }
+                        }
+                        val queryCost = if (policy == "root-fixed") cost.copy(boolWeights = coefficients,
+                            constant = offset) else cost
+                        val rootCostNs = if (policy == "root-fixed") System.nanoTime() - rootCostStart else 0L
+                        val rootCostAllocation = if (policy == "root-fixed") {
+                            bean.getThreadAllocatedBytes(thread) - rootCostBytes
+                        } else 0L
                         val history = ArrayList<JsonObject>()
                         var search: ResumableSearch? = null
                         var observedCores = 0L
@@ -105,7 +126,7 @@ internal object CoreQueryProfile {
                             cancellation = stop, nativeSat = false)
                         val started = System.nanoTime()
                         val before = bean.getThreadAllocatedBytes(thread)
-                        val handle = constructor.newInstance(model, cost, params, policy == "stratified", null,
+                        val handle = constructor.newInstance(model, queryCost, params, policy == "stratified", null,
                             2_000L, TimeSource.Monotonic, policy == "refined") as ResumableSearch
                         search = handle
                         val result = handle.use { it.runSlice(stop, 2_000L, -1L) {} }
@@ -127,8 +148,9 @@ internal object CoreQueryProfile {
                             put("preparationThreadBytes", preparationBytes)
                             put("preparedBooleans", model.numBoolVars)
                             put("preparedFactors", model.numFactors)
-                            put("elapsedNsIncludingDisposal", elapsed)
-                            put("threadBytesIncludingDisposal", bytes)
+                            put("rootSatisfiedCostPins", removed)
+                            put("elapsedNsIncludingDisposal", elapsed + rootCostNs)
+                            put("threadBytesIncludingDisposal", bytes + rootCostAllocation)
                             put("nativeResult", result?.javaClass?.simpleName)
                             put("sourceAccepted", sourceAccepted)
                             put("sourceObjective", point?.let { objective.evaluateLong(it) })
