@@ -144,6 +144,12 @@ internal object EqualityMoveReplay {
                 }.toString())
             }
         }
+        if (options["kernel"] == "true") EqualityKernelReplay.capture(view, out.resolve("kernel.json"),
+            objective::evaluateExact) {
+            point, token -> FiniteConflictSelection.checkSource(source, point, token)
+        }
+        if (options["completion"] == "true") equalityRowCompletion(state, requireNotNull(prepared.objective),
+            state.assignment.snapshot(), stop, out.resolve("completion.json"))
         if (options["owners"] == "true") {
             val controls = out.resolve("controls.jsonl")
             controls.writeText(buildJsonObject {
