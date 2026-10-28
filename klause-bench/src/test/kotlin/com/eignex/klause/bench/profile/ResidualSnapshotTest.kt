@@ -9,6 +9,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import java.math.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -17,9 +18,18 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import org.junit.jupiter.api.BeforeAll
 
 class ResidualSnapshotTest {
-    private fun capture(): ResidualCapture {
+    companion object {
+        @BeforeAll
+        @JvmStatic
+        fun initializeCodec() {
+            ProblemJson().encodeToString(Problem(0, 0, emptyArray(), emptyArray()))
+        }
+    }
+
+    private fun capture(maxBytes: Int = ResidualSnapshots.MAX_BYTES): ResidualCapture {
         val factors = listOf(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
             Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
@@ -29,7 +39,7 @@ class ResidualSnapshotTest {
         return ResidualSnapshots.capture(
             problem, LinearObjective(longArrayOf(1, -2, 3, 4, 5, -6), constant = 10),
             listOf(null, null, null, null, true, null), LearnedResidualInspection(emptyList(), 0, null),
-            JsonObject(emptyMap()), JsonObject(emptyMap()), null, Cancellation.Never, ResidualSnapshots.MAX_BYTES,
+            JsonObject(emptyMap()), JsonObject(emptyMap()), null, Cancellation.Never, maxBytes,
         )
     }
 
@@ -103,12 +113,15 @@ class ResidualSnapshotTest {
         )) }
     }
 
-    @Test
-    fun `interrupted capture should publish no partial payload`() {
+    @ParameterizedTest
+    @ValueSource(ints = [1, 4, 8])
+    fun `interrupted capture should publish no partial payload`(interruptAt: Int) {
+        var polls = 0
         val capture = ResidualSnapshots.capture(
-            Problem(0, 0, emptyArray(), emptyArray()), LinearObjective(), emptyList(),
+            Problem(3, 0, emptyArray(), Array(3) { Clause(intArrayOf(Lit.make(it, true))) }),
+            LinearObjective(), List(3) { null },
             LearnedResidualInspection(emptyList(), 0, null), JsonObject(emptyMap()), JsonObject(emptyMap()),
-            null, Cancellation { true }, ResidualSnapshots.MAX_BYTES,
+            null, Cancellation { ++polls >= interruptAt }, ResidualSnapshots.MAX_BYTES,
         )
 
         assertEquals("interrupted", capture.decline)
@@ -116,7 +129,7 @@ class ResidualSnapshotTest {
     }
 
     @Test
-    fun `one containing budget should bound retained snapshot count and bytes`() {
+    fun `one containing budget should bound retained snapshot count`() {
         val budget = ResidualSnapshotBudget(1, ResidualSnapshots.MAX_BYTES)
         val retained = budget.retain { capture() }
 
@@ -125,8 +138,33 @@ class ResidualSnapshotTest {
         assertNotNull(retained.bytes)
         assertEquals("snapshot-count-limit", next.decline)
         assertEquals(retained.bytes.size, budget.bytes)
+    }
+
+    @Test
+    fun `an exhausted containing byte allowance should not invoke capture`() {
         val exhausted = ResidualSnapshotBudget(1, 0).retain { error("must not renew the byte allowance") }
+
         assertEquals("snapshot-byte-limit", exhausted.decline)
+    }
+
+    @Test
+    fun `capture should decline its conservative byte preflight`() {
+        assertEquals("byte-limit", capture(maxBytes = 64).decline)
+    }
+
+    @Test
+    fun `fixed objective contributions should remain exact beyond a signed word`() {
+        val captured = ResidualSnapshots.capture(
+            Problem(3, 0, emptyArray(), emptyArray()),
+            LinearObjective(longArrayOf(Long.MAX_VALUE, Long.MAX_VALUE, Long.MIN_VALUE), constant = Long.MAX_VALUE),
+            listOf(true, true, null), LearnedResidualInspection(emptyList(), 0, null),
+            JsonObject(emptyMap()), JsonObject(emptyMap()), null, Cancellation.Never, ResidualSnapshots.MAX_BYTES,
+        )
+
+        val snapshot = ResidualSnapshots.load(assertNotNull(captured.bytes).decodeToString())
+
+        assertEquals((BigInteger.valueOf(Long.MAX_VALUE) * BigInteger.valueOf(3)).toString(), snapshot.fixedObjective)
+        assertEquals(Long.MIN_VALUE.toString(), snapshot.isolatedObjective)
     }
 
     @Test
