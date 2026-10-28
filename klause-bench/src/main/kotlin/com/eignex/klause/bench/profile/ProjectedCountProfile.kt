@@ -71,7 +71,12 @@ internal object ProjectedCountProfile {
                             val result = (method.invoke(instance, problem, config) as Sequence<*>).last() as Count
                             val end = System.nanoTime()
                             val bytes = bean.getThreadAllocatedBytes(thread) - allocationStart
-                            expected?.let { check(it == result) { "$name projectX=$projectX: $it != $result" } }
+                            check(result.semantics === problem.semantics)
+                            expected?.let {
+                                check(it.copy(semantics = result.semantics) == result) {
+                                    "$name projectX=$projectX: $it != $result"
+                                }
+                            }
                             expected = result
                             if (repeat < 0) continue
                             val record = buildJsonObject {

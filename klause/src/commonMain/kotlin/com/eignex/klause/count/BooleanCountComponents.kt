@@ -59,7 +59,8 @@ internal class BooleanCountComponents private constructor(
 
     companion object {
         fun partition(problem: BakedProblem, config: ExactCountConfig): BooleanCountComponents? {
-            if (problem.numIntVars != 0 || problem.numRealVars != 0 || problem.projectionProviders != null ||
+            if (problem.numFactors < 2 || problem.numIntVars != 0 || problem.numRealVars != 0 ||
+                problem.projectionProviders != null ||
                 problem.hasSymmetryBreaking || problem.rootDeductions is PropagationResult.Unsat ||
                 problem.factors.any { it !is Clause || !it.allLiteralsBool(problem.numBoolVars) }
             ) return null
