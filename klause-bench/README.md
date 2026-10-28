@@ -3609,6 +3609,26 @@ returned SAT and passed the independent XCSP3 SolutionChecker. These external-ti
 captures establish source admission and a checked small witness, without a large
 instance verdict or a runtime speedup claim.
 
+### Bounded scheduling deadlines
+
+The bounded scheduling deadline controls reuse the original LargeScaleScheduling
+03200 and 06400 hashes from [8824](https://lab.eignex.com/jobs/8824).
+Ordinary mixed seed 7 on `364582ebfe` in [8849](https://lab.eignex.com/jobs/8849)
+publishes UNKNOWN records at 30.7 and 38.5 seconds, without reproducing the kill.
+The exact 03200 [stage capture](https://lab.eignex.com/jobs/8850) instead reaches
+the 80-second kill: both post-deadline stacks remain in cumulative edge finding
+entered by LP rounding. Its failed child, source, streams and JFR remain retained.
+
+With cumulative scan polling at `56a957019b`,
+[8853](https://lab.eignex.com/jobs/8853) runs ordinary mixed P1 for 30 seconds over
+both sources and seeds 3/7/11 on Linux/amd64. All six hashes match, and all six
+publish exit-0 UNKNOWN records and physical resource receipts at 30.44–30.57
+seconds. The [matched stage capture](https://lab.eignex.com/jobs/8854) also exits
+0 with complete UNKNOWN output. No witness or proof is claimed, so these controls
+establish deadline handling without independent witness or proof validation.
+Instrumented profiles establish no throughput result; charged scheduling visits
+also change the units included in propagation-work totals.
+
 ### Portfolio slice policy
 
 Retain the finite schedule's base 5000, maximum 150000 and growth 1.5; alternatives

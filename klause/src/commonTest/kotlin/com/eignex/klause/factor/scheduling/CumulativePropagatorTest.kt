@@ -61,14 +61,15 @@ class CumulativePropagatorTest {
         state.currentLevel = 1
         check(state.tightenIntMax(0, 0))
         check(state.tightenIntMax(1, 0))
+        state.beginSeedFixpoint().forEach { }
         val token = object : Cancellation {
             override fun isCancelled(): Boolean = state.intDomains[2].min == 2L
             override fun workMeter(): WorkMeter = WorkMeter { }
         }
 
-        assertNull(state.runToFixpoint(allFactors = false, cancellation = token))
+        assertNull(state.advanceRootFixpoint(token))
 
-        assertTrue(state.runCancelled)
+        assertTrue(state.rootFixpointPending)
         assertEquals(2L, state.intDomains[2].min)
         state.undoTo(root)
         state.currentLevel = 1
