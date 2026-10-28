@@ -22,6 +22,7 @@ internal class HistoricalTableReason(private val state: PropagationState) {
         replacement = (state.factorAt(marker[1]) as TablePropagator).historicalAlternative(
             state, marker.copyOfRange(LAZY_PAYLOAD, marker.size), marker[2], preferred,
         )
-        return replacement != null
+        val alternate = replacement ?: return false
+        return state.lazyReasonMemo[marker]?.contentEquals(alternate) == false
     }
 }
