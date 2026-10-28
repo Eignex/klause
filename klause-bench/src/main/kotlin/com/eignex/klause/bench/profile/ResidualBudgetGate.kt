@@ -45,7 +45,12 @@ internal object ResidualBudgetGate {
             }
             coefficients[v] = BigInteger.ZERO
         }
-        if (coefficients.all { it.signum() == 0 }) return rhs.signum() >= 0
+        var maximum = BigInteger.ZERO
+        for (coefficient in coefficients) {
+            if (!allowance.visit()) return false
+            if (coefficient.signum() > 0) maximum += coefficient
+        }
+        if (maximum <= rhs) return true
         val pivot = weights.indices.firstOrNull { it !in fixed && weights[it] != 0L } ?: return false
         var numerator = coefficients[pivot]
         var denominator = BigInteger.valueOf(weights[pivot])

@@ -171,6 +171,7 @@ object ScopedComponentProfile {
             put("lower", composition.floor(result.children).toString())
             put("exact", composition.exact(result.children)?.toString())
             put("witnessObjective", witness?.let(residual::cost)?.toString())
+            put("witnessImprovesCutoff", witness != null && residual.cost(witness) < cutoff)
             put("nativeClauseCheck", witness != null)
             put("originalSourceWitnessChecked", sourceChecked)
             put("sourceInfeasible", result.children.any { it.sourceInfeasible })
@@ -196,8 +197,8 @@ object ScopedComponentProfile {
         millis: Long,
         seed: Long,
         sourceCheck: ((List<Boolean>, ComponentAllowance) -> Boolean)? = null,
+        allowance: ComponentAllowance = ComponentAllowance(Cancellation.after(millis.milliseconds)),
     ): JsonObject {
-        val allowance = ComponentAllowance(Cancellation.after(millis.milliseconds))
         val start = System.nanoTime()
         val separator = BooleanSeparators.choose(residual.clauses, residual.weights.size, residual.fixed,
             { allowance.visit() }, retain = allowance::retain)
@@ -268,7 +269,7 @@ object ScopedComponentProfile {
         }
     }
 
-    private class DecisionTrace(
+    internal class DecisionTrace(
         private val delegate: VariableSelector,
         private val biased: Int?,
         private val trace: MutableList<JsonObject>,

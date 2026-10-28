@@ -39,6 +39,14 @@ class ResidualBudgetGateTest {
     }
 
     @Test
+    fun `domain satisfied row should need no budget edge`() {
+        val row = PseudoBoolean(longArrayOf(1L, 2L), intArrayOf(0, 2), PbOp.LE, 3L)
+
+        assertTrue(ResidualBudgetGate.impliedByCutoff(row, listOf(1L, 1L), BigInteger.ZERO,
+            BigInteger.valueOf(3), emptyMap(), ComponentAllowance(Cancellation.Never)))
+    }
+
+    @Test
     fun `unnameable atom should prevent budget certification`() {
         val row = PseudoBoolean(longArrayOf(1L), intArrayOf(20), PbOp.LE, 5L)
 
