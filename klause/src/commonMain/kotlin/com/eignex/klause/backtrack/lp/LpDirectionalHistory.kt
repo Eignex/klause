@@ -32,12 +32,14 @@ internal class LpDirectionalHistory(
         if (pending?.depth != level) pending = null
     }
 
-    fun clear() {
+    val retainedEntries: Int get() = gains.size + parents.size
+
+    fun clear(report: Boolean = true) {
         gains.clear()
         parents.clear()
         pending = null
         objective = Double.NaN
-        observe("RESET")
+        if (report) observe("RESET")
     }
 
     fun record(value: Double) {
@@ -90,6 +92,11 @@ internal class LpDirectionalHistory(
         val distance = if (up) floor + 1.0 - parent.value else parent.value - floor
         if (distance <= DISTANCE_TOL || distance >= 1.0 - DISTANCE_TOL) return
         pending = Pending(parent, up, distance, level)
+    }
+
+    fun infeasible() {
+        if (pending != null) observe("INFEASIBLE")
+        pending = null
     }
 
     fun finishNode() {

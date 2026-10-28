@@ -435,6 +435,7 @@ internal fun LpEngine.sparseSafePrune(
                 )
                 if (ray != null) {
                     sink.lp.observeInfeasiblePrune()
+                    hints?.recordInfeasible()
                     val clause = if (learn) {
                         LpExplanation.infeasibilityClause(filter.relaxation, ray, session)
                     } else {
@@ -512,6 +513,7 @@ internal fun LpEngine.sparseSafePrune(
         }
         if (ray != null) {
             sink.lp.observeInfeasiblePrune()
+            hints?.recordInfeasible()
             // With learning, the Farkas ray becomes a bound-atom nogood for a 1UIP backjump;
             // null (auxiliary column / unbacked non-global row / constraint-only) prunes reason-less.
             val clause = if (learn) LpExplanation.infeasibilityClause(relaxation, ray, session) else null
@@ -526,7 +528,6 @@ internal fun LpEngine.sparseSafePrune(
     // advisory — it never changes feasibility or the optimum.
     hints?.record(relaxation, result.primal, result.duals)
     if (result.optimal && hints != null) {
-        noteNodeOverhead(relaxation.colVarId.size.toLong() + 1L)
         hints.recordObjective(relaxation, result.objective)
     }
     // The scoped owner carries appended-row bases itself; the hint is only for external fresh solves.
