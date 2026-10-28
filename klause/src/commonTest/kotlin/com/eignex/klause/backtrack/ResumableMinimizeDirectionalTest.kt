@@ -2,8 +2,11 @@ package com.eignex.klause.backtrack
 
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.InputOrder
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpPlan
@@ -25,11 +28,11 @@ class ResumableMinimizeDirectionalTest {
         val factors = ArrayList<Factor>()
         repeat(3) { block ->
             repeat(3) { edge ->
-                factors.add(Cardinality(intArrayOf(Lit.make(block * 3 + edge, true),
-                    Lit.make(block * 3 + (edge + 1) % 3, true)), min = 1, max = 2))
+                factors.add(Linear(longArrayOf(1L, 1L),
+                    intArrayOf(block * 3 + edge, block * 3 + (edge + 1) % 3), LinearOp.GE, 1L))
             }
         }
-        val problem = Problem(9, 0, emptyArray(), factors.toTypedArray()).bake()
+        val problem = Problem(0, 9, Array(9) { IntDomain(0, 1) }, factors.toTypedArray()).bake()
         val params = BacktrackParams(
             variableSelector = InputOrder,
             valueSelector = IndomainMin,
@@ -43,12 +46,13 @@ class ResumableMinimizeDirectionalTest {
             }) },
         )
 
-        val result = BacktrackSolver(problem).minimize(LinearObjective(boolWeights = LongArray(9) { 1L }), params)
+        val result = BacktrackSolver(problem).minimize(LinearObjective(intCoefficients = LongArray(9) { 1L }), params)
 
         val observations = result.stats.lp.phases.getValue("DIRECTIONAL_BRANCH_NODE").outcomes
-        assertTrue((observations["DOWN"] ?: 0L) >= 2L, observations.toString())
+        val diagnostic = "$observations; solves=${result.stats.lp.solves.sum}; prunes=${result.stats.lp.pruned.sum}"
+        assertTrue((observations["DOWN"] ?: 0L) >= 2L, diagnostic)
         assertTrue((observations["UP"] ?: 0L) >= 2L, observations.toString())
-        assertTrue((observations["CONSUMED"] ?: 0L) > 0L, observations.toString())
+        assertTrue((observations["CONSUMED"] ?: 0L) > 0L, diagnostic)
     }
 
     @Test
