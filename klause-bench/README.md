@@ -147,6 +147,27 @@ accepts the four wide-square/overflow SAT models; its two Boolean-assumption mod
 checks remain unknown with `unbound-id`. This bounded check establishes no
 existing-source benefit and makes no claim about the ten rejected executions.
 
+`nonlinear-integer-images-v1` retains three large fixed-power sources with sums
+seven, three and four; its [notes](smoke-corpus/nonlinear-integer-images-v1/README.md)
+give mathematical expectations and pinned hashes. Cloud
+[9013](https://lab.eignex.com/jobs/9013) compares tuple-only `e0cf591ef7` with images
+at `2700c386cb`, with residues enabled, eight candidates, 100,000 containing work
+units and two-second cases on Linux amd64. All twelve executions load their
+original source and enter NIA. Sum seven changes from UNKNOWN with 65,536 residue
+steps and 458 tuples to native UNSAT with 4,255 residue steps, zero tuples and
+4,256 total native work. Its process elapsed times are 1,008 and 802 ms; one
+observation per arm establishes capability, not process throughput.
+
+Sum three remains UNKNOWN in both arms. Sum four remains SAT after both checks
+reach the private ceiling; Dolmen cannot check its power syntax (`unbound-id`).
+Shared-product/sum and rational refutations retain their tuple counts, with 616
+and 834 extra image work units. The zero-divisor SAT control adds 616 work units;
+Dolmen accepts both original-source models. Build/runtime/platform identities,
+source hashes, process costs and checker resource receipts remain with the job.
+Native UNSAT has no exported certificate or independent reference replay. These
+synthetic controls and the unchanged admission shapes in the twelve-source audit
+establish no existing-corpus benefit or default activation case.
+
 `sets/<name>.txt` fixes membership as one `<suite>/<problem>` identity per line,
 matching `select`; `@<set>` includes another set and `#` starts a comment.
 Focused sets cover the structural themes reported by `select features=true`:
