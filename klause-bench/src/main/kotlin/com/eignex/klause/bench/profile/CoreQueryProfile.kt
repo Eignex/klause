@@ -12,6 +12,7 @@ import com.eignex.klause.formats.dimacs.toProblem
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
+import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
@@ -80,7 +81,9 @@ internal object CoreQueryProfile {
                     val model = ordinary?.problem as? BakedProblem ?: sourceBaked
                     val cost = ordinary?.objective ?: objective
                     val repeats = if (confirmation) 1..1 else 0..2
-                    for (repeat in repeats) for (policy in listOf("ordinary", "stratified", "root-fixed", "refined")) {
+                    for (repeat in repeats) for (policy in listOf(
+                        "ordinary", "stratified", "root-fixed", "refined", "projected",
+                    )) {
                         val rootCostStart = System.nanoTime()
                         val rootCostBytes = bean.getThreadAllocatedBytes(thread)
                         val root = deductions.get(model) as? PropagationResult.Implied
@@ -139,7 +142,11 @@ internal object CoreQueryProfile {
                         val started = System.nanoTime()
                         val before = bean.getThreadAllocatedBytes(thread)
                         val handle = constructor.newInstance(model, queryCost, params, policy == "stratified", null,
-                            2_000L, TimeSource.Monotonic, policy == "refined") as ResumableSearch
+                            2_000L, TimeSource.Monotonic, refinementMode(when (policy) {
+                                "refined" -> "DELETION"
+                                "projected" -> "REASONS"
+                                else -> "NONE"
+                            })) as ResumableSearch
                         search = handle
                         val result = handle.use { it.runSlice(stop, 2_000L, -1L) {} }
                         observe()
@@ -195,6 +202,7 @@ internal object CoreQueryProfile {
                             variableSelector = InputOrder, valueSelector = IndomainMin, nativeSat = true,
                             cancellation = Cancellation.after(2.seconds),
                             lpConfig = if (lp) LpConfig(LpEmphasis.DEFAULT) else null,
+                            lpPlan = LpPlan(bounding = lp),
                         ))
                         val elapsed = System.nanoTime() - started
                         val bytes = bean.getThreadAllocatedBytes(thread) - before
@@ -227,6 +235,10 @@ internal object CoreQueryProfile {
     }
 
     private fun ints(values: IntArray) = JsonArray(values.map(::JsonPrimitive))
+
+    internal fun refinementMode(name: String): Any = Class.forName(
+        "com.eignex.klause.meta.coreguided.CoreRefinementMode",
+    ).enumConstants.single { (it as Enum<*>).name == name }
 
     internal fun checkPoint(problem: BakedProblem, sample: Sample): Boolean {
         val session = PropagationSession(problem)

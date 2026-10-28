@@ -99,7 +99,7 @@ internal object CoreQueryLearningProfile {
                 val constructor = type.declaredConstructors.single { it.parameterCount == 8 }
                     .apply { isAccessible = true }
                 val handle = constructor.newInstance(model, cost, params, false, null, 2_000L,
-                    TimeSource.Monotonic, false) as ResumableSearch
+                    TimeSource.Monotonic, CoreQueryProfile.refinementMode("NONE")) as ResumableSearch
                 owner = handle
                 val captureResult = handle.use { it.runSlice(stop, 2_000L, -1L) {} }
                 val captureNs = System.nanoTime() - started

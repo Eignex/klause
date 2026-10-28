@@ -58,12 +58,15 @@ controls and establish no solver throughput or verdict claim.
 ## Klause-lab
 
 `bench.profile.CoreQueryProfile` compares retained and ordinarily prepared Boolean
-core controls with unrelated cheap objective pins. It takes no arguments. Two source
-shapes, four OLL policies and three repeats give 48 two-second cases within a
-180-second lab profile, alongside 24 matched ordinary BnB controls with LP
-off/default. It retains source/objective hashes, actual query/core
+core controls with unrelated cheap objective pins. Two source shapes, five OLL
+policies and three repeats give 60 two-second core cases, alongside 24 matched
+native-SAT BnB controls with LP off/forced bounding. Allow 300 seconds for the full
+profile. `confirm=true` selects one equal-weight retained source and one repeat:
+five core policies, two BnB cases and two helper calls, each capped at two seconds.
+It retains source/objective hashes, actual query/core
 sequences, source point checks, preparation and complete-handle time/allocation,
-work and thresholds. Policies include removing root-satisfied cost pins. The
+work and thresholds. Policies include removing root-satisfied cost pins, bounded
+propagation deletion (`refined`) and seed reason projection (`projected`). The
 opt-in propagation-deletion control shares the worker's
 allowance. Separate helper calls retain the existing opt-in deletion minimizer's
 actual seed-path behavior. These native controls establish no independently checked
@@ -79,6 +82,9 @@ candidate checks, query construction/search time and allocation, source-point
 checks and visits to `q=false`. A conditioned `q or a` negative rejects exporting
 `q` from `a=false`. This is a bounded replay experiment, not a mutable query owner
 or ordinary slice-retention measurement.
+`confirm=true` selects one repeat of each preparation policy, including checked
+source outcomes and actual `q=false` assertion attempts. It is an observation
+confirmation rather than a timing repeat.
 
 [Klause-lab](https://github.com/Eignex/klause-lab) owns everything that runs more than
 one case: experiments and A/B comparisons, regression schedules, reference solving and

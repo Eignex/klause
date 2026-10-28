@@ -69,12 +69,40 @@ class CoreRefinementTest {
             Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
         )).bake()
         val search = CoreGuidedSearch(problem, LinearObjective(longArrayOf(1, 100, 100)),
-            BacktrackParams(), refineCores = true)
+            BacktrackParams(), coreRefinement = CoreRefinementMode.REASONS)
 
         val result = search.use { it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {} }
 
         assertEquals(100.0, assertIs<MinimizeResult.Optimal>(result).objective)
         assertEquals(2, search.stats.coreGuided.largestCore)
         assertEquals(1L, search.stats.coreGuided.cores)
+    }
+
+    @Test
+    fun `tree refutations retain their certified core`() {
+        val problem = Problem(5, 0, emptyArray(), Array(4) { signs ->
+            Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true),
+                Lit.make(3, signs and 1 == 0), Lit.make(4, signs and 2 == 0)))
+        }).bake()
+        val search = CoreGuidedSearch(problem, LinearObjective(longArrayOf(1, 100, 100)),
+            BacktrackParams(), coreRefinement = CoreRefinementMode.REASONS)
+
+        search.use { it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {} }
+
+        assertEquals(3, search.stats.coreGuided.largestCore)
+    }
+
+    @Test
+    fun `caller pins remain attached to projected cores`() {
+        val problem = Problem(3, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
+        )).bake()
+        val search = CoreGuidedSearch(problem, LinearObjective(longArrayOf(0, 1, 1)),
+            BacktrackParams(assumptions = Assumptions(bools = mapOf(0 to false))),
+            coreRefinement = CoreRefinementMode.REASONS)
+
+        val result = search.use { it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {} }
+
+        assertEquals(1.0, assertIs<MinimizeResult.Optimal>(result).objective)
     }
 }
