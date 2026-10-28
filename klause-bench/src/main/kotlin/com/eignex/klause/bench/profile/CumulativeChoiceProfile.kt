@@ -4,6 +4,7 @@ import com.eignex.klause.bench.catalog.Catalog
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
+import com.eignex.klause.bench.runner.MiniZincCompatibility
 import com.eignex.klause.bench.runner.MiniZincRunner
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
@@ -43,6 +44,7 @@ internal object CumulativeChoiceProfile {
             val model = CorpusFetcher.resolve(ref.source).readBytes()
             out.resolve("source.mzn").writeBytes(model)
             ref.data?.let { out.resolve("source.dzn").writeBytes(CorpusFetcher.resolve(it).readBytes()) }
+            Reports.writeJson(out.resolve("compiler.json").path, MiniZincCompatibility.compiler)
             MiniZincRunner().compileFzn(ref).readText()
         }
         out.resolve("source.fzn").writeText(text)
@@ -82,6 +84,7 @@ internal object CumulativeChoiceProfile {
                 put("arch", System.getProperty("os.arch"))
                 put("preparationWork", budget.spent())
                 put("preparationWorkAllowance", budget.allowance)
+                put("preparationBudgetExhausted", budget.spent() >= budget.allowance)
                 put("objectiveSupplied", parsed.linearObjective() != null)
                 put("elapsedNs", System.nanoTime() - started)
                 put("threadAllocatedBytes", bean.getThreadAllocatedBytes(thread) - before)

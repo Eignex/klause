@@ -4108,7 +4108,7 @@ establish deadline handling without independent witness or proof validation.
 Instrumented profiles establish no throughput result; charged scheduling visits
 also change the units included in propagation-work totals.
 
-### Cumulative demand-window qualification
+### Cumulative demand-window admission
 
 `bench.profile.CumulativeChoiceProfile` captures ordinary propagation and
 off/default/aggressive finite preparation, with a 500-million-work allowance and
@@ -4116,26 +4116,48 @@ off/default/aggressive finite preparation, with a 500-million-work allowance and
 choice control; `suite=ID problem=NAME` compiles an original MiniZinc identity and
 preserves its model, data and FlatZinc bytes. The original objective participates
 in preparation. Reports retain complete native equality rows, demand domains,
-runtime/build identities and current-thread allocation. The compiler must be on
-the worker's `PATH`; these instrumented captures establish no throughput result
-or independently checked source verdict.
+compiler/runtime/build identities, work-budget exhaustion and current-thread
+allocation. The compiler must be on the worker's `PATH`; these instrumented
+captures establish no throughput result or independently checked source verdict.
 
 On matching control bytes, [baseline 8881](https://lab.eignex.com/jobs/8881)
 retains `q=0..1` and `machine=1..3`, while
 [candidate 8889](https://lab.eignex.com/jobs/8889), at `b9854a4548`, fixes `q=0`
 and removes interior `machine=2`. A baseline failed-choice probe also refutes
 that value, and default/aggressive preparation fixes the demand in both arms.
-The control therefore establishes consumed inference before those preparation
-controls, without a post-preparation search gain or default-admission conclusion.
-The first inspector omitted equality rows containing constant columns; its raw
-demand/machine observations remain separate from that incomplete row count.
+The corrected [control 8922](https://lab.eignex.com/jobs/8922) retains both native
+equality rows, including the machine constant column. The control establishes
+consumed inference before preparation, without a prepared-source benefit.
 
-The original TestScheduling-20 [capture 8882](https://lab.eignex.com/jobs/8882)
-and all four [pilot 8888](https://lab.eignex.com/jobs/8888) cases decline before
-solving because their auto workers lack MiniZinc. The pilot pairs baseline and
-candidate under default and aggressive preparation/LP, P1, seed 3 and ten seconds.
-Those load declines supply no source verdict, witness, cost comparison or
-original-source applicability result.
+Original TestScheduling-20 captures [8931](https://lab.eignex.com/jobs/8931) and
+[8908](https://lab.eignex.com/jobs/8908), at `a0f1daf9d7` and `1354c5aca0`, retain
+ten constant-duration, 20-task machine cumulatives and their channels. Their
+captured demand/channel domains match across all four stages. Both aggressive
+stages reach the 500-million-work allowance. Source model/data hashes match;
+FlatZinc differs only in generated path comments, with comment-free payload hash
+`7a5f6ba081138be4702d0d79fa4a7255ce9cd64524197f4a03d5bfb1ded5d9ef`.
+
+[Pilot 8936](https://lab.eignex.com/jobs/8936) compares main `56a06e3194` with
+candidate `6214c20e57` on that original identity, P1/seed 3, serial ten-second CP
+cases. Each pins one `lp-default` or `lp-aggressive` arm with matching preparation
+and LP ceilings. Linux/amd64 JDK 25.0.4.1 has a hard one-CPU, 4,608 MiB cgroup.
+Each pair below is baseline → candidate; all reported objectives remain unproven.
+
+| Controls | Reported objective | Nodes | CP propagation work | Peak CLI RSS (KiB) |
+|---|---:|---:|---:|---:|
+| Default | 1295 → 6581 | 524 → 292 | 18,952,922 → 56,358,713 | 239,680 → 221,008 |
+| Aggressive | 6581 → 6581 | 104 → 103 | 79,799 → 890,484 | 256,244 → 271,796 |
+
+Whole-CLI wall time is 10.40–10.48 seconds; LP runs in all four cases. The lab
+records legacy `lab-minizinc-gecode-v1` checks as valid after completing the model
+with reported output variables fixed. These receipts do not establish an
+assignment-only checker or an optimality proof. The single-identity/seed pilot
+supports rejecting this candidate's default admission, without a universal
+performance claim. The runtime subwindow prototype is withdrawn; ordinary
+cumulative propagation remains the control, and no heldout campaign follows.
+Earlier [8882](https://lab.eignex.com/jobs/8882)/[8888](https://lab.eignex.com/jobs/8888)
+compiler declines and [8932](https://lab.eignex.com/jobs/8932)'s invalid fixed-engine
+LP configuration establish no search or cost result.
 
 ### Source task-order applicability
 

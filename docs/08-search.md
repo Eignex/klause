@@ -442,18 +442,6 @@ Cumulative edge-finding runs in both time directions over fixed durations, deman
 and capacity, declining the reversed pass when its arithmetic is not safely
 representable.
 
-Cumulative factors with constant durations, ranged demands and at most 32 task
-positions also scan windows between earliest starts and latest completions. The
-minimum energy of definitely present tasks contained in a window leaves an upper
-bound on each contained task's demand. Demand channels consume these bounds through
-ordinary propagation. Unknown presences and zero durations contribute no energy;
-unrepresentable completion times, window areas or energy sums decline the scan.
-Reasons reconstruct only participating start bounds, demand minima and presences
-at the deduction's trail position, together with the capacity ceiling. The scan
-polls finite propagation work and retains no state across interruption or undo.
-The running-prefix energy check also declines unrepresentable completion times,
-window areas and energy sums.
-
 Unary resources also check overload over minimum durations while a duration is
 unfixed or a presence unknown. Present tasks whose minima cannot fit between their
 earliest start and latest completion conflict, and an unknown task whose minimum
