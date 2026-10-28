@@ -7818,3 +7818,37 @@ native level at application. Store events assign a trace-local stable id; consum
 events carry that id, current factor, coordinate, bound/value and native level.
 Remap events retire or move the same id. Truncation stops all subsequent capture;
 missing events after it cannot be interpreted as a decline or lack of reuse.
+
+[Prepared replay 8900](https://lab.eignex.com/jobs/8900) completes all 48
+invocations at `8f0f7b8d330bf6e8d3c545937c855ed8e9e1cb3b`. The returned OPB
+`cc9d2968347e` and FlatZinc `30eaca5a4886` hashes match the statically selected
+bytes. All 48 original-point checks pass, including sixteen reconstructed production
+witnesses; there is no independent witness or exported-proof check. No invocation
+is cancelled and no retained script trace is truncated. Automatic placement chose
+Mac/aarch64, JDK `25.0.4.1+1-LTS`; the one-core/4608 MiB resource receipt is advisory,
+not a hard cgroup limit. Original bytes, complete hashes, runtime/distribution
+fingerprints, commands, JFR and receipts remain outside Git in the campaign above.
+
+| Source | Retained conflict replay | Normal prepared source |
+|---|---|---|
+| Boolean PB | One PB owns the asserting pin; native work rises from 44 to 78. | Structural normalization, dual fixing and symmetry add `b0=false`, `b1=true`, `b4=true`. The trigger is removed. Ordinary LP-enabled solving takes two decisions, 45 finite work and three LP solves in both arms, with no learned constraint. |
+| Integer rows | One row owns assertion and the later `z<=11` deduction `x<=2`, versus clause control `x<=5`; native work rises from 207 to 261. Both stores have four entries, of different kinds. | Singleton-column, dual-fix and strengthening preparation removes both rows and fixes `x=0`. Both ordinary arms finish with zero decisions, six finite work and no LP solve or learned constraint. |
+
+The two warmed retained PB clause intervals are 0.793–0.817 ms and 133504
+current-thread allocated bytes; PB intervals are 0.890–1.126 ms and 151704–215392
+bytes. Integer clauses take 1.348–1.654 ms and 164184–166336 bytes, versus
+1.405–1.732 ms and 196160 bytes for rows. These disjoint complete in-process
+intervals include capture and source-point checking. Two instrumented observations
+per arm supply no uninstrumented throughput or physical-memory conclusion; JVM
+startup and future GC are outside the intervals. The normal changed trajectories
+are separate controls, not same-conflict timing pairs.
+Preparation has no separate deterministic work meter here; its time and allocation
+are included in the invocation totals.
+
+This gate rejects practical/default promotion on these two SAT source controls:
+normal preparation removes the retained opportunities, and the direct controls
+supply no total-cost advantage. It does not reject arithmetic learning universally,
+undo the delivered opt-in capability, change pure-Boolean PB admission, or determine
+the separate guarded, Element, hole or recursive-row hypotheses. No broader source
+campaign is required by this negative. Failed lint checks and the seed-hook compile
+correction are retained with their CI logs; they executed no accepted new replay.
