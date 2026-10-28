@@ -102,10 +102,14 @@ internal object ConditionalSymmetryProfile {
                                         return delegate.pick(session, rng)
                                     }
                                 }
-                                val params: BacktrackParams = base.copy(variableSelector = selector,
-                                    lpConfig = if (arm in listOf("ordinary", "lp-bound")) LpConfig.AUTO else LpConfig.OFF,
+                                val lp = if (arm == "ordinary" || arm == "lp-bound") LpConfig.AUTO else LpConfig.OFF
+                                val params: BacktrackParams = base.copy(
+                                    variableSelector = selector,
+                                    lpConfig = lp,
                                     lpPlan = LpPlan(bounding = arm == "lp-bound"),
-                                    pbObjectiveCutoff = arm == "pb-cutoff", objectiveGuidedValues = arm == "prefix-first")
+                                    pbObjectiveCutoff = arm == "pb-cutoff",
+                                    objectiveGuidedValues = arm == "prefix-first",
+                                )
                                 val solveStart = System.nanoTime()
                                 val result = BacktrackSolver(model).minimize(requireNotNull(prepared.objective), params)
                                 val solveNs = System.nanoTime() - solveStart
@@ -122,7 +126,9 @@ internal object ConditionalSymmetryProfile {
                                     put("lpWork", result.stats.lp.workOps.sum)
                                     result.assignment?.let(prepared.reconstruct)?.let { sample ->
                                         put("sourceObjective", objective.evaluateExact(sample).toString())
-                                        put("sourceBooleans", (0..3).joinToString("") { if (sample.bools[it]) "1" else "0" })
+                                        put("sourceBooleans", (0..3).joinToString("") {
+                                            if (sample.boolValue(it)) "1" else "0"
+                                        })
                                     }
                                     put("branchStates", JsonArray(trace))
                                 })
@@ -133,7 +139,9 @@ internal object ConditionalSymmetryProfile {
                     put("conditionalPruningInstalled", false)
                     put("completeResidualCertificate", false)
                 }
-                val name = "${if (openingPins) "opening" else "retained"}-${if (mode == "default") "protected" else "objective"}"
+                val scope = if (openingPins) "opening" else "retained"
+                val admission = if (mode == "default") "protected" else "objective"
+                val name = "$scope-$admission"
                 out.resolve("$name.json").writeText(report.toString())
                 println("$name: ${model.factors.size} factors, stopped=${stop()}")
             }
@@ -151,7 +159,11 @@ internal object ConditionalSymmetryProfile {
     private fun snapshot(session: PropagationSession): JsonObject = buildJsonObject {
         put("level", session.decisionLevel)
         put("booleans", (0 until session.problem.numBoolVars).joinToString("") {
-            when (session.boolValue(it)) { true -> "1"; false -> "0"; null -> "?" }
+            when (session.boolValue(it)) {
+                true -> "1"
+                false -> "0"
+                null -> "?"
+            }
         })
         put("factors", factors(session.problem))
     }
