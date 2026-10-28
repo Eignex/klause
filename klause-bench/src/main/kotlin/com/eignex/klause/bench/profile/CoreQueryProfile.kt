@@ -10,6 +10,8 @@ import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.formats.dimacs.Dimacs
 import com.eignex.klause.formats.dimacs.toProblem
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
@@ -174,6 +176,38 @@ internal object CoreQueryProfile {
                         out.resolve("helper-$unrelated-$prepared-$minimize.txt").writeText(
                             "elapsedNs=${System.nanoTime() - started}\n$result\n",
                         )
+                    }
+                    for (repeat in 0..2) for (lp in listOf(false, true)) {
+                        val started = System.nanoTime()
+                        val before = bean.getThreadAllocatedBytes(thread)
+                        val result = BacktrackSolver(model).minimize(cost, BacktrackParams(
+                            variableSelector = InputOrder, valueSelector = IndomainMin, nativeSat = false,
+                            cancellation = Cancellation.after(2.seconds),
+                            lpConfig = if (lp) LpConfig(LpEmphasis.DEFAULT) else null,
+                        ))
+                        val elapsed = System.nanoTime() - started
+                        val bytes = bean.getThreadAllocatedBytes(thread) - before
+                        val point = (result as? MinimizeResult.WithSample)?.sample?.let {
+                            ordinary?.reconstruct?.invoke(it) ?: it
+                        }
+                        val accepted = point?.let { checkPoint(sourceBaked, it) }
+                        if (point != null) check(accepted == true)
+                        out.resolve("ordinary.jsonl").appendText(buildJsonObject {
+                            put("sourceSha256", identity)
+                            put("unrelated", unrelated)
+                            put("prepared", prepared)
+                            put("repeat", repeat)
+                            put("warmup", repeat == 0)
+                            put("lp", lp)
+                            put("elapsedNsIncludingDisposal", elapsed)
+                            put("threadBytesIncludingDisposal", bytes)
+                            put("nativeResult", result.javaClass.simpleName)
+                            put("sourceAccepted", accepted)
+                            put("sourceObjective", point?.let { objective.evaluateLong(it) })
+                            put("nodes", result.stats.search.nodes.sum)
+                            put("propagation", result.stats.search.propagationWork.sum)
+                            put("independentProofCheck", false)
+                        }.toString() + "\n")
                     }
                 }
             }
