@@ -9235,7 +9235,9 @@ These captures use Linux/amd64, JDK 25.0.4.1, one vCPU and a 4,608 MiB cgroup.
 Recorded transition prefixes and final witnesses pass native original-FlatZinc
 checks. Only the reused starting vectors have independent MiniZinc/Gecode checks;
 new walks have no independent witness or proof certificate. Timings and allocation
-include capture, checks and disposal and establish no intrinsic throughput claim.
+include instrumented capture, checks and handle close; GC and disposal are not
+isolated. Full-job receipts retain setup and execution cost. These measurements
+establish no intrinsic throughput claim.
 Earlier frame/center failures and repair-disabled captures remain non-results,
 not evidence of penalty benefit. Sources, runtime/compiler/resource receipts and
 all negative observations remain outside Git in
