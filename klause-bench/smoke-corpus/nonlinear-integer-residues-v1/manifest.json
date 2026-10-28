@@ -1,0 +1,56 @@
+{
+  "license": "Apache-2.0",
+  "attribution": "Self-authored Eignex Klause fixtures",
+  "cases": [
+    {
+      "name": "guarded-sat",
+      "sha256": "4f21e4e978514e5867b80d5519092d7ef6ac271b148f73b1877dac072ee8e242",
+      "expected": "SAT"
+    },
+    {
+      "name": "rational-unsat",
+      "sha256": "c2b8d47b45c59709b1e403b2dd7b787f0a64cb55b6b2af232a9de45072639f62",
+      "expected": "UNSAT"
+    },
+    {
+      "name": "real-sat",
+      "sha256": "289bc9e8841b787445d1e9b6dd42bcb28952a521d569579fe775d151802c18f5",
+      "expected": "SAT"
+    },
+    {
+      "name": "shared-unsat",
+      "sha256": "6074581fc1091f85a7dc2595c862b6317e54d7e3387da7b59b19058d2b5e077e",
+      "expected": "UNSAT"
+    },
+    {
+      "name": "squares-sat",
+      "sha256": "3b3be055dc0f31dfcc2fc3be998ffb59ef408b3d4116d72e241f407ac00b4cc9",
+      "expected": "SAT"
+    },
+    {
+      "name": "squares-unsat",
+      "sha256": "7ed539fd1788ea307910cfe7b8d3075a879e029e9e4de415255c81fc364af411",
+      "expected": "UNSAT"
+    },
+    {
+      "name": "support-inconclusive",
+      "sha256": "1f9b896ac868f5900bdf25923d79ad6a1adb04d49d762f10c4a48093f1c9941d",
+      "expected": "UNSAT"
+    },
+    {
+      "name": "unbounded-unsat",
+      "sha256": "0175c299cb7e4e25e2c90a65a28e37a0863d07fb85b7d7b100ee15028afa7f41",
+      "expected": "UNSAT"
+    },
+    {
+      "name": "wide-unsat",
+      "sha256": "6645cc4b2141eb7aa5fd7cef0bcc6377e849555f707e748277887eb4b3dd14ba",
+      "expected": "UNSAT"
+    },
+    {
+      "name": "zero-divisors-sat",
+      "sha256": "aaa82b4b26e629b189737496608e94d40b5d3eb4350529f2b8dc8e948bf20a0d",
+      "expected": "SAT"
+    }
+  ]
+}

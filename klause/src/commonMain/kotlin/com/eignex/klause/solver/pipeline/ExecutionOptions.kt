@@ -187,6 +187,9 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** Admit complete integer root sets of mandatory unary polynomial equalities. */
         val niaIntegerRoots: ExecutionOption<Boolean> = ExecutionOption("nia-integer-roots", ValueKind.BOOLEAN)
 
+        /** Refute mandatory integer equality subsystems by bounded residue enumeration. */
+        val niaResidues: ExecutionOption<Boolean> = ExecutionOption("nia-residues", ValueKind.BOOLEAN)
+
         /** Native heuristic proposal cap. */
         val maxFlips: ExecutionOption<Long> = ExecutionOption("max-flips", ValueKind.LONG)
 
@@ -418,7 +421,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 sourcePointCuts, sourceAggregateCuts, sourceRefutationReuse, sourceRefutationPropagation,
                 sourceRefutationResolution,
                 nraWorkLimit, nraDenseCoefficients, nraMatrixCells, niaCandidates, niaMoves,
-                niaCellRefinement, niaCellReuse, niaCellSteering, niaIntegerRoots,
+                niaCellRefinement, niaCellReuse, niaCellSteering, niaIntegerRoots, niaResidues,
                 maxFlips, maxInstructions, alnsIterations, sharedRestart, openBranching,
                 openHintFlips, openHintMinSplits,
                 maxDecisions, luby, adaptiveRestart, emaRestart, modeSwitchingRestart,

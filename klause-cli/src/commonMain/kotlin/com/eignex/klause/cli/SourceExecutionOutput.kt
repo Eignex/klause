@@ -250,4 +250,13 @@ internal fun reportNativeSatisfaction(
             "niaRootCompletionChecks" to roots.completionChecks.toString(),
         ))
     }
+    execution.integerResidues?.let { residues ->
+        output.onAllowanceStatistics(listOf(
+            "niaResidueRings" to residues.completedRings.toString(),
+            "niaResidueTuples" to residues.tuples.toString(),
+            "niaResidueWork" to residues.workSpent.toString(),
+            "niaResidueRefutedScopes" to residues.refutedScopes.toString(),
+            "niaResidueDeclines" to residues.declinedChecks.toString(),
+        ))
+    }
 }

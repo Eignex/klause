@@ -1,0 +1,10 @@
+smtlib-nonlinear-integer-residues-v1/squares-unsat
+smtlib-nonlinear-integer-residues-v1/unbounded-unsat
+smtlib-nonlinear-integer-residues-v1/shared-unsat
+smtlib-nonlinear-integer-residues-v1/rational-unsat
+smtlib-nonlinear-integer-residues-v1/wide-unsat
+smtlib-nonlinear-integer-residues-v1/squares-sat
+smtlib-nonlinear-integer-residues-v1/zero-divisors-sat
+smtlib-nonlinear-integer-residues-v1/guarded-sat
+smtlib-nonlinear-integer-residues-v1/support-inconclusive
+smtlib-nonlinear-integer-residues-v1/real-sat

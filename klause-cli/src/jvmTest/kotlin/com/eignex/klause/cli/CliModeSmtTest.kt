@@ -14,6 +14,23 @@ import kotlin.test.assertTrue
 
 class CliModeSmtTest {
     @Test
+    fun `SMT residue refutation should report consumed source authority`() {
+        val source = File.createTempFile("nia-residues", ".smt2").apply {
+            writeText("(declare-const x Int) (declare-const y Int) " +
+                "(assert (= (+ (* x x) (* y y)) 3)) (check-sat)")
+            deleteOnExit()
+        }
+
+        val output = capture {
+            assertEquals(0, runCli(arrayOf("-e", "cp", "-s", "--param", "nia-residues=true", source.absolutePath)))
+        }
+
+        assertTrue("unsat" in output.lines(), output)
+        assertTrue("; niaResidueRefutedScopes=1" in output.lines(), output)
+        assertTrue(output.lines().any { it.matches(Regex("; niaResidueWork=[1-9][0-9]*")) }, output)
+    }
+
+    @Test
     fun `SMT integer cell reuse should report avoided completions without an unsat claim`() {
         val source = File.createTempFile("nia-cells", ".smt2").apply {
             writeText("(declare-const n Int) (declare-const q Int) (assert (= (* n n) 2)) (check-sat)")

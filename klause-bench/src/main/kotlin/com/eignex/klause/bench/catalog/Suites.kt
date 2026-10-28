@@ -31,7 +31,7 @@ internal object Suites {
             smtlibCore, xcsp3Core, mpsCore, mznSmoke, satCrafted, lpComponentSplit, productAliases,
         ) + QfNraSuites.all + QfNraCanonicalSuite.suite + QfNraPartialConflictSuite.suite +
             QfNraCoupledSuite.suite + QfNraPreparedSupportSuite.suite +
-            NonlinearIntegerSuite.suite + NonlinearIntegerCellSuite.suite + DivModSuite.suite + AbsSuite.suite +
+            NonlinearIntegerSuite.suite + NonlinearIntegerCellSuite.suite + NonlinearIntegerResidueSuite.suite + DivModSuite.suite + AbsSuite.suite +
             ContinuousArithmeticSuite.suite + MpsLinearSourceSuite.suite +
             SourceOwnershipSuite.suite + ExactGlobalsSuite.suite + SourceEqualitySuite.suite
     }

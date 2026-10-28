@@ -1,0 +1,7 @@
+(set-logic ALL)
+(declare-const x Int)
+(declare-const y Int)
+(declare-const z Int)
+(declare-const r Real)
+(assert (= (+ (* x x) (* r r)) 3))
+(check-sat)
