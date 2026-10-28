@@ -114,6 +114,7 @@ class ArithmeticLearningTraceTest {
             assertEquals(2L, native.intDomain(0).max)
             work.add(native.explanationState.work)
             if (capture) {
+                assertTrue(trace.events.any { it.kind == "analysis.seed-endpoint" })
                 assertTrue(trace.events.any { it.kind == "integer.pivot-row" })
                 assertTrue(trace.events.any { it.kind == "integer.fallback" })
                 assertTrue(trace.events.any { it.kind == "analysis.mapped-target" })
