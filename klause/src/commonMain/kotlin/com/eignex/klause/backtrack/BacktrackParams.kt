@@ -415,7 +415,8 @@ data class BacktrackParams(
     }
 
     override fun withAssumptions(assumptions: Assumptions): BacktrackParams =
-        if (assumptions.isEmpty) this else copy(assumptions = merge(this.assumptions, assumptions))
+        if (assumptions.isEmpty && assumptions.deductions.isEmpty) this
+        else copy(assumptions = merge(this.assumptions, assumptions))
 
     override fun withCancellation(cancellation: Cancellation): BacktrackParams =
         copy(cancellation = this.cancellation.forInvocation(cancellation))

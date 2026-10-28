@@ -137,14 +137,14 @@ internal class TotalizerOptimizer(val baseProblem: BakedProblem) {
     /**
      * Weighted MaxSAT via a pseudo-Boolean threshold chain. Each threshold value `k` gets
      * a [ReifiedPseudoBoolean] reifying `aux_k ↔ (Σ wᵢ·rᵢ ≥ k)`; the loop assumes
-     * `aux_{lb+1} = false` (cost ≤ lb) and bumps `lb` by the core's min weight each unsat.
-     * Termination: SAT under the current threshold-bit assumption.
+     * `aux_{k} = false` (cost < k). Binary search over the bounded integer cost range
+     * raises the lower bound after a refutation and lowers the upper bound after a witness.
      *
-     * **Lazy thresholds.** Only the `aux_{lb+1}` the loop actually assumes are
-     * materialised — one per round as `lb` rises, so `O(#cores)` reifications rather
+     * **Lazy thresholds.** Only the threshold bits the loop actually assumes are
+     * materialised — one per round, so logarithmically many reifications rather
      * than the `O(totalWeight)` up-front bake the chain would otherwise need. The solver is
-     * rebuilt when a fresh threshold is added (lb advances monotonically, so each round
-     * needs at most one new reification); the rebuild cost mirrors the per-core rebuild in
+     * rebuilt when a fresh threshold is added; each round needs at most one new
+     * reification. The rebuild cost mirrors the per-core rebuild in
      * [CoreGuidedOptimizer] and is far cheaper than baking thousands of unused PB factors.
      */
     fun minimizeWeighted(
@@ -161,6 +161,9 @@ internal class TotalizerOptimizer(val baseProblem: BakedProblem) {
             )
         }
         val n = softs.size
+        require(softs.all { it.weight <= Int.MAX_VALUE }) {
+            "minimizeWeighted: a weight exceeds Int.MAX_VALUE — use CoreGuidedOptimizer for very large weights"
+        }
         val totalWeight = softs.sumOf { it.weight }
         require(totalWeight <= Int.MAX_VALUE) {
             "minimizeWeighted: sum of weights exceeds Int.MAX_VALUE — use CoreGuidedOptimizer for very large weights"
@@ -174,25 +177,20 @@ internal class TotalizerOptimizer(val baseProblem: BakedProblem) {
 
         val selectorLits = IntArray(n) { Lit.make(selectors[it], positive = true) }
         val weightsInt = IntArray(n) { softs[it].weight.toInt() }
-        val selectorToSoft = MutableIntIntMap(n).apply {
-            for (i in 0 until n) put(selectors[i], i)
-        }
         val costSofts = softs.map { Oll.Soft(it.lit, it.weight) }
 
-        // Materialised threshold reifications keyed by k (= "Σ wᵢrᵢ ≥ k"); `solver` is
-        // rebuilt (set null) whenever a new one is appended.
+        // Materialised thresholds share their selector vocabulary across bounded-cost queries.
         val thresholdVarForK = MutableIntIntMap()
         val thresholdFactors = ArrayList<Factor>()
         var solver: BacktrackSolver? = null
 
-        // Selectors still assumed false; a core's softs drop out and relax through the threshold bump.
-        val activeSofts = BooleanArray(n) { true }
-
         var lb = 0L
-        while (lb <= totalWeight) {
-            val thresholdVar: Int? = if (lb < totalWeight) {
-                // Need aux for k = lb+1 ("sum ≥ lb+1"); assuming it false bounds cost ≤ lb.
-                val k = (lb + 1).toInt()
+        var upper = totalWeight
+        var best: Sample? = null
+        while (lb <= upper) {
+            val bound = lb + (upper - lb) / 2L
+            val thresholdVar: Int? = if (bound < totalWeight) {
+                val k = (bound + 1).toInt()
                 val existing = thresholdVarForK.getOrDefault(k, -1)
                 if (existing >= 0) {
                     existing
@@ -230,40 +228,22 @@ internal class TotalizerOptimizer(val baseProblem: BakedProblem) {
                     ).bake(),
                 ).also { solver = it }
             }
-            val assumptions = buildWeightedAssumptions(selectors, activeSofts, thresholdVar)
+            val assumptions = thresholdVar?.let { Assumptions(bools = mapOf(it to false)) } ?: Assumptions.None
             when (val r = activeSolver.satisfyUnderAssumptions(assumptions, params)) {
-                is SatisfyResult.Sat ->
-                    return Result.Optimal(Oll.recoverOptimalSample(baseProblem, costSofts, r.sample, lb, params), lb)
+                is SatisfyResult.Sat -> {
+                    best = r.sample
+                    upper = Oll.softCost(r.sample, costSofts) - 1L
+                }
 
                 is SatisfyResult.GloballyUnsat -> return Result.Infeasible()
 
                 is SatisfyResult.Unknown -> return Result.Unknown(r.reason, lb)
 
                 is SatisfyResult.UnsatUnderAssumptions -> {
-                    val coreSofts = Oll.projectCoreToSofts(r.core, selectorToSoft)
-                    if (coreSofts.isEmpty()) {
-                        // A core over the threshold bit alone gives no wMin; +1 is the smallest sound advance.
-                        lb += 1
-                    } else {
-                        // Advance by the core's minimum weight and stop assuming its softs' `r_i = false`.
-                        val wMin = coreSofts.minOf { softs[it].weight }
-                        lb += wMin
-                        for (idx in coreSofts) activeSofts[idx] = false
-                    }
+                    lb = bound + 1L
                 }
             }
         }
-        return Result.Infeasible()
-    }
-
-    private fun buildWeightedAssumptions(
-        selectors: IntArray,
-        activeSofts: BooleanArray,
-        thresholdVar: Int?,
-    ): Assumptions {
-        val bools = HashMap<Int, Boolean>()
-        for (i in selectors.indices) if (activeSofts[i]) bools[selectors[i]] = false
-        if (thresholdVar != null) bools[thresholdVar] = false
-        return Assumptions(bools = bools)
+        return best?.let { Result.Optimal(it, lb) } ?: Result.Infeasible()
     }
 }

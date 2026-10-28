@@ -33,6 +33,34 @@ import kotlin.test.assertTrue
 class SessionTest {
 
     @Test
+    fun `parameter scopes should retain bounds and holes without exact pins`() {
+        val scopes = listOf(
+            Assumptions.None.withTightenedMin(0, 1L),
+            Assumptions.None.withTightenedMax(0, 1L),
+            Assumptions.None.withIntHole(0, 1L),
+        )
+        val params = listOf<SolverParams>(BacktrackParams(), LocalSearchParams())
+
+        for (scope in scopes) {
+            for (parameter in params) {
+                assertEquals(scope, parameter.withAssumptions(scope).assumptions)
+            }
+        }
+    }
+
+    @Test
+    fun `pushed bounds without exact pins should constrain enumeration`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyArray())
+        BacktrackSolver(problem.bake()).session().use { session ->
+            session.push(Assumptions.None.withTightenedMin(0, 1L))
+
+            val values = session.enumerate(BacktrackParams()).map { it.ints.single() }.toSet()
+
+            assertEquals(setOf(1L, 2L), values)
+        }
+    }
+
+    @Test
     fun `push should pin a variable and pop should revert it`() {
         val problem = exactlyOneOver(3)
         val session = BacktrackSolver(problem.bake()).session()

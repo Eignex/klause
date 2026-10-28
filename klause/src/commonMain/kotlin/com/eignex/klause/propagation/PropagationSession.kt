@@ -5,7 +5,6 @@ import com.eignex.klause.factor.bool.ClausePropagator
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.result.ValueOrderingStatsSink
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.util.Cancellation
@@ -136,7 +135,9 @@ class PropagationSession private constructor(
     private val boolPinned: IntArray = preparedBuffers?.boolPinned ?: (IntArray(problem.numBoolVars) { -1 })
     private val intPinnedSet: BooleanArray = preparedBuffers?.intPinnedSet ?: (BooleanArray(problem.numIntVars))
     private val intPinnedVal: LongArray = preparedBuffers?.intPinnedVal ?: (LongArray(problem.numIntVars))
+    private val intPinnedLevel: IntArray = IntArray(problem.numIntVars)
     private val trail: IntArrayList = IntArrayList()
+    private var seededRestrictions: DeducedRestrictions = DeducedRestrictions.None
     private val impliedIntUndo: IntArray = preparedBuffers?.impliedIntUndo ?: (IntArray(problem.numIntVars) { -1 })
     private fun encBool(v: Int): Int = v
     private fun encInt(v: Int): Int = problem.numBoolVars + v
@@ -309,6 +310,7 @@ class PropagationSession private constructor(
             return@sequence
         }
         check(trail.size == 0 && levelTop == 1)
+        seededRestrictions = assumptions.deductions
         for (i in assumptions.boolKeys.indices) {
             for (result in preparePin(true, assumptions.boolKeys[i], if (assumptions.boolValues[i]) 1L else 0L)) {
                 if (result is PropagationResult.Unsat) {
@@ -326,6 +328,13 @@ class PropagationSession private constructor(
                 }
                 yield(null)
             }
+        }
+        for (result in seedRestrictions(assumptions.deductions)) {
+            if (result is PropagationResult.Unsat) {
+                yield(result)
+                return@sequence
+            }
+            yield(null)
         }
         yield(PropagationResult.Implied.EMPTY)
     }.iterator()
@@ -364,6 +373,7 @@ class PropagationSession private constructor(
         } else {
             intPinnedSet[v] = true
             intPinnedVal[v] = value
+            intPinnedLevel[v] = trail.size + 1
             trail.add(encInt(v))
         }
         var mark: PropagationState.LevelMark? = null
@@ -458,7 +468,7 @@ class PropagationSession private constructor(
 
     /**
      * Seed with an initial assumption set. Resets any prior trail to level 0 first, then
-     * pushes each assumption in iteration order (bools first, then ints). Each gets its own
+     * pushes each assumption in iteration order (bools, ints, then domain restrictions). Each gets its own
      * decision level. Returns the cumulative implied set beyond the seed pins (or Unsat).
      * A seed refutation retains its complete applied prefix: propagated levels alone can
      * omit earlier assumptions that contributed through a reason chain.
@@ -470,6 +480,7 @@ class PropagationSession private constructor(
         state.undoTo(requireNotNull(levelStates[0]))
         if (levelTop > 1) levelTruncateAfterRoot()
         clearPins()
+        seededRestrictions = assumptions.deductions
 
         // Iterating the primitive arrays directly (vs. forEachBool / forEachInt) lets the first
         // Unsat `return` without a captured flag.
@@ -495,7 +506,57 @@ class PropagationSession private constructor(
                 return r.copy(conflictLevels = IntArray(bk.size + i + 1) { it + 1 })
             }
         }
+        for (result in seedRestrictions(assumptions.deductions)) {
+            if (result is PropagationResult.Unsat) return result
+        }
         return computeImplied()
+    }
+
+    private fun seedRestrictions(restrictions: DeducedRestrictions): Sequence<PropagationResult> = sequence {
+        for (i in restrictions.intMinKeys.indices) {
+            if (seedCancelled()) return@sequence
+            yield(pinIntAtLeast(restrictions.intMinKeys[i], restrictions.intMinValues[i]))
+        }
+        for (i in restrictions.intMaxKeys.indices) {
+            if (seedCancelled()) return@sequence
+            yield(pinIntAtMost(restrictions.intMaxKeys[i], restrictions.intMaxValues[i]))
+        }
+        for (i in restrictions.intHoleVarIds.indices) {
+            if (seedCancelled()) return@sequence
+            val variable = restrictions.intHoleVarIds[i]
+            yield(pushRestriction(variable) { state.excludeIntValue(variable, restrictions.intHoleValues[i]) })
+        }
+        for (i in restrictions.intSetKeys.indices) {
+            if (seedCancelled()) return@sequence
+            val variable = restrictions.intSetKeys[i]
+            yield(pushRestriction(variable) { state.restrictIntToSurvivors(variable, restrictions.intSetSurvivorsAt(i)) })
+        }
+    }
+
+    private fun seedCancelled(): Boolean {
+        if (state.runCancelled) return true
+        if (!cancellation()) return false
+        state.runCancelled = true
+        return true
+    }
+
+    private fun pushRestriction(variable: Int, apply: () -> Boolean): PropagationResult {
+        val base = state.undoTop
+        val applied = applyDecision {
+            state.levelToDecisionVar.add(encInt(variable))
+            state.currentLevel = state.levelToDecisionVar.size
+            state.currentFactor = -1
+            state.lastDecisionConflictVar = -1
+            apply()
+        }
+        if (applied == false) return revertAndUnsat(state.conflictLevels ?: EmptyIntArray)
+        val conflict = if (applied == null) null else {
+            state.runToFixpoint(allFactors = false, cancellation = cancellation)
+        }
+        if (conflict != null) return revertAndUnsat(conflict)
+        trail.add(encInt(variable))
+        levelPush(state.mark())
+        return impliedSince(base)
     }
 
     /**
@@ -519,6 +580,9 @@ class PropagationSession private constructor(
             state.runCancelled = false
             interruptedReseed = false
         }
+        if (!seededRestrictions.isEmpty || !desired.deductions.isEmpty) {
+            return seed(desired).also { if (state.runCancelled) interruptedReseed = true }
+        }
         var keep = 0
         while (keep < trail.size) {
             val e = trail[keep]
@@ -526,7 +590,7 @@ class PropagationSession private constructor(
                 desired.boolValueOrNull(e) == (boolPinned[e] == 1)
             } else {
                 val iv = e - problem.numBoolVars
-                intPinnedSet[iv] && desired.intValueOrNull(iv) == intPinnedVal[iv]
+                intPinnedSet[iv] && intPinnedLevel[iv] == keep + 1 && desired.intValueOrNull(iv) == intPinnedVal[iv]
             }
             if (!agrees) break
             keep++
@@ -576,7 +640,13 @@ class PropagationSession private constructor(
     private fun clearPins() {
         for (i in 0 until trail.size) {
             val e = trail[i]
-            if (trailIsBool(e)) boolPinned[e] = -1 else intPinnedSet[e - problem.numBoolVars] = false
+            if (trailIsBool(e)) {
+                boolPinned[e] = -1
+            } else {
+                val variable = e - problem.numBoolVars
+                intPinnedSet[variable] = false
+                intPinnedLevel[variable] = 0
+            }
         }
         trail.clear()
     }
@@ -1022,6 +1092,7 @@ class PropagationSession private constructor(
         if (conflict != null) return revertAndUnsat(conflict)
         intPinnedSet[v] = true
         intPinnedVal[v] = value
+        intPinnedLevel[v] = trail.size + 1
         trail.add(encInt(v))
         levelPush(state.mark())
         return if (reportImplied) impliedSince(base) else PropagationResult.Implied.EMPTY
@@ -1103,7 +1174,15 @@ class PropagationSession private constructor(
         while (trail.size > level) {
             val e = trail[trail.size - 1]
             trail.removeAt(trail.size - 1)
-            if (trailIsBool(e)) boolPinned[e] = -1 else intPinnedSet[e - problem.numBoolVars] = false
+            if (trailIsBool(e)) {
+                boolPinned[e] = -1
+            } else {
+                val variable = e - problem.numBoolVars
+                if (intPinnedLevel[variable] > level) {
+                    intPinnedSet[variable] = false
+                    intPinnedLevel[variable] = 0
+                }
+            }
             levelPop()
         }
         state.undoTo(levelLast())
@@ -1120,7 +1199,7 @@ class PropagationSession private constructor(
         while (trail.size > 0) {
             val top = trail[trail.size - 1]
             popLast()
-            if (top == target) break
+            if (top == target && (kind == VarKind.Bool || !intPinnedSet[v])) break
         }
     }
 
@@ -1135,7 +1214,7 @@ class PropagationSession private constructor(
                 bools[e] = boolPinned[e] == 1
             } else {
                 val iv = e - problem.numBoolVars
-                ints[iv] = intPinnedVal[iv]
+                if (intPinnedSet[iv] && intPinnedLevel[iv] == i + 1) ints[iv] = intPinnedVal[iv]
             }
         }
         return Assumptions(bools = bools, ints = ints)

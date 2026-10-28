@@ -18,6 +18,23 @@ import kotlin.test.assertTrue
 class AnytimeCounterTest {
 
     @Test
+    fun `repeated projection coordinates should not multiply distinct counts`() {
+        val problem = Problem(1, 1, arrayOf(IntDomain(0, 1)), emptyArray()).bake()
+        val configurations = listOf(
+            ExactCountConfig(samplingSet = intArrayOf(0, 0)) to 2L,
+            ExactCountConfig(intSamplingSet = intArrayOf(0, 0)) to 2L,
+            ExactCountConfig(samplingSet = intArrayOf(0, 0), intSamplingSet = intArrayOf(0, 0)) to 4L,
+        )
+
+        for ((config, expected) in configurations) {
+            val count = AnytimeCounter.run(problem, config).last()
+
+            assertTrue(count.exact)
+            assertEquals(expected, count.estimate)
+        }
+    }
+
+    @Test
     fun `Boolean counting should retain an unchecked sibling when the budget ends`() {
         val solver = BacktrackSolver(Problem(1, 0, emptyArray(), emptyArray()).bake())
 

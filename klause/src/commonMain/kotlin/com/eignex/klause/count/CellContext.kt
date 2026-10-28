@@ -90,8 +90,8 @@ internal class CellContext private constructor(
                 bools = base.allBoolVars()
                 ints = IntArray(base.numIntVars) { it }
             } else {
-                bools = boolSet ?: EmptyIntArray
-                ints = intSet ?: EmptyIntArray
+                bools = boolSet?.distinct()?.toIntArray() ?: EmptyIntArray
+                ints = intSet?.distinct()?.toIntArray() ?: EmptyIntArray
             }
             return build(base, bools, ints)
         }

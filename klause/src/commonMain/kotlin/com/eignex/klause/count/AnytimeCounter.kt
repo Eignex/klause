@@ -58,9 +58,9 @@ internal object AnytimeCounter {
         config: ExactCountConfig,
         budget: CountCheckBudget,
     ): Sequence<ExactCountInterval> = sequence {
-        val boolVars = config.samplingSet
+        val boolVars = config.samplingSet?.distinct()?.toIntArray()
             ?: if (config.intSamplingSet == null) problem.allBoolVars() else EmptyIntArray
-        val intVars = config.intSamplingSet
+        val intVars = config.intSamplingSet?.distinct()?.toIntArray()
             ?: if (config.samplingSet == null) IntArray(problem.numIntVars) { it } else EmptyIntArray
         val depth = boolVars.size + intVars.size
 

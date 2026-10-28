@@ -80,6 +80,7 @@ internal object UniGen {
             } else if (++consecutiveRejects >= MAX_CONSECUTIVE_REJECTS) {
                 // Hashing can't find an in-band cell (highly skewed count or hard slices).
                 yieldAll(cheapFallback())
+                return@sequence
             }
         }
     }

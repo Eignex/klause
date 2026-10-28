@@ -135,6 +135,25 @@ class CorpusSelectionTest {
     }
 
     @Test
+    fun `MznChallenge layout should discover models inside family subdirectories`() {
+        val root = Files.createTempDirectory("mznnested").toFile()
+        try {
+            File(root, "alpha/models").mkdirs()
+            File(root, "alpha/models/alpha.mzn").writeText("% model")
+            File(root, "alpha/i1.dzn").writeText("n=1;")
+
+            val found = Layout.MznChallenge().discover(root)
+
+            assertEquals(
+                listOf(Discovered("alpha/i1", "alpha/models/alpha.mzn", "alpha/i1.dzn", familyKey = "alpha")),
+                found,
+            )
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun `MznChallengeAllYears layout should year-prefix families so a repeated name does not collide`() {
         val root = Files.createTempDirectory("mznyears").toFile()
         try {

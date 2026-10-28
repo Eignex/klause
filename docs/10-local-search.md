@@ -299,6 +299,8 @@ coordinates keep their values and an unreachable row produces no partial move.
 Tables reading defined integers decline implicit seeding, because a definition could
 rewrite them outside the chosen row. Built-in random restarts apply implicit seeding
 and the definition sweep before costs are initialized.
+Lexicographic seeding preserves its deciding first coordinates when either appears
+again in a suffix, so suffix initialization cannot erase the strict ordering.
 
 An owned AllDifferent's swaps and rotations keep its occupied value set. The opt-in
 `unused-values` source lets a satisfied owner without optional entries or excepted

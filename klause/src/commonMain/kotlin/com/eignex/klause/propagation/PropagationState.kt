@@ -259,6 +259,7 @@ class PropagationState private constructor(
 
     // Untrailed unconditional root carves retain their exact membership and position across every pop.
     internal val rootHoleHist: Array<RootHoleHistory?> = prepared?.rootHoleHist ?: arrayOfNulls(problem.numIntVars)
+    internal var survivorRestrictionHistory: MutableMap<Int, RevRef<SurvivorRestrictionHistory?>>? = null
 
     // Per Boolean variable, the undo-log size when its current pin was logged, so a lazy reason can tell a pin
     // that predates its deduction from a later one ([boolPinnedAt]). Meaningful only while the variable is pinned.

@@ -27,6 +27,13 @@ class SolveEvidenceTest {
     }
 
     @Test
+    fun `an empty OPB assignment should be retained`() {
+        val witness = SolveEvidence.finalWitness(Format.OPB, "s SATISFIABLE\nv\nc solutions=1\n")
+
+        assertEquals("v", witness)
+    }
+
+    @Test
     fun `a stream without a complete candidate should carry no witness`() {
         for (format in listOf(Format.MINIZINC, Format.OPB, Format.XCSP3)) {
             assertNull(SolveEvidence.finalWitness(format, "=====UNKNOWN=====\n"))
@@ -223,5 +230,16 @@ class SolveEvidenceTest {
         val raw = "v <instantiation>\nv <list>x</list>\n"
 
         assertNull(SolveEvidence.finalWitness(Format.XCSP3, raw))
+    }
+
+    @Test
+    fun `only the last complete XCSP3 instantiation should be retained`() {
+        val model = "<instantiation><list>x</list><values>2</values></instantiation>"
+        val raw = "v <instantiation><list>x</list><values>1</values></instantiation>\n" +
+            "v $model\nv <instantiation>\nv <list>x</list>\n"
+
+        val witness = SolveEvidence.finalWitness(Format.XCSP3, raw)
+
+        assertEquals("v $model", witness)
     }
 }

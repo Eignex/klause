@@ -5,11 +5,52 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.util.CheckedLongOverflowException
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 
 class CoreGuidedOptimizerTest {
+
+    @Test
+    fun `an optimal cost beyond the signed word range should fail explicitly`() {
+        val problem = Problem(
+            numBoolVars = 2,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf(
+                Clause(intArrayOf(Lit.make(0, false))),
+                Clause(intArrayOf(Lit.make(1, false))),
+            ),
+        )
+        val softs = (0..1).map { CoreGuidedOptimizer.Soft(Lit.make(it, true), Long.MAX_VALUE) }
+
+        assertFailsWith<CheckedLongOverflowException> {
+            CoreGuidedOptimizer(problem.bake()).minimize(softs, BacktrackParams())
+        }
+    }
+
+    @Test
+    fun `overlapping cores should permit multiple relaxations within an earlier core`() {
+        val problem = Problem(
+            numBoolVars = 3,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf(
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, false))),
+                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
+            ),
+        )
+        val softs = (0..2).map { CoreGuidedOptimizer.Soft(Lit.make(it, true)) }
+
+        val result = CoreGuidedOptimizer(problem.bake()).minimize(softs, BacktrackParams())
+
+        val optimal = assertIs<CoreGuidedOptimizer.Result.Optimal>(result)
+        assertEquals(2L, optimal.lowerBound)
+        assertEquals(2, softs.count { !optimal.sample.boolValue(Lit.variable(it.lit)) })
+    }
 
     @Test
     fun `returned sample cost should equal the reported lower bound under overlapping cores`() {

@@ -611,8 +611,8 @@ internal fun PropagationState.setIntImpl(v: Int, value: Long, antecedents: IntAr
  * one seed decision — the compact counterpart to excluding each hole individually. Sets the domain in a
  * single step and wakes the affected order/eq atoms off the value-sorted atom index
  * ([propagateAtomsForSetRestriction]), so both the domain write and the atom wakeups are O(survivors +
- * eq-atoms) rather than O(span). It is a root-seed input (no antecedents; presolve does not learn), so
- * per-hole reasons are not recorded — the excluded values are unconditional facts of the folded domain.
+ * eq-atoms) rather than O(span). A search-time seed retains its compact before/after domains and level
+ * through reversible history; root preparation needs no conditional hole reasons.
  */
 internal fun PropagationState.restrictIntToSurvivors(v: Int, survivors: LongArray): Boolean {
     val d = intDomains[v]
@@ -639,6 +639,7 @@ internal fun PropagationState.restrictIntToSurvivors(v: Int, survivors: LongArra
     val oldMax = d.max
     if (undoLogging) logIntChange(v) // one record restores the full prior domain + bound atoms
     val newDomain = intDomainFromSurvivors(filtered, problem.settings.storage)
+    if (undoLogging) recordSurvivorRestriction(v, d, newDomain)
     intDomains[v] = newDomain
     intLevel[v] = maxOf(intLevel[v], currentLevel)
     var kindMask = IntEvent.VALUE_REMOVED_BIT

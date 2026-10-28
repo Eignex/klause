@@ -15,6 +15,23 @@ import kotlin.test.assertTrue
 class LexLessInvariantTest {
 
     @Test
+    fun `seeding should preserve deciding coordinates repeated in the suffix`() {
+        val factor = LexLess(intArrayOf(0, 2, 1), intArrayOf(1, 3, 0), strict = true)
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 4,
+            intDomains = Array(4) { IntDomain(0, 5) },
+            factors = arrayOf<Factor>(factor),
+        )
+        val state = LocalSearchState(problem.bake(), Random(0))
+
+        val seeded = state.factors[0].seedFeasible(state, 0)
+
+        assertTrue(seeded)
+        assertTrue(!state.factors[0].isViolated(state, 0))
+    }
+
+    @Test
     fun `repair moves should restore violated strict lex at the first decided position`() {
         val factor = LexLess(intArrayOf(0, 1), intArrayOf(2, 3), strict = true)
         val problem = Problem(
