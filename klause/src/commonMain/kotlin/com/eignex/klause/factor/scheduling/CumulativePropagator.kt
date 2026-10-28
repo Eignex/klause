@@ -272,8 +272,11 @@ internal class CumulativePropagator(
                         if (est[k] < left || lct[k] > right) continue
                         val i = ids[k]
                         val demand = state.intDomains[resourceVars[i]]
+                        if (demand.min == demand.max) continue
                         val bound = addExact((budget - energy) / durations[i], demand.min)
-                        if (!tightenMax(state, resourceVars[i], bound, packed(SUBWINDOW, i, left, right))) return false
+                        if (bound < demand.max &&
+                            !tightenMax(state, resourceVars[i], bound, packed(SUBWINDOW, i, left, right))
+                        ) return false
                     }
                 }
             }
