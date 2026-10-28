@@ -137,7 +137,9 @@ internal fun PropagationState.undoTo(mark: PropagationState.LevelMark) {
     // The native-SAT BCP cursor must not point past the truncated trail; the surviving prefix is
     // already propagated, so resume from its end. Any stashed conflict reason belonged to the
     // rewound state.
+    learned.unitsPending = learned.units.size > 0
     nativeEngine?.let {
+        it.onRetraction()
         it.bcpHead = boolPinOrder.size
         nativeConflictReason = null
     }
@@ -174,6 +176,7 @@ private fun PropagationState.replayVarUndo(undoSize: Int) {
             0 -> { // bool pin — prior state is always unassigned
                 val v = undo.varId[i]
                 retracting?.invoke(v)
+                recheckRetractedLearning(boolReason[v])
                 boolValues[v] = null
                 boolLevel[v] = -1
                 boolReason[v] = -1
@@ -200,6 +203,8 @@ private fun PropagationState.replayIntVarUndo(
         1 -> { // int change — restore the full recorded prior int-var state
             val v = undo.varId[i]
             retracting?.invoke(numBool + v)
+            recheckRetractedLearning(intMinReason[v])
+            recheckRetractedLearning(intMaxReason[v])
             boundMoves[v]?.let { it.truncateTo(it.size - 1) }
             boundMovePriorMin[v]?.let { it.truncateTo(it.size - 1) }
             boundMovePriorMax[v]?.let { it.truncateTo(it.size - 1) }

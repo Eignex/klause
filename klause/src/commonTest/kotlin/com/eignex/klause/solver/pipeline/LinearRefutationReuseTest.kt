@@ -524,4 +524,23 @@ class LinearRefutationReuseTest {
         assertNull(reuse.find(restricted.condition))
         assertEquals(0L, reuse.observations()["numericalRefutationReuseRetained"])
     }
+
+    @Test
+    fun `source lifecycle should distinguish a checked lookup from consumed pruning`() {
+        val reuse = LinearRefutationReuse(source, SourceLpBudget(), Cancellation.Never)
+        reuse.retain(evidence)
+        assertNotNull(reuse.find(restricted.condition))
+        assertNull(reuse.observations()["learningSourceRefutationConsumed"])
+
+        assertNotNull(reuse.find(restricted.condition, consume = true))
+        assertNotNull(reuse.find(restricted.condition, consume = true))
+        reuse.clear()
+
+        val report = reuse.observations()
+        assertEquals(1L, report["learningSourceRefutationConstructed"])
+        assertEquals(1L, report["learningSourceRefutationAdmitted"])
+        assertEquals(1L, report["learningSourceRefutationAsserted"])
+        assertEquals(1L, report["learningSourceRefutationConsumed"])
+        assertEquals(1L, report["learningSourceRefutationRetired"])
+    }
 }

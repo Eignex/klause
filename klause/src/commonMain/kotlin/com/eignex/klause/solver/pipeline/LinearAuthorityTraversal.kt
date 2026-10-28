@@ -307,6 +307,7 @@ internal class LinearAuthorityTraversal(
             child.assertion = SearchDecision.Theory(survivor)
             path += context.decisionLevel to child
             val result = context.imply(survivor.literal, explanation)
+            refutations?.consumed(exclusion.id)
             if (result !is ComponentResult.Consistent) return result
             if (exclusion.resolved) observe("numericalRefutationResolvedDeductions")
             if (exclusion.unfixedPivot) observe("numericalRefutationUnfixedDeductions")
@@ -428,7 +429,7 @@ internal class LinearAuthorityTraversal(
             }
         }
         if (refutations != null && !current.pending && current.split == null) {
-            refutations.find(current.condition)?.let { evidence ->
+            refutations.find(current.condition, consume = true)?.let { evidence ->
                 current.result = LinearAuthorityResult(evidence = evidence)
                 pending--
                 observe("numericalClosedLeaves")

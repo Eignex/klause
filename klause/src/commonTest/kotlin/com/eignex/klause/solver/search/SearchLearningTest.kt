@@ -1,10 +1,31 @@
 package com.eignex.klause.solver.search
 
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
 class SearchLearningTest {
+    @Test
+    fun `cancellation should preserve pending learning until the search resumes`() {
+        var cancelled = false
+        val session = SearchSession(emptyList(), cancellation = Cancellation { cancelled })
+        session.initialize()
+        val run = session.openRun(1, lifecycle = object : SearchRunLifecycle {
+            override fun onCancellation(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Pause
+        })
+        session.learn(SearchExplanation(intArrayOf(0)))
+        cancelled = true
+        assertIs<SearchRunEvent.Paused>(run.next())
+        assertEquals(null, session.learnedLifecycle()["learningClauseConsumed"])
+
+        cancelled = false
+        assertIs<SearchRunEvent.Satisfied>(run.next())
+
+        assertEquals(true, session.boolValue(0))
+        assertEquals(1L, session.learnedLifecycle()["learningClauseConsumed"])
+    }
+
     @Test
     fun `learned clause should imply its last unfalsified literal`() {
         val session = SearchSession(emptyList())
@@ -164,5 +185,51 @@ class SearchLearningTest {
 
             assertEquals(true, session.boolValue(levels + 1), "levels=$levels")
         }
+    }
+
+    @Test
+    fun `lifecycle counts should distinguish duplicate construction and first consumption`() {
+        val session = SearchSession(emptyList())
+        session.learn(SearchExplanation(intArrayOf(0, 2)))
+        session.learn(SearchExplanation(intArrayOf(2, 0)))
+        session.push(SearchDecision.Bool(1))
+        session.popTo(0)
+
+        session.push(SearchDecision.Bool(1))
+
+        assertEquals(true, session.boolValue(1))
+        assertEquals(mapOf("learningClauseConstructed" to 2L, "learningClauseAdmitted" to 1L,
+            "learningClauseAsserted" to 1L, "learningClauseConsumed" to 1L), session.learnedLifecycle())
+    }
+
+    @Test
+    fun `retired shared clauses should leave copied historical reasons intact`() {
+        val session = SearchSession(emptyList(), learnedDb = SearchLearnedDbParams(maxClauses = 0, glueLbd = 0))
+        session.learn(SearchExplanation(intArrayOf(0, 2)))
+        session.push(SearchDecision.Bool(1))
+        val reason = requireNotNull(session.reasonFor(1))
+        session.restart()
+
+        session.restart()
+
+        assertEquals(0, session.learnedClauseCount)
+        assertEquals(setOf(0, 2), reason.literals.toSet())
+        assertEquals(1L, session.learnedLifecycle()["learningClauseRetired"])
+    }
+
+    @Test
+    fun `a pending attachment should survive suspension of the actual search run`() {
+        val session = SearchSession(emptyList())
+        session.initialize()
+        val run = session.openRun(1)
+        run.pauseBeforeDecision = { true }
+        assertIs<SearchRunEvent.Paused>(run.next())
+        session.learn(SearchExplanation(intArrayOf(0)))
+
+        run.pauseBeforeDecision = { false }
+        assertIs<SearchRunEvent.Satisfied>(run.next())
+
+        assertEquals(true, session.boolValue(0))
+        assertEquals(1L, session.learnedLifecycle()["learningClauseConsumed"])
     }
 }

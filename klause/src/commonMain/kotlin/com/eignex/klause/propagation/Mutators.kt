@@ -146,6 +146,7 @@ internal fun PropagationState.pinBoolImpl(v: Int, value: Boolean, antecedents: I
     }
     if (undoLogging) logBoolPin(v)
     if (currentFactor >= 0) propagations++
+    noteLearnedUse(currentFactor)
     if (value) boolValueBits.set(v) else boolValueBits.clear(v)
     boolAssigned.set(v)
     nativeBoolTruth?.set(v, (if (value) 2 else 1).toByte())
@@ -154,7 +155,7 @@ internal fun PropagationState.pinBoolImpl(v: Int, value: Boolean, antecedents: I
     boolLevel[v] = maxOf(currentLevel, levelToDecisionVar.size)
     boolReason[v] = currentFactor
     arithmeticLearningTrace?.pin(currentFactor, v, if (value) 1 else 0, "bool", boolLevel[v])
-    noteLearnedUse(currentFactor) // a learned clause that forces a unit counts as reused
+
     boolAntecedents[v] = antecedents
     boolPinOrder.add(v)
     bumpObjectiveBoolBound(v, value)
@@ -278,6 +279,7 @@ private inline fun PropagationState.tightenBoundImpl(
     }
     if (undoLogging) logIntChange(v)
     if (currentFactor >= 0) propagations++
+    noteLearnedUse(currentFactor)
     // Preserves interior holes.
     val newDomain = if (isMin) d.withMinAtLeast(bound) else d.withMaxAtMost(bound)
     // A landing value inside a hole snaps the bound further. The snapped bound rests on the requested
@@ -345,6 +347,7 @@ internal fun PropagationState.excludeIntValueImpl(v: Int, value: Long, anteceden
         if (interior) logIntCarve(v, value) else logIntChange(v)
     }
     if (currentFactor >= 0) propagations++
+    noteLearnedUse(currentFactor)
     val newDomain = d.excludeValue(value)
     // An edge exclusion advances the endpoint: the new bound rests on the *prior* bound, the
     // exclusion itself, and any further holes crossed on the way. The supplied reason only
@@ -507,6 +510,7 @@ internal fun PropagationState.excludeIntValues(v: Int, values: LongArray, antece
         if (value in newMin..newMax) (interior ?: LongArrayList().also { interior = it }).add(value)
     }
     if (currentFactor >= 0) propagations += excluded
+    noteLearnedUse(currentFactor)
 
     val root = rootDomains[v]
     val antMin = if (newMin != d.min) {
@@ -587,6 +591,7 @@ internal fun PropagationState.excludeInteriorIntValues(
     intDomains[v] = newDomain
     intLevel[v] = maxOf(intLevel[v], currentLevel)
     if (currentFactor >= 0) propagations += interior.size
+    noteLearnedUse(currentFactor)
     completeDomainMutation(interior.size, { i ->
         pushHoleHist(v, interior[i], currentLevel, reasons[i])
     }) {

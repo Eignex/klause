@@ -139,6 +139,13 @@ and neighborhood exhaustion supplies no global claim.
 
 ### Statistics
 
+Learned-object counters use the `nativeLearning{Kind}{Stage}` and
+`sharedLearning{Kind}{Stage}` names for native and shared stores. Source refutation
+stages use `learningSourceRefutation{Stage}` in complete-search observations.
+Only observed nonzero counters are emitted. The
+[learning lifecycle](09-learning.md#learned-object-authority-and-lifetime) defines
+construction, admission, assertion, consumption and retirement.
+
 For controlled nonlinear integer comparisons, `nia-cell-refinement=true` enables
 checked univariate production and `nia-cell-reuse=true` filters fixed tuples with
 source-scoped cells. Both default to false; reuse requires the producer. With the

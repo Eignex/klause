@@ -138,6 +138,42 @@ after a new source check, preserving proof authority independently of clause nam
 and queue order. This bounded opt-in policy retains complete Boolean scope and
 opening restrictions; unsupported predicates cannot produce a resolvent.
 
+## Learned-object authority and lifetime
+
+Native clauses, shared clauses, pseudo-Boolean rows, integer rows and source
+refutations keep specialized stores under the same lifecycle contract:
+
+| Boundary | Contract |
+|---|---|
+| Construction | A candidate supplies no authority until its owner admits its derivation. Native conflict analysis uses historical reasons; shared analysis requires expressible component premises. |
+| Admission | The store owns the retained payload and its scope. Clauses and arithmetic rows must follow from the session model with every conditional premise represented. Source refutations require checked source revision, objective and conditions. |
+| Assertion | A retained object is evaluated against the current assignment before it can supply consequences. Imports are examined even when their watched root facts were assigned before attachment. |
+| Consumption | A deduction or conflict reaches the owning search state. Checking or retaining a candidate alone is insufficient. A source unit is consumed only when traversal installs its split and implication; a reused refutation closes its covered node. |
+| Retirement | Watchers, queues and identities move together. Native compaction retains objects referenced by live pins or saved integer reasons, then remaps both live and historical IDs. Shared pins own copied clause reasons. Checked source evidence remains immutable after cache eviction. |
+
+An assumption is a decision premise, never an unconditional source fact. Learned
+clauses preserve those premises through resolution. Permanent objective bounds and
+model blockers belong to the containing search scope. Clause exchange requires
+compatible problem and objective contexts; repair pools filter permanent assertions.
+Imported clauses retain their origin and are not re-exported. PB and integer rows
+are not clause-portable. Shared component clauses remain session-local; source
+refutations import only into conditions that imply their recorded support.
+
+Retraction removes assignments, not admitted deductions. Learned units are examined
+again after undo. Suspension retains stores and pending attachment; cancellation
+withholds unfinished analysis or checking and grants no refutation. Retiring a
+source cache releases its indexes and names under the containing allowance.
+
+The common counters are `learning{Kind}{Stage}`, with kinds `Clause`, `Pb`,
+`Integer` and `SourceRefutation`, and stages `Constructed`, `Admitted`,
+`Asserted`, `Consumed` and `Retired`. Construction counts candidates presented
+to admission, including duplicates and declines. The other stages count each
+stored object once in its retained lifetime; reattachment and repeated use do not
+inflate them. Native and shared reports remain separate. Source assertion means a
+checked application in a compatible condition; a returned unit can still be declined
+by traversal before consumption. These counters describe ownership and use, not
+proof coverage or independent validation.
+
 ## Native SAT lane
 
 A pure-Boolean model whose factors are all clauses runs on a dedicated lane. The

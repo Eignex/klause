@@ -322,6 +322,7 @@ internal fun searchStatPairs(stats: SolveStats): List<Pair<String, String>> {
         out += "valueProbeWork" to "${ordering.probeWork}"
         out += "valueProbeCappedOrders" to "${ordering.cappedOrders}"
     }
+    for ((key, value) in stats.search.learning) out += "native" + key.replaceFirstChar { it.uppercase() } to "$value"
     val learned = stats.search.learnedClauses.sum
     out += "learned" to "${learned.toLong()}"
     if (learned > 0.0) {
@@ -447,7 +448,7 @@ internal fun openTheoryStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pai
                 "openAssertingConflicts" to "$assertingConflicts",
                 "openNonAssertingConflicts" to "$nonAssertingConflicts",
                 "openReductionNs" to "$reductionNanos",
-            )
+            ) + learning.map { (key, value) -> "shared" + key.replaceFirstChar { it.uppercase() } to "$value" }
         } + with(stats.openHints) {
             if (draws == 0L) {
                 emptyList()
