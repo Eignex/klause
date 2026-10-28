@@ -4124,10 +4124,11 @@ is unchanged by its rebase onto the MDD contract. See
 [explanation lifetime](../docs/09-learning.md#table-explanations).
 
 `bench.profile.HistoricalTableReasonProfile` captures the issue's binary ground-table
-control, a delayed implication and an ordinary blocker-order control. One invocation
-has 24 replay cells: original/prepared sources, the internal historical-reason option
-off/on, and a warmup/measured pass with reversed option order. It applies the native
-learned constraint and inspects the `A=0` sibling when the backjump reaches level one.
+control, a delayed guarded integer row and an ordinary blocker-order control. One invocation
+has 36 replay cells: original, satisfaction-prepared and solution-set-preserving
+prepared sources, the internal historical-reason option off/on, and a warmup/measured
+pass with reversed option order. It applies the native learned constraint and inspects
+`Q` at the `B=1`, `A`-free prefix and its `A=0` sibling in both arms.
 Source-coordinate mapping declines reconstructed coordinates rather than guessing
 ids. Three ordinary prepared backtrack runs retain automatic LP as strong controls.
 Each cell has a two-second stop; use a 180-second lab profile envelope. Original

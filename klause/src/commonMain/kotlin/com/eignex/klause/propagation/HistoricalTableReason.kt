@@ -20,14 +20,18 @@ internal class HistoricalTableReason(private val state: PropagationState) {
 
     fun prepare(frontier: IntArray): Boolean {
         val marker = selected ?: return false
+        val ordinary = state.lazyReasonMemo[marker] ?: return false
+        if (ordinary.size > 64) return false
+        val introduced = IntHashSet(ordinary.size)
+        for (lit in ordinary) introduced.add(lit)
         val preferred = IntHashSet(frontier.size)
-        for (lit in frontier) preferred.add(lit)
+        for (lit in frontier) if (!introduced.contains(lit)) preferred.add(lit)
         replacement = (state.factorAt(marker[1]) as TablePropagator).historicalAlternative(
             state, marker.copyOfRange(LAZY_PAYLOAD, marker.size), marker[2], preferred,
         )
         val alternate = replacement ?: return false
-        state.lazyReasonMemo[marker]?.let { state.arithmeticLearningTrace?.clause("table.ordinary-reason", it, state) }
+        state.arithmeticLearningTrace?.clause("table.ordinary-reason", ordinary, state)
         state.arithmeticLearningTrace?.clause("table.alternate-reason", alternate, state)
-        return state.lazyReasonMemo[marker]?.contentEquals(alternate) == false
+        return !ordinary.contentEquals(alternate)
     }
 }

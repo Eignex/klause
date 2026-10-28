@@ -357,18 +357,23 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
     }
 
     private fun historicalTableResolution(seedReason: IntArray, currentLevel: Int): AnalysisResult {
-        if (!state.historicalTableReasons) return runResolution(clauseResolvent, seedReason, currentLevel)
+        if (!state.historicalTableReasons || universe > 4096) {
+            return runResolution(clauseResolvent, seedReason, currentLevel)
+        }
         val choice = HistoricalTableReason(state)
         state.historicalTableReason = choice
         try {
             state.finiteWork.checkNow()
             val fallback = runResolution(clauseResolvent, seedReason, currentLevel)
-            if (fallback !is AnalysisResult.Learned || !fallback.asserting || state.runCancelled) return fallback
+            if (fallback !is AnalysisResult.Learned || !fallback.asserting || state.runCancelled ||
+                fallback.literals.size > 64
+            ) return fallback
             val prepared = choice.prepare(fallback.literals)
             state.finiteWork.checkNow()
             state.arithmeticLearningTrace?.record(if (prepared) "table.retry" else "table.decline")
             if (!prepared) return fallback
             universe = state.problem.numBoolVars + state.atoms.intVar.size
+            if (universe > 4096) return fallback
             val alternateResolvent = ClauseResolvent(state, this)
             val alternate = runResolution(alternateResolvent, seedReason, currentLevel)
             state.finiteWork.checkNow()

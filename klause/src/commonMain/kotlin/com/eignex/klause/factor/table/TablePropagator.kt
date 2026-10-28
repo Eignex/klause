@@ -8,12 +8,12 @@ import com.eignex.klause.factor.table.internals.allEventWatches
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.values
-import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.ExtensionalSupportCounts
 import com.eignex.klause.propagation.ExtensionalSupportProvider
 import com.eignex.klause.propagation.InterruptiblePropagator
-import com.eignex.klause.propagation.checkFiniteWork
+import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.carvedAt
+import com.eignex.klause.propagation.checkFiniteWork
 import com.eignex.klause.propagation.domainAt
 import com.eignex.klause.propagation.excludeInteriorIntValues
 import com.eignex.klause.propagation.excludeIntValues

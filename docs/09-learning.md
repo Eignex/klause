@@ -55,10 +55,13 @@ larger relations keep the scan path. A reason visits only the target value or bo
 range's postings, then checks the deduction's historical domains. Mutable live
 prefixes and explanation caches remain state-local.
 An internal opt-in conflict analysis can retry one unextended ground-table reason
-against the ordinary minimized clause's frozen literals. Reconstruction admits at
+against the ordinary minimized clause's frozen literals that its original reason
+did not introduce. Reconstruction admits at
 most 256 rows, 4096 cells, 64 columns and 64 distinct considered premises; bound deductions
 with more than 62 historical target holes decline. It retains target-domain scope
 premises and chooses only blockers present at the deduction's trail position.
+The minimized frontier admits at most 64 literals and the replay at most 4096 atom
+and Boolean variables.
 The retry runs both minimization passes and replaces an asserting ordinary clause
 only for a lexicographically smaller backjump level, LBD or clause size. A local
 decline retains ordinary learning. Frontier-dependent reasons belong only to that
