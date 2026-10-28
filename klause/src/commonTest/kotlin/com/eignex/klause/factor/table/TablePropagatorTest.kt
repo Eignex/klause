@@ -21,7 +21,6 @@ import com.eignex.klause.propagation.holeReasonFor
 import com.eignex.klause.propagation.mark
 import com.eignex.klause.propagation.reasonOf
 import com.eignex.klause.propagation.undoTo
-import com.eignex.klause.propagation.atomVarEq
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
