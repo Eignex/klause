@@ -70,7 +70,8 @@ internal object SourceStageProfile {
 
     private fun capture(input: JsonObject, out: File) {
         val required = setOf("suite", "problem", "sha256", "engine", "exact")
-        require(input.keys.containsAll(required) && input.keys - required - setOf("seed", "timeout") == emptySet<String>())
+        require(input.keys.containsAll(required) &&
+            input.keys - required - setOf("seed", "timeout") == emptySet<String>())
         val reference = Catalog.uncapped(input.getValue("suite").jsonPrimitive.content).problems
             .single { it.name == input.getValue("problem").jsonPrimitive.content }
         val bytes = CorpusFiles.open(CorpusFetcher.resolve(reference.source)).use {
@@ -99,7 +100,8 @@ internal object SourceStageProfile {
                 "<setting name=\"enabled\">true</setting>")
         })
         val options = "-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=1 " +
-            "-XX:StartFlightRecording=filename=$recording,settings=$settings,duration=${timeout + 35_000}ms,dumponexit=true"
+            "-XX:StartFlightRecording=filename=$recording,settings=$settings," +
+            "duration=${timeout + 35_000}ms,dumponexit=true"
         val command = buildList {
             add(SolverInvocation.klauseCliBin().absolutePath)
             addAll(listOf("--format", format, source.absolutePath, "-t", timeout.toString(), "-r", seed.toString(), "-s",
