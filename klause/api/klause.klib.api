@@ -14338,12 +14338,14 @@ final class com.eignex.klause.solver.pipeline/NonlinearIntegerCellReuseStats { /
 }
 
 final class com.eignex.klause.solver.pipeline/NonlinearIntegerResidueStats { // com.eignex.klause.solver.pipeline/NonlinearIntegerResidueStats|null[0]
-    constructor <init>(kotlin/Long, kotlin/Long, kotlin/Long, kotlin/Long, kotlin/Long) // com.eignex.klause.solver.pipeline/NonlinearIntegerResidueStats.<init>|<init>(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long){}[0]
+    constructor <init>(kotlin/Long, kotlin/Long, kotlin/Long, kotlin/Long, kotlin/Long, kotlin/Long = ...) // com.eignex.klause.solver.pipeline/NonlinearIntegerResidueStats.<init>|<init>(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long){}[0]
 
     final val completedRings // com.eignex.klause.solver.pipeline/NonlinearIntegerResidueStats.completedRings|{}completedRings[0]
         final fun <get-completedRings>(): kotlin/Long // com.eignex.klause.solver.pipeline/NonlinearIntegerResidueStats.completedRings.<get-completedRings>|<get-completedRings>(){}[0]
     final val declinedChecks // com.eignex.klause.solver.pipeline/NonlinearIntegerResidueStats.declinedChecks|{}declinedChecks[0]
         final fun <get-declinedChecks>(): kotlin/Long // com.eignex.klause.solver.pipeline/NonlinearIntegerResidueStats.declinedChecks.<get-declinedChecks>|<get-declinedChecks>(){}[0]
+    final val excludedAtoms // com.eignex.klause.solver.pipeline/NonlinearIntegerResidueStats.excludedAtoms|{}excludedAtoms[0]
+        final fun <get-excludedAtoms>(): kotlin/Long // com.eignex.klause.solver.pipeline/NonlinearIntegerResidueStats.excludedAtoms.<get-excludedAtoms>|<get-excludedAtoms>(){}[0]
     final val refutedScopes // com.eignex.klause.solver.pipeline/NonlinearIntegerResidueStats.refutedScopes|{}refutedScopes[0]
         final fun <get-refutedScopes>(): kotlin/Long // com.eignex.klause.solver.pipeline/NonlinearIntegerResidueStats.refutedScopes.<get-refutedScopes>|<get-refutedScopes>(){}[0]
     final val tuples // com.eignex.klause.solver.pipeline/NonlinearIntegerResidueStats.tuples|{}tuples[0]
@@ -14356,7 +14358,8 @@ final class com.eignex.klause.solver.pipeline/NonlinearIntegerResidueStats { // 
     final fun component3(): kotlin/Long // com.eignex.klause.solver.pipeline/NonlinearIntegerResidueStats.component3|component3(){}[0]
     final fun component4(): kotlin/Long // com.eignex.klause.solver.pipeline/NonlinearIntegerResidueStats.component4|component4(){}[0]
     final fun component5(): kotlin/Long // com.eignex.klause.solver.pipeline/NonlinearIntegerResidueStats.component5|component5(){}[0]
-    final fun copy(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ...): com.eignex.klause.solver.pipeline/NonlinearIntegerResidueStats // com.eignex.klause.solver.pipeline/NonlinearIntegerResidueStats.copy|copy(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long){}[0]
+    final fun component6(): kotlin/Long // com.eignex.klause.solver.pipeline/NonlinearIntegerResidueStats.component6|component6(){}[0]
+    final fun copy(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ...): com.eignex.klause.solver.pipeline/NonlinearIntegerResidueStats // com.eignex.klause.solver.pipeline/NonlinearIntegerResidueStats.copy|copy(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/NonlinearIntegerResidueStats.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/NonlinearIntegerResidueStats.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/NonlinearIntegerResidueStats.toString|toString(){}[0]
