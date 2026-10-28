@@ -103,11 +103,16 @@ internal object TableCostProfile {
 
     private fun snapshot(problem: Problem, objective: LinearObjective) = buildJsonObject {
         require(problem.numIntVars <= 100_000 && problem.numFactors <= 100_000)
+        require(problem.factors.sumOf { it.intVars.size.toLong() } <= 1_048_576)
+        val ternary = problem.factors.filterIsInstance<Table>().filter { it.arity == 3 }
+        require(ternary.size <= 4096)
         val weights = objective.intCoefficients
         val readers = Array(problem.numIntVars) { ArrayList<String>() }
         for ((index, factor) in problem.factors.withIndex()) {
-            for (v in factor.intVars.distinct()) readers[v].add("$index:${factor::class.simpleName}")
+            val reader = "$index:${factor::class.simpleName}"
+            for (v in factor.intVars.distinct()) readers[v].add(reader)
         }
+        require(ternary.sumOf { table -> table.xs.sumOf { readers[it].size.toLong() } } <= 1_048_576)
         put("boolVars", problem.numBoolVars)
         put("intVars", problem.numIntVars)
         put("objective", objective.toString())
