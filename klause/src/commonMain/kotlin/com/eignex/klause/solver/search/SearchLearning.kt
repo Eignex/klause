@@ -111,7 +111,6 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
         val droppable = IntArrayList(learned.size)
         for (index in 0 until learned.size) {
             val retained = learned.lbdAt(index) <= learnedDb.glueLbd ||
-                stages[index] and 2 != 0 ||
                 learned.usedAt(index) ||
                 learned.literalsAt(index).size == 1
             if (!retained) droppable.add(index)
@@ -132,7 +131,10 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
             }
         }
         stages.truncateTo(target)
-        repeat(rechecks.size) { rechecks.addLast(remap[rechecks.removeFirst()]) }
+        repeat(rechecks.size) {
+            val next = remap[rechecks.removeFirst()]
+            if (next >= 0) rechecks.addLast(next)
+        }
         val retainedReasons = MutableIntIntMap()
         reasons.forEach { variable, index -> if (remap[index] >= 0) retainedReasons.put(variable, remap[index]) }
         reasons = retainedReasons

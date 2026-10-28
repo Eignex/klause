@@ -325,7 +325,6 @@ internal class NativeSatState(private val state: PropagationState) {
     fun forget(keep: (learnedIndex: Int, lbd: Int) -> Boolean) {
         // old learned index -> new learned index, or -1 if dropped.
         val referenced = state.referencedLearned(learnedCount)
-        for (i in recheckHead until rechecks.size) referenced[rechecks[i] - baseCount] = true
         val remap = IntArray(learnedCount)
         var survivors = 0
         for (i in 0 until learnedCount) {
@@ -338,7 +337,10 @@ internal class NativeSatState(private val state: PropagationState) {
         }
         state.remapReasons(state.boolReason, remap, baseCount)
         var queued = 0
-        for (i in recheckHead until rechecks.size) rechecks[queued++] = baseCount + remap[rechecks[i] - baseCount]
+        for (i in recheckHead until rechecks.size) {
+            val next = remap[rechecks[i] - baseCount]
+            if (next >= 0) rechecks[queued++] = baseCount + next
+        }
         rechecks.truncateTo(queued)
         recheckHead = 0
 

@@ -8,6 +8,9 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -15,20 +18,24 @@ import kotlin.test.assertIs
 
 class ClauseDbTest {
     @Test
-    fun `cancellation should preserve admitted native learning for a later fixpoint`() {
+    fun `cancellation should retain native learning until component retraction permits resumption`() {
         for (nativeSat in listOf(false, true)) {
             var cancelled = false
-            val session = PropagationSession(Problem(2, 0, emptyArray(), emptyArray()),
+            val session = PropagationSession(Problem(3, 0, emptyArray(), emptyArray()),
                 cancellation = Cancellation { cancelled }, propagationCancelFloor = 0, nativeSat = nativeSat)
+            val shared = SearchSession(listOf(CpSearchComponent(session)), cancellation = Cancellation { cancelled })
+            shared.initialize()
+            shared.push(SearchDecision.Bool(4))
             cancelled = true
 
             session.addLearnedClause(Clause(intArrayOf(0)), 1)
+            shared.popTo(0)
             cancelled = false
-            session.seed(Assumptions.None)
-            session.pinBool(1, true)
+            assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.Bool(5)))
 
             assertEquals(1, session.learnedClauseCount)
             assertEquals(true, session.boolValue(0))
+            assertEquals(true, shared.boolValue(0))
             assertEquals(1L, session.learnedLifecycle()["learningClauseConsumed"])
         }
     }
@@ -171,6 +178,20 @@ class ClauseDbTest {
         assertEquals(true, session.boolValue(1))
         assertEquals(1L, session.learnedLifecycle()["learningPbConsumed"])
         assertEquals(0, session.exportGlueClauses(10, 10).size)
+    }
+
+    @Test
+    fun `admitted clauses should own their literal buffers on each native lane`() {
+        for (nativeSat in listOf(false, true)) {
+            val session = PropagationSession(Problem(2, 0, emptyArray(), emptyArray()), nativeSat = nativeSat)
+            val clause = Clause(intArrayOf(0, 2))
+            session.addLearnedClause(clause, 2)
+            clause.literals.fill(1)
+
+            session.pinBool(0, false)
+
+            assertEquals(true, session.boolValue(1))
+        }
     }
 
     @Test
