@@ -30,7 +30,7 @@ import kotlin.test.assertTrue
 
 class IntegerConflictLearnerTest {
     @Test
-    fun `original rows should reroute the retained row scaling conflict`() {
+    fun `original rows should retain a reusable consequence of the scaling conflict`() {
         for (scale in listOf(2, 8, 32)) {
             for (order in listOf(listOf(0, 1, 2), listOf(0, 2, 1), listOf(1, 0, 2),
                 listOf(1, 2, 0), listOf(2, 0, 1), listOf(2, 1, 0))) {
@@ -49,10 +49,9 @@ class IntegerConflictLearnerTest {
 
                 val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(conflict.learnedClause,
                     "scale=$scale order=$order")
-                assertEquals(0L, learned.row.bound)
-                assertEquals(-1L, learned.row.coefficient(3))
-                assertEquals(1L, learned.row.coefficient(0) + learned.row.coefficient(1))
-                assertEquals(0L, learned.row.coefficient(2))
+                native.popToLevel(learned.backjumpLevel)
+                assertIs<PropagationResult.Implied>(native.addLearnedIntegerRow(learned.row, learned.lbd))
+                assertEquals(1L, native.intDomain(3).min, "scale=$scale order=$order")
             }
         }
     }

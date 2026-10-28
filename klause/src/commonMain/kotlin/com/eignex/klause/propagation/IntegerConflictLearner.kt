@@ -92,9 +92,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             val sourceRow = source.row(useLo) ?: continue
             if ((sourceRow.coefficient(variable) > 0L) == lower) continue
             val proposed = sourceRow.boundFor(state, variable, marker[2]) ?: continue
-            val domain = state.intDomains[variable]
-            // A snapped endpoint needs its crossed exclusions; the raw row alone must support the pivot.
-            if ((lower && proposed < domain.min) || (!lower && proposed > domain.max)) continue
+            if (!state.rawIntegerEndpointSupported(variable, lower, proposed, marker[2])) continue
             latest = BoundEvent(sourceRow, variable, marker[2], key)
         }
         return latest

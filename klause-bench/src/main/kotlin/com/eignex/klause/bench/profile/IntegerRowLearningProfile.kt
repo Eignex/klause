@@ -17,6 +17,7 @@ import com.eignex.klause.solver.search.SearchSession
 import com.sun.management.ThreadMXBean
 import java.io.File
 import java.lang.management.ManagementFactory
+import java.security.MessageDigest
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -36,6 +37,8 @@ internal object IntegerRowLearningProfile {
             val started = System.nanoTime()
             val before = bean.getThreadAllocatedBytes(thread)
             val yDomain = IntDomain(0, 12).let { if (hole == null) it else it.excludeValue(hole) }
+            val source = "2*x+y-z<=0; 2*x-y<=0; x=0..6; y=0..12; z=0..24" +
+                if (hole == null) "" else "; y!=$hole"
             val problem = Problem(0, 3, arrayOf(IntDomain(0, 6), yDomain, IntDomain(0, 24)), arrayOf(
                 Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
                 Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
@@ -58,6 +61,7 @@ internal object IntegerRowLearningProfile {
                 it.name.startsWith("getWork") && it.parameterCount == 0
             }
             val reasons = state.javaClass.getMethod("getIntMaxReason").invoke(state) as IntArray
+            var pointCheckWork = 0L
             for (upper in listOf(7L, 11L, 15L, 23L)) {
                 if (upper != 7L) {
                     shared.popTo(0)
@@ -75,10 +79,15 @@ internal object IntegerRowLearningProfile {
                 val x = if (upper == 7L) 1L else 2L
                 val y = if (2 * x == hole) 2 * x + 1 else 2 * x
                 val point = problem.withIntDomains(arrayOf(IntDomain(x, x), IntDomain(y, y), IntDomain(upper, upper)))
-                check(!PropagationSession(point).isUnsatAtRoot)
+                val checker = PropagationSession(point)
+                check(!checker.isUnsatAtRoot)
+                val pointState = checker.javaClass.getDeclaredField("state").apply { isAccessible = true }.get(checker)
+                pointCheckWork += workGetter.invoke(pointState) as Long
                 val record = buildJsonObject {
                     put("revision", Reports.readGitSha())
-                    put("source", "2*x+y-z<=0; 2*x-y<=0; x=0..6; y=0..12; y!=$hole; z=0..24")
+                    put("source", source)
+                    put("sourceSha256", MessageDigest.getInstance("SHA-256").digest(source.toByteArray())
+                        .joinToString("") { "%02x".format(it) })
                     put("hole", hole?.toString() ?: "none")
                     put("preparation", "retained finite projection; no presolve, difference/binary substitution or LP")
                     put("integerRowLearning", learning)
@@ -93,6 +102,7 @@ internal object IntegerRowLearningProfile {
                     put("nativeSourceCheck", true)
                     put("independentWitnessOrProofCheck", false)
                     put("cumulativeWork", workGetter.invoke(state) as Long)
+                    put("cumulativeNativePointCheckWork", pointCheckWork)
                     put("cumulativeElapsedNs", System.nanoTime() - started)
                     put("cumulativeThreadAllocatedBytes", bean.getThreadAllocatedBytes(thread) - before)
                     put("osName", System.getProperty("os.name"))
@@ -112,6 +122,7 @@ internal object IntegerRowLearningProfile {
                 put("hole", hole?.toString() ?: "none")
                 put("integerRowLearning", learning)
                 put("cumulativeWork", workGetter.invoke(state) as Long)
+                put("cumulativeNativePointCheckWork", pointCheckWork)
                 put("cumulativeElapsedNs", System.nanoTime() - started)
                 put("cumulativeThreadAllocatedBytes", bean.getThreadAllocatedBytes(thread) - before)
                 put("nativeStoredConstraints", native.learnedClauseCount)

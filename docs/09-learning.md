@@ -165,7 +165,9 @@ source row, with its exact guard false-literal and historical guard truth.
 The raw requested bound, reconstructed at the deduction's trail position, must
 support the eliminated live endpoint; a hole-snapped stronger endpoint retains
 clause fallback. Interior holes in the remaining terms stay in the actual domains
-and do not prevent a source-implied combination. Disequalities, wide constants
+and do not prevent a source-implied combination. Historical exclusions clipped by
+a pivot move remain conservative: a sparse tail walk admits at most 64 positions,
+using historical membership to exclude later carves. Disequalities, wide constants
 and unsupported projections retain clause fallback.
 
 A selected variable-array `Element` can seed a conflict from either side of its
@@ -181,9 +183,9 @@ propagate against the session's historical domains at its native backjump and th
 mapped shared target. The raw assertion target must have been a member of its
 historical domain; a later carve cannot remove that earlier membership, and a
 historical hole cannot supply a raw bound assertion. Literal counts do not establish
-assertion. Foreign unavailable
-bound premises retain clause analysis. The producer admits at most 16 terms, 16
-combinations, 64 native levels and 64 stored rows, with bounded duplicate lookup.
+assertion. Foreign unavailable bound premises retain clause analysis. The producer
+admits at most 16 terms, 16 combinations, 64 native levels and 64 stored rows, with
+bounded duplicate lookup.
 
 Rows retain at most one distinct signed guard; combinations requiring different
 guards retain clause fallback. A guarded row asserts only where its guard already
