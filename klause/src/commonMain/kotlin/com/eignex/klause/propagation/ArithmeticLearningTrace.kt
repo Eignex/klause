@@ -85,6 +85,20 @@ internal class ArithmeticLearningTrace(
         record("integer.marker", *LongArray(marker.size) { marker[it].toLong() })
     }
 
+    fun seedEndpoints(variables: IntArray, state: PropagationState) {
+        if (!accepting) return
+        if (variables.size > 16) {
+            record("analysis.seed-endpoints-declined", variables.size.toLong())
+            return
+        }
+        for (variable in variables) {
+            if (!accepting) return
+            val domain = state.intDomains[variable]
+            record("analysis.seed-endpoint", variable.toLong(), domain.min, domain.max,
+                state.intMinReason[variable].toLong(), state.intMaxReason[variable].toLong())
+        }
+    }
+
     fun stored(factorId: Int, kind: String) {
         if (!accepting) return
         if (storedIds.size == 64) {
