@@ -7318,6 +7318,18 @@ frontier under its own directory. The lab places this job normally; allow 600
 seconds for the six ordered captures. Their inspection allowances are separate
 from solving, and their ordered JFR timings establish no throughput comparison.
 
+`bench.profile.RealBooleanCutProfile` qualifies bounded common real consequences
+on two self-authored coupled-row sources. It records ordinary default source
+preparation separately, then compares partial rows, composed consequences,
+separate bounded reification hull closures and exhaustive Boolean coverage.
+One warmup and three measured rounds alternate arm order. Each arm has 20M modeled
+work and 64 MiB modeled allocation, divided between exhaustive alternatives.
+Lifecycle measurements include consequence construction, source checking, numerical
+consultation and disposal; JFR/thread allocation observations remain distinct from
+modeled costs. Native exact-source derivations are retained with their scope and
+nonnegative branch weights; they are not independent proof checks. Optional
+`preparationOnly=true` runs only the ordinary preparation audit.
+
 The capture retains the original bytes, native affine system and build/runtime
 identity. `incumbents.jsonl` flushes accepted incumbent values and branch conditions.
 `bounds.jsonl` flushes changed global bounds after cooperative slices, recording

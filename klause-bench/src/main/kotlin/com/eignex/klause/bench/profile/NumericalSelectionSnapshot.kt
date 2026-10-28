@@ -106,7 +106,7 @@ internal class NumericalSelectionSnapshot(private val stop: Cancellation) {
             val context = field(record, "context") as SourceProofContext
             val booleans = context.scope.condition.bools
             if (context.coordinates.none { it.kind == SourceCoordinate.Kind.Boolean && it.id !in booleans }) continue
-            val replay = run.invoke(instance, record, 20_000_000L, 67_108_864L, stop)
+            val replay = run.invoke(instance, record, 20_000_000L, 67_108_864L, stop, false)
             inspected++
             emit(buildJsonObject {
                 put("originalQuery", field(record, "id") as Int)

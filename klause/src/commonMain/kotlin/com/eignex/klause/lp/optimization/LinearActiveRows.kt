@@ -92,7 +92,14 @@ internal class LinearActiveRows(
                 var work = 0L
                 val allowance = minOf(100_000L, budget.funding?.availableWork ?: 100_000L)
                 val checks = SourceEvidenceVerifier(branch, maximumSteps = 100_000).verifyAll(
-                    prepared.consequences, Cancellation { if (work >= allowance) true else { work++; funded() } })
+                    prepared.consequences, Cancellation {
+                        if (work >= allowance || funded() ||
+                            (budget.funding?.remainingAllocation ?: Long.MAX_VALUE) < 128L) true else {
+                            work++
+                            budget.funding?.charge(0L, 128L)
+                            funded()
+                        }
+                    })
                 budget.observe(boundCertification = work)
                 if (funded()) return LinearActiveResult(attempted = true, paused = budget.funding?.paused == true)
                 prepared.consequences.filterIndexed { index, _ -> checks[index] == SourceEvidenceCheck.Checked }.also {
@@ -118,6 +125,11 @@ internal class LinearActiveRows(
         }
         fun checked(weights: List<BigFraction>?): SourceEvidence? {
             if (weights == null) return null
+            if (composeBranches) {
+                val allocation = branch.coordinateCount * 128L + branch.premiseCount * 128L
+                if (allocation > (budget.funding?.remainingAllocation ?: Long.MAX_VALUE)) return null
+                budget.funding?.charge(0L, allocation)
+            }
             val proof = SourceDerivation.Combination(weights.mapIndexedNotNull { id, weight ->
                 if (weight.isZero) null else SourceDerivation.Combination.Term(weight, query.cited[id].second)
             })
@@ -126,8 +138,10 @@ internal class LinearActiveRows(
             val allowance = budget.funding?.availableWork ?: Long.MAX_VALUE
             val verdict = try {
                 SourceEvidenceVerifier(branch.withLinearAuthority()).verify(evidence, Cancellation {
-                    if (work >= allowance) true else {
+                    if (work >= allowance || (composeBranches && (budget.funding?.paused == true ||
+                            (budget.funding?.remainingAllocation ?: Long.MAX_VALUE) < 128L))) true else {
                         work++
+                        if (composeBranches) budget.funding?.charge(0L, 128L)
                         cancellation()
                     }
                 })
