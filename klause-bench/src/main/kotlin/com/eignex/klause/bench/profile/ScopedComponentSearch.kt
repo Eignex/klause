@@ -61,8 +61,9 @@ internal object ScopedComponentSearch {
         seed: Long,
         lp: Boolean = false,
         initial: List<ComponentCostBounds>? = null,
+        restrictionCutoff: BigInteger? = null,
     ): ComponentSearchResult {
-        val composition = ScopedComponentBounds(fixedAndIsolated, scopes)
+        val composition = ScopedComponentBounds(fixedAndIsolated, scopes, restrictionCutoff)
         require(initial == null || initial.map { it.scope } == scopes)
         val bounds = (initial ?: scopes.map { ComponentCostBounds.opening(it) }).toMutableList()
         var queries = 0

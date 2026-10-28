@@ -150,23 +150,29 @@ object ScopedComponentProfile {
         seed: Long,
         allowance: ComponentAllowance = ComponentAllowance(Cancellation.after(millis.milliseconds)),
         lp: Boolean = false,
+        sourceCheck: ((List<Boolean>, ComponentAllowance) -> Boolean)? = null,
     ): JsonObject {
         val start = System.nanoTime()
         val partition = residual.capture(allowance)
             ?: return buildJsonObject { put("decline", "capture-allowance") }
         val captured = System.nanoTime()
-        val result = ScopedComponentSearch.run(partition.scopes, partition.offset, cutoff, allowance, seed, lp)
-        val composition = ScopedComponentBounds(partition.offset, partition.scopes)
+        val result = ScopedComponentSearch.run(partition.scopes, partition.offset, cutoff, allowance, seed, lp,
+            restrictionCutoff = residual.restrictionCutoff)
+        val composition = ScopedComponentBounds(partition.offset, partition.scopes, residual.restrictionCutoff)
         val witness = if (allowance.visit(residual.weights.size.toLong() + residual.clauses.sumOf { it.size.toLong() })) {
             partition.reconstruct(result.children)?.also { check(residual.accepts(it)) }
         } else null
+        val sourceChecked = witness != null && sourceCheck != null && sourceCheck(witness, allowance)
+        check(witness == null || sourceCheck == null || sourceChecked || allowance.stop())
         return buildJsonObject {
+            put("authority", "captured-conditions-and-cutoff")
             put("cutoff", cutoff.toString())
-            put("closed", result.closed)
+            put("closed", result.closed && !allowance.stop())
             put("lower", composition.floor(result.children).toString())
             put("exact", composition.exact(result.children)?.toString())
             put("witnessObjective", witness?.let(residual::cost)?.toString())
             put("nativeClauseCheck", witness != null)
+            put("originalSourceWitnessChecked", sourceChecked)
             put("sourceInfeasible", result.children.any { it.sourceInfeasible })
             put("components", JsonArray(partition.scopes.map { JsonPrimitive(it.variables.size) }))
             put("childLower", JsonArray(result.children.map { JsonPrimitive(it.lower.toString()) }))
@@ -184,7 +190,13 @@ object ScopedComponentProfile {
         }
     }
 
-    internal fun separator(residual: ComponentResidual, cutoff: BigInteger, millis: Long, seed: Long): JsonObject {
+    internal fun separator(
+        residual: ComponentResidual,
+        cutoff: BigInteger,
+        millis: Long,
+        seed: Long,
+        sourceCheck: ((List<Boolean>, ComponentAllowance) -> Boolean)? = null,
+    ): JsonObject {
         val allowance = ComponentAllowance(Cancellation.after(millis.milliseconds))
         val start = System.nanoTime()
         val separator = BooleanSeparators.choose(residual.clauses, residual.weights.size, residual.fixed,
@@ -193,7 +205,7 @@ object ScopedComponentProfile {
         val analysis = System.nanoTime() - start
         val branches = separator.branches.map { branch ->
             composition(residual.copy(fixed = residual.fixed + (separator.variable to branch.value)),
-                cutoff, millis, seed, allowance)
+                cutoff, millis, seed, allowance, sourceCheck = sourceCheck)
         }
         return buildJsonObject {
             put("variable", separator.variable)
@@ -214,11 +226,15 @@ object ScopedComponentProfile {
         biased: Int? = null,
         cutoff: BigInteger? = null,
         pbCutoff: Boolean = false,
+        sourceCheck: ((List<Boolean>, ComponentAllowance) -> Boolean)? = null,
     ): JsonObject {
+        require(residual.restrictionCutoff == null || cutoff != null && cutoff <= residual.restrictionCutoff)
         val start = System.nanoTime()
         val allowance = ComponentAllowance(Cancellation.after(millis.milliseconds))
         val clauses = residual.clauses + residual.fixed.map { (v, value) -> listOf(Lit.make(v, value)) }
-        val factors = clauses.map { Clause(it.toIntArray()) }.toMutableList<Factor>()
+        val factors = ArrayList<Factor>(clauses.size + 1).apply {
+            clauses.forEach { add(Clause(it.toIntArray())) }
+        }
         if (cutoff != null) factors += PseudoBoolean(
             residual.weights.map { parseBigInt(it.toString()) }.toTypedArray(),
             IntArray(residual.weights.size) { Lit.make(it, true) }, PbOp.LE,
@@ -235,14 +251,17 @@ object ScopedComponentProfile {
             lpConfig = if (lp) LpConfig(LpEmphasis.DEFAULT) else null))
         val witness = result.assignment?.let { sample -> List(residual.weights.size) { sample.boolValue(it) } }
         witness?.let { check(residual.accepts(it)) }
+        val sourceChecked = witness != null && sourceCheck != null && sourceCheck(witness, allowance)
+        check(witness == null || sourceCheck == null || sourceChecked || allowance.stop())
         return buildJsonObject {
             put("authority", "captured-conditions-and-cutoff")
             put("result", result::class.simpleName)
             put("cutoff", cutoff?.toString())
-            put("cutoffClosed", cutoff != null && result is MinimizeResult.Infeasible)
+            put("cutoffClosed", cutoff != null && result is MinimizeResult.Infeasible && !allowance.stop())
             put("pbObjectiveCutoff", pbCutoff)
             put("objective", witness?.let(residual::cost)?.toString())
             put("nativeClauseCheck", witness != null)
+            put("originalSourceWitnessChecked", sourceChecked)
             put("decisions", allowance.nodes.spent)
             put("decisionTrace", JsonArray(decisions))
             put("totalMs", (System.nanoTime() - start) / 1_000_000.0)

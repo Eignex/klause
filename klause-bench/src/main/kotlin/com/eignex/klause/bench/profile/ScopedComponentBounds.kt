@@ -81,6 +81,7 @@ internal data class ComponentCostBounds private constructor(
 internal class ScopedComponentBounds(
     private val fixedAndIsolated: BigInteger,
     private val scopes: List<ComponentCostScope>,
+    private val restrictionCutoff: BigInteger? = null,
 ) {
     init {
         require(scopes.flatMap { it.variables }.distinct().size == scopes.sumOf { it.variables.size })
@@ -108,7 +109,7 @@ internal class ScopedComponentBounds(
 
     fun exact(children: List<ComponentCostBounds>): BigInteger? {
         checkScopes(children)
-        if (children.any { it.exact == null || it.scope.restrictionCutoff != null }) return null
+        if (restrictionCutoff != null || children.any { it.exact == null || it.scope.restrictionCutoff != null }) return null
         return children.fold(fixedAndIsolated) { total, child -> total + checkNotNull(child.exact) }
     }
 
@@ -117,6 +118,7 @@ internal class ScopedComponentBounds(
     }
 
     private fun checkCutoff(cutoff: BigInteger) {
+        require(restrictionCutoff == null || cutoff <= restrictionCutoff)
         require(scopes.all { it.restrictionCutoff == null || cutoff <= it.restrictionCutoff })
     }
 }
