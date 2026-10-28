@@ -225,6 +225,12 @@ encodings and the original column declarations. Unsupported encodings or objecti
 operations retain unknown. `SourceStrategy.solveSample` publishes the native typed
 witness without parsing symbolic expression text.
 
+`Problem.checkExactRealSample` checks a captured witness against the complete native
+encodings and original declarations; unavailable encodings, undecided comparisons
+and exhausted allowances withhold a verdict. `ExactRealValue.approximate` supplies
+a separate bounded numerical view for display and learning features. Neither that
+view nor a consumer's rounded feature vector has witness authority.
+
 Only an original-source check turns these values into a witness: a symbolic value
 describes one coordinate, not that a formula holds. `Sample.symbolicReals` captures
 the expressions beside rational and algebraic coordinates, and replacing an

@@ -21,9 +21,11 @@ fun BigFraction.toExactRealValue(): ExactRealValue = AlgebraicArithmetic().ratio
 /** Authoritative real coordinate, widening a finite binary64 value only when no exact witness exists. */
 fun Sample.exactRealValue(id: Int): ExactRealValue = symbolicReals?.get(id)
     ?: algebraicReals?.get(id)?.toExactRealValue()
-    ?: (exactReals?.get(id) ?: requireNotNull(BigFraction.ofDouble(approximateRealValue(id))) {
+    ?: (
+        exactReals?.get(id) ?: requireNotNull(BigFraction.ofDouble(approximateRealValue(id))) {
         "real coordinate $id has no exact value"
-    }).toExactRealValue()
+    }
+    ).toExactRealValue()
 
 /** Numerical view for display or learning features; NaN means an enclosure was unavailable. */
 fun ExactRealValue.approximate(): Double {
@@ -31,8 +33,10 @@ fun ExactRealValue.approximate(): Double {
     var polls = 0
     val stop = Cancellation { ++polls > 100000 }
     return try {
-        val arithmetic = ExactRealArithmetic(TranscendentalArithmetic(stop, maximumWork = 100000),
-            AlgebraicArithmetic(PolynomialArithmetic(stop)))
+        val arithmetic = ExactRealArithmetic(
+            TranscendentalArithmetic(stop, maximumWork = 100000),
+            AlgebraicArithmetic(PolynomialArithmetic(stop)),
+        )
         val enclosure = arithmetic.enclose(this, 16)
         enclosure.lower.toDouble() / 2 + enclosure.upper.toDouble() / 2
     } catch (_: PolynomialInterrupted) {
@@ -53,8 +57,10 @@ fun ExactRealValue.compareExactly(other: ExactRealValue): Int? {
     var polls = 0
     val stop = Cancellation { ++polls > 100000 }
     return try {
-        ExactRealArithmetic(TranscendentalArithmetic(stop, maximumWork = 100000),
-            AlgebraicArithmetic(PolynomialArithmetic(stop))).compare(this, other)
+        ExactRealArithmetic(
+            TranscendentalArithmetic(stop, maximumWork = 100000),
+            AlgebraicArithmetic(PolynomialArithmetic(stop)),
+        ).compare(this, other)
     } catch (_: PolynomialInterrupted) {
         null
     } catch (_: PolynomialResourceLimit) {

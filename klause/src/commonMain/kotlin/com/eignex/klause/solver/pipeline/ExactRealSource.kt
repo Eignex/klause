@@ -10,13 +10,24 @@ import com.eignex.klause.util.bigIntOf
 
 private class ExactRealSourceUnavailable : RuntimeException()
 
+private fun unavailable(): Nothing = throw ExactRealSourceUnavailable()
+
 internal fun prepareExactRealSource(request: SourceSetupRequest, stop: Cancellation): SourceProblemRoute.NativeFormula {
-    if (request.operation != ExecutionOperation.SATISFY) return SourceProblemRoute.NativeFormula(null,
-        com.eignex.klause.solver.result.TerminationReason.Unsupported)
+    if (request.operation != ExecutionOperation.SATISFY) {
+        return SourceProblemRoute.NativeFormula(
+            null,
+            com.eignex.klause.solver.result.TerminationReason.Unsupported,
+        )
+    }
     val functions = request.source.problem.exactRealSource(request.providers, stop)
-        ?: return SourceProblemRoute.NativeFormula(null, if (stop())
-            com.eignex.klause.solver.result.TerminationReason.Cancelled
-        else com.eignex.klause.solver.result.TerminationReason.Unsupported)
+        ?: return SourceProblemRoute.NativeFormula(
+            null,
+            if (stop()) {
+                com.eignex.klause.solver.result.TerminationReason.Cancelled
+            } else {
+                com.eignex.klause.solver.result.TerminationReason.Unsupported
+            },
+        )
     return prepareNativeSource(request, AttachedSourceFormula.Functions(functions), stop)
 }
 
@@ -27,7 +38,7 @@ internal fun Problem.exactRealSource(
     val source = this
     fun checkpoint() {
         stop.charge(1)
-        if (stop()) throw ExactRealSourceUnavailable()
+        if (stop()) unavailable()
     }
     return try {
         val formulas = ArrayList<TranscendentalFormula>()
@@ -44,19 +55,30 @@ internal fun Problem.exactRealSource(
             checkpoint()
             if (source.intBounds.hasLower(id) && source.intBounds.hasUpper(id) &&
                 source.intBounds.lower(id) == source.intBounds.upper(id)
-            ) SourceIntId(id) to bigIntOf(source.intBounds.lower(id)) else null
+            ) {
+                SourceIntId(id) to bigIntOf(source.intBounds.lower(id))
+            } else {
+                null
+            }
         }.toMap()
         val projections = providers.prepare(source)
         for ((index, factor) in source.factors.withIndex()) {
             checkpoint()
             if (factor is ExactRealEquality) {
-                formulas += TranscendentalFormula.Atom(real(factor.id.index), PolynomialRelation.EQ,
-                    TranscendentalExpression.ExactValue(factor.value))
+                formulas += TranscendentalFormula.Atom(
+                    real(factor.id.index),
+                    PolynomialRelation.EQ,
+                    TranscendentalExpression.ExactValue(factor.value),
+                )
                 continue
             }
-            val encoder = projections.requestEncoders(EncodingTarget.POLYNOMIAL, listOf(index),
-                fixedIntegers = fixed, cancellation = stop)?.encoders?.single()
-                ?: throw ExactRealSourceUnavailable()
+            val encoder = projections.requestEncoders(
+                EncodingTarget.POLYNOMIAL,
+                listOf(index),
+                fixedIntegers = fixed,
+                cancellation = stop,
+            )?.encoders?.single()
+                ?: unavailable()
             var emissions = 0
             val encoding = object : TheoryEncoding {
                 override val target = EncodingTarget.POLYNOMIAL
@@ -64,7 +86,7 @@ internal fun Problem.exactRealSource(
                 override val cancellation = stop
                 override fun fixedInteger(id: SourceIntId): BigInt? = fixed[id]
                 override fun fixedBoolean(id: SourceBoolId): Boolean? = null
-                override fun linear(form: LinearForm): Unit = throw ExactRealSourceUnavailable()
+                override fun linear(form: LinearForm): Unit = unavailable()
                 override fun polynomial(formula: PolynomialRealFormula) {
                     formulas += formula.functions(::checkpoint)
                     emissions++
@@ -77,10 +99,13 @@ internal fun Problem.exactRealSource(
                     require(id.index in factor.variables.reals)
                     return PolynomialExpression.Variable(SourceRealId(source.numIntVars + id.index))
                 }
-                override fun conditional(condition: PolynomialRealFormula, whenTrue: PolynomialExpression,
-                    whenFalse: PolynomialExpression): PolynomialExpression = throw ExactRealSourceUnavailable()
+                override fun conditional(
+                    condition: PolynomialRealFormula,
+                    whenTrue: PolynomialExpression,
+                    whenFalse: PolynomialExpression,
+                ): PolynomialExpression = unavailable()
             }
-            if (encoder.install(factor, encoding) != null || emissions == 0) throw ExactRealSourceUnavailable()
+            if (encoder.install(factor, encoding) != null || emissions == 0) unavailable()
         }
         for (id in 0 until source.numIntVars) {
             val bounds = source.intBounds
@@ -88,12 +113,15 @@ internal fun Problem.exactRealSource(
             if (bounds.hasUpper(id)) relation(integer(id), PolynomialRelation.LE, BigFraction.ofLong(bounds.upper(id)))
             val domain = source.intDomainOrNull(id) ?: continue
             if (domain.holeCount != 0L) {
-                val members = domain.spanOrNull(domain.holeCount) ?: throw ExactRealSourceUnavailable()
+                val members = domain.spanOrNull(domain.holeCount) ?: unavailable()
                 val alternatives = ArrayList<TranscendentalFormula>()
                 members.forEach {
                     checkpoint()
-                    alternatives += TranscendentalFormula.Atom(integer(id), PolynomialRelation.EQ,
-                        constant(BigFraction.ofLong(it)))
+                    alternatives += TranscendentalFormula.Atom(
+                        integer(id),
+                        PolynomialRelation.EQ,
+                        constant(BigFraction.ofLong(it)),
+                    )
                 }
                 formulas += TranscendentalFormula.Or(alternatives)
             }
@@ -103,15 +131,18 @@ internal fun Problem.exactRealSource(
             val upper = source.realUpper[id]
             if (lower.isFinite()) relation(real(id), PolynomialRelation.GE, requireNotNull(BigFraction.ofDouble(lower)))
             if (upper.isFinite()) relation(real(id), PolynomialRelation.LE, requireNotNull(BigFraction.ofDouble(upper)))
-            if (lower.isNaN() || upper.isNaN()) throw ExactRealSourceUnavailable()
+            if (lower.isNaN() || upper.isNaN()) unavailable()
             if (lower == Double.POSITIVE_INFINITY || upper == Double.NEGATIVE_INFINITY) {
                 formulas += TranscendentalFormula.Constant(false)
             }
         }
-        val functions = TranscendentalProblem(TranscendentalFormula.And(formulas),
+        val functions = TranscendentalProblem(
+            TranscendentalFormula.And(formulas),
             (0 until source.numIntVars).associate { "ints.$it" to it },
             (0 until source.numRealVars).associate { "reals.$it" to (source.numIntVars + it) },
-            (0 until source.numBoolVars).associate { "bools.$it" to it }, semantics = source.semantics)
+            (0 until source.numBoolVars).associate { "bools.$it" to it },
+            semantics = source.semantics,
+        )
         functions
     } catch (_: ExactRealSourceUnavailable) {
         null
@@ -135,13 +166,23 @@ private fun PolynomialRealFormula.functions(checkpoint: () -> Unit): Transcenden
     checkpoint()
     return when (this) {
         is PolynomialRealFormula.Constant -> TranscendentalFormula.Constant(value)
+
         is PolynomialRealFormula.BooleanVariable -> TranscendentalFormula.BooleanVariable(id)
-        is PolynomialRealFormula.Atom -> TranscendentalFormula.Atom(left.functions(checkpoint), relation,
-            right.functions(checkpoint))
+
+        is PolynomialRealFormula.Atom -> TranscendentalFormula.Atom(
+            left.functions(checkpoint),
+            relation,
+            right.functions(checkpoint),
+        )
+
         is PolynomialRealFormula.Not -> TranscendentalFormula.Not(operand.functions(checkpoint))
+
         is PolynomialRealFormula.And -> TranscendentalFormula.And(operands.map { it.functions(checkpoint) })
+
         is PolynomialRealFormula.Or -> TranscendentalFormula.Or(operands.map { it.functions(checkpoint) })
+
         is PolynomialDistinct -> TranscendentalDistinct(operands.map { it.functions(checkpoint) })
-        is PolynomialSelection -> throw ExactRealSourceUnavailable()
+
+        is PolynomialSelection -> unavailable()
     }
 }

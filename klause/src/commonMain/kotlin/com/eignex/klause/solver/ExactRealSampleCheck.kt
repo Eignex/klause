@@ -31,8 +31,10 @@ fun Problem.checkExactRealSample(sample: Sample, cancellation: Cancellation = Ca
     }
     return try {
         val source = exactRealSource(FactorProjectionProviders.Default, cancellation) ?: return null
-        val arithmetic = ExactRealArithmetic(TranscendentalArithmetic(cancellation, maximumWork = 100000),
-            AlgebraicArithmetic(PolynomialArithmetic(cancellation)))
+        val arithmetic = ExactRealArithmetic(
+            TranscendentalArithmetic(cancellation, maximumWork = 100000),
+            AlgebraicArithmetic(PolynomialArithmetic(cancellation)),
+        )
         val values = List(numIntVars) { BigFraction.of(sample.exactIntValue(it), BIG_ONE).toExactRealValue() } +
             List(numRealVars) { sample.exactRealValue(it) }
         when (TranscendentalSourceCheck(arithmetic, values, sample.bools).check(source.formula)) {

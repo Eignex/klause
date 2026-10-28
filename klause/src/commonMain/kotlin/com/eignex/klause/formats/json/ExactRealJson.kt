@@ -1,10 +1,10 @@
 package com.eignex.klause.formats.json
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
-import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
+import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.arithmetic.real.ExactRealArithmetic
 import com.eignex.klause.arithmetic.real.ExactRealExpression
 import com.eignex.klause.arithmetic.real.ExactRealFunction
@@ -58,70 +58,89 @@ object ExactRealJson {
                     val coefficients = (payload["coefficients"] as? JsonArray)?.map {
                         require(it is JsonPrimitive && it.isString) { "root coefficients must be fraction strings" }
                         Json.decodeFromJsonElement(BigFractionSerializer, it)
-                    } ?: throw IllegalArgumentException("root coefficients must be an array")
+                    } ?: invalid("root coefficients must be an array")
                     require(coefficients.size in 2..1024 && coefficients.last() != BigFraction.ZERO) {
                         "root requires a nonconstant polynomial without trailing zero coefficients"
                     }
                     val index = (payload["index"] as? JsonPrimitive)?.takeUnless { it.isString }?.intOrNull
-                        ?: throw IllegalArgumentException("root index must be an integer")
+                        ?: invalid("root index must be an integer")
                     require(index > 0) { "root index must be positive" }
                     val roots = algebraic.roots(RationalPolynomial(coefficients))
                     require(index <= roots.size) { "root index exceeds the number of distinct real roots" }
                     arithmetic.scalar(roots[index - 1])
                 }
+
                 "pi" -> {
                     require(payload is JsonObject && payload.isEmpty()) { "pi requires an empty object" }
                     arithmetic.pi()
                 }
+
                 "exp", "log", "sin", "cos" -> arithmetic.function(
-                    ExactRealFunction.valueOf(key.uppercase()), decode(payload, depth + 1),
+                    ExactRealFunction.valueOf(key.uppercase()),
+                    decode(payload, depth + 1),
                 )
+
                 "add" -> arithmetic.add(operands())
+
                 "multiply" -> arithmetic.multiply(operands())
+
                 "power" -> {
                     require(payload is JsonArray && payload.size == 2) { "power requires a base and exponent" }
                     val exponent = (payload[1] as? JsonPrimitive)?.takeUnless { it.isString }?.intOrNull
-                        ?: throw IllegalArgumentException("power exponent must be an integer")
+                        ?: invalid("power exponent must be an integer")
                     require(exponent >= 0) { "power exponent must be nonnegative" }
                     arithmetic.power(decode(payload[0], depth + 1), exponent)
                 }
-                else -> throw IllegalArgumentException("unknown exact real operator '$key'")
+
+                else -> invalid("unknown exact real operator '$key'")
             }
         }
         return try {
             decode(element, 0)
         } catch (error: RealDomainInvalid) {
-            throw IllegalArgumentException("exact real function domain is invalid", error)
+            invalid("exact real function domain is invalid", error)
         } catch (error: RealCertificationUnavailable) {
-            throw IllegalArgumentException("exact real function domain could not be certified", error)
+            invalid("exact real function domain could not be certified", error)
         } catch (error: PolynomialInterrupted) {
-            throw IllegalArgumentException("exact real decoding allowance exceeded", error)
+            invalid("exact real decoding allowance exceeded", error)
         } catch (error: PolynomialResourceLimit) {
-            throw IllegalArgumentException("exact real polynomial representation limit exceeded", error)
+            invalid("exact real polynomial representation limit exceeded", error)
         } catch (error: TranscendentalInterrupted) {
-            throw IllegalArgumentException("exact real decoding allowance exceeded", error)
+            invalid("exact real decoding allowance exceeded", error)
         } catch (error: TranscendentalResourceLimit) {
-            throw IllegalArgumentException("exact real analytic representation limit exceeded", error)
+            invalid("exact real analytic representation limit exceeded", error)
         }
     }
 
     /** Decode JSON text using the same closed expression contract. */
     fun decodeFromString(text: String): ExactRealValue = decodeFromJsonElement(Json.parseToJsonElement(text))
 
+    private fun invalid(message: String, cause: Throwable? = null): Nothing =
+        throw IllegalArgumentException(message, cause)
+
     private fun encode(node: ExactRealExpression): JsonElement = when (node) {
         is ExactRealExpression.Algebraic -> node.value.rational?.let { JsonPrimitive(it.toString()) }
             ?: buildJsonObject {
-                put("root", buildJsonObject {
-                    put("coefficients", JsonArray(node.value.definingCoefficients.map { JsonPrimitive(it.toString()) }))
-                    put("index", node.value.rootIndex)
-                })
+                put(
+                    "root",
+                    buildJsonObject {
+                        val coefficients = node.value.definingCoefficients.map { JsonPrimitive(it.toString()) }
+                        put("coefficients", JsonArray(coefficients))
+                        put("index", node.value.rootIndex)
+                    },
+                )
             }
+
         ExactRealExpression.Pi -> buildJsonObject { put("pi", JsonObject(emptyMap())) }
+
         is ExactRealExpression.Function -> buildJsonObject {
             put(node.function.name.lowercase(), encode(node.argument))
         }
+
         is ExactRealExpression.Sum -> buildJsonObject { put("add", JsonArray(node.operands.map(::encode))) }
+
         is ExactRealExpression.Product -> buildJsonObject { put("multiply", JsonArray(node.operands.map(::encode))) }
+
         is ExactRealExpression.Power -> buildJsonObject {
             put("power", JsonArray(listOf(encode(node.base), JsonPrimitive(node.exponent))))
         }

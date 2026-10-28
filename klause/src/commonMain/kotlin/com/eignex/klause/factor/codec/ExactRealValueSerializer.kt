@@ -5,8 +5,8 @@ import com.eignex.klause.formats.json.ExactRealJson
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonEncoder
 
 internal object ExactRealValueSerializer : KSerializer<ExactRealValue> {

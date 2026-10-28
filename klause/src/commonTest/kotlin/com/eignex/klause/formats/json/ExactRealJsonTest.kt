@@ -36,6 +36,10 @@ class ExactRealJsonTest {
             """{"root":{"coefficients":["-2","0","1"],"index":3}}""",
             """{"root":{"coefficients":["-2","0","1"],"index":2,"lower":"1"}}""",
             """{"power":[{"pi":{}},-1]}""", """{"exp":"1","sin":"1"}""",
-        )) assertFailsWith<IllegalArgumentException>(text) { ExactRealJson.decodeFromJsonElement(Json.parseToJsonElement(text)) }
+        )) {
+            assertFailsWith<IllegalArgumentException>(text) {
+                ExactRealJson.decodeFromJsonElement(Json.parseToJsonElement(text))
+            }
+        }
     }
 }

@@ -74,6 +74,14 @@ public final class com/eignex/klause/arithmetic/real/ExactRealValue {
 	public final fun getRational ()Lcom/eignex/klause/simplex/exact/BigFraction;
 }
 
+public final class com/eignex/klause/arithmetic/real/ExactRealValuesKt {
+	public static final fun approximate (Lcom/eignex/klause/arithmetic/real/ExactRealValue;)D
+	public static final fun compareExactly (Lcom/eignex/klause/arithmetic/real/ExactRealValue;Lcom/eignex/klause/arithmetic/real/ExactRealValue;)Ljava/lang/Integer;
+	public static final fun exactRealValue (Lcom/eignex/klause/solver/Sample;I)Lcom/eignex/klause/arithmetic/real/ExactRealValue;
+	public static final fun toExactRealValue (Lcom/eignex/klause/arithmetic/polynomial/AlgebraicReal;)Lcom/eignex/klause/arithmetic/real/ExactRealValue;
+	public static final fun toExactRealValue (Lcom/eignex/klause/simplex/exact/BigFraction;)Lcom/eignex/klause/arithmetic/real/ExactRealValue;
+}
+
 public final class com/eignex/klause/backtrack/BacktrackParams : com/eignex/klause/solver/SolverParams {
 	public fun <init> ()V
 	public fun <init> (Lkotlin/jvm/functions/Function0;JLjava/lang/Long;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/backtrack/selector/VariableSelector;Lcom/eignex/klause/backtrack/selector/ValueSelector;IILjava/lang/Long;ZZZZZJZLjava/lang/Integer;IZIZIZIILkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Lcom/eignex/klause/solver/incumbent/IncumbentSource;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/bounding/LpPlan;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Long;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/propagation/ClauseExchange;Lcom/eignex/klause/lp/cut/CutExchange;Ljava/lang/Boolean;Ljava/lang/Boolean;ZZZ)V
@@ -1255,6 +1263,26 @@ public final class com/eignex/klause/factor/arithmetic/ExactLinear : com/eignex/
 public final class com/eignex/klause/factor/arithmetic/ExactLinear$Companion {
 	public final fun of ([ILjava/util/List;Lcom/eignex/klause/ir/LinearOp;Lcom/eignex/klause/simplex/exact/BigFraction;ZI)Lcom/eignex/klause/factor/arithmetic/ExactLinear;
 	public static synthetic fun of$default (Lcom/eignex/klause/factor/arithmetic/ExactLinear$Companion;[ILjava/util/List;Lcom/eignex/klause/ir/LinearOp;Lcom/eignex/klause/simplex/exact/BigFraction;ZIILjava/lang/Object;)Lcom/eignex/klause/factor/arithmetic/ExactLinear;
+}
+
+public final class com/eignex/klause/factor/arithmetic/ExactRealEquality : com/eignex/klause/ir/Factor {
+	public synthetic fun <init> (ILcom/eignex/klause/arithmetic/real/ExactRealValue;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun canSubstituteAffine (IIII)Z
+	public fun getBoolVars ()[I
+	public final fun getId-P0Uu7zc ()I
+	public fun getIntVars ()[I
+	public fun getLinearForm ()Lcom/eignex/klause/ir/LinearForm;
+	public fun getStructuralKeyWeight ()I
+	public final fun getValue ()Lcom/eignex/klause/arithmetic/real/ExactRealValue;
+	public fun getVariables ()Lcom/eignex/klause/ir/RealVars;
+	public synthetic fun getVariables ()Lcom/eignex/klause/ir/VarList;
+	public fun isValueAnonymous ()Z
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
+	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
+	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
+	public fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
+	public fun structuralReduce ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
 public final class com/eignex/klause/factor/arithmetic/Linear : com/eignex/klause/ir/Factor, com/eignex/klause/ir/LinearRow {
@@ -2723,6 +2751,14 @@ public final class com/eignex/klause/formats/flatzinc/SolveDirective$Satisfy : c
 
 public final class com/eignex/klause/formats/flatzinc/UnsupportedFlatZincException : com/eignex/klause/formats/flatzinc/FlatZincParseException {
 	public fun <init> (Ljava/lang/String;II)V
+}
+
+public final class com/eignex/klause/formats/json/ExactRealJson {
+	public static final field INSTANCE Lcom/eignex/klause/formats/json/ExactRealJson;
+	public final fun decodeFromJsonElement (Lkotlinx/serialization/json/JsonElement;)Lcom/eignex/klause/arithmetic/real/ExactRealValue;
+	public final fun decodeFromString (Ljava/lang/String;)Lcom/eignex/klause/arithmetic/real/ExactRealValue;
+	public final fun encodeToJsonElement (Lcom/eignex/klause/arithmetic/real/ExactRealValue;)Lkotlinx/serialization/json/JsonElement;
+	public final fun encodeToString (Lcom/eignex/klause/arithmetic/real/ExactRealValue;)Ljava/lang/String;
 }
 
 public class com/eignex/klause/formats/json/JsonFormatException : com/eignex/klause/formats/FormatException {
@@ -10485,6 +10521,11 @@ public final class com/eignex/klause/solver/AssignmentCheckCapability : java/lan
 	public static fun values ()[Lcom/eignex/klause/solver/AssignmentCheckCapability;
 }
 
+public final class com/eignex/klause/solver/ExactRealSampleCheckKt {
+	public static final fun checkExactRealSample (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/util/Cancellation;)Ljava/lang/Boolean;
+	public static synthetic fun checkExactRealSample$default (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Ljava/lang/Boolean;
+}
+
 public final class com/eignex/klause/solver/FactorProjectionProviders {
 	public static final field Companion Lcom/eignex/klause/solver/FactorProjectionProviders$Companion;
 	public fun <init> ()V
@@ -10874,6 +10915,11 @@ public final class com/eignex/klause/solver/SolverParams$DefaultImpls {
 	public static fun withAssumptions (Lcom/eignex/klause/solver/SolverParams;Lcom/eignex/klause/propagation/Assumptions;)Lcom/eignex/klause/solver/SolverParams;
 	public static fun withCancellation (Lcom/eignex/klause/solver/SolverParams;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/SolverParams;
 	public static fun withLifetimeCancellation (Lcom/eignex/klause/solver/SolverParams;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/SolverParams;
+}
+
+public final class com/eignex/klause/solver/SourceSamplesKt {
+	public static final fun solveSample (Lcom/eignex/klause/solver/SourceStrategy;Lcom/eignex/klause/backtrack/BacktrackParams;)Lcom/eignex/klause/solver/SolveResult;
+	public static synthetic fun solveSample$default (Lcom/eignex/klause/solver/SourceStrategy;Lcom/eignex/klause/backtrack/BacktrackParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/SolveResult;
 }
 
 public final class com/eignex/klause/solver/SourceStrategy {
