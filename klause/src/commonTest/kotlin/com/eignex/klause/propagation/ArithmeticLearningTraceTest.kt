@@ -1,8 +1,10 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.LinearPropagator
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
@@ -18,6 +20,37 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class ArithmeticLearningTraceTest {
+    @Test
+    fun `capture should attribute PB rejection of an integer reason`() {
+        val state = PropagationState(Problem(1, 1, arrayOf(IntDomain(0, 6)), emptyArray()), Assumptions.None)
+        val trace = ArithmeticLearningTrace()
+        state.arithmeticLearningTrace = trace
+        val atom = state.atomVarGe(0, 1)
+        val resolvent = PbConflictResolvent(state, state.conflictAnalyzer)
+
+        resolvent.resolve(intArrayOf(Lit.make(atom, false)), 1)
+
+        assertTrue(resolvent.failed)
+        assertEquals("pb.decline.non-boolean-reason", trace.events.last().kind)
+        assertFalse(trace.truncated)
+    }
+
+    @Test
+    fun `historical capture should exclude a later journalled hole`() {
+        val state = PropagationState(Problem(0, 1,
+            arrayOf(IntDomain(0, 6).excludeValue(1)), emptyArray()), Assumptions.None)
+        state.undoLogging = true
+        val row = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
+            longArrayOf(1), intArrayOf(0), LinearOp.LE, 6), useLo = true))
+        assertTrue(state.excludeIntValueImpl(0, 3, null))
+        val trace = ArithmeticLearningTrace()
+
+        trace.row("historical", row, state, trail = 0)
+
+        assertContentEquals(longArrayOf(0, 1), trace.events.single { it.kind == "historical.hole" }.data)
+        assertFalse(trace.truncated)
+    }
+
     @Test
     fun `capture should own payloads and stop at its word allowance`() {
         val trace = ArithmeticLearningTrace(maxEvents = 4, maxWords = 3)

@@ -26,18 +26,19 @@ import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchConflictResolution
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchLearnedConflictResult
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.util.Cancellation
 import com.sun.management.ThreadMXBean
-import java.io.File
-import java.lang.management.ManagementFactory
-import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import java.lang.management.ManagementFactory
+import kotlin.time.Duration.Companion.seconds
 
 internal object PreparedArithmeticLearningProfile {
     private val sources = listOf(
@@ -74,6 +75,7 @@ internal object PreparedArithmeticLearningProfile {
         for (pass in 0..3) {
             val order = if (pass % 2 == 0) cells else cells.reversed()
             for ((source, route, learning) in order) {
+                println("cell source=$source route=$route learning=$learning pass=$pass")
                 val before = bean.getThreadAllocatedBytes(thread)
                 val started = System.nanoTime()
                 val observation = invoke(source, route, learning)
@@ -91,7 +93,8 @@ internal object PreparedArithmeticLearningProfile {
                     put("intervalEndNs", finished)
                     put("invocationElapsedNs", finished - started)
                     put("invocationThreadAllocatedBytes", allocated)
-                    put("measurement", "disjoint; parse through native point check, release and capture serialization; JFR enabled")
+                    put("measurement",
+                        "disjoint in-process; parse to point check, release and capture serialization; JFR enabled")
                     put("physicalGcOrRssMeasured", false)
                     put("independentWitnessOrProofCheck", false)
                     put("osName", System.getProperty("os.name"))
@@ -116,12 +119,22 @@ internal object PreparedArithmeticLearningProfile {
         ))
         val problem = prepared?.problem ?: original
         val preparedJson = codec.encodeToString(problem)
+        if (stop() || prepared?.presolve?.infeasible == true || (route == 2 && problem !is BakedProblem)) {
+            return buildJsonObject {
+                put("original", originalJson)
+                put("prepared", preparedJson)
+                put("presolve", prepared?.presolve.toString())
+                put("scriptDecline", "preparation-terminal-or-unavailable")
+                put("cancelled", stop())
+                put("nativeOriginalPointCheck", false)
+            }
+        }
         if (route == 2) {
             val result = BacktrackSolver(problem as BakedProblem).solve(BacktrackParams(
                 pbLearning = source == 0 && learning, integerRowLearning = source == 1 && learning,
                 lpConfig = LpConfig.AUTO, randomSeed = 3L, maxDecisions = 1024, cancellation = stop,
             ))
-            val sample = (result as? SolveResult.Sat)?.assignment?.let { prepared!!.reconstruct(it) }
+            val sample = (result as? SolveResult.Sat)?.assignment?.let { requireNotNull(prepared).reconstruct(it) }
             val checked = sample?.let { checkPoint(original, it, stop) } ?: false
             return buildJsonObject {
                 put("original", originalJson)
@@ -131,6 +144,13 @@ internal object PreparedArithmeticLearningProfile {
                 put("nativeOriginalPointCheck", checked)
                 put("witness", sample?.let { "bools=${it.bools.joinToString()};ints=${it.ints.joinToString()}" })
                 put("changedTrajectory", true)
+                put("finiteWork", result.stats.search.propagationWork.sum)
+                put("decisions", result.stats.search.nodes.sum)
+                put("learnedConstraints", result.stats.search.learnedClauses.sum)
+                put("lpSolves", result.stats.lp.solves.sum)
+                put("lpRootWork", result.stats.lp.rootWorkOps.sum)
+                put("lpStandaloneWork", result.stats.lp.standaloneWorkOps.sum)
+                put("lpComponentWork", result.stats.lp.componentWorkOps.sum)
                 put("stats", result.stats.toString())
                 put("cancelled", stop())
             }
@@ -143,20 +163,28 @@ internal object PreparedArithmeticLearningProfile {
         val initialized = shared.initialize()
         val identity = originalJson == preparedJson
         var conflict = false
+        var firstOutcome: String? = null
+        var secondOutcome: String? = null
         var resolution = "not-run"
+        var application: String? = null
         var siblingUpper: Long? = null
         if (initialized is ComponentResult.Consistent && identity) {
             val first = if (source == 0) SearchDecision.Bool(Lit.make(0, true)) else SearchDecision.IntAtMost(2, 7)
             val second = if (source == 0) SearchDecision.Bool(Lit.make(1, false)) else SearchDecision.IntAtLeast(0, 2)
-            if (shared.push(first) is ComponentResult.Consistent) {
-                conflict = shared.push(second) is ComponentResult.Conflict
+            val firstResult = shared.push(first)
+            firstOutcome = firstResult::class.simpleName
+            if (firstResult is ComponentResult.Consistent) {
+                val secondResult = shared.push(second)
+                secondOutcome = secondResult::class.simpleName
+                conflict = secondResult is ComponentResult.Conflict
                 if (conflict) {
                     val learned = cp.resolveConflict(shared)
                     resolution = learned::class.simpleName ?: "unknown"
                     if (learned is SearchConflictResolution.Backjump) {
                         shared.popTo(learned.conflict.decisionLevel)
-                        learned.conflict.apply(shared)
-                        if (source == 1) {
+                        val applied = learned.conflict.apply(shared)
+                        application = applied::class.simpleName
+                        if (source == 1 && applied == SearchLearnedConflictResult.Resume) {
                             shared.popTo(0)
                             shared.push(SearchDecision.IntAtMost(2, 11))
                             siblingUpper = native.intDomain(0).max
@@ -179,8 +207,13 @@ internal object PreparedArithmeticLearningProfile {
             put("fixedSourceCoordinates", identity)
             put("scriptDecline", if (identity) "none" else "preparation-changed-source-identity; no guessed remap")
             put("initialized", initialized::class.simpleName)
-            put("conflict", conflict)
+            put("fixedScript", if (source == 0) "b0=true; b1=false; resolve; apply"
+                else "z<=7; x>=2; resolve; apply; pop-to-root; z<=11")
+            put("firstDecisionOutcome", firstOutcome)
+            put("secondDecisionOutcome", secondOutcome)
+            put("secondDecisionConflict", conflict)
             put("resolution", resolution)
+            put("application", application)
             put("siblingUpper", siblingUpper)
             put("nativeStores", stores)
             put("finiteWork", capture.work())
@@ -219,6 +252,9 @@ internal object PreparedArithmeticLearningProfile {
         }.invoke(state) as Long
 
         fun export(): JsonObject = buildJsonObject {
+            put("schemaVersion", 1)
+            put("eventLimit", 128)
+            put("wordLimit", 8192)
             put("truncated", trace.javaClass.getMethod("getTruncated").invoke(trace) as Boolean)
             put("words", trace.javaClass.getMethod("getWords").invoke(trace) as Int)
             put("events", buildJsonArray {
