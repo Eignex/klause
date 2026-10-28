@@ -1,0 +1,2 @@
+smtlib-nonlinear-integer-boolean-residues-v1/covered-unsat
+smtlib-nonlinear-integer-boolean-residues-v1/negated-support-sat

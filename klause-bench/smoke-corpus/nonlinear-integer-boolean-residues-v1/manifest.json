@@ -1,0 +1,16 @@
+{
+  "license": "Apache-2.0",
+  "attribution": "Self-authored Eignex Klause fixtures",
+  "cases": [
+    {
+      "name": "covered-unsat",
+      "sha256": "0c1125945a9465ac6ee0c0ecd4cd57a50906a1346de671581b39853d4042049d",
+      "expected": "UNSAT"
+    },
+    {
+      "name": "negated-support-sat",
+      "sha256": "a27b5468fa0ea79198d1a0cb2995c74f5dd00a89776c94342d66771f8192fbc9",
+      "expected": "SAT"
+    }
+  ]
+}

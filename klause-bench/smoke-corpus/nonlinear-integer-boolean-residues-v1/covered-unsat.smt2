@@ -1,0 +1,5 @@
+(set-logic ALL)
+(declare-const x Int)
+(declare-const y Int)
+(assert (or (= (+ (* x x) (* y y)) 3) (= (+ (* x x) (* y y)) 7)))
+(check-sat)

@@ -22,10 +22,11 @@ internal data class NonlinearIntegerResidueCounts(
     val work: Long = 0,
     val refuted: Long = 0,
     val declined: Long = 0,
+    val excluded: Long = 0,
 ) {
     operator fun plus(other: NonlinearIntegerResidueCounts): NonlinearIntegerResidueCounts =
         NonlinearIntegerResidueCounts(rings + other.rings, tuples + other.tuples, work + other.work,
-            refuted + other.refuted, declined + other.declined)
+            refuted + other.refuted, declined + other.declined, excluded + other.excluded)
 }
 
 // Every node denotes an integer numerator divided by its positive, assignment-independent denominator.
@@ -48,6 +49,57 @@ internal class NonlinearIntegerResidues(
 
     fun refutes(): Boolean = try {
         prepare()
+        refutesPrepared().also { if (it) stats = stats.copy(refuted = stats.refuted + 1) }
+    } catch (_: ResidueUnsupported) {
+        stats = stats.copy(declined = stats.declined + 1)
+        false
+    } catch (_: ResidueDecline) {
+        stats = stats.copy(declined = stats.declined + 1)
+        false
+    } finally {
+        clearCircuit()
+    }
+
+    fun simplify(): PolynomialRealFormula = try {
+        reserve(problem.integerCoordinates.size)
+        val integers = problem.integerCoordinates.map { step(); it }.toSet()
+        val reduced = NonlinearIntegerResidueReduction(::step, ::reserve) { atom ->
+            try {
+                val left = compile(atom.left, integers)
+                val right = compile(atom.right, integers)
+                multivariate = minOf(nodes[left].firstVariable, nodes[right].firstVariable) <
+                    maxOf(nodes[left].lastVariable, nodes[right].lastVariable)
+                reserve(2)
+                equations.add(left to right)
+                refutesPrepared()
+            } catch (_: ResidueUnsupported) {
+                stats = stats.copy(declined = stats.declined + 1)
+                false
+            } finally {
+                clearCircuit()
+            }
+        }.reduce(problem.formula)
+        step()
+        stats = stats.copy(excluded = stats.excluded + reduced.excluded,
+            refuted = stats.refuted + if (reduced.excluded > 0 &&
+                (reduced.formula as? PolynomialRealFormula.Constant)?.value == false) 1 else 0)
+        reduced.formula
+    } catch (_: ResidueDecline) {
+        stats = stats.copy(declined = stats.declined + 1)
+        problem.formula
+    } finally {
+        clearCircuit()
+    }
+
+    private fun clearCircuit() {
+        nodes.clear()
+        indices.clear()
+        variables.clear()
+        equations.clear()
+        multivariate = false
+    }
+
+    private fun refutesPrepared(): Boolean =
         if (!multivariate) false else {
             reserve(nodes.size * 3 + nodes.sumOf { it.args.size } + equations.size * 2 + variables.size)
             var refuted = false
@@ -57,7 +109,6 @@ internal class NonlinearIntegerResidues(
                     if (!hasSupport(modulus, imagesOnly)) {
                         // A final containing poll is required before publishing a completed negative fact.
                         step()
-                        stats = stats.copy(refuted = stats.refuted + 1)
                         refuted = true
                         break
                     }
@@ -66,17 +117,9 @@ internal class NonlinearIntegerResidues(
             }
             refuted
         }
-    } catch (_: ResidueDecline) {
-        stats = stats.copy(declined = stats.declined + 1)
-        false
-    } finally {
-        nodes.clear()
-        indices.clear()
-        variables.clear()
-        equations.clear()
-    }
 
     private fun step() {
+        if (stats.work >= MAX_WORK) throw ResidueDecline()
         arithmetic.step()
         stats = stats.copy(work = stats.work + 1)
         if (stats.work >= MAX_WORK) throw ResidueDecline()
@@ -159,7 +202,7 @@ internal class NonlinearIntegerResidues(
                 else -> args.fold(BIG_ONE) { value, child -> multiply(value, nodes[child].denominator) }
             }
             val variable = if (expression is PolynomialExpression.Variable) {
-                if (expression.id.index !in integers) throw ResidueDecline()
+                if (expression.id.index !in integers) throw ResidueUnsupported()
                 variables.getOrPut(expression.id.index) { variables.size }
             } else -1
             indices[key] = nodes.size
@@ -360,6 +403,7 @@ private class ResidueExpressionKey(private val expression: PolynomialExpression)
 }
 
 private class ResidueDecline : RuntimeException()
+private class ResidueUnsupported : RuntimeException()
 private val MODULI = intArrayOf(2, 3, 4, 5, 8)
 private const val MAX_WORK = 65_536L
 private const val MAX_CELLS = 16_384

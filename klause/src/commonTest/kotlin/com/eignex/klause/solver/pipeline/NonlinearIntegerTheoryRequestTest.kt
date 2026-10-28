@@ -24,6 +24,22 @@ import kotlin.test.assertTrue
 
 class NonlinearIntegerTheoryRequestTest {
     @Test
+    fun `integer residue exclusions should reach the surviving original source branch`() {
+        val source = assertIs<NonlinearIntegerProblem>(SmtLib.parse(
+            "(declare-const x Int) (declare-const y Int) " +
+                "(assert (or (= (+ (* x x) (* y y)) 3) (and (= x 1) (= y 1))))",
+        ).source.originalSource)
+
+        val execution = OpenTheoryPipeline.execute(source.pipelineRequest(),
+            NonlinearIntegerTheoryParams(residueRefutation = true), FiniteEngine.BACKTRACK)
+
+        val witness = assertIs<OpenTheoryResult.Sat>(execution.result).assignment
+        assertEquals("1", witness.intValue(0))
+        assertEquals("1", witness.intValue(1))
+        assertEquals(1L, assertNotNull(execution.integerResidues).excludedAtoms)
+    }
+
+    @Test
     fun `residue refutations should close complete source search before polynomial completion`() {
         val source = assertIs<NonlinearIntegerProblem>(SmtLib.parse(
             "(declare-const x Int) (declare-const y Int) (declare-const z Int) " +

@@ -43,7 +43,7 @@ internal class NonlinearIntegerCursor(
     private val work = NonlinearIntegerWork(params.arithmetic)
     private val arithmetic = PolynomialArithmetic(work, params.arithmetic.polynomialLimits)
     private val cells = NonlinearIntegerCells(problem.formula, problem.integerCoordinates, arithmetic)
-    private val invocation = PolynomialTheoryService(problem.formula, problem.boolCount, problem.numericCount)
+    private var invocation = PolynomialTheoryService(problem.formula, problem.boolCount, problem.numericCount)
         .invocation(params.arithmetic.copy(cancellation = work, maximumWork = null))
         .also { if (params.arithmetic.cellRefinement) it.checkedCellObserver = cells::retain }
     private val random = Random(params.seed)
@@ -118,12 +118,21 @@ internal class NonlinearIntegerCursor(
         if (params.maximumCandidates == 0L) return unknown()
         if (params.residueRefutation) {
             val residues = NonlinearIntegerResidues(problem, arithmetic, params.arithmetic.polynomialLimits)
-            val refuted = try {
-                residues.refutes()
+            try {
+                if (residues.refutes()) return QfNraResult.Unsatisfiable(polynomialStats())
+                val reduced = residues.simplify()
+                if ((reduced as? PolynomialRealFormula.Constant)?.value == false) {
+                    return QfNraResult.Unsatisfiable(polynomialStats())
+                }
+                if (reduced !== problem.formula) {
+                    invocation.close()
+                    // Integer-valid reductions belong only to this NIA completion, never real source-cell reuse.
+                    invocation = PolynomialTheoryService(reduced, problem.boolCount, problem.numericCount)
+                        .invocation(params.arithmetic.copy(cancellation = work, maximumWork = null))
+                }
             } finally {
                 residueStats = residues.stats
             }
-            if (refuted) return QfNraResult.Unsatisfiable(polynomialStats())
         }
         condition = problem.integerBounds(condition, arithmetic)
         if (condition.lower.any { (id, value) -> condition.upper[id]?.let { it < value } == true }) {

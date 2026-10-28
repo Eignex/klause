@@ -257,6 +257,7 @@ internal fun reportNativeSatisfaction(
             "niaResidueWork" to residues.workSpent.toString(),
             "niaResidueRefutedScopes" to residues.refutedScopes.toString(),
             "niaResidueDeclines" to residues.declinedChecks.toString(),
+            "niaResidueExcludedAtoms" to residues.excludedAtoms.toString(),
         ))
     }
 }

@@ -17,9 +17,110 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class NonlinearIntegerResiduesTest {
+    @Test
+    fun `globally impossible alternatives should leave a checked integer witness`() {
+        val source = source("(assert (or (= (+ (* x x) (* y y)) 3) (and (= x 1) (= y 1))))")
+
+        val execution = solveNonlinearIntegers(source, NonlinearIntegerParams(residueRefutation = true))
+
+        val witness = assertIs<QfNraResult.Satisfiable>(execution.result).assignment
+        assertTrue(checkNonlinearSource(source.formula, witness, PolynomialArithmetic()))
+        assertEquals(1L, execution.stats.residues.excluded)
+        assertEquals(0L, execution.stats.residues.refuted)
+    }
+
+    @Test
+    fun `complete impossible Boolean coverage should refute the integer source`() {
+        val source = source("(assert (or (= (+ (* x x) (* y y)) 3) (= (+ (* x x) (* y y)) 7)))")
+
+        val execution = solveNonlinearIntegers(source, NonlinearIntegerParams(residueRefutation = true))
+
+        assertIs<QfNraResult.Unsatisfiable>(execution.result)
+        assertEquals(2L, execution.stats.residues.excluded)
+        assertEquals(1L, execution.stats.residues.refuted)
+        assertEquals(0L, execution.stats.checks)
+    }
+
+    @Test
+    fun `residue exclusions should preserve Boolean pins and changed numeric windows`() {
+        val source = source("(assert (or (= (+ (* x x) (* y y)) 3) (and b (= x 1) (= y 1))))")
+        val params = NonlinearIntegerParams(residueRefutation = true)
+        val yes = PolynomialCondition(bools = mapOf(0 to true), lower = mapOf(0 to BigFraction.ONE))
+        val no = PolynomialCondition(bools = mapOf(0 to false))
+
+        val rejected = solveNonlinearIntegers(source, params, no)
+        val accepted = solveNonlinearIntegers(source, params, yes)
+
+        assertIs<QfNraResult.Unsatisfiable>(rejected.result)
+        val witness = assertIs<QfNraResult.Satisfiable>(accepted.result).assignment
+        assertTrue(checkNonlinearSource(source.formula, witness, PolynomialArithmetic()))
+        assertEquals(0L, rejected.stats.residues.refuted)
+        assertEquals(1L, rejected.stats.residues.excluded)
+        assertEquals(1L, accepted.stats.residues.excluded)
+    }
+
+    @Test
+    fun `negation should consume only impossible equalities and preserve supported predicates`() {
+        for (assertion in listOf(
+            "(assert (not (= (+ (* x x) (* y y)) 3)))",
+            "(assert (not (= (+ (* x x) (* y y)) 2)))",
+            "(assert (distinct (+ (* x x) (* y y)) 3))",
+        )) {
+            val source = source(assertion)
+
+            val execution = solveNonlinearIntegers(source, NonlinearIntegerParams(residueRefutation = true))
+
+            val witness = assertIs<QfNraResult.Satisfiable>(execution.result, assertion).assignment
+            assertTrue(checkNonlinearSource(source.formula, witness, PolynomialArithmetic()), assertion)
+            assertEquals(0L, execution.stats.residues.refuted)
+        }
+    }
+
+    @Test
+    fun `real and auxiliary alternatives should retain their original predicates`() {
+        for (assertion in listOf(
+            "(assert (or (= (+ (* x x) (* r r)) 3) (= x y)))",
+            "(assert (or (= (+ (* x x) (ite b (* y y) 0)) 3) (= x y)))",
+            "(assert (or (= (+ (* x x) (* y y)) 21) (= x y)))",
+        )) {
+            val source = source(assertion)
+            val residues = NonlinearIntegerResidues(source, PolynomialArithmetic(), PolynomialLimits())
+
+            val reduced = residues.simplify()
+
+            assertSame(source.formula, reduced, assertion)
+            assertEquals(0L, residues.stats.excluded)
+        }
+    }
+
+    @Test
+    fun `an incomplete Boolean reduction should publish no atom exclusions`() {
+        val source = source("(assert (or (= (+ (* x x) (* y y)) 3) (= (+ (* x x) (* y y)) 7)))")
+        val residues = NonlinearIntegerResidues(source, PolynomialArithmetic(), PolynomialLimits(maxMatrixCells = 30))
+
+        assertSame(source.formula, residues.simplify())
+        assertEquals(0L, residues.stats.excluded)
+        assertEquals(0L, residues.stats.refuted)
+        assertEquals(1L, residues.stats.declined)
+    }
+
+    @Test
+    fun `cancellation after an atom proof should withhold incomplete Boolean consumption`() {
+        val source = source("(assert (or (= (+ (* x x) (* y y)) 3) (= (+ (* x x) (* y y)) 7)))")
+        lateinit var residues: NonlinearIntegerResidues
+        val cancellation = Cancellation { residues.stats.rings >= 4 }
+        residues = NonlinearIntegerResidues(source, PolynomialArithmetic(cancellation), PolynomialLimits())
+
+        assertFailsWith<PolynomialInterrupted> { residues.simplify() }
+
+        assertEquals(0L, residues.stats.excluded)
+        assertEquals(0L, residues.stats.refuted)
+    }
+
     @Test
     fun `mandatory multivariate systems should refute with shared integer residues`() {
         val assertions = listOf(
