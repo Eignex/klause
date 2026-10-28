@@ -203,9 +203,7 @@ Only clauses are shared across arms. Row satisfaction tests the complete maximum
 activity; a satisfied endpoint literal cannot discharge the row or certify a root
 contradiction.
 
-## Learned-clause retention
-
-### Arithmetic diagnostics
+## Arithmetic diagnostics
 
 An optional native-session `ArithmeticLearningTrace` records bounded arithmetic
 analysis events before conflict retraction. It retains seed and fallback literals,
@@ -221,6 +219,8 @@ per-payload limits stop capture with explicit truncation. It reads existing stat
 does not reconstruct new reasons or run propagation, and supplies no proof or source
 mapping authority. Source and preparation identities belong to the containing
 diagnostic invocation; an incomplete trace cannot establish exhaustive applicability.
+
+## Learned-clause retention
 
 Native forgetting runs at restart boundaries only with a configured cap. Permanent
 and glue clauses (default LBD at most 2) survive; remaining space favors lower LBD.
