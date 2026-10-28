@@ -251,16 +251,21 @@ class BooleanCountComponentsTest {
     }
 
     @Test
-    fun `an explicit empty integer projection should leave all Boolean columns existential`() {
+    fun `empty projections should use one whole model feasibility check`() {
         val problem = Problem(4, 0, emptyArray(), listOf(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
             Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
         )).bake()
 
-        val result = AnytimeCounter.run(problem, ExactCountConfig(intSamplingSet = intArrayOf())).last()
+        for (config in listOf(
+            ExactCountConfig(samplingSet = intArrayOf(), maxChecks = 1L),
+            ExactCountConfig(intSamplingSet = intArrayOf(), maxChecks = 1L),
+        )) {
+            val result = AnytimeCounter.run(problem, config).last()
 
-        assertTrue(result.exact)
-        assertEquals(1L, result.lower)
+            assertTrue(result.exact)
+            assertEquals(1L, result.lower)
+        }
     }
 
     @Test
@@ -286,10 +291,25 @@ class BooleanCountComponentsTest {
         val config = ExactCountConfig(maxChecks = 3L)
 
         val clausesOnly = problem.withFactors(problem.factors.copyOfRange(0, 2))
-        for (baked in listOf(problem.bake(), clausesOnly.bake(FactorProjectionProviders.Default))) {
+        for (baked in listOf(problem.bake(), clausesOnly.bake(FactorProjectionProviders()))) {
             assertNull(BooleanCountComponents.partition(baked, config))
             assertEquals(AnytimeCounter.monolithic(baked, config).toList(), AnytimeCounter.run(baked, config).toList())
         }
+    }
+
+    @Test
+    fun `captured default projections should admit component counting`() {
+        val problem = Problem(4, 0, emptyArray(), listOf(
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
+        )).bake(FactorProjectionProviders.Default)
+        val config = ExactCountConfig(samplingSet = intArrayOf(0, 2), maxChecks = 6L)
+
+        val result = AnytimeCounter.run(problem, config).last()
+
+        assertNotNull(BooleanCountComponents.partition(problem, config))
+        assertTrue(result.exact)
+        assertEquals(4L, result.lower)
     }
 
     @Test
