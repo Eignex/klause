@@ -28,10 +28,13 @@ internal class GuardedIntegerSource(private val state: PropagationState) {
                 if (original.vars.size > INTEGER_LEARNING_TERMS) return decline("term-limit", factorId)
                 if (original.realVars.isNotEmpty()) return decline("real-coordinates", factorId)
                 val constants = original.integerConstants ?: return decline("wide-constants", factorId)
-                val source = state.factorAt(factorId) as? LinearPropagator ?: return decline("projection-kind", factorId)
+                val source = state.factorAt(factorId) as? LinearPropagator
+                    ?: return decline("projection-kind", factorId)
                 if (source.boolVars.isNotEmpty() || source.op == LinearOp.NE || source.op != original.op ||
                     source.bound != constants.bound || !source.vars.contentEquals(original.vars) ||
-                    !source.coeffs.contentEquals(constants.coeffs)) return decline("projection-identity-or-operation", factorId)
+                    !source.coeffs.contentEquals(constants.coeffs)) {
+                    return decline("projection-identity-or-operation", factorId)
+                }
                 IntegerSourceRow(source)
             }
             is ReifiedLinear -> {
@@ -63,7 +66,8 @@ internal class GuardedIntegerSource(private val state: PropagationState) {
             is Element -> {
                 if (forBoundReason) return decline("element-support-reason", factorId)
                 if (!original.arrIsVars) return decline("element-constant-array", factorId)
-                val source = state.factorAt(factorId) as? ElementPropagator ?: return decline("projection-kind", factorId)
+                val source = state.factorAt(factorId) as? ElementPropagator
+                    ?: return decline("projection-kind", factorId)
                 if (source.idx != original.idx || source.result != original.result ||
                     source.arrIsVars != original.arrIsVars || source.indexOffset != original.indexOffset ||
                     source.arr !== original.arr) return decline("projection-identity", factorId)
@@ -74,7 +78,9 @@ internal class GuardedIntegerSource(private val state: PropagationState) {
                     return decline("element-selection-range", factorId)
                 }
                 val cell = original.arr[(selected.min - first).toInt()]
-                if (cell !in 0 until state.problem.numIntVars.toLong()) return decline("element-cell-coordinate", factorId)
+                if (cell !in 0 until state.problem.numIntVars.toLong()) {
+                    return decline("element-cell-coordinate", factorId)
+                }
                 val variables = intArrayOf(original.result, cell.toInt())
                 val guard = Lit.make(state.atomVarEq(original.idx, selected.min), true)
                 if (!state.integerGuardTrueAt(guard, trail)) return decline("guard-history", factorId)
