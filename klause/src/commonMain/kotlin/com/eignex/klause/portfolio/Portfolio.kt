@@ -27,7 +27,9 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.UnsoundnessException
 import com.eignex.klause.solver.withSourceSemantics
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.SchedulingCancellation
 import com.eignex.klause.util.cancelledWhen
+import com.eignex.klause.util.workScheduled
 import com.eignex.kumulant.bandit.UnivariateBandit
 import com.eignex.kumulant.core.Concurrency
 import com.eignex.kumulant.stream.lock
@@ -317,7 +319,8 @@ class Portfolio(
             else -> if (run.allRetired) {
                 SolveResult.Unknown(unsettledReason(verdicts), stats)
             } else {
-                SolveResult.Unknown(TerminationReason.Cancelled, stats)
+                SolveResult.Unknown(if (run.workLimitReached) TerminationReason.BudgetExhausted
+                    else TerminationReason.Cancelled, stats)
             }
         }
     }
@@ -720,7 +723,8 @@ class Portfolio(
         private val stopped = AtomicBoolean(false)
 
         /** The run's token: the caller's, stopped early once any lane settles the run. */
-        private val external = if (diagnostics == null) cancellation else object : Cancellation {
+        private val external = if (diagnostics == null) cancellation else object : SchedulingCancellation {
+            override val workScheduled: Boolean = true
             override fun isCancelled(): Boolean = cancellation()
             override fun workMeter() = cancellation.workMeter()
         }
@@ -790,6 +794,7 @@ class Portfolio(
 
         /** Whether every arm has retired. */
         val allRetired: Boolean get() = remaining == 0
+        val workLimitReached: Boolean get() = diagnostics?.let { chargedWork >= it.workLimit } == true
 
         fun continuePreparation(arm: Int) {
             continuingPreparation = arm
@@ -1116,7 +1121,8 @@ class Portfolio(
                 }
                 if (!claim.preparing) {
                     trialSearchTime[arm] += claim.trialTime
-                    if (work > 0L) trialSearchWork[arm] += minOf(work, trialWorkLimit - trialSearchWork[arm])
+                    val trialWork = if (diagnostics == null) work else charge
+                    if (trialWork > 0L) trialSearchWork[arm] += minOf(trialWork, trialWorkLimit - trialSearchWork[arm])
                 }
             }
             if (!unproductiveTrial && !workers[arm].auxiliaryProof) {
@@ -1374,4 +1380,4 @@ private const val CHECK_SHARE = 0.2
 
 // The caller's token that also stops on [flag], keeping the caller's deadline.
 private fun Cancellation.alsoStoppedBy(flag: AtomicBoolean): Cancellation =
-    cancelledWhen(this::deadline) { flag.load() || this() }
+    cancelledWhen(this::deadline, this::workScheduled) { flag.load() || this() }

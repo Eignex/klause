@@ -21,6 +21,7 @@ import com.eignex.klause.solver.pipeline.fixedDiscreteSample
 import com.eignex.klause.solver.result.SearchEvent
 import kotlin.math.abs
 import kotlin.math.ln
+import kotlin.random.Random
 
 /**
  * A portfolio arm running hybrid ALNS with CP repair: an outer destroy/repair loop over the
@@ -52,6 +53,7 @@ internal class AlnsWorkerConfig private constructor(
     val nodeBudget: NodeBudget?,
     private val numericalCompletion: Boolean,
     private val toleranceCheck: ((Sample) -> Boolean)?,
+    private val workScheduled: Boolean = false,
 ) :
     WorkerConfig {
     constructor(
@@ -61,12 +63,16 @@ internal class AlnsWorkerConfig private constructor(
     ) : this(profile, nodeBudget, numericalCompletion, null)
 
     fun withToleranceCheck(check: (Sample) -> Boolean): AlnsWorkerConfig =
-        AlnsWorkerConfig(profile, nodeBudget, numericalCompletion, check)
+        AlnsWorkerConfig(profile, nodeBudget, numericalCompletion, check, workScheduled)
 
     override fun withNodeBudget(budget: NodeBudget): WorkerConfig =
-        AlnsWorkerConfig(profile, budget, numericalCompletion, toleranceCheck)
+        AlnsWorkerConfig(profile, budget, numericalCompletion, toleranceCheck, workScheduled)
 
-    fun withNumericalCompletion(): AlnsWorkerConfig = AlnsWorkerConfig(profile, nodeBudget, true, toleranceCheck)
+    fun withNumericalCompletion(): AlnsWorkerConfig =
+        AlnsWorkerConfig(profile, nodeBudget, true, toleranceCheck, workScheduled)
+
+    fun withWorkScheduling(): AlnsWorkerConfig =
+        AlnsWorkerConfig(profile, nodeBudget, numericalCompletion, toleranceCheck, true)
 
     override val label: String get() = "alns-${profile.label}"
 
@@ -116,6 +122,7 @@ internal class AlnsWorkerConfig private constructor(
             pooledIncumbents = matchedPools?.solutions,
             acceptanceFor = acceptanceFactory(),
             literalSweep = definitionalSweep,
+            rng = if (workScheduled) Random(seed + index) else Random.Default,
         )
         val params = LocalSearchParams(
             randomSeed = seed + index,

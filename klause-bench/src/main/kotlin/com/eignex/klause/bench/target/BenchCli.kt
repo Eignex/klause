@@ -21,12 +21,12 @@ import com.eignex.klause.bench.source.ProblemKind
 import java.io.File
 import java.time.Instant
 import java.time.temporal.ChronoUnit
+import kotlin.system.exitProcess
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
-import kotlin.system.exitProcess
 
 /**
  * The bench commands klause-lab runs: `select` names problems, `solve-one` solves one and writes its
@@ -184,6 +184,7 @@ object BenchCli {
             lp = f["lp"],
             presolve = f["presolve"],
             exact = f["exact"]?.toBooleanStrict() ?: false,
+            captureDirectory = File(out, "diagnostics").takeIf { args.any { it.startsWith("param=portfolio-work=") } },
         )
         val budget = f["timeout"]?.toLongOrNull()?.let { Budget(it) } ?: Budget()
         val record = SolveMetric.solveOne(ref, budget, settings, File(out))

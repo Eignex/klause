@@ -31,6 +31,7 @@ import com.eignex.klause.solver.validation.finiteWitnessVerifier
 import com.eignex.klause.solver.withSourceSemantics
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.cancelledWhen
+import com.eignex.klause.util.workScheduled
 import com.eignex.kumulant.bandit.UnivariateBandit
 import com.eignex.kumulant.bandit.univariate.RouletteWheelBandit
 import kotlin.math.ceil
@@ -276,7 +277,8 @@ internal class Alns(
         private var repairOpened = false
         private var closed = false
         private var currentCancellation = params.cancellation
-        private val repairCancellation = cancelledWhen({ currentCancellation.deadline() }) {
+        private val repairCancellation = cancelledWhen({ currentCancellation.deadline() },
+            { currentCancellation.workScheduled() }) {
             currentCancellation() || backtrackParams?.cancellation?.invoke() == true
         }
         private var iter = 0
@@ -336,7 +338,7 @@ internal class Alns(
                 val perIterParams = params.copy(
                     maxFlips = iterFlips,
                     // Null lets the inner solver draw its own per-call seed.
-                    randomSeed = null,
+                    randomSeed = if (params.cancellation.workScheduled()) rng.nextLong() else null,
                     // The iteration's allowance is charged below, whatever its repair spends.
                     nodeBudget = null,
                 )

@@ -1,13 +1,14 @@
 package com.eignex.klause.backtrack
 
-import com.eignex.klause.solver.lifetimeCancellation
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.lifetimeCancellation
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.cancelledWhen
+import com.eignex.klause.util.workScheduled
 
 /**
  * The satisfaction driver for a single-threaded portfolio: one [CpSatisfactionTraversal] advanced a slice at a
@@ -38,7 +39,7 @@ internal class ResumableSatisfaction(
     )
     private val params = params0.copy(cancellation = cancelledWhen({
         listOfNotNull(globalToken.deadline(), slice.deadline).minOrNull()
-    }) { globalToken() || slice.expired() })
+    }, { globalToken.workScheduled() }) { globalToken() || slice.expired() })
     private val assumptions = params0.assumptions
     private val traversal: CpSatisfactionTraversal = CpSatisfactionTraversal(
         solver.problem,

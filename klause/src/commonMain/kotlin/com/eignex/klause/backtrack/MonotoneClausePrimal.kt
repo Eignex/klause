@@ -10,6 +10,8 @@ import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.SchedulingCancellation
+import com.eignex.klause.util.workScheduled
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
@@ -40,9 +42,11 @@ internal class MonotoneClausePrimal private constructor(
     private var trialSample: Sample? = null
     private var bestValue = Double.POSITIVE_INFINITY
     private var activeStart: TimeSource.Monotonic.ValueTimeMark? = null
-    private val phaseToken = object : Cancellation {
+    private val phaseToken = object : SchedulingCancellation {
+        override val workScheduled: Boolean get() = lifetime.workScheduled()
         override fun isCancelled(): Boolean = lifetime() || params.nodeBudget?.allowance?.exhausted() == true ||
-            activeMillis + (activeStart?.elapsedNow()?.inWholeMilliseconds ?: 0L) >= activeBudgetMillis
+            (!lifetime.workScheduled() &&
+                activeMillis + (activeStart?.elapsedNow()?.inWholeMilliseconds ?: 0L) >= activeBudgetMillis)
         override fun deadline() = lifetime.deadline()
     }
     private var closed = false
@@ -254,7 +258,7 @@ internal class MonotoneClausePrimal private constructor(
     private fun finishPolishing(): Sample? {
         val candidate = checkNotNull(polishing)
         val values = candidate.bools
-        val budget = lifetime or Cancellation.after(100.milliseconds)
+        val budget = if (lifetime.workScheduled()) lifetime else lifetime or Cancellation.after(100.milliseconds)
         while (polishingIndex < polishingVariables.size) {
             if (budget()) return null
             val pureVariable = polishingIndex < polishingPureCount
@@ -312,7 +316,9 @@ internal class MonotoneClausePrimal private constructor(
             var literalWork = 0L
             val clauses = mutableListOf<Clause>()
             for (factor in problem.factors) {
-                if (lifetime() || start.elapsedNow().inWholeMilliseconds >= activeBudgetMillis) return null
+                if (lifetime() || (!lifetime.workScheduled() &&
+                        start.elapsedNow().inWholeMilliseconds >= activeBudgetMillis)
+                ) return null
                 val clause = factor as? Clause ?: return null
                 clauses.add(clause)
                 for (literal in clause.literals) {

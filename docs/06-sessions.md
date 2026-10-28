@@ -172,6 +172,12 @@ construction and every later invocation or slice. Each retained slice supplies i
 own invocation token, and scopes keep their earliest deadline without retaining an
 old slice deadline.
 
+The opt-in [portfolio diagnostic schedule](12-portfolio.md#reproducible-diagnostics)
+marks internal cancellation adapters as work scheduled. Composition, invocation and
+lifetime wrappers preserve that policy. Finite root LP preparation, primal search
+and candidate verification retain work limits and emergency cancellation while
+omitting their optional clock backstops. This marker grants no result authority.
+
 Source setup charges objective inspection, bound closure, integral real-column
 recognition and linear preparation to the containing invocation. An arithmetic
 preparation cap applies only once the selected completion requires that arithmetic.

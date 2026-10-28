@@ -1,10 +1,13 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.solver.ResumableSearch
+import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TestTimeSource
@@ -42,7 +45,15 @@ class PortfolioDiagnosticsTest {
         val trace = mutableListOf<PortfolioEvent>()
         var stopped = false
         val handle = TrackingResumableSearch(null, onRun = { stopped = true })
-        val worker = trackingWorker("worker", 0, handle)
+        val search = object : ResumableSearch by handle {
+            override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+                onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
+                assertNull(global.deadline())
+                assertEquals(Long.MAX_VALUE, sliceMillis)
+                return handle.runSlice(global, sliceMillis, sliceNodes, onIncumbent)
+            }
+        }
+        val worker = trackingWorker("worker", 0, search)
         val token = object : Cancellation {
             override fun isCancelled(): Boolean = stopped
             override fun deadline() = kotlin.time.TimeSource.Monotonic.markNow() + 100.milliseconds

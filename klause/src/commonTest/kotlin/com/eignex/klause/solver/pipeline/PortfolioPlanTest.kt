@@ -29,7 +29,7 @@ class PortfolioPlanTest {
 
         assertEquals(1000L, scenario.diagnosticWorkLimit)
         assertFailsWith<PipelineConfigException> {
-            buildPortfolioScenario(params, 17L, 2, Kind.COP, EngineMix.MIXED, 6)
+            buildPortfolioScenario(EngineParams(listOf("portfolio-work=1000")), 17L, 2, Kind.COP, EngineMix.MIXED, 6)
         }
     }
 

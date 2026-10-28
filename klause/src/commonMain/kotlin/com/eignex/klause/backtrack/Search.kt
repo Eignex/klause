@@ -67,6 +67,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.cancelledWhen
+import com.eignex.klause.util.workScheduled
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
@@ -240,7 +241,7 @@ internal class CpSatisfactionTraversal(
             val session = SearchComponentSet(components, branchers = listOf(traversal.brancher)).session(
                 cancellation = if (deferredRoot) cancelledWhen({
                     if (run == null) propagationCancellation.deadline() else params.cancellation.deadline()
-                }) {
+                }, { params.cancellation.workScheduled() }) {
                     if (run == null) propagationCancellation() else params.cancellation()
                 } else params.cancellation,
                 learnedDb = params.sharedLearnedDb(),
@@ -732,7 +733,7 @@ private class LpFeasibilityComponent(
     solveContext: LpSolveContext,
 ) : LpSearchResource {
     private var preparationToken: Cancellation? = null
-    private val cancellation = cancelledWhen({ params.cancellation.deadline() }) {
+    private val cancellation = cancelledWhen({ params.cancellation.deadline() }, { params.cancellation.workScheduled() }) {
         params.cancellation() || preparationToken?.invoke() == true
     }
     val engine = LpEngine(
@@ -770,7 +771,7 @@ private class LpFeasibilityComponent(
         val token = params.cancellation or Cancellation {
             (plan.rootMaxWork > 0L && engine.totalSolveWork() - before >= plan.rootMaxWork) ||
                 engine.lpWorkAllowanceSpent()
-        } or if (plan.rootBudgetFraction > 0.0) {
+        } or if (plan.rootBudgetFraction > 0.0 && !params.cancellation.workScheduled()) {
             Cancellation.after(millis.coerceAtLeast(0L).milliseconds)
         } else {
             Cancellation.Never
