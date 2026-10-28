@@ -56,6 +56,63 @@ import kotlin.time.TestTimeSource
 
 class CoreGuidedSearchTest {
     @Test
+    fun `cancelled prepared delegate construction should retain its query for retry`() {
+        var cancelled = false
+        var interrupted = false
+        val params = BacktrackParams(nativeSat = false, componentFactory = {
+            if (!interrupted) {
+                interrupted = true
+                cancelled = true
+            }
+            emptyList()
+        })
+        val objective = LinearObjective(longArrayOf(1))
+        val search = CoreGuidedSearch(Problem(1, 0, emptyArray(), emptyArray()).bake(), objective, params)
+
+        val paused = search.runSlice(Cancellation { cancelled }, Long.MAX_VALUE, -1L) {
+            error("cancelled construction")
+        }
+        val charged = search.preparationWork
+        cancelled = false
+        val resumed = search.runSlice(Cancellation { cancelled }, Long.MAX_VALUE, -1L) {}
+
+        assertNull(paused)
+        assertTrue(interrupted)
+        assertEquals(0L, objective.evaluateLong(assertIs<MinimizeResult.Optimal>(resumed).sample))
+        assertTrue(search.preparationWork > charged)
+    }
+
+    @Test
+    fun `paused source verification should retain its candidate without another query`() {
+        val hard = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
+        val source = Problem(2, 0, emptyArray(), Array(3) { hard })
+        var augmented = false
+        var cancelled = false
+        var verificationStops = 0
+        val providers = observingHard(hard) { state ->
+            if (state.problem.numBoolVars > source.numBoolVars) augmented = true
+            else if (augmented && verificationStops++ == 0) cancelled = true
+        }
+        val objective = LinearObjective(longArrayOf(1, 1))
+        val search = CoreGuidedSearch(source.bake(providers.prepare(source)), objective,
+            BacktrackParams(nativeSat = false, randomSeed = 3L))
+
+        val paused = search.runSlice(Cancellation { cancelled }, Long.MAX_VALUE, -1L) {
+            error("unchecked publication")
+        }
+        val queries = search.queryCount
+        val verification = search.verificationVisits
+        cancelled = false
+        val resumed = search.runSlice(Cancellation { cancelled }, Long.MAX_VALUE, -1L) {}
+
+        assertNull(paused)
+        assertTrue(verificationStops > 0)
+        assertEquals(1L, objective.evaluateLong(assertIs<MinimizeResult.Optimal>(resumed).sample))
+        assertEquals(queries, search.queryCount)
+        assertTrue(search.verificationVisits > verification)
+    }
+
+    @Test
     fun `native segment interruption after a decision should pause the core query`() {
         val clock = TestTimeSource()
         val interrupter = ClockJumpOnDecision(clock)

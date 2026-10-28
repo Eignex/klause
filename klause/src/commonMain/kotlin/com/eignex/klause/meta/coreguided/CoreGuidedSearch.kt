@@ -81,18 +81,19 @@ internal class CoreGuidedSearch(
     private var activeTime = Duration.ZERO
     private var activeSlice: TimeMark? = null
     private val lifetime = params.cancellation.lifetimeCancellation()
-    private val factors = ArrayList<Factor>().apply {
+    private var factors = ArrayList<Factor>().apply {
         addAll(base.factors)
         (base.rootDeductions as? PropagationResult.Implied)?.forEachBool { id, value ->
             add(Clause(intArrayOf(Lit.make(id, value))))
         }
     }
     private val initialFactorCount = factors.size
-    private val weights = LinkedHashMap<Int, BigInt>()
-    private val tails = HashMap<Int, Tail>()
+    private var weights = LinkedHashMap<Int, BigInt>()
+    private var tails = HashMap<Int, Tail>()
     private var nextBool = base.numBoolVars
     private var costs = objective
     private var costsPrepared = false
+    private var objectivePrepared = false
     private val objectiveTerms get() = costs.boolWeightValues.size + costs.intCoefficientValues.size
     private var initialIndex = 0
     private var lower = cheapest(base, objective)
@@ -120,6 +121,9 @@ internal class CoreGuidedSearch(
     private var completedPropagation = 0L
     private var workDebt = 0L
     private var best: Sample? = null
+    private var candidate: Sample? = null
+    private var verificationConstruction = 2L * base.numBoolVars + base.numIntVars + base.numFactors +
+        objective.boolWeightValues.size + objective.intCoefficientValues.size
     private var bestValue: BigFraction? = null
     private var terminal: MinimizeResult? = null
     private var closed = false
@@ -159,11 +163,11 @@ internal class CoreGuidedSearch(
     override val initialWork: Long = work
     override val canReseed: Boolean get() = false
     override val preparationPending: Boolean
-        get() = !costsPrepared || objectivePreparation != null || initialIndex < objectiveTerms || core != null ||
+        get() = !closed && (!costsPrepared || !objectivePrepared || core != null || candidate != null ||
             transitionPreparation != null ||
             (query as? PreparingSatisfaction)?.preparationPending == true ||
             (query as? ResumableSatisfaction)?.preparationPending == true ||
-            ((queryPreparation != null || queryModel != null || queryPins != null) && query == null)
+            ((queryPreparation != null || queryModel != null || queryPins != null) && query == null))
 
     override fun runSlice(
         global: Cancellation,
@@ -239,7 +243,7 @@ internal class CoreGuidedSearch(
                 }
                 if (preparation()) continue
             }
-            if (objectivePreparation != null || initialIndex < objectiveTerms) {
+            if (!objectivePrepared) {
                 val builder = objectivePreparation ?: prepareObjective().also { objectivePreparation = it }
                 if (!advancePreparation(builder, preparation)) continue
                 objectivePreparation = null
@@ -252,6 +256,11 @@ internal class CoreGuidedSearch(
                 val builder = corePreparation ?: extendCore().also { corePreparation = it }
                 if (!advancePreparation(builder, preparation)) continue
                 corePreparation = null
+            }
+            if (candidate != null) {
+                verifyCandidate(token or segment or Cancellation { allowanceExhausted }, onIncumbent)?.let { return it }
+                if (candidate != null) return null
+                continue
             }
             if (token() || segment()) return null
             val incumbent = best
@@ -275,7 +284,17 @@ internal class CoreGuidedSearch(
             val remaining = if (allowance < 0L) -1L else (allowance - (work - start)).coerceAtLeast(0L)
             val millis = (deadline - TimeSource.Monotonic.markNow()).inWholeMilliseconds.coerceAtLeast(0L)
             val traversalToken = token or Cancellation.until(deadline) or segment or Cancellation { allowanceExhausted }
-            val result = handle.runSlice(traversalToken.withLifetime(lifetime), millis, remaining)
+            val result = try {
+                handle.runSlice(traversalToken.withLifetime(lifetime), millis, remaining)
+            } catch (failure: SearchInitializationCancelled) {
+                handle.close()
+                recordPreparation(1L)
+                settleQuery(failure.stats, failure.work)
+                query = null
+                resumableOpening = true
+                queryPreparation = prepareQueryConstruction()
+                return if (allowanceExhausted) finish(stopped(TerminationReason.BudgetExhausted)) else null
+            }
             if (result == null) {
                 return if (allowanceExhausted) finish(stopped(TerminationReason.BudgetExhausted)) else null
             }
@@ -296,39 +315,10 @@ internal class CoreGuidedSearch(
                 is SolveResult.Unknown -> return finish(stopped(result.reason))
 
                 is SolveResult.Sat -> {
-                    val sample = Sample(
+                    candidate = Sample(
                         BooleanArray(base.numBoolVars) { result.assignment.boolValue(it) },
                         result.assignment.ints,
                     )
-                    when (val verified = composedFixpoint(
-                        base, Candidate(sample, Unit), traversalToken, params.assumptions,
-                        onWork = { units ->
-                            recordPreparation(units)
-                            verificationVisits = addWork(verificationVisits, units)
-                        },
-                    )) {
-                        is Verification.Rejected -> throw UnsoundnessException(verified.reason)
-                        is Verification.Indeterminate -> return if (allowanceExhausted) {
-                            finish(stopped(TerminationReason.BudgetExhausted))
-                        } else null
-                        is Verification.Accepted -> Unit
-                    }
-                    val value = objective.evaluateExact(sample)
-                    if (bestValue == null || value < requireNotNull(bestValue)) {
-                        best = sample
-                        bestValue = value
-                        onIncumbent(
-                            MinimizeResult.BestFound(sample, value.toDouble(), TerminationReason.BudgetExhausted)
-                                .withSourceSemantics(base.semantics),
-                        )
-                    }
-                    if (value == lowerBound) return finish(MinimizeResult.Optimal(sample, value.toDouble(), stats))
-                    val current = requireNotNull(threshold)
-                    queryPreparation = sequence {
-                        threshold = maximumWeight(current)
-                        check(threshold != null) { "core objective identity differs from source objective" }
-                        yieldAll(prepareQuery())
-                    }.iterator()
                 }
 
                 is SolveResult.Unsat -> {
@@ -337,6 +327,48 @@ internal class CoreGuidedSearch(
             }
         }
         return if (allowanceExhausted) finish(stopped(TerminationReason.BudgetExhausted)) else null
+    }
+
+    private fun verifyCandidate(
+        token: Cancellation,
+        onIncumbent: (MinimizeResult.WithSample) -> Unit,
+    ): MinimizeResult? {
+        val sample = requireNotNull(candidate)
+        recordVerification(verificationConstruction)
+        when (val verified = composedFixpoint(
+            base, Candidate(sample, Unit), token, params.assumptions, onWork = ::recordVerification,
+        )) {
+            is Verification.Rejected -> throw UnsoundnessException(verified.reason)
+            is Verification.Indeterminate -> return when {
+                allowanceExhausted -> finish(stopped(TerminationReason.BudgetExhausted))
+                token() -> null
+                else -> finish(stopped(TerminationReason.Unsupported))
+            }
+            is Verification.Accepted -> Unit
+        }
+        candidate = null
+        val value = objective.evaluateExact(sample)
+        if (bestValue == null || value < requireNotNull(bestValue)) {
+            best = sample
+            bestValue = value
+            onIncumbent(
+                MinimizeResult.BestFound(sample, value.toDouble(), TerminationReason.BudgetExhausted)
+                    .withSourceSemantics(base.semantics),
+            )
+        }
+        if (value == lowerBound) return finish(MinimizeResult.Optimal(sample, value.toDouble(), stats))
+        val current = requireNotNull(threshold)
+        queryPreparation = sequence {
+            threshold = maximumWeight(current)
+            check(threshold != null) { "core objective identity differs from source objective" }
+            yieldAll(prepareQuery())
+        }.iterator()
+        return null
+    }
+
+    private fun recordVerification(units: Long) {
+        recordPreparation(units)
+        verificationVisits = addWork(verificationVisits, units)
     }
 
     private fun prepareCore(assumptions: Assumptions?, model: BakedProblem?): Iterator<Unit> = sequence {
@@ -377,6 +409,11 @@ internal class CoreGuidedSearch(
     }.iterator()
 
     private fun prepareObjective(): Iterator<Unit> = sequence {
+        for (factor in base.factors) {
+            verificationConstruction += factor.structuralKeyWeight
+            recordPreparation(1L)
+            yield(Unit)
+        }
         while (initialIndex < objectiveTerms) {
             val id = initialIndex++
             recordPreparation(1L)
@@ -404,6 +441,7 @@ internal class CoreGuidedSearch(
             weights[violation] = exact.abs()
         }
         threshold = if (stratify) maximumWeight() else BIG_ONE
+        objectivePrepared = true
     }.iterator()
 
     private fun extendCore(): Iterator<Unit> = sequence {
@@ -554,6 +592,7 @@ internal class CoreGuidedSearch(
     private fun finishQuery(keepModel: Boolean = false) {
         val handle = query ?: return
         handle.close()
+        recordPreparation(1L)
         settleQuery(handle.stats, handle.work)
         query = null
         if (!keepModel) {
@@ -595,11 +634,14 @@ internal class CoreGuidedSearch(
         corePreparation = null
         queryPreparation = null
         transitionPreparation = null
-        tails.clear()
-        weights.clear()
-        factors.clear()
+        recordPreparation(tails.size.toLong() + weights.size + factors.size + coreLiterals.size + querySofts.size)
+        tails = HashMap()
+        weights = LinkedHashMap()
+        factors = ArrayList()
         core = null
+        candidate = null
         coreLiterals = IntArray(0)
+        querySofts = IntArray(0)
         closed = true
     }
 
