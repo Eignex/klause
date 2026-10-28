@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.evidence
 
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -113,5 +114,23 @@ class SourceIntegerAggregateSplitTest {
         assertFalse(scope.condition.implies(condition))
         assertEquals(setOf(below), pinned.integerRows)
         assertEquals(emptySet(), scope.condition.integerRows)
+    }
+
+    @Test
+    fun `a custom witness checker should not bypass aggregate restrictions`() {
+        val branch = scope.copy(condition = scope.condition.integerBound(below))
+        val checker = object : SourceSemanticsChecker {
+            override fun witness(sample: Sample, scope: SourceScope, cancellation: Cancellation) =
+                SourceEvidenceCheck.Checked
+            override fun ray(claim: SourceClaim.Ray, scope: SourceScope, cancellation: Cancellation) =
+                SourceEvidenceCheck.Checked
+        }
+        val context = SourceProofContext(branch, setOf(x, y), emptyMap(), semanticsChecker = checker)
+        val sample = Sample(booleanArrayOf(), longArrayOf(1, 0))
+
+        val result = SourceEvidenceVerifier(context).verify(
+            SourceEvidence(branch, SourceClaim.Witness(sample), SourceDerivation.SourceWitness))
+
+        assertIs<SourceEvidenceCheck.Rejected>(result)
     }
 }

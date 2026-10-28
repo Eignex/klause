@@ -73,6 +73,7 @@ class SourceProofContext(
 ) {
     private val capturedCoordinates = coordinates.toSet()
     private val capturedPremises = premises.toMap()
+    internal val premiseCount: Int get() = capturedPremises.size
     private val capturedObjective = objective?.filterValues { !it.isZero }?.toMap()
     internal val coordinateCount: Int get() = capturedCoordinates.size
     internal val premiseCount: Int get() = capturedPremises.size
@@ -175,6 +176,27 @@ class SourceEvidenceVerifier(
             claim: SourceClaim, derivation: SourceDerivation, scope: SourceScope, depth: Int,
         ): SourceEvidenceCheck {
             step(depth)
+            if (scope.condition.integerRows.isNotEmpty()) {
+                val sample = when (claim) {
+                    is SourceClaim.Witness -> claim.sample
+                    is SourceClaim.Ray -> claim.sample
+                    else -> null
+                }
+                if (sample != null) {
+                    val checked = scope.condition.checkWitness(sample, Cancellation { step(depth); cancellation() })
+                    if (checked != SourceEvidenceCheck.Checked) return checked
+                }
+                if (claim is SourceClaim.Ray) {
+                    for (row in scope.condition.integerRows) {
+                        var activity = BigFraction.ZERO
+                        for ((id, coefficient) in row.coefficients) {
+                            step(depth)
+                            activity += coefficient * (claim.direction[id] ?: BigFraction.ZERO)
+                        }
+                        if (activity > BigFraction.ZERO) return reject("ray leaves an integer aggregate restriction")
+                    }
+                }
+            }
             when (derivation) {
                 is SourceDerivation.Unavailable -> return SourceEvidenceCheck.Unavailable(derivation.reason)
                 is SourceIntegerAggregateSplit -> {
@@ -188,9 +210,14 @@ class SourceEvidenceVerifier(
                     }
                 }
                 is SourceIntegerRowAssumption -> Unit
-                is SourceDerivation.Extension -> return context.semanticsChecker?.derivation(claim,
-                    derivation, scope, cancellation)
-                    ?: SourceEvidenceCheck.Unavailable("source-specific derivation checker unavailable")
+                is SourceDerivation.Extension -> {
+                    if (scope.condition.integerRows.isNotEmpty() &&
+                        context.semanticsChecker !is SourceIntegerAggregateSemantics) {
+                        return SourceEvidenceCheck.Unavailable("source-specific checker has no aggregate scope support")
+                    }
+                    return context.semanticsChecker?.derivation(claim, derivation, scope, cancellation)
+                        ?: SourceEvidenceCheck.Unavailable("source-specific derivation checker unavailable")
+                }
                 is SourceDerivation.Import -> {
                     val imported = derivation.evidence
                     if (imported.scope.revision != scope.revision || imported.scope.objective != scope.objective ||

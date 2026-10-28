@@ -10,6 +10,7 @@ import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceInequality
+import com.eignex.klause.solver.evidence.SourceIntegerAggregateSemantics
 import com.eignex.klause.solver.evidence.SourcePremise
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceScope
@@ -142,8 +143,11 @@ class LinearAuthoritySemantics(private val source: SourceProofContext) : SourceS
  */
 fun SourceProofContext.withLinearAuthority(): SourceProofContext = SourceProofContext(
     scope, coordinates, premises, objective.takeIf { affineObjectiveAvailable }, objectiveConstant,
-    LinearAuthoritySemantics(this), semantics,
+    LinearAggregateAuthoritySemantics(LinearAuthoritySemantics(this)), semantics,
 )
+
+private class LinearAggregateAuthoritySemantics(delegate: SourceSemanticsChecker) :
+    SourceSemanticsChecker by delegate, SourceIntegerAggregateSemantics
 
 internal fun SourceProofContext.atScope(scope: SourceScope): SourceProofContext = SourceProofContext(
     scope, coordinates, premises, objective.takeIf { affineObjectiveAvailable }, objectiveConstant, semanticsChecker,

@@ -10,5 +10,7 @@ internal class SourceIntegerAggregateSplit(
 
 internal class SourceIntegerRowAssumption(val row: SourceInequality) : SourceDerivation.Extension
 
+internal interface SourceIntegerAggregateSemantics
+
 internal fun SourceInequality.adjacentIntegerAbove(): SourceInequality =
     SourceInequality(coefficients.mapValues { it.value.negated() }, (rhs + BigFraction.ONE).negated())
