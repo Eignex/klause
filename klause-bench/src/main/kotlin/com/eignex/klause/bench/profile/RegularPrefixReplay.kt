@@ -9,9 +9,9 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.CpBranching
 import com.eignex.klause.propagation.CpSearchComponent
-import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
@@ -22,12 +22,12 @@ import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchBrancher
-import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchConflictResolution
+import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchExplanation
-import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.SearchLearnedConflictResult
+import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchRunObserver
 import com.eignex.klause.solver.search.SearchSession
@@ -35,13 +35,13 @@ import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.explainAtoms
 import com.eignex.klause.util.Cancellation
 import com.sun.management.ThreadMXBean
-import java.io.File
-import java.lang.management.ManagementFactory
-import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import java.lang.management.ManagementFactory
+import kotlin.time.Duration.Companion.seconds
 
 internal data class RegularPrefixDefinitions(val problem: Problem, val states: IntArray, val booleans: IntArray)
 
@@ -66,17 +66,28 @@ internal fun regularPrefixDefinitions(source: Problem): RegularPrefixDefinitions
             val key = kernel + factor.seq.take(i).joinToString(",")
             val previous = prefixes[key]
             chain[i] = previous ?: domains.size.also { variable ->
-                domains.add(if (i == 0) IntDomain(factor.q0.toLong(), factor.q0.toLong())
-                    else IntDomain(0, factor.numStates.toLong()))
+                domains.add(
+                    if (i == 0) {
+                        IntDomain(factor.q0.toLong(), factor.q0.toLong())
+                    } else {
+                        IntDomain(0, factor.numStates.toLong())
+                    },
+                )
                 prefixes[key] = variable
                 if (i > 0) {
                     val tuples = ArrayList<Long>()
-                    for (q in 0..factor.numStates) for (symbol in 1..factor.alphabetSize) {
-                        val next = if (q == 0) 0L else factor.transitions[(q - 1) * factor.alphabetSize + symbol - 1]
+                    for (q in 0..factor.numStates) {
+                        for (symbol in 1..factor.alphabetSize) {
+                        val next = if (q == 0) {
+                            0L
+                        } else {
+                            factor.transitions[(q - 1) * factor.alphabetSize + symbol - 1]
                             .takeIf { it in 1L..factor.numStates.toLong() } ?: 0L
+                        }
                         tuples.add(q.toLong())
                         tuples.add(symbol.toLong())
                         tuples.add(next)
+                    }
                     }
                     cells += tuples.size
                     require(cells <= 32_768)
@@ -91,12 +102,35 @@ internal fun regularPrefixDefinitions(source: Problem): RegularPrefixDefinitions
     val target = chosen[boundary]
     val count = domains[target].max.toInt()
     val booleans = IntArray(count) { source.numBoolVars + it }
-    for (q in 1..count) factors.add(ReifiedLinear(booleans[q - 1], longArrayOf(1), intArrayOf(target), LinearOp.EQ,
-        q.toLong()))
-    val mask = source.impliedFactorMask?.let { original -> BooleanArray(factors.size) { it < original.size && original[it] } }
-    return RegularPrefixDefinitions(Problem(source.numBoolVars + count, domains.size, domains.toTypedArray(),
-        factors.toTypedArray(), impliedFactorMask = mask, hasSymmetryBreaking = source.hasSymmetryBreaking,
-        settings = source.settings, semantics = source.semantics), chosen, booleans)
+    for (q in 1..count) {
+        factors.add(
+            ReifiedLinear(
+        booleans[q - 1],
+        longArrayOf(1),
+        intArrayOf(target),
+        LinearOp.EQ,
+        q.toLong(),
+    )
+        )
+    }
+    val mask = source.impliedFactorMask?.let { original ->
+        BooleanArray(
+            factors.size,
+        ) { it < original.size && original[it] }
+    }
+    return RegularPrefixDefinitions(
+        Problem(
+        source.numBoolVars + count,
+        domains.size,
+        domains.toTypedArray(),
+        factors.toTypedArray(),
+        impliedFactorMask = mask,
+        hasSymmetryBreaking = source.hasSymmetryBreaking,
+        settings = source.settings,
+        semantics = source.semantics,
+    ),
+        chosen, booleans
+    )
 }
 
 internal object RegularPrefixReplay {
@@ -110,8 +144,13 @@ internal object RegularPrefixReplay {
         val definitionNs = System.nanoTime() - start
         val definitionBytes = bean.getThreadAllocatedBytes(thread) - before
         val records = out.resolve("replay.jsonl").apply { writeText("") }
-        for (mode in listOf("native", "source-reasons", "definitions-source-reasons", "definitions-learning",
-            "definitions-branching")) {
+        for (mode in listOf(
+            "native",
+            "source-reasons",
+            "definitions-source-reasons",
+            "definitions-learning",
+            "definitions-branching",
+        )) {
             val model = if (mode.startsWith("definitions")) definitions.problem else source
             val allocated = bean.getThreadAllocatedBytes(thread)
             val started = System.nanoTime()
@@ -121,9 +160,20 @@ internal object RegularPrefixReplay {
                 originalAlternatives(session, source.numIntVars, sourceId)
             }
             val cp = CpSearchComponent(native, branching = originalBranching)
-            val component = if (mode.endsWith("source-reasons")) SourceReasons(cp, source.numIntVars,
-                source.numBoolVars) else cp
-            val shared = SearchSession(listOf(component), cancellation = stop, atoms = SearchAtomRegistry(model.numBoolVars))
+            val component = if (mode.endsWith("source-reasons")) {
+                SourceReasons(
+                cp,
+                source.numIntVars,
+                source.numBoolVars,
+            )
+            } else {
+                cp
+            }
+            val shared = SearchSession(
+                listOf(component),
+                cancellation = stop,
+                atoms = SearchAtomRegistry(model.numBoolVars),
+            )
             var decisions = 0
             var conflicts = 0
             var helperDecisions = 0
@@ -134,20 +184,35 @@ internal object RegularPrefixReplay {
                         helperDecisions++
                     }
                 }
-                override fun onConflict(decision: SearchDecision?) { conflicts++ }
+                override fun onConflict(decision: SearchDecision?) {
+                    conflicts++
+                }
             }
-            val result = shared.solve(model.numBoolVars, SearchSolveParams(maxDecisions = 2048),
-                booleanBranching = BooleanBranching.SourceOrder(if (mode == "definitions-branching")
-                    model.numBoolVars else source.numBoolVars), observer = observer)
+            val result = shared.solve(
+                model.numBoolVars,
+                SearchSolveParams(maxDecisions = 2048),
+                booleanBranching = BooleanBranching.SourceOrder(
+                    if (mode == "definitions-branching") {
+                        model.numBoolVars
+                    } else {
+                        source.numBoolVars
+                    },
+                ),
+                observer = observer,
+            )
             val runNs = System.nanoTime() - started
             val runBytes = bean.getThreadAllocatedBytes(thread) - allocated
             val checkStarted = System.nanoTime()
             val checkStop = Cancellation.after(2.seconds)
             val checked = if (result is SearchResult.Satisfied) {
-                val sample = Sample(BooleanArray(source.numBoolVars) { native.boolValue(it) ?: false },
-                    LongArray(source.numIntVars) { native.intDomain(it).min })
+                val sample = Sample(
+                    BooleanArray(source.numBoolVars) { native.boolValue(it) ?: false },
+                    LongArray(source.numIntVars) { native.intDomain(it).min },
+                )
                 FiniteConflictSelection.checkSource(original.bake(checkStop), reconstruct(sample), checkStop)
-            } else null
+            } else {
+                null
+            }
             val clauseGetter = native.javaClass.declaredMethods.single {
                 it.name.startsWith("learnedClauseLiterals") && it.parameterCount == 1
             }
@@ -170,9 +235,14 @@ internal object RegularPrefixReplay {
                 put("sharedStored", shared.learnedClauseCount)
                 put("helperBooleanClauses", helperClauses.size)
                 put("helperBooleanClausesMarkedUsed", helperClauses.count(native::learnedClauseUsedSinceReduction))
-                put("helperClauseSamples", JsonArray(helperClauses.take(16).map { index ->
+                put(
+                    "helperClauseSamples",
+                    JsonArray(
+                        helperClauses.take(16).map { index ->
                     JsonArray((clauseGetter.invoke(native, index) as IntArray).map(::JsonPrimitive))
-                }))
+                }
+                    )
+                )
                 put("definitionNs", if (mode.startsWith("definitions")) definitionNs else 0)
                 put("definitionThreadBytes", if (mode.startsWith("definitions")) definitionBytes else 0)
                 put("runNs", runNs)
@@ -197,7 +267,11 @@ internal object RegularPrefixReplay {
     }
 
     private fun work(session: PropagationSession): Long {
-        val getter = session.javaClass.declaredMethods.single { it.name.startsWith("getWork") && it.parameterCount == 0 }
+        val getter = session.javaClass.declaredMethods.single {
+            it.name.startsWith(
+                "getWork",
+            ) && it.parameterCount == 0
+        }
         return getter.invoke(session) as Long
     }
 
@@ -226,13 +300,20 @@ internal object RegularPrefixReplay {
                     check(session.seed(Assumptions.None) is PropagationResult.Implied)
                     check(session.boolValue(definitions.booleans[0]) == false)
                 } else {
-                    check(session.addLearnedClause(Clause(IntArray(boundary) { session.boundGeLit(it, 2, true) }),
-                        boundary) is PropagationResult.Implied)
+                    check(
+                        session.addLearnedClause(
+                        Clause(IntArray(boundary) { session.boundGeLit(it, 2, true) }),
+                        boundary,
+                    ) is PropagationResult.Implied
+                    )
                 }
                 var completed = 0
                 var beforePin = false
                 for (v in 0 until boundary) {
-                    if (symbol !in session.intDomain(v)) { beforePin = true; break }
+                    if (symbol !in session.intDomain(v)) {
+                        beforePin = true;
+                        break
+                    }
                     if (session.pinInt(v, symbol) is PropagationResult.Unsat) break
                     completed++
                 }
@@ -254,13 +335,17 @@ internal object RegularPrefixReplay {
         }
     }
 
-    private class SourceReasons(private val cp: CpSearchComponent, private val integers: Int,
-        private val booleans: Int) : SearchBrancher {
+    private class SourceReasons(
+        private val cp: CpSearchComponent,
+        private val integers: Int,
+        private val booleans: Int,
+    ) : SearchBrancher {
         private val choices = LinkedHashSet<SearchDecision>()
         private val active = ArrayList<Pair<Int, SearchDecision>>()
 
         private fun explanation(context: SearchContext): SearchExplanation? = context.explainAtoms(
-            SearchAtomPremise.All(active.map { SearchAtomPremise.Asserted(it.second) }))
+            SearchAtomPremise.All(active.map { SearchAtomPremise.Asserted(it.second) }),
+        )
 
         private fun result(result: ComponentResult, context: SearchContext): ComponentResult =
             if (result is ComponentResult.Conflict) ComponentResult.Conflict(explanation(context)) else result
@@ -268,8 +353,11 @@ internal object RegularPrefixReplay {
         override fun initialize(context: SearchContext): ComponentResult = result(cp.initialize(context), context)
         override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
             val literal = context.atomLiteral(decision)
-            val original = if (decision is SearchDecision.Bool && Lit.variable(decision.literal) < booleans) decision
-                else choices.firstOrNull { context.atomLiteral(it) == literal && literal != null }
+            val original = if (decision is SearchDecision.Bool && Lit.variable(decision.literal) < booleans) {
+                decision
+            } else {
+                choices.firstOrNull { context.atomLiteral(it) == literal && literal != null }
+            }
             if (original != null && (context as SearchSession).reasonFor(requireNotNull(literal) ushr 1) == null) {
                 active.add(context.decisionLevel to original)
             }
@@ -290,7 +378,11 @@ internal object RegularPrefixReplay {
     }
 }
 
-private fun originalAlternatives(session: PropagationSession, count: Int, sourceId: (Int) -> Int): List<SearchDecision>? {
+private fun originalAlternatives(
+    session: PropagationSession,
+    count: Int,
+    sourceId: (Int) -> Int,
+): List<SearchDecision>? {
     for (v in 0 until count) {
         val domain = session.intDomain(v)
         if (domain.min == domain.max) continue
