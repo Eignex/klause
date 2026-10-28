@@ -4338,8 +4338,9 @@ existing terminator. [Output replay 8975](https://lab.eignex.com/jobs/8975) reus
 the frozen points and output models with that empty block removed; it runs no
 solver. Both original sources render successfully in both libraries, including
 `p=false; task=<>` with the native control's independent `c=2` value and workforce's
-allocation, starts and optional totals. Some authored output models also contain an undefined absent `deopt` or
-an undeclared `int_ne`; both libraries retain these compiler-output declines.
+allocation, starts and optional totals. Some authored output models also contain
+an undefined absent `deopt` or an undeclared `int_ne`; both libraries retain these
+compiler-output declines.
 They supply no complete-source output validation. The original control and
 workforce output checks are separate from these limits and from the native factor
 checks. The lab has no independent MiniZinc assignment/proof checker.
