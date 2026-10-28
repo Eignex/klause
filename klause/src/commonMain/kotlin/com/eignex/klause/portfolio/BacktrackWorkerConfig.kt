@@ -72,7 +72,8 @@ internal class BacktrackWorkerConfig(
         params = params.copy(zeroObjectivePricing = zeroObjectivePricing, toleranceCheck = toleranceCheck)
         if (recipe.label == BacktrackArm.CoreGuided.label) {
             val coreParams = params
-            return CoreGuidedWorkerConfig(params.nodeBudget, coreRefinement = coreRefinement) { coreParams }.materialize(
+            val core = CoreGuidedWorkerConfig(params.nodeBudget, coreRefinement = coreRefinement) { coreParams }
+            return core.materialize(
                 problem, index, armId, seed, lsLambda, objective, lsObjective, definitionalSweep, onEvent, pools,
             )
         }
