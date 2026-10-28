@@ -34,6 +34,7 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.explainAtoms
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.IntArrayList
 import com.sun.management.ThreadMXBean
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
@@ -135,7 +136,14 @@ internal fun regularPrefixDefinitions(source: Problem): RegularPrefixDefinitions
 }
 
 internal object RegularPrefixReplay {
-    fun capture(source: Problem, identity: String, out: File, original: Problem, reconstruct: (Sample) -> Sample) {
+    fun capture(
+        source: Problem,
+        identity: String,
+        out: File,
+        original: Problem,
+        reconstruct: (Sample) -> Sample,
+        fixed: Boolean = false,
+    ) {
         val bean = ManagementFactory.getThreadMXBean() as ThreadMXBean
         bean.isThreadAllocatedMemoryEnabled = true
         val thread = Thread.currentThread().threadId()
@@ -145,17 +153,19 @@ internal object RegularPrefixReplay {
         val definitionNs = System.nanoTime() - start
         val definitionBytes = bean.getThreadAllocatedBytes(thread) - before
         val records = out.resolve("replay.jsonl").apply { writeText("") }
-        for (mode in listOf(
+        val modes = listOf(
             "native",
             "source-reasons",
             "definitions-source-reasons",
             "definitions-learning",
             "definitions-branching",
-        )) {
+        )
+        val order = modes.map { 0 to it } + if (fixed) modes.reversed().map { 1 to it } else emptyList()
+        for ((round, mode) in order) {
             val model = if (mode.startsWith("definitions")) definitions.problem else source
             val allocated = bean.getThreadAllocatedBytes(thread)
             val started = System.nanoTime()
-            val stop = Cancellation.after(2.seconds)
+            val stop = Cancellation.after(if (fixed) 5.seconds else 2.seconds)
             val native = PropagationSession(model, cancellation = stop)
             val originalBranching = CpBranching { session, sourceId ->
                 originalAlternatives(session, source.numIntVars, sourceId)
@@ -178,9 +188,11 @@ internal object RegularPrefixReplay {
             var decisions = 0
             var conflicts = 0
             var helperDecisions = 0
+            val trace = ArrayList<String>()
             val observer = object : SearchRunObserver {
                 override fun onCommit(decision: SearchDecision, decisionLevel: Int) {
                     decisions++
+                    if (trace.size < 128) trace.add(decision.toString())
                     if (decision is SearchDecision.Bool && Lit.variable(decision.literal) >= source.numBoolVars) {
                         helperDecisions++
                     }
@@ -191,7 +203,7 @@ internal object RegularPrefixReplay {
             }
             val result = shared.solve(
                 model.numBoolVars,
-                SearchSolveParams(maxDecisions = 2048),
+                SearchSolveParams(maxDecisions = if (fixed) 64 else 2048),
                 booleanBranching = BooleanBranching.SourceOrder(
                     if (mode == "definitions-branching") {
                         model.numBoolVars
@@ -222,9 +234,24 @@ internal object RegularPrefixReplay {
                     Lit.variable(it) in source.numBoolVars until model.numBoolVars
                 }
             }
+            val state = native.javaClass.getDeclaredField("state").apply { isAccessible = true }.get(native)
+            val atoms = state.javaClass.declaredMethods.single {
+                it.name.startsWith("getAtoms") && it.parameterCount == 0
+            }.invoke(state)
+            val atomVariables = atoms.javaClass.getMethod("getIntVar").invoke(atoms) as IntArrayList
+            val helperIntegerClauses = (0 until native.learnedClauseCount).filter { index ->
+                (clauseGetter.invoke(native, index) as IntArray).any {
+                    val variable = Lit.variable(it)
+                    variable >= model.numBoolVars && atomVariables[variable - model.numBoolVars] >= source.numIntVars
+                }
+            }
             val record = buildJsonObject {
                 put("preparedIdentity", identity)
                 put("mode", mode)
+                put("round", round)
+                put("decisionCap", if (fixed) 64 else 2048)
+                put("decisionTrace", JsonArray(trace.map(::JsonPrimitive)))
+                put("decisionTraceCapped", decisions > trace.size)
                 put("result", result.javaClass.simpleName)
                 put("stopped", stop())
                 put("decisions", decisions)
@@ -236,6 +263,11 @@ internal object RegularPrefixReplay {
                 put("sharedStored", shared.learnedClauseCount)
                 put("helperBooleanClauses", helperClauses.size)
                 put("helperBooleanClausesMarkedUsed", helperClauses.count(native::learnedClauseUsedSinceReduction))
+                put("helperIntegerClauses", helperIntegerClauses.size)
+                put(
+                    "helperIntegerClausesMarkedUsed",
+                    helperIntegerClauses.count(native::learnedClauseUsedSinceReduction),
+                )
                 put(
                     "helperClauseSamples",
                     JsonArray(
