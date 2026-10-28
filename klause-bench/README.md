@@ -876,7 +876,7 @@ The lab runs no shell scripts, so a new measurement is a class in that package.
 
 `TaskOrderProfile` captures native unary and single-pair reified-order controls
 before selecting a task-order consumer. The free-pair and equal-start controls
-compare minimum, midpoint, impact probing, LP and default/aggressive preparation;
+compare minimum, midpoint, impact probing, VSIDS and LP with default/aggressive preparation;
 the order overlay adds two existing reified rows and their covering clause.
 Each solve has 256 decisions and five seconds for construction and search.
 Prefix records retain both order polarities and undo; bounded selector traces,
@@ -889,6 +889,8 @@ are retained. The annotated control preserves the source selectors; separate fre
 controls inspect default preparation and a first-pair overlay. These satisfaction
 projections supply no original MiniZinc objective or proof claim. Optional tasks,
 variable/zero durations and shared starts decline the overlay.
+`mode=source` runs only the four MiniZinc controls, allowing compiler-capable
+placement without repeating retained authored captures.
 
 `SourceStageProfile` accepts `request64=<base64 JSON array>` for stage attribution.
 A source request has `suite`, `problem`, decoded-source `sha256`, `engine`
@@ -3917,6 +3919,36 @@ seconds. The [matched stage capture](https://lab.eignex.com/jobs/8854) also exit
 establish deadline handling without independent witness or proof validation.
 Instrumented profiles establish no throughput result; charged scheduling visits
 also change the units included in propagation-work totals.
+
+### Source task-order applicability
+
+[Task-order capture 8898](https://lab.eignex.com/jobs/8898), at `f41e018c2a`,
+retains 18 authored controls on Linux/amd64 under a one-CPU, 4,608 MiB cgroup.
+Each construction/search has five seconds and 256 decisions, with source checking
+recorded separately. The process exits 1 after those controls because that worker
+lacks MiniZinc; it establishes no original-source coverage. All nine authored
+witnesses pass the native factor checker. Refutations have no independent exported
+proof check, and the serial JFR timings establish no throughput comparison.
+
+For two mandatory duration-2 tasks, unary non-overlap requires one order, and both
+orders would imply `2 + 2 <= 0`. The existing two reified rows and covering clause
+enforce this source-relative partition. Both prefixes propagate bounds across the
+whole start range and undo restores the root. The free pair remains a two-node,
+zero-conflict solve; prepared reified orders raise propagation work from 22 to
+206 and add two Booleans and three factors before preparation. The prepared free
+pair also installs the existing difference-system propagator.
+
+On equal starts, raw reified orders produce two conflicts and one learned clause,
+versus 31 conflicts for minimum-value search. Impact probing also refutes before
+committed decisions. Ordinary preparation maps the native tasks to a shared start,
+outside the proposed initial guard; preparing the reified rows refutes at root.
+This contradiction therefore supplies no eligible prepared source for a new order
+consumer. The capture retains construction, search, check and cumulative thread
+allocation costs; allocation is not peak storage or RSS.
+No dynamic order consumer is qualified by these controls. Original-source
+consumption remains unavailable: compiler-capable cloud placement was not
+advertised, and the unstarted local-only capture 8913 was cancelled when local
+placement was disallowed.
 
 ### Portfolio slice policy
 
