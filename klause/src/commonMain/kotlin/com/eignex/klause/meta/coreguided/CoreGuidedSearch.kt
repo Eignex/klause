@@ -10,15 +10,12 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.SeparableObjectiveView
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.RootWorkMeter
-import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.ReseedGuard
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
@@ -41,6 +38,7 @@ import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.abs
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.compareTo
@@ -99,7 +97,20 @@ internal class CoreGuidedSearch(
     private var threshold: BigInt? = null
     private var query: ResumableSolve? = null
     private var queryModel: BakedProblem? = null
+    private var queryPins: Assumptions? = null
+    private var objectivePreparation: Iterator<Unit>? = null
+    private var corePreparation: Iterator<Unit>? = null
+    private var queryPreparation: Iterator<Unit>? = null
+    private var transitionPreparation: Iterator<Unit>? = null
+    private var preparationToken: Cancellation = Cancellation.Never
     private var preparationVisits = factors.size.toLong() + objectiveTerms
+    internal val preparationWork: Long get() = preparationVisits
+    internal var thresholdVisits = 0L
+        private set
+    internal var queryCount = 0L
+        private set
+    internal var verificationVisits = 0L
+        private set
     private var querySofts = IntArray(0)
     private var completedStats = SolveStats.EMPTY
     private var completedWork = 0L
@@ -111,9 +122,7 @@ internal class CoreGuidedSearch(
     private var closed = false
     private var core: IntArray? = null
     private var coreWeight = BIG_ZERO
-    private var coreCursor = 0
     private var coreLiterals = IntArray(0)
-    private var coreEncoded = false
     private var completedCores = 0L
     private var largestCore = 0
 
@@ -147,8 +156,9 @@ internal class CoreGuidedSearch(
     override val initialWork: Long = work
     override val canReseed: Boolean get() = false
     override val preparationPending: Boolean
-        get() = !costsPrepared || initialIndex < objectiveTerms || core != null ||
-            (queryModel != null && query == null)
+        get() = !costsPrepared || objectivePreparation != null || initialIndex < objectiveTerms || core != null ||
+            transitionPreparation != null ||
+            (queryPreparation != null || queryModel != null) && query == null
 
     override fun runSlice(
         global: Cancellation,
@@ -194,11 +204,13 @@ internal class CoreGuidedSearch(
             override fun workMeter(): RootWorkMeter = meter
         }
         activeSlice = timeSource.markNow()
+        preparationToken = preparation
         try {
             return advance(token, preparation, segment, start, allowance, onIncumbent)
         } finally {
             activeTime += checkNotNull(activeSlice).elapsedNow()
             activeSlice = null
+            preparationToken = Cancellation.Never
             if (offered >= 0L) workDebt = addWork(workDebt, (work - start - offered).coerceAtLeast(0L))
         }
     }
@@ -213,6 +225,7 @@ internal class CoreGuidedSearch(
     ): MinimizeResult? {
         val deadline = requireNotNull(segment.deadline())
         while (!preparation()) {
+            terminal?.let { return it }
             if (!costsPrepared) {
                 costsPrepared = true
                 SeparableObjectiveView.create(base, objective, preparation)?.let {
@@ -221,14 +234,19 @@ internal class CoreGuidedSearch(
                 }
                 if (preparation()) continue
             }
-            if (initialIndex < objectiveTerms) {
-                prepareObjective()
-                if (initialIndex < objectiveTerms) continue
-                threshold = if (stratify) maximumWeight() else BIG_ONE
+            if (objectivePreparation != null || initialIndex < objectiveTerms) {
+                val builder = objectivePreparation ?: prepareObjective().also { objectivePreparation = it }
+                if (!advancePreparation(builder, preparation)) continue
+                objectivePreparation = null
             }
+            transitionPreparation?.let { builder ->
+                if (advancePreparation(builder, preparation)) transitionPreparation = null
+            }
+            if (transitionPreparation != null || terminal != null) continue
             if (core != null) {
-                extendCore()
-                if (core != null) continue
+                val builder = corePreparation ?: extendCore().also { corePreparation = it }
+                if (!advancePreparation(builder, preparation)) continue
+                corePreparation = null
             }
             if (token() || segment()) return null
             val incumbent = best
@@ -238,6 +256,12 @@ internal class CoreGuidedSearch(
             if (allowance >= 0L && work - start >= allowance) {
                 return if (allowanceExhausted) finish(stopped(TerminationReason.BudgetExhausted)) else null
             }
+            if (query == null && queryPins == null) {
+                val builder = queryPreparation ?: prepareQuery().also { queryPreparation = it }
+                if (!advancePreparation(builder, preparation)) continue
+                queryPreparation = null
+            }
+            if (preparation()) continue
             val handle = query ?: try {
                 openQuery(preparation.withLifetime(lifetime)).also { query = it }
             } catch (_: SearchInitializationCancelled) {
@@ -273,6 +297,10 @@ internal class CoreGuidedSearch(
                     )
                     when (val verified = composedFixpoint(
                         base, Candidate(sample, Unit), traversalToken, params.assumptions,
+                        onWork = { units ->
+                            recordPreparation(units)
+                            verificationVisits = addWork(verificationVisits, units)
+                        },
                     )) {
                         is Verification.Rejected -> throw UnsoundnessException(verified.reason)
                         is Verification.Indeterminate -> return if (allowanceExhausted) {
@@ -291,51 +319,63 @@ internal class CoreGuidedSearch(
                     }
                     if (value == lowerBound) return finish(MinimizeResult.Optimal(sample, value.toDouble(), stats))
                     val current = requireNotNull(threshold)
-                    threshold = maximumWeight(current)
-                    check(threshold != null) { "core objective identity differs from source objective" }
+                    queryPreparation = sequence {
+                        threshold = maximumWeight(current)
+                        check(threshold != null) { "core objective identity differs from source objective" }
+                        yieldAll(prepareQuery())
+                    }.iterator()
                 }
 
                 is SolveResult.Unsat -> {
-                    val assumptions = result.assumptionCore
-                    recordPreparation(querySofts.size.toLong())
-                    val projected = if (assumptions == null) {
-                        querySofts
-                    } else {
-                        querySofts.filter {
-                            assumptions.boolValueOrNull(Lit.variable(it)) == !Lit.isPositive(it)
-                        }.toIntArray()
-                    }
-                    val selected = refutationModel?.let {
-                        CoreRefinement.refine(it, projected, params.assumptions, preparation, ::recordPreparation)
-                    } ?: projected
-                    if (selected.isEmpty()) return finish(MinimizeResult.Infeasible(stats = stats))
-                    recordPreparation(3L * selected.size)
-                    coreWeight = selected.map { requireNotNull(weights[it]) }.reduce { a, b -> if (a < b) a else b }
-                    core = selected
-                    coreCursor = 0
-                    coreEncoded = false
-                    coreLiterals = selected.copyOf()
-                    factors.add(Clause(coreLiterals))
-                    lower += coreWeight
-                    completedCores++
-                    largestCore = maxOf(largestCore, selected.size)
-                    publishLowerBound()
-                    best?.let { sample ->
-                        if (bestValue == lowerBound) {
-                            return finish(MinimizeResult.Optimal(sample, requireNotNull(bestValue).toDouble(), stats))
-                        }
-                    }
+                    transitionPreparation = prepareCore(result.assumptionCore, refutationModel)
                 }
             }
         }
         return if (allowanceExhausted) finish(stopped(TerminationReason.BudgetExhausted)) else null
     }
 
-    private fun prepareObjective() {
-        val end = minOf(objectiveTerms, initialIndex + 256)
-        while (initialIndex < end) {
+    private fun prepareCore(assumptions: Assumptions?, model: BakedProblem?): Iterator<Unit> = sequence {
+        val projected = IntArrayList()
+        for (literal in querySofts) {
+            recordPreparation(1L)
+            if (assumptions == null ||
+                assumptions.boolValueOrNull(Lit.variable(literal)) == !Lit.isPositive(literal)
+            ) projected.add(literal)
+            yield(Unit)
+        }
+        recordPreparation(projected.size.toLong())
+        val original = projected.toIntArray()
+        val selected = model?.let {
+            CoreRefinement.refine(it, original, params.assumptions, preparationToken, ::recordPreparation)
+        } ?: original
+        yield(Unit)
+        if (selected.isEmpty()) {
+            finish(MinimizeResult.Infeasible(stats = stats))
+            return@sequence
+        }
+        var minimum = requireNotNull(weights[selected[0]])
+        for (literal in selected) {
+            recordPreparation(1L)
+            val weight = requireNotNull(weights[literal])
+            if (weight < minimum) minimum = weight
+            yield(Unit)
+        }
+        recordPreparation(selected.size.toLong())
+        coreWeight = minimum
+        core = selected
+        coreLiterals = selected.copyOf()
+        factors.add(Clause(coreLiterals))
+        lower += coreWeight
+        completedCores++
+        largestCore = maxOf(largestCore, selected.size)
+        publishLowerBound()
+    }.iterator()
+
+    private fun prepareObjective(): Iterator<Unit> = sequence {
+        while (initialIndex < objectiveTerms) {
             val id = initialIndex++
             recordPreparation(1L)
+            yield(Unit)
             if (id >= costs.boolWeightValues.size) {
                 val variable = id - costs.boolWeightValues.size
                 val coefficient = costs.intCoefficientValues[variable]
@@ -358,18 +398,14 @@ internal class CoreGuidedSearch(
             } else Lit.negate(preferred)
             weights[violation] = exact.abs()
         }
-    }
+        threshold = if (stratify) maximumWeight() else BIG_ONE
+    }.iterator()
 
-    private fun extendCore() {
+    private fun extendCore(): Iterator<Unit> = sequence {
         val selected = requireNotNull(core)
-        if (!coreEncoded) {
-            coreEncoded = true
-            if (selected.size > 1) appendThreshold(coreLiterals, 2, coreWeight)
-            return
-        }
-        val end = minOf(selected.size, coreCursor + 256)
-        while (coreCursor < end) {
-            val id = selected[coreCursor++]
+        if (selected.size > 1) appendThreshold(coreLiterals, 2, coreWeight)
+        yield(Unit)
+        for (id in selected) {
             recordPreparation(1L)
             val residual = requireNotNull(weights[id]) - coreWeight
             if (residual == BIG_ZERO) {
@@ -382,13 +418,13 @@ internal class CoreGuidedSearch(
             } else {
                 weights[id] = residual
             }
+            yield(Unit)
         }
-        if (coreCursor < selected.size) return
         val current = threshold ?: coreWeight
         val maximum = maximumWeight() ?: coreWeight
         threshold = if (current < maximum) current else maximum
         core = null
-    }
+    }.iterator()
 
     private fun appendThreshold(literals: IntArray, minimum: Int, weight: BigInt) {
         val aux = nextBool++
@@ -414,26 +450,50 @@ internal class CoreGuidedSearch(
         recordPreparation(3L)
     }
 
-    private fun maximumWeight(below: BigInt? = null): BigInt? {
+    private suspend fun SequenceScope<Unit>.maximumWeight(below: BigInt? = null): BigInt? {
         var maximum: BigInt? = null
         for (weight in weights.values) {
             recordPreparation(1L)
-            if (below != null && weight >= below) continue
-            if (maximum == null || weight > maximum) maximum = weight
+            thresholdVisits = addWork(thresholdVisits, 1L)
+            if ((below == null || weight < below) && (maximum == null || weight > maximum)) maximum = weight
+            yield(Unit)
         }
         return maximum
     }
 
+    private fun advancePreparation(builder: Iterator<Unit>, token: Cancellation): Boolean {
+        while (!token()) {
+            if (!builder.hasNext()) return true
+            builder.next()
+        }
+        return false
+    }
+
+    private fun prepareQuery(): Iterator<Unit> = sequence {
+        val literals = IntArrayList()
+        val pins = LinkedHashMap<Int, Boolean>()
+        for ((literal, weight) in weights) {
+            recordPreparation(1L)
+            thresholdVisits = addWork(thresholdVisits, 1L)
+            if (weight >= (threshold ?: BIG_ZERO)) {
+                literals.add(literal)
+                pins[Lit.variable(literal)] = !Lit.isPositive(literal)
+                recordPreparation(1L)
+            }
+            yield(Unit)
+        }
+        recordPreparation(literals.size.toLong() + pins.size + params.assumptions.numBools +
+            params.assumptions.numInts)
+        querySofts = literals.toIntArray()
+        queryPins = params.assumptions.mergedWith(Assumptions(bools = pins))
+    }.iterator()
+
     private fun openQuery(token: Cancellation): ResumableSolve {
-        recordPreparation(weights.size.toLong())
-        querySofts = weights.filterValues { it >= (threshold ?: BIG_ZERO) }.keys.toIntArray()
-        recordPreparation(querySofts.size.toLong())
-        val softPins = Assumptions(bools = querySofts.associate { Lit.variable(it) to !Lit.isPositive(it) })
-        val baked = queryModel ?: bakeQuery(token).also { queryModel = it }
+        val baked = queryModel ?: bakeQuery().also { queryModel = it }
         return try {
             ResumableSatisfaction(BacktrackSolver(baked),
                 params.copy(
-                    assumptions = params.assumptions.mergedWith(softPins),
+                    assumptions = requireNotNull(queryPins),
                     cancellation = token,
                     propagationCancelFloor = 0,
                     maxDecisions = (
@@ -445,31 +505,18 @@ internal class CoreGuidedSearch(
                 ),
                 ownsWorkDebt = false,
                 projectAssumptionCore = coreRefinement == CoreRefinementMode.REASONS,
-            )
+            ).also { queryCount = addWork(queryCount, 1L) }
         } catch (failure: SearchInitializationCancelled) {
             settleQuery(failure.stats, failure.work)
             throw failure
         }
     }
 
-    private fun bakeQuery(token: Cancellation): BakedProblem {
+    private fun bakeQuery(): BakedProblem {
         // Residual assumptions do not change the immutable source projection or its root deductions.
         if (nextBool == base.numBoolVars && factors.size == initialFactorCount) return base
-        val problem = Problem(
-            settings = base.settings,
-            semantics = base.semantics,
-            numBoolVars = nextBool,
-            numIntVars = base.numIntVars,
-            intDomains = base.rootIntDomains(),
-            factors = factors,
-            modelBounds = base.intBounds,
-        )
-        val providers = base.projectionProviders
-        return if (providers == null || providers == FactorProjectionProviders.Default) {
-            problem.bake(token)
-        } else {
-            problem.bake(requireNotNull(base.factorProjections).withAppendedFactors(problem), token)
-        }
+        recordPreparation(factors.size.toLong() + base.numIntVars)
+        return BakedProblem.fromAugmentedRoot(base, nextBool, factors.toTypedArray())
     }
 
     private fun recordPreparation(units: Long) {
@@ -488,7 +535,10 @@ internal class CoreGuidedSearch(
         handle.close()
         settleQuery(handle.stats, handle.work)
         query = null
-        if (!keepModel) queryModel = null
+        if (!keepModel) {
+            queryModel = null
+            queryPins = null
+        }
     }
 
     private fun settleQuery(queryStats: SolveStats, queryWork: Long) {
@@ -515,6 +565,11 @@ internal class CoreGuidedSearch(
         if (closed) return
         finishQuery()
         queryModel = null
+        queryPins = null
+        objectivePreparation = null
+        corePreparation = null
+        queryPreparation = null
+        transitionPreparation = null
         tails.clear()
         weights.clear()
         factors.clear()

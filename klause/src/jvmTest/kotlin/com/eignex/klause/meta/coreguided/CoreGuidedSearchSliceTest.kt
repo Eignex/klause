@@ -13,6 +13,7 @@ import org.junit.runners.Parameterized
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @RunWith(Parameterized::class)
@@ -47,6 +48,54 @@ class CoreGuidedSearchSliceTest(private val sliceWork: Long) {
         assertEquals(objective.evaluateExact(expected.sample), objective.evaluateExact(actual.sample))
         assertEquals(fresh.work, sliced.work)
         assertEquals(objective.evaluateExact(actual.sample), sliced.lowerBound)
+    }
+
+    @Test
+    fun `sliced stratification should retain scans with costs beyond scalar precision`() {
+        val problem = Problem(
+            3, 0, emptyArray(),
+            arrayOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
+        ).bake()
+        val objective = LinearObjective(longArrayOf(9_007_199_254_740_993L, Long.MAX_VALUE, Long.MIN_VALUE))
+        val fresh = CoreGuidedSearch(problem, objective, BacktrackParams(), stratify = true)
+        val sliced = CoreGuidedSearch(problem, objective, BacktrackParams(), stratify = true)
+        val expected = assertIs<MinimizeResult.Optimal>(fresh.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {})
+        var result: MinimizeResult? = null
+
+        repeat(100) {
+            if (result == null) result = sliced.runSlice(Cancellation.Never, Long.MAX_VALUE, sliceWork) {}
+        }
+
+        val actual = assertIs<MinimizeResult.Optimal>(result)
+        assertEquals(objective.evaluateExact(expected.sample), objective.evaluateExact(actual.sample))
+        assertEquals(fresh.preparationWork, sliced.preparationWork)
+        assertEquals(fresh.thresholdVisits, sliced.thresholdVisits)
+        assertEquals(fresh.queryCount, sliced.queryCount)
+        assertEquals(fresh.work, sliced.work)
+        assertEquals(objective.evaluateExact(actual.sample), sliced.lowerBound)
+    }
+
+    @Test
+    fun `query pin preparation should resume without repeating threshold visits`() {
+        val problem = Problem(1024, 0, emptyArray(), emptyArray()).bake()
+        val objective = LinearObjective(LongArray(1024) { 1L })
+        val search = CoreGuidedSearch(problem, objective, BacktrackParams())
+        val fresh = CoreGuidedSearch(problem, objective, BacktrackParams())
+        val expected = fresh.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {}
+
+        val paused = search.runSlice(Cancellation { search.thresholdVisits >= sliceWork }, Long.MAX_VALUE, -1L) {
+            error("unfinished query pins")
+        }
+        val visited = search.thresholdVisits
+        val actual = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {}
+
+        assertNull(paused)
+        assertEquals(sliceWork, visited)
+        assertIs<MinimizeResult.Optimal>(expected)
+        assertIs<MinimizeResult.Optimal>(actual)
+        assertEquals(1024L, search.thresholdVisits)
+        assertEquals(fresh.preparationWork, search.preparationWork)
+        assertEquals(fresh.work, search.work)
     }
 
     companion object {
