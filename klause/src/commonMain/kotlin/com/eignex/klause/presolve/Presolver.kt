@@ -79,7 +79,8 @@ internal fun passBaseUnits(factors: Array<Factor>, booleanPins: IntHashSet? = nu
 internal val PresolvePass.baseWorkWeight: Long
     get() = when (this) {
         // Relation admission and scans are metered before reading payloads, including declined diagrams.
-        PresolvePass.COMPOSE_EXTENSIONAL, PresolvePass.SUBSTITUTE_TUPLE_PACKING -> 0L
+        PresolvePass.COMPOSE_EXTENSIONAL, PresolvePass.SUBSTITUTE_TUPLE_PACKING,
+        PresolvePass.SUBSTITUTE_TABLE_VALUES -> 0L
         PresolvePass.REMOVE_REDUNDANT -> 63L
         PresolvePass.FOLD_COMPARISON_CLAUSES -> 18L
         PresolvePass.FUSE_LINEAR_BOUNDS -> 16L

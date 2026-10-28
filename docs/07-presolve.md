@@ -397,6 +397,25 @@ and exact subset checks select replacements; incomplete indexing publishes nothi
 Strictly decreasing costs make replacement chains acyclic, preserving an optimum.
 Like dual fixing, this rule is excluded from complete-coverage queries.
 
+Opt-in finite `+table-substitution` excludes an integer value when a strictly
+cheaper value preserves every complete tuple of every reader. Only unconditional
+ground Tables with distinct coordinate roles qualify; channels, posted breaks and
+other readers exclude the coordinate. Both values belong to the captured root
+domain, including its holes and opening pins. Exact linear coefficients determine
+strict descent by ordering values, avoiding product or difference overflow.
+Every excluded value reaches a retained cheaper replacement through an acyclic
+chain. Substitutions preserve all other coordinates and the optimum; identity
+reconstruction keeps source witness checking and objective units unchanged.
+
+This restriction belongs only to the captured optimization model, objective and
+assumptions. Fresh objectives or pins require fresh preparation. It supplies no
+source-feasibility nogood and stays disabled for feasibility and complete-coverage
+queries, including counting, enumeration and sampling. Admission permits 4,096
+integer columns, 64 values per candidate, Table scopes of 64 and payloads of
+65,536 cells. At most 65,536 reader entries and 262,144 charged visits cover
+occurrence construction, candidate pairs, tuple-cell comparisons and domain copies.
+An unfinished call publishes no exclusion; its work remains charged.
+
 ### Boolean reductions
 
 Opt-in `+clause-subsume` removes a clause implied by a retained subset and shortens

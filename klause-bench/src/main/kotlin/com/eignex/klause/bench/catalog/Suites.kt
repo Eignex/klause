@@ -774,6 +774,11 @@ internal object Suites {
             relPath = "extensional-overlap/cyclic-mod3-unsat.xml", license = "Apache-2.0")
         vendored("cyclic-mod3-sat", Category.OPTIMIZATION, Expected.Opt(4L),
             relPath = "extensional-overlap/cyclic-mod3-sat.xml", license = "Apache-2.0")
+        for (name in listOf("interior", "hole", "outside-reader")) {
+            vendored("table-substitution-$name", Category.OPTIMIZATION,
+                Expected.Opt(if (name == "hole") 36L else 35L),
+                relPath = "table-substitution/$name.xml", license = "Apache-2.0")
+        }
     }
 
     private val lpComponentSplit = suite("lp-component-split", "Targeted separable and linked dense LP models") {
