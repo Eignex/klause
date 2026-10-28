@@ -2,6 +2,7 @@ package com.eignex.klause.factor.scheduling
 
 import com.eignex.klause.factor.ConflictReasonOracle
 import com.eignex.klause.factor.PropagationReasonOracle
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
@@ -10,12 +11,15 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.factorAt
+import com.eignex.klause.propagation.mark
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.propagation.reasonOf
+import com.eignex.klause.propagation.undoTo
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class DisjunctivePropagatorTest {
@@ -84,6 +88,199 @@ class DisjunctivePropagatorTest {
             }
         }
     }
+
+    @Test
+    fun `overload deductions over duration ranges and optional tasks should be implied by their reasons`() {
+        val shapes = listOf(
+            OverloadShape("distinct"),
+            OverloadShape("shared start", starts = intArrayOf(0, 0, 1)),
+            OverloadShape("shared duration", durationVars = intArrayOf(3, 3, 4)),
+            OverloadShape("repeated presence", presents = IntArray(3) { Lit.make(it / 2, true) }),
+            OverloadShape("opposite presence", presents = IntArray(3) { Lit.make(minOf(it, 1), it < 2) }),
+            OverloadShape("zero minima", minDuration = 0),
+        )
+        for ((index, shape) in shapes.withIndex()) {
+            val used = (shape.starts + shape.durationVars).toSet()
+            val problem = Problem(
+                numBoolVars = 3,
+                numIntVars = 6,
+                intDomains = Array(6) {
+                    when {
+                        it !in used -> IntDomain(0, 0)
+                        it < 3 -> IntDomain(0, 3)
+                        else -> IntDomain(shape.minDuration, 2)
+                    }
+                },
+                factors = arrayOf<Factor>(
+                    Cumulative.unary(
+                        starts = shape.starts,
+                        durations = LongArray(3) { 2L },
+                        presents = shape.presents,
+                        durationVars = shape.durationVars,
+                    ),
+                ),
+            )
+            val rng = Random(0xD17 + index)
+            repeat(5) { iter ->
+                PropagationReasonOracle.assertReasonsImply(problem, "${shape.label}#$iter") { state ->
+                    (0 until 3).all { b -> rng.nextInt(3) != 0 || state.pinBool(b, rng.nextBoolean()) } &&
+                        shape.starts.all { state.tightenIntMax(it, 1L + rng.nextInt(3)) } &&
+                        shape.durationVars.all { rng.nextBoolean() || state.tightenIntMin(it, 2) } &&
+                        (rng.nextBoolean() || state.excludeIntValue(shape.starts[2], 1))
+                }
+            }
+        }
+    }
+
+    private class OverloadShape(
+        val label: String,
+        val starts: IntArray = intArrayOf(0, 1, 2),
+        val durationVars: IntArray = intArrayOf(3, 4, 5),
+        val presents: IntArray = IntArray(3) { Lit.make(it, true) },
+        val minDuration: Long = 1,
+    )
+
+    @Test
+    fun `minimum durations should refute three tasks that cannot share a window`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 6,
+            intDomains = Array(6) { if (it < 3) IntDomain(0, 2) else IntDomain(2, 3) },
+            factors = arrayOf<Factor>(
+                Cumulative.unary(
+                    starts = intArrayOf(0, 1, 2),
+                    durations = LongArray(3) { 3L },
+                    durationVars = intArrayOf(3, 4, 5),
+                ),
+            ),
+        )
+
+        val result = problem.propagate(Assumptions.None)
+
+        assertTrue(result is PropagationResult.Unsat, "$result")
+    }
+
+    @Test
+    fun `an unknown task overloading the present ones should be ruled absent`() {
+        val problem = Problem(
+            numBoolVars = 3,
+            numIntVars = 3,
+            intDomains = Array(3) { IntDomain(0, 2) },
+            factors = arrayOf<Factor>(optionalTriple()),
+        )
+
+        val result = problem.propagate(Assumptions(bools = mapOf(0 to true, 1 to true)))
+
+        assertTrue(result is PropagationResult.Implied, "$result")
+        assertEquals(false, result.boolValueOrNull(2))
+    }
+
+    @Test
+    fun `an excluded presence should reach a clause over it`() {
+        val problem = Problem(
+            numBoolVars = 4,
+            numIntVars = 3,
+            intDomains = Array(3) { IntDomain(0, 2) },
+            factors = arrayOf(optionalTriple(), Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true)))),
+        )
+
+        val result = problem.propagate(Assumptions(bools = mapOf(0 to true, 1 to true)))
+
+        assertTrue(result is PropagationResult.Implied, "$result")
+        assertEquals(true, result.boolValueOrNull(3))
+    }
+
+    @Test
+    fun `an exclusion reason should cite the overloaded windows as they stood and not the excluded presence`() {
+        val problem = Problem(
+            numBoolVars = 3,
+            numIntVars = 6,
+            intDomains = Array(6) { if (it < 3) IntDomain(0, 9) else IntDomain(1, 4) },
+            factors = arrayOf<Factor>(
+                Cumulative.unary(
+                    starts = intArrayOf(0, 1, 2),
+                    durations = LongArray(3) { 4L },
+                    presents = IntArray(3) { Lit.make(it, true) },
+                    durationVars = intArrayOf(3, 4, 5),
+                ),
+            ),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        state.currentLevel = 1
+        check(state.pinBool(0, true) && state.pinBool(1, true))
+        check((0 until 3).all { state.tightenIntMax(it, 2) } && (3 until 6).all { state.tightenIntMin(it, 2) })
+        state.currentFactor = 0
+        check(state.factorAt(0).propagate(state, 0))
+        val recorded = state.boolAntecedents[2]
+        state.currentFactor = -1
+        state.currentLevel = 2
+        check(state.tightenIntMax(0, 1) && state.tightenIntMin(3, 3))
+
+        val reason = requireNotNull(state.reasonOf(recorded))
+
+        val cited = reason.map { lit ->
+            val v = Lit.variable(lit)
+            if (v < problem.numBoolVars) {
+                "b$v=${Lit.isPositive(lit)}"
+            } else {
+                val atom = v - problem.numBoolVars
+                "x${state.atoms.intVar[atom]} ${state.atoms.kind[atom]} ${state.atoms.threshold[atom]}"
+            }
+        }.toSet()
+        assertEquals(
+            setOf("b0=false", "b1=false", "x0 LE 2", "x1 LE 2", "x2 LE 2", "x3 GE 2", "x4 GE 2", "x5 GE 2"),
+            cited,
+        )
+    }
+
+    @Test
+    fun `an exclusion should retract with its premises`() {
+        val problem = Problem(
+            numBoolVars = 3,
+            numIntVars = 3,
+            intDomains = Array(3) { IntDomain(0, 4) },
+            factors = arrayOf<Factor>(optionalTriple()),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        val mark = state.mark()
+        state.currentLevel = 1
+        check(state.pinBool(0, true) && state.pinBool(1, true) && (0 until 3).all { state.tightenIntMax(it, 2) })
+        state.currentFactor = 0
+        check(state.factorAt(0).propagate(state, 0) && state.boolValues[2] == false)
+
+        state.undoTo(mark)
+
+        assertNull(state.boolValues[2])
+    }
+
+    @Test
+    fun `an unrepresentable completion time should decline the overload check`() {
+        val top = Long.MAX_VALUE - 1
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 4,
+            intDomains = arrayOf(IntDomain(top, top), IntDomain(top, top), IntDomain(2, 3), IntDomain(2, 3)),
+            factors = arrayOf<Factor>(
+                Cumulative.unary(
+                    starts = intArrayOf(0, 1),
+                    durations = longArrayOf(3, 3),
+                    durationVars = intArrayOf(2, 3),
+                ),
+            ),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.currentFactor = 0
+
+        assertTrue(state.factorAt(0).propagate(state, 0))
+    }
+
+    private fun optionalTriple() = Cumulative.unary(
+        starts = intArrayOf(0, 1, 2),
+        durations = LongArray(3) { 2L },
+        presents = IntArray(3) { Lit.make(it, true) },
+    )
 
     @Test
     fun `an edge-finding bound should cite only the cluster it follows`() {

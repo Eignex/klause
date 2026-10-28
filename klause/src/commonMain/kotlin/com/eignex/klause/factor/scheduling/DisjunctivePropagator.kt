@@ -12,9 +12,12 @@ import com.eignex.klause.propagation.boolPinnedAt
 import com.eignex.klause.propagation.boundLiteral
 import com.eignex.klause.propagation.domainAt
 import com.eignex.klause.propagation.lazyReason
+import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.addExact
 import com.eignex.klause.util.argsortBy
+import com.eignex.klause.util.subExact
 
 /**
  * CP propagator for the no-overlap case of [Cumulative] (`unary = true`, built via [Cumulative.unary]):
@@ -22,10 +25,17 @@ import com.eignex.klause.util.argsortBy
  * "O(n log n) Filtering Algorithms for Unary Resource Constraint", CPAIOR 2004,
  * https://doi.org/10.1007/978-3-540-24664-0_23).
  *
+ * Those passes wait for every duration to be fixed. Before them, a Θ-tree overload check over minimum durations
+ * runs while a duration is unfixed or a presence unknown: every solution shortens to one where each task runs
+ * exactly its minimum, so present tasks whose minima cannot fit between their earliest start and latest
+ * completion conflict, and an unknown task whose minimum would overload them is absent.
+ *
  * Each deduction cites only the tasks it rests on: a detectable precedence its pair, a time-table shave the
  * tasks whose compulsory parts block the shaved starts, an edge-finding bound the tasks of the overloaded set
- * and of the set the bound comes from. The latter two cost O(tasks) and are built only when conflict analysis
- * reads them, from the bounds as they stood ([explain]). Bounds are cited only as far as the deduction needs them.
+ * and of the set the bound comes from, an exclusion the present tasks it would overload and the excluded task's
+ * own window and minimum duration, never its presence. The latter three cost O(tasks) and are built only when
+ * conflict analysis reads them, from the bounds as they stood ([explain]). Bounds are cited only as far as the
+ * deduction needs them.
  */
 internal class DisjunctivePropagator(
     val intVars: IntArray,
@@ -68,6 +78,7 @@ internal class DisjunctivePropagator(
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         state.propagatorFailures.remove(this)
         if (n == 0) return true
+        if (!overloadCheck(state)) return false
         val effDur = effDurOrNull(state) ?: return true
         if (!timeTable(state, effDur)) return false
         if (!detectablePrecedences(state, effDur)) return false
@@ -92,8 +103,136 @@ internal class DisjunctivePropagator(
     private fun View.explainPayload(payload: IntArray) {
         when (payload[0]) {
             TIME_TABLE -> timeTableReason(payload[1], lower = payload[2] == 1, unpack(payload, 3))
-            else -> edgeReason(reversed = payload[1] == 1, cand = payload[2], tau = unpack(payload, 3))
+            EDGE -> edgeReason(reversed = payload[1] == 1, cand = payload[2], tau = unpack(payload, 3))
+            else -> excludedBy(cand = payload[1], tau = unpack(payload, 3))
         }
+    }
+
+    private fun minDuration(state: PropagationState, i: Int): Long =
+        if (durationVars.isEmpty()) durations[i] else state.intDomains[durationVars[i]].min
+
+    private fun isUnknown(state: PropagationState, i: Int): Boolean =
+        !OptionalPresence.isDefinitelyPresent(presents, i, state) &&
+            !OptionalPresence.isDefinitelyAbsent(presents, i, state)
+
+    /**
+     * Fail on present tasks whose minimum durations overload a window, and exclude each unknown task whose minimum
+     * would. With fixed durations and no unknown task, edge-finding already checks the overload.
+     */
+    private fun overloadCheck(state: PropagationState): Boolean {
+        if (durationVars.isEmpty() && presents.isEmpty()) return true
+        val mandatory = IntArrayList()
+        val optional = IntArrayList()
+        var durationsFixed = true
+        for (i in 0 until n) {
+            if (durationVars.isNotEmpty() && state.intDomains[durationVars[i]].let { it.min != it.max }) {
+                durationsFixed = false
+            }
+            if (minDuration(state, i) <= 0L) continue
+            if (OptionalPresence.isDefinitelyPresent(presents, i, state)) {
+                mandatory.add(i)
+            } else if (!OptionalPresence.isDefinitelyAbsent(presents, i, state)) {
+                optional.add(i)
+            }
+        }
+        if (mandatory.isEmpty() || (durationsFixed && optional.isEmpty())) return true
+        val windows = overloadWindows(state, mandatory, optional) ?: return true
+        return sweepOverload(state, windows)
+    }
+
+    // The tasks an overload sweep reads, mandatory first, indexed by position.
+    private class OverloadWindows(
+        val tasks: IntArray,
+        val mandatoryCount: Int,
+        val ests: LongArray,
+        val lcts: LongArray,
+        val durs: LongArray,
+    )
+
+    // Null when a completion time or envelope is not representable: the check then declines, which only weakens it.
+    private fun overloadWindows(
+        state: PropagationState,
+        mandatory: IntArrayList,
+        optional: IntArrayList,
+    ): OverloadWindows? {
+        val m = mandatory.size + optional.size
+        val tasks = IntArray(m) { if (it < mandatory.size) mandatory[it] else optional[it - mandatory.size] }
+        val ests = LongArray(m)
+        val lcts = LongArray(m)
+        val durs = LongArray(m)
+        try {
+            var energy = 0L
+            for (t in 0 until m) {
+                val dom = state.intDomains[starts[tasks[t]]]
+                durs[t] = minDuration(state, tasks[t])
+                ests[t] = dom.min
+                lcts[t] = addExact(dom.max, durs[t])
+                energy = addExact(energy, durs[t])
+            }
+            addExact(ests.max(), energy)
+            // The tree's empty-subtree sentinel must stay below every envelope it is compared with.
+            if (subExact(ests.min(), energy) <= CumulativeThetaTree.NO_ENV) return null
+        } catch (_: CheckedLongOverflowException) {
+            return null
+        }
+        return OverloadWindows(tasks, mandatory.size, ests, lcts, durs)
+    }
+
+    // Sweep completion times upward: Θ holds the present tasks completing by τ, and each unknown task completing by
+    // τ is tested against it there and at every later τ.
+    private fun sweepOverload(state: PropagationState, w: OverloadWindows): Boolean {
+        val m = w.tasks.size
+        val estOrder = argsortBy(m) { a, b -> w.ests[a].compareTo(w.ests[b]) }
+        val leafPos = IntArray(m)
+        for (leafIdx in 0 until m) leafPos[estOrder[leafIdx]] = leafIdx
+        val lctOrder = argsortBy(m) { a, b -> w.lcts[a].compareTo(w.lcts[b]) }
+        val tree = CumulativeThetaTree(n = m, capacity = 1L)
+        tree.setLeafOrder(leafPos)
+        val pending = IntArrayList()
+        var k = 0
+        while (k < m) {
+            val tau = w.lcts[lctOrder[k]]
+            while (k < m && w.lcts[lctOrder[k]] == tau) {
+                val t = lctOrder[k]
+                if (t < w.mandatoryCount) tree.activate(t, w.ests[t], w.durs[t]) else pending.add(t)
+                k++
+            }
+            if (tree.envOfTheta() > tau) {
+                state.propagatorFailures[this] = now(state).run {
+                    overloadedBy(reversed = false, tau)
+                    literals()
+                }
+                return false
+            }
+            if (!excludeOverloading(state, w, tree, pending, tau)) return false
+        }
+        return true
+    }
+
+    // Exclude each pending unknown task that would overload Θ by [tau]; keep the rest pending for later windows.
+    private fun excludeOverloading(
+        state: PropagationState,
+        w: OverloadWindows,
+        tree: CumulativeThetaTree,
+        pending: IntArrayList,
+        tau: Long,
+    ): Boolean {
+        var kept = 0
+        for (r in 0 until pending.size) {
+            val t = pending[r]
+            val task = w.tasks[t]
+            // An earlier exclusion in this sweep may have fixed this presence through a shared literal.
+            if (!isUnknown(state, task)) continue
+            if (tree.envIfActivated(t, w.ests[t], w.durs[t]) <= tau) {
+                pending[kept++] = t
+                continue
+            }
+            val lit = presents[task]
+            val reason = reasonFor(state, packed(EXCLUSION, task, 0, tau))
+            if (!state.pinBool(Lit.variable(lit), !Lit.isPositive(lit), reason)) return false
+        }
+        pending.truncateTo(kept)
+        return true
     }
 
     // Tightening [task]'s start failed against its other bound or a hole: the deduction's reason plus its own domain.
@@ -383,8 +522,12 @@ internal class DisjunctivePropagator(
 
         // Task [i] runs, for at least its duration.
         fun task(i: Int) {
-            if (durationVars.isNotEmpty()) add(state.boundLiteral(durationVars[i], true, dur(i), atTrail, atLevel))
+            lastsAtLeast(i)
             if (presents.isNotEmpty()) add(Lit.negate(presents[i]))
+        }
+
+        private fun lastsAtLeast(i: Int) {
+            if (durationVars.isNotEmpty()) add(state.boundLiteral(durationVars[i], true, dur(i), atTrail, atLevel))
         }
 
         /** [before] precedes [after]: [after] cannot end before [before]'s latest start. */
@@ -481,7 +624,7 @@ internal class DisjunctivePropagator(
         private fun theta(reversed: Boolean, tau: Long, except: Int): IntArrayList {
             val out = IntArrayList()
             for (k in 0 until n) {
-                if (k == except || !present(k) || dur(k) == 0L) continue
+                if (k == except || !present(k) || dur(k) <= 0L) continue
                 if (lct(k, reversed) <= tau) out.add(k)
             }
             return out
@@ -518,12 +661,29 @@ internal class DisjunctivePropagator(
             }
         }
 
+        /**
+         * Unknown task [cand], completing by [tau], would overload the present tasks completing by [tau]: the
+         * overloaded set's windows and minimum durations, and the presence of its members other than [cand].
+         */
+        fun excludedBy(cand: Int, tau: Long) {
+            val withCand = theta(reversed = false, tau, except = cand)
+            withCand.add(cand)
+            val (e, overload) = ectSubset(withCand, reversed = false)
+            for (k in 0 until overload.size) {
+                val x = overload[k]
+                if (x == cand) lastsAtLeast(x) else task(x)
+                startGe(x, e)
+                startLe(x, tau - dur(x))
+            }
+        }
+
         fun literals(): IntArray = out.toIntArray()
     }
 
     private companion object {
         const val TIME_TABLE = 0
         const val EDGE = 1
+        const val EXCLUSION = 2
 
         fun packed(kind: Int, a: Int, b: Int, value: Long) =
             intArrayOf(kind, a, b, (value ushr 32).toInt(), value.toInt())
