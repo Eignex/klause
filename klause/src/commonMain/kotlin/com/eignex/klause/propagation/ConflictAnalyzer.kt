@@ -349,11 +349,38 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
             }
         }
         lastResolvent = clauseResolvent
-        val result = runResolution(clauseResolvent, seedReason, currentLevel)
+        val result = historicalTableResolution(seedReason, currentLevel)
         (result as? AnalysisResult.Learned)?.let {
             state.arithmeticLearningTrace?.clause("analysis.clause-result", it.literals, state)
         }
         return result
+    }
+
+    private fun historicalTableResolution(seedReason: IntArray, currentLevel: Int): AnalysisResult {
+        if (!state.historicalTableReasons) return runResolution(clauseResolvent, seedReason, currentLevel)
+        val choice = HistoricalTableReason(state)
+        state.historicalTableReason = choice
+        try {
+            state.finiteWork.checkNow()
+            val fallback = runResolution(clauseResolvent, seedReason, currentLevel)
+            if (fallback !is AnalysisResult.Learned || !fallback.asserting || state.runCancelled) return fallback
+            if (!choice.prepare(fallback.literals)) return fallback
+            universe = state.problem.numBoolVars + state.atoms.intVar.size
+            val alternateResolvent = ClauseResolvent(state, this)
+            val alternate = runResolution(alternateResolvent, seedReason, currentLevel)
+            state.finiteWork.checkNow()
+            if (alternate !is AnalysisResult.Learned || !alternate.asserting) return fallback
+            val improves = when {
+                alternate.backjumpLevel != fallback.backjumpLevel -> alternate.backjumpLevel < fallback.backjumpLevel
+                alternate.lbd != fallback.lbd -> alternate.lbd < fallback.lbd
+                else -> alternate.literals.size < fallback.literals.size
+            }
+            if (!improves) return fallback
+            lastResolvent = alternateResolvent
+            return alternate
+        } finally {
+            state.historicalTableReason = null
+        }
     }
 
     /**

@@ -21,6 +21,8 @@ import com.eignex.klause.propagation.holeReasonFor
 import com.eignex.klause.propagation.mark
 import com.eignex.klause.propagation.reasonOf
 import com.eignex.klause.propagation.undoTo
+import com.eignex.klause.propagation.atomVarEq
+import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
 import kotlin.test.Test
@@ -32,6 +34,39 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class TablePropagatorTest {
+
+    @Test
+    fun `historical alternative should ignore a preferred hole carved after the deduction`() {
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 2) }, arrayOf<Factor>(
+            Table(intArrayOf(0, 1, 2), longArrayOf(0, 0, 0, 1, 1, 1))))
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        state.currentLevel = 1
+        check(state.excludeIntValue(1, 1))
+        val atTrail = state.undo.size
+        check(state.excludeIntValue(2, 1))
+        val preferred = IntHashSet().apply { add(Lit.make(state.atomVarEq(2, 1), true)) }
+
+        val reason = assertNotNull((state.factorAt(0) as TablePropagator).historicalAlternative(
+            state, intArrayOf(0, 2, 0, 1), atTrail, preferred))
+
+        assertEquals(listOf(Lit.make(state.atomVarEq(1, 1), true)), reason.toList())
+    }
+
+    @Test
+    fun `historical alternative should decline tables outside its row cell and column limits`() {
+        for ((rows, columns) in listOf(257 to 2, 128 to 33, 1 to 65)) {
+            val problem = Problem(0, columns, Array(columns) { IntDomain(0, 1) }, arrayOf<Factor>(
+                Table(IntArray(columns) { it }, LongArray(rows * columns))))
+            val state = PropagationState(problem, Assumptions.None)
+
+            val reason = (state.factorAt(0) as TablePropagator).historicalAlternative(
+                state, intArrayOf(0, 2, 0, 1), 0, IntHashSet())
+
+            assertNull(reason)
+        }
+    }
+
 
     @Test
     fun `indexed table deductions should be implied by their historical reasons`() {

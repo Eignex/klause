@@ -7,12 +7,44 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.factor.table.Table
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class ConflictAnalyzerTest {
+    @Test
+    fun `historical table replay should improve the minimized asserting backjump`() {
+        val tuples = (0 until 8).flatMap { listOf(0L, (it / 4).toLong(), (it / 2 % 2).toLong(), (it % 2).toLong()) }
+            .toLongArray() + longArrayOf(1, 0, 0, 1, 1, 1, 1, 0)
+        val problem = Problem(1, 4, Array(4) { IntDomain(0, 1) },
+            arrayOf<Factor>(Table(intArrayOf(0, 1, 2, 3), tuples)))
+        for (enabled in listOf(false, true)) {
+            val state = PropagationState(problem, Assumptions.None)
+            state.undoLogging = true
+            state.historicalTableReasons = enabled
+            check(state.setIntMinAsDecision(2, 1))
+            check(state.setIntMinAsDecision(1, 1))
+            check(state.pinBoolAsDecision(0, true))
+            check(state.tightenIntMin(3, 1, intArrayOf(Lit.make(0, false))))
+            val x = state.atomVarGe(0, 1)
+            val b = state.atomVarGe(2, 1)
+            state.currentFactor = 0
+            check(state.factorAt(0).propagate(state, 0))
+            val seed = intArrayOf(Lit.make(x, true), Lit.make(b, false), Lit.make(0, false))
+
+            val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(
+                state.conflictAnalyzer.analyzeConflictClause(seed))
+
+            assertTrue(learned.asserting)
+            assertEquals(if (enabled) 1 else 2, learned.backjumpLevel)
+            assertEquals(if (enabled) 2 else 3, learned.literals.size)
+            val ordinary = state.reasonOf(state.intMaxAntecedents[0])!!
+            assertTrue(ordinary.any { state.atoms.intVar[Lit.variable(it) - 1] == 1 })
+        }
+    }
+
     @Test
     fun `a single decision conflict should learn the negated decision and backjump to the root`() {
         val session = PropagationSession(

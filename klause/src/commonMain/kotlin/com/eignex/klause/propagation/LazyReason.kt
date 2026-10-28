@@ -75,6 +75,7 @@ internal fun PropagationState.reasonOf(reason: IntArray?): IntArray? {
     if (!isLazyReason(reason)) return reason
     val marker = requireNotNull(reason)
     val built = try {
+        historicalTableReason?.read(marker)?.let { return it }
         if (lazyReasonMemo.containsKey(marker)) return lazyReasonMemo[marker]
         finiteWork.begin()
         buildLazyReason(marker)
@@ -93,7 +94,13 @@ private fun PropagationState.buildLazyReason(marker: IntArray): IntArray {
     return if (fid == EXTENDED) {
         val count = marker[HEADER]
         val extra = marker.copyOfRange(HEADER + 1, HEADER + 1 + count)
-        val base = reasonOf(marker.copyOfRange(HEADER + 1 + count, marker.size))
+        val choice = historicalTableReason
+        val base = try {
+            historicalTableReason = null
+            reasonOf(marker.copyOfRange(HEADER + 1 + count, marker.size))
+        } finally {
+            historicalTableReason = choice
+        }
         if (base == null) extra else base + extra
     } else {
         // A lazily recorded deduction is never a decision, so a reason with no literals (every premise a root
