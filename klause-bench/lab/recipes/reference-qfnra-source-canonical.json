@@ -1,0 +1,26 @@
+{
+  "name": "reference-qfnra-source-canonical",
+  "description": "Canonical negative-constant polynomial-real variants: both qfnra-source-canonical-v1 identities with Z3 at ten seconds on one core, three repeats; original frozen memberships and declined original source records remain separate.",
+  "base": {
+    "backend": "reference",
+    "solver": "z3",
+    "timeout": "10000",
+    "processors": "1"
+  },
+  "parallel": 1,
+  "repeats": 3,
+  "priority": 0,
+  "repository": "Eignex/klause",
+  "bench": {
+    "manifest": "klause-bench/lab/bench.json",
+    "sourceValidation": false,
+    "request": {
+      "parameters": {
+        "selections": "[{\"set\":\"qfnra-source-canonical-v1\"}]",
+        "timeout-ms": "10000",
+        "cpus": "1"
+      }
+    },
+    "referenceFilters": {}
+  }
+}

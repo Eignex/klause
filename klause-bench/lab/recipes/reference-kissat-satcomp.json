@@ -1,0 +1,26 @@
+{
+  "name": "reference-kissat-satcomp",
+  "description": "One-off reference run: kissat on every satcomp-compact-v1 problem without a current kissat verdict, at 60 s, the budget klause runs them at, so the scoreboard compares like with like; the earlier 300 s rows are retired first (lab references retire satcomp-compact-v1 kissat 300). A few instances took the competition's Kissat over 60 s and stay unknown here.",
+  "base": {
+    "backend": "reference",
+    "solver": "kissat",
+    "timeout": "60000"
+  },
+  "parallel": 4,
+  "priority": 0,
+  "confirm": true,
+  "repository": "Eignex/klause",
+  "bench": {
+    "manifest": "klause-bench/lab/bench.json",
+    "sourceValidation": false,
+    "request": {
+      "parameters": {
+        "selections": "[{\"suite\":\"satcomp-compact-v1\",\"per-family\":\"1000000\"}]",
+        "timeout-ms": "60000"
+      }
+    },
+    "referenceFilters": {
+      "satcomp-compact-v1": "missing"
+    }
+  }
+}

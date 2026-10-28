@@ -1,0 +1,26 @@
+{
+  "name": "reference-kissat",
+  "description": "Second CNF reference: kissat on every SATLIB problem without a kissat verdict, at 60 s, to cross-check clasp.",
+  "base": {
+    "backend": "reference",
+    "solver": "kissat",
+    "timeout": "60000"
+  },
+  "parallel": 6,
+  "priority": 0,
+  "confirm": true,
+  "repository": "Eignex/klause",
+  "bench": {
+    "manifest": "klause-bench/lab/bench.json",
+    "sourceValidation": false,
+    "request": {
+      "parameters": {
+        "selections": "[{\"suite\":\"satlib\",\"per-family\":\"1000000\"}]",
+        "timeout-ms": "60000"
+      }
+    },
+    "referenceFilters": {
+      "satlib": "missing"
+    }
+  }
+}

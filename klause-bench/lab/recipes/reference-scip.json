@@ -1,0 +1,30 @@
+{
+  "name": "reference-scip",
+  "description": "MPS reference: SCIP on every MIP problem without a current SCIP verdict, at 60 s on one core, its solutions checked against the model.",
+  "base": {
+    "backend": "reference",
+    "solver": "scip",
+    "timeout": "60000"
+  },
+  "parallel": 4,
+  "priority": 0,
+  "confirm": true,
+  "repository": "Eignex/klause",
+  "bench": {
+    "manifest": "klause-bench/lab/bench.json",
+    "sourceValidation": false,
+    "request": {
+      "parameters": {
+        "selections": "[{\"suite\":\"miplib2017\",\"per-family\":\"1000000\"},{\"suite\":\"miplib2010\",\"per-family\":\"1000000\"},{\"suite\":\"miplib2003\",\"per-family\":\"1000000\"},{\"suite\":\"miplib3\",\"per-family\":\"1000000\"},{\"suite\":\"orlib\",\"per-family\":\"1000000\"}]",
+        "timeout-ms": "60000"
+      }
+    },
+    "referenceFilters": {
+      "miplib2017": "missing",
+      "miplib2010": "missing",
+      "miplib2003": "missing",
+      "miplib3": "missing",
+      "orlib": "missing"
+    }
+  }
+}

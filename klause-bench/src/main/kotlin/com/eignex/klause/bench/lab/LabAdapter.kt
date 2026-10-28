@@ -58,9 +58,7 @@ internal object KlauseLabSuite : BenchSuite {
 
     override fun plan(request: BenchRequest): List<BenchCase> {
         val settings = LabSettings(request.parameters)
-        val selection = request.parameters.filterKeys { it in LabSettings.SELECTORS }
-            .ifEmpty { mapOf("suite" to "dimacs-core", "name" to "php4") }
-        return KlauseCli.selectProblems(selection).flatMap { selected ->
+        return settings.selections.flatMap { KlauseCli.selectProblems(it) }.distinctBy { it.suite to it.ref.name }.flatMap { selected ->
             val ref = selected.ref
             require(ref.source !is ProblemSource.InCode) { "Lab subprocess solves require file-backed inputs" }
             val inputs = LabInputs.resolve(ref)
@@ -75,6 +73,9 @@ internal object KlauseLabSuite : BenchSuite {
                             inputs = inputs,
                             attributes = trees + mapOf(
                                 "suite" to selected.suite,
+                                "comparisonKey" to "${selected.suite}/${ref.name}/${if (settings.engines.size > 1) "$engine/" else ""}$seed/$repeat",
+                                "seed" to seed.toString(),
+                                "budgetMs" to settings.timeout.toString(),
                                 "problem" to ref.name,
                                 "collection" to collectionOf(ref),
                                 "family" to (ref.family ?: ref.name.substringBefore('/')),
