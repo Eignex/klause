@@ -1,12 +1,12 @@
 package com.eignex.klause.propagation
 
-import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.factor.bool.PseudoBooleanPropagator
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearPropagator
+import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.bool.PseudoBooleanPropagator
 import com.eignex.klause.ir.IntDomain
-import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -194,6 +194,19 @@ class ClauseDbTest {
 
             assertEquals(0, session.exportGlueClauses(10, 10, skipPermanent = true).size)
             assertEquals(1, session.exportGlueClauses(10, 10).size)
+        }
+    }
+
+    @Test
+    fun `retirement should preserve permanent model blockers on each native lane`() {
+        for (nativeSat in listOf(false, true)) {
+            val session = PropagationSession(Problem(2, 0, emptyArray(), emptyArray()), nativeSat = nativeSat)
+            session.addLearnedClause(Clause(intArrayOf(0, 2)), 2, permanent = true)
+
+            session.forgetLearnedClauses { _, _ -> false }
+
+            assertEquals(1, session.learnedClauseCount)
+            assertEquals(null, session.learnedLifecycle()["learningClauseRetired"])
         }
     }
 }

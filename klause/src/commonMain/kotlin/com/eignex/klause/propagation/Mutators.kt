@@ -146,13 +146,13 @@ internal fun PropagationState.pinBoolImpl(v: Int, value: Boolean, antecedents: I
     }
     if (undoLogging) logBoolPin(v)
     if (currentFactor >= 0) propagations++
-    noteLearnedUse(currentFactor)
     if (value) boolValueBits.set(v) else boolValueBits.clear(v)
     boolAssigned.set(v)
     nativeBoolTruth?.set(v, (if (value) 2 else 1).toByte())
     // The undo mark owns the pin's lifetime, even when its clause cites facts from a shallower level.
     // Dating it before that mark lets an asserting backjump erase several supposedly surviving literals.
     boolLevel[v] = maxOf(currentLevel, levelToDecisionVar.size)
+    noteLearnedUse(currentFactor)
     boolReason[v] = currentFactor
     arithmeticLearningTrace?.pin(currentFactor, v, if (value) 1 else 0, "bool", boolLevel[v])
 
@@ -279,7 +279,6 @@ private inline fun PropagationState.tightenBoundImpl(
     }
     if (undoLogging) logIntChange(v)
     if (currentFactor >= 0) propagations++
-    noteLearnedUse(currentFactor)
     // Preserves interior holes.
     val newDomain = if (isMin) d.withMinAtLeast(bound) else d.withMaxAtMost(bound)
     // A landing value inside a hole snaps the bound further. The snapped bound rests on the requested
@@ -299,6 +298,7 @@ private inline fun PropagationState.tightenBoundImpl(
         antecedents
     }
     intDomains[v] = newDomain
+    noteLearnedUse(currentFactor)
     arithmeticLearningTrace?.pin(currentFactor, v, if (isMin) newDomain.min else newDomain.max,
         if (isMin) "lower" else "upper", currentLevel)
     intLevel[v] = maxOf(intLevel[v], currentLevel)
@@ -347,7 +347,6 @@ internal fun PropagationState.excludeIntValueImpl(v: Int, value: Long, anteceden
         if (interior) logIntCarve(v, value) else logIntChange(v)
     }
     if (currentFactor >= 0) propagations++
-    noteLearnedUse(currentFactor)
     val newDomain = d.excludeValue(value)
     // An edge exclusion advances the endpoint: the new bound rests on the *prior* bound, the
     // exclusion itself, and any further holes crossed on the way. The supplied reason only
@@ -377,6 +376,7 @@ internal fun PropagationState.excludeIntValueImpl(v: Int, value: Long, anteceden
         else -> antecedents
     }
     intDomains[v] = newDomain
+    noteLearnedUse(currentFactor)
     intLevel[v] = maxOf(intLevel[v], currentLevel)
     // An interior carve (no endpoint moved) records the hole-carve record — the level/reason source
     // for an eq atom materialized after its value was already carved. (A bound move instead stamps
@@ -510,7 +510,6 @@ internal fun PropagationState.excludeIntValues(v: Int, values: LongArray, antece
         if (value in newMin..newMax) (interior ?: LongArrayList().also { interior = it }).add(value)
     }
     if (currentFactor >= 0) propagations += excluded
-    noteLearnedUse(currentFactor)
 
     val root = rootDomains[v]
     val antMin = if (newMin != d.min) {
@@ -539,6 +538,7 @@ internal fun PropagationState.excludeIntValues(v: Int, values: LongArray, antece
     if (undoLogging) logIntChange(v) // one record restores the full prior domain + bound atoms
 
     intDomains[v] = newDomain
+    noteLearnedUse(currentFactor)
     intLevel[v] = maxOf(intLevel[v], currentLevel)
     if (newMin != d.min) {
         intMinLevel[v] = currentLevel
@@ -589,9 +589,9 @@ internal fun PropagationState.excludeInteriorIntValues(
     }
     if (undoLogging) logIntChange(v)
     intDomains[v] = newDomain
+    noteLearnedUse(currentFactor)
     intLevel[v] = maxOf(intLevel[v], currentLevel)
     if (currentFactor >= 0) propagations += interior.size
-    noteLearnedUse(currentFactor)
     completeDomainMutation(interior.size, { i ->
         pushHoleHist(v, interior[i], currentLevel, reasons[i])
     }) {
@@ -646,6 +646,7 @@ internal fun PropagationState.restrictIntToSurvivors(v: Int, survivors: LongArra
     val newDomain = intDomainFromSurvivors(filtered, problem.settings.storage)
     if (undoLogging) recordSurvivorRestriction(v, d, newDomain)
     intDomains[v] = newDomain
+    noteLearnedUse(currentFactor)
     intLevel[v] = maxOf(intLevel[v], currentLevel)
     var kindMask = IntEvent.VALUE_REMOVED_BIT
     if (newDomain.min != oldMin) {

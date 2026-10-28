@@ -246,7 +246,7 @@ internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd
     val remap = IntArray(n) // remap[i] = new learned index, or -1 if dropped
     var newCount = 0
     for (i in 0 until n) {
-        remap[i] = if (referenced[i] || keep(i, learned.lbds[i])) newCount++ else -1
+        remap[i] = if (learned.permanent[i] == 1 || referenced[i] || keep(i, learned.lbds[i])) newCount++ else -1
     }
     if (newCount == n) return // nothing dropped
     arithmeticLearningTrace?.remap(baseFactorCount, remap)
