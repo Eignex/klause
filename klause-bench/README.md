@@ -2803,6 +2803,15 @@ cost and retained AllDifferent count; `composition.jsonl` records actual removed
 rows and matching original table payloads. A cancelled preparation does not
 establish an ordinary prepared residual. The existing relation and its private
 columns remain the authority for each projected restriction.
+`sensitive=false` captures ordinary solve-mode preparation, including affine
+aliases; the default sensitive mode excludes transformations that change enumeration
+multiplicity. `cycles=true` samples the first and last three-Table cycles after
+that preparation. Each two-letter projection checks complete source rows against
+prepared domains, retaining pair multiplicities for original-row removal counts.
+Two triads share 8,388,608 visits and sixty seconds; each source scan has
+1,500,000 visits and 65,536 key/value/count/payload cells. The original relations and
+private AllDifferent constraints stay in place. These diagnostic overapproximations
+cannot establish source satisfiability and do not widen production admission.
 Use `presolve=off,+extensional` for isolated CLI comparisons and
 `presolve=default,+extensional` alongside the default presolve passes.
 
@@ -3198,6 +3207,43 @@ before relation admission. The self-metered pass charges its own visits and uses
 unit-weight scheduling normalization. The scheduling failures in
 [8164](https://lab.eignex.com/jobs/8164) are errors and supply no UNKNOWN verdict
 or search evidence.
+
+Three-Table cyclic projection is part of the same opt-in pass. The protected
+modulo-three controls in [9024](https://lab.eignex.com/jobs/9024), at `58fee78206`,
+retain both ternary relations and their third binary relation after pairwise
+closure. Eight Linux/amd64 CP/satOptimized/P1 cases use off/default preparation,
+composition off/on, seed 3 and three-second limits. Both composition arms
+avoid four search nodes, nine failures and 3,870 native CP work units through a
+completed source refutation. Charged preparation work falls from 4,304 to 215
+with off, and 48,161 to 15,905 with default preparation. The SAT neighbor drops
+from six nodes to three in both comparisons; native CP work falls from 1,850 to
+755 with off and 1,980 to 811 with default. All four original-source witnesses
+pass the external XCSP3 checker at objective 4. UNSAT and optimality remain native
+claims without an independent proof check.
+
+The SAT off comparison also raises charged preparation work from 4,570 to 4,890,
+peak RSS from 96,944 to 102,304 KiB and process wall time from 1.12 to 1.21 seconds.
+The default comparison uses 64,821/43,689 preparation units and 1.30/1.19 seconds.
+These single cold-process cases establish consumed deductions, not general
+throughput. Source hashes, build/runtime fingerprints, JVM options and hard
+cgroup/resource receipts stay with the job. Completed root projections reuse
+ordinary Table propagation and explanations. Temporary cluster propagation would
+need retained support, undo and branch-premise reconstruction; the observed root
+deductions require none of that additional state.
+
+[9022](https://lab.eignex.com/jobs/9022) stops the frozen WordSquare capture at its
+two-billion-work preparation allowance: 2,055,035,126 charged units in 0.266 seconds,
+110 integer slots and 56 remaining factors. It records no completed preparation,
+composition attempt or source verdict and establishes no retained-source benefit.
+
+[9042](https://lab.eignex.com/jobs/9042), at `1a03686fbf`, completes the same
+solution-set-sensitive preparation with 4,767,274,505 charged units in 0.305 seconds.
+It retains ten disjoint eleven-column/104,909-row Tables, their private word indices
+100–109 and AllDifferent, plus explicit equality rows. Sensitive preparation excludes
+affine alias elimination. Each Table has 1,153,999 cells, exceeding raw admission;
+the three calls each spend 56 visits and remove no original tuple. Measured calls
+take 0.064–0.815 ms and allocate 232–57,624 current-thread bytes. This capture
+establishes no cyclic deduction or source verdict.
 
 ### Reusable Regular prefix states
 
