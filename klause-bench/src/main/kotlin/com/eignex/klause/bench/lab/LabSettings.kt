@@ -16,6 +16,7 @@ internal data class LabSettings(val parameters: Map<String, String>) {
     val measurement = parameters["measurement"] ?: "none"
     val heap = (parameters["heap-mib"] ?: (memory - 1536).toString()).toLong()
     val gc = parameters["gc"] ?: "default"
+    val wallTimeout = (timeout * 2 + 20_999) / 1000 + 2 * compileTimeout + 120
 
     init {
         val unknown = parameters.keys.filterNot { it in SELECTORS || it in OPTIONS || it.startsWith("param.") }
@@ -24,6 +25,7 @@ internal data class LabSettings(val parameters: Map<String, String>) {
         require(measurement in setOf("none", "resources", "jfr", "compilation", "compilation+log"))
         require(heap in 512..memory - 1536) { "heap-mib must reserve 1536 MiB for harness and native memory" }
         require(gc in setOf("default", "serial", "parallel", "g1", "z"))
+        require(wallTimeout <= 604800) { "Combined solve and compiler ceilings exceed the lab's seven-day case limit" }
         parameters["exact"]?.toBooleanStrict()
         parameters["lp"]?.let { require(runCatching { LpConfig.parse(it) }.isSuccess) { "Invalid LP configuration" } }
         parameters["presolve"]?.let { requireNotNull(PresolveEmphasis.fromId(it)) { "Unknown presolve emphasis" } }
@@ -38,7 +40,7 @@ internal data class LabSettings(val parameters: Map<String, String>) {
     fun resources() = BenchResources(
         cpus,
         memory,
-        (timeout * 2 + 20_999) / 1000 + compileTimeout + 120,
+        wallTimeout,
         requiredTags = setOf("platform:linux", "arch:x86_64"),
     )
 

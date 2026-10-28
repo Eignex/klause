@@ -34,7 +34,7 @@ class LabAdapterTest {
     fun `case resource ceilings include compilation and subprocess shutdown`() {
         val settings = LabSettings(mapOf("timeout-ms" to "1000", "compile-timeout-sec" to "30", "cpus" to "2"))
         val resources = settings.resources()
-        assertEquals(172L, resources.timeoutSeconds)
+        assertEquals(202L, resources.timeoutSeconds)
         assertEquals(2, resources.cpus)
         assertEquals(setOf("platform:linux", "arch:x86_64"), resources.requiredTags)
     }
