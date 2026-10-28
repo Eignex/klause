@@ -69,7 +69,8 @@ class LinearAuthoritySemantics(private val source: SourceProofContext) : SourceS
                 (claim is SourceClaim.Bound && scope.objective == null)) {
                 return SourceEvidenceCheck.Rejected("active rows establish only a scoped contradiction")
             }
-            val numeric = source.atScope(scope).activeNumericContext(cancellation, retainGuardedRows = true)
+            val numeric = source.atScope(scope).activeNumericContext(cancellation,
+                retainGuardedRows = derivation.alternatives)
                 ?: return SourceEvidenceCheck.Unavailable("active row capture incomplete")
             return SourceEvidenceVerifier(numeric).verify(
                 SourceEvidence(scope, SourceClaim.Refutation, derivation.conflict), cancellation)

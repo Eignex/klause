@@ -257,7 +257,7 @@ class LinearBooleanCutsTest {
         val proof = LinearActiveRefutation(SourceDerivation.Combination(listOf(
             SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Import(falseGlobal)),
             SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("lower")),
-        )))
+        )), alternatives = true)
 
         val verdict = SourceEvidenceVerifier(source.withLinearAuthority().atScope(branch)).verify(
             SourceEvidence(branch, SourceClaim.Refutation, proof))

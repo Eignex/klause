@@ -18,7 +18,9 @@ import com.eignex.klause.solver.evidence.integerPinBounds
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.magnitudeBitLength
 
-internal class LinearActiveRefutation(val conflict: SourceDerivation) : SourceDerivation.Extension
+internal class LinearActiveRefutation(
+    val conflict: SourceDerivation, val alternatives: Boolean = false,
+) : SourceDerivation.Extension
 
 internal data class LinearActiveResult(
     val evidence: SourceEvidence? = null,
@@ -133,7 +135,8 @@ internal class LinearActiveRows(
             val proof = SourceDerivation.Combination(weights.mapIndexedNotNull { id, weight ->
                 if (weight.isZero) null else SourceDerivation.Combination.Term(weight, query.cited[id].second)
             })
-            val evidence = SourceEvidence(branch.scope, SourceClaim.Refutation, LinearActiveRefutation(proof))
+            val evidence = SourceEvidence(branch.scope, SourceClaim.Refutation,
+                LinearActiveRefutation(proof, alternatives = composeBranches))
             var work = 0L
             val allowance = budget.funding?.availableWork ?: Long.MAX_VALUE
             val verdict = try {
