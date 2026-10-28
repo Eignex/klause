@@ -8,14 +8,19 @@ import com.eignex.klause.backtrack.selector.VariableSelector
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.formats.xcsp3.Xcsp3
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.presolve.BakeConfig
+import com.eignex.klause.presolve.RootBaker
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
@@ -44,6 +49,7 @@ internal object AssignmentCostProfile {
         out.resolve("screen.jsonl").bufferedWriter().use { output ->
             for ((name, bytes) in controls) {
                 out.resolve("$name.xml").writeBytes(bytes)
+                if (name != "latin4") cutoffControl(bytes, out.resolve("$name-cutoff.json"))
                 for (mode in listOf("off", "default", "aggressive")) {
                     val stop = Cancellation.after(4.seconds)
                     val parsed = Xcsp3.parse(bytes.decodeToString(), recoveryCancellation = stop)
@@ -121,6 +127,41 @@ internal object AssignmentCostProfile {
                 }
             }
         }
+    }
+
+    private fun cutoffControl(bytes: ByteArray, output: File) {
+        val stop = Cancellation.after(2.seconds)
+        val source = Xcsp3.parse(bytes.decodeToString(), recoveryCancellation = stop)
+        val objective = requireNotNull(source.objective).toLinearObjective()
+        val sourceModel = source.problem.bake()
+        val witness = Sample(BooleanArray(0), if (sourceModel.numIntVars == 4) {
+            longArrayOf(1, 3, 4, 11)
+        } else longArrayOf(1, 3, 4))
+        val coefficients = objective.intCoefficients
+        val cutoff = Linear(coefficients, IntArray(coefficients.size) { it }, LinearOp.LE, 10L)
+        val query = source.problem.withFactors(source.problem.factors + cutoff).bake()
+        val root = PropagationSession(query, stop)
+        val before = root.intDomain(0).toString()
+        val pinned = root.pinInt(0, 1)
+        val started = System.nanoTime()
+        val probed = RootBaker.reseed(query, BakeConfig(probeIntBounds = true, probeIntHoles = true,
+            probeBudgetPerVar = 32, probeTotalBudget = 128, probeSeed = 3))
+        val elapsed = System.nanoTime() - started
+        val report = buildJsonObject {
+            put("sourceSha256", sha256(bytes))
+            put("queryMaximum", 10)
+            put("nativeSourceWitnessAccepted", FiniteConflictSelection.checkSource(sourceModel, witness, stop))
+            put("sourceWitnessObjective", objective.evaluateExact(witness).toString())
+            put("rootX", before)
+            put("pinX1", pinned::class.simpleName)
+            put("probedX", PropagationSession(probed, stop).intDomain(0).toString())
+            put("probingNs", elapsed)
+            put("stopped", stop())
+            put("independentSourceCheck", false)
+            put("conditionalPruningInstalled", false)
+        }
+        output.writeText(report.toString())
+        println(report)
     }
 
     private fun control(alias: Boolean): String = """
