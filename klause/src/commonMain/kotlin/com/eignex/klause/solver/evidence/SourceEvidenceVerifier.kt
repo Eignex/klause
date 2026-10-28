@@ -73,7 +73,6 @@ class SourceProofContext(
 ) {
     private val capturedCoordinates = coordinates.toSet()
     private val capturedPremises = premises.toMap()
-    internal val premiseCount: Int get() = capturedPremises.size
     private val capturedObjective = objective?.filterValues { !it.isZero }?.toMap()
     internal val coordinateCount: Int get() = capturedCoordinates.size
     internal val premiseCount: Int get() = capturedPremises.size
