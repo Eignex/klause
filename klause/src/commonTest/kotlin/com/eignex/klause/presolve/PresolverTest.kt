@@ -5,6 +5,7 @@ import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.Xor
+import com.eignex.klause.factor.global.NValue
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -12,6 +13,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.baked
@@ -163,6 +165,33 @@ class PresolverTest {
             assertTrue(reduced.factors.filterIsInstance<Linear>().any {
                 it.vars.contentEquals(intArrayOf(3)) && it.op == LinearOp.LE && it.coeff(0) == 1L && it.bound == 2L
             })
+        }
+    }
+
+    @Test
+    fun `sparsification should consume late equalities after its measured cost backoff`() {
+        val problem = Problem(0, 4, arrayOf(
+            IntDomain(1, 1), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 4),
+        ), listOf(
+            NValue(0, IntArray(32) { 1 + it % 2 }),
+            Linear(intArrayOf(1, -1, 1), intArrayOf(1, 2, 3), LinearOp.LE, 2),
+        ))
+        for (schedule in listOf("source", "incremental", "rebuilt")) {
+            val budget = PresolveBudget(Long.MAX_VALUE)
+            val config = PresolveConfig.parse("off,+sparsify,+subsume,+structural" + if (schedule == "rebuilt") ",+bce" else "")
+            val context = PresolveContext(presolveBudget = budget)
+
+            val reduced = if (schedule == "source") Presolver.runSource(problem, config, context).problem
+            else Presolver.run(problem.bake(), config, context).problem
+
+            assertTrue((reduced as? BakedProblem)?.rootIntDomain(3)?.max == 2L ||
+                reduced.factors.filterIsInstance<Linear>().any {
+                it.vars.contentEquals(intArrayOf(3)) && it.op == LinearOp.LE && it.coeff(0) == 1L && it.bound == 2L
+            })
+            assertEquals(
+                listOf(PresolveInvocationOutcome.COMPLETE_MISS, PresolveInvocationOutcome.CHANGED),
+                budget.invocations.filter { it.pass == "sparsify" }.map { it.outcome },
+            )
         }
     }
 

@@ -83,8 +83,10 @@ internal object LinearSubSumAggregation {
 
     private class SparseRow(val linear: Linear, val terms: Map<Int, Long>, val magnitude: Long)
 
+    fun sparsificationEligible(factorCount: Int): Boolean = factorCount <= MAX_FACTORS
+
     fun sparsifyRows(problem: Problem, cancellation: Cancellation = Cancellation.Never): PassDelta {
-        if (problem.factors.size > MAX_FACTORS || cancellation()) return PassDelta()
+        if (!sparsificationEligible(problem.factors.size) || cancellation()) return PassDelta()
         val work = Work(cancellation)
         val rows = arrayOfNulls<SparseRow>(problem.factors.size)
         val equalities = IntArrayList()

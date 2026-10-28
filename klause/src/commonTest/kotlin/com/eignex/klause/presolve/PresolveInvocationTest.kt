@@ -517,6 +517,15 @@ class PresolveInvocationTest {
     }
 
     @Test
+    fun `sparsification admission should follow the live factor count before parking`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyList())
+        val pass = PresolvePass.SPARSIFY_LINEAR_ROWS
+
+        assertFalse(pass.namespaceEligible(problem, 200_001))
+        assertTrue(pass.namespaceEligible(problem, 200_000))
+    }
+
+    @Test
     fun `clause subsumption eligibility should follow the supplied live factor count at its cap`() {
         val problem = Problem(3, 0, emptyArray(), listOf(Clause(intArrayOf(0, 2)), Clause(intArrayOf(0, 2, 4))))
         val pass = PresolvePass.SUBSUME_CLAUSES
