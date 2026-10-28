@@ -14,12 +14,28 @@ import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchRunObserver
 import com.eignex.klause.solver.search.SearchSession
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class PbConflictResolventTest {
+    @Test
+    fun `cancellation should withhold the learned result`() {
+        val state = PropagationState(Problem(2, 1, arrayOf(IntDomain(0, 10)), emptyArray()),
+            Assumptions.None, pbLearning = true)
+        state.currentLevel = 1
+        state.pinBool(0, true)
+        state.pinBool(1, true)
+        state.finiteWork.cancellation = Cancellation { true }
+
+        val result = state.conflictAnalyzer.analyzeConflictClause(intArrayOf(Lit.make(0, false), Lit.make(1, false)))
+
+        assertIs<ConflictAnalyzer.AnalysisResult.NotApplicable>(result)
+        assertTrue(state.runCancelled)
+    }
+
     @Test
     fun `the same counting conflict should store and consume PB through shared traversal`() {
         for (mode in 0..2) {
