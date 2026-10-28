@@ -460,11 +460,11 @@ internal object Compiler {
 
         /** Parse a `<condition>` `(op, rhs)` where rhs is a constant or a variable. Returns the
          *  operator, a constant bound, and the rhs var id when the right-hand side is a variable. */
-        internal fun sumCondition(text: String): Triple<LinearOp, Int, Int?> {
+        internal fun sumCondition(text: String): Triple<LinearOp, Long, Int?> {
             val (opTok, rhs) = splitCondition(text)
             val (op, delta) = relOp(opTok) ?: throw UnsupportedXcsp3Exception("condition op '$opTok'")
             val k = rhs.toIntOrNull()
-            return if (k != null) Triple(op, k + delta, null) else Triple(op, delta, ref(rhs))
+            return if (k != null) Triple(op, k.toLong() + delta, null) else Triple(op, delta.toLong(), ref(rhs))
         }
 
         /** Constrain the linear expression `Σ coeffs·vars` by a `<condition>`: a simple `(op, k|var)`
@@ -494,9 +494,10 @@ internal object Compiler {
             }
             val (op, k, rhsVar) = sumCondition(condText)
             if (rhsVar == null) {
-                factors.add(Linear(coeffs, vars, op, k))
+                factors.add(Linear(LongArray(coeffs.size) { coeffs[it].toLong() }, vars, op, k))
             } else {
-                factors.add(Linear(coeffs + -1, vars + rhsVar, op, k))
+                factors.add(Linear(LongArray(coeffs.size + 1) { if (it < coeffs.size) coeffs[it].toLong() else -1L },
+                    vars + rhsVar, op, k))
                 // `(eq, v)` makes v the sum's value: v = Σ coeffs·vars. Orienting a bare equality could
                 // pick a decision var as the output, so the front-end records the definition itself.
                 if (op == LinearOp.EQ) definedVars.add(rhsVar)
@@ -1350,10 +1351,10 @@ internal object Compiler {
 
         internal fun domainMin(vars: IntArray) = vars.minOf { domains[it].min }
         internal fun domainSpan(vars: IntArray) = vars.maxOf { domains[it].max } - domainMin(vars) + 1
-        internal fun domainValues(v: Int): List<Int> {
+        internal fun domainValues(v: Int): List<Long> {
             val d = domains[v]
-            val out = ArrayList<Int>(d.values.size)
-            for (k in 0 until d.values.size) out.add(d.values.valueAt(k).toInt())
+            val out = ArrayList<Long>(d.values.size)
+            for (k in 0 until d.values.size) out.add(d.values.valueAt(k))
             return out
         }
 

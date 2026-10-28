@@ -122,8 +122,10 @@ class ContiguousDomainTest {
 
     @Test
     fun `excludeValue should throw when it would empty the domain`() {
-        val d = ContiguousDomain(5, 5)
-        assertFails { d.excludeValue(5) }
+        for (value in listOf(Long.MIN_VALUE, 5L, Long.MAX_VALUE)) {
+            val d = ContiguousDomain(value, value)
+            assertFails { d.excludeValue(value) }
+        }
     }
 
     @Test

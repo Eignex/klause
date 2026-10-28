@@ -3,7 +3,6 @@ package com.eignex.klause.lp
 import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.ir.values
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
@@ -41,8 +40,9 @@ internal fun Regular.emitLpRelaxation(builder: RelaxationBuilder) {
         val box = builder.rootDomain(seq[t])
         val live = builder.liveDomain(seq[t])
         reach[t].forEach { state ->
-            box.values.forEach { sym ->
-                if (sym !in 1..s) return@forEach
+            (1..s).forEach { symbol ->
+                val sym = symbol.toLong()
+                if (sym !in box) return@forEach
                 val nxt = delta(state, sym)
                 if (nxt == 0) return@forEach
                 // The arc is present while symbol sym stays in seq[t]'s live domain.

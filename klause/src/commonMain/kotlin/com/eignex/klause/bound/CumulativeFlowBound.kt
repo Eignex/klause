@@ -105,7 +105,7 @@ internal class CumulativeFlowBound(
             flow.addEdge(source, 1 + i, mulExact(view.durations[i], view.resources[i]))
         }
         for (k in 0 until intervals) {
-            val len = bps[k + 1] - bps[k]
+            val len = subExact(bps[k + 1], bps[k])
             val node = n + 1 + k
             flow.addEdge(node, sink, mulExact(cap, len))
             for (i in 0 until n) {

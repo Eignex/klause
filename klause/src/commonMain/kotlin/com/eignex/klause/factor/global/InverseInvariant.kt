@@ -8,6 +8,7 @@ import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.MutableIntLongMap
 
 internal class InverseInvariant(
     private val f: IntArray,
@@ -66,7 +67,7 @@ internal class InverseInvariant(
                 return
             }
             val gVal = state.assignment.intValue(g[gIdx.toInt()])
-            val fBack = (i + fOffset).toLong()
+            val fBack = i.toLong() + fOffset
             if (gVal != fBack) {
                 val gd = state.rootDomains[g[gIdx.toInt()]]
                 if (fBack in gd && fBack != gVal) sink.addChannelingIntSet(state, g[gIdx.toInt()], fBack)
@@ -79,7 +80,7 @@ internal class InverseInvariant(
                 val fd = state.rootDomains[f[i]]
                 for (jPrime in g.indices) {
                     if (state.assignment.intValue(g[jPrime]) == fBack) {
-                        val tgt = (jPrime + gOffset).toLong()
+                        val tgt = jPrime.toLong() + gOffset
                         if (tgt in fd && tgt != j) {
                             sink.addChannelingIntSet(state, f[i], tgt)
                             break
@@ -113,8 +114,8 @@ internal class InverseInvariant(
             if (gIdxA !in g.indices || gIdxB !in g.indices) continue
             val gA = g[gIdxA.toInt()]
             val gB = g[gIdxB.toInt()]
-            val newGA = (i2 + fOffset).toLong()
-            val newGB = (i1 + fOffset).toLong()
+            val newGA = i2.toLong() + fOffset
+            val newGB = i1.toLong() + fOffset
             if (b !in state.rootDomains[f[i1]]) continue
             if (a !in state.rootDomains[f[i2]]) continue
             if (newGA !in state.rootDomains[gA]) continue
@@ -172,7 +173,7 @@ internal class InverseInvariant(
         val parts = ArrayList<Move>(indices.size)
         for (k in indices.indices) {
             val v = f[indices[k]]
-            val value = (targets[k] + gOffset).toLong()
+            val value = targets[k].toLong() + gOffset
             if (value !in state.rootDomains[v]) return false
             parts.add(Move.IntSet(v, value))
         }
@@ -187,16 +188,21 @@ internal class InverseInvariant(
      *  before writing any, so a failure leaves the assignment untouched for the matching fallback. */
     private fun seedIdentity(state: LocalSearchState): Boolean {
         val n = f.size
+        val values = MutableIntLongMap(n)
         for (i in 0 until n) {
-            val fv = (i + gOffset).toLong()
-            val gv = (i + fOffset).toLong()
+            val fv = i.toLong() + gOffset
+            val gv = i.toLong() + fOffset
+            if (values.getOrDefault(f[i], fv) != fv) return false
+            values.put(f[i], fv)
+            if (values.getOrDefault(g[i], gv) != gv) return false
+            values.put(g[i], gv)
             if (fv !in state.rootDomains[f[i]] || gv !in state.rootDomains[g[i]]) return false
             if (state.assumptions.isFrozenInt(f[i]) && state.assignment.intValue(f[i]) != fv) return false
             if (state.assumptions.isFrozenInt(g[i]) && state.assignment.intValue(g[i]) != gv) return false
         }
         for (i in 0 until n) {
-            if (!state.assumptions.isFrozenInt(f[i])) state.assignment.setInt(f[i], (i + gOffset).toLong())
-            if (!state.assumptions.isFrozenInt(g[i])) state.assignment.setInt(g[i], (i + fOffset).toLong())
+            if (!state.assumptions.isFrozenInt(f[i])) state.assignment.setInt(f[i], i.toLong() + gOffset)
+            if (!state.assumptions.isFrozenInt(g[i])) state.assignment.setInt(g[i], i.toLong() + fOffset)
         }
         return true
     }
@@ -226,8 +232,8 @@ internal class InverseInvariant(
             val allowed = IntArrayList()
             val fd = state.rootDomains[f[i]]
             for (vid in 0 until n) {
-                if ((vid + gOffset).toLong() !in fd) continue
-                if ((i + fOffset).toLong() !in state.rootDomains[g[vid]]) continue
+                if (vid.toLong() + gOffset !in fd) continue
+                if (i.toLong() + fOffset !in state.rootDomains[g[vid]]) continue
                 allowed.add(vid)
             }
             IntArray(allowed.size) { allowed[it] }
@@ -241,8 +247,8 @@ internal class InverseInvariant(
         }
         for (i in 0 until n) {
             val vid = matchVar[i]
-            state.assignment.setInt(f[i], (vid + gOffset).toLong())
-            state.assignment.setInt(g[vid], (i + fOffset).toLong())
+            state.assignment.setInt(f[i], vid.toLong() + gOffset)
+            state.assignment.setInt(g[vid], i.toLong() + fOffset)
         }
         return true
     }
@@ -257,7 +263,7 @@ internal class InverseInvariant(
                 continue
             }
             val gVal = state.assignment.intValue(g[gIdx.toInt()])
-            if (gVal != (i + fOffset).toLong()) bad++
+            if (gVal != i.toLong() + fOffset) bad++
         }
         for (i in g.indices) {
             val j = state.assignment.intValue(g[i])
@@ -267,7 +273,7 @@ internal class InverseInvariant(
                 continue
             }
             val fVal = state.assignment.intValue(f[fIdx.toInt()])
-            if (fVal != (i + gOffset).toLong()) bad++
+            if (fVal != i.toLong() + gOffset) bad++
         }
         return bad
     }
@@ -283,7 +289,7 @@ internal class InverseInvariant(
             }
             val gv = g[gIdx.toInt()]
             val gVal = if (gv == intVar) newValue else state.assignment.intValue(gv)
-            if (gVal != (i + fOffset).toLong()) bad++
+            if (gVal != i.toLong() + fOffset) bad++
         }
         for (i in g.indices) {
             val j = if (g[i] == intVar) newValue else state.assignment.intValue(g[i])
@@ -294,7 +300,7 @@ internal class InverseInvariant(
             }
             val fv = f[fIdx.toInt()]
             val fVal = if (fv == intVar) newValue else state.assignment.intValue(fv)
-            if (fVal != (i + gOffset).toLong()) bad++
+            if (fVal != i.toLong() + gOffset) bad++
         }
         return bad
     }

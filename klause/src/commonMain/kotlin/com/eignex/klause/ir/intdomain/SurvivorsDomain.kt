@@ -97,6 +97,7 @@ internal class SurvivorsDomain(
         var pos = from
         while (pos <= to) {
             if (i < survivors.size && survivors[i] == pos) {
+                if (pos == to) return
                 i++
                 pos++
             } else {

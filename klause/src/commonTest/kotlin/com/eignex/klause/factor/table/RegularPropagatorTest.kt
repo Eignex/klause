@@ -13,8 +13,28 @@ import com.eignex.klause.propagation.reasonOf
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class RegularPropagatorTest {
+
+    @Test
+    fun `regular restricts wide sequence domains to its alphabet`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(-1000000000000L, 1000000000000L)),
+            factors = arrayOf<Factor>(
+                Regular(intArrayOf(0), 1, 2, longArrayOf(1, 1), q0 = 1, accepting = intArrayOf(1)),
+            ),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.currentFactor = 0
+
+        assertTrue(state.factorAt(0).propagate(state, 0))
+
+        assertEquals(1L, state.intDomains[0].min)
+        assertEquals(2L, state.intDomains[0].max)
+    }
 
     @Test
     fun `regular deductions should be implied by their reasons under carved holes`() {

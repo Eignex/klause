@@ -28,7 +28,15 @@ internal actual fun exitCli(code: Int): Nothing = exitProcess(code)
 
 internal actual fun openFileSource(path: String): CharSource {
     val ext = compressionExtension(path) ?: return ReaderCharSource(File(path).bufferedReader())
-    if (ext == "gz") return ReaderCharSource(GZIPInputStream(File(path).inputStream()).bufferedReader())
+    if (ext == "gz") {
+        val input = File(path).inputStream()
+        return try {
+            ReaderCharSource(GZIPInputStream(input).bufferedReader())
+        } catch (failure: Throwable) {
+            input.close()
+            throw failure
+        }
+    }
     val cmd = DECOMPRESSORS.getValue(ext) + path
     val proc = ProcessBuilder(cmd).redirectError(ProcessBuilder.Redirect.DISCARD).start()
     return ReaderCharSource(

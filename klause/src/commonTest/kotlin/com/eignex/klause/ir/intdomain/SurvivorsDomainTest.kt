@@ -8,6 +8,35 @@ import kotlin.test.assertTrue
 class SurvivorsDomainTest {
 
     @Test
+    fun `hole iteration should stop at the largest signed word`() {
+        val domain = SurvivorsDomain(
+            Long.MAX_VALUE - 4, Long.MAX_VALUE,
+            longArrayOf(Long.MAX_VALUE - 4, Long.MAX_VALUE - 2, Long.MAX_VALUE),
+        )
+        val holes = mutableListOf<Long>()
+
+        domain.forEachHoleInRange(Long.MAX_VALUE - 4, Long.MAX_VALUE) {
+            assertTrue(holes.size < 2)
+            holes.add(it)
+        }
+
+        assertEquals(listOf(Long.MAX_VALUE - 3, Long.MAX_VALUE - 1), holes)
+    }
+
+    @Test
+    fun `hole count should subtract survivors before saturating`() {
+        val cases = listOf(
+            longArrayOf(Long.MIN_VALUE, Long.MIN_VALUE + 1, 0),
+            longArrayOf(-1, 0, Long.MAX_VALUE),
+        )
+        for (values in cases) {
+            val domain = intDomainFromSurvivors(values)
+
+            assertEquals(Long.MAX_VALUE - 1, domain.holeCount)
+        }
+    }
+
+    @Test
     fun `valueCount should count signed word survivors regardless of span`() {
         val cases = listOf(
             longArrayOf(Long.MIN_VALUE, 0, Long.MAX_VALUE),

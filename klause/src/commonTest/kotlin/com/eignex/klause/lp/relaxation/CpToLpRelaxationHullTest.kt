@@ -284,6 +284,27 @@ class CpToLpRelaxationHullTest {
     }
 
     @Test
+    fun `regular flow hull should admit alphabet symbols from a wide domain`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(-1000000000000L, 1000000000000L)),
+            factors = arrayOf<Factor>(
+                Regular(intArrayOf(0), 1, 2, longArrayOf(1, 1), q0 = 1, accepting = intArrayOf(1)),
+            ),
+        )
+
+        val relaxation = CpToLpRelaxation(
+            problem,
+            LinearObjective(intCoefficients = longArrayOf(1)),
+            regularHull = true,
+        ).build(PropagationSession(problem))
+
+        assertEquals(3, relaxation.model.n)
+        assertEquals(3, relaxation.model.m)
+    }
+
+    @Test
     fun `cost mdd flow hull should give the exact minimum path cost`() {
         val p = mddProblem()
         val r = CpToLpRelaxation(p, LinearObjective(intCoefficients = longArrayOf(0, 0, 1)), mddHull = true)

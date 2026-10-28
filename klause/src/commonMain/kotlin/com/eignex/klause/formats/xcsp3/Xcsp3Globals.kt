@@ -621,7 +621,7 @@ internal fun Compiler.Builder.cumulative(e: XmlElement) {
             starts = starts,
             durations = durations,
             resources = resources,
-            capacity = if (capVar == null) cap.toLong() else domains[capVar].max,
+            capacity = if (capVar == null) cap else domains[capVar].max,
             durationVars = durationVars,
             resourceVars = resourceVars,
             capacityVar = capVar ?: -1,
@@ -1053,14 +1053,15 @@ internal fun Compiler.Builder.precedence(e: XmlElement) {
     // The list may be a <list> child or, in the symmetry-breaking shorthand, direct content.
     val vars = refList(listText(e))
     if (vars.isEmpty()) return
-    val values = parseInts(e.child("values")?.textContent)
-        ?: vars.flatMap { domainValues(it) }.distinct().sorted().toIntArray()
+    val values = parseInts(e.child("values")?.textContent)?.let { parsed ->
+        LongArray(parsed.size) { parsed[it].toLong() }
+    } ?: vars.flatMap { domainValues(it) }.distinct().sorted().toLongArray()
     if (values.size < 2) return
     // The source names the precedence, so post it: [ValuePrecede] scans the sequence for the first
     // occurrence of either value, where the clause encoding needs a reified equality per (position,
     // value) and a clause per position — quadratic in the sequence, and each clause sees one position.
     for (i in 0 until values.size - 1) {
-        factors.add(ValuePrecede(values[i].toLong(), values[i + 1].toLong(), vars))
+        factors.add(ValuePrecede(values[i], values[i + 1], vars))
     }
 }
 

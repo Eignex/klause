@@ -24,9 +24,9 @@ internal object Xcsp3Mode : CliMode {
             val overrides = common.sourceOverrides(xcsp3Semantics)
             // Parsing only reads: the base bake runs as presolve step 0, bounded by the presolve deadline.
             // The file is streamed into the parser so a huge instance is never fully resident.
-            val parsed = Xcsp3.parse(
-                openFileSource(path), common.config.problemSettings(), semanticOverrides = overrides,
-            )
+            val parsed = openFileSource(path).useSource { source ->
+                Xcsp3.parse(source, common.config.problemSettings(), semanticOverrides = overrides)
+            }
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: bool=${parsed.problem.numBoolVars} int=${parsed.problem.numIntVars} " +
                     "factors=${parsed.problem.numFactors}"

@@ -46,6 +46,7 @@ internal class ContiguousDomain(
 
     override fun excludeValue(value: Long): IntDomain {
         if (value !in min..max) return this
+        check(min != max) { "Empty domain after excludeValue($value)" }
         return when (value) {
             min -> ContiguousDomain(min + 1, max, storage)
 

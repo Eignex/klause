@@ -85,6 +85,50 @@ class BigFractionTest {
     }
 
     @Test
+    fun `double conversion should preserve finite IEEE values across exponent boundaries`() {
+        for (input in listOf(
+            Double.MIN_VALUE, -Double.MIN_VALUE, Double.fromBits(3L),
+            Double.fromBits(0x000fffffffffffffL), Double.fromBits(0x0010000000000000L),
+            0.1, -0.1, Double.MAX_VALUE, -Double.MAX_VALUE,
+        )) {
+            assertEquals(input.toBits(), assertNotNull(BigFraction.ofDouble(input)).toDouble().toBits(), "$input")
+        }
+    }
+
+    @Test
+    fun `double conversion should divide fractions whose components exceed the IEEE range`() {
+        val scale = BIG_ONE shl 4096
+        val fraction = BigFraction.of(scale + BIG_ONE, scale * bigIntOf(2) + BIG_ONE)
+
+        assertEquals(0.5, fraction.toDouble())
+        assertEquals(-0.5, fraction.negated().toDouble())
+    }
+
+    @Test
+    fun `double conversion should round halfway fractions to even`() {
+        val denominator = BIG_ONE shl 53
+        for ((offset, expected) in listOf(1 to 1.0, 3 to Double.fromBits(1.0.toBits() + 2))) {
+            val fraction = BigFraction.of(denominator + bigIntOf(offset), denominator)
+
+            assertEquals(expected, fraction.toDouble())
+            assertEquals(-expected, fraction.negated().toDouble())
+        }
+    }
+
+    @Test
+    fun `double conversion should round underflow and overflow at their IEEE boundaries`() {
+        val halfMinimum = BigFraction.of(BIG_ONE, BIG_ONE shl 1075)
+        val aboveHalfMinimum = BigFraction.of(bigIntOf(3), BIG_ONE shl 1076)
+        val overflow = BigFraction.of((BIG_ONE shl 1025) - (BIG_ONE shl 971), bigIntOf(2))
+
+        assertEquals(0L, halfMinimum.toDouble().toBits())
+        assertEquals(Long.MIN_VALUE, halfMinimum.negated().toDouble().toBits())
+        assertEquals(Double.MIN_VALUE, aboveHalfMinimum.toDouble())
+        assertEquals(Double.POSITIVE_INFINITY, overflow.toDouble())
+        assertEquals(Double.NEGATIVE_INFINITY, overflow.negated().toDouble())
+    }
+
+    @Test
     fun `integer ceiling should round positive and negative fractions upward`() {
         for ((numerator, denominator, expected) in listOf(
             Triple(0L, 3L, 0L),

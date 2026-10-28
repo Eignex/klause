@@ -6,6 +6,8 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.PropagationSession
 import kotlin.test.Test
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class CumulativeFlowBoundTest {
@@ -22,6 +24,28 @@ class CumulativeFlowBoundTest {
     fun `flow bound should not flag a feasible cumulative`() {
         val p = problem(2, 5, longArrayOf(2, 2), longArrayOf(1, 1), capacity = 2)
         assertTrue(!CumulativeFlowBound(p).isInfeasible(PropagationSession(p)))
+    }
+
+    @Test
+    fun `flow bound declines an unrepresentable interval width`() {
+        val p = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(-(1L shl 62), 1L shl 62) },
+            arrayOf<Factor>(Cumulative(intArrayOf(0, 1), longArrayOf(1, 1), longArrayOf(1, 1), capacity = 2)),
+        )
+        assertFalse(CumulativeFlowBound(p).isInfeasible(PropagationSession(p)))
+    }
+
+    @Test
+    fun `flow bound supplies no conflict for an unrepresentable interval width`() {
+        val p = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(-(1L shl 62), 1L shl 62) },
+            arrayOf<Factor>(Cumulative(intArrayOf(0, 1), longArrayOf(1, 1), longArrayOf(1, 1), capacity = 2)),
+        )
+        assertNull(CumulativeFlowBound(p).explain(PropagationSession(p)))
     }
 
     @Test

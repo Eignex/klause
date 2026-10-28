@@ -288,14 +288,15 @@ internal class KnapsackLagrangianBound(
         for (k in kItems.indices) {
             val i = kItems[k]
             if (pinned[i] != -1 || w[i] >= 0L) continue // pinned handled; W≥0 never helps a min
+            if (kWeights[k] > rem.toLong()) continue
             take.add(i to kWeights[k].toInt())
         }
         val chosenFlag = Array(take.size) { BooleanArray(rem + 1) }
         for (t in take.indices) {
             val (i, wt) = take[t]
-            val value = -w[i]
+            val value = subExact(0L, w[i])
             for (c in rem downTo wt) {
-                val cand = dp[c - wt] + value
+                val cand = addExact(dp[c - wt], value)
                 if (cand > dp[c]) {
                     dp[c] = cand
                     chosenFlag[t][c] = true
@@ -375,8 +376,9 @@ internal class KnapsackLagrangianBound(
 
     private fun coeffOf(r: Int, localVar: Int): Long {
         val vs = rowVars[r]
-        for (k in vs.indices) if (vs[k] == localVar) return rowCoeffs[r][k]
-        return 0L
+        var coefficient = 0L
+        for (k in vs.indices) if (vs[k] == localVar) coefficient = addExact(coefficient, rowCoeffs[r][k])
+        return coefficient
     }
 
     /** Objective contribution of the integer variables at their bound-optimal value (the bools are
