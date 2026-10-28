@@ -394,11 +394,16 @@ data class LpStats(
     val rootRoute: LpRouteSolveStats = LpRouteSolveStats(),
     /** Inclusive phase timings and outcomes, keyed by engine phase and consumer route. */
     val phases: Map<String, LpPhaseStats> = emptyMap(),
+    /** Peak sparse-trial admission estimates and decline indicators across workers. */
+    val sparseTrial: Map<String, Long> = emptyMap(),
 ) {
     /** Combine two workers' LP stats: counts add, LU maxes take the larger, wall time sums, and the
      *  root bound (same root across workers) keeps the tightest finite reading (NaN defers). */
     fun mergedWith(o: LpStats): LpStats = LpStats(
         phases = mergePhaseStats(phases, o.phases),
+        sparseTrial = (sparseTrial.keys + o.sparseTrial.keys).associateWith {
+            maxOf(sparseTrial[it] ?: 0L, o.sparseTrial[it] ?: 0L)
+        },
         nodePasses = SumResult(nodePasses.sum + o.nodePasses.sum),
         standalonePasses = SumResult(standalonePasses.sum + o.standalonePasses.sum),
         componentPasses = SumResult(componentPasses.sum + o.componentPasses.sum),
@@ -487,6 +492,7 @@ internal fun LpStats.hasActivity(): Boolean =
 
 /** Mutable LP-stats accumulator, one per solve; snapshots into an [LpStats]. See [SolveStatsSink]. */
 internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
+    var sparseTrial: Map<String, Long> = emptyMap()
     private val phases = LinkedHashMap<String, LpPhaseStats>()
 
     fun observeDirectionalBranch(outcome: String) {
@@ -891,6 +897,7 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
 
     fun snapshot(): LpStats = LpStats(
         phases = phases.toMap(),
+        sparseTrial = sparseTrial,
         nodePasses = SumResult(nodePasses.toDouble()),
         standalonePasses = SumResult(standalonePasses.toDouble()),
         componentPasses = SumResult(componentPasses.toDouble()),

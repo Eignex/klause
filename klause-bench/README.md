@@ -167,3 +167,15 @@ The opt-in basis tool uses the [basis corpus](../klause/src/jvmTest/resources/ba
 
 Run captures, timing comparisons and profiles through the lab. Harness unit tests
 use `./gradlew :klause-bench:test`; they do not run benchmark campaigns.
+
+### Bounded sparse admission trials
+
+`lp=default,+sparse-trial` selects the ordinary model-facing LP route's bounded
+root trial. Compare it with `lp=default` at the identical revision, source,
+preparation policy, seed and allowance. Admission emits `lpSparse*` statistics for
+nonzeros, component dimensions, scalar width, row-intersection risk, reserved
+storage and decline reasons. Ordinary LP work, pivots, factor fill, certification,
+root bound, prunes and fixings establish progress and consumption. An admitted
+trial or completed lab job alone establishes no useful deduction or source proof.
+Keep physical RSS separate from modeled storage reservations. Source checking and
+all preparation, failed work and retirement belong to the containing comparison.

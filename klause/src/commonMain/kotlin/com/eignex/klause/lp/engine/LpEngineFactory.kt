@@ -15,6 +15,8 @@ enum class LpZeroObjectivePricing {
 internal data class LpPricingOptions(
     val zeroObjective: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
     val tieSeed: Long = 0L,
+    val basisEntryLimit: Long = Long.MAX_VALUE,
+    val basisWorkLimit: Long = Long.MAX_VALUE,
 )
 
 /**

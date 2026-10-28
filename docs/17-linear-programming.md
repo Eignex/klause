@@ -126,6 +126,25 @@ fixing allows movement at most `(U - L) / abs(d(j))` from the minimizing endpoin
 Objective changes retract dependent bounds, cuts and clauses, or restore an
 objective-independent region.
 
+The explicit `+sparse-trial` LP option selects a bounded root trial for compact
+unconditional linear sources. Emphasis levels leave it disabled. Admission bounds
+source assembly, then inspects emitted nonzeros, connected-component dimensions,
+exact scalar width and row-intersection fill risk. Sparse storage is reserved
+independently of the ordinary dense cost proxy. The root trial uses the ordinary
+bound, fixing and conflict consumers with their existing exact checks; cuts,
+expanded hulls and primal probes stay outside its allowance.
+
+Preparation is capped at eight million modeled work units; root and node LP work
+share at most 150 million units and the containing invocation's smaller allowance.
+The two-GiB modeled storage envelope includes source authority, sparse owners,
+scratch and capped factor construction. Each sparse factor attempt reserves entries
+before writing input, fill or factors, and stops at two million entries or eight
+million work units. Declines publish no factors or exact rank claim. Cancelled
+and failed attempts retain their work charges. Component estimates do not imply
+component-owned node solvers. Existing work, pivot, factor-fill, certificate and
+consumed-deduction statistics accompany the admission estimates. Sparse admission
+never changes the dense exact-continuation cell or column caps.
+
 ### Cuts
 
 The internal `composeBooleanBranches` traversal option augments partial-row

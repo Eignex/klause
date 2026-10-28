@@ -8,6 +8,14 @@ import kotlin.test.assertTrue
 
 class LpConfigTest {
     @Test
+    fun `sparse trials require an explicit per invocation option`() {
+        for (emphasis in LpEmphasis.entries) {
+            assertFalse(LpConfig(emphasis).resolved(LpTechnique.SPARSE_TRIAL))
+        }
+        assertTrue(LpConfig.parse("default,+sparse-trial").resolved(LpTechnique.SPARSE_TRIAL))
+    }
+
+    @Test
     fun `parse of a technique list should force only those on`() {
         val cfg = LpConfig.parse("cuts,cumulative-flow")
         assertTrue(cfg.resolved(LpTechnique.CUTS))

@@ -42,6 +42,7 @@ import com.eignex.klause.lp.rootDomainOf
 import com.eignex.klause.lp.statesBothBounds
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
+import com.eignex.klause.util.Cancellation
 
 internal data class LpAdmission(
     val estimatedRows: Long,
@@ -53,6 +54,7 @@ internal data class LpAdmission(
     val explicitBounding: Boolean,
     val plan: LpPlan,
     val elementIndexes: Set<Int>? = null,
+    val sparseTrial: SparseLpAdmission? = null,
 )
 
 /**
@@ -83,13 +85,15 @@ internal data class LpAdmission(
  *    structural fact that [CumulativeRelaxation] proves a makespan link, so this also lets the
  *    scheduling globals turn the LP bounding stack on; size-gated like the other relaxation flags.
  *
- * The LP-relaxation flags are additionally gated by a **size guard** bounding per-node solve cost. LP is declined once
+ * The LP-relaxation flags are additionally gated by a **size guard** bounding per-node solve cost. Ordinary LP is declined once
  * the estimated relaxation size (`rows × (cols + rows + 1)`) exceeds the ceiling [KlauseConfig.lpCeilingTableauCells].
  * The gated hulls (circuit / element / table / nvalue / regular / mdd / gcc-count / time-indexed) then compete for a
  * hull budget — the base cap [KlauseConfig.lpMaxTableauCells] when the base relaxation fits it, else the ceiling —
  * accepted smallest-first, so a stack of hulls is shed rather than allowed to defeat the guard. The Lagrangian and
  * energetic bounds have their own internal caps and are not size-gated here. An explicit caller flag bypasses the
  * guard: every flag is OR-ed onto `base`, so an explicit setting is never turned *off*.
+ * An explicit [LpTechnique.SPARSE_TRIAL] request can instead select a resource-bounded root plan after inspecting
+ * the emitted linear relaxation. This does not expand ordinary node admission or dense exact continuation.
  *
  * `LpEngine` resolves [LpParams.lpConfig] through this; the portfolio calls [resolve] directly to ask
  * whether an arm's emphasis enables any LP technique.
@@ -155,6 +159,7 @@ object LpAutoConfig {
         config: LpConfig,
         base: LpPlan,
         objective: LinearObjective? = null,
+        cancellation: Cancellation = Cancellation.Never,
         observe: ((LpAdmission) -> Unit)? = null,
     ): LpPlan {
         var visits = 0
@@ -351,7 +356,7 @@ object LpAutoConfig {
         val cuts = lpActive && config.resolved(LpTechnique.CUTS)
         val structuralCuts = cuts && (cutEligible || pseudoBoolean)
         val energetic = cumulative && config.resolved(LpTechnique.ENERGETIC)
-        val plan = base.copy(
+        var plan = base.copy(
             bounding = base.bounding || lpActive,
             cuts = base.cuts || cuts,
             // LP learning rides on the bounding path: the objective-bound reason is built from the
@@ -392,9 +397,18 @@ object LpAutoConfig {
                 base.energeticEvery
             },
         )
+        val sparse = if (config.resolved(LpTechnique.SPARSE_TRIAL) && !base.bounding &&
+            structApplicable && config.resolved(LpTechnique.BOUNDING)
+        ) {
+            prepareSparseLpAdmission(problem, objective, cancellation)
+        } else null
+        if (sparse?.admitted == true) {
+            plan = LpPlan(bounding = true, sparseTrial = true, boundMaxDepth = 0, learn = true,
+                probe = false, rootCutHarvest = false, rootMaxWork = SPARSE_LP_MAX_WORK)
+        }
         observe?.invoke(LpAdmission(rows, baseCols, cells, structApplicable,
             config.resolved(LpTechnique.BOUNDING), coneRequested || cells <= ceilingCap, base.bounding, plan,
-            if (base.element) null else selection.elementIndexes.toSet()))
+            if (base.element) null else selection.elementIndexes.toSet(), sparse))
         return plan
     }
 
