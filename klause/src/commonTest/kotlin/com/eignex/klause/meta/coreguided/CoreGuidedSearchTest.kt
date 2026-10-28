@@ -13,7 +13,6 @@ import com.eignex.klause.formats.dimacs.toProblem
 import com.eignex.klause.formats.opb.Opb
 import com.eignex.klause.formats.opb.toProblem
 import com.eignex.klause.ir.Factor
-import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
@@ -44,7 +43,6 @@ import com.eignex.klause.solver.search.PreparingSearchComponent
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
-import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -726,7 +724,7 @@ class CoreGuidedSearchTest {
     }
 
     @Test
-    fun `integer costs should be admitted only over exact columns and stay out of curated eligibility`() {
+    fun `integer costs should be admitted only on exact models and stay out of curated eligibility`() {
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
         val approximate = pairCover().withSourceSemantics(
             SourceSemantics(
@@ -734,13 +732,10 @@ class CoreGuidedSearchTest {
                 feasibilityTolerance = SourceTolerance(absolute = SemanticRational.ofLong(1)),
             ).resolve(),
         )
-        val open = Bits(1).also { it.set(0) }
-        val unbounded = Problem(0, IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(9), null, open), emptyArray())
 
         assertTrue(CoreGuidedSearch.admits(pairCover().bake(), objective))
         assertFalse(CoreGuidedSearch.eligible(pairCover().bake(), objective))
         assertFalse(CoreGuidedSearch.admits(approximate.bake(), objective))
-        assertFalse(CoreGuidedSearch.admits(unbounded.bake(), LinearObjective(intCoefficients = longArrayOf(1))))
     }
 
     @Test
