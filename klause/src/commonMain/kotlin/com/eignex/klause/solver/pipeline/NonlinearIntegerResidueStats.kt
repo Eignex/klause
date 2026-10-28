@@ -12,6 +12,8 @@ data class NonlinearIntegerResidueStats(
     val refutedScopes: Long,
     /** Checks declined for unsupported source support or private work, storage and representation ceilings. */
     val declinedChecks: Long,
+    /** Globally impossible equality atoms replaced by false in NIA-owned completion formulas. */
+    val excludedAtoms: Long = 0,
 )
 
 internal fun integerResidueStats(
@@ -23,5 +25,6 @@ internal fun integerResidueStats(
         workers.sumOf { it.residueCounts.rings }, workers.sumOf { it.residueCounts.tuples },
         workers.sumOf { it.residueCounts.work }, workers.sumOf { it.residueCounts.refuted },
         workers.sumOf { it.residueCounts.declined },
+        workers.sumOf { it.residueCounts.excluded },
     )
 }

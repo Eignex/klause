@@ -67,6 +67,7 @@ sealed interface PolynomialRealFormula {
     /** Disjunction; an empty disjunction is false. */
     class Or(operands: List<PolynomialRealFormula>) : PolynomialRealFormula {
         private val values = operands.toTypedArray()
+        internal val operandCount: Int get() = values.size
         /** Captured operands in syntax order. */
         val operands: List<PolynomialRealFormula> get() = values.toList()
         override fun equals(other: Any?): Boolean = other is Or && polynomialFormulasEqual(this, other)

@@ -63,9 +63,18 @@ equality image refutes the source. Overlapping images supply no fact and retain
 shared-tuple enumeration for cross-atom correlations. Exhausting a ring without a
 shared support also refutes the source. Surviving support supplies no integer
 witness or proof.
-Guarded, negated and order predicates supply no residue premises; an equality
-with real or auxiliary support declines the check. Unary-only systems remain
-with root admission.
+An equality with real or auxiliary support declines the check. Unary-only systems
+remain with root admission.
+
+NIA-owned Boolean reduction also checks each equality atom independently over all
+original integer coordinates, ignoring Boolean guards and numeric windows. A
+completed impossible atom becomes false under conjunction, disjunction and
+negation. Supported atoms remain unchanged; modular support never proves equality,
+and disequalities and order predicates are not modularized. Only complete Boolean
+coverage by impossible alternatives establishes source refutation. The reduced
+formula is private to integer completion and never enters the pure-real route or
+real-valid source-cell producer. Conditions still apply to every completion, and
+every witness passes the original source evaluator.
 
 Each candidate fixes every original integer coordinate and asks the
 [conditioned polynomial service](#conditioned-theory-service)
@@ -141,7 +150,9 @@ They use a private 65,536-step ceiling, at most 16,384 modeled storage cells, an
 4,096-bit coefficients and cleared denominators; configured polynomial coefficient
 and matrix ceilings further limit storage. Formula admission, DAG preparation,
 denominator work, image storage and set operations, and shared tuple evaluation
-all charge the containing meter.
+all charge the containing meter. Atom checks, repeated-node caching, proof storage
+and Boolean reconstruction share that same private allowance. An unfinished
+reduction discards its replacements; completed replacements remain cursor-local.
 Private ceilings decline without proof; containing cancellation or exhaustion stops
 the cursor. Completed checks remain inside that cursor and use no numeric window
 or Boolean pin as a residue premise, so no conditional refutation can escape to a

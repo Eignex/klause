@@ -187,7 +187,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** Admit complete integer root sets of mandatory unary polynomial equalities. */
         val niaIntegerRoots: ExecutionOption<Boolean> = ExecutionOption("nia-integer-roots", ValueKind.BOOLEAN)
 
-        /** Refute mandatory integer equality subsystems by bounded residue enumeration. */
+        /** Refute integer equality subsystems and exclude impossible atoms by bounded residue checks. */
         val niaResidues: ExecutionOption<Boolean> = ExecutionOption("nia-residues", ValueKind.BOOLEAN)
 
         /** Native heuristic proposal cap. */
