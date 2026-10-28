@@ -31,7 +31,9 @@ internal object EqualityKernelMove {
         if (stop() || rows.any { row ->
                 row.indices.fold(zero) { sum, i -> sum + row[i] * direction[i] } != zero
             }
-        ) return emptyList()
+        ) {
+            return emptyList()
+        }
         val result = ArrayList<Step>(4)
         for (sign in listOf(one, -one)) {
             val g = direction.map { it * sign }
@@ -115,7 +117,9 @@ internal object EqualityKernelMove {
             val source = view.reconstruct(working)
             if (!verify(source, stop) || stop()) return null
             return Applied(
-                source, score(source), move.parts.map { (it as Move.IntSet).varId }.toIntArray(),
+                source,
+                score(source),
+                move.parts.map { (it as Move.IntSet).varId }.toIntArray(),
                 (0 until center.numIntVars).count { center.intValue(it) != source.intValue(it) },
             )
         } finally {

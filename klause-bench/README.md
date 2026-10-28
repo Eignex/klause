@@ -6557,6 +6557,12 @@ takes 19 ms/1.13 MB, including checks and restoration.
 matched owners also reach; CP spends four decision equivalents. Its cold kernel
 capture costs 7,511 work, 8 ms and 0.82 MB.
 
+[9076](https://lab.eignex.com/jobs/9076), at `1d11dfb3bf`, confirms the typed
+admission path on the same sparsified source: both reconstructed points pass
+native checks, and the whole endpoint transition is applied with three source
+changes. The cold capture spends 7,511 work, 10 ms and 0.98 MB; extraction and
+reporting remain outside the focused admission unit tests.
+
 Retain the diagnostic and reject a production kernel source on these scopes:
 existing owners cover the admitted points within their allowances, sparsification
 exposes the weighted transition, and ring extraction exhausts its cap. No larger
