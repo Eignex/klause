@@ -142,6 +142,51 @@ class ClauseDbTest {
     }
 
     @Test
+    fun `a PB assertion should wake after its deduction is retracted`() {
+        val session = PropagationSession(Problem(2, 0, emptyArray(), emptyArray()))
+        session.pinBool(1, true)
+        session.addLearnedPb(longArrayOf(1), intArrayOf(0), 1, 1)
+        session.popToLevel(0)
+
+        session.pinBool(1, false)
+
+        assertEquals(true, session.boolValue(0))
+        assertEquals(1L, session.learnedLifecycle()["learningPbConsumed"])
+    }
+
+    @Test
+    fun `an integer assertion should wake after its deduction is retracted`() {
+        val session = PropagationSession(Problem(1, 1, arrayOf(IntDomain(0, 10)),
+            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10))))
+        session.pinBool(0, true)
+        val row = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
+            longArrayOf(1), intArrayOf(0), LinearOp.LE, 8), useLo = true))
+        session.addLearnedIntegerRow(row, 1)
+        session.popToLevel(0)
+
+        session.pinBool(0, false)
+
+        assertEquals(IntDomain(0, 8), session.intDomain(0))
+        assertEquals(1L, session.learnedLifecycle()["learningIntegerConsumed"])
+    }
+
+    @Test
+    fun `an imported implication should retain its assumption premise on each native lane`() {
+        for (nativeSat in listOf(false, true)) {
+            val session = PropagationSession(Problem(3, 0, emptyArray(), emptyArray()), nativeSat = nativeSat)
+            session.seed(Assumptions.None.withBool(0, true))
+            session.importClause(SharedClause(intArrayOf(1, 2), longArrayOf(), 2), origin = 3)
+            session.pinBool(2, true)
+            assertEquals(true, session.boolValue(1))
+
+            session.seed(Assumptions.None.withBool(0, false))
+
+            assertEquals(null, session.boolValue(1))
+            assertEquals(0, session.exportGlueClauses(10, 10).size)
+        }
+    }
+
+    @Test
     fun `scoped permanent clauses should stay out of global exports when requested`() {
         for (nativeSat in listOf(false, true)) {
             val session = PropagationSession(Problem(2, 0, emptyArray(), emptyArray()), nativeSat = nativeSat)

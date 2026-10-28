@@ -884,8 +884,9 @@ class SearchSession(
     override fun levelOf(literal: Int): Int = trail.levelOf(literal)
 
     override fun implied(clause: Int, literal: Int): ComponentResult {
-        learning.consumed(clause)
-        return imply(literal, learning.explanationOf(clause))
+        val result = imply(literal, learning.explanationOf(clause))
+        if (result !is ComponentResult.Indeterminate) learning.consumed(clause)
+        return result
     }
 
     override fun conflicted(clause: Int): ComponentResult {

@@ -93,6 +93,8 @@ class PbConflictResolventTest {
 
             assertTrue(native.explanationState.learned.store.any { it is PseudoBooleanPropagator }, "mode=$mode")
             assertTrue(consumed, "mode=$mode")
+            assertTrue(native.learnedLifecycle().getValue("learningPbAdmitted") > 0L, "mode=$mode")
+            assertTrue(native.learnedLifecycle().getValue("learningPbConsumed") > 0L, "mode=$mode")
             if (mode == 3) {
                 assertTrue(restarted)
                 shared.popTo(0)

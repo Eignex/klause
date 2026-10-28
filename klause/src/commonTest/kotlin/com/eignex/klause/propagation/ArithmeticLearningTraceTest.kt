@@ -142,6 +142,8 @@ class ArithmeticLearningTraceTest {
             assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.IntAtMost(2, 11)))
 
             assertEquals(2L, native.intDomain(0).max)
+            assertTrue(native.learnedLifecycle().getValue("learningIntegerAdmitted") > 0L)
+            assertTrue(native.learnedLifecycle().getValue("learningIntegerConsumed") > 0L)
             work.add(native.explanationState.work)
             if (capture) {
                 assertTrue(trace.events.any { it.kind == "analysis.seed-endpoint" })
