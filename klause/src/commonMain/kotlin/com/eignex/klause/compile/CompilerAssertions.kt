@@ -41,6 +41,7 @@ import com.eignex.klause.model.IntRef
 import com.eignex.klause.model.InverseChannel
 import com.eignex.klause.model.LexExpr
 import com.eignex.klause.model.MddExpr
+import com.eignex.klause.model.NValueExpr
 import com.eignex.klause.model.NValueExprOpt
 import com.eignex.klause.model.NValueMode
 import com.eignex.klause.model.NominalEq
@@ -158,6 +159,8 @@ internal fun Lowering.assertExpr(expr: BoolExpr) {
         is DisjunctiveExprOpt -> assertDisjunctiveOpt(expr)
 
         is NValueExprOpt -> assertNValueOpt(expr)
+
+        is NValueExpr -> assertNValue(expr)
 
         is GccExprOpt -> assertGccOpt(expr)
 

@@ -1,5 +1,6 @@
 package com.eignex.klause.schema
 
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.compile.compile
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
@@ -26,6 +27,7 @@ import com.eignex.klause.model.IntSpec
 import com.eignex.klause.model.NamedConstraint
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.model.SchemaEntry
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.bigIntOf
@@ -79,7 +81,7 @@ class NativeFactorsTest {
             valuePrecede(1, 2, listOf(x, y, z)) to ValuePrecede::class,
             allDifferentTuples(listOf(listOf(x, y), listOf(z, w))) to AllDifferentTuples::class,
             allDifferentExcept(listOf(x, y, z), setOf(0L)) to AllDifferent::class,
-            nValue(2, listOf(x, y, z), NValue.Mode.AtMost, setOf(0L)) to NValue::class,
+            nValue(w, listOf(x, y, z), NValue.Mode.AtMost, setOf(0L)) to NValue::class,
             distinct(
                 listOf(
                     AffineOperand(ints = listOf(x to ratio(1, 2)), constant = ratio(1, 3)),
@@ -108,6 +110,49 @@ class NativeFactorsTest {
         val factor = compiledFactors(valuePrecede(1, 2, listOf(ints[4], ints[2]))).single() as ValuePrecede
 
         assertEquals(listOf(4, 2), factor.xs.toList())
+    }
+
+    @Test
+    fun `a constant distinct count should restrict the number of distinct values`() {
+        class S : VariableSchema() {
+            val x by intVar(1, 3)
+            val y by intVar(1, 3)
+            val z by intVar(1, 3)
+            val count by constraint { nValue(2, listOf(x, y, z)) }
+        }
+        val definition = S().definition()
+        val parsed = JsonSchema.parse(SchemaJson.encodeToString(serializer, definition))
+        val compiled = parsed.compile()
+        val ids = listOf("x", "y", "z").map { compiled.intVarIdByName.getValue(it) }
+
+        val samples = BacktrackSolver(compiled.problem.bake()).enumerate().toList()
+
+        assertEquals(definition, parsed)
+        assertEquals(18, samples.size)
+        samples.forEach { sample -> assertEquals(2, ids.map { sample.intValue(it) }.distinct().size) }
+    }
+
+    @Test
+    fun `a variable distinct count should exclude the requested values`() {
+        class S : VariableSchema() {
+            val n by intVar(0, 2)
+            val x by intVar(0, 2)
+            val y by intVar(0, 2)
+            val count by constraint { nValue(n, listOf(x, y), except = setOf(0L)) }
+        }
+        val definition = S().definition()
+        val parsed = JsonSchema.parse(SchemaJson.encodeToString(serializer, definition))
+        val compiled = parsed.compile()
+        val n = compiled.intVarIdByName.getValue("n")
+        val ids = listOf("x", "y").map { compiled.intVarIdByName.getValue(it) }
+
+        val samples = BacktrackSolver(compiled.problem.bake()).enumerate().toList()
+
+        assertEquals(definition, parsed)
+        assertEquals(9, samples.size)
+        samples.forEach { sample ->
+            assertEquals(ids.map { sample.intValue(it) }.filter { it != 0L }.distinct().size.toLong(), sample.intValue(n))
+        }
     }
 
     @Test

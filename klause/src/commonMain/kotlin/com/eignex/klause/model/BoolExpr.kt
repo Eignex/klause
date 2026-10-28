@@ -734,6 +734,24 @@ data class NValueExprOpt(
     }
 }
 
+/** Asserted distinct-value count with an expression target and optional excluded values. */
+@Serializable
+@SerialName("nvalue")
+data class NValueExpr(
+    /** The number-of-distinct-values target. */
+    val n: IntExpr,
+    /** The variables whose distinct values are counted. */
+    val xs: List<IntExpr>,
+    /** How [n] relates to the distinct count. */
+    val mode: NValueMode = NValueMode.EQ,
+    /** Values omitted from the count. */
+    val except: List<Long> = emptyList(),
+) : BoolExpr {
+    init {
+        require(xs.isNotEmpty()) { "NValueExpr: xs must be non-empty" }
+    }
+}
+
 /** How an `nvalue` constraint's target relates to the actual distinct-value count. */
 @Serializable
 enum class NValueMode {

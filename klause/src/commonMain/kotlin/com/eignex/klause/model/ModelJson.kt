@@ -208,6 +208,7 @@ object BoolExprSerializer : CompactSerializer<BoolExpr>(
             jsonNode<CumulativeExprOpt>("cumulativeOpt"),
             jsonNode<DisjunctiveExprOpt>("disjunctiveOpt"),
             jsonNode<NValueExprOpt>("nValueOpt"),
+            jsonNode<NValueExpr>("nValue"),
             jsonNode<GccExprOpt>("gccOpt"),
             jsonNode<LexExpr>("lexLess"),
             jsonNode<VariableCumulativeExpr>("cumulativeVars"),

@@ -126,6 +126,8 @@ fun BoolExpr.mapReferences(rename: (String) -> String): BoolExpr = when (this) {
     is DisjunctiveExprOpt ->
         copy(starts = starts.mapIntReferences(rename), presents = presents.mapBoolReferences(rename))
 
+    is NValueExpr -> copy(n = n.mapReferences(rename), xs = xs.mapIntReferences(rename))
+
     is NValueExprOpt -> copy(
         n = n.mapReferences(rename),
         xs = xs.mapIntReferences(rename),
