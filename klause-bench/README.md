@@ -7295,18 +7295,6 @@ frontier under its own directory. The lab places this job normally; allow 600
 seconds for the six ordered captures. Their inspection allowances are separate
 from solving, and their ordered JFR timings establish no throughput comparison.
 
-`bench.profile.RealBooleanCutProfile` qualifies bounded common real consequences
-on two self-authored coupled-row sources. It records ordinary default source
-preparation separately, then compares partial rows, composed consequences,
-separate bounded reification hull closures and exhaustive Boolean coverage.
-One warmup and three measured rounds alternate arm order. Each arm has 20M modeled
-work and 64 MiB modeled allocation, divided between exhaustive alternatives.
-Lifecycle measurements include consequence construction, source checking, numerical
-consultation and disposal; JFR/thread allocation observations remain distinct from
-modeled costs. Native exact-source derivations are retained with their scope and
-nonnegative branch weights; they are not independent proof checks. Optional
-`preparationOnly=true` runs only the ordinary preparation audit.
-
 The capture retains the original bytes, native affine system and build/runtime
 identity. `incumbents.jsonl` flushes accepted incumbent values and branch conditions.
 `bounds.jsonl` flushes changed global bounds after cooperative slices, recording
@@ -8092,6 +8080,53 @@ support unchanged complete-check accounting, with no partial-policy benefit or
 throughput claim. Useful captured conflicts qualify the bounded internal consumer;
 inactive-state cost and original-source applicability keep automatic activation
 disabled.
+
+##### Composed real alternatives
+
+`bench.profile.RealBooleanCutProfile` qualifies bounded common real consequences
+on two self-authored coupled-row sources. It records ordinary default source
+preparation separately, then compares partial rows, composed consequences,
+separate bounded reification hull closures and exhaustive Boolean coverage.
+One warmup and three measured rounds alternate arm order. Each arm has 20M modeled
+work and 64 MiB modeled allocation, divided between exhaustive alternatives.
+Lifecycle measurements include consequence construction, source checking, numerical
+consultation and disposal; JFR/thread allocation observations remain distinct from
+modeled costs. Native exact-source derivations are retained with their scope and
+nonnegative branch weights; they are not independent proof checks. Optional
+`preparationOnly=true` runs only the ordinary preparation audit.
+
+[9049](https://lab.eignex.com/jobs/9049) qualifies `21bc31f031` on Linux/amd64,
+JDK 25.0.4.1 and Kotlin 2.4.21, under one enforced CPU and a 4,608 MiB cgroup.
+The retained source hashes, installed distributions, dependency/runtime hashes and
+resource receipts bind all 32 arm runs. Neither default preparation fires a
+reduction or refutes the model: one Boolean, two reals and all four/five factors
+survive. Both bounded scans complete; installed source rounding emits no cuts.
+The feasible source retains checked `x-y <= 1/4` and `y-x <= 1/4`, including
+their strict/non-strict branch combinations, and a checked lower bound of `-1/4`
+on `y-x`. The separate hull's proposed `(2/5,-2/5,1/2)` point checks natively.
+
+Adding `x-y >= 1/2` gives a checked composed refutation before the Boolean is
+pinned. Partial rows and separate hulls do not refute it. Ordinary exhaustive
+coverage supplies the same checked refutation through two alternatives. All
+measured repeats preserve these results without a stop; counts alone supply no
+cost advantage.
+
+| Coupled-refutation arm | Consultations | Modeled work | Modeled allocation bytes |
+| --- | ---: | ---: | ---: |
+| Partial rows | 1 | 3,044 | 12,756 |
+| Separate hulls | 1 | 4,383 | 18,466 |
+| Exhaustive Boolean coverage | 2 | 7,496 | 31,001 |
+| Composed rows | 1 | 8,750 | 339,624 |
+
+Measured composed thread allocation is 1,007,648–1,244,824 bytes, versus
+498,208–499,360 for exhaustive coverage. Its instrumented lifecycle ranges from
+3.28 to 68.06 ms, versus 2.95–3.14 ms; these short ordered JFR intervals establish
+no throughput claim. On the feasible source, composition preserves no-conflict
+behavior while work grows from 2,804 to 10,456 and modeled allocation from
+11,204 to 287,788 bytes. This accepts bounded checked composition and rejects
+default promotion on these controls. It establishes no corpus gain or independent
+proof validation. Source compilation failures in 9029 and 9041 preceded the
+successful qualification and produced no numerical results.
 
 ### Boolean conflict locality
 

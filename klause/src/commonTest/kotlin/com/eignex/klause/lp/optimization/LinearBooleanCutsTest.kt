@@ -89,11 +89,13 @@ class LinearBooleanCutsTest {
         val source = assertNotNull(model(true).sourceProofContext(scope, objective))
         val proofs = listOf(false, true).map { value ->
             LinearActiveRows(source, SourceLpBudget()).use {
-                assertNotNull(it.check(SourceCondition(bools = mapOf(0 to value)), Cancellation.Never).evidence).derivation
+                val result = it.check(SourceCondition(bools = mapOf(0 to value)), Cancellation.Never)
+                assertNotNull(result.evidence).derivation
             }
         }
 
-        val evidence = SourceEvidence(scope, SourceClaim.Refutation, SourceDerivation.BooleanSplit(0, proofs[0], proofs[1]))
+        val evidence = SourceEvidence(scope, SourceClaim.Refutation,
+            SourceDerivation.BooleanSplit(0, proofs[0], proofs[1]))
 
         assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority()).verify(evidence))
     }

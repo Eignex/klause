@@ -35,6 +35,7 @@ internal object LinearBooleanCutPreparation {
     private data class Row(val id: String, val premise: SourcePremise)
     private data class Derived(val row: SourceInequality, val proof: SourceDerivation)
     private class Stop(val reason: String) : RuntimeException()
+    private fun stop(reason: String): Nothing = throw Stop(reason)
 
     fun prepare(
         source: SourceProofContext, cancellation: Cancellation,
@@ -45,18 +46,18 @@ internal object LinearBooleanCutPreparation {
         var allocation = 0L
         val retained = ArrayList<SourceEvidence>()
         fun reserve(steps: Long, bytes: Long = 0L) {
-            if (cancellation()) throw Stop("stopped")
-            if (steps > limits.work - work) throw Stop("work")
-            if (bytes > limits.allocation - allocation) throw Stop("allocation")
+            if (cancellation()) stop("stopped")
+            if (steps > limits.work - work) stop("work")
+            if (bytes > limits.allocation - allocation) stop("allocation")
             work += steps
             allocation += bytes
             onCost(steps, bytes)
-            if (cancellation()) throw Stop("stopped")
+            if (cancellation()) stop("stopped")
         }
         fun number(value: BigFraction): BigFraction {
             reserve(1L, 64L + (limits.scalarBits + 7L) / 4L)
             if (value.num.magnitudeBitLength() > limits.scalarBits ||
-                value.den.magnitudeBitLength() > limits.scalarBits) throw Stop("width")
+                value.den.magnitudeBitLength() > limits.scalarBits) stop("width")
             return value
         }
         fun derive(terms: List<Pair<Row, BigFraction>>): Derived {
@@ -74,7 +75,7 @@ internal object LinearBooleanCutPreparation {
                 strict = strict || row.strict
             }
             val nonzero = coefficients.filterValues { !it.isZero }
-            if (nonzero.size > limits.support) throw Stop("support")
+            if (nonzero.size > limits.support) stop("support")
             val first = nonzero.entries.minWithOrNull(compareBy({ it.key.kind.ordinal }, { it.key.id }))?.value
             val scale = if (first == null) BigFraction.ONE else
                 number((if (first < BigFraction.ZERO) first.negated() else first).reciprocal())
@@ -105,15 +106,16 @@ internal object LinearBooleanCutPreparation {
                 if (row.coefficients.keys.any { it.kind != SourceCoordinate.Kind.Real || it !in coordinates }) {
                     continue
                 }
-                if (rows.size >= limits.rows) throw Stop("rows")
+                if (rows.size >= limits.rows) stop("rows")
                 for (bool in premise.guards.keys) {
-                    if (SourceCoordinate(SourceCoordinate.Kind.Boolean, bool) !in coordinates) throw Stop("typing")
+                    if (SourceCoordinate(SourceCoordinate.Kind.Boolean, bool) !in coordinates) stop("typing")
                     if (bool !in pinned) booleans += bool
-                    if (booleans.size > limits.booleans) throw Stop("booleans")
+                    if (booleans.size > limits.booleans) stop("booleans")
                 }
                 rows += Row(id, premise)
             }
-            val unconditional = rows.filter { it.premise.guards.isEmpty() }.map { derive(listOf(it to BigFraction.ONE)) }
+            val unconditional = rows.filter { it.premise.guards.isEmpty() }
+                .map { derive(listOf(it to BigFraction.ONE)) }
             fun branch(bool: Int, value: Boolean): Map<Map<SourceCoordinate, BigFraction>, Derived> {
                 val available = rows.filter { it.premise.guards.isEmpty() || it.premise.guards == mapOf(bool to value) }
                 val derived = linkedMapOf<Map<SourceCoordinate, BigFraction>, Derived>()
@@ -123,7 +125,7 @@ internal object LinearBooleanCutPreparation {
                     val key = candidate.row.coefficients
                     val previous = derived[key]
                     if (previous != null && stronger(previous.row, candidate.row)) return
-                    if (previous == null && derived.size >= limits.branchRows) throw Stop("branch rows")
+                    if (previous == null && derived.size >= limits.branchRows) stop("branch rows")
                     reserve(1L, 128L + key.size * 48L)
                     derived[key] = candidate
                 }
@@ -150,7 +152,7 @@ internal object LinearBooleanCutPreparation {
                     val common = SourceInequality(key, rhs, strict)
                     if (unconditional.any { it.row.coefficients == key && stronger(it.row, common) } ||
                         retained.any { (it.claim as SourceClaim.Consequence).inequality == common }) continue
-                    if (retained.size >= limits.candidates) throw Stop("candidates")
+                    if (retained.size >= limits.candidates) stop("candidates")
                     reserve(1L + key.size, 256L + key.size * 64L)
                     retained += SourceEvidence(source.scope, SourceClaim.Consequence(common),
                         SourceDerivation.BooleanSplit(bool, left.proof, right.proof))

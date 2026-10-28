@@ -97,8 +97,9 @@ internal object RealBooleanCutProfile {
                             field(replay, "query")?.let { field(it, "refutation") as SourceEvidence? }
                         }
                         val evidence = if (arm != "exhaustive") proofs.single() else
-                            if (proofs.any { it == null }) null else SourceEvidence(source.scope, SourceClaim.Refutation,
-                                SourceDerivation.BooleanSplit(0, proofs[0]!!.derivation, proofs[1]!!.derivation))
+                            if (proofs.any { it == null }) null else SourceEvidence(source.scope,
+                                SourceClaim.Refutation, SourceDerivation.BooleanSplit(0,
+                                    checkNotNull(proofs[0]).derivation, checkNotNull(proofs[1]).derivation))
                         val verdict = evidence?.let { SourceEvidenceVerifier(context.withLinearAuthority()).verify(it) }
                         check(evidence == null || verdict == SourceEvidenceCheck.Checked)
                         val record = buildJsonObject {
@@ -182,7 +183,8 @@ internal object RealBooleanCutProfile {
         val capture = captureType.declaredConstructors.single { it.parameterCount == 4 }
             .newInstance(1, 1_000_000L, 16_777_216L, stop)
         val result = Class.forName(PREFIX + "LinearAuthorityResult").getDeclaredConstructor().newInstance()
-        captureType.declaredMethods.single { it.name == "record" }.invoke(capture, source, null, null, null, result, null)
+        captureType.declaredMethods.single { it.name == "record" }
+            .invoke(capture, source, null, null, null, result, null)
         val query = (field(capture, "retained") as List<*>).single()
         val type = Class.forName(PREFIX + "LinearAuthorityReplay")
         return type.declaredMethods.single { it.name == "activeRows" }
