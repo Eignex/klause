@@ -31,6 +31,7 @@ import java.io.File
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -110,7 +111,7 @@ internal object EqualityMoveReplay {
                             val constants = row.constants as? IntegralConstants
                             put("coefficients", constants?.let { exact -> JsonArray((0 until row.size).map {
                                 JsonPrimitive(exact.exactCoeff(it).toString())
-                            }) })
+                            }) } ?: JsonNull)
                             put("bound", constants?.exactBound?.toString())
                         })
                     })
