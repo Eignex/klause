@@ -11,6 +11,7 @@ import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCoordinate
+import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceInequality
@@ -24,6 +25,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchNodeDisposition
+import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -168,5 +170,23 @@ class LinearAggregateBranchesTest {
         assertEquals(SourceEvidenceCheck.Checked,
             SourceEvidenceVerifier(context.withLinearAuthority()).verify(terminal))
         assertEquals(1L, result.stats.smt.completeSearchStages?.get("numericalAggregateSplits"))
+    }
+
+    @Test
+    fun `Boolean composition should retain coordinate coverage when aggregate branching is requested`() {
+        val budget = SourceLpBudget(maxOperations = 64)
+        LinearAuthorityTraversal(source, budget, Cancellation.Never, { false }, {}, { null },
+            composeBooleanBranches = true, aggregateBranching = true).use { component ->
+            val session = SearchComponentSet(listOf(component)).session()
+
+            val result = session.openRun(0, nodePolicy = component).next()
+
+            assertEquals(SearchRunEvent.Exhausted, result)
+            val terminal = assertNotNull(component.completed())
+            assertIs<SourceDerivation.IntegerSplit>(terminal.derivation)
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
+            session.popTo(0)
+        }
     }
 }
