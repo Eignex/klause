@@ -115,6 +115,7 @@ internal object WeightedSearchProfile {
                 objectiveLowerBoundSink = { observe("bound") })
             var result: MinimizeResult? = null
             var checked = 0
+            var slices = 0L
             if (model != null && !stop()) {
                 val live = constructor.newInstance(model, prepared.objective, params, policy == "stratified",
                     maximumWork, timeout, TimeSource.Monotonic, CoreQueryProfile.refinementMode(when (policy) {
@@ -125,6 +126,7 @@ internal object WeightedSearchProfile {
                 handle = live
                 live.use {
                     while (result == null && !stop()) {
+                        slices++
                         result = live.runSlice(observing, timeout, sliceWork) { accepted ->
                             val point = prepared.reconstruct(accepted.sample)
                             check(CoreQueryProfile.checkPoint(original, point, stop))
@@ -135,6 +137,7 @@ internal object WeightedSearchProfile {
                     }
                     observe("terminal", true)
                 }
+                observe("closed", true)
             }
             Reports.writeJson(out.resolve("summary.json").path, buildJsonObject {
                 put("suite", suite)
@@ -152,6 +155,9 @@ internal object WeightedSearchProfile {
                 put("preparedIntegers", model?.numIntVars)
                 put("result", result?.javaClass?.simpleName)
                 put("acceptedIncumbents", checked)
+                put("slices", slices)
+                put("finalWork", handle?.work)
+                handle?.let { live -> for ((name, field) in fields) put(name, field.getLong(live)) }
                 put("elapsedNsIncludingClose", System.nanoTime() - opened)
                 put("sourceCheck", "native-Boolean-point-propagation")
                 put("independentProofCheck", false)

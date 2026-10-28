@@ -504,8 +504,9 @@ materialized. Weights and the bound use arbitrary-precision integers.
 Objective terms, residual-core updates, maximum-weight scans, core projection and
 query-pin selection retain private cursors across slices. A completed pin set stays
 with its query model across interrupted openings; resuming does not repeat its
-threshold scan. Preparation visits and source-verification propagation spend the
-same cumulative worker allowance as query traversal. Augmented queries retain the
+threshold scan. Preparation visits, point-check construction, verification
+propagation and private retirement spend the same cumulative worker allowance as
+query traversal. Augmented queries retain the
 source's established root domains, deductions and captured projections; their
 additional constraints propagate in the query session.
 General query sessions retain projection construction, root propagation and
@@ -513,6 +514,9 @@ assumption seeding across slices. Native clausal opening stays atomic; an
 interrupted opening retains its charges, model and selected pins and retries with
 the retained general preparer. This prevents repeated native construction from
 using every subsequent slice without reaching traversal.
+An interrupted point check keeps its candidate for the next slice; each attempt
+retains its construction and propagation charges. Closing discards query pins,
+auxiliary buffers and preparation cursors while keeping completed observations.
 
 Internal core refinement is default-disabled. Seed-proof projection uses the
 [historical reasons](09-learning.md#explanation-lifetime) of the existing query,
