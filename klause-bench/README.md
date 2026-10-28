@@ -3729,6 +3729,64 @@ variation and missing holdout centers leave throughput and default admission
 unqualified. They do not overturn the uniform value/inverse rejection.
 
 
+### Coupled cost Table frontier qualification
+
+Retain the source fixture and preparation capture, without a production relaxed
+frontier bound or refinement policy. The bounded retained-source screen supplies
+no admitted binary pair-cost graph beyond the synthetic K4 discriminator.
+This is a rejection for that screen, not a claim of corpus-wide absence.
+
+[9083](https://lab.eignex.com/jobs/9083), at `2b2f374b56`, confirms that K4's six
+four-row ground Tables survive default preparation. Ten exact Boolean channels
+carry the objective coefficients; the captured integer source view retains the
+original weights and private costs. Its default preparation spends 107,362 phase
+work units. The static separate-hull 7.5, relaxed-diagram 70 and source-split
+138/136 values remain algebra, without executed relaxed compilation or consumption.
+Underestimated path costs supply no original cost equality or enforceable
+merged-state predicate.
+
+[9086](https://lab.eignex.com/jobs/9086) runs seven existing-consumer controls at
+that revision: Linux/amd64, Java 25.0.4.1, P1, seed 3, three seconds, a 3 GiB heap
+and Serial GC. The source hash, installed build, runtime options and independent
+checker identity match across arms. All five reported witnesses pass the original
+XCSP3 SolutionChecker; native optimality is not independently proof-checked.
+
+| Existing consumer | Native result | Nodes / failures |
+| --- | --- | --- |
+| Default CP | Optimum 136 | 62 / 28 |
+| Default mixed | Optimum 136 | 54 / 27 |
+| CP, presolve and LP off | Optimum 136 | 66 / 31 |
+| CP, default plus extensional composition | Optimum 136 | 69 / 34 |
+| CP, aggressive LP with root cuts and variable shaving | Optimum 136 | 61 / 28 |
+| Forced core search | No witness, bound 98, unresolved | 609 / 7583 |
+| Forced core search, presolve off | No witness, bound 123, unresolved | 752 / 9020 |
+
+Default and aggressive CP report root bound 8 and zero cuts. The five completed
+CLI proofs take 1.30–2.22 seconds and 104,076–116,708 KiB peak RSS; the unresolved
+core controls take 3.40–3.58 seconds and 120,824–125,736 KiB. These are single-run
+external-time observations, not repeat-based throughput or candidate speedup claims.
+
+All five retained-source off/default captures finish without cancellation.
+[AircraftLanding-table-airland01](https://lab.eignex.com/jobs/9084) has ten ternary
+Tables with one wide time coordinate and two private costs, rather than two binary
+labels. [Spot5-0054](https://lab.eignex.com/jobs/9085) retains 23 ternary feasibility
+Tables with no private weighted output, including in the pre-channel view.
+[LowAutocorrelation-010](https://lab.eignex.com/jobs/9088) retains Product/Linear
+factors and [BlockModeling-karate-02](https://lab.eignex.com/jobs/9089) retains
+clauses/reified rows; neither retains a Table.
+
+[9094](https://lab.eignex.com/jobs/9094), at `f8c4ece647`, captures the actual
+2025 `proteindesign12/2TRX.11p.8aa.usingEref_self_x` pair-cost source with pinned
+model/data, MiniZinc 2.10.1 compiler/library hashes, FlatZinc and output mapping.
+Its 55 ternary pair-cost and 11 unary Tables survive; every label retains more
+than two values, with 18–48 remaining. The objective stays on its sum coordinate.
+Default preparation spends 612,195,741 phase work units versus 20,246,901 with
+presolve off. These captures establish applicability limits, without source
+verdicts, bound benefit or justification for broader label admission. Source-coordinate
+refinement and its conditional width/arc/scalar/work contracts are not admitted
+after this gate; ordinary source checking and solution-set operations retain their
+existing semantics.
+
 ### Cargo objective-coordinate trajectories
 
 `LocalSearchTrajectory` accepts `suite`, `problem`, decoded-source `sha256`,
