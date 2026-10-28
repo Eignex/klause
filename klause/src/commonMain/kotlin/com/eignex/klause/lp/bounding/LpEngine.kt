@@ -712,7 +712,9 @@ internal class LpEngine(
             cpAdapter.reset()
             persistentRelaxation = null
             val base = relaxer.build(PropagationSession(problem), cancellation = params.cancellation)
-            if (base.persistentEligible) persistentRelaxation = base
+            if (base.persistentEligible && (!sparseTrialActive || !base.model.hasContinuous)) {
+                persistentRelaxation = base
+            }
             persistentRelaxer = relaxer
         }
         persistentRelaxation?.let {
