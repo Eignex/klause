@@ -403,7 +403,7 @@ object LpAutoConfig {
             prepareSparseLpAdmission(problem, objective, cancellation)
         } else null
         if (sparse?.admitted == true) {
-            plan = LpPlan(bounding = true, sparseTrial = true, boundMaxDepth = 0, learn = true,
+            plan = LpPlan(bounding = true, boundMaxDepth = 0, learn = true,
                 probe = false, rootCutHarvest = false, rootMaxWork = SPARSE_LP_MAX_WORK)
         }
         observe?.invoke(LpAdmission(rows, baseCols, cells, structApplicable,

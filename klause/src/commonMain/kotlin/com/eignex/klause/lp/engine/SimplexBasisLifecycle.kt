@@ -18,10 +18,15 @@ internal class SimplexBasisLifecycle(m: Int, numVars: Int) {
     var unitRows = IntArray(0)
     private var retiredWork: BasisOperationWork? = null
 
-    fun solver(matrix: SparseMatrix, factory: ((SparseMatrix) -> BasisSolver)?,
-        entryLimit: Long, workLimit: Long, cancelled: () -> Boolean): BasisSolver =
-        current ?: (factory?.invoke(matrix) ?: KotlinBasisSolver(matrix,
-            policy = LuPivotPolicy(maxEntries = entryLimit, maxWork = workLimit, cancelled = cancelled))).also { current = it }
+    fun solver(
+        matrix: SparseMatrix,
+        factory: ((SparseMatrix) -> BasisSolver)?,
+        entryLimit: Long,
+        workLimit: Long,
+        cancelled: () -> Boolean,
+    ): BasisSolver = current ?: (factory?.invoke(matrix) ?: KotlinBasisSolver(
+        matrix, policy = LuPivotPolicy(maxEntries = entryLimit, maxWork = workLimit, cancelled = cancelled),
+    )).also { current = it }
 
     fun invalidate() {
         factorized = false

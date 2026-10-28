@@ -44,7 +44,7 @@ class SparseLpAdmissionTest {
 
         LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, 1, 1)),
             LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")), sink).use { engine ->
-            assertTrue(engine.params.lpPlan.sparseTrial)
+            assertTrue(engine.sparseTrialActive)
             assertEquals(0, engine.params.lpPlan.boundMaxDepth)
             assertTrue(engine.pruneNode(session, 2.0, -1, true))
         }
@@ -59,7 +59,6 @@ class SparseLpAdmissionTest {
         val plan = LpAutoConfig.resolve(triangle(), LpConfig.AUTO)
 
         assertFalse(plan.bounding)
-        assertFalse(plan.sparseTrial)
     }
 
     @Test

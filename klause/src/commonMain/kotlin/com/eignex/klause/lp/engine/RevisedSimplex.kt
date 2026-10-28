@@ -145,7 +145,8 @@ internal class RevisedSimplex(
     internal val lastTheoryPricingSelections: Int get() = observations.lastTheoryPricingSelections
     internal val lastTheorySelectedColumn: Int get() = observations.lastTheorySelectedColumn
     private val observations = SimplexObservations()
-    internal var progressTrace: SimplexProgressTrace? = null
+    internal var progressTrace: SimplexProgressTrace? =
+        if (pricing.basisEntryLimit != Long.MAX_VALUE) SimplexProgressTrace() else null
         private set
 
     internal fun enableProgressTrace() {
@@ -471,6 +472,17 @@ internal class RevisedSimplex(
     override val lastSingularRefactorizations: Int get() = observations.singularRefactorizations
     override val lastSmallPivotBails: Int get() = observations.smallPivotBails
     override val lastMetrics: LpSolveMetrics get() = observations.snapshot(work.ops)
+    override val trialProgress: Map<String, Long> get() {
+        val samples = progressTrace?.samples ?: return emptyMap()
+        return buildMap {
+            put("ProgressSamples", samples.size.toLong())
+            samples.firstOrNull()?.let { put("FirstViolatedBasics", it.violatedBasics.toLong()) }
+            samples.lastOrNull()?.let { put("LastViolatedBasics", it.violatedBasics.toLong()) }
+            put("NumericalWork", work.ops)
+            put("Pivots", lastPivots.toLong())
+            lastTermination?.let { put("Termination" + it.name, 1L) }
+        }
+    }
 
     init {
         rebuildRowView()
