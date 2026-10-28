@@ -24,11 +24,11 @@ import com.eignex.klause.util.MutableIntIntMap
 internal class ElementPropagator(
     val boolVars: IntArray,
     val intVars: IntArray,
-    private val idx: Int,
-    private val result: Int,
-    private val arr: LongArray,
-    private val arrIsVars: Boolean,
-    private val indexOffset: Int,
+    val idx: Int,
+    val result: Int,
+    val arr: LongArray,
+    val arrIsVars: Boolean,
+    val indexOffset: Int,
 ) : Propagator {
 
     override val initialIntEventWatches: IntArray? = if (!arrIsVars) null else allEventWatches(intVars)

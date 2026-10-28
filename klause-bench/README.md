@@ -7396,3 +7396,13 @@ solution-set-preserving preparation and the existing exact-certified LP relaxati
 with objective `-x`, a ten-second containing deadline and 200,000 floating work units.
 They retain prepared factor/domain shapes and establish only conditional authority.
 These instrumented controls do not qualify defaults or establish whole-CLI throughput.
+
+`producer=element` selects the independent variable-array control
+`r=Element([a,b],i)`, `2*x+a<=z`, `2*x-r<=0`, with `i=0..1` and the same numeric
+boxes. Only a selected equality's bound conflict seeds arithmetic learning; support
+reasons retain clause fallback. The profile requires an index-guarded row to own
+sibling deductions and keeps the feasible `i=1,x=2,a=0,b=r=4,z=4` alternative.
+Ordinary controls include default and aggressive solution-set-preserving preparation
+with separate one-million-work allowances, and the existing Element LP hull under
+root conditioning. Neither root preparation nor its hull creates an unconditional
+selected equality in the retained search session.

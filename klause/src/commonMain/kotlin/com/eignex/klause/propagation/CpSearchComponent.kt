@@ -95,8 +95,18 @@ class CpSearchComponent(
             if (!learned.row.assertsAt(state, trail)) return false
             if (learned.row.guard != Lit.NONE) {
                 val guard = learned.row.guard
-                if (Lit.variable(guard) >= session.problem.numBoolVars) return false
-                val premise = SearchAtomPremise.Asserted(SearchDecision.Bool(guard))
+                val variable = Lit.variable(guard)
+                val premise = if (variable < session.problem.numBoolVars) {
+                    SearchAtomPremise.Asserted(SearchDecision.Bool(guard))
+                } else {
+                    val atom = state.atomIdOf(variable)
+                    if (!Lit.isPositive(guard) || state.atoms.kind[atom] != AtomKind.EQ) return false
+                    val source = sourceIntId(state.atoms.intVar[atom])
+                    val value = state.atoms.threshold[atom]
+                    if (context.intLowerBound(source) != value || context.intUpperBound(source) != value) return false
+                    SearchAtomPremise.All(listOf(context.intLowerBoundPremise(source),
+                        context.intUpperBoundPremise(source)))
+                }
                 if (context.explainAtoms(premise, maxNodes = 128) == null) {
                     return false
                 }

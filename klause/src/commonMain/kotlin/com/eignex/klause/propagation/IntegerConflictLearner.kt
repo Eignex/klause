@@ -62,8 +62,11 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         return null
     }
 
-    private fun sourceFactor(factorId: Int, trail: Int = state.undo.size): IntegerSourceRow? =
-        GuardedIntegerSource(state).source(factorId, trail)
+    private fun sourceFactor(
+        factorId: Int,
+        trail: Int = state.undo.size,
+        forBoundReason: Boolean = false,
+    ): IntegerSourceRow? = GuardedIntegerSource(state).source(factorId, trail, forBoundReason)
 
     private fun reason(row: IntegerConflictRow, used: Set<Pair<Int, Int>>): BoundEvent? {
         var latest: BoundEvent? = null
@@ -78,7 +81,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             if (marker.size != LAZY_PAYLOAD + 6 || marker[1] != factorId) continue
             val key = variable to if (lower) marker[2] else marker[2].inv()
             if (key in used || (latest != null && marker[2] <= latest.trail)) continue
-            val source = sourceFactor(factorId, marker[2]) ?: continue
+            val source = sourceFactor(factorId, marker[2], forBoundReason = true) ?: continue
             val extra = marker[LAZY_PAYLOAD + 5] != 0
             if (extra != (source.guard != Lit.NONE)) continue
             if (extra && marker[LAZY_PAYLOAD + 4] != (source.guard xor 1)) continue
