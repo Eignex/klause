@@ -13,6 +13,7 @@ import java.util.HexFormat
 object ConditionalComponentReplay {
     /** Accept `snapshot64=BASE64` or `snapshotFile=PATH`, `sha256=HEX`, and optional `replay=true`. */
     @JvmStatic
+    @Suppress("LongMethod")
     fun main(args: Array<String>) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val known = setOf("snapshot64", "snapshotFile", "snapshotJob", "sha256", "replay", "probeMillis", "seed")
