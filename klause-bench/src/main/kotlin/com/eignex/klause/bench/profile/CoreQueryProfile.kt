@@ -52,21 +52,22 @@ internal object CoreQueryProfile {
 
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.isEmpty())
+        require(args.isEmpty() || args.contentEquals(arrayOf("confirm=true")))
+        val confirmation = args.isNotEmpty()
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
         val bean = ManagementFactory.getThreadMXBean() as ThreadMXBean
         bean.isThreadAllocatedMemoryEnabled = true
         val thread = Thread.currentThread().threadId()
         out.resolve("cores.jsonl").bufferedWriter().use { output ->
-            for (unrelated in listOf(1, 8)) {
+            for (unrelated in if (confirmation) listOf(8) else listOf(1, 8)) {
                 val sourceText = "p cnf ${unrelated + 2} 1\n${unrelated + 1} ${unrelated + 2} 0\n"
                 val weights = LongArray(unrelated + 2) { if (unrelated == 1 && it == 0) 1L else 100L }
                 val objective = LinearObjective(weights)
                 out.resolve("source-$unrelated.cnf").writeText(sourceText)
                 out.resolve("objective-$unrelated.txt").writeText(weights.joinToString(","))
                 val identity = sha256((sourceText + weights.joinToString(",")).encodeToByteArray())
-                for (prepared in listOf(false, true)) {
+                for (prepared in if (confirmation) listOf(false) else listOf(false, true)) {
                     val source = Dimacs.parse(sourceText).toProblem()
                     val sourceBaked = source.bake()
                     val preparationStart = System.nanoTime()
@@ -78,7 +79,8 @@ internal object CoreQueryProfile {
                     val preparationBytes = bean.getThreadAllocatedBytes(thread) - beforePreparation
                     val model = ordinary?.problem as? BakedProblem ?: sourceBaked
                     val cost = ordinary?.objective ?: objective
-                    for (repeat in 0..2) for (policy in listOf("ordinary", "stratified", "root-fixed", "refined")) {
+                    val repeats = if (confirmation) 1..1 else 0..2
+                    for (repeat in repeats) for (policy in listOf("ordinary", "stratified", "root-fixed", "refined")) {
                         val rootCostStart = System.nanoTime()
                         val rootCostBytes = bean.getThreadAllocatedBytes(thread)
                         val root = deductions.get(model) as? PropagationResult.Implied
@@ -186,11 +188,11 @@ internal object CoreQueryProfile {
                             "elapsedNs=${System.nanoTime() - started}\n$result\n",
                         )
                     }
-                    for (repeat in 0..2) for (lp in listOf(false, true)) {
+                    for (repeat in repeats) for (lp in listOf(false, true)) {
                         val started = System.nanoTime()
                         val before = bean.getThreadAllocatedBytes(thread)
                         val result = BacktrackSolver(model).minimize(cost, BacktrackParams(
-                            variableSelector = InputOrder, valueSelector = IndomainMin, nativeSat = false,
+                            variableSelector = InputOrder, valueSelector = IndomainMin, nativeSat = true,
                             cancellation = Cancellation.after(2.seconds),
                             lpConfig = if (lp) LpConfig(LpEmphasis.DEFAULT) else null,
                         ))
