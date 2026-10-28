@@ -66,7 +66,7 @@ internal object HistoricalTableReasonProfile {
                         put("warmup", pass == 0)
                         put("elapsedNs", elapsed)
                         put("threadAllocatedBytes", allocated)
-                        put("measurement", "instrumented parse, preparation, replay, application, sibling and retraction")
+                        put("measurement", "instrumented parse through application, sibling check and retraction")
                         put("independentWitnessOrProofCheck", false)
                         put("physicalRssOrGcMeasured", false)
                         put("javaVersion", System.getProperty("java.version"))
@@ -198,8 +198,10 @@ internal object HistoricalTableReasonProfile {
                         check(factor.javaClass.simpleName == "DifferenceSystem")
                         buildJsonObject {
                             put("derivedClass", factor.javaClass.name)
-                            put("privateVertices", factor.javaClass.getMethod("getPrivateVertices").invoke(factor).toString())
-                            put("indexGuards", factor.javaClass.getMethod("getIndexGuards").invoke(factor).toString())
+                            val privateVertices = factor.javaClass.getMethod("getPrivateVertices").invoke(factor)
+                            val indexGuards = factor.javaClass.getMethod("getIndexGuards").invoke(factor)
+                            put("privateVertices", privateVertices.toString())
+                            put("indexGuards", indexGuards.toString())
                             put("edges", buildJsonArray {
                                 for (edge in factor.javaClass.getMethod("getEdges").invoke(factor) as List<*>) {
                                     val value = requireNotNull(edge)
@@ -249,18 +251,23 @@ internal object HistoricalTableReasonProfile {
         val order = if (variant == 2) listOf(0, 2, 1, 3) else listOf(0, 1, 2, 3)
         val cells = rows.flatMap { row -> order.map { row[it] } }.joinToString()
         val names = order.map { listOf("x", "a", "b", "c")[it] }.joinToString()
+        val declarations = if (variant == 0) "var bool: x1; var bool: b0;" else "var bool: d;"
+        val aliases = if (variant == 0) {
+            "constraint int_eq_reif(x, 1, x1); constraint int_eq_reif(b, 0, b0);"
+        } else ""
+        val implication = if (variant == 0) "constraint bool_clause([x1,b0], [q]);" else
+            "constraint bool_clause([d], [q]); " + "constraint int_lin_le_imp([1,-1], [b,x], 0, d);"
         return """
             var 0..1: x;
             var 0..1: a;
             var 0..1: b;
             var 0..1: c;
             var bool: q;
-            ${if (variant == 0) "var bool: x1; var bool: b0;" else "var bool: d;"}
+            $declarations
             constraint table_int([$names], [$cells]);
-            ${if (variant == 0) "constraint int_eq_reif(x, 1, x1); constraint int_eq_reif(b, 0, b0);" else ""}
+            $aliases
             constraint int_eq_imp(c, 1, q);
-            ${if (variant == 0) "constraint bool_clause([x1,b0], [q]);" else
-                "constraint bool_clause([d], [q]); constraint int_lin_le_imp([1,-1], [b,x], 0, d);"}
+            $implication
             solve satisfy;
         """.trimIndent()
     }
