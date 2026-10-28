@@ -2644,6 +2644,20 @@ share one deadline, decision ledger, visit cap and cumulative modeled storage ca
 Records separate construction, checking, search and structural costs. These controls
 do not admit production traversal, caching or source-family policies.
 
+`bench.profile.ScopedResidualConsumer` forwards trace arguments and uses `probeMillis=0`
+to disable legacy cold probes. It compares at most one checked control and one catalog
+context. Retained-node composition keeps the captured restrictions and cutoff. The
+separate root study uses the same prepared root and a checked retained incumbent,
+reapplies ordinary strict-budget propagation, and captures through `ResidualSnapshots`.
+Post-split observations alone do not settle earlier root choices. Every arm funds
+input verification, construction, native original-Problem checks and search under one
+two-second allowance, a shared million-decision ledger, four million inspection visits
+and 16 MiB of cumulative modeled storage. Default search, LP, aggressive LP with PB
+cutoffs and objective ordering, and same-variable ordering remain separate controls;
+both separator alternatives share one arm allowance. Root snapshots and full checked
+witnesses go under `$OUT`. Checks are native original-Problem clauses and exact costs,
+without an independent source-format proof certificate or a production default change.
+
 ### Table profiling
 
 `bench.profile.ExtensionalCompositionProfile` accepts `suite=ID problem=NAME
