@@ -15,7 +15,9 @@ internal object CoreRefinement {
         cancellation: Cancellation,
         charge: (Long) -> Unit,
     ): IntArray {
-        if (literals.size !in 2..32 || cancellation()) return literals
+        if (literals.size !in 2..32 || problem.numBoolVars.toLong() + problem.numIntVars > 4_096L ||
+            problem.numFactors > 4_096 || cancellation()
+        ) return literals
         var session: PropagationSession? = null
         val stop = cancellation or Cancellation { (session?.work ?: 0L) >= 32_768L }
         return try {
