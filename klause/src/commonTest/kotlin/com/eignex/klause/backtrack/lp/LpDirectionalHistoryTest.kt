@@ -106,4 +106,37 @@ class LpDirectionalHistoryTest {
 
         assertEquals(listOf("RESET"), observations)
     }
+
+    @Test
+    fun `checked infeasibility stays separate from missing numeric observations`() {
+        val observations = ArrayList<String>()
+        val history = LpDirectionalHistory(observations::add)
+        history.beginNode(0)
+        history.record(10.0)
+        history.branch(VarRef.Bool(0), 0.5)
+        history.commit(SearchDecision.Bool(1), 1)
+        history.beginNode(1)
+
+        history.infeasible()
+        history.finishNode()
+
+        assertEquals(listOf("INFEASIBLE"), observations)
+    }
+
+    @Test
+    fun `all zero gains keep the fallback even with reliable history`() {
+        val history = LpDirectionalHistory({})
+        history.beginNode(0)
+        history.record(10.0)
+        history.branch(VarRef.Bool(0), 0.5)
+        repeat(2) {
+            for (literal in listOf(0, 1)) {
+                history.commit(SearchDecision.Bool(literal), 1)
+                history.beginNode(1)
+                history.record(10.0)
+            }
+        }
+
+        assertTrue(history.score(VarRef.Bool(0), 0.5).isNaN())
+    }
 }

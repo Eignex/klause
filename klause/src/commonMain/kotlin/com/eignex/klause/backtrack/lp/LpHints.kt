@@ -1,6 +1,8 @@
 package com.eignex.klause.backtrack.lp
 
 import com.eignex.klause.lp.bounding.LpHintSink
+import com.eignex.klause.lp.engine.ExactLpModel
+import com.eignex.klause.lp.engine.LpScopedRows
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.VarRef
@@ -28,59 +30,76 @@ internal class LpHints(
     private val collect = numIntVars.toLong() + numBoolVars <= 8192L
     private val history = LpDirectionalHistory(observe)
     private var freshRecord = false
-    private var scopeModel: Any? = null
-    private var scopeRows: Any? = null
+    private var objectiveRecorded = false
+    private var directionalChoice: VarRef? = null
+    private var scopeModel: ExactLpModel? = null
+    private var scopeRows: LpScopedRows? = null
+    private var scopeVariables = IntArray(0)
+    private var scopeBooleans = BooleanArray(0)
     private var scopeConstant = 0L
     private var scopeCutoff = Double.NaN
     private var cutoff = Double.NaN
 
     fun beginNode(depth: Int, bound: Double) {
-        charge(1L)
+        if (scopeModel != null) charge(1L)
         cutoff = bound
         freshRecord = false
+        objectiveRecorded = false
+        directionalChoice = null
         if (collect) history.beginNode(depth)
     }
 
     override fun recordObjective(relaxation: LpRelaxation, objective: Double) {
-        if (!collect) return
+        if (!collect || relaxation.colVarId.size > 8192) return
         val state = relaxation.model.exactState ?: return
+        charge(2L * relaxation.colVarId.size + 1L)
         if (scopeModel !== state.baseModel || scopeRows !== state.rows ||
+            !scopeVariables.contentEquals(relaxation.colVarId) || !scopeBooleans.contentEquals(relaxation.colIsBool) ||
             scopeConstant != relaxation.objectiveConstant || scopeCutoff != cutoff
         ) {
-            observe("INCOMPATIBLE")
-            history.clear()
+            if (scopeModel != null) observe("INCOMPATIBLE")
+            charge(history.retainedEntries.toLong() + 2L * relaxation.colVarId.size)
+            history.clear(report = scopeModel != null)
             scopeModel = state.baseModel
             scopeRows = state.rows
+            scopeVariables = relaxation.colVarId.copyOf()
+            scopeBooleans = relaxation.colIsBool.copyOf()
             scopeConstant = relaxation.objectiveConstant
             scopeCutoff = cutoff
         }
-        history.record(objective + relaxation.objectiveConstant)
+        val value = objective + relaxation.objectiveConstant
+        objectiveRecorded = value.isFinite()
+        history.record(value)
     }
+
+    override fun recordInfeasible() = history.infeasible()
 
     fun finishNode() = history.finishNode()
 
     fun branch(variable: VarRef) {
-        if (collect) {
+        if (directionalGains && scopeModel != null) observe(if (directionalChoice == variable) "CONSUMED" else "FALLBACK")
+        directionalChoice = null
+        if (collect && scopeModel != null) {
             charge(129L)
             history.branch(variable, value(variable))
         }
     }
 
     fun commit(decision: SearchDecision, depth: Int) {
-        if (collect) {
+        if (collect && scopeModel != null) {
             charge(129L)
             history.commit(decision, depth)
         }
     }
 
     fun directionalScore(variable: VarRef): Double {
-        if (!collect || !directionalGains) return Double.NaN
+        if (!collect || !directionalGains || !objectiveRecorded) return Double.NaN
         charge(1L)
         return history.score(variable, value(variable))
     }
 
-    fun selected(directional: Boolean) {
-        if (directionalGains) observe(if (directional) "CONSUMED" else "FALLBACK")
+    fun selected(variable: VarRef?) {
+        directionalChoice = variable
     }
 
     private fun value(variable: VarRef): Double = if (!freshRecord) Double.NaN else when (variable) {
@@ -111,10 +130,17 @@ internal class LpHints(
     private var recorded = false
 
     fun resetHistory() {
-        history.clear()
+        if (scopeModel != null) {
+            charge(history.retainedEntries.toLong() + scopeVariables.size + scopeBooleans.size)
+            history.clear()
+        }
         scopeModel = null
         scopeRows = null
+        scopeVariables = IntArray(0)
+        scopeBooleans = BooleanArray(0)
         freshRecord = false
+        objectiveRecorded = false
+        directionalChoice = null
     }
 
     override fun clear() {

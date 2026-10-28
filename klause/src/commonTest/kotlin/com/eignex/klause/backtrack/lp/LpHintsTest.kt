@@ -11,11 +11,11 @@ import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpObjective
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.LpBoundTrail
-import com.eignex.klause.lp.engine.LpScopedRow
-import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.engine.LpBuilder
+import com.eignex.klause.lp.engine.LpScopedRow
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
+import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.propagation.PropagationSession
@@ -96,16 +96,17 @@ class LpHintsTest {
 
     @Test
     fun `cutoff row and objective changes reject pending directional gains`() {
-        for (change in listOf("cutoff", "cut", "scale", "objective", "mapping")) {
+        for (change in listOf("cutoff", "cut", "scale", "objective", "constant", "mapping")) {
             val b = LpBuilder()
             val x = b.addVar(0, 10, cost = 1)
             b.addRow(intArrayOf(x), longArrayOf(1), Relation.LE, 10L)
             val base = b.build(Sense.MINIMIZE)
             val trail = LpBoundTrail(assertNotNull(base.authoritativeModel()))
             val observations = ArrayList<String>()
-            val hints = LpHints(1, 0, directionalGains = true, observe = observations::add)
+            val hints = LpHints(1, 1, directionalGains = true, observe = observations::add)
             fun relaxation() = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
-                booleanArrayOf(false), if (change == "mapping" && trail.state.depth > 0) 1L else 0L,
+                booleanArrayOf(change == "mapping" && trail.state.depth > 0),
+                if (change == "constant" && trail.state.depth > 0) 1L else 0L,
                 intArrayOf(0), IntArray(0))
             hints.beginNode(0, 100.0)
             val parent = relaxation()
@@ -164,5 +165,34 @@ class LpHintsTest {
 
         assertEquals(1, observations.count { it == "DOWN" })
         assertEquals(1, observations.count { it == "UP" })
+    }
+
+    @Test
+    fun `missing current optimum uses the existing score instead of directional history`() {
+        val b = LpBuilder()
+        b.addVar(0, 10, cost = 1)
+        val trail = LpBoundTrail(assertNotNull(b.build(Sense.MINIMIZE).authoritativeModel()))
+        val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+            booleanArrayOf(false), 0L, intArrayOf(0), IntArray(0))
+        val hints = LpHints(1, 0, directionalGains = true)
+        repeat(2) {
+            hints.beginNode(0, 100.0)
+            hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+            hints.recordObjective(relaxation, 10.0)
+            hints.branch(VarRef.IntVar(0))
+            for (up in listOf(false, true)) {
+                hints.commit(if (up) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2), 1)
+                hints.beginNode(1, 100.0)
+                hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+                hints.recordObjective(relaxation, if (up) 13.0 else 11.0)
+            }
+        }
+        assertTrue(hints.directionalScore(VarRef.IntVar(0)).isFinite())
+
+        hints.beginNode(1, 100.0)
+        hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+
+        assertTrue(hints.directionalScore(VarRef.IntVar(0)).isNaN())
+        assertTrue(hints.branchScore(VarRef.IntVar(0)).isFinite())
     }
 }
