@@ -11,6 +11,8 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchResult
@@ -75,9 +77,20 @@ internal object MixedPbLocalityProfile {
                             backjumps++
                         }
                     }
+                    check(shared.initialize() is ComponentResult.Consistent)
                     val result = shared.solve(booleans, observer = observer)
                     val storedPb = (0 until native.learnedClauseCount).count { !(clauseKind.invoke(native, it) as Boolean) }
                     check(if (feasible) result is SearchResult.Satisfied else result is SearchResult.Exhausted)
+                    if (feasible) {
+                        val checker = PropagationSession(problem.withIntDomains(Array(problem.numIntVars) {
+                            val value = native.intDomain(it).min
+                            IntDomain(value, value)
+                        }))
+                        check(!checker.isUnsatAtRoot)
+                        for (variable in 0 until booleans) {
+                            check(checker.pinBool(variable, checkNotNull(native.boolValue(variable))) is PropagationResult.Implied)
+                        }
+                    }
                     val record = buildJsonObject {
                         put("revision", Reports.readGitSha())
                         put("projection", listOf("boolean", "retained-integer", "connected-integer")[mode])

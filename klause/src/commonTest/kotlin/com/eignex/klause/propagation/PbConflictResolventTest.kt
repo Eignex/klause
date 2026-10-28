@@ -2,7 +2,6 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Cardinality
-import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBooleanPropagator
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -10,6 +9,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.search.SearchAtomRegistry
+import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchRunObserver
@@ -69,6 +69,7 @@ class PbConflictResolventTest {
                 }
             }
 
+            assertIs<ComponentResult.Consistent>(shared.initialize())
             assertIs<SearchResult.Exhausted>(shared.solve(20, observer = observer))
 
             assertTrue(native.explanationState.learned.store.any { it is PseudoBooleanPropagator }, "mode=$mode")
@@ -106,6 +107,7 @@ class PbConflictResolventTest {
         )), pbLearning = true)
         val shared = SearchSession(listOf(CpSearchComponent(native)), atoms = SearchAtomRegistry(2))
 
+        assertIs<ComponentResult.Consistent>(shared.initialize())
         assertIs<SearchResult.Satisfied>(shared.solve(2))
 
         assertEquals(native.boolValue(0), native.intDomain(0).min <= 5)
