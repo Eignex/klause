@@ -139,6 +139,13 @@ same off/on controls. Its records distinguish source admission, native work and
 original-source witness checks. Unary, guarded and real-supported equalities are
 outside residue admission; the open product has modular support. These source
 shapes supply no expectation of a new residue refutation or a default benefit.
+Five identities reject the NIA-specific CLI controls on finite or polynomial-real
+routes in both arms; these are command rejections, not UNKNOWN solver outcomes.
+The seven executed pairs match, with no residue refutation. The admitted open
+product retains support in all five rings and adds 370 native work units. Dolmen
+accepts the four wide-square/overflow SAT models; its two Boolean-assumption model
+checks remain unknown with `unbound-id`. This bounded check establishes no
+existing-source benefit and makes no claim about the ten rejected executions.
 
 `sets/<name>.txt` fixes membership as one `<suite>/<problem>` identity per line,
 matching `select`; `@<set>` includes another set and `#` starts a comment.
