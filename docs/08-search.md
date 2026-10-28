@@ -462,7 +462,9 @@ durations in both time directions. Shortening each task to its minimum keeps eve
 start and every non-overlap, so those bounds hold for the original tasks. Their
 reasons cite the minimum-duration bounds they used and retract with them.
 Time-tabling and detectable precedences still wait for fixed durations. Windows
-outside a quarter of the integer range decline the pass.
+outside a quarter of the integer range decline the pass, as does a variable that is
+both a start and a duration, since a start bound could then raise a minimum the pass
+already read.
 
 Diffn's constant-size sweep filters positive-area compulsory parts. Strict boxes
 with a zero dimension also receive the pairwise separation check, so the sweep's

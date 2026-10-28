@@ -191,6 +191,7 @@ class DisjunctivePropagatorTest {
         OverloadShape("repeated presence", presents = IntArray(3) { Lit.make(it / 2, true) }),
         OverloadShape("opposite presence", presents = IntArray(3) { Lit.make(minOf(it, 1), it < 2) }),
         OverloadShape("zero minima", minDuration = 0),
+        OverloadShape("start as duration", durationVars = intArrayOf(3, 4, 0)),
     )
 
     @Test

@@ -78,6 +78,14 @@ internal class DisjunctivePropagator(
         guardRuns = runs.toIntArray()
     }
 
+    // A variable that is both a start and a duration lets an edge-finding bound raise a minimum mid-pass, while each
+    // later reason is rebuilt from the minima as they then stood rather than the ones the pass read: decline those.
+    private val startsRaiseMinima: Boolean = durationVars.isNotEmpty() &&
+        IntHashSet().let { startSet ->
+            for (v in starts) startSet.add(v)
+            durationVars.any { it in startSet }
+        }
+
     /** Effective per-task durations, or null while any duration var is unfixed (propagation then waits). */
     private fun effDurOrNull(state: PropagationState): LongArray? {
         if (durationVars.isEmpty()) return LongArray(n) { durations[it] }
@@ -458,6 +466,7 @@ internal class DisjunctivePropagator(
     // Edge-finding's start bounds hold for the schedule shortened to minimum durations, which keeps every start, so
     // they hold for the original. Its reasons cite each task's minimum, so they stay valid as durations grow.
     private fun edgeFindingOverMinima(state: PropagationState): Boolean {
+        if (startsRaiseMinima) return true
         val minima = LongArray(n) { minDuration(state, it) }
         if (!windowsRepresentable(state, minima)) return true
         return edgeFinding(state, minima)
