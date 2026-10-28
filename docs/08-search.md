@@ -450,6 +450,14 @@ For each left endpoint, a completion-order sweep accumulates contained energy; s
 minimum slack selects the strongest right endpoint containing each target. This takes
 quadratic task/window visits. A zero minimum load with every maximum demand at most
 capacity skips the scan, since each containing window spans at least its target's duration.
+When every positive-load task and ranged-demand target has a fixed start, the complete
+minimum profile already dominates the window bounds. This skip requires demand
+coordinates to be separate from starts and capacity, so height pruning preserves that profile.
+Ineligible calls allocate no window scratch.
+Global minimum energy also bounds every contained-task sum. A necessary eligibility
+check compares it with positive-load and target envelopes before constructing windows.
+Fixed tasks are omitted from overload eligibility only when height pruning preserves
+their complete profile. Unrepresentable eligibility arithmetic falls back to scanning.
 Historical reasons cite the participating start bounds, other minimum demands and
 capacity ceiling. Negative minimum demands or unrepresentable window arithmetic decline
 the pass. Window scratch belongs to one fire and is rebuilt after interruption or undo.

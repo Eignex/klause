@@ -61,6 +61,22 @@ class CumulativePropagatorTest {
     }
 
     @Test
+    fun `fixed target demand should still use flexible positive task windows`() {
+        val problem = Problem(0, 6, arrayOf(
+            IntDomain(0, 100), IntDomain(100, 103), IntDomain(100, 103), IntDomain(101, 101),
+            IntDomain(1, 1), IntDomain(0, 1),
+        ), arrayOf<Factor>(Cumulative(
+            intArrayOf(0, 1, 2, 3), longArrayOf(1, 3, 3, 2), longArrayOf(1, 1, 1, 1), 1,
+            resourceVars = intArrayOf(4, 4, 4, 5),
+        )))
+        val state = PropagationState(problem, Assumptions.None)
+
+        assertTrue(problem.propagators[0].propagate(state, 0))
+
+        assertEquals(IntDomain(0, 0), state.intDomains[5])
+    }
+
+    @Test
     fun `zero minimum load should still bound a demand above capacity`() {
         val problem = Problem(0, 4, arrayOf(
             IntDomain(0, 100), IntDomain(100, 102), IntDomain(0, 0), IntDomain(0, 3),
@@ -113,7 +129,7 @@ class CumulativePropagatorTest {
         val problem = Problem(0, n + 1, Array(n + 1) {
             if (it == n) IntDomain(1, 2) else IntDomain(it.toLong(), 64L + it)
         }, arrayOf<Factor>(Cumulative(
-            IntArray(n) { it }, LongArray(n) { 1L }, LongArray(n) { 1L }, n.toLong(),
+            IntArray(n) { it }, LongArray(n) { 64L }, LongArray(n) { 1L }, (n / 2).toLong(),
             resourceVars = IntArray(n) { n },
         )))
         val state = PropagationState(problem, Assumptions.None)

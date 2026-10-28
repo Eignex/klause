@@ -4311,6 +4311,29 @@ captures establish consumed inference and scan reduction, not avoided search or
 default admission. The temporary hooks and alternate scans are absent from runtime
 code; their frozen captures retain the diagnostic implementation.
 
+[8968](https://lab.eignex.com/jobs/8968), at `610423671c`, compares exact canonical
+domain digests at completed selector picks. The 20-task instance differs at two/six
+picks and the 30-task instance at 12/68; selected variables and levels match throughout.
+The exclusions therefore survive ordinary fixpoints, but do not change these branch
+choices. [8966](https://lab.eignex.com/jobs/8966) extends the 20-task control to 4,096
+decisions with the same six/eight bounds and unchanged nodes/failures.
+
+Fixed-profile eligibility captures [8971](https://lab.eignex.com/jobs/8971) preserve
+every completed domain/choice digest on both instances. Under default LP,
+[8972](https://lab.eignex.com/jobs/8972) reduces scans from 3,629 to 26; its propagation
+work is 15.29M versus 15.07M with the window pass disabled. Global-energy eligibility
+and deferred scratch allocation require a separate uninstrumented admission check.
+
+[8965](https://lab.eignex.com/jobs/8965) is the rejected uninstrumented sweep control
+at `215627f9f1`: 48 serial P1 ten-second CP/default-LP/aggressive-LP cases, two original
+instances, seeds 3/7 and balanced ABBA replicas against `48ff493b06`. On the 30-task
+CP-only instance, four baseline runs report a witness and four candidate runs report
+none. [8977](https://lab.eignex.com/jobs/8977)'s 16 first-fail cases establish no
+repeatable gain. The maintained lab reports assignment-only MiniZinc checking as
+unsupported, so these objectives are reported values, not independently checked source
+results or optimality claims. An overflow-only prefix control separates checked
+arithmetic cost from the window mechanism in subsequent comparisons.
+
 ### Source task-order applicability
 
 [Task-order capture 8898](https://lab.eignex.com/jobs/8898), at `f41e018c2a`,

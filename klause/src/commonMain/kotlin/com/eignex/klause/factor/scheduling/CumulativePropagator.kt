@@ -45,6 +45,8 @@ internal class CumulativePropagator(
     private val capacityVar: Int,
     private val n: Int,
 ) : InterruptiblePropagator {
+    private val profilePreservesStartAndCapacity = n <= SUBWINDOW_TASK_LIMIT && resourceVars.isNotEmpty() &&
+        durationVars.isEmpty() && starts.none { it in resourceVars } && capacityVar !in resourceVars
 
     override fun interrupted(state: PropagationState, factorId: Int) {
         state.propagatorFailures.remove(this)
@@ -237,10 +239,14 @@ internal class CumulativePropagator(
 
     private fun subwindowDemandPass(state: PropagationState): Boolean {
         if (resourceVars.isEmpty() || durationVars.isNotEmpty() || n > SUBWINDOW_TASK_LIMIT) return true
-        val active = IntArrayList()
+        val cap = capMax(state)
+        if (cap < 0L) return true
+        var activeCount = 0
         var variableDemand = false
         var positiveMinimum = false
         var demandAboveCapacity = false
+        var positiveStartsFixed = true
+        var rangedStartsFixed = true
         for (i in 0 until n) {
             state.checkFiniteWork()
             if (!OptionalPresence.isDefinitelyPresent(presents, i, state) || durations[i] == 0L) continue
@@ -248,14 +254,26 @@ internal class CumulativePropagator(
             if (demand.min < 0L) return true
             variableDemand = variableDemand || demand.min != demand.max
             positiveMinimum = positiveMinimum || demand.min > 0L
-            demandAboveCapacity = demandAboveCapacity || demand.max > capMax(state)
-            active.add(i)
+            demandAboveCapacity = demandAboveCapacity || demand.max > cap
+            val start = state.intDomains[starts[i]]
+            val fixedStart = start.min == start.max
+            positiveStartsFixed = positiveStartsFixed && (demand.min == 0L || fixedStart)
+            rangedStartsFixed = rangedStartsFixed && (demand.min == demand.max || fixedStart)
+            activeCount++
         }
-        if (!variableDemand || capMax(state) < 0L) return true
+        if (!variableDemand) return true
         // Every containing window is at least the target's duration, so its bound is >= capacity.
         if (!positiveMinimum && !demandAboveCapacity) return true
+        // The complete minimum profile bounds each fixed target at its peak and excludes overload.
+        if (profilePreservesStartAndCapacity && positiveStartsFixed && rangedStartsFixed) return true
+        if (!subwindowCouldImprove(state, cap, positiveStartsFixed)) return true
         return try {
-            val ids = active.toIntArray()
+            val ids = IntArray(activeCount)
+            var next = 0
+            for (i in 0 until n) {
+                state.checkFiniteWork()
+                if (OptionalPresence.isDefinitelyPresent(presents, i, state) && durations[i] > 0L) ids[next++] = i
+            }
             val est = LongArray(ids.size) { state.intDomains[starts[ids[it]]].min }
             val lct = LongArray(ids.size) { addExact(state.intDomains[starts[ids[it]]].max, durations[ids[it]]) }
             subwindowDemandSweep(state, ids, est, lct)
@@ -263,6 +281,46 @@ internal class CumulativePropagator(
             true
         }
     }
+
+    private fun subwindowCouldImprove(state: PropagationState, cap: Long, positiveStartsFixed: Boolean): Boolean =
+        try {
+            var energy = 0L
+            var narrowest = Long.MAX_VALUE
+            for (i in 0 until n) {
+                state.checkFiniteWork()
+                if (!OptionalPresence.isDefinitelyPresent(presents, i, state) || durations[i] == 0L) continue
+                val demand = minHeight(state, i)
+                energy = addExact(energy, mulExact(durations[i], demand))
+                val start = state.intDomains[starts[i]]
+                if (demand > 0L && (!profilePreservesStartAndCapacity || start.min != start.max)) {
+                    narrowest = minOf(narrowest, addExact(subExact(start.max, start.min), durations[i]))
+                }
+            }
+            // Fixed minimum-load tasks already fit the profile; an overload must contain a flexible one.
+            val completeProfile = profilePreservesStartAndCapacity && positiveStartsFixed
+            if (!completeProfile && energy > mulExact(cap, narrowest)) {
+                true
+            } else {
+                var candidate = false
+                for (i in 0 until n) {
+                    state.checkFiniteWork()
+                    if (!OptionalPresence.isDefinitelyPresent(presents, i, state) || durations[i] == 0L) continue
+                    val demand = state.intDomains[resourceVars[i]]
+                    if (demand.min == demand.max) continue
+                    val start = state.intDomains[starts[i]]
+                    if (completeProfile && start.min == start.max) continue
+                    val budget = mulExact(cap, addExact(subExact(start.max, start.min), durations[i]))
+                    // Contained minimum energy is bounded by the global sum in every target-containing window.
+                    if (budget < energy || budget - energy < mulExact(durations[i], demand.max - demand.min)) {
+                        candidate = true
+                        break
+                    }
+                }
+                candidate
+            }
+        } catch (_: CheckedLongOverflowException) {
+            true
+        }
 
     private fun subwindowDemandSweep(
         state: PropagationState,
