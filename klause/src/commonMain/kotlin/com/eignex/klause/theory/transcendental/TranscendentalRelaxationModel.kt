@@ -50,6 +50,15 @@ internal class TranscendentalRelaxationModel(
     private fun boolean(source: TranscendentalFormula, guard: PolynomialRealFormula): PolynomialRealFormula {
         arithmetic.step()
         return when (source) {
+            is TranscendentalExpression.ExactValue -> {
+                val exact = com.eignex.klause.arithmetic.real.ExactRealArithmetic(
+                    arithmetic, com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic(),
+                )
+                val enclosure = exact.enclose(source.value, terms)
+                val value = fresh()
+                range(value, enclosure)
+                value to enclosure
+            }
             is TranscendentalFormula.Constant -> PolynomialRealFormula.Constant(source.value)
             is TranscendentalFormula.BooleanVariable -> PolynomialRealFormula.BooleanVariable(source.id)
             is TranscendentalFormula.Atom -> atom(source, guard)

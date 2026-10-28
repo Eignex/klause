@@ -3,6 +3,7 @@ package com.eignex.klause.ir
 internal enum class TranscendentalFunction { EXP, LOG, SIN, COS }
 
 internal sealed interface TranscendentalExpression {
+    data class ExactValue(val value: com.eignex.klause.arithmetic.real.ExactRealValue) : TranscendentalExpression
     data class Constant(val value: PolynomialExpression.Constant) : TranscendentalExpression
     data class Variable(val id: SourceRealId) : TranscendentalExpression
     data object Pi : TranscendentalExpression

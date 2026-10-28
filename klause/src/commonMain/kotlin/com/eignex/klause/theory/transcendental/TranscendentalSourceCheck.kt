@@ -49,6 +49,7 @@ internal class TranscendentalSourceCheck(
                 continue
             }
             expressions[node] = when (node) {
+                is TranscendentalExpression.ExactValue -> node.value
                 is TranscendentalExpression.Constant -> arithmetic.rational(
                     BigFraction.of(node.value.numerator, node.value.denominator),
                 )

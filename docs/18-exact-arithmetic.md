@@ -211,6 +211,20 @@ then strict separation of enclosures; overlapping enclosures give no verdict.
 
 ### Source and publication boundary
 
+`formats.json.ExactRealJson` reads and writes these closed values directly. Rational
+leaves are fraction strings; `root` selects a one-based distinct real root using
+rational polynomial coefficients in ascending order. Structured `pi`, `exp`, `log`,
+`sin`, `cos`, `add`, `multiply` and `power` nodes retain exact expression authority.
+Decoding checks root selection and function domains. Display approximations and
+isolating intervals are not part of the interchange identity.
+
+`ExactRealEquality` pins a native real column to one of these values. Algebraic
+equalities have polynomial encodings with strict isolating bounds. Symbolic pins
+select exact function completion over the other factors' complete polynomial
+encodings and the original column declarations. Unsupported encodings or objective
+operations retain unknown. `SourceStrategy.solveSample` publishes the native typed
+witness without parsing symbolic expression text.
+
 Only an original-source check turns these values into a witness: a symbolic value
 describes one coordinate, not that a formula holds. `Sample.symbolicReals` captures
 the expressions beside rational and algebraic coordinates, and replacing an

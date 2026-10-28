@@ -1,6 +1,8 @@
 package com.eignex.klause.factor.codec
 
 import com.eignex.klause.factor.arithmetic.Abs
+import com.eignex.klause.factor.arithmetic.ExactRealEquality
+import com.eignex.klause.arithmetic.real.ExactRealValue
 import com.eignex.klause.factor.arithmetic.AbsAffineValue
 import com.eignex.klause.factor.arithmetic.AffineAbs
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
@@ -187,7 +189,18 @@ private fun DivModPayload.toDivMod(): DivMod {
     }
 }
 
+@Serializable
+internal class ExactRealEqualityPayload(
+    val real: Int,
+    @Serializable(with = ExactRealValueSerializer::class) val value: ExactRealValue,
+)
+
 internal fun arithmeticFactorCodecs(): List<FactorCodec<*, *>> = listOf(
+    factorCodec<ExactRealEquality, ExactRealEqualityPayload>(
+        "exactRealEquality",
+        { ExactRealEqualityPayload(it.id.index, it.value) },
+        { ExactRealEquality(SourceRealId(it.real), it.value) },
+    ),
     factorCodec<Product, ProductPayload>(
         "product",
         { ProductPayload(it.a, it.b, it.result) },
