@@ -170,18 +170,20 @@ internal class CpSatisfactionTraversal(
     private val deferredInitialization: Boolean = false,
     singleModel: Boolean = false,
     projectAssumptionCore: Boolean = false,
+    preparedSession: PropagationSession? = null,
+    preparedSeed: PropagationResult? = null,
 ) : AutoCloseable {
     private val resources = SearchInvocationResources()
     private val lpResources = ArrayList<LpSearchResource>()
     private val cp = CpSearchComponent(
-        PropagationSession(
+        (preparedSession ?: PropagationSession(
             projection,
             propagationCancellation,
             params.propagationCancelFloor,
             nativeSat = params.nativeSat ?: true,
             pbLearning = params.pbLearning ?: (problem.numIntVars == 0),
             cumulativeUnarySubsets = problem.numRealVars == 0 && params.useCumulativeUnarySubsets,
-        ).also { if (params.integerRowLearning) it.enableIntegerRowLearning() },
+        )).also { if (params.integerRowLearning) it.enableIntegerRowLearning() },
         branching = CpBranching.None,
     ).also {
         it.conflictStats = sink?.ca
@@ -247,7 +249,7 @@ internal class CpSatisfactionTraversal(
                 } else params.cancellation,
                 learnedDb = params.sharedLearnedDb(),
             )
-            val seed = cp.session.seed(params.assumptions)
+            val seed = preparedSeed ?: cp.session.seed(params.assumptions)
             val seeded = if (projectAssumptionCore && seed is PropagationResult.Unsat) {
                 cp.session.projectSeedCore(params.assumptions, seed, propagationCancellation)
             } else seed
