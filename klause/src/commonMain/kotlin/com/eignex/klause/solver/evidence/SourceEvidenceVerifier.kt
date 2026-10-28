@@ -214,7 +214,11 @@ class SourceEvidenceVerifier(
                         context.semanticsChecker !is SourceIntegerAggregateSemantics) {
                         return SourceEvidenceCheck.Unavailable("source-specific checker has no aggregate scope support")
                     }
-                    return context.semanticsChecker?.derivation(claim, derivation, scope, cancellation)
+                    val token = if (scope.condition.integerRows.isEmpty()) cancellation else Cancellation {
+                        step(depth)
+                        false
+                    }
+                    return context.semanticsChecker?.derivation(claim, derivation, scope, token)
                         ?: SourceEvidenceCheck.Unavailable("source-specific derivation checker unavailable")
                 }
                 is SourceDerivation.Import -> {
