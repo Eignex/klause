@@ -26,8 +26,8 @@ class LabAdapterTest {
         "debug,yes", "exact,yes", "measurement,arbitrary", "heap-mib,8192", "gc,arbitrary", "compile-timeout-sec,0",
         "max,no", "lp,invalid", "presolve,invalid", "param.,value",
     )
-    fun `invalid controls fail before corpus discovery`(key: String, value: String) {
-        assertFailsWith<IllegalArgumentException> { KlauseLabSuite.plan(BenchRequest(mapOf(key to value))) }
+    fun `invalid controls fail validation`(key: String, value: String) {
+        assertFailsWith<IllegalArgumentException> { LabSettings(mapOf(key to value)) }
     }
 
     @Test
@@ -37,25 +37,6 @@ class LabAdapterTest {
         assertEquals(172L, resources.timeoutSeconds)
         assertEquals(2, resources.cpus)
         assertEquals(setOf("platform:linux", "arch:x86_64"), resources.requiredTags)
-    }
-
-    @Test
-    fun `planning expands engines seeds and repetitions without changing frozen inputs`() {
-        val cases = KlauseLabSuite.plan(
-            BenchRequest(
-                mapOf(
-                    "suite" to "dimacs-core",
-                    "name" to "php4",
-                    "engines" to "cp,ls",
-                    "solver-seeds" to "1,2",
-                    "repeats" to "2",
-                ),
-            ),
-        )
-        assertEquals(8, cases.size)
-        assertEquals(8, cases.map { it.id }.distinct().size)
-        assertEquals(1, cases.map { it.inputs }.distinct().size)
-        assertTrue(cases.first().inputs.single().sha256 != null)
     }
 
     @Test

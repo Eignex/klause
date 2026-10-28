@@ -130,8 +130,9 @@ Submit `repository: "Eignex/klause"` and
 The planner accepts the catalog selectors `suite`, `set`, `name`, `category`,
 `tag`, `kind`, `per-family`, `seed`, `max` and `balance`. It expands
 `engines`, `solver-seeds` and `repeats` into distinct cases. Catalog file formats
-include DIMACS, WCNF, OPB, JSON schema, XCSP3, SMT-LIB, MPS and MiniZinc model/data;
-in-code problems have no subprocess input and are rejected.
+include DIMACS, WCNF, OPB, XCSP3, SMT-LIB, MPS and MiniZinc model/data.
+JSON schema catalog entries retain a labelled unsupported result because the CLI
+has no schema frontend; in-code problems have no subprocess input and are rejected.
 
 | Control | Contract |
 |---|---|

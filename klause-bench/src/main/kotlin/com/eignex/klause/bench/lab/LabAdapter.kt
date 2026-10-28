@@ -5,6 +5,7 @@ import com.eignex.klause.bench.catalog.Expected
 import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.ProblemSource
+import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.SolveMetric
 import com.eignex.klause.bench.metric.SolveRecord
 import com.eignex.klause.bench.metric.SolverInvocation
@@ -15,6 +16,7 @@ import com.eignex.lab.bench.*
 import kotlinx.serialization.json.JsonObject
 import java.nio.file.Files
 import java.nio.file.Path
+import java.time.Instant
 import com.eignex.klause.bench.target.BenchCli as KlauseCli
 
 /** Repository-owned lab planning and installed-CLI execution entry point. */
@@ -117,12 +119,24 @@ internal object KlauseLabSuite : BenchSuite {
             captureDirectory = context.outputDirectory.resolve("report").toFile(),
             measureResources = p.getValue("measurement") != "none",
         )
-        val record = SolveMetric.solveOne(
-            ref,
-            Budget(p.getValue("timeout-ms").toLong()),
-            settings,
-            context.outputDirectory.resolve("report").toFile(),
-        )
+        val budget = Budget(p.getValue("timeout-ms").toLong())
+        val record = if (ref.format == Format.JSON_SCHEMA) {
+            val reason = "JSON schema is an in-process catalog format; the installed CLI has no schema frontend"
+            SolveMetric.loadFailureRecord(
+                ref,
+                settings,
+                budget,
+                Instant.now().toString(),
+                Reports.readGitSha(),
+                IllegalArgumentException(reason),
+            ).copy(
+                command = "UNSUPPORTED",
+                stats = mapOf("unsupported" to reason),
+                buildProvenance = InstalledBuild.current,
+            )
+        } else {
+            SolveMetric.solveOne(ref, budget, settings, context.outputDirectory.resolve("report").toFile())
+        }
         val provenance = record.buildProvenance?.let { build ->
             build.copy(
                 runtimeOptions = build.runtimeOptions +
