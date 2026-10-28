@@ -104,8 +104,8 @@ internal object SourceStageProfile {
             "duration=${timeout + 35_000}ms,dumponexit=true"
         val command = buildList {
             add(SolverInvocation.klauseCliBin().absolutePath)
-            addAll(listOf("--format", format, source.absolutePath, "-t", timeout.toString(), "-r", seed.toString(), "-s",
-                "-a", "--output-objective"))
+            addAll(listOf("--format", format, source.absolutePath, "-t", timeout.toString(), "-r", seed.toString(),
+                "-s", "-a", "--output-objective"))
             if (engine != "default") addAll(listOf("-e", engine))
             if (exact) add("--exact")
         }
