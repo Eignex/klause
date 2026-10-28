@@ -64,6 +64,22 @@ class NonlinearIntegerResiduesTest {
     }
 
     @Test
+    fun `widening a window should keep the surviving integer branch reachable`() {
+        val source = source("(assert (or (= (+ (* x x) (* y y)) 3) (and (= x 1) (= y 1))))")
+        val params = NonlinearIntegerParams(residueRefutation = true)
+        val zero = mapOf(0 to BigFraction.ZERO, 1 to BigFraction.ZERO)
+        val narrow = solveNonlinearIntegers(source, params, PolynomialCondition(lower = zero, upper = zero))
+
+        val widened = solveNonlinearIntegers(source, params)
+
+        assertIs<QfNraResult.Unsatisfiable>(narrow.result)
+        assertIs<QfNraResult.Satisfiable>(widened.result)
+        assertEquals(1L, narrow.stats.residues.excluded)
+        assertEquals(1L, widened.stats.residues.excluded)
+        assertEquals(0L, narrow.stats.residues.refuted)
+    }
+
+    @Test
     fun `negation should consume only impossible equalities and preserve supported predicates`() {
         for (assertion in listOf(
             "(assert (not (= (+ (* x x) (* y y)) 3)))",
@@ -291,17 +307,23 @@ class NonlinearIntegerResiduesTest {
 
     @Test
     fun `paused entry should preserve the same residue result and charge on resume`() {
-        val source = source("(assert (= (+ (* x x) (* y y)) 3))")
-        val params = NonlinearIntegerParams(residueRefutation = true)
-        val whole = solveNonlinearIntegers(source, params)
-        NonlinearIntegerCursor(source, params, PolynomialCondition()).use { cursor ->
-            assertNull(cursor.runSlice(Cancellation { true }))
-            assertEquals(0L, cursor.stats.polynomial.workSpent)
+        for (assertion in listOf(
+            "(assert (= (+ (* x x) (* y y)) 3))",
+            "(assert (or (= (+ (* x x) (* y y)) 3) (= (+ (* x x) (* y y)) 7)))",
+            "(assert (or (= (+ (* x x) (* y y)) 3) (and (= x 1) (= y 1))))",
+        )) {
+            val source = source(assertion)
+            val params = NonlinearIntegerParams(residueRefutation = true)
+            val whole = solveNonlinearIntegers(source, params)
+            NonlinearIntegerCursor(source, params, PolynomialCondition()).use { cursor ->
+                assertNull(cursor.runSlice(Cancellation { true }))
+                assertEquals(0L, cursor.stats.polynomial.workSpent)
 
-            val resumed = requireNotNull(cursor.runSlice(maximumCandidates = 1))
+                val resumed = requireNotNull(cursor.runSlice(maximumCandidates = 1))
 
-            assertIs<QfNraResult.Unsatisfiable>(resumed.result)
-            assertEquals(whole.stats, resumed.stats)
+                assertEquals(whole.result::class, resumed.result::class)
+                assertEquals(whole.stats, resumed.stats)
+            }
         }
     }
 

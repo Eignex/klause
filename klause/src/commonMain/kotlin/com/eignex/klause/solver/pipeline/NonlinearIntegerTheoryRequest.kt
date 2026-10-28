@@ -70,7 +70,7 @@ data class NonlinearIntegerTheoryParams(
     val steerSourceCells: Boolean = false,
     /** Admit complete integer root sets of mandatory unary polynomial equalities on original integers. */
     val admitIntegerRoots: Boolean = false,
-    /** Enable bounded residue refutations of mandatory equalities on original integers. */
+    /** Enable bounded integer residue refutations and Boolean consumption of impossible equality atoms. */
     val residueRefutation: Boolean = false,
 ) {
     init {
