@@ -2433,16 +2433,18 @@ independent cycles). Each hash-checked source goes through finite preparation wi
 CLI's presolve allowance, then `satOptimized` minimization. A wrapping variable selector
 samples every branch point for 4,096 picks, then every sixteenth, until the trace
 allowance is spent; sampling time is excluded from the search deadline. A sample joins
-the free coordinates of every live factor: a clause with a true literal is discharged,
-and every other factor, including clauses with atom literals, connects all its free
+the free coordinates of every live factor: a clause with a true literal is discharged
+whatever its literal order (`dischargedAfterFreeLiteral` counts those whose true literal
+follows a free one), and every other factor, including clauses with atom literals, connects all its free
 coordinates. The objective is treated as additive, so splits are an upper bound for a
 decomposition that must also respect an incumbent cutoff. A component's key hashes each
 live factor's residual in factor order; a key seen again after an intervening retraction,
 conflict or restart counts as a re-encountered child obligation. Every eighth sample re-joins with
 learned clauses, with and without permanent incumbent-scoped entries. Up to `probes` split
 nodes keep their residual clauses; after the search each component and the joint residual
-are solved as fresh `satOptimized` models, and the joint residual once more with
-`LpConfig(LpEmphasis.DEFAULT)` as the ordinary-bounds control. The children share one allowance equal to the
+are solved as fresh `satOptimized` models, and the joint residual twice more, with
+`LpConfig(LpEmphasis.DEFAULT)` as the ordinary-bounds control and with `objectiveGuidedValues`
+as the ordering control. The children share one allowance equal to the
 joint solve's, carry no incumbent cutoff or learned clause, and an unfinished child leaves
 the composition open. The composed witness is reconstructed and checked against the
 original clauses, and later sightings of each probed key are reported. Records retain
@@ -2503,31 +2505,53 @@ the recorded witnesses against the original MiniZinc source.
 
 [Conditional component traces](#conditional-component-traces) cover the eleven
 WCNF sources of status sweep [8846](https://lab.eignex.com/jobs/8846) at `364582ebf`,
-all feasible and unproven at ten seconds, plus the two-five-cycle controls. Jobs
+all feasible and unproven at ten seconds, plus the two-five-cycle controls. Every
+prepared factor is a clause, so no enforcing source relation is outside the trace. Jobs
 [8852](https://lab.eignex.com/jobs/8852), [8856](https://lab.eignex.com/jobs/8856) and
-[8858](https://lab.eignex.com/jobs/8858) ran at `f6dc3eca`, `7a315f07` and `891e11ae` on
-one Linux/amd64 vCPU with 4.6 GiB and JDK 25. Every prepared factor is a clause, so no
-enforcing relation is outside the trace.
+[8858](https://lab.eignex.com/jobs/8858) ran at `f6dc3eca`, `7a315f07` and `891e11ae`
+with a trace that joined a clause's free literals before reading a later true literal,
+so their split statistics undercount independence; their compositions, witnesses and
+refutations are unaffected. Job [8862](https://lab.eignex.com/jobs/8862) at `2b1b6867`
+repeats 8856 with order-independent membership. At `846b8184`, jobs
+[8868](https://lab.eignex.com/jobs/8868) and [8892](https://lab.eignex.com/jobs/8892) add
+the objective-guided joint control on the five sources with closed compositions, with a
+20-second trace allowance. [8867](https://lab.eignex.com/jobs/8867) ran on a host three
+times slower and spent its 6-second allowance before the p06 split region, and
+[8872](https://lab.eignex.com/jobs/8872) timed out fetching the corpus before any source. All ran on one Linux/amd64 vCPU with 4.6 GiB and JDK 25.
 
 The conditioned control splits at its root into the two cycles. Children of 3 and 3 plus
 the fixed separator compose to 7 in 20 nodes, against 82 for the joint residual. Across
-the sources, all ten closed node compositions equal the joint optimum, every composed witness
-passes the original clauses, and child and joint refutations agree in four probes.
+the sources, every closed node composition that a joint residual also closes equals its
+optimum, every composed witness passes the original clauses, and child and joint
+refutations agree in every refuted probe: four in 8856, five in 8862.
 
-Independence is narrow. One source never splits. On six others a giant component holds
-the residual: split-off children carry at most 6% of free variables, the giant stops
-without a verdict, or no probe-eligible split appears. Wall-time gains appear only at shallow balanced splits under the
-trivial objective bound: an auctions node solves 161 and 9 clauses in 31,810 nodes and
-59 ms against 137,777 nodes and 235 ms joint, and a preference-planning node closes its
-children where the joint residual stops at two seconds. Elsewhere, per-child model cost
-exceeds the saved nodes. `LpConfig(LpEmphasis.DEFAULT)` left every joint node count
-unchanged. Re-encountered child keys are mostly at most nine clauses solved in at most
-22 nodes, while a full residual scan costs about eight search nodes on auctions and
-milliseconds per sample on the largest sources. Incumbent-scoped learned entries merge
-many splits; non-permanent learned clauses merged splits only on tcp.
+The correction changes one source. Preference-planning p06 splits from decision level
+10,600: its largest component holds 44–62% of live clauses instead of 99.8%. Two probed
+nodes split into 575 and 576 components whose children all close at zero residual cost
+in at most 2,209 nodes, while the joint and LP-bounded joint residuals stop at two
+seconds. The composed witnesses, 1,312 and 1,322, pass the original clauses and lie below
+the traced incumbent of 2,969–3,234. With `objectiveGuidedValues` the joint residual
+closes the same nodes in 2,139 and 1,985 nodes (81 and 39 ms), and it refutes the third
+probed node in 144 nodes against 1,264 for its children. The surviving work is a
+value-ordering cost that existing ordering removes, not independence.
 
-The retained scope shows no consumed reuse under containing allowances, so no traversal
-or cache integration follows. Raw records are under
+The other sources keep their pattern. Protein never splits. On privilege, tcp, CSG,
+haplotyping and packup a giant component holds the residual: split-off children carry at
+most 12.4% of free variables, or the giant stops without a verdict. A p03 node closes its
+children where the joint stops only on the faster 8856 host. There its 26,707-clause giant
+child, beside a six-clause one, finishes within the allowance; on later hosts every child
+solve and joint control stops. On metro, rna and p03 the ordered joint residual closes
+every node the children close in less time than the children's total. The one gain that survives
+every joint control is a shallow auctions node, where 161 clauses beside a nine-clause child
+solve in 31,810 nodes and 124 ms against 96,302 nodes and 170 ms ordered. A full residual
+scan costs 4–220 search nodes per sample. Learned-clause merges count clauses only, not
+learned pseudo-Boolean entries such as the objective cutoff, so they bound no
+cutoff-inclusive connectivity. Probed keys are re-encountered after retractions, but a
+re-encountered key is not consumed reuse.
+
+On the corrected trace, no nontrivial independent obligation survives preparation, LP
+bounds, learning and ordering under containing allowances on the retained scope, so
+neither traversal nor cache integration follows from it. Raw records are under
 `klause-evidence/campaigns/conditional-components-3724/`.
 
 ### Integer cost cores
