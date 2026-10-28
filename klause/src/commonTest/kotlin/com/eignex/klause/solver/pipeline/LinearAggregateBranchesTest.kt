@@ -21,6 +21,7 @@ import com.eignex.klause.solver.search.SearchNodeDisposition
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -116,5 +117,23 @@ class LinearAggregateBranchesTest {
             assertEquals(operations, budget.operations)
             session.popTo(0)
         }
+    }
+
+    @Test
+    fun `a guarded aggregate refutation should preserve the feasible Boolean alternative`() {
+        val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
+        val guarded = rows.mapValues { (id, premise) ->
+            if (id == "lower" || id == "upper") SourcePremise(premise.inequality, mapOf(0 to false)) else premise
+        }
+        val context = SourceProofContext(scope, source.coordinates + bool, guarded, mapOf(bool to BigFraction.ONE))
+
+        val result = LinearAuthorityInvocation(context, TheoryParams(sourceLpOperations = 16),
+            boundOrdered = true, aggregateBranching = true).use { it.run { _, _ -> } }
+
+        val terminal = assertNotNull(result.terminal)
+        assertTrue(assertIs<SourceClaim.Optimal>(terminal.claim).sample.boolValue(0))
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(context.withLinearAuthority()).verify(terminal))
+        assertEquals(1L, result.stats.smt.completeSearchStages?.get("numericalAggregateSplits"))
     }
 }
