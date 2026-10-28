@@ -2842,6 +2842,45 @@ and scope fidelity, with no portfolio or reuse-speed claim. Runtime/resource rec
 hashes, snapshots and the timed-out source attempt remain under
 `klause-evidence/campaigns/residual-snapshots-3740-3741/`.
 
+### Scoped component cutoff and separator gates
+
+[Control 8916](https://lab.eignex.com/jobs/8916), at `70d9e18945`, checks exact
+child floors 3+3 against strict cutoffs 6 and 7. Threshold refutation closes 6
+without claiming source infeasibility; cutoff 7 permits the checked optimum 6.
+The bridge control keeps both separator alternatives. Its two-decision ordering
+gain does not cover structural analysis, and supplies no performance admission.
+Thirty-four CI controls cover immutable scopes, signed costs, partial siblings,
+cutoff changes, undo, budget-implied PB rows and containing allowances.
+
+[Source gate 8953](https://lab.eignex.com/jobs/8953), at `870a202eee`, completes
+one frozen auctions source, seed 3, and two seconds per containing arm on Linux/amd64,
+JDK 25.0.4.1, one vCPU and 4608 MiB. The first retained split has no incumbent
+and declines. Sample 270 has four enforcing children of 6,4,4,2 variables, fixed
+cost 68,480 and checked strict cutoff 69,645. Floors 865+300 close that cutoff
+in three queries and one charged decision. Ordinary learning and both LP controls
+close it with zero charged decisions. Total input-through-check cost is 91 ms for
+composition versus 87 ms for ordinary search; cumulative modeled storage is
+555 KB versus 453 KB. Neither reusable progress nor useful additional closure
+survives these controls, so component traversal is not admitted.
+
+The separate fresh prepared root reapplies ordinary cutoff propagation under the
+same checked incumbent. It remains one 186-variable component. The bounded
+separator selects variable 0, which ordinary search already selects first; its
+first branch leaves children of 184 and 1 variables. Analysis costs 471 ms,
+and the shared allowance expires without closure or a composed source witness;
+the other branch remains unresolved. At the retained node, both separator branches
+close, but total cost is 210 ms versus natural composition's 91 ms. These results
+reject this bounded separator pilot independently of the cutoff contract. No
+child results are reused, and no source-family or production default is admitted.
+
+Incumbents retain complete prepared and reconstructed witnesses checked against
+native original-Problem clauses and exact costs. Expired root candidate checks
+supply no source-witness claim; there is no independent source-format proof
+certificate. Raw snapshots, witnesses, JFR, runtime receipts and the first failed
+artifact-upload attempt remain outside Git in
+`klause-evidence/campaigns/scoped-components-3742-3743/`. No local executable
+validation ran. Job 8896 failed remote compilation before any solver case.
+
 ### Retained objective alias costs
 
 [8895](https://lab.eignex.com/jobs/8895) compares `d4e3c9b659` with the matched
