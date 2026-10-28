@@ -59,10 +59,11 @@ controls and establish no solver throughput or verdict claim.
 
 `bench.profile.CoreQueryProfile` compares retained and ordinarily prepared Boolean
 core controls with unrelated cheap objective pins. It takes no arguments. Two source
-shapes, three OLL policies and three repeats give 36 two-second cases within a
+shapes, four OLL policies and three repeats give 48 two-second cases within a
 180-second lab profile. It retains source/objective hashes, actual query/core
 sequences, source point checks, preparation and complete-handle time/allocation,
-work and thresholds. The opt-in propagation-deletion control shares the worker's
+work and thresholds. Policies include removing root-satisfied cost pins. The
+opt-in propagation-deletion control shares the worker's
 allowance. Separate helper calls retain the existing opt-in deletion minimizer's
 actual seed-path behavior. These native controls establish no independently checked
 proof or whole-CLI throughput claim.
