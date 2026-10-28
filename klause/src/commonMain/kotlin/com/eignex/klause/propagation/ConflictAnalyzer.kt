@@ -366,6 +366,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
             if (fallback !is AnalysisResult.Learned || !fallback.asserting || state.runCancelled) return fallback
             val prepared = choice.prepare(fallback.literals)
             state.finiteWork.checkNow()
+            state.arithmeticLearningTrace?.record(if (prepared) "table.retry" else "table.decline")
             if (!prepared) return fallback
             universe = state.problem.numBoolVars + state.atoms.intVar.size
             val alternateResolvent = ClauseResolvent(state, this)
@@ -378,6 +379,8 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
                 else -> alternate.literals.size < fallback.literals.size
             }
             if (!improves) return fallback
+            state.arithmeticLearningTrace?.record("table.accepted", fallback.backjumpLevel.toLong(),
+                alternate.backjumpLevel.toLong(), fallback.literals.size.toLong(), alternate.literals.size.toLong())
             lastResolvent = alternateResolvent
             return alternate
         } finally {
