@@ -199,8 +199,25 @@ class NodeBudgetTest {
 
         assertEquals(10L, budget.spent)
         assertTrue(quotas[0].exhausted())
-        assertEquals(4L, quotas[1].movesLeft())
+        assertEquals(0L, quotas[1].movesLeft())
+        assertEquals(0L, quotas[1].decisionsLeft())
+        assertTrue(quotas[1].exhausted())
+        assertEquals(5L, quotas[1].limit)
         assertEquals(0L, quotas[1].spent)
+    }
+
+    @Test
+    fun `worker move capacity should include the containing allowance`() {
+        val budget = NodeBudget(9L)
+        val quotas = budget.quotas(9)
+        repeat(7) { quotas[it].spendMoves(1L) }
+
+        val remaining = quotas[7].movesLeft()
+
+        assertEquals(0L, remaining)
+        assertEquals(1L, quotas[7].decisionsLeft())
+        assertEquals(0L, quotas[7].spent)
+        assertEquals(8L, budget.spent)
     }
 
     @Test

@@ -289,7 +289,9 @@ give a complete worker three quarters when heuristic siblings are present.
 Quotas persist across reopens and reseeds and are not redistributed when a worker
 finishes or fails, so a quota can stop a worker while other quota remains unused.
 Atomic overspend stays visible in the aggregate counter and can exhaust the whole
-cap. Parallel scheduling and stopping order are not reproducible.
+cap. Worker capacity queries also respect every containing allowance, including
+the aggregate instruction price across sibling quotas. Parallel scheduling and
+stopping order are not reproducible.
 
 ### Native arithmetic allowances
 
