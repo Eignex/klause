@@ -11,7 +11,6 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -36,11 +35,10 @@ internal object EqualityKernelReplay {
         file: File,
         score: (Sample) -> BigFraction,
         cancellation: Cancellation = Cancellation.Never,
-        threadBytes: () -> Long = ::trajectoryThreadBytes,
         verify: (Sample, Cancellation) -> Boolean,
     ): Map<String, IntArray> {
         val started = System.nanoTime()
-        val allocated = threadBytes()
+        val allocated = trajectoryThreadBytes()
         var work = 0L
         val clock = Cancellation.after(2.seconds) or cancellation
         val stop = object : Cancellation {
@@ -56,10 +54,10 @@ internal object EqualityKernelReplay {
             if (matrix != null) {
                 for (mode in listOf("network", "hermite")) {
                     val extractionStart = System.nanoTime()
-                    val extractionBytes = threadBytes()
+                    val extractionBytes = trajectoryThreadBytes()
                     val directions = if (mode == "network") network(matrix, view, stop) else hermite(matrix, stop)
                     val extractionNs = System.nanoTime() - extractionStart
-                    val extractionAllocation = threadBytes() - extractionBytes
+                    val extractionAllocation = trajectoryThreadBytes() - extractionBytes
                     var selected: Move? = null
                     var best = score(center)
                     add(
@@ -97,11 +95,19 @@ internal object EqualityKernelReplay {
                         }
                         )
                         val move = selected as? Move.Compound
-                        val consumed = move?.let { consume(view, it, center, score, stop, verify) }
+                        val consumed = move?.let { EqualityKernelMove.consume(view, it, center, score, stop, verify) }
                         if (consumed != null) {
-                            consumedScopes[mode] = move.parts.map { (it as Move.IntSet).varId }.toIntArray()
+                            consumedScopes[mode] = consumed.inputs
                         }
-                        put("consumed", consumed ?: JsonNull)
+                        put("consumed", consumed?.let {
+                            buildJsonObject {
+                                put("preparedInputs", JsonArray(it.inputs.map(::JsonPrimitive)))
+                                put("source", trajectorySource(it.source))
+                                put("sourceObjective", it.value.toString())
+                                put("sourceChanges", it.changes)
+                                put("nativeSourceCheck", true)
+                            }
+                        } ?: JsonNull)
                     }
                     )
                 }
@@ -115,7 +121,7 @@ internal object EqualityKernelReplay {
             put("work", work)
             put("workLimit", MAX_WORK)
             put("elapsedNs", System.nanoTime() - started)
-                put("threadBytes", threadBytes() - allocated)
+                put("threadBytes", trajectoryThreadBytes() - allocated)
             put("interrupted", stop())
             put("scope", "cold bounded diagnostic; no retained source or default policy")
             put("records", records)
@@ -125,44 +131,6 @@ internal object EqualityKernelReplay {
         return consumedScopes
     }
 
-    private fun consume(
-        view: TrajectoryView,
-        move: Move.Compound,
-        center: Sample,
-        score: (Sample) -> BigFraction,
-        stop: Cancellation,
-        verify: (Sample, Cancellation) -> Boolean,
-    ): JsonObject? {
-        if (stop()) return null
-        try {
-            view.state.apply(move)
-            val working = view.state.assignment.snapshot()
-            if (view.state.cost != 0L || !honorsPins(view, working) || stop()) return null
-            val point = view.reconstruct(working)
-            if (!verify(point, stop)) return null
-            return buildJsonObject {
-                put("preparedInputs", JsonArray(move.parts.map { JsonPrimitive((it as Move.IntSet).varId) }))
-                put("source", trajectorySource(point))
-                put("sourceObjective", score(point).toString())
-                put(
-                    "sourceChanges",
-                    (0 until center.numIntVars).count {
-                    center.intValue(it) != point.intValue(it)
-                }
-                )
-                put("nativeSourceCheck", true)
-            }
-        } finally {
-            check(view.load(center) == null)
-        }
-    }
-
-    private fun honorsPins(view: TrajectoryView, point: Sample): Boolean {
-        var honored = true
-        view.state.assumptions.forEachInt { id, value -> if (point.intValue(id) != value) honored = false }
-        view.state.assumptions.forEachBool { id, value -> if (point.boolValue(id) != value) honored = false }
-        return honored
-    }
     private fun matrix(view: TrajectoryView, stop: Cancellation): Matrix? {
         val state = view.state
         if (state.problem.semantics.effective.feasibilityTolerance?.isExact == false) return null
@@ -316,59 +284,32 @@ internal object EqualityKernelReplay {
         improving: (Move, Sample) -> Unit,
     ) = buildJsonArray {
         val state = view.state
-        for (sign in listOf(one, -one)) {
-            val g = direction.map { it * sign }
-            var maximum: BigInteger? = null
-            for ((i, id) in matrix.columns.withIndex()) {
-                if (g[i] == zero) continue
-                val current = BigInteger.valueOf(state.assignment.intValue(id))
-                val domain = state.rootDomains[id]
-                val limit = if (g[i] > zero) {
-                    (BigInteger.valueOf(domain.max) - current) / g[i]
-                } else {
-                    (current - BigInteger.valueOf(domain.min)) / -g[i]
-                }
-                maximum = maximum?.min(limit) ?: limit
-            }
-            val cap = maximum ?: continue
-            for (step in listOf(one, cap).distinct().filter { it > zero && it <= cap }) {
-                if (stop()) return@buildJsonArray
-                val parts = ArrayList<Move>()
-                var admissible = true
-                for ((i, id) in matrix.columns.withIndex()) {
-                    if (g[i] == zero) continue
-                    val target = BigInteger.valueOf(state.assignment.intValue(id)) + step * g[i]
-                    if (target < BigInteger.valueOf(Long.MIN_VALUE) || target > BigInteger.valueOf(Long.MAX_VALUE) ||
-                        target.toLong() !in state.rootDomains[id] || state.assumptions.isFrozenInt(id) ||
-                        state.invariants?.isDefinedInt(id) == true || (state.seeding.ownerInt?.get(id) ?: -1) >= 0
-                    ) {
-                        admissible = false
-                        break
-                    }
-                    parts += Move.IntSet(id, target.toLong())
-                }
-                if (!admissible || parts.size < 2) continue
-                val sink = view.proposalSink()
-                sink.addCompound(parts)
-                val move = sink.list.singleOrNull() as? Move.Compound ?: continue
-                if (move.parts != parts) continue
-                val inspection = state.inspectMove(move, view.objective)
-                if (!honorsPins(view, inspection.assignment)) continue
-                val source = view.reconstruct(inspection.assignment)
-                val accepted = check(source, stop)
-                if (inspection.netDelta == 0L && accepted) improving(move, source)
-                add(
-                    buildJsonObject {
-                        put("step", (step * sign).toString())
-                        put("move", move.toString())
-                        put("netDelta", inspection.netDelta)
-                        put("source", trajectorySource(source))
-                        put("nativeSourceCheck", accepted)
-                        put("objectiveDelta", inspection.objectiveDelta.toString())
-                        put("wholeSinkAdmission", true)
-                    },
-                )
-            }
+        val steps = EqualityKernelMove.steps(
+            matrix.columns, matrix.rows, direction, state.assignment::intValue,
+            { state.rootDomains[it] },
+            { id ->
+                !state.assumptions.isFrozenInt(id) && state.invariants?.isDefinedInt(id) != true &&
+                    (state.seeding.ownerInt?.get(id) ?: -1) < 0
+            },
+            stop,
+        )
+        for (step in steps) {
+            if (stop()) return@buildJsonArray
+            val move = EqualityKernelMove.admit(step, view::proposalSink) ?: continue
+            val probe = EqualityKernelMove.probe(view, move, stop, check) ?: continue
+            val inspection = probe.inspection
+            if (inspection.netDelta == 0L && probe.accepted) improving(move, probe.source)
+            add(
+                buildJsonObject {
+                    put("step", step.scalar.toString())
+                    put("move", move.toString())
+                    put("netDelta", inspection.netDelta)
+                    put("source", trajectorySource(probe.source))
+                    put("nativeSourceCheck", probe.accepted)
+                    put("objectiveDelta", inspection.objectiveDelta.toString())
+                    put("wholeSinkAdmission", true)
+                },
+            )
         }
     }
 }
