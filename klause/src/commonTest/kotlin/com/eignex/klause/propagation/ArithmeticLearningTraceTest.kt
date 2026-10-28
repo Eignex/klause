@@ -22,6 +22,29 @@ import kotlin.test.assertTrue
 
 class ArithmeticLearningTraceTest {
     @Test
+    fun `row capture should retain signed Boolean and order guards`() {
+        val state = PropagationState(Problem(1, 1, arrayOf(IntDomain(0, 6)), emptyArray()), Assumptions.None)
+        val selected = Lit.make(state.atomVarEq(0, 2), true)
+        for (guard in intArrayOf(Lit.make(0, false), selected)) {
+            val row = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
+                longArrayOf(1), intArrayOf(0), LinearOp.LE, 6), useLo = true, guard = guard))
+            val trace = ArithmeticLearningTrace()
+
+            trace.row("candidate", row, state)
+
+            assertContentEquals(longArrayOf(guard.toLong()), trace.events.single { it.kind == "candidate.guard" }.data)
+            val literal = trace.events.single { it.kind == "candidate.guard-literal" }.data
+            assertEquals(guard.toLong(), literal[0])
+            if (guard == selected) {
+                assertEquals(0L, literal[2])
+                assertEquals(AtomKind.EQ.ordinal.toLong(), literal[3])
+                assertEquals(2L, literal[4])
+            }
+            assertFalse(trace.truncated)
+        }
+    }
+
+    @Test
     fun `capture should attribute PB rejection of a nonboolean reason`() {
         val state = PropagationState(Problem(1, 1, arrayOf(IntDomain(0, 6)), emptyArray()), Assumptions.None)
         val integer = state.atomVarGe(0, 1)

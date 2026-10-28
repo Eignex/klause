@@ -63,6 +63,9 @@ internal class ArithmeticLearningTrace(
     fun row(kind: String, row: IntegerConflictRow, state: PropagationState, trail: Int? = null) {
         if (!accepting) return
         record(kind, row.bound, (trail ?: -1).toLong())
+        if (!accepting) return
+        record("$kind.guard", row.guard.toLong())
+        if (row.guard != Lit.NONE) clause("$kind.guard-literal", intArrayOf(row.guard), state)
         for (index in row.variables.indices) {
             if (!accepting) return
             val variable = row.variables[index]
