@@ -48,7 +48,9 @@ class ResumableMinimizeDirectionalTest {
             }) },
         )
 
-        val result = BacktrackSolver(problem).minimize(LinearObjective(intCoefficients = LongArray(variables) { 1L }), params)
+        val result = BacktrackSolver(problem).minimize(
+            LinearObjective(intCoefficients = LongArray(variables) { 1L }), params,
+        )
 
         val observations = result.stats.lp.phases.getValue("DIRECTIONAL_BRANCH_NODE").outcomes
         val diagnostic = "$observations; solves=${result.stats.lp.solves.sum}; prunes=${result.stats.lp.pruned.sum}"

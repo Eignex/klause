@@ -2,6 +2,7 @@ package com.eignex.klause.backtrack.lp
 
 import com.eignex.klause.lp.bounding.LpHintSink
 import com.eignex.klause.lp.engine.ExactLpModel
+import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpScopedRows
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.solver.search.SearchDecision
@@ -74,7 +75,15 @@ internal class LpHints(
 
     override fun recordInfeasible() = history.infeasible()
 
-    fun finishNode() = history.finishNode()
+    fun finishNode(state: LpExactState? = null) {
+        history.finishNode()
+        if (scopeModel != null && state != null &&
+            (scopeModel !== state.baseModel || scopeRows !== state.rows)
+        ) {
+            observe("INCOMPATIBLE")
+            resetHistory()
+        }
+    }
 
     fun branch(variable: VarRef) {
         if (directionalGains && scopeModel != null) {

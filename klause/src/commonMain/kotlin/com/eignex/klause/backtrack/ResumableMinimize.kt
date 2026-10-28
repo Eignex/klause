@@ -1266,7 +1266,7 @@ internal class ResumableMinimize(
             val lpBound = if (rebindable) externalBound else effectiveBound
             lpHints?.beginNode(context.decisionLevel, lpBound)
             val pruned = lpEngine.pruneNode(session, lpBound, singleObj?.varId ?: -1, singleObj?.ascending ?: true)
-            lpHints?.finishNode()
+            lpHints?.finishNode(lpEngine.cpAdapter.currentModel?.exactState)
             if (!pruned) {
                 return SearchNodeDisposition.Expand
             }
