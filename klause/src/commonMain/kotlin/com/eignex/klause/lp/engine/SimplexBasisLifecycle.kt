@@ -3,6 +3,7 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.simplex.basis.BasisOperationWork
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
+import com.eignex.klause.simplex.basis.LuPivotPolicy
 import com.eignex.koblas.SparseMatrix
 
 internal class SimplexBasisLifecycle(m: Int, numVars: Int) {
@@ -17,8 +18,10 @@ internal class SimplexBasisLifecycle(m: Int, numVars: Int) {
     var unitRows = IntArray(0)
     private var retiredWork: BasisOperationWork? = null
 
-    fun solver(matrix: SparseMatrix, factory: ((SparseMatrix) -> BasisSolver)?): BasisSolver =
-        current ?: (factory?.invoke(matrix) ?: KotlinBasisSolver(matrix)).also { current = it }
+    fun solver(matrix: SparseMatrix, factory: ((SparseMatrix) -> BasisSolver)?,
+        entryLimit: Long, workLimit: Long, cancelled: () -> Boolean): BasisSolver =
+        current ?: (factory?.invoke(matrix) ?: KotlinBasisSolver(matrix,
+            policy = LuPivotPolicy(maxEntries = entryLimit, maxWork = workLimit, cancelled = cancelled))).also { current = it }
 
     fun invalidate() {
         factorized = false

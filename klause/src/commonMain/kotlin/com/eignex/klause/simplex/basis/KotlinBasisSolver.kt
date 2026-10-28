@@ -134,7 +134,8 @@ internal class KotlinBasisSolver(
             }
         }
         var dense: LuBuildResult.Rejected? = null
-        if (n in 1..denseDimensionLimit && entries > n && entries.toDouble() >= denseMinimumDensity * n * n) {
+        if (policy.maxEntries == Long.MAX_VALUE && policy.maxWork == Long.MAX_VALUE &&
+            n in 1..denseDimensionLimit && entries > n && entries.toDouble() >= denseMinimumDensity * n * n) {
             val owner = denseBuilder ?: DenseBasisFactors(source).also {
                 denseBuilder = it
                 selectionUnits += n.toLong() * n + 3L * n

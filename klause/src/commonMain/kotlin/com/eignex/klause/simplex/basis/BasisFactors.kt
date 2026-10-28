@@ -11,11 +11,15 @@ internal data class LuPivotPolicy(
     val absoluteTolerance: Double = 1e-10,
     val relativeThreshold: Double = 0.1,
     val searchLimit: Int = 8,
+    val maxEntries: Long = Long.MAX_VALUE,
+    val maxWork: Long = Long.MAX_VALUE,
+    val cancelled: () -> Boolean = { false },
 ) {
     init {
         require(absoluteTolerance.isFinite() && absoluteTolerance >= 0.0)
         require(relativeThreshold.isFinite() && relativeThreshold > 0.0 && relativeThreshold <= 1.0)
         require(searchLimit > 0)
+        require(maxEntries >= 0L && maxWork >= 0L)
     }
 }
 
@@ -51,7 +55,7 @@ internal data class LuBuildReport(
 }
 
 // These are floating-point declines, including exhausted numerical pivots, never exact rank claims.
-internal enum class LuBuildRejection { NO_USABLE_PIVOT, NONFINITE_INPUT, ARITHMETIC_BREAKDOWN }
+internal enum class LuBuildRejection { NO_USABLE_PIVOT, NONFINITE_INPUT, ARITHMETIC_BREAKDOWN, STORAGE, WORK, CANCELLED }
 
 internal sealed interface LuBuildResult {
     val work: LuBuildWork
@@ -220,10 +224,43 @@ private class LuConstruction(
     private var schurUpdates = 0L
     private var fillCreated = 0L
 
+    private var reservedEntries = 0L
+    private var storageStopped = false
+    private var workStopped = false
+    private var cancelled = false
+    private val limited = policy.maxEntries != Long.MAX_VALUE || policy.maxWork != Long.MAX_VALUE
+
+    private fun permitted(): Boolean {
+        if (!limited) return true
+        cancelled = cancelled || policy.cancelled()
+        val units = inputEntries.toLong() + candidates + maximumEntries + schurUpdates +
+            2L * (lower.size + upper.size)
+        workStopped = workStopped || units >= policy.maxWork
+        return !cancelled && !workStopped
+    }
+
+    private fun stopReason(fallback: LuBuildRejection): LuBuildRejection = when {
+        cancelled -> LuBuildRejection.CANCELLED
+        workStopped -> LuBuildRejection.WORK
+        storageStopped -> LuBuildRejection.STORAGE
+        else -> fallback
+    }
+
+    private fun reserveEntry(): Boolean {
+        if (!permitted()) return false
+        if (reservedEntries >= policy.maxEntries) {
+            storageStopped = true
+            return false
+        }
+        reservedEntries++
+        return true
+    }
+
     fun build(): LuAttemptResult {
-        if (!load()) return rejected(LuBuildRejection.NONFINITE_INPUT)
+        if (!load()) return rejected(stopReason(LuBuildRejection.NONFINITE_INPUT))
         var inKernel = false
         while (pivots < n) {
+            if (!permitted()) return rejected(stopReason(LuBuildRejection.WORK))
             val proposed = proposedOrder?.let {
                 LuPivot(it.rowOrder[pivots], it.columnOrder[pivots]).takeIf { pivot ->
                     acceptable(pivot.row, pivot.column)
@@ -234,8 +271,9 @@ private class LuConstruction(
                 inKernel = true
                 kernelDimension = n - pivots
             }
-            val pivot = proposed ?: singleton ?: markowitz() ?: return rejected(LuBuildRejection.NO_USABLE_PIVOT)
-            if (!eliminate(pivot)) return rejected(LuBuildRejection.ARITHMETIC_BREAKDOWN)
+            val pivot = proposed ?: singleton ?: markowitz()
+                ?: return rejected(stopReason(LuBuildRejection.NO_USABLE_PIVOT))
+            if (!eliminate(pivot)) return rejected(stopReason(LuBuildRejection.ARITHMETIC_BREAKDOWN))
             if (singleton != null) singletonPivots++
             rowOrder[pivots] = pivot.row
             columnOrder[pivots] = pivot.column
@@ -255,18 +293,20 @@ private class LuConstruction(
             val unitRow = unitRows[j]
             if (unitRow >= 0) {
                 inputEntries++
+                if (!reserveEntry()) return false
                 columns[j].put(unitRow, 1.0)
                 rows[unitRow].add(j)
             } else {
                 source.forEachInColumn(basisColumns[j]) { i, value ->
                     inputEntries++
                     if (!value.isFinite()) finite = false
-                    if (value != 0.0) {
+                    if (value != 0.0 && reserveEntry()) {
                         columns[j].put(i, value)
                         rows[i].add(j)
                     }
                 }
             }
+            if (storageStopped || !permitted()) return false
             refreshMaximum(j)
         }
         for (i in n - 1 downTo 0) {
@@ -332,6 +372,7 @@ private class LuConstruction(
         for (count in 2..n) {
             var j = columnBuckets.first(count)
             while (j >= 0) {
+                if (!permitted()) return null
                 val entries = stageColumn(j)
                 val eligible = SparseSlices.pivotCandidatePositions(
                     stagedRows, 0, stagedValues, 0, entries, activeRows,
@@ -372,6 +413,7 @@ private class LuConstruction(
         for (position in 0 until affectedColumnCount) {
             val column = affectedColumns[position]
             val top = columns[column].getOrDefault(i, 0.0)
+            if (!reserveEntry()) return false
             upper.add(pivots, column, top)
             columns[column].remove(i)
             if (column == j) continue
@@ -407,6 +449,7 @@ private class LuConstruction(
             val multiplier = columns[j].getOrDefault(affectedRows[k], 0.0) / diagonal
             if (!multiplier.isFinite() || multiplier == 0.0) return false
             multipliers[k] = multiplier
+            if (!reserveEntry()) return false
             lower.add(affectedRows[k], pivots, multiplier)
         }
         return true
@@ -415,6 +458,7 @@ private class LuConstruction(
     // Subtract the pivot row's [top] entry times each multiplier from [column]; false on a nonfinite update.
     private fun schurUpdate(column: Int, top: Double, affectedRowCount: Int): Boolean {
         for (k in 0 until affectedRowCount) {
+            if (!permitted()) return false
             val row = affectedRows[k]
             val product = multipliers[k] * top
             val before = columns[column].getOrDefault(row, 0.0)
@@ -428,6 +472,7 @@ private class LuConstruction(
                 }
 
                 else -> {
+                    if (before == 0.0 && !reserveEntry()) return false
                     columns[column].put(row, after)
                     if (before == 0.0) {
                         rows[row].add(column)

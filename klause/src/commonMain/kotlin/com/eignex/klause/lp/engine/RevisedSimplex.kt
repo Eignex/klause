@@ -515,7 +515,8 @@ internal class RevisedSimplex(
         return columnDot(y, j)
     }
 
-    private fun solver(): BasisSolver = basisLifecycle.solver(columns, basisSolverFactory)
+    private fun solver(): BasisSolver = basisLifecycle.solver(columns, basisSolverFactory,
+        pricing.basisEntryLimit, pricing.basisWorkLimit) { cancellation() }
 
     @Suppress("TooGenericExceptionCaught")
     override fun close() {

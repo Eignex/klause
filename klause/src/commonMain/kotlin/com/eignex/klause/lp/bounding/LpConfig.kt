@@ -38,6 +38,9 @@ enum class LpTiming {
  * @property timing the cost tier gating which emphasis levels may run this technique.
  */
 enum class LpTechnique(val id: String, val timing: LpTiming) {
+    /** Explicit bounded sparse root trial; emphasis levels leave it disabled. */
+    SPARSE_TRIAL("sparse-trial", LpTiming.MEDIUM),
+
     /** Cumulative / Disjunctive energetic over-subscription feasibility check. */
     ENERGETIC("energetic", LpTiming.FAST),
 
@@ -189,7 +192,7 @@ enum class LpEmphasis(
 class LpConfig(val emphasis: LpEmphasis = LpEmphasis.DEFAULT, val overrides: Map<LpTechnique, Boolean> = emptyMap()) {
 
     /** Whether [technique] is permitted: an explicit override wins, else its tier ≤ the emphasis. */
-    fun resolved(technique: LpTechnique): Boolean = overrides[technique] ?: (technique.timing in emphasis.timings)
+    fun resolved(technique: LpTechnique): Boolean = overrides[technique] ?: (technique != LpTechnique.SPARSE_TRIAL && technique.timing in emphasis.timings)
 
     /** This config capped under [ceiling] for a portfolio arm: the lower emphasis, with the ceiling's
      *  per-technique overrides applied on top (so a `--lp aggressive,-cuts` ceiling forces cuts off on

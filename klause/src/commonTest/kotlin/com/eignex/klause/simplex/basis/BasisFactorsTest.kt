@@ -13,6 +13,22 @@ import kotlin.test.assertTrue
 
 class BasisFactorsTest {
     @Test
+    fun `resource limits decline before publishing factors and leave the builder reusable`() {
+        val matrix = sparse(arrayOf(doubleArrayOf(3.0, 1.0), doubleArrayOf(1.0, 3.0)))
+        val builder = BasisFactors(matrix)
+        for ((policy, reason) in listOf(
+            LuPivotPolicy(maxEntries = 2L) to LuBuildRejection.STORAGE,
+            LuPivotPolicy(maxWork = 1L) to LuBuildRejection.WORK,
+            LuPivotPolicy(maxWork = 100L, cancelled = { true }) to LuBuildRejection.CANCELLED,
+        )) {
+            val declined = builder.build(intArrayOf(0, 1), policy)
+
+            assertEquals(reason, assertIs<LuBuildResult.Rejected>(declined).reason)
+            assertIs<LuBuildResult.Built>(builder.build(intArrayOf(0, 1)))
+        }
+    }
+
+    @Test
     fun `factors should reconstruct each shape in original coordinates`() {
         for (shape in listOf("empty", "unit", "triangular", "spiked", "dense16")) {
             val n = when (shape) {

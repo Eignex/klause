@@ -138,6 +138,7 @@ internal class LpEngine(
 
     private var closed = false
     private val requestedPlan = params0.lpPlan
+    private val sparseTrialRequested = params0.lpConfig?.resolved(LpTechnique.SPARSE_TRIAL) == true
     internal var primalPropagationWork: Long = 0L
     internal var primalSearchWork: Long = 0L
     internal var rootRoundingWarmStart: RootRoundingWarmStart? = null
@@ -246,7 +247,9 @@ internal class LpEngine(
         private set
 
     internal val pricingOptions: LpPricingOptions
-        get() = LpPricingOptions(params.zeroObjectivePricing, params.randomSeed ?: 0L)
+        get() = LpPricingOptions(params.zeroObjectivePricing, params.randomSeed ?: 0L,
+            if (params.lpPlan.sparseTrial) SPARSE_LP_MAX_FACTOR_ENTRIES else Long.MAX_VALUE,
+            if (params.lpPlan.sparseTrial) SPARSE_LP_MAX_FACTOR_WORK else Long.MAX_VALUE)
 
     private val auxiliarySources = LpAuxiliarySources()
     private var structuralCutSupport = params0.lpPlan.cuts || params0.lpPlan.circuit
@@ -430,7 +433,10 @@ internal class LpEngine(
     // solve cannot run far past the allowance before the ledger sees it. See [LpEffortGovernor].
     private val lpEffortGovernor = LpEffortGovernor(
         opsPerNodeCap = params.lpPlan.boundMaxOpsPerNode,
-        workAllowance = lpWorkAllowance(params.solveBudgetMillis, params.lpPlan.lpWorkBudgetFraction),
+        workAllowance = lpWorkAllowance(params.solveBudgetMillis, params.lpPlan.lpWorkBudgetFraction).let {
+            if (sparseTrialRequested) minOf(it.takeIf { work -> work > 0L } ?: SPARSE_LP_MAX_WORK,
+                SPARSE_LP_MAX_WORK) else it
+        },
         warmupSolves = LpEffortLadder.DEFAULT_WARMUP,
     )
 
@@ -461,6 +467,7 @@ internal class LpEngine(
      * floor does not already get.
      */
     internal fun nodeWorkBudget(): Long {
+        if (params.lpPlan.sparseTrial) return lpEffortGovernor.remainingWork()?.coerceAtLeast(1L) ?: 1L
         val budget = when {
             !adaptiveWork -> 0L
             lpEffortGovernor.isDemoted -> MIN_NODE_WORK_OPS
@@ -472,12 +479,13 @@ internal class LpEngine(
     }
 
     internal fun nodeQueryWorkBudget(): Long? {
+        if (params.lpPlan.sparseTrial) return lpEffortGovernor.remainingWork()?.coerceAtLeast(1L)
         val offered = nodeWorkAllowance()?.coerceAtLeast(1L) ?: return null
         val containing = nodeWorkBudget()
         return if (containing == 0L) offered else minOf(containing, offered)
     }
 
-    internal fun nodePreparationWorkBudget(): Long = if (rootQueryPolicy != LpRootQueryPolicy.SHARED_WORK) {
+    internal fun nodePreparationWorkBudget(): Long = if (separateNodePreparation) {
         lpEffortGovernor.remainingWork()?.coerceAtLeast(1L) ?: nodeWorkBudget()
     } else nodeWorkBudget()
 
@@ -566,7 +574,11 @@ internal class LpEngine(
         ) lpWorkBudget.observeWorkStop()
     }
 
-    internal val measuresRootQueries: Boolean get() = rootQueryPolicy == LpRootQueryPolicy.INTERRUPTED_WORK ||
+    private val separateNodePreparation: Boolean get() = sparseTrialRequested ||
+        rootQueryPolicy != LpRootQueryPolicy.SHARED_WORK
+
+    internal val measuresRootQueries: Boolean get() = params.lpPlan.sparseTrial ||
+        rootQueryPolicy == LpRootQueryPolicy.INTERRUPTED_WORK ||
         rootQueryPolicy == LpRootQueryPolicy.CHECKPOINTED_WORK
     internal var measuredRootLowerBound: Double? = null
         private set
@@ -645,9 +657,9 @@ internal class LpEngine(
         solveContext = solveContext,
         cancellation = params.cancellation,
         queryWorkAllowance = {
-            nodeQueryWorkBudget() ?: nodeWorkBudget().takeIf { rootQueryPolicy != LpRootQueryPolicy.SHARED_WORK }
+            nodeQueryWorkBudget() ?: nodeWorkBudget().takeIf { separateNodePreparation }
         },
-        onPreparation = if (rootQueryPolicy != LpRootQueryPolicy.SHARED_WORK) { metrics ->
+        onPreparation = if (separateNodePreparation) { metrics ->
             sink.lp.observeEngineCost(LpRoute.NODE, metrics)
             noteSolveOps(metrics.workOps)
         } else null,
@@ -1079,7 +1091,13 @@ internal class LpEngine(
     internal fun preparation(): Iterator<Unit> = sequence {
         params.lpConfig?.let { config ->
             val plan = with(LpAutoConfig) {
-                prepare(problem, config, requestedPlan, objective) { elementIndexes = it.elementIndexes }
+                prepare(problem, config, requestedPlan, objective, params.cancellation) { admission ->
+                    elementIndexes = admission.elementIndexes
+                    admission.sparseTrial?.let { trial ->
+                        sink.lp.sparseTrial = trial.metrics
+                        noteNodeOverhead(trial.work)
+                    }
+                }
             }
             params = params.copy(lpPlan = plan)
         }
