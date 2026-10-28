@@ -32,8 +32,8 @@ fun SourceStrategy.solveSample(params: BacktrackParams = BacktrackParams()): Sol
                 } else assignment.toSample(source)
             }
         }
-        SolveResult.Sat(sample, result.stats)
+        SolveResult.Sat(sample, result.stats, semantics = result.semantics)
     }
-    is OpenTheoryResult.Unsat -> SolveResult.Unsat(result.stats)
-    is OpenTheoryResult.Unknown -> SolveResult.Unknown(result.reason, result.stats)
+    is OpenTheoryResult.Unsat -> SolveResult.Unsat(stats = result.stats, semantics = result.semantics)
+    is OpenTheoryResult.Unknown -> SolveResult.Unknown(result.reason, result.stats, semantics = result.semantics)
 }
