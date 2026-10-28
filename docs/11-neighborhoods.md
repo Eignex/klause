@@ -262,12 +262,18 @@ These observations grant no proof outside the exact candidate pins and cutoff.
 
 ### Restart anchors
 
-Optimization restart policies receive only accepted feasible incumbents; before the
-first one, random restarts diversify the feasibility walk. Anchoring and custom
+The engine passes its accepted best feasible incumbent to optimization restart
+policies; before the first one, random restarts diversify the feasibility walk. Anchoring and custom
 policies keep the best assignment in private packed storage, updated only on a strict
 improvement, and each restart receives a fresh copy so a policy cannot alter the
 anchor. Fixed-cadence and Luby policies keep no copy. Anchored perturbations restore
 exact pins after their random draws and clear tabu state.
+
+ILS also receives zero-score snapshots at feasible stalls and completed descents.
+Those notifications classify the working walk and supply heuristic population
+anchors; they do not grant original-source witness admission. The engine's checked
+best remains a separate restart input. A source-feasible archive must validate its
+points against the original source and preserve that separation.
 
 Retained ILS restarts over unconditional AllDifferent boards report searched-input
 outcomes after ordinary preparation and the enabled greedy-repair pass. Changed
