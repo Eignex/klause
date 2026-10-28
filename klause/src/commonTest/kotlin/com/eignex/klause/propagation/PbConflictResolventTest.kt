@@ -13,9 +13,11 @@ import com.eignex.klause.solver.search.BooleanBranching
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchRestartPolicy
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchRunObserver
 import com.eignex.klause.solver.search.SearchSession
+import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -40,22 +42,30 @@ class PbConflictResolventTest {
 
     @Test
     fun `the same counting conflict should store and consume PB through shared traversal`() {
-        for (mode in 0..2) {
+        for (mode in 0..3) {
+            val booleanCount = if (mode == 3) 6 else 5
             val factors = buildList<Factor> {
                 add(Cardinality(intArrayOf(Lit.make(0, false), Lit.make(2, true),
                     Lit.make(3, true), Lit.make(4, true)), min = 2, max = 4))
                 add(Clause(intArrayOf(Lit.make(1, true), Lit.make(2, false))))
                 add(Clause(intArrayOf(Lit.make(1, true), Lit.make(3, false))))
-                if (mode == 2) add(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 5))
+                if (mode >= 2) add(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 5))
             }
             val native = PropagationSession(
-                Problem(5, if (mode == 0) 0 else 1,
+                Problem(booleanCount, if (mode == 0) 0 else 1,
                     if (mode == 0) emptyArray() else arrayOf(IntDomain(0, 10)), factors.toTypedArray()),
                 pbLearning = true,
             )
+            if (mode == 3) assertIs<PropagationResult.Implied>(native.seed(Assumptions.None.withBool(5, true)))
             val cp = CpSearchComponent(native)
-            val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(5))
+            cp.rebase()
+            val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(booleanCount))
             var consumed = false
+            var restarted = false
+            val restart = object : SearchRestartPolicy {
+                override fun shouldRestart(decisionsThisRun: Long): Boolean = mode == 3 && consumed && !restarted
+                override fun onRestart() { restarted = true }
+            }
             val observer = object : SearchRunObserver {
                 override fun onCommit(decision: SearchDecision, decisionLevel: Int) {
                     val state = native.explanationState
@@ -78,10 +88,16 @@ class PbConflictResolventTest {
                     )
                 }
             }
-            assertIs<SearchResult.Satisfied>(shared.solve(5, booleanBranching = brancher, observer = observer))
+            assertIs<SearchResult.Satisfied>(shared.solve(booleanCount, SearchSolveParams(restart = restart),
+                booleanBranching = brancher, observer = observer))
 
             assertTrue(native.explanationState.learned.store.any { it is PseudoBooleanPropagator }, "mode=$mode")
             assertTrue(consumed, "mode=$mode")
+            if (mode == 3) {
+                assertTrue(restarted)
+                shared.popTo(0)
+                assertEquals(true, native.boolValue(5))
+            }
         }
     }
 

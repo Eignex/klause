@@ -7140,3 +7140,17 @@ broader/default admission needs a separately authorized matched study.
 The initial five-pigeon/four-hole source-order test produced no stored PB on native
 CI and was rejected as a consumption control. Lab 8851 failed in source compilation
 before executing that control. These outcomes establish no locality rejection.
+
+[Lab 8857](https://lab.eignex.com/jobs/8857) completes all twelve controls at
+`02b9fe7ab2bd2672ec8246a71cf23ef711f208cf` on Linux amd64, Temurin
+`25.0.4.1+1-LTS`, with a hard cgroup budget of one vCPU and 4608 MiB. All twelve
+feasible points pass fresh native-session checks. Each conflict-triggering PB arm
+stores one PB and observes its reason after backjump; the clause arms store none.
+Decisions and backjumps match within each projection. Finite work rises from
+76 to 111 (Boolean), 76 to 121 (retained integer) and 106 to 151 (connected integer).
+The two mixed triggering pairs allocate roughly 150–166 KiB per solve including
+preparation and native point recheck; the first Boolean arm includes class loading.
+These single ordered runs supply no timing advantage or practical-admission result.
+Mixed automatic admission remains disabled. Raw records, JFR, distribution hashes,
+resource receipts and the failed attempt are retained outside Git under
+`klause-evidence/campaigns/finite-conflict-learning-3727-3728/` beside the primary checkout.
