@@ -77,7 +77,9 @@ internal class LpHints(
     fun finishNode() = history.finishNode()
 
     fun branch(variable: VarRef) {
-        if (directionalGains && scopeModel != null) observe(if (directionalChoice == variable) "CONSUMED" else "FALLBACK")
+        if (directionalGains && scopeModel != null) {
+            observe(if (directionalChoice == variable) "CONSUMED" else "FALLBACK")
+        }
         directionalChoice = null
         if (collect && scopeModel != null) {
             charge(129L)
