@@ -96,7 +96,8 @@ class CpSearchComponent(
             if (learned.row.guard != Lit.NONE) {
                 val guard = learned.row.guard
                 if (Lit.variable(guard) >= session.problem.numBoolVars) return false
-                if (context.explainAtoms(SearchAtomPremise.Asserted(SearchDecision.Bool(guard)), maxNodes = 128) == null) {
+                val premise = SearchAtomPremise.Asserted(SearchDecision.Bool(guard))
+                if (context.explainAtoms(premise, maxNodes = 128) == null) {
                     return false
                 }
             }

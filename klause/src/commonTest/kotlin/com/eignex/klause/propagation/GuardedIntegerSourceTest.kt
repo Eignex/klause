@@ -1,6 +1,7 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.LinearPropagator
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -17,10 +18,36 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class GuardedIntegerSourceTest {
+    @Test
+    fun `a guard pinned after the historical boundary should withhold the source row`() {
+        val state = PropagationState(Problem(1, 1, arrayOf(IntDomain(0, 6)), arrayOf(
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 3),
+        )), Assumptions.None)
+        state.undoLogging = true
+        val before = state.undo.size
+        assertTrue(state.pinBool(0, true))
+
+        assertNull(GuardedIntegerSource(state).source(0, before))
+        assertEquals(Lit.make(0, true), assertNotNull(GuardedIntegerSource(state).source(0)).guard)
+    }
+
+    @Test
+    fun `distinct signed guards should withhold arithmetic resolution`() {
+        for (right in listOf(Lit.make(0, false), Lit.make(1, true))) {
+            val left = assertNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0, 1),
+                longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 3), true, Lit.make(0, true)))
+            val other = assertNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(1, 2),
+                longArrayOf(-1, 1), intArrayOf(1, 2), LinearOp.LE, 3), true, right))
+
+            assertNull(left.resolve(other, 1))
+        }
+    }
+
     @Test
     fun `a signed reified row should wake at a sibling endpoint after guard undo`() {
         for (truth in listOf(true, false)) {
