@@ -21,10 +21,12 @@ import com.eignex.klause.solver.pipeline.FinitePipelineRequest
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.util.Cancellation
 import java.io.File
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 internal object WeightedSearchProfile {
     private val type = Class.forName("com.eignex.klause.meta.coreguided.CoreGuidedSearch")
@@ -37,6 +39,7 @@ internal object WeightedSearchProfile {
     private val threshold = type.getDeclaredField("threshold").apply { isAccessible = true }
     private val softs = type.getDeclaredField("querySofts").apply { isAccessible = true }
     private val coreCount = type.getDeclaredField("completedCores").apply { isAccessible = true }
+    private val core = type.getDeclaredField("coreLiterals").apply { isAccessible = true }
 
     @JvmStatic
     fun main(args: Array<String>) {
@@ -61,14 +64,17 @@ internal object WeightedSearchProfile {
         out.resolve("source.$format").writeBytes(bytes)
         val source: Problem
         val objective: LinearObjective
+        val sourceBooleans: Int
         if (format == "wbo") {
             val parsed = Opb.parse(bytes.decodeToString()).toProblem()
             source = parsed.problem
             objective = requireNotNull(parsed.objective).toLinearObjective()
+            sourceBooleans = parsed.numDeclaredVars
         } else {
             val parsed = Dimacs.parseWcnf(bytes.decodeToString()).toProblem()
             source = parsed.problem
             objective = parsed.objective.toLinearObjective()
+            sourceBooleans = parsed.numOriginalBoolVars
         }
         require(source.numIntVars == 0 && source.numRealVars == 0)
         val budget = PresolveBudget(100_000_000L)
@@ -84,6 +90,7 @@ internal object WeightedSearchProfile {
             var previousCores = -1L
             var previousQueries = -1L
             var incumbent: String? = null
+            var witness: String? = null
             fun observe(event: String, force: Boolean = false) {
                 val live = handle ?: return
                 val queries = fields.getValue("queryCount").getLong(live)
@@ -100,9 +107,11 @@ internal object WeightedSearchProfile {
                     put("cores", stats.cores)
                     put("largestCore", stats.largestCore)
                     put("coreWeight", weight.get(live).toString())
+                    put("coreSize", (core.get(live) as IntArray).size)
                     put("threshold", threshold.get(live)?.toString())
                     put("querySofts", (softs.get(live) as IntArray).size)
                     put("incumbent", incumbent)
+                    put("witness", witness)
                     put("work", live.work)
                     put("nodes", live.stats.search.nodes.sum)
                     put("propagationVisits", live.stats.search.propagationWork.sum)
@@ -116,6 +125,7 @@ internal object WeightedSearchProfile {
             var result: MinimizeResult? = null
             var checked = 0
             var slices = 0L
+            var witnessValues = 0L
             if (model != null && !stop()) {
                 val live = constructor.newInstance(model, prepared.objective, params, policy == "stratified",
                     maximumWork, timeout, TimeSource.Monotonic, CoreQueryProfile.refinementMode(when (policy) {
@@ -131,6 +141,24 @@ internal object WeightedSearchProfile {
                             val point = prepared.reconstruct(accepted.sample)
                             check(CoreQueryProfile.checkPoint(original, point, stop))
                             incumbent = objective.evaluateExact(point).toString()
+                            val values = sourceBooleans.toLong() + source.numBoolVars
+                            check(checked < 128 && values <= 2_000_000L - witnessValues) {
+                                "qualification witness capture allowance exhausted"
+                            }
+                            witnessValues += values
+                            witness = "incumbent-${checked + 1}.json"
+                            Reports.writeJson(out.resolve(requireNotNull(witness)).path, buildJsonObject {
+                                put("sourceSha256", hash)
+                                put("objectiveExact", incumbent)
+                                put("originalBooleanValues", JsonArray((0 until sourceBooleans).map {
+                                    JsonPrimitive(point.boolValue(it))
+                                }))
+                                put("loweredBooleanValues", JsonArray((0 until source.numBoolVars).map {
+                                    JsonPrimitive(point.boolValue(it))
+                                }))
+                                put("coordinateOrder", "source variable i+1 at index i")
+                                put("validation", "native-original-source")
+                            })
                             checked++
                             observe("accepted-incumbent", true)
                         }
@@ -155,6 +183,7 @@ internal object WeightedSearchProfile {
                 put("preparedIntegers", model?.numIntVars)
                 put("result", result?.javaClass?.simpleName)
                 put("acceptedIncumbents", checked)
+                put("capturedWitnessValues", witnessValues)
                 put("slices", slices)
                 put("finalWork", handle?.work)
                 handle?.let { live -> for ((name, field) in fields) put(name, field.getLong(live)) }

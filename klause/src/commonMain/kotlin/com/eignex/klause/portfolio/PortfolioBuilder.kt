@@ -103,6 +103,9 @@ object PortfolioBuilder {
         val plan = PortfolioComposition.plan(scenario, ProblemFacts.of(problem, profile, scenario.lpCeiling, objective))
         val residuals = if (scenario.reportLsResiduals) plan.arms.map { it.withLsResiduals() } else plan.arms
         val configs = if (scenario.reportLsPhaseTimes) residuals.map { it.withLsPhaseTimes() } else residuals
+        require(!scenario.earlyCoreAdmission || configs.any { it is CoreGuidedWorkerConfig }) {
+            "core-early requires an eligible Boolean objective core worker"
+        }
         val strategies = configs.mapNotNull { config ->
             when (config) {
                 is LocalSearchWorkerConfig -> ExecutionStrategy.LOCAL_SEARCH
@@ -145,7 +148,8 @@ object PortfolioBuilder {
                 } else {
                     admitted
                 }
-                val bounded = budget?.let(completion::withNodeBudget) ?: completion
+                val bounded = (budget?.let(completion::withNodeBudget) ?: completion)
+                    .withCoreRefinement(scenario.coreRefinement)
                 val worker = if (objectiveCoordinates != null && bounded is LocalSearchWorkerConfig &&
                     config.label == LocalSearchArm.CblsPlateauIlsBasin.label &&
                     scenario.cores == 1 && scenario.engine == EngineMix.MIXED &&
@@ -159,8 +163,9 @@ object PortfolioBuilder {
                     selectedSweep, onEvent, pools,
                 )
                 worker.bindEvidence(ModelIdentity.of(problem, objective)).also {
-                    it.improvementOnly = armId >= plan.firstSolutionCount ||
-                        (config is CoreGuidedWorkerConfig && deferCore)
+                    it.improvementOnly = if (config is CoreGuidedWorkerConfig && deferCore) {
+                        !scenario.earlyCoreAdmission
+                    } else armId >= plan.firstSolutionCount
                 }
             }
         }

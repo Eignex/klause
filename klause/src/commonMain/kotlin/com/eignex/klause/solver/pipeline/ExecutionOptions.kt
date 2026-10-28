@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.localsearch.strategy.AxisEdits
 import com.eignex.klause.localsearch.strategy.AxisToken
+import com.eignex.klause.meta.coreguided.CoreRefinementMode
 import com.eignex.klause.presolve.AffinePivotOrder
 
 /** A typed execution setting. Values describe policy; workers own live heuristic state. */
@@ -45,6 +46,11 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 )
         }
 
+        ValueKind.CORE_REFINEMENT -> params.string(id)?.let { raw ->
+            CoreRefinementMode.entries.firstOrNull { it.name.equals(raw, ignoreCase = true) }
+                ?: pipelineConfigError("engine param `$id` expects none|deletion|reasons, got `$raw`")
+        }
+
         ValueKind.VARIABLE_SELECTOR -> params.varSelectorKind(id)
 
         ValueKind.VALUE_SELECTOR -> params.valSelectorKind(id)
@@ -80,6 +86,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
     }
 
     private enum class ValueKind {
+        CORE_REFINEMENT,
         LONG,
         POSITIVE_LONG,
         INT,
@@ -404,6 +411,13 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** Opt-in single-lane portfolio diagnostic work allowance. */
         val portfolioWork: ExecutionOption<Long> = ExecutionOption("portfolio-work", ValueKind.LONG)
 
+        /** Allow the curated bounded core worker before the first incumbent. Default false. */
+        val coreEarly: ExecutionOption<Boolean> = ExecutionOption("core-early", ValueKind.BOOLEAN)
+
+        /** Select bounded private objective-core refinement. Default [CoreRefinementMode.NONE]. */
+        val coreRefinement: ExecutionOption<CoreRefinementMode> =
+            ExecutionOption("core-refinement", ValueKind.CORE_REFINEMENT)
+
         /** The `phase-retention` execution setting. */
         val phaseRetention: ExecutionOption<Double> = ExecutionOption("phase-retention", ValueKind.DOUBLE)
 
@@ -442,8 +456,8 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 minTemp, smoothProb, smoothFactor, tabuTenure, sources,
                 scoring, acceptance, restart, strategy, localSearchArm, objectiveGuidance,
                 lambda, arms, localSearchArms, backtrackArms, clauseShareLbd,
-                clauseShareLen, sliceWork, sliceMaxWork, sliceGrowth, portfolioWork, phaseRetention,
-                reseedStaleThreshold, lsResiduals, lsPhaseTimes, backtrackArmsByLabel,
+                clauseShareLen, sliceWork, sliceMaxWork, sliceGrowth, portfolioWork, coreEarly, coreRefinement,
+                phaseRetention, reseedStaleThreshold, lsResiduals, lsPhaseTimes, backtrackArmsByLabel,
             ).associateBy { it.id }
         }
     }

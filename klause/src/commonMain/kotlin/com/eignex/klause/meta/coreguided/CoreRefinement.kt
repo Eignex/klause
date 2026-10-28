@@ -10,7 +10,17 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.util.Cancellation
 
-internal enum class CoreRefinementMode { NONE, DELETION, REASONS }
+/** Bounded private refinement of a completed objective-query core. */
+enum class CoreRefinementMode {
+    /** Use the completed query's certified core. */
+    NONE,
+
+    /** Try bounded member deletion using propagation. */
+    DELETION,
+
+    /** Resolve supported seed reasons to named assumptions. */
+    REASONS,
+}
 
 internal object CoreRefinement {
     fun refine(

@@ -6,6 +6,7 @@ import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.meta.coreguided.CoreGuidedSearch
 import com.eignex.klause.meta.coreguided.CoreGuidedSolver
+import com.eignex.klause.meta.coreguided.CoreRefinementMode
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.incumbent.CompletedEnginePublication
 import com.eignex.klause.solver.incumbent.ModelIdentity
@@ -18,17 +19,21 @@ internal class CoreGuidedWorkerConfig(
     private val nodeBudget: NodeBudget? = null,
     private val maximumWork: Long? = null,
     private val maximumMillis: Long? = null,
+    private val coreRefinement: CoreRefinementMode = CoreRefinementMode.NONE,
     private val edit: ((BacktrackParams) -> BacktrackParams)? = null,
 ) : WorkerConfig {
     override val label: String get() = "core-guided"
     override fun withNodeBudget(budget: NodeBudget): WorkerConfig =
-        CoreGuidedWorkerConfig(budget, maximumWork, maximumMillis, edit)
+        CoreGuidedWorkerConfig(budget, maximumWork, maximumMillis, coreRefinement, edit)
+
+    override fun withCoreRefinement(mode: CoreRefinementMode): CoreGuidedWorkerConfig =
+        CoreGuidedWorkerConfig(nodeBudget, maximumWork, maximumMillis, mode, edit)
 
     internal fun withActiveTimeLimit(): CoreGuidedWorkerConfig =
-        CoreGuidedWorkerConfig(nodeBudget, maximumWork, 2_000L, edit)
+        CoreGuidedWorkerConfig(nodeBudget, maximumWork, 2_000L, coreRefinement, edit)
 
     internal fun withWorkLimit(limit: Long): CoreGuidedWorkerConfig =
-        CoreGuidedWorkerConfig(nodeBudget, limit, null, edit)
+        CoreGuidedWorkerConfig(nodeBudget, limit, null, coreRefinement, edit)
 
     override fun materialize(
         problem: BakedProblem,
@@ -64,7 +69,7 @@ internal class CoreGuidedWorkerConfig(
         worker = PortfolioWorker.of(
             workerLabel,
             armId,
-            CoreGuidedSolver(problem, maximumWork, maximumMillis).session(),
+            CoreGuidedSolver(problem, maximumWork, maximumMillis, coreRefinement).session(),
             params,
             sourceObjective,
         ).bindEvidence(identity, provesResults = CoreGuidedSearch.scalarProofs(problem, sourceObjective)).also {

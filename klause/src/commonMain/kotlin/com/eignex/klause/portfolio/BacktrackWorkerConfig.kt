@@ -8,6 +8,7 @@ import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpTechnique
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
+import com.eignex.klause.meta.coreguided.CoreRefinementMode
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.CompletedEnginePublication
@@ -30,13 +31,17 @@ internal class BacktrackWorkerConfig(
     val recipe: BacktrackRecipe,
     internal val zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
     private val toleranceCheck: ((Sample) -> Boolean)? = null,
+    private val coreRefinement: CoreRefinementMode = CoreRefinementMode.NONE,
 ) : WorkerConfig {
 
     fun withToleranceCheck(check: (Sample) -> Boolean): BacktrackWorkerConfig =
-        BacktrackWorkerConfig(recipe, zeroObjectivePricing, check)
+        BacktrackWorkerConfig(recipe, zeroObjectivePricing, check, coreRefinement)
 
     override fun withNodeBudget(budget: NodeBudget): WorkerConfig =
-        BacktrackWorkerConfig(recipe.spending(budget), zeroObjectivePricing, toleranceCheck)
+        BacktrackWorkerConfig(recipe.spending(budget), zeroObjectivePricing, toleranceCheck, coreRefinement)
+
+    override fun withCoreRefinement(mode: CoreRefinementMode): BacktrackWorkerConfig =
+        BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, mode)
 
     override val label: String get() = recipe.label
 
@@ -67,7 +72,7 @@ internal class BacktrackWorkerConfig(
         params = params.copy(zeroObjectivePricing = zeroObjectivePricing, toleranceCheck = toleranceCheck)
         if (recipe.label == BacktrackArm.CoreGuided.label) {
             val coreParams = params
-            return CoreGuidedWorkerConfig(params.nodeBudget) { coreParams }.materialize(
+            return CoreGuidedWorkerConfig(params.nodeBudget, coreRefinement = coreRefinement) { coreParams }.materialize(
                 problem, index, armId, seed, lsLambda, objective, lsObjective, definitionalSweep, onEvent, pools,
             )
         }

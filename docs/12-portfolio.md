@@ -518,7 +518,9 @@ An interrupted point check keeps its candidate for the next slice; each attempt
 retains its construction and propagation charges. Closing discards query pins,
 auxiliary buffers and preparation cursors while keeping completed observations.
 
-Internal core refinement is default-disabled. Seed-proof projection uses the
+Core refinement is disabled by default; `core-refinement=none|reasons|deletion`
+selects the private policy for curated and directly selected core workers.
+Seed-proof projection uses the
 [historical reasons](09-learning.md#explanation-lifetime) of the existing query,
 without another propagation session or solve; unsupported seed conflicts and tree
 exhaustion keep their certified cores. Caller conditions remain attached to every
@@ -559,6 +561,12 @@ with another complete worker, the core worker joins after the first incumbent on
 ordinary complete workers stall, with the allowance described in
 [resources](06-sessions.md#resource-allowances); parallel pools admit it immediately, and `core-guided`
 selects it directly.
+
+`core-early=true` removes only the first-incumbent admission condition in a mixed
+optimization pool on one lane with automatic backtrack workers and an eligible
+Boolean objective. Worker order, seeds, initial complete-worker coverage and the
+bounded auxiliary allowance stay fixed. The control also preserves the containing
+work allowance in diagnostic schedules. It does not expand core eligibility.
 
 ### Exact theory strategy execution
 

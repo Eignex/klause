@@ -52,6 +52,7 @@ import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.localsearch.strategy.WalkSat
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
+import com.eignex.klause.meta.coreguided.CoreRefinementMode
 import com.eignex.klause.portfolio.BacktrackCatalog
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
@@ -644,6 +645,8 @@ internal fun buildPortfolioScenario(
     val maxSliceWork = p[ExecutionOption.sliceMaxWork]
     val sliceGrowth = p[ExecutionOption.sliceGrowth]
     val diagnosticWorkLimit = p[ExecutionOption.portfolioWork]
+    val earlyCoreAdmission = p[ExecutionOption.coreEarly] ?: false
+    val coreRefinement = p[ExecutionOption.coreRefinement] ?: CoreRefinementMode.NONE
     if (diagnosticWorkLimit != null && (diagnosticWorkLimit <= 0L || cores != 1)) {
         pipelineConfigError("portfolio-work requires one core and a positive work limit")
     }
@@ -661,7 +664,7 @@ internal fun buildPortfolioScenario(
     if (sliceGrowth != null && (!sliceGrowth.isFinite() || sliceGrowth < 1.0)) {
         pipelineConfigError("slice-growth must be finite and >= 1")
     }
-    p.finish("portfolio", "arms, ls, bt, seed, lambda, clause-share-lbd, clause-share-len, slice-work, slice-max-work, slice-growth, portfolio-work, phase-retention, reseed-stale-threshold, ls-residuals, ls-phase-times")
+    p.finish("portfolio", "arms, ls, bt, seed, lambda, clause-share-lbd, clause-share-len, slice-work, slice-max-work, slice-growth, portfolio-work, core-early, core-refinement, phase-retention, reseed-stale-threshold, ls-residuals, ls-phase-times")
     if (armsParam != null && (ls != null || bt != null)) {
         pipelineConfigError("portfolio: set either `arms=N` or `ls=/bt=`, not both")
     }
@@ -679,6 +682,9 @@ internal fun buildPortfolioScenario(
         defaultEngine to (armsParam ?: defaultArms)
     }
     require(arms >= 1) { "portfolio needs arms ≥ 1 (got $arms)" }
+    if (earlyCoreAdmission && (cores != 1 || kind != Kind.COP || engine != EngineMix.MIXED || btPool != null)) {
+        pipelineConfigError("core-early requires a mixed optimization pool with automatic backtrack workers on one core")
+    }
     var scenario = PortfolioScenario(
         cores = cores,
         arms = maxOf(arms, cores),
@@ -699,6 +705,8 @@ internal fun buildPortfolioScenario(
         maxSliceWork = effectiveMaxSliceWork,
         sliceGrowth = sliceGrowth ?: 1.5,
         diagnosticWorkLimit = diagnosticWorkLimit,
+        earlyCoreAdmission = earlyCoreAdmission,
+        coreRefinement = coreRefinement,
     )
     clauseShareLbd?.let { scenario = scenario.copy(clauseShareMaxLbd = it) }
     clauseShareLen?.let { scenario = scenario.copy(clauseShareMaxLen = it) }
