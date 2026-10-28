@@ -51,6 +51,9 @@ internal class NativeSatState(private val state: PropagationState) {
     private val learnedPermanent = IntArrayList()
     private val learnedTier = IntArrayList()
     private val learnedUsed = IntArrayList()
+    private val lifecycleStages = IntArrayList()
+    private val learnedUnits = IntArrayList()
+    private var unitsPending = false
 
     // The origin an imported learned clause came from, parallel to the learned columns; see [OriginCounts].
     private val learnedOrigin = IntArrayList()
@@ -181,15 +184,6 @@ internal class NativeSatState(private val state: PropagationState) {
      * already false, or just install watches when two or more literals are still open. The trailing
      * [propagate] call continues BCP from any pin this makes.
      */
-    private val lifecycleStages = IntArrayList()
-    private val learnedUnits = IntArrayList()
-    private var unitsPending = false
-
-    fun onRetraction() {
-        unitsPending = learnedUnits.size > 0
-        pendingConflict = false
-    }
-
     fun addLearned(lits: IntArray, lbd: Int, permanent: Boolean, origin: Int = OWN_ORIGIN): Int {
         state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Constructed)
         val h = appendLearned(lits, lbd, permanent, origin)
@@ -328,11 +322,11 @@ internal class NativeSatState(private val state: PropagationState) {
      */
     fun forget(keep: (learnedIndex: Int, lbd: Int) -> Boolean) {
         // old learned index -> new learned index, or -1 if dropped.
-        val protected = state.referencedLearned(learnedCount)
+        val referenced = state.referencedLearned(learnedCount)
         val remap = IntArray(learnedCount)
         var survivors = 0
         for (i in 0 until learnedCount) {
-            remap[i] = if (protected[i] || keep(i, learnedLbd[i])) survivors++ else -1
+            remap[i] = if (referenced[i] || keep(i, learnedLbd[i])) survivors++ else -1
         }
         if (survivors == learnedCount) return
 
@@ -397,6 +391,11 @@ internal class NativeSatState(private val state: PropagationState) {
             return false
         }
         return true
+    }
+
+    fun onRetraction() {
+        unitsPending = learnedUnits.size > 0
+        pendingConflict = false
     }
 
     /**

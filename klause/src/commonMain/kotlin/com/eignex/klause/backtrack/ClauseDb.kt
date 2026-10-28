@@ -35,7 +35,7 @@ internal fun forgetIfOverCap(session: PropagationSession, params: BacktrackParam
     session.forgetLearnedClauses { index, lbd ->
         lbd <= glueThreshold || session.learnedClausePermanent(index) || index in kept
     }
-    val dropped = nonGlue.size - remaining
+    val dropped = learnedSize - session.learnedClauseCount
     params.onEvent?.invoke(SearchEvent.LearnedDbSweep(kept = learnedSize - dropped, dropped = dropped))
 }
 
@@ -79,7 +79,8 @@ private fun forgetTiered(session: PropagationSession, params: BacktrackParams, c
     val dropped = IntHashSet(locals.size - residual)
     for (index in residual until locals.size) dropped.add(locals[index][1])
     session.forgetLearnedClauses { index, _ -> index !in dropped }
-    params.onEvent?.invoke(SearchEvent.LearnedDbSweep(kept = learnedSize - dropped.size, dropped = dropped.size))
+    val retired = learnedSize - session.learnedClauseCount
+    params.onEvent?.invoke(SearchEvent.LearnedDbSweep(kept = session.learnedClauseCount, dropped = retired))
     for (index in 0 until session.learnedClauseCount) session.clearLearnedClauseUsed(index)
 }
 
