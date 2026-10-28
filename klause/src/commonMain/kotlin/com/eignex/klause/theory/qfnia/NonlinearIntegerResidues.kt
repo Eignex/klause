@@ -120,9 +120,10 @@ internal class NonlinearIntegerResidues(
         while (pending.isNotEmpty()) {
             step()
             val (expression, combine) = pending.removeLast()
-            if (expression is PolynomialExpression.Constant &&
-                maxOf(expression.numerator.magnitudeBitLength(), expression.denominator.magnitudeBitLength()) > MAX_BITS
-            ) throw ResidueDecline()
+            if (expression is PolynomialExpression.Constant) {
+                chargeBits(expression.numerator)
+                chargeBits(expression.denominator)
+            }
             val key = ResidueExpressionKey(expression)
             if (key in indices) continue
             val childCount = when (expression) {
@@ -147,11 +148,7 @@ internal class NonlinearIntegerResidues(
             reserve(children.size + 6)
             val args = children.map { indices.getValue(ResidueExpressionKey(it)) }
             val denominator = when (expression) {
-                is PolynomialExpression.Constant -> {
-                    chargeBits(expression.numerator)
-                    chargeBits(expression.denominator)
-                    expression.denominator
-                }
+                is PolynomialExpression.Constant -> expression.denominator
                 is PolynomialExpression.Power -> power(nodes[args.single()].denominator, expression.exponent)
                 is PolynomialExpression.Sum -> args.fold(BIG_ONE) { value, child ->
                     commonDenominator(value, nodes[child].denominator)
