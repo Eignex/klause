@@ -16,6 +16,13 @@ import kotlin.test.assertTrue
 
 class EngineParamsTest {
     @Test
+    fun `directional lp gains remain opt in and survive fixed backtrack overrides`() {
+        val base = com.eignex.klause.backtrack.BacktrackParams()
+        assertTrue(!base.lpDirectionalGains)
+        assertTrue(applyBacktrackParams(base, EngineParams(listOf("lp-directional-gains=true"))).lpDirectionalGains)
+    }
+
+    @Test
     fun `objective guidance must not create an automatic recipe pool`() {
         assertFailsWith<PipelineConfigException> {
             resolveLocalSearchRecipes(EngineParams(listOf("objective-guidance=geometric")))

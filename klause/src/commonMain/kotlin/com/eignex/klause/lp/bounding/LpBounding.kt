@@ -525,6 +525,10 @@ internal fun LpEngine.sparseSafePrune(
     // branch values toward the LP point and pick reduced-cost-impactful fractional variables. Purely
     // advisory — it never changes feasibility or the optimum.
     hints?.record(relaxation, result.primal, result.duals)
+    if (result.optimal && hints != null) {
+        noteNodeOverhead(relaxation.colVarId.size.toLong() + 1L)
+        hints.recordObjective(relaxation, result.objective)
+    }
     // The scoped owner carries appended-row bases itself; the hint is only for external fresh solves.
     var optimalBasis: Basis? = result.basis
     val rowMeter = if (problem.numRealVars > 0 &&

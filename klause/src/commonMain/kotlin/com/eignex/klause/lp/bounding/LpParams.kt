@@ -40,6 +40,9 @@ class LpParams(
 internal interface LpHintSink {
     fun clear()
 
+    /** Advisory floating optimum in minimized working units; supplies no certified bound. */
+    fun recordObjective(relaxation: LpRelaxation, objective: Double) {}
+
     /** Record an LP solution's [primal] and [duals] against [relaxation]'s column→variable map. */
     fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray)
 }

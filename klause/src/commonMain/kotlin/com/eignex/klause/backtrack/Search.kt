@@ -537,6 +537,7 @@ internal class BacktrackBrancher(
             ?: variables.pick(session, rng)
             ?: return null
         if (restart.phaseMode() != PhaseMode.UNMANAGED) phase.setManagedMode(restart.phaseMode())
+        branching.onBranch(variable)
         val preferred = branching.orderValues(
             variable,
             phase.applyPhase(variable, values.values(session, variable, rng), rng),
@@ -568,6 +569,7 @@ internal class BacktrackBrancher(
     }
 
     override fun onCommit(decision: SearchDecision, decisionLevel: Int) {
+        branching.onCommit(decision, decisionLevel)
         val (variable, value) = decision.asSelectorDecision() ?: return
         variables.onCommit(variable)
         values.onCommit(variable, value)
@@ -603,6 +605,7 @@ internal class BacktrackBrancher(
     }
 
     override fun onRestart(decisions: Long) {
+        branching.onRestart()
         variables.onRestart()
         values.onRestart()
         sink?.search?.observeRestart()
@@ -652,6 +655,12 @@ internal fun splitIntAlternatives(
 
 /** Optional search-only branch guidance layered over the configured selectors. */
 internal interface BacktrackBranching {
+    fun onBranch(variable: VarRef) {}
+
+    fun onCommit(decision: SearchDecision, depth: Int) {}
+
+    fun onRestart() {}
+
     fun pick(session: PropagationSession): VarRef? = null
 
     fun orderValues(variable: VarRef, values: Sequence<Long>): Sequence<Long> = values

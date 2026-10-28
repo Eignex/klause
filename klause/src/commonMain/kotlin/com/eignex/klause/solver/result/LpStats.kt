@@ -489,6 +489,12 @@ internal fun LpStats.hasActivity(): Boolean =
 internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     private val phases = LinkedHashMap<String, LpPhaseStats>()
 
+    fun observeDirectionalBranch(outcome: String) {
+        val key = "DIRECTIONAL_BRANCH_NODE"
+        val delta = LpPhaseStats(calls = 1L, outcomes = mapOf(outcome to 1L))
+        phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(delta)
+    }
+
     fun observePrimalPhase(stage: String, outcome: String, nanos: Long) {
         val key = "${stage}_ROOT"
         val delta = LpPhaseStats(calls = 1L, nanos = nanos, outcomes = mapOf(outcome to 1L))
