@@ -101,7 +101,7 @@ internal object TaskOrderProfile {
         val stop = Cancellation.after(5.seconds)
         val model = if (arm.orders) withOrderPair(source) else source
         val prepared = PresolvePipeline.run(model, null, PresolveConfig.parse(arm.prepare),
-            solutionSetSensitive = true, cancellation = stop, randomSeed = 1)
+            solutionSetSensitive = false, cancellation = stop, randomSeed = 1)
         val baked = prepared.problem.bake(cancellation = stop)
         val preparationNs = System.nanoTime() - started
         val trace = ArrayList<String>()
