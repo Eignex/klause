@@ -28,8 +28,18 @@ park a pass. Parity elimination tracks revisions of XOR and integral equality ro
 participating Boolean pins and odd-coefficient integer ranges in both lanes. A
 relevant revision releases its completed miss; unrelated factor, pin and range
 changes retain parking. Tracking reads changed factors and participating columns,
-charges the same phase allowance and stops on its cancellation. Other parked
-analyses retain their completed misses for the schedule. These signals are
+charges the same phase allowance and stops on its cancellation. Coefficient
+strengthening also parks a completed miss until an implied integral equality,
+a complete integer or Boolean row, or a participating integer inequality endpoint
+changes.
+Opt-in row sparsification wakes on complete integral row changes; domains, pins and
+objectives alone do not change its premises. Each lane owns its block revisions,
+retracts dropped occurrences and releases columns when their last inequality disappears.
+The state is bounded by live participating columns and dies with the lane. Interrupted
+tracking discards its state and publishes no revision. Both wakeups retain the
+containing allowance and existing cost/yield backoff; a changed revision establishes
+eligibility, not an obligation to spend. Other parked analyses retain their completed
+misses for the schedule. These signals are
 deterministic spending heuristics, not predictions or proofs of search
 savings. Unmetered calls use the 1% change threshold without adding accounting
 scans. Cancellation and phase allowances still bound optional work. Presolve and

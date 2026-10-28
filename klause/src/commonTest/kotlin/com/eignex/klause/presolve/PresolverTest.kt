@@ -1,6 +1,7 @@
 package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.Xor
@@ -100,6 +101,93 @@ class PresolverTest {
 
         assertSame(problem, prepared.problem)
         assertEquals(1, budget.passCalls["xor-units"])
+    }
+
+    @Test
+    fun `strengthening should consume an equality exposed by later product reduction`() {
+        val problem = Problem(0, 2, arrayOf(IntDomain(3, 3), IntDomain(0, 2)), listOf(Product(0, 1, 1)))
+        for (schedule in listOf("source", "incremental", "rebuilt")) {
+            val budget = PresolveBudget(Long.MAX_VALUE)
+            val config = PresolveConfig.parse("off,+strengthen,+structural" + if (schedule == "rebuilt") ",+bce" else "")
+            val context = PresolveContext(presolveBudget = budget)
+
+            val reduced = if (schedule == "source") {
+                Presolver.runSource(problem, config, context).problem
+            } else Presolver.run(problem.bake(), config, context).problem
+
+            val row = reduced.factors.filterIsInstance<Linear>().single()
+            assertEquals(listOf(-1L), (0 until row.size).map { row.coeff(it) })
+            assertEquals(0L, row.bound)
+            assertTrue(budget.invocations.filter { it.pass == "strengthen" }.any {
+                it.outcome == PresolveInvocationOutcome.CHANGED
+            })
+        }
+    }
+
+    @Test
+    fun `strengthening should consume endpoints tightened by later Diophantine reduction`() {
+        val problem = Problem(0, 4, arrayOf(
+            IntDomain(0, 2), IntDomain(0, 4), IntDomain(0, 2), IntDomain(0, 4),
+        ), listOf(
+            Linear(intArrayOf(5, 3, 3), intArrayOf(0, 1, 2), LinearOp.LE, 22),
+            Linear(intArrayOf(2, 3), intArrayOf(1, 3), LinearOp.EQ, 12),
+        ))
+        for (schedule in listOf("source", "incremental", "rebuilt")) {
+            val budget = PresolveBudget(Long.MAX_VALUE)
+            val config = PresolveConfig.parse("off,+strengthen,+diophantine" + if (schedule == "rebuilt") ",+bce" else "")
+            val context = PresolveContext(presolveBudget = budget)
+
+            val reduced = if (schedule == "source") Presolver.runSource(problem, config, context).problem
+            else Presolver.run(problem.bake(), config, context).problem
+
+            val row = reduced.factors.filterIsInstance<Linear>().single { it.op == LinearOp.LE }
+            assertEquals(listOf(1L, 1L, 1L), (0 until row.size).map { row.coeff(it) })
+            assertEquals(6L, row.bound)
+        }
+    }
+
+    @Test
+    fun `sparsification should consume an equality exposed by later product reduction`() {
+        val problem = Problem(0, 4, arrayOf(
+            IntDomain(3, 3), IntDomain(0, 2), IntDomain(0, 6), IntDomain(0, 4),
+        ), listOf(
+            Product(0, 1, 2),
+            Linear(intArrayOf(3, -1, 1), intArrayOf(1, 2, 3), LinearOp.LE, 2),
+        ))
+        for (schedule in listOf("source", "incremental", "rebuilt")) {
+            val config = PresolveConfig.parse("off,+sparsify,+structural" + if (schedule == "rebuilt") ",+bce" else "")
+
+            val reduced = if (schedule == "source") Presolver.runSource(problem, config).problem
+            else Presolver.run(problem.bake(), config).problem
+
+            assertTrue(reduced.factors.filterIsInstance<Linear>().any {
+                it.vars.contentEquals(intArrayOf(3)) && it.op == LinearOp.LE && it.coeff(0) == 1L && it.bound == 2L
+            })
+        }
+    }
+
+    @Test
+    fun `linear misses should stay parked across many unrelated Boolean eliminations`() {
+        val problem = Problem(64, 2, Array(2) { IntDomain(0, 2) }, listOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 3),
+        ) + (0 until 32).flatMap { v -> listOf(
+            Clause(intArrayOf(Lit.make(2 * v, true), Lit.make(2 * v + 1, true))),
+            Clause(intArrayOf(Lit.make(2 * v, true), Lit.make(2 * v + 1, false))),
+        ) })
+        for (lane in PresolveLane.entries) {
+            val budget = PresolveBudget(Long.MAX_VALUE)
+            val context = PresolveContext(
+                objectiveBoolCoeffs = (0 until 32).associate { 2 * it to 1L }, presolveBudget = budget,
+            )
+            val config = PresolveConfig.parse("off,+strengthen,+sparsify,+bve")
+
+            val fired = if (lane == PresolveLane.SOURCE) Presolver.runSource(problem, config, context).passesFired
+            else Presolver.run(problem.bake(), config, context).passesFired
+
+            assertEquals(listOf(PresolvePass.ELIMINATE_BOOL_VARS), fired)
+            assertEquals(1, budget.passCalls["sparsify"])
+            assertEquals(if (lane == PresolveLane.SOURCE) 1 else 2, budget.passCalls["strengthen"])
+        }
     }
 
     @Test

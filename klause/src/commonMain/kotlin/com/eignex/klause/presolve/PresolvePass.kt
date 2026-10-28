@@ -50,6 +50,7 @@ enum class PresolvePass(
         PresolveTiming.FAST,
         true,
         autoEligible = true,
+        skipAfterEmpty = true,
     ) {
         override fun applySource(problem: Problem, ctx: PresolveContext) =
             Presolve.strengthenSourceCoefficients(problem, ctx.cancellation)
