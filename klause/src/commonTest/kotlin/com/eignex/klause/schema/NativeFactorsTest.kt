@@ -151,7 +151,8 @@ class NativeFactorsTest {
         assertEquals(definition, parsed)
         assertEquals(9, samples.size)
         samples.forEach { sample ->
-            assertEquals(ids.map { sample.intValue(it) }.filter { it != 0L }.distinct().size.toLong(), sample.intValue(n))
+            val count = ids.map { sample.intValue(it) }.filter { it != 0L }.distinct().size
+            assertEquals(count.toLong(), sample.intValue(n))
         }
     }
 
