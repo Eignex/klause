@@ -2750,6 +2750,28 @@ the recorded witnesses against the original MiniZinc source.
 
 ## Design evidence
 
+### Unary edge-finding over minimum durations
+
+Unary edge-finding over minimum durations while durations are unfixed (rejected
+[#3776](https://github.com/Eignex/klause/pull/3776) at `c3c0294b56`) was compared
+against merge-base `a8808b5665`. The comparison covered the only corpus sources with
+a variable-duration unary resource, stripboard 2022/2025. Every record compiled with
+MiniZinc 2.10.1 on cloud Linux/amd64. The lab had no independent MiniZinc assignment
+checker, so only Klause's model-level witness checks ran. In
+[job 8970](https://lab.eignex.com/jobs/8970) (10 instances, seeds 3/17, P1/20s), seven
+instances find no solution in any arm. Aggressive presolve and LP match the base
+arm. [Job 8990](https://lab.eignex.com/jobs/8990) added seeds 5/11/23/29 on the three
+instances that differ.
+
+Across both jobs the bound wins 4 and loses 6 paired outcomes under default
+settings, and wins 3 and loses 4 on CP alone. The wins include a proof of 90 on
+stripboard_w20_h15_l4_c4_n24 that the base misses at seed 3; the losses include 247
+against 90 on the same instance at seed 23. Median node throughput is 11% lower
+under default settings and 6.5% lower on CP. The bound is sound and changes the
+search, but it does not pay for its cost, so time-tabling, detectable precedences
+and edge-finding keep waiting for fixed durations. Raw records are under
+`klause-evidence/campaigns/unary-bounds-3748-3749/`.
+
 ### Objective core projection and completed-query replay
 
 [8917](https://lab.eignex.com/jobs/8917) runs 48 core and 24 ordinary BnB controls
