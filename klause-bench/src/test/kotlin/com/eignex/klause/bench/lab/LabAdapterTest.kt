@@ -34,7 +34,7 @@ class LabAdapterTest {
     @CsvSource(
         "typo,true", "cpus,0", "memory-mib,2047", "repeats,0", "timeout-ms,0", "engines,no-such-engine",
         "debug,yes", "exact,yes", "measurement,arbitrary", "heap-mib,8192", "gc,arbitrary", "compile-timeout-sec,0",
-        "max,no", "lp,invalid", "presolve,invalid", "param.,value",
+        "max,no", "lp,invalid", "presolve,invalid", "param.,value", "complete-assignment,yes",
     )
     fun `invalid controls fail validation`(key: String, value: String) {
         assertFailsWith<IllegalArgumentException> { LabSettings(mapOf(key to value)) }

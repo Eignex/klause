@@ -170,6 +170,18 @@ class SolveEvidenceTest {
     }
 
     @Test
+    fun `model reconstruction should preserve the final complete assignment frame`() {
+        val raw = "x = 1;\n% klause-assignment: hidden = 2;\n----------\n" +
+            "x = 7;\n% klause-assignment-begin: flatzinc-integer-v1\n" +
+            "% klause-assignment: hidden = 14;\n% klause-assignment-end\n----------\n"
+
+        val witness = SolveEvidence.finalWitness(Format.MINIZINC, raw) { "model_x = 7;" }
+
+        assertEquals("model_x = 7;\n% klause-assignment-begin: flatzinc-integer-v1\n" +
+            "% klause-assignment: hidden = 14;\n% klause-assignment-end", witness)
+    }
+
+    @Test
     fun `a MiniZinc solution of exact coordinates alone should keep only those lines`() {
         val raw = "% klause-exact: x = 1/3;\n% klause-coordinate: y = 2;\n----------\n"
 

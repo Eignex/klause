@@ -42,6 +42,76 @@ class MiniZincModeTest(private val direction: String) {
     }
 
     @Test
+    fun `complete assignment capture should retain reconstructed hidden coordinates without changing model output`() {
+        val source = File.createTempFile("complete-assignment", ".fzn").apply {
+            writeText("""
+                var 7..7: x :: output_var;
+                var 0..28: hidden;
+                constraint int_lin_eq([2,-1], [x,hidden], 0);
+                solve $direction hidden;
+            """.trimIndent())
+        }
+        val common = CommonOptions().apply {
+            engine = "cp"
+            parallel = 1
+            randomSeed = 17
+        }
+        val session = MiniZincMode.newSession()
+        parseArgs(arrayOf("--output-complete-assignment"), session.flags()) {}
+        val bytes = ByteArrayOutputStream()
+        val previous = System.out
+        val stream = PrintStream(bytes)
+
+        try {
+            val solvable = session.load(source.absolutePath, common)
+            System.setOut(stream)
+            SolveCore.solve(solvable, common, session.output(common))
+        } finally {
+            System.setOut(previous)
+            stream.close()
+            source.delete()
+        }
+
+        val text = bytes.toString(Charsets.UTF_8.name())
+        assertTrue("x = 7;" in text.lines(), text)
+        assertFalse("hidden = 14;" in text.lines(), text)
+        assertTrue("% klause-assignment: hidden = 14;" in text.lines(), text)
+        assertTrue("% klause-assignment: _objective = 14;" in text.lines(), text)
+        assertTrue("% klause-assignment-end" in text.lines(), text)
+    }
+
+    @Test
+    fun `complete assignment capture should decline float coordinates without publishing a partial point`() {
+        val source = File.createTempFile("complete-float-assignment", ".fzn").apply {
+            writeText("var 0.0..1.0: x :: output_var; constraint float_eq(x,0.25); solve $direction x;")
+        }
+        val common = CommonOptions().apply {
+            engine = "cp"
+            parallel = 1
+            randomSeed = 17
+        }
+        val session = MiniZincMode.newSession()
+        parseArgs(arrayOf("--output-complete-assignment"), session.flags()) {}
+        val bytes = ByteArrayOutputStream()
+        val previous = System.out
+        val stream = PrintStream(bytes)
+
+        try {
+            val solvable = session.load(source.absolutePath, common)
+            System.setOut(stream)
+            SolveCore.solve(solvable, common, session.output(common))
+        } finally {
+            System.setOut(previous)
+            stream.close()
+            source.delete()
+        }
+
+        val text = bytes.toString(Charsets.UTF_8.name())
+        assertTrue("% klause-assignment-unavailable: integer and Boolean coordinates required" in text.lines(), text)
+        assertFalse("% klause-assignment-begin:" in text, text)
+    }
+
+    @Test
     fun `output reconstruction should retain independent scaled costs and original objective units`() {
         val source = File.createTempFile("scaled-costs", ".fzn").apply {
             writeText("""

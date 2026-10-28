@@ -27,6 +27,7 @@ internal data class LabSettings(val parameters: Map<String, String>) {
         require(gc in setOf("default", "serial", "parallel", "g1", "z"))
         require(wallTimeout <= 604800) { "Combined solve and compiler ceilings exceed the lab's seven-day case limit" }
         parameters["exact"]?.toBooleanStrict()
+        parameters["complete-assignment"]?.toBooleanStrict()
         parameters["lp"]?.let { require(runCatching { LpConfig.parse(it) }.isSuccess) { "Invalid LP configuration" } }
         parameters["presolve"]?.let { requireNotNull(PresolveEmphasis.fromId(it)) { "Unknown presolve emphasis" } }
         for (key in listOf("max", "per-family")) parameters[key]?.let { require(it.toInt() > 0) }
@@ -57,13 +58,14 @@ internal data class LabSettings(val parameters: Map<String, String>) {
             "measurement" to measurement,
             "heap-mib" to heap.toString(),
             "gc" to gc,
+            "complete-assignment" to (parameters["complete-assignment"] ?: "false"),
         )
 
     companion object {
         val SELECTORS = setOf("suite", "set", "name", "category", "tag", "kind", "per-family", "seed", "max", "balance")
         private val OPTIONS = setOf(
             "engines", "solver-seeds", "repeats", "cpus", "memory-mib", "timeout-ms", "lp",
-            "presolve", "exact", "debug", "measurement", "heap-mib", "gc", "compile-timeout-sec",
+            "presolve", "exact", "debug", "measurement", "heap-mib", "gc", "compile-timeout-sec", "complete-assignment",
         )
         private val ENGINES = setOf(
             "default", "fixed", "backtrack", "bt", "cp", "localsearch", "ls", "local-search",

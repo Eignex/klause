@@ -117,6 +117,7 @@ internal object KlauseLabSuite : BenchSuite {
             presolve = p["presolve"],
             exact = p["exact"]?.toBooleanStrict() ?: false,
             captureDirectory = context.outputDirectory.resolve("report").toFile(),
+            completeAssignment = p["complete-assignment"]?.toBooleanStrict() ?: false,
             measureResources = p.getValue("measurement") != "none",
         )
         val budget = Budget(p.getValue("timeout-ms").toLong())

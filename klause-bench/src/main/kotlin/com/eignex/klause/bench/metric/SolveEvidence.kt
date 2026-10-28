@@ -63,7 +63,7 @@ internal object SolveEvidence {
         val comments = raw.split("----------").dropLast(1).lastOrNull()
             ?.lineSequence()?.filter {
                 it.startsWith("% klause-exact: ") || it.startsWith("% klause-coordinate: ") ||
-                    it.startsWith("% klause-float-")
+                    it.startsWith("% klause-float-") || it.startsWith("% klause-assignment")
             }?.joinToString("\n").orEmpty()
         if (comments.isEmpty()) candidate else candidate + "\n" + comments
     }
