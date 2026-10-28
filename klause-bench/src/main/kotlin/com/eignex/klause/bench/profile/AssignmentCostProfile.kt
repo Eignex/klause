@@ -123,7 +123,13 @@ internal object AssignmentCostProfile {
                                 put("nodes", result.stats.search.nodes.sum)
                                 put("fails", result.stats.search.fails.sum)
                                 put("lpRootBound", result.stats.lp.rootBound.takeIf { it.isFinite() })
+                                put("lpSolves", result.stats.lp.solves.sum)
+                                put("lpPruned", result.stats.lp.pruned.sum)
+                                put("lpFixed", result.stats.lp.fixed.sum)
+                                put("lpCuts", result.stats.lp.cuts.sum)
+                                put("lagrangianPruned", result.stats.scheduling.lagrangianPruned.sum)
                                 put("lpWork", result.stats.lp.workOps.sum)
+                                put("lpOverhead", result.stats.lp.overheadOps.sum)
                                 result.assignment?.let(prepared.reconstruct)?.let { sample ->
                                     put("nativeSourceAccepted", FiniteConflictSelection.checkSource(original, sample,
                                         stop or solveStop))
