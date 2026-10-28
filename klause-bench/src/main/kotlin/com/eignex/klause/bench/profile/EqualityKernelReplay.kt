@@ -33,7 +33,7 @@ internal object EqualityKernelReplay {
     fun capture(view: TrajectoryView, file: File, score: (Sample) -> BigFraction,
         cancellation: Cancellation = Cancellation.Never,
         verify: (Sample, Cancellation) -> Boolean,
-    ) {
+    ): Map<String, IntArray> {
         val started = System.nanoTime()
         val allocated = trajectoryThreadBytes()
         var work = 0L
@@ -44,6 +44,7 @@ internal object EqualityKernelReplay {
         }
         val matrix = matrix(view, stop)
         val center = view.reconstruct(view.state.assignment.snapshot())
+        val consumedScopes = LinkedHashMap<String, IntArray>()
         val records = buildJsonArray {
             if (matrix != null) for (mode in listOf("network", "hermite")) {
                 val extractionStart = System.nanoTime()
@@ -74,19 +75,23 @@ internal object EqualityKernelReplay {
                         }
                     })
                     put("consumed", selected?.takeUnless { stop() }?.let { move ->
-                        view.state.apply(move)
-                        val point = view.reconstruct(view.state.assignment.snapshot())
-                        check(view.state.cost == 0L && verify(point, stop))
-                        val record = buildJsonObject {
-                            put("source", trajectorySource(point))
-                            put("sourceObjective", score(point).toString())
-                            put("sourceChanges", (0 until center.numIntVars).count {
-                                center.intValue(it) != point.intValue(it)
-                            })
-                            put("nativeSourceCheck", true)
+                        try {
+                            view.state.apply(move)
+                            val point = view.reconstruct(view.state.assignment.snapshot())
+                            if (view.state.cost != 0L || stop() || !verify(point, stop)) null else buildJsonObject {
+                                val inputs = (move as Move.Compound).parts.map { (it as Move.IntSet).varId }
+                                consumedScopes[mode] = inputs.toIntArray()
+                                put("preparedInputs", JsonArray(inputs.map(::JsonPrimitive)))
+                                put("source", trajectorySource(point))
+                                put("sourceObjective", score(point).toString())
+                                put("sourceChanges", (0 until center.numIntVars).count {
+                                    center.intValue(it) != point.intValue(it)
+                                })
+                                put("nativeSourceCheck", true)
+                            }
+                        } finally {
+                            check(view.load(center) == null)
                         }
-                        check(view.load(center) == null)
-                        record
                     } ?: JsonNull)
                 })
             }
@@ -104,6 +109,7 @@ internal object EqualityKernelReplay {
             put("records", records)
             put("connectivityOrCompletenessClaim", false)
         }.toString())
+        return consumedScopes
     }
 
     private fun matrix(view: TrajectoryView, stop: Cancellation): Matrix? {
@@ -156,7 +162,7 @@ internal object EqualityKernelReplay {
                     it.javaClass.getMethod("get", Int::class.javaPrimitiveType).invoke(it, column) != zero
                 }) continue
             val direction = Array(matrix.columns.size) { entry.invoke(v, it, column) as BigInteger }
-            if (direction.any { it.bitLength() > 256 }) return null
+            if (direction.any { it.abs().bitLength() > 256 }) return null
             result += direction
             if (result.size == MAX_DIRECTIONS) break
         }
