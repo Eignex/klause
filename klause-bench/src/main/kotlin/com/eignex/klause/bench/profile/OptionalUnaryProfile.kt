@@ -15,6 +15,7 @@ import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.formats.flatzinc.FlatZincProgram
 import com.eignex.klause.formats.flatzinc.OznApplier
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
+import com.eignex.klause.formats.flatzinc.writeFlatZincSolution
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveBudget
@@ -159,6 +160,15 @@ internal object OptionalUnaryProfile {
         val checked = sample?.let { FiniteConflictSelection.checkSource(program.problem.bake(), it, stop) }
         sample?.let {
             out.resolve("assignment.txt").writeText("${it.bools.contentToString()}\n${it.ints.contentToString()}\n")
+            out.resolve("flat.dzn").writeText(writeFlatZincSolution(program, it) + "\n----------\n")
+            val renderer = ProcessBuilder(MiniZincCompatibility.compiler.executable, "--ozn-file",
+                out.parentFile.resolve("source.ozn").absolutePath)
+                .redirectInput(out.resolve("flat.dzn"))
+                .redirectOutput(out.resolve("compiler-output.txt"))
+                .redirectError(out.resolve("compiler-output.log")).start()
+            val rendered = renderer.waitFor(5, TimeUnit.SECONDS)
+            if (!rendered) renderer.destroyForcibly().waitFor()
+            out.resolve("compiler-output-exit.txt").writeText("completed=$rendered exit=${renderer.exitValue()}\n")
             try {
                 out.resolve("output.txt").writeText(OznApplier(out.parentFile.resolve("source.ozn").readText())
                     .render(program, it))
