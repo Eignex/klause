@@ -6,6 +6,7 @@ import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.formats.xcsp3.Xcsp3
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.localsearch.CostShaping
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.IteratedLocalSearchRestart
 import com.eignex.klause.localsearch.LocalSearchParams
@@ -21,6 +22,7 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
@@ -44,6 +46,8 @@ import kotlinx.serialization.json.put
 internal object PopulationAnchors {
     @JvmStatic
     fun main(args: Array<String>) {
+        val captureStarted = System.nanoTime()
+        val captureAllocated = trajectoryThreadBytes()
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         val bytes = trajectorySourceBytes(options.getValue("suite"), options.getValue("problem"),
@@ -77,6 +81,7 @@ internal object PopulationAnchors {
         val coordinates = LocalSearchTrajectory.trajectoryCoordinates(invocation, prepared, stop)
         val hints = LocalSearchTrajectory.heuristicHints(invocation, prepared, stop)
         val sweep = hints?.let { LocalSearchTrajectory.getter(it, "getSweep") as DefinitionalSweep? }
+        val gradient = hints?.let { LocalSearchTrajectory.getter(it, "getObjective") as IncrementalObjective? }
         out.resolve("preparation.json").writeText(buildJsonObject {
             put("sourceIntegers", source.numIntVars)
             put("workingIntegers", problem.numIntVars)
@@ -89,6 +94,8 @@ internal object PopulationAnchors {
             put("sourceConditions", "none")
             put("independentWitnessCheck", false)
             put("sourceVerdictClaim", false)
+            put("elapsedNanos", System.nanoTime() - captureStarted)
+            put("allocatedBytes", trajectoryThreadBytes() - captureAllocated)
         }.toString())
         if (coordinates == null || stop()) return
         val inputs = parsed.intVarNames.values.distinct().filterNot { it in parsed.definedVars }
@@ -140,7 +147,8 @@ internal object PopulationAnchors {
                             optimizeStrategy = recipe.optimizeStrategy, definitionalSweep = sweep,
                             perMoveInvariants = sweep != null, seedImplicitOnRestart = false)
                         val result = solver.minimize(workingObjective, LocalSearchParams(
-                            randomSeed = seed, maxFlips = 1600, cancellation = stop))
+                            randomSeed = seed, maxFlips = 1600, cancellation = stop, lsObjective = gradient,
+                            costShaping = CostShaping.Linear(lambda = 1.0), normalizeWeightsByClass = true))
                         writer.appendLine(buildJsonObject {
                             put("mode", mode); put("dedup", dedup)
                             put("objective", result.objectiveValue)
@@ -210,7 +218,9 @@ internal object PopulationAnchors {
                             LocalSearchSolver(problem, strategy = recipe.strategy,
                                 optimizeStrategy = recipe.optimizeStrategy, definitionalSweep = sweep,
                                 perMoveInvariants = sweep != null).minimize(workingObjective, LocalSearchParams(
-                                randomSeed = seed, maxFlips = 512, initialAssignment = it, cancellation = stop))
+                                randomSeed = seed, maxFlips = 512, initialAssignment = it, cancellation = stop,
+                                lsObjective = gradient, costShaping = CostShaping.Linear(lambda = 1.0),
+                                normalizeWeightsByClass = true))
                         }
                         writer.appendLine(buildJsonObject {
                             put("mode", "existing-recipe-control"); put("center", index); put("extended", extended)
@@ -242,5 +252,11 @@ internal object PopulationAnchors {
                 }.toString())
             }
         }
+        out.resolve("full-cost.json").writeText(buildJsonObject {
+            put("elapsedNanos", System.nanoTime() - captureStarted)
+            put("allocatedBytes", trajectoryThreadBytes() - captureAllocated)
+            put("cancelled", stop())
+            put("scope", "source loading, preparation, checks, all controls, serialization and policy disposal")
+        }.toString())
     }
 }
