@@ -31,12 +31,13 @@ internal object EqualityKernelReplay {
     private class Arc(val from: Int, val to: Int, val column: Int, val sign: Int)
 
     fun capture(view: TrajectoryView, file: File, score: (Sample) -> BigFraction,
+        cancellation: Cancellation = Cancellation.Never,
         verify: (Sample, Cancellation) -> Boolean,
     ) {
         val started = System.nanoTime()
         val allocated = trajectoryThreadBytes()
         var work = 0L
-        val clock = Cancellation.after(2.seconds)
+        val clock = Cancellation.after(2.seconds) or cancellation
         val stop = object : Cancellation {
             override fun isCancelled(): Boolean = work >= MAX_WORK || clock()
             override fun charge(units: Long) { work += units }
