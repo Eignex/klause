@@ -487,7 +487,7 @@ internal class LpEngine(
      * solves still advance the next one — so there is nothing to gain from silencing it entirely that a
      * floor does not already get.
      */
-    private fun sparseTrialRemainingWork(): Long {
+    internal fun sparseTrialRemainingWork(): Long {
         val cap = minOf(params.lpPlan.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK,
             SPARSE_LP_MAX_WORK)
         var remaining = (cap - minOf(cap, totalSolveOps)).coerceAtLeast(0L)
