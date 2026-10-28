@@ -7804,3 +7804,17 @@ alone. Review PB and integer costs independently; no prepared consumer or losing
 total work/storage rejects practical admission for that selected source, without
 claiming a broad negative or enabling a default. Raw records belong under
 `klause-evidence/campaigns/prepared-arithmetic-3757/` beside the primary checkout.
+
+The internal trace defaults to 128 events, 8192 scalar words and at most 64 tracked
+arithmetic constraints. A row endpoint records variable, coefficient, historical
+minimum/maximum, historical hole count and live lower/upper reason factor ids;
+following hole events name the excluded values. Raw endpoint markers retain their
+original trail boundary and payload. Clause tuples record literal, cached level,
+integer coordinate, atom-kind ordinal and threshold (Boolean tuples use the reason
+factor id in the last slot). `analysis.seed-level` carries the effective level
+already computed by analysis. Derived rows/PBs and clause fallback stay distinct.
+`analysis.mapped-target` gives requested native target, shared target and actual
+native level at application. Store events assign a trace-local stable id; consumer
+events carry that id, current factor, coordinate, bound/value and native level.
+Remap events retire or move the same id. Truncation stops all subsequent capture;
+missing events after it cannot be interpreted as a decline or lack of reuse.

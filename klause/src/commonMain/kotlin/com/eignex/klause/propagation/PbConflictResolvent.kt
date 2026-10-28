@@ -30,8 +30,8 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
         private set
 
     private fun decline(cause: String) {
+        if (!failed) state.arithmeticLearningTrace?.record("pb.decline.$cause")
         failed = true
-        state.arithmeticLearningTrace?.record("pb.decline.$cause")
     }
 
     override val bumpBoolVars = IntArrayList()
