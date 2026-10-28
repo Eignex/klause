@@ -12,6 +12,7 @@ internal object BooleanSeparators {
         fixed: Map<Int, Boolean>,
         visit: () -> Boolean,
         maxCandidates: Int = 32,
+        retain: (Long) -> Boolean = { true },
     ): BooleanSeparator? {
         require(variables >= 0 && maxCandidates >= 0)
         require(fixed.keys.all { it in 0 until variables })
@@ -23,7 +24,7 @@ internal object BooleanSeparators {
             if (candidates++ >= maxCandidates) break
             val branches = ArrayList<SeparatorBranch>(2)
             for (value in listOf(false, true)) {
-                val branch = partition(clauses, variables, fixed + (v to value), visit) ?: return null
+                val branch = partition(clauses, variables, fixed + (v to value), visit, retain) ?: return null
                 branches += SeparatorBranch(value, branch.components, branch.conflict)
             }
             val score = branches.maxOf { branch ->
@@ -42,13 +43,17 @@ internal object BooleanSeparators {
         variables: Int,
         fixed: Map<Int, Boolean>,
         visit: () -> Boolean,
+        retain: (Long) -> Boolean = { true },
     ): Partition? {
-        if (!visit()) return null
+        if (!visit() || !retain(variables * 24L + clauses.sumOf { it.size * 8L + 32L })) return null
         val parent = IntArray(variables) { it }
         val live = BooleanArray(variables)
         fun root(v: Int): Int {
             var r = v
-            while (parent[r] != r) r = parent[r]
+            while (parent[r] != r) {
+                if (!visit()) return -1
+                r = parent[r]
+            }
             return r
         }
         val residual = ArrayList<List<Int>>()
@@ -68,18 +73,25 @@ internal object BooleanSeparators {
             residual += free
             if (free.isNotEmpty()) {
                 val representative = root(Lit.variable(free.first()))
+                if (representative < 0) return null
                 for (lit in free) {
                     if (!visit()) return null
                     val v = Lit.variable(lit)
                     live[v] = true
-                    parent[root(v)] = representative
+                    val previous = root(v)
+                    if (previous < 0) return null
+                    parent[previous] = representative
                 }
             }
         }
         val groups = linkedMapOf<Int, MutableList<Int>>()
         for (v in 0 until variables) {
             if (!visit()) return null
-            if (live[v]) groups.getOrPut(root(v)) { ArrayList() } += v
+            if (live[v]) {
+                val representative = root(v)
+                if (representative < 0) return null
+                groups.getOrPut(representative) { ArrayList() } += v
+            }
         }
         return Partition(groups.values.map { it.toList() }, residual, conflict)
     }
