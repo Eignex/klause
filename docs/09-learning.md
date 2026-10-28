@@ -207,7 +207,8 @@ contradiction.
 
 An optional native-session `ArithmeticLearningTrace` records bounded arithmetic
 analysis events before conflict retraction. It retains seed and fallback literals,
-integer endpoint markers and historical row domains, native/shared targets, decline
+integer endpoint markers and historical row domains, signed row guards with native
+Boolean or order-atom metadata, native/shared targets, decline
 categories and stored arithmetic consumers. Literal metadata distinguishes cached
 atom levels from the analyzer's effective conflict level. Historical domain holes
 exclude later journalled carves; endpoint factor ids describe the live reason owner.

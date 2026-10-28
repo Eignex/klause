@@ -7808,7 +7808,9 @@ claiming a broad negative or enabling a default. Raw records belong under
 The internal trace defaults to 128 events, 8192 scalar words and at most 64 tracked
 arithmetic constraints. A row endpoint records variable, coefficient, historical
 minimum/maximum, historical hole count and live lower/upper reason factor ids;
-following hole events name the excluded values. Raw endpoint markers retain their
+following hole events name the excluded values. Each row names its signed guard,
+with a separate Boolean/order-atom tuple; `Lit.NONE` records unconditional rows.
+Raw endpoint markers retain their
 original trail boundary and payload. Clause tuples record literal, cached level,
 integer coordinate, atom-kind ordinal and threshold (Boolean tuples use the reason
 factor id in the last slot). `analysis.seed-level` carries the effective level
