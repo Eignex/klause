@@ -8,9 +8,11 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.factor.table.Table
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ConflictAnalyzerTest {
@@ -42,7 +44,59 @@ class ConflictAnalyzerTest {
             assertEquals(if (enabled) 2 else 3, learned.literals.size)
             val ordinary = state.reasonOf(state.intMaxAntecedents[0])!!
             assertTrue(ordinary.any { state.atoms.intVar[Lit.variable(it) - 1] == 1 })
+            assertNull(state.historicalTableReason)
         }
+    }
+
+    @Test
+    fun `cancelled historical table analysis should discard unfinished learning`() {
+        val tuples = (0 until 8).flatMap { listOf(0L, (it / 4).toLong(), (it / 2 % 2).toLong(), (it % 2).toLong()) }
+            .toLongArray() + longArrayOf(1, 0, 0, 1, 1, 1, 1, 0)
+        val problem = Problem(1, 4, Array(4) { IntDomain(0, 1) },
+            arrayOf<Factor>(Table(intArrayOf(0, 1, 2, 3), tuples)))
+        for (stop in 1..8) {
+            val state = PropagationState(problem, Assumptions.None)
+            state.undoLogging = true
+            state.historicalTableReasons = true
+            check(state.setIntMinAsDecision(2, 1))
+            check(state.setIntMinAsDecision(1, 1))
+            check(state.pinBoolAsDecision(0, true))
+            check(state.tightenIntMin(3, 1, intArrayOf(Lit.make(0, false))))
+            val x = state.atomVarGe(0, 1)
+            val b = state.atomVarGe(2, 1)
+            state.currentFactor = 0
+            check(state.factorAt(0).propagate(state, 0))
+            var polls = 0
+            state.finiteWork.cancellation = Cancellation { ++polls >= stop }
+
+            val result = state.conflictAnalyzer.analyzeConflictClause(
+                intArrayOf(Lit.make(x, true), Lit.make(b, false), Lit.make(0, false)))
+
+            if (state.runCancelled) assertIs<ConflictAnalyzer.AnalysisResult.NotApplicable>(result)
+            else assertIs<ConflictAnalyzer.AnalysisResult.Learned>(result)
+            assertNull(state.historicalTableReason)
+        }
+    }
+
+    @Test
+    fun `historical table selection should leave extended reasons and scope premises intact`() {
+        val problem = Problem(1, 2, Array(2) { IntDomain(0, 1) }, arrayOf<Factor>(
+            Table(intArrayOf(0, 1), longArrayOf(0, 1, 1, 0))))
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        check(state.pinBoolAsDecision(0, true))
+        check(state.tightenIntMin(1, 1))
+        state.currentFactor = 0
+        val marker = state.lazyReason(intArrayOf(0, 2, 0, 1))
+        val scope = Lit.make(0, false)
+        val choice = HistoricalTableReason(state)
+        state.historicalTableReason = choice
+
+        val reason = state.reasonOf(extendReason(marker, intArrayOf(scope)))!!
+
+        assertTrue(scope in reason)
+        assertTrue(!choice.prepare(reason))
+        state.historicalTableReason = null
     }
 
     @Test

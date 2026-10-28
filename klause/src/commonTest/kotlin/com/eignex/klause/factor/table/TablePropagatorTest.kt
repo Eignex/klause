@@ -66,6 +66,37 @@ class TablePropagatorTest {
         }
     }
 
+    @Test
+    fun `historical alternative should decline more than sixty four retained premises`() {
+        val tuples = (1..65).flatMap { listOf(1L, it.toLong()) }.toLongArray()
+        val problem = Problem(0, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 66)), arrayOf<Factor>(
+            Table(intArrayOf(0, 1), tuples)))
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        state.currentLevel = 1
+        for (value in 1L..65L) check(state.excludeIntValue(1, value))
+
+        val reason = (state.factorAt(0) as TablePropagator).historicalAlternative(
+            state, intArrayOf(0, 2, 0, 1), state.undo.size, IntHashSet())
+
+        assertNull(reason)
+    }
+
+    @Test
+    fun `historical alternative should decline a target scope exceeding its hole allowance`() {
+        val problem = Problem(0, 2, arrayOf(IntDomain(0, 65), IntDomain(0, 1)), arrayOf<Factor>(
+            Table(intArrayOf(0, 1), longArrayOf(0, 0, 65, 1))))
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        state.currentLevel = 1
+        for (value in 1L..63L) check(state.excludeIntValue(0, value))
+
+        val reason = (state.factorAt(0) as TablePropagator).historicalAlternative(
+            state, intArrayOf(0, 1, 0, 64), state.undo.size, IntHashSet())
+
+        assertNull(reason)
+    }
+
 
     @Test
     fun `indexed table deductions should be implied by their historical reasons`() {

@@ -364,7 +364,9 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
             state.finiteWork.checkNow()
             val fallback = runResolution(clauseResolvent, seedReason, currentLevel)
             if (fallback !is AnalysisResult.Learned || !fallback.asserting || state.runCancelled) return fallback
-            if (!choice.prepare(fallback.literals)) return fallback
+            val prepared = choice.prepare(fallback.literals)
+            state.finiteWork.checkNow()
+            if (!prepared) return fallback
             universe = state.problem.numBoolVars + state.atoms.intVar.size
             val alternateResolvent = ClauseResolvent(state, this)
             val alternate = runResolution(alternateResolvent, seedReason, currentLevel)
