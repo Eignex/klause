@@ -18,10 +18,10 @@ import com.eignex.klause.util.parseBigInt
 import java.math.BigInteger
 
 internal class ComponentAllowance(
-    private val cancellation: Cancellation,
+    cancellation: Cancellation,
     decisions: Long = 1_000_000L,
-    private val maxVisits: Long = 4_000_000L,
-    private val maxBytes: Long = 16L * 1024 * 1024,
+    maxVisits: Long = 4_000_000L,
+    maxBytes: Long = 16L * 1024 * 1024,
 ) {
     val nodes = NodeBudget(decisions)
     var visits = 0L
@@ -84,7 +84,8 @@ internal object ScopedComponentSearch {
                 scope.clauses.forEach { factors += Clause(it.toIntArray()) }
                 factors += PseudoBoolean(
                     scope.weights.map { parseBigInt(it.toString()) }.toTypedArray(),
-                    IntArray(scope.weights.size) { Lit.make(it, true) }, PbOp.LE,
+                    IntArray(scope.weights.size) { Lit.make(it, true) },
+                    PbOp.LE,
                     parseBigInt((threshold - BigInteger.ONE).toString()),
                 )
                 val problem = Problem(scope.weights.size, 0, emptyArray(), factors.toTypedArray())
@@ -93,10 +94,12 @@ internal object ScopedComponentSearch {
                 buildNanos += built - start
                 if (allowance.stop()) break
                 val base = BacktrackPresets.satOptimized(randomSeed = seed, cancellation = allowance.stop)
-                val result = BacktrackSolver(problem).solve(base.copy(
-                    nodeBudget = allowance.nodes,
-                    lpConfig = if (lp) LpConfig(LpEmphasis.DEFAULT) else null,
-                ))
+                val result = BacktrackSolver(problem).solve(
+                    base.copy(
+                        nodeBudget = allowance.nodes,
+                        lpConfig = if (lp) LpConfig(LpEmphasis.DEFAULT) else null,
+                    ),
+                )
                 searchNanos += System.nanoTime() - built
                 queries++
                 val checking = System.nanoTime()
@@ -105,12 +108,14 @@ internal object ScopedComponentSearch {
                     is SolveResult.Unsat -> {
                         bounds[i] = bounds[i].refutedBelow(scope, threshold)
                     }
+
                     is SolveResult.Sat -> {
                         val values = List(scope.weights.size) { result.assignment.boolValue(it) }
                         check(scope.accepts(values) && scope.cost(values) < threshold)
                         bounds[i] = bounds[i].withWitness(values)
                         threshold = checkNotNull(bounds[i].upper)
                     }
+
                     else -> break
                 }
                 checkNanos += System.nanoTime() - checking

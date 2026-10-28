@@ -1,5 +1,7 @@
 package com.eignex.klause.bench.profile
 
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import java.math.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -7,8 +9,6 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.ValueSource
 
 class ScopedComponentBoundsTest {
     private fun scope(v: Int, weight: Long = 1L, conditions: Map<Int, Boolean> = emptyMap()) =
@@ -18,8 +18,10 @@ class ScopedComponentBoundsTest {
     fun `exact child floors should close a strict global cutoff`() {
         val a = scope(0, 3L)
         val b = scope(1, 3L)
-        val children = listOf(a, b).map { ComponentCostBounds.opening(it).withWitness(listOf(true))
-            .refutedBelow(it, BigInteger.valueOf(3)) }
+        val children = listOf(a, b).map {
+            ComponentCostBounds.opening(it).withWitness(listOf(true))
+                .refutedBelow(it, BigInteger.valueOf(3))
+        }
         val composition = ScopedComponentBounds(BigInteger.ZERO, listOf(a, b))
 
         assertTrue(composition.closes(BigInteger.valueOf(6), children))
@@ -41,8 +43,10 @@ class ScopedComponentBoundsTest {
     fun `partial sibling witness should not supply an outside lower bound`() {
         val a = scope(0)
         val b = scope(1, 9L)
-        val children = listOf(ComponentCostBounds.opening(a),
-            ComponentCostBounds.opening(b).withWitness(listOf(true)))
+        val children = listOf(
+            ComponentCostBounds.opening(a),
+            ComponentCostBounds.opening(b).withWitness(listOf(true)),
+        )
         val composition = ScopedComponentBounds(BigInteger.ONE, listOf(a, b))
 
         assertEquals(BigInteger.valueOf(9), composition.improvementBudget(0, BigInteger.TEN, children))
@@ -57,8 +61,10 @@ class ScopedComponentBoundsTest {
         val composition = ScopedComponentBounds(BigInteger.valueOf(-7), listOf(a, b))
 
         assertEquals(BigInteger("-18446744073709551623"), composition.exact(children))
-        assertEquals(BigInteger("9223372036854775825"),
-            composition.improvementBudget(0, BigInteger.TEN, children))
+        assertEquals(
+            BigInteger("9223372036854775825"),
+            composition.improvementBudget(0, BigInteger.TEN, children),
+        )
     }
 
     @ParameterizedTest
@@ -68,9 +74,19 @@ class ScopedComponentBoundsTest {
         val child = ComponentCostBounds.opening(original)
         val altered = when (changed) {
             "condition" -> scope(0, conditions = mapOf(7 to false))
+
             "clauses" -> ComponentCostScope("source", original.conditions, listOf(0), emptyList(), listOf(1L))
-            "source" -> ComponentCostScope("another-source", original.conditions, listOf(0), original.clauses, listOf(1L))
+
+            "source" -> ComponentCostScope(
+                "another-source",
+                original.conditions,
+                listOf(0),
+                original.clauses,
+                listOf(1L),
+            )
+
             "coordinates" -> scope(1, conditions = original.conditions)
+
             else -> scope(0, 2L, original.conditions)
         }
 
@@ -135,8 +151,14 @@ class ScopedComponentBoundsTest {
 
     @Test
     fun `cutoff conditioned restrictions should reject a looser query`() {
-        val scope = ComponentCostScope("source", emptyMap(), listOf(0), listOf(listOf(0)), listOf(3L),
-            restrictionCutoff = BigInteger.valueOf(3))
+        val scope = ComponentCostScope(
+            "source",
+            emptyMap(),
+            listOf(0),
+            listOf(listOf(0)),
+            listOf(3L),
+            restrictionCutoff = BigInteger.valueOf(3),
+        )
         val children = listOf(ComponentCostBounds.opening(scope).refutedBelow(scope, BigInteger.valueOf(3)))
         val composition = ScopedComponentBounds(BigInteger.ZERO, listOf(scope))
 

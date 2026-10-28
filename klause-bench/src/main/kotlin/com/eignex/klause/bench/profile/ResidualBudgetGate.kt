@@ -16,7 +16,9 @@ internal object ResidualBudgetGate {
     ): Boolean {
         if (restriction.op == PbOp.EQ || !allowance.retain(weights.size * 32L) ||
             !allowance.visit(weights.size * 2L)
-        ) return false
+        ) {
+            return false
+        }
         val coefficients = Array(weights.size) { BigInteger.ZERO }
         var rhs = restriction.constants.exactBound
         if (rhs.bitLength() > 512) return false

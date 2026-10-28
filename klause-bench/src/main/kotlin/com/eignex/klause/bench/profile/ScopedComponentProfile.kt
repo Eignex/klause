@@ -12,8 +12,8 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.model.PbOp
-import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.search.VarRef
@@ -40,14 +40,21 @@ internal data class ComponentResidual(
     fun capture(allowance: ComponentAllowance): ComponentPartition? {
         val size = clauses.sumOf { it.size.toLong() } + weights.size * 8L + clauses.size * 4L
         if (!allowance.retain(size * 8L) || !allowance.visit(size)) return null
-        val partition = BooleanSeparators.partition(clauses, weights.size, fixed, { allowance.visit() },
-            allowance::retain) ?: return null
+        val partition = BooleanSeparators.partition(
+            clauses,
+            weights.size,
+            fixed,
+            { allowance.visit() },
+            allowance::retain,
+        ) ?: return null
         val owner = IntArray(weights.size) { -1 }
         val local = IntArray(weights.size)
-        for ((i, variables) in partition.components.withIndex()) for ((j, v) in variables.withIndex()) {
-            if (!allowance.visit()) return null
-            owner[v] = i
-            local[v] = j
+        for ((i, variables) in partition.components.withIndex()) {
+            for ((j, v) in variables.withIndex()) {
+                if (!allowance.visit()) return null
+                owner[v] = i
+                local[v] = j
+            }
         }
         val grouped = List(partition.components.size) { ArrayList<List<Int>>() }
         for (clause in partition.clauses) {
@@ -58,12 +65,24 @@ internal data class ComponentResidual(
             grouped[component] += clause.map { Lit.make(local[Lit.variable(it)], Lit.isPositive(it)) }
         }
         val scopes = partition.components.mapIndexed { i, variables ->
-            ComponentCostScope(identity, fixed.toMap(), variables.toList(), grouped[i],
-                variables.map { weights[it] }, restrictionCutoff)
+            ComponentCostScope(
+                identity,
+                fixed.toMap(),
+                variables.toList(),
+                grouped[i],
+                variables.map { weights[it] },
+                restrictionCutoff,
+            )
         }.toMutableList()
         if (partition.conflict) {
-            scopes += ComponentCostScope(identity, fixed.toMap(), emptyList(), listOf(emptyList()), emptyList(),
-                restrictionCutoff)
+            scopes += ComponentCostScope(
+                identity,
+                fixed.toMap(),
+                emptyList(),
+                listOf(emptyList()),
+                emptyList(),
+                restrictionCutoff,
+            )
         }
         val witness = MutableList(weights.size) { false }
         val active = partition.components.flatten().toSet()
@@ -96,8 +115,10 @@ internal data class ComponentPartition(
     fun reconstruct(children: List<ComponentCostBounds>): List<Boolean>? {
         if (children.any { it.witness == null }) return null
         val witness = baseline.toMutableList()
-        for (child in children) for ((i, v) in child.scope.variables.withIndex()) {
-            witness[v] = checkNotNull(child.witness)[i]
+        for (child in children) {
+            for ((i, v) in child.scope.variables.withIndex()) {
+                witness[v] = checkNotNull(child.witness)[i]
+            }
         }
         return witness.toList()
     }
@@ -114,23 +135,30 @@ object ScopedComponentProfile {
         val seed = options["seed"]?.toLong() ?: 3L
         require(millis in 1L..30_000L)
         val out = File(System.getenv("OUT") ?: "build/profile-out").apply { mkdirs() }
-        out.resolve("request.json").writeText(buildJsonObject {
-            put("millis", millis)
-            put("seed", seed)
-            put("javaVersion", System.getProperty("java.version"))
-            put("osArch", System.getProperty("os.arch"))
-            put("processors", Runtime.getRuntime().availableProcessors())
-            put("maxMemory", Runtime.getRuntime().maxMemory())
-            put("provenance", InstalledBuild.current.fingerprint)
-        }.toString())
-        val cycles = (0 until 2).flatMap { cycle -> (0 until 5).map { i ->
-            listOf(Lit.make(cycle * 5 + i, true), Lit.make(cycle * 5 + (i + 1) % 5, true))
-        } }
+        out.resolve("request.json").writeText(
+            buildJsonObject {
+                put("millis", millis)
+                put("seed", seed)
+                put("javaVersion", System.getProperty("java.version"))
+                put("osArch", System.getProperty("os.arch"))
+                put("processors", Runtime.getRuntime().availableProcessors())
+                put("maxMemory", Runtime.getRuntime().maxMemory())
+                put("provenance", InstalledBuild.current.fingerprint)
+            }.toString(),
+        )
+        val cycles = (0 until 2).flatMap { cycle ->
+            (0 until 5).map { i ->
+                listOf(Lit.make(cycle * 5 + i, true), Lit.make(cycle * 5 + (i + 1) % 5, true))
+            }
+        }
         val independent = ComponentResidual("two-five-cycles", cycles, List(10) { 1L }, BigInteger.ZERO, emptyMap())
         write(out, "independent-cutoff-6", composition(independent, BigInteger.valueOf(6), millis, seed))
         write(out, "independent-cutoff-7", composition(independent, BigInteger.valueOf(7), millis, seed))
-        val bridge = independent.copy(identity = "two-five-cycles-bridge", clauses = cycles + listOf(listOf(20, 0, 10)),
-            weights = List(11) { 1L })
+        val bridge = independent.copy(
+            identity = "two-five-cycles-bridge",
+            clauses = cycles + listOf(listOf(20, 0, 10)),
+            weights = List(11) { 1L },
+        )
         write(out, "bridge-cutoff-7", separator(bridge, BigInteger.valueOf(7), millis, seed))
         write(out, "natural-cutoff-7", composition(bridge, BigInteger.valueOf(7), millis, seed))
         write(out, "ordinary", ordinary(bridge, millis, seed, lp = false))
@@ -156,12 +184,22 @@ object ScopedComponentProfile {
         val partition = residual.capture(allowance)
             ?: return buildJsonObject { put("decline", "capture-allowance") }
         val captured = System.nanoTime()
-        val result = ScopedComponentSearch.run(partition.scopes, partition.offset, cutoff, allowance, seed, lp,
-            restrictionCutoff = residual.restrictionCutoff)
+        val result = ScopedComponentSearch.run(
+            partition.scopes,
+            partition.offset,
+            cutoff,
+            allowance,
+            seed,
+            lp,
+            restrictionCutoff = residual.restrictionCutoff,
+        )
         val composition = ScopedComponentBounds(partition.offset, partition.scopes, residual.restrictionCutoff)
-        val witness = if (allowance.visit(residual.weights.size.toLong() + residual.clauses.sumOf { it.size.toLong() })) {
+        val witnessVisits = residual.weights.size.toLong() + residual.clauses.sumOf { it.size.toLong() }
+        val witness = if (allowance.visit(witnessVisits)) {
             partition.reconstruct(result.children)?.also { check(residual.accepts(it)) }
-        } else null
+        } else {
+            null
+        }
         val sourceChecked = witness != null && sourceCheck != null && sourceCheck(witness, allowance)
         check(witness == null || sourceCheck == null || sourceChecked || allowance.stop())
         return buildJsonObject {
@@ -200,13 +238,24 @@ object ScopedComponentProfile {
         allowance: ComponentAllowance = ComponentAllowance(Cancellation.after(millis.milliseconds)),
     ): JsonObject {
         val start = System.nanoTime()
-        val separator = BooleanSeparators.choose(residual.clauses, residual.weights.size, residual.fixed,
-            { allowance.visit() }, retain = allowance::retain)
+        val separator = BooleanSeparators.choose(
+            residual.clauses,
+            residual.weights.size,
+            residual.fixed,
+            { allowance.visit() },
+            retain = allowance::retain,
+        )
             ?: return buildJsonObject { put("decline", "no-bounded-separator") }
         val analysis = System.nanoTime() - start
         val branches = separator.branches.map { branch ->
-            composition(residual.copy(fixed = residual.fixed + (separator.variable to branch.value)),
-                cutoff, millis, seed, allowance, sourceCheck = sourceCheck)
+            composition(
+                residual.copy(fixed = residual.fixed + (separator.variable to branch.value)),
+                cutoff,
+                millis,
+                seed,
+                allowance,
+                sourceCheck = sourceCheck,
+            )
         }
         return buildJsonObject {
             put("variable", separator.variable)
@@ -229,27 +278,37 @@ object ScopedComponentProfile {
         pbCutoff: Boolean = false,
         sourceCheck: ((List<Boolean>, ComponentAllowance) -> Boolean)? = null,
     ): JsonObject {
-        require(residual.restrictionCutoff == null || cutoff != null && cutoff <= residual.restrictionCutoff)
+        require(residual.restrictionCutoff == null || (cutoff != null && cutoff <= residual.restrictionCutoff))
         val start = System.nanoTime()
         val allowance = ComponentAllowance(Cancellation.after(millis.milliseconds))
         val clauses = residual.clauses + residual.fixed.map { (v, value) -> listOf(Lit.make(v, value)) }
         val factors = ArrayList<Factor>(clauses.size + 1).apply {
             clauses.forEach { add(Clause(it.toIntArray())) }
         }
-        if (cutoff != null) factors += PseudoBoolean(
-            residual.weights.map { parseBigInt(it.toString()) }.toTypedArray(),
-            IntArray(residual.weights.size) { Lit.make(it, true) }, PbOp.LE,
-            parseBigInt((cutoff - BigInteger.ONE - residual.constant).toString()),
-        )
+        if (cutoff != null) {
+            factors += PseudoBoolean(
+                residual.weights.map { parseBigInt(it.toString()) }.toTypedArray(),
+                IntArray(residual.weights.size) { Lit.make(it, true) },
+                PbOp.LE,
+                parseBigInt((cutoff - BigInteger.ONE - residual.constant).toString()),
+            )
+        }
         val model = Problem(residual.weights.size, 0, emptyArray(), factors.toTypedArray())
             .bake(cancellation = allowance.stop)
         val base = BacktrackPresets.satOptimized(randomSeed = seed, cancellation = allowance.stop)
         val decisions = ArrayList<JsonObject>()
-        val result = BacktrackSolver(model).minimize(LinearObjective(residual.weights.toLongArray(),
-            constant = residual.constant.longValueExact()), base.copy(nodeBudget = allowance.nodes,
-            variableSelector = DecisionTrace(base.variableSelector, biased, decisions),
-            pbObjectiveCutoff = pbCutoff,
-            lpConfig = if (lp) LpConfig(LpEmphasis.DEFAULT) else null))
+        val result = BacktrackSolver(model).minimize(
+            LinearObjective(
+                residual.weights.toLongArray(),
+                constant = residual.constant.longValueExact(),
+            ),
+            base.copy(
+                nodeBudget = allowance.nodes,
+                variableSelector = DecisionTrace(base.variableSelector, biased, decisions),
+                pbObjectiveCutoff = pbCutoff,
+                lpConfig = if (lp) LpConfig(LpEmphasis.DEFAULT) else null,
+            ),
+        )
         val witness = result.assignment?.let { sample -> List(residual.weights.size) { sample.boolValue(it) } }
         witness?.let { check(residual.accepts(it)) }
         val sourceChecked = witness != null && sourceCheck != null && sourceCheck(witness, allowance)
@@ -277,12 +336,17 @@ object ScopedComponentProfile {
         override fun fresh(): VariableSelector = DecisionTrace(delegate.fresh(), biased, trace)
 
         override fun pick(session: PropagationSession, rng: Random): VarRef? {
-            val choice = if (biased != null && session.boolValue(biased) == null) VarRef.Bool(biased)
-                else delegate.pick(session, rng)
-            if (trace.size < 32) trace += buildJsonObject {
-                put("level", session.decisionLevel)
-                put("variable", (choice as? VarRef.Bool)?.varId)
-                put("biased", choice == biased?.let { VarRef.Bool(it) })
+            val choice = if (biased != null && session.boolValue(biased) == null) {
+                VarRef.Bool(biased)
+            } else {
+                delegate.pick(session, rng)
+            }
+            if (trace.size < 32) {
+                trace += buildJsonObject {
+                    put("level", session.decisionLevel)
+                    put("variable", (choice as? VarRef.Bool)?.varId)
+                    put("biased", choice == biased?.let { VarRef.Bool(it) })
+                }
             }
             return choice
         }
