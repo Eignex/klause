@@ -7122,15 +7122,21 @@ disabled.
 
 ### Boolean conflict locality
 
-`MixedPbLocalityProfile` runs twelve tiny retained-projection controls: four-hole
-counting with four/five pigeons, pure Boolean/unrelated finite integer/connected
-finite integer, and clause/PB learning. The connection is `b0 iff x0 <= 5` with
-`x0` in `0..10`. Direct finite construction excludes presolve, binary substitution
-and LP preparation. The profile reports stored PB constraints and later Boolean
-pins whose factor reason is a stored PB constraint, alongside decisions, backjumps,
-finite work, elapsed time and current-thread allocations. Reflection reads existing
-internal reason identities without changing propagation. Pin observations can repeat
-across commits and are not a count of distinct deductions. Feasible verdicts have
-native source checks only; these controls provide no independent proof/witness check
-or corpus speedup estimate. Run once as a bounded lab profile; broader/default
-admission needs a separately authorized matched study.
+`MixedPbLocalityProfile` runs twelve tiny retained-projection controls for
+`!b0+b2+b3+b4 >= 2`, `b2 <= b1` and `b3 <= b1`: two first-Boolean
+polarities, pure Boolean/unrelated finite integer/connected finite integer, and
+clause/PB learning. The connection is `b0 iff x0 <= 5` with `x0` in `0..10`.
+Choosing `b0=true` then `b1=false` reaches the counting conflict. Resolving the
+two gated inputs retains `!b0+2*b1+b4 >= 2`, which asserts `b1=true` after undo.
+Direct finite construction excludes presolve, binary substitution and LP preparation.
+The profile reports stored PB constraints and later pins with a stored PB reason,
+decisions, backjumps, finite work, elapsed time and current-thread allocations.
+Reflection reads existing reason identities without changing propagation. Pin
+observations can repeat across commits and do not count distinct deductions.
+A fresh native session rechecks each feasible point; there is no independent proof
+or witness check and no corpus speedup estimate. Run once as a bounded lab profile;
+broader/default admission needs a separately authorized matched study.
+
+The initial five-pigeon/four-hole source-order test produced no stored PB on native
+CI and was rejected as a consumption control. Lab 8851 failed in source compilation
+before executing that control. These outcomes establish no locality rejection.

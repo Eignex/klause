@@ -102,6 +102,12 @@ class SearchSession(
     /** Clause-form reason for the current assignment of [variable], or null when it is a decision. */
     fun reasonFor(variable: Int): SearchExplanation? = trail.reasonFor(variable)
 
+    internal fun supportsNativeBooleanAnalysis(variable: Int, owner: SearchComponent, booleanCount: Int): Boolean {
+        val publisher = trail.publisherOf(variable)
+        if (publisher != null && publisher !== owner) return false
+        return trail.reasonFor(variable)?.literals?.all { (it ushr 1) < booleanCount } != false
+    }
+
     override fun imply(literal: Int, explanation: SearchExplanation): ComponentResult =
         assignImplied(literal, explanation)
 

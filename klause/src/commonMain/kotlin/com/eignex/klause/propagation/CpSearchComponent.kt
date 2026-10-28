@@ -77,7 +77,7 @@ class CpSearchComponent(
             (lastConflict?.learnedClause as? ConflictAnalyzer.AnalysisResult.LearnedPb)?.let(::usableMixedPb) == true
 
     private fun usableMixedPb(learned: ConflictAnalyzer.AnalysisResult.LearnedPb): Boolean {
-        val context = sharedContext ?: return false
+        val context = sharedContext as? SearchSession ?: return false
         var nativeTarget = sharedRootLevel
         for (level in minOf(nativeLevelBySharedLevel.size - 1, analysisSharedLevel - 1) downTo 0) {
             if (nativeLevelBySharedLevel[level] <= learned.backjumpLevel) {
@@ -93,10 +93,11 @@ class CpSearchComponent(
             val literal = learned.literals[i]
             val variable = Lit.variable(literal)
             val sharedValue = context.boolValue(variable)
-            if (sharedValue != null && context.explainAtoms(
-                    SearchAtomPremise.Asserted(SearchDecision.Bool(Lit.make(variable, sharedValue))),
-                ) == null
-            ) return false
+            if (sharedValue != null &&
+                !context.supportsNativeBooleanAnalysis(variable, this, session.problem.numBoolVars)
+            ) {
+                return false
+            }
             val freed = !state.boolAssignedAt(variable) || state.boolLevel[variable] > nativeTarget
             if (freed || state.boolValueAt(variable) == Lit.isPositive(literal)) available += learned.weights[i]
             if (freed) maxFree = maxOf(maxFree, learned.weights[i])
@@ -472,7 +473,9 @@ class CpSearchComponent(
     override fun resolveConflict(context: com.eignex.klause.solver.search.SearchContext): SearchConflictResolution {
         val unsat = lastResult as? PropagationResult.Unsat ?: return SearchConflictResolution.Chronological
         var learned = unsat.learnedClause as? ConflictAnalyzer.AnalysisResult.LearnedConstraint
-        if (session.problem.numIntVars > 0 && learned is ConflictAnalyzer.AnalysisResult.LearnedPb && !usableMixedPb(learned)) {
+        if (session.problem.numIntVars > 0 &&
+            learned is ConflictAnalyzer.AnalysisResult.LearnedPb && !usableMixedPb(learned)
+        ) {
             learned = learned.fallbackClause
         }
         if (learned == null) {
