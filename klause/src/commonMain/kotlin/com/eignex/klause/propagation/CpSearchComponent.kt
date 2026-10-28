@@ -530,7 +530,13 @@ class CpSearchComponent(
 
     /** Shared level corresponding to the latest native level not above [nativeLevel]. */
     fun sharedLevelForNative(nativeLevel: Int): Int {
-        for (level in nativeLevelBySharedLevel.size - 1 downTo 0) {
+        // A rejected native pin has already undone its own level; its shared scope still awaits retraction.
+        val latest = if (lastResult is PropagationResult.Unsat) {
+            minOf(nativeLevelBySharedLevel.size - 1, analysisSharedLevel - 1)
+        } else {
+            nativeLevelBySharedLevel.size - 1
+        }
+        for (level in latest downTo 0) {
             if (nativeLevelBySharedLevel[level] <= nativeLevel) return level
         }
         return 0
