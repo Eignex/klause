@@ -30,6 +30,34 @@ import kotlin.test.assertTrue
 
 class IntegerConflictLearnerTest {
     @Test
+    fun `original rows should reroute the retained row scaling conflict`() {
+        for (scale in listOf(2, 8, 32)) {
+            for (order in listOf(listOf(0, 1, 2), listOf(0, 2, 1), listOf(1, 0, 2),
+                listOf(1, 2, 0), listOf(2, 0, 1), listOf(2, 1, 0))) {
+                val factors = arrayOf(
+                    Linear(intArrayOf(scale, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+                    Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                    Linear(intArrayOf(1, -scale, -1), intArrayOf(2, 0, 3), LinearOp.LE, 0),
+                )
+                val native = PropagationSession(Problem(0, 4, arrayOf(IntDomain(0, scale.toLong()),
+                    IntDomain(0, scale.toLong()), IntDomain(0, scale.toLong() * (scale + 1)),
+                    IntDomain(0, scale.toLong() * (scale + 1))), order.map { factors[it] }.toTypedArray()),
+                    pbLearning = false).apply { enableIntegerRowLearning() }
+                assertIs<PropagationResult.Implied>(native.pinIntAtLeast(0, 1))
+
+                val conflict = assertIs<PropagationResult.Unsat>(native.pinIntAtMost(3, 0))
+
+                val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(conflict.learnedClause,
+                    "scale=$scale order=$order")
+                assertEquals(0L, learned.row.bound)
+                assertEquals(-1L, learned.row.coefficient(3))
+                assertEquals(1L, learned.row.coefficient(0) + learned.row.coefficient(1))
+                assertEquals(0L, learned.row.coefficient(2))
+            }
+        }
+    }
+
+    @Test
     fun `an incidental hole should retain a row across sibling endpoints without filling the domain`() {
         for (sign in listOf(1, -1)) {
             val native = PropagationSession(Problem(0, 3, arrayOf(
