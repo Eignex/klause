@@ -7,6 +7,8 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 
 class ScopedComponentBoundsTest {
     private fun scope(v: Int, weight: Long = 1L, conditions: Map<Int, Boolean> = emptyMap()) =
@@ -59,17 +61,21 @@ class ScopedComponentBoundsTest {
             composition.improvementBudget(0, BigInteger.TEN, children))
     }
 
-    @Test
-    fun `refutation should reject a different condition or restriction`() {
+    @ParameterizedTest
+    @ValueSource(strings = ["condition", "clauses", "source", "coordinates", "weights"])
+    fun `refutation should reject a different condition or restriction`(changed: String) {
         val original = scope(0, conditions = mapOf(7 to true))
         val child = ComponentCostBounds.opening(original)
-        val altered = listOf(scope(0, conditions = mapOf(7 to false)),
-            ComponentCostScope("source", original.conditions, listOf(0), emptyList(), listOf(1L)),
-            ComponentCostScope("another-source", original.conditions, listOf(0), original.clauses, listOf(1L)),
-            scope(1, conditions = original.conditions), scope(0, 2L, original.conditions))
+        val altered = when (changed) {
+            "condition" -> scope(0, conditions = mapOf(7 to false))
+            "clauses" -> ComponentCostScope("source", original.conditions, listOf(0), emptyList(), listOf(1L))
+            "source" -> ComponentCostScope("another-source", original.conditions, listOf(0), original.clauses, listOf(1L))
+            "coordinates" -> scope(1, conditions = original.conditions)
+            else -> scope(0, 2L, original.conditions)
+        }
 
-        for (scope in altered) assertFailsWith<IllegalArgumentException> {
-            child.refutedBelow(scope, BigInteger.ONE)
+        assertFailsWith<IllegalArgumentException> {
+            child.refutedBelow(altered, BigInteger.ONE)
         }
     }
 
