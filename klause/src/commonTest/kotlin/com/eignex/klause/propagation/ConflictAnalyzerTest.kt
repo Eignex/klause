@@ -42,10 +42,33 @@ class ConflictAnalyzerTest {
             assertTrue(learned.asserting)
             assertEquals(if (enabled) 1 else 2, learned.backjumpLevel)
             assertEquals(if (enabled) 2 else 3, learned.literals.size)
-            val ordinary = state.reasonOf(state.intMaxAntecedents[0])!!
-            assertTrue(ordinary.any { state.atoms.intVar[Lit.variable(it) - 1] == 1 })
-            assertNull(state.historicalTableReason)
         }
+    }
+
+    @Test
+    fun `historical table replay should preserve the ordinary marker memo`() {
+        val tuples = (0 until 8).flatMap { listOf(0L, (it / 4).toLong(), (it / 2 % 2).toLong(), (it % 2).toLong()) }
+            .toLongArray() + longArrayOf(1, 0, 0, 1, 1, 1, 1, 0)
+        val problem = Problem(1, 4, Array(4) { IntDomain(0, 1) },
+            arrayOf<Factor>(Table(intArrayOf(0, 1, 2, 3), tuples)))
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        state.historicalTableReasons = true
+        check(state.setIntMinAsDecision(2, 1))
+        check(state.setIntMinAsDecision(1, 1))
+        check(state.pinBoolAsDecision(0, true))
+        check(state.tightenIntMin(3, 1, intArrayOf(Lit.make(0, false))))
+        val x = state.atomVarGe(0, 1)
+        val b = state.atomVarGe(2, 1)
+        state.currentFactor = 0
+        check(state.factorAt(0).propagate(state, 0))
+        val marker = state.intMaxAntecedents[0]
+        val ordinary = state.reasonOf(marker)!!.toList()
+
+        state.conflictAnalyzer.analyzeConflictClause(
+            intArrayOf(Lit.make(x, true), Lit.make(b, false), Lit.make(0, false)))
+
+        assertEquals(ordinary, state.reasonOf(marker)!!.toList())
     }
 
     @Test
