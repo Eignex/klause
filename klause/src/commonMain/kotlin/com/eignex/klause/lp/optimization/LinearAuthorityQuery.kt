@@ -51,6 +51,7 @@ internal class LinearAuthorityQuery private constructor(
             maximumCutProofSteps: Int = 100_000,
             onCutWork: (Long) -> Unit = {},
             cutMask: Set<Int>? = null,
+            consequences: List<SourceEvidence> = emptyList(),
         ): LinearAuthorityQuery? {
             val coordinates = template?.coordinates ?: source.numericCoordinates()
             val numeric = template?.numeric ?: source.numericContext()
@@ -99,6 +100,12 @@ internal class LinearAuthorityQuery private constructor(
                     if (cut.mixed) activeMixedCuts++
                 } else inactive += cited.size
                 cited += cut.inequality to cut.derivation
+            }
+            for (evidence in consequences) {
+                if (cancellation()) return null
+                require(evidence.scope == source.scope)
+                val claim = evidence.claim as SourceClaim.Consequence
+                cited += claim.inequality to SourceDerivation.Import(evidence)
             }
             val condition = source.scope.condition
             for ((upper, bounds) in listOf(false to condition.lower, true to condition.upper)) {

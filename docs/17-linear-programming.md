@@ -122,6 +122,24 @@ objective-independent region.
 
 ### Cuts
 
+The internal `composeBooleanBranches` traversal option augments partial-row
+feasibility queries with common real consequences. It combines at most two rows
+per alternative of one unresolved source Boolean, using positive weights 1 and 2
+and exact positive normalization. Equal coefficient vectors yield the weaker
+right side; strictness survives only when both alternatives establish it. Each
+consequence imports an existing `BooleanSplit` proof, so mutually exclusive row
+guards are discharged by exhaustive coverage rather than simultaneously activated.
+The partial LP consumes only source-checked consequences. Its final refutation
+rechecks dormant numeric premises with their original guards and integer pins.
+
+This option is disabled by default. Preparation caps source rows at 32, Booleans
+at four, support at eight, scalar width at 128 bits, derived rows at 128 per
+alternative and retained consequences at 16. A containing work/allocation ledger
+also bounds failed construction; local ceilings are 65,536 work and 1 MiB modeled
+allocation. Capped scans report incomplete coverage. Proofs retain the exact source
+revision, objective and invocation restrictions; retraction rebuilds conditional
+queries, and no consequence becomes an original premise or witness authority.
+
 Cuts aggregate exact source rows and apply their rounding rule's bound and
 integrality checks. Local cuts keep their substitutions and premises and are
 revalidated after pop or remap. Selection considers efficacy, parallelism,

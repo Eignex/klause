@@ -67,6 +67,7 @@ internal class LinearAuthorityTraversal(
     aggregateCuts: Boolean = false,
     latestFeedback: Boolean = true,
     feedbackRequest: LinearAuthorityFeedbackRequest? = null,
+    composeBooleanBranches: Boolean = false,
 ) : SearchBrancher, SearchBranchProposal, SearchNodePolicy, AutoCloseable {
     override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
 
@@ -85,7 +86,8 @@ internal class LinearAuthorityTraversal(
         } else if (!shape.admitted) observe("numericalLpShapesOutsideDimensionGuard")
     }, retainLp = true, aggregateCuts = aggregateCuts)
     private val initialCutObservations = authority.cutObservations()
-    private val activeRows = if (useActiveRows) LinearActiveRows(source, budget) else null
+    private val activeRows = if (useActiveRows || composeBooleanBranches)
+        LinearActiveRows(source, budget, composeBranches = composeBooleanBranches) else null
     private val propagateRefutations = useRefutationPropagation || useRefutationResolution
     private val refutations = if (useRefutationReuse || propagateRefutations)
         LinearRefutationReuse(source, budget, cancellation, resolve = useRefutationResolution) else null

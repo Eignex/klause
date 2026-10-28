@@ -242,6 +242,14 @@ internal class LinearAuthorityCapture(
             is SourceDerivation.IntegerRounding -> proof(value.inequality, depth + 1)
             is SourceDerivation.MixedIntegerRounding -> proof(value.inequality, depth + 1) &&
                 value.bounds.all { proof(it, depth + 1) }
+            is SourceDerivation.BooleanSplit -> proof(value.whenFalse, depth + 1) && proof(value.whenTrue, depth + 1)
+            is SourceDerivation.Import -> {
+                val claim = value.evidence.claim as? SourceClaim.Consequence ?: return false
+                val condition = value.evidence.scope.condition
+                spend(1L + condition.bools.size, 128L + condition.bools.size * 48L) &&
+                    (condition.lower.values + condition.upper.values).all(::scalar) && row(claim.inequality) &&
+                    proof(value.evidence.derivation, depth + 1)
+            }
             is LinearPinnedObjective -> proof(value.bound, depth + 1)
             is LinearPinnedRefutation -> proof(value.conflict, depth + 1)
             is LinearActiveRefutation -> proof(value.conflict, depth + 1)
