@@ -795,6 +795,19 @@ factor batches are separate controls.
 
 ## Profiling
 
+`bench.profile.ProjectedCountProfile` compares component and monolithic exact
+projected counting over retained DIMACS sources with disjoint Boolean XOR pairs
+and a connected holdout. Options are `pairs=2,4,8 repeats=3 maxChecks=10000`.
+Both paths use the same ordinary feasibility preset and 100 decisions per check;
+full and x-only projections are separate. Reflection selects the retained internal
+monolithic path and fails if its entry point changes. Each measured traversal
+includes source parsing/baking, partitioning, component construction, feasibility
+search and interval consumption; construction and count time are also separate.
+The profile retains original bytes/hashes, exact intervals, current-thread allocated
+bytes and installed-build/runtime identity. Alternating repeats follow one warmup
+per path and shape. Run it through one bounded lab profile job; instrumented times
+and allocations establish no ordinary-source throughput or physical RSS claim.
+
 `ExactLinearScoringProfile` compares identical dyadic mixed-row candidate sequences
 at widths 8/64/512/4096, including committed choices and a fresh final score.
 Three warmup batches precede five measured batches of 4096 primitive candidates
