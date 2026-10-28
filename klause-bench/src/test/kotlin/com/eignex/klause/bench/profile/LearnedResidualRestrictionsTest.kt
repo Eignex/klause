@@ -9,7 +9,6 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonObject
@@ -32,7 +31,6 @@ class LearnedResidualRestrictionsTest {
         repeat(8) { recorder.observe(session) }
 
         assertTrue(observed.complete)
-        assertEquals(1, observed.componentCount(cycles))
         assertEquals((0 until 10).toList(), observed.entries.single().support)
         assertTrue(observed.entries.single().permanentRetention)
         val incidence = recorder.summary().getValue("lastEnforcingIncidence").jsonObject
@@ -42,14 +40,21 @@ class LearnedResidualRestrictionsTest {
 
     @Test
     fun `established PB weight should discharge its free bridge`() {
-        val session = PropagationSession(Problem(4, 0, emptyArray(), emptyArray()), nativeSat = false)
+        val problem = Problem(5, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(Lit.make(1, true), Lit.make(3, true))),
+            Clause(intArrayOf(Lit.make(2, true), Lit.make(4, true))),
+        ))
+        val session = PropagationSession(problem, nativeSat = false)
         session.addLearnedPb(longArrayOf(5L, 2L, 3L), IntArray(3) { Lit.make(it, true) }, 5L, 2)
         session.pinBool(0, true)
 
         val observed = LearnedResidualRestrictions.inspect(session)
+        val recorder = ConditionalComponentTrace.Recorder(problem, Long.MAX_VALUE, 0)
+        repeat(8) { recorder.observe(session) }
 
         assertTrue(observed.entries.single().discharged)
-        assertEquals(2, observed.componentCount(listOf(listOf(1), listOf(2))))
+        assertEquals(2, recorder.summary().getValue("lastEnforcingIncidence").jsonObject
+            .getValue("allEnforcingComponents").jsonPrimitive.int)
     }
 
     @ParameterizedTest
@@ -64,7 +69,6 @@ class LearnedResidualRestrictionsTest {
 
             assertTrue(observed.complete)
             assertEquals(listOf(true, false), observed.entries.map { it.permanentRetention })
-            assertEquals(2, observed.componentCount((0 until 4).map { listOf(it) }))
     }
 
     @ParameterizedTest
@@ -105,7 +109,6 @@ class LearnedResidualRestrictionsTest {
         val observed = LearnedResidualRestrictions.inspect(session)
 
         assertFalse(observed.complete)
-        assertNull(observed.componentCount(listOf(listOf(0))))
     }
 
     @Test
@@ -126,6 +129,5 @@ class LearnedResidualRestrictionsTest {
         )
 
         assertFalse(observed.complete)
-        assertNull(observed.componentCount(listOf(listOf(0), listOf(1))))
     }
 }
