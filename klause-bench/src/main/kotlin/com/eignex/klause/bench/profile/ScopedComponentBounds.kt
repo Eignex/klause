@@ -9,6 +9,7 @@ internal class ComponentCostScope(
     variables: List<Int>,
     clauses: List<List<Int>>,
     weights: List<Long>,
+    val restrictionCutoff: BigInteger? = null,
 ) {
     val conditions = conditions.toMap()
     val variables = variables.toList()
@@ -38,9 +39,9 @@ internal class ComponentCostScope(
 
     override fun equals(other: Any?): Boolean = other is ComponentCostScope && source == other.source &&
         conditions == other.conditions && variables == other.variables && clauses == other.clauses &&
-        weights == other.weights
+        weights == other.weights && restrictionCutoff == other.restrictionCutoff
 
-    override fun hashCode(): Int = listOf(source, conditions, variables, clauses, weights).hashCode()
+    override fun hashCode(): Int = listOf(source, conditions, variables, clauses, weights, restrictionCutoff).hashCode()
 }
 
 internal data class ComponentCostBounds private constructor(
@@ -67,7 +68,7 @@ internal data class ComponentCostBounds private constructor(
     }
 
     fun refutedSource(checkedScope: ComponentCostScope): ComponentCostBounds {
-        require(checkedScope == scope && witness == null)
+        require(checkedScope == scope && witness == null && scope.restrictionCutoff == null)
         return copy(sourceInfeasible = true)
     }
 
@@ -93,6 +94,7 @@ internal class ScopedComponentBounds(
 
     fun improvementBudget(child: Int, cutoff: BigInteger, children: List<ComponentCostBounds>): BigInteger {
         checkScopes(children)
+        checkCutoff(cutoff)
         require(child in children.indices)
         return cutoff - fixedAndIsolated - children.indices.filter { it != child }
             .fold(BigInteger.ZERO) { sum, i -> sum + children[i].lower }
@@ -100,16 +102,21 @@ internal class ScopedComponentBounds(
 
     fun closes(cutoff: BigInteger, children: List<ComponentCostBounds>): Boolean {
         checkScopes(children)
+        checkCutoff(cutoff)
         return children.any { it.sourceInfeasible } || floor(children) >= cutoff
     }
 
     fun exact(children: List<ComponentCostBounds>): BigInteger? {
         checkScopes(children)
-        if (children.any { it.exact == null }) return null
+        if (children.any { it.exact == null || it.scope.restrictionCutoff != null }) return null
         return children.fold(fixedAndIsolated) { total, child -> total + checkNotNull(child.exact) }
     }
 
     private fun checkScopes(children: List<ComponentCostBounds>) {
         require(children.map { it.scope } == scopes)
+    }
+
+    private fun checkCutoff(cutoff: BigInteger) {
+        require(scopes.all { it.restrictionCutoff == null || cutoff <= it.restrictionCutoff })
     }
 }

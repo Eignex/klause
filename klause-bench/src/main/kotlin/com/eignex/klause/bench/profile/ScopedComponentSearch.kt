@@ -46,7 +46,6 @@ internal class ComponentAllowance(
 internal data class ComponentSearchResult(
     val children: List<ComponentCostBounds>,
     val closed: Boolean,
-    val witness: List<Boolean>?,
     val queries: Int,
     val buildNanos: Long,
     val searchNanos: Long,
@@ -61,9 +60,11 @@ internal object ScopedComponentSearch {
         allowance: ComponentAllowance,
         seed: Long,
         lp: Boolean = false,
+        initial: List<ComponentCostBounds>? = null,
     ): ComponentSearchResult {
         val composition = ScopedComponentBounds(fixedAndIsolated, scopes)
-        val bounds = scopes.map(ComponentCostBounds::opening).toMutableList()
+        require(initial == null || initial.map { it.scope } == scopes)
+        val bounds = (initial ?: scopes.map { ComponentCostBounds.opening(it) }).toMutableList()
         var queries = 0
         var buildNanos = 0L
         var searchNanos = 0L
@@ -116,9 +117,6 @@ internal object ScopedComponentSearch {
         }
         val canPublish = allowance.visit(scopes.size.toLong())
         val closed = canPublish && composition.closes(cutoff, bounds)
-        val witness = if (canPublish && bounds.all { it.witness != null }) {
-            bounds.flatMap { checkNotNull(it.witness) }
-        } else null
-        return ComponentSearchResult(bounds.toList(), closed, witness, queries, buildNanos, searchNanos, checkNanos)
+        return ComponentSearchResult(bounds.toList(), closed, queries, buildNanos, searchNanos, checkNanos)
     }
 }

@@ -126,4 +126,17 @@ class ScopedComponentBoundsTest {
         assertTrue(composition.closes(BigInteger.TEN, children))
         assertNull(composition.exact(children))
     }
+
+    @Test
+    fun `cutoff conditioned restrictions should reject a looser query`() {
+        val scope = ComponentCostScope("source", emptyMap(), listOf(0), listOf(listOf(0)), listOf(3L),
+            restrictionCutoff = BigInteger.valueOf(3))
+        val children = listOf(ComponentCostBounds.opening(scope).refutedBelow(scope, BigInteger.valueOf(3)))
+        val composition = ScopedComponentBounds(BigInteger.ZERO, listOf(scope))
+
+        assertTrue(composition.closes(BigInteger.valueOf(3), children))
+        assertTrue(composition.closes(BigInteger.TWO, children))
+        assertFailsWith<IllegalArgumentException> { composition.closes(BigInteger.valueOf(4), children) }
+        assertNull(composition.exact(children))
+    }
 }
