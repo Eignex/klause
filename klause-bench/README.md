@@ -2319,7 +2319,7 @@ input was required at that center.
 
 `bench.profile.ConditionalComponentTrace` takes repeatable `source=SUITE:PROBLEM:SHA256`
 and optional `searchMillis` (10,000), `traceMillis` (15,000), `prepareMillis` (60,000)
-and `seed` (3). Two self-authored two-five-cycle WCNF controls run first: the bridge
+`seed` (3), `probes` (3) and `probeMillis` (2,000). Two self-authored two-five-cycle WCNF controls run first: the bridge
 `s or x(0) or y(0)` as stated (optimum 6), then with `s` hard-true (optimum 7, two
 independent cycles). Each hash-checked source goes through finite preparation with the
 CLI's presolve allowance, then `satOptimized` minimization. A wrapping variable selector
@@ -2329,9 +2329,14 @@ the free coordinates of every live factor: a clause with a true literal is disch
 and every other factor, including clauses with atom literals, connects all its free
 coordinates. The objective is treated as additive, so splits are an upper bound for a
 decomposition that must also respect an incumbent cutoff. A component's key hashes each
-live factor's residual in factor order; a key seen again after an intervening conflict
-or restart counts as a re-encountered child obligation. Every eighth sample re-joins with
-learned clauses, with and without permanent incumbent-scoped entries. Records retain
+live factor's residual in factor order; a key seen again after an intervening retraction,
+conflict or restart counts as a re-encountered child obligation. Every eighth sample re-joins with
+learned clauses, with and without permanent incumbent-scoped entries. Up to `probes` split
+nodes keep their residual clauses; after the search each component and the joint residual
+are solved as fresh `satOptimized` models. The children share one allowance equal to the
+joint solve's, carry no incumbent cutoff or learned clause, and an unfinished child leaves
+the composition open. The composed witness is reconstructed and checked against the
+original clauses, and later sightings of each probed key are reported. Records retain
 source hashes, preparation outcome, the solve result, and native original-clause checks
 of the reconstructed witness; non-clause factors are counted as unchecked. A trace
 establishes residual structure only, not reuse savings or portfolio throughput.
