@@ -150,6 +150,7 @@ internal object CoreQueryProfile {
                             put("preparationThreadBytes", preparationBytes)
                             put("preparedBooleans", model.numBoolVars)
                             put("preparedFactors", model.numFactors)
+                            put("presolveStats", ordinary?.presolve.toString())
                             put("rootSatisfiedCostPins", removed)
                             put("elapsedNsIncludingDisposal", elapsed + rootCostNs)
                             put("threadBytesIncludingDisposal", bytes + rootCostAllocation)
@@ -206,6 +207,7 @@ internal object CoreQueryProfile {
                             put("sourceObjective", point?.let { objective.evaluateLong(it) })
                             put("nodes", result.stats.search.nodes.sum)
                             put("propagation", result.stats.search.propagationWork.sum)
+                            put("lpStats", result.stats.lp.toString())
                             put("independentProofCheck", false)
                         }.toString() + "\n")
                     }
