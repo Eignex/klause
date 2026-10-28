@@ -2744,6 +2744,35 @@ and scope fidelity, with no portfolio or reuse-speed claim. Runtime/resource rec
 hashes, snapshots and the timed-out source attempt remain under
 `klause-evidence/campaigns/residual-snapshots-3740-3741/`.
 
+### Retained objective alias costs
+
+[8895](https://lab.eignex.com/jobs/8895) compares `d4e3c9b659` with the matched
+expansion-disabled `6d8a789c68` on the pair-cover alias and replacement-objective
+controls: P1/5s, seeds 3/17, one case per seed and arm. Ordinary mixed and aggressive
+LP/probing controls retain their existing preparation. All sixteen cases attain
+native optimum 6, and every original-source witness passes the independent XCSP3
+checker. The native proofs are not independently certified. Runtime, non-solver
+dependencies and source hashes match on Linux/amd64, JDK 25.0.4.1+1-LTS, with a
+3 GiB Serial-GC heap and one active processor per CLI. Four concurrent cases share
+a hard four-vCPU/16,896-MiB cgroup.
+
+Normal preparation retains the protected sum output. Its private separable view
+consumes two two-term cores instead of six singleton output cores, reaching floor 6
+with propagation work 898/752 instead of 2,205/2,221. The already exposed objective
+retains two cores and 544/547 propagation work in both builds. Retaining the alias
+also preserves ordinary-search structure: ordinary nodes are 7/2 with the alias and
+17/17 after objective replacement; aggressive LP/probing uses 5/11 and 19/18.
+These are consumed capability and representation controls, without a verdict gain.
+
+Whole-CLI external wall seconds for the alias core change from 1.50/1.42 to
+1.67/1.29; peak RSS KiB changes from 124,608/125,060 to 124,012/122,448. The opposite
+timing directions, cold startup, concurrent execution and single observation per
+seed establish no speedup. Allocations were not collected. The bounded directly
+selected capability retains original objective authority and ordinary admission;
+no broader-source or default-route benefit is established. Sources, hashes, runtime
+identities, checker results and resource receipts remain outside Git in
+`klause-evidence/campaigns/objective-alias-costs-3745/`.
+
 ### Bounded retained integer probing
 
 Default metered finite satisfaction preparation funds one retained root, 128 probe
