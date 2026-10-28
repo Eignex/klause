@@ -11,7 +11,7 @@ enum class LpZeroObjectivePricing {
     MIN_BOUND_SUPPORT,
 }
 
-/** Construction-time pricing configuration. Nonzero objectives ignore [zeroObjective]. */
+/** Construction-time pricing and basis resource policy. Nonzero objectives ignore [zeroObjective]. */
 internal data class LpPricingOptions(
     val zeroObjective: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
     val tieSeed: Long = 0L,

@@ -233,9 +233,11 @@ internal class LpEngine(
         solver: LpSolver,
         metrics: com.eignex.klause.lp.engine.LpSolveMetrics = solver.lastMetrics,
     ) {
-        sink.lp.observeEngineCost(LpRoute.ROOT, metrics)
+        val charged = if (sparseTrialActive) metrics.copy(workOps =
+            saturatingAdd(metrics.workOps, metrics.preparationOps)) else metrics
+        sink.lp.observeEngineCost(LpRoute.ROOT, charged)
         observeSparseTrial(solver)
-        chargeWork(metrics.workOps)
+        chargeWork(charged.workOps)
     }
 
     internal fun observeSparseTrial(solver: LpSolver) {

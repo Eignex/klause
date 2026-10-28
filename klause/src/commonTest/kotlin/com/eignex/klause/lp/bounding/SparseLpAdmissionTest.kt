@@ -19,6 +19,20 @@ import kotlin.test.assertTrue
 
 class SparseLpAdmissionTest {
     @Test
+    fun `wide exact scalars decline numerical admission`() {
+        val model = LpBuilder().apply {
+            addRealVar(0.0, 1.0)
+            addRealRow(intArrayOf(0), doubleArrayOf(Double.MIN_VALUE), Relation.LE, 1.0)
+        }.build(Sense.MINIMIZE)
+
+        val estimate = estimateSparseLpAdmission(model)
+
+        assertFalse(estimate.admitted)
+        assertEquals(1L, estimate.metrics["DeclineScalarWidth"])
+        assertTrue(requireNotNull(estimate.metrics["ScalarBits"]) > 128L)
+    }
+
+    @Test
     fun `estimates retain disconnected dimensions and row intersection risk`() {
         val model = LpBuilder().apply {
             repeat(5) { addVar(0L, 10L) }
@@ -38,7 +52,14 @@ class SparseLpAdmissionTest {
 
     @Test
     fun `ordinary root bounding consumes a sparse trial certificate beyond the size proxy`() {
-        val problem = triangle()
+        val problem = Problem(
+            0, 3, Array(3) { IntDomain(0, 1) },
+            listOf(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+                Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 1),
+                Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+            ), settings = ProblemSettings(lpCeilingTableauCells = 1L),
+        )
         val session = PropagationSession(problem)
         val sink = SolveStatsSink("sparse-trial")
 
@@ -46,6 +67,8 @@ class SparseLpAdmissionTest {
             LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")), sink).use { engine ->
             assertTrue(engine.sparseTrialActive)
             assertEquals(0, engine.params.lpPlan.boundMaxDepth)
+            engine.rootLpRelaxationBound(requireNotNull(engine.lpRelaxer), emptyList())
+
             assertTrue(engine.pruneNode(session, 2.0, -1, true))
         }
 
@@ -56,16 +79,22 @@ class SparseLpAdmissionTest {
 
     @Test
     fun `default admission preserves the size refusal`() {
-        val plan = LpAutoConfig.resolve(triangle(), LpConfig.AUTO)
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
+            settings = ProblemSettings(lpCeilingTableauCells = 1L))
+
+        val plan = LpAutoConfig.resolve(problem, LpConfig.AUTO)
 
         assertFalse(plan.bounding)
     }
 
     @Test
     fun `cancelled sparse admission supplies no bounding route`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)))
         var admission: SparseLpAdmission? = null
         sequence<Unit> {
-            admission = prepareSparseLpAdmission(triangle(), null, Cancellation { true })
+            admission = prepareSparseLpAdmission(problem, null, Cancellation { true })
         }.forEach { }
 
         assertFalse(requireNotNull(admission).admitted)
@@ -84,9 +113,4 @@ class SparseLpAdmissionTest {
         assertEquals(1L, requireNotNull(admission.sparseTrial).metrics["DeclineShape"])
     }
 
-    private fun triangle() = Problem(0, 3, Array(3) { IntDomain(0, 1) }, listOf(
-        Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
-        Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 1),
-        Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
-    ), settings = ProblemSettings(lpCeilingTableauCells = 1L))
 }

@@ -1302,8 +1302,45 @@ internal fun LpEngine.rootLpRelaxationBound(
     globalCuts: List<Cut>,
     cancellation: Cancellation = Cancellation.Never,
 ): Double = try {
+    if (sparseTrialActive && globalCuts.isEmpty()) {
+        sparseRootLpRelaxationBound(relaxer, cancellation)
+    } else {
+        standaloneRootLpRelaxationBound(relaxer, globalCuts, cancellation)
+    }
+} catch (_: CheckedLongOverflowException) {
+    Double.NaN
+} catch (_: LpAssemblyCancelled) {
+    Double.NaN
+}
+
+private fun LpEngine.sparseRootLpRelaxationBound(
+    relaxer: CpToLpRelaxation,
+    cancellation: Cancellation,
+): Double {
+    val relaxation = nodeRelaxation(relaxer, PropagationSession(problem, cancellation)) ?: return Double.NaN
+    if (relaxation.model.n == 0) return Double.NaN
+    val attempt = solveNode(relaxation.model, null, cancellation) ?: return Double.NaN
+    return try {
+        val lower = attempt.second?.let {
+            certifiedTightObjectiveLowerBound(relaxation.model, it.duals,
+                rootCertificationObserver(), solveContext.certificationPolicy)
+        }
+        if (cancellation()) Double.NaN else projectCertifiedLowerBound(relaxation, lower)
+    } finally {
+        // Scoped preparation has already charged its scaling-construction reservation.
+        val metrics = if (nodeUsesTrail) propagator.lastMetrics.copy(preparationOps = 0L)
+            else attempt.first.lastMetrics
+        observeRootSolve(attempt.first, metrics)
+    }
+}
+
+private fun LpEngine.standaloneRootLpRelaxationBound(
+    relaxer: CpToLpRelaxation,
+    globalCuts: List<Cut>,
+    cancellation: Cancellation,
+): Double {
     val relaxation = relaxer.build(PropagationSession(problem), globalCuts, cancellation)
-    if (relaxation.model.n == 0) {
+    return if (relaxation.model.n == 0) {
         Double.NaN
     } else {
         val simplex = dualSimplex(relaxation.model, cancellation)
@@ -1326,10 +1363,6 @@ internal fun LpEngine.rootLpRelaxationBound(
         }
         projectCertifiedLowerBound(relaxation, lower)
     }
-} catch (_: CheckedLongOverflowException) {
-    Double.NaN
-} catch (_: LpAssemblyCancelled) {
-    Double.NaN
 }
 
 private fun LpEngine.recordRootQueryBound(relaxation: LpRelaxation, result: FloatLpResult) {
