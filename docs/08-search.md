@@ -442,25 +442,9 @@ Cumulative edge-finding runs in both time directions over fixed durations, deman
 and capacity, declining the reversed pass when its arithmetic is not safely
 representable.
 
-With fixed durations and ranged demands, cumulative propagation checks contained-task
-energy in bounded subwindows over at most 32 tasks. Definitely present positive-duration
-tasks contribute their minimum demand. Remaining window capacity bounds each contained
-task's demand from above; its channel consumes that bound through ordinary propagation.
-For each left endpoint, a completion-order sweep accumulates contained energy; suffix
-minimum slack selects the strongest right endpoint containing each target. This takes
-quadratic task/window visits. A zero minimum load with every maximum demand at most
-capacity skips the scan, since each containing window spans at least its target's duration.
-When every positive-load task and ranged-demand target has a fixed start, the complete
-minimum profile already dominates the window bounds. This skip requires demand
-coordinates to be separate from starts and capacity, so height pruning preserves that profile.
-Ineligible calls allocate no window scratch.
-Global minimum energy also bounds every contained-task sum. A necessary eligibility
-check compares it with positive-load and target envelopes before constructing windows.
-Fixed tasks are omitted from overload eligibility only when height pruning preserves
-their complete profile. Unrepresentable eligibility arithmetic falls back to scanning.
-Historical reasons cite the participating start bounds, other minimum demands and
-capacity ceiling. Negative minimum demands or unrepresentable window arithmetic decline
-the pass. Window scratch belongs to one fire and is rebuilt after interruption or undo.
+Range-aware cumulative prefix energy also declines unrepresentable completions,
+window widths, areas and energy sums. Capacity ceilings use quotient and remainder
+so their rounding cannot overflow a representable surface.
 
 Unary resources also check overload over minimum durations while a duration is
 unfixed or a presence unknown. Present tasks whose minima cannot fit between their

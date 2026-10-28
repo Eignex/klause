@@ -7,9 +7,7 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.localsearch.LocalSearchModel
-import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
@@ -18,31 +16,6 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 
 class FlatZincIntConstraintsTest {
-    @Test
-    fun `cumulative subwindows should remove a machine value through its bool2int channel`() {
-        val program = parseFlatZinc(
-            """
-            var 0..100: spectator;
-            var 100..102: a;
-            var 100..102: b;
-            var 100..102: c;
-            var 1..3: machine;
-            var bool: selected;
-            var 0..1: q;
-            constraint int_eq_reif(machine, 2, selected);
-            constraint bool2int(selected, q);
-            constraint cumulative([spectator,a,b,c], [1,2,2,2], [1,1,1,q], 1);
-            solve satisfy;
-            """.trimIndent(),
-        )
-
-        val session = PropagationSession(program.problem)
-
-        assertEquals(IntDomain(0, 0), session.intDomain(program.intVarsByName.getValue("q")))
-        val domain = session.intDomain(program.intVarsByName.getValue("machine"))
-        assertEquals(listOf(1L, 3L), (domain.min..domain.max).filter { it in domain })
-    }
-
     @Test
     fun `equal pipe lengths should retain independent scaled cost slack`() {
         val program = parseFlatZinc(
