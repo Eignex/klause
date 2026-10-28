@@ -310,7 +310,7 @@ most half the remaining time and 5 seconds.
 
 Counters describe observed work, never proof coverage.
 `propagations` counts deductions from completed finite fixpoints, excluding decision
-and root pins; `propagationWork` also counts dispatch, watcher and reason visits
+and root pins; `propagationWork` also counts dispatch, watcher, scheduling and reason visits
 across undo. Root figures are subsets of totals. Fixpoint time excludes some counted
 reason scans.
 
@@ -325,7 +325,7 @@ and [CLI statistics](20-cli.md#statistics) define the exported fields.
 | `propagations` | Finite Boolean, singleton, bound, hole and survivor-set deductions reported by completed search fixpoints; excludes decision and root pins |
 | `learned` | Learned consequences observed by the traversal, including native CP learning |
 | `caNotApplicable`, `caNonAsserting` | Native CP analyses declining a usable or asserting consequence; exported by every CLI format |
-| `propagationWork` | Monotonic dispatch, literal, watcher, level and linear-term/reason visits, including work across undo |
+| `propagationWork` | Monotonic dispatch, literal, watcher, level, scheduling and linear-term/reason visits, including work across undo |
 | `rootPropagationWork`, `rootPropagationMs` | Initialization root-fixpoint work and time, including private preparation |
 | `propagationMs` | Fixpoint elapsed time; some counted reason scans are outside it |
 | `openAssertingConflicts` | Shared first-UIP analyses yielding an asserting backjump |
