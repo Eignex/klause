@@ -90,6 +90,20 @@ internal class IntEventMachinery private constructor(
         o.getOrPut(packed) { IntArrayList(initialCapacity = 1) }.add(fid)
     }
 
+    fun remapLearned(remap: IntArray, base: Int) {
+        overflow?.forEach { _, list ->
+            var write = 0
+            for (index in 0 until list.size) {
+                val factor = list[index]
+                val next = if (factor < base) factor else remap.getOrNull(factor - base)?.let {
+                    if (it < 0) null else base + it
+                }
+                if (next != null) list[write++] = next
+            }
+            list.truncateTo(write)
+        }
+    }
+
     /** Visit every factor subscribed to event [packed]: base subscribers (CSR, ascending factor id) then
      *  mid-life subscribers (overflow, add order). */
     inline fun forEachWatcher(packed: Int, action: (Int) -> Unit) {

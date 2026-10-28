@@ -148,6 +148,28 @@ nonnegative combinations with Chvátal-Gomory rounding preserve implication. A s
 that declines, including signed-word overflow, falls back to clause resolution.
 Learned pseudo-Boolean constraints share clause retention.
 
+## Integer row learning
+
+`integerRowLearning` is opt-in and independent of pseudo-Boolean learning. Mandatory
+finite `Linear` inequalities and the explaining half of equalities provide integer
+rows. Each resolved endpoint must name an unextended historical linear reason from
+the same source row; historical holes, reification, disequalities, wide constants
+and unsupported projections retain clause fallback.
+
+Opposite-sign nonnegative combinations use checked signed arithmetic and integer
+gcd normalization. Each combination must remain conflicting. A retained row must
+propagate against the session's historical domains at its native backjump and the
+mapped shared target; literal counts do not establish assertion. Foreign unavailable
+bound premises retain clause analysis. The producer admits at most 16 terms, 16
+combinations, 64 native levels and 64 stored rows, with bounded duplicate lookup.
+
+Rows share the learned store and integer bounds propagation. Eager reasons freeze
+the historical clause premises without a compactable lazy factor id. Integer bound
+event subscriptions wake rows after undo and are remapped or removed on forgetting.
+Only clauses are shared across arms. Row satisfaction tests the complete maximum
+activity; a satisfied endpoint literal cannot discharge the row or certify a root
+contradiction.
+
 ## Learned-clause retention
 
 Native forgetting runs at restart boundaries only with a configured cap. Permanent

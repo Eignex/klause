@@ -24,6 +24,8 @@ internal class LearnedClauseDb(
      *  problem, not trail state); pruned by `forgetLearnedClauses`. */
     val store = ArrayList<LearnedPropagator>()
 
+    internal var integerRows: ArrayList<LearnedIntegerPropagator>? = null
+
     /** LBD (literal block distance) per learned clause, parallel to [store]: lower = more re-usable.
      *  Forgetting policies key on it (G. Audemard, L. Simon, "Predicting Learnt Clauses Quality in
      *  Modern SAT Solvers", IJCAI 2009, https://www.ijcai.org/Proceedings/09/Papers/074.pdf). */

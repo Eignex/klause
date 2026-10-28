@@ -7212,3 +7212,23 @@ These single ordered runs supply no timing advantage or practical-admission resu
 Mixed automatic admission remains disabled. Raw records, JFR, distribution hashes,
 resource receipts and the failed attempt are retained outside Git under
 `klause-evidence/campaigns/finite-conflict-learning-3727-3728/` beside the primary checkout.
+
+### Finite integer conflict rows
+
+`IntegerRowLearningProfile` compares clause and explicitly enabled integer-row
+learning with PB disabled on the retained finite projection `2*x+y<=z`,
+`2*x-y<=0`, `x=0..6`, `y=0..12`, `z=0..24`. It reaches the same conflict at
+`z<=7`, `x>=2`, applies the shared/native backjump contract, then reuses the store
+after undo at `z<=11`, `15` and `23`. The row `4*x<=z` should assert `x<=1`
+and tighten sibling upper bounds to `2`, `3` and `5`; individual rows reach
+`5`, `6` and `6`, and the original endpoint clause is inactive there.
+
+The eight records retain actual row reason identities, native/shared store counts,
+cumulative finite work, total elapsed/current-thread allocations and explicit
+feasible source points checked in fresh native sessions. There is no independent
+witness or exported-proof check. Construction deliberately retains the finite
+projection without presolve or LP: difference extraction excludes the three-term
+and non-unit coefficient shapes, binary substitution requires Boolean domains,
+and LP/OBBT can discharge the inference. This applicability control establishes no
+advantage over preparation or default admission. Later qualification must compare
+consumed reuse and full costs with ordinary CP, normal presolve/LP and clause controls.
