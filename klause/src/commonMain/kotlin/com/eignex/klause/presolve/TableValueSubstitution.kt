@@ -34,8 +34,9 @@ internal object TableValueSubstitution {
         val eligible = BooleanArray(problem.numIntVars)
         for (v in eligible.indices) {
             if (!work.visit()) return PassDelta()
+            val domain = problem.rootIntDomain(v)
             eligible[v] = objective.intCoefficientValues.getOrElse(v) { 0L } != 0L &&
-                problem.rootIntDomain(v).valueCount in 2..MAX_VALUES
+                domain.max - domain.min in 1 until MAX_VALUES
         }
         var cells = 0
         for (factor in problem.factors) {
@@ -65,8 +66,16 @@ internal object TableValueSubstitution {
             val occurrences = readers[v] ?: continue
             if (!eligible[v]) continue
             val original = problem.rootIntDomain(v)
-            val values = checkNotNull(original.spanOrNull(MAX_VALUES))
-            var retained = original
+            // Root domains can retain large historical bitsets after narrowing their endpoints.
+            // Rebuild only the bounded span, charging its membership checks and fresh storage.
+            var retained = IntDomain(original.min, original.max)
+            for (offset in 0..(original.max - original.min).toInt()) {
+                if (!work.visit()) return PassDelta()
+                val value = original.min + offset
+                if (value !in original) retained = retained.excludeValue(value)
+            }
+            val values = checkNotNull(retained.spanOrNull(MAX_VALUES))
+            var changed = false
             val positive = objective.intCoefficientValues[v] > 0L
             for (i in 0 until values.size) {
                 if (!work.visit()) return PassDelta()
@@ -86,12 +95,13 @@ internal object TableValueSubstitution {
                         }
                     }
                     if (!verified) continue
-                    if (!work.visit()) return PassDelta()
+                    for (cell in 0 until values.size) if (!work.visit()) return PassDelta()
                     retained = retained.excludeValue(a)
+                    changed = true
                     break
                 }
             }
-            if (retained === original) continue
+            if (!changed) continue
             if (domains == null) {
                 for (column in eligible.indices) if (!work.visit()) return PassDelta()
                 domains = problem.rootIntDomains()
