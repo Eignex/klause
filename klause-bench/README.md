@@ -322,7 +322,7 @@ plain inputs. Hashes use decompressed bytes.
 Compression writes beside the original, verifies SHA-256, then replaces it;
 interrupted migration can resume.
 
-## Fixture provenance
+## Objective-preserving symmetry admission
 
 `bench.profile.SymmetryAdmissionProfile` captures ordinary protected preparation
 and opt-in `default,+objective-symmetry` preparation for one to eight hash-pinned
@@ -334,6 +334,45 @@ coordinates and their coefficients, pass outcomes, elapsed time and charged work
 It executes no search and makes no source-verdict or runtime-gain claim. Stopped
 preparations remain incomplete observations. Use ordinary source-checked lab solves
 for consumed pruning, quality, proof and total-cost qualification.
+
+Objective-preserving admission control [8865](https://lab.eignex.com/jobs/8865),
+at `c8e09efafc`, uses the self-authored Latin4 source, normal preparation,
+`conflictDriven`, P1, seed 3 and five seconds per case on Linux/amd64, JDK
+25.0.4.1+1-LTS, with a hard one-vCPU/4608-MiB cgroup. Protected admission and
+symmetry disabled both visit 977 nodes and perform 5,094 propagations; opt-in
+admission visits 245 nodes and performs 1,361 propagations through the existing
+generator consumer. All three attain native optimum 24, with independently
+accepted original-source witnesses. Witness checking does not certify the proofs.
+The admitted transpose moves twelve cost coordinates and adds one propagator-only
+factor, with no scalar orders. Preparation costs rise from 139 to 203 ms and
+50,802 to 62,042 phase units. Whole-CLI wall/user-CPU/peak-RSS observations are
+2.20 s / 1.98 s / 109,448 KiB protected, 1.90 s / 1.63 s / 108,296 KiB admitted,
+and 2.31 s / 2.09 s / 119,364 KiB disabled. One ordered repeat establishes consumed
+pruning on this fixture, not a runtime speedup or ordinary-source gain.
+
+Preparation screen [8866](https://lab.eignex.com/jobs/8866), at `8e4dd749a1`,
+completes all ten captures without a stop. Latin4 retains its transpose after normal
+preparation. Warehouse-40-80-00, GBACP-UD04, TestScheduling-t020m10r03-1 and
+BinPacking2-n1c1w1a retain no generator in either mode. These four ordinary sources
+cover explicit costs, nonlinear cost auxiliaries, a maximum-output objective and
+source symmetry rows. Their extra objective-symmetry analyses spend respectively
+898,844, 49,699,697, 7,151,610 and 246,015 phase units without a reduction. Affine
+and binary replacement remain enabled; the prepared objectives and complete source
+hashes are retained in the capture. BinPacking2's source symmetry rows are present
+although the existing XCSP3 source marker reports false, so no marker-based skip
+is inferred. The ordered JFR preparations are applicability and cost observations,
+not search or timing comparisons.
+
+This gate retains an opt-in consumed capability and rejects broader/default
+admission on the screened evidence. No ordinary-source benefit or mixed-local-search
+qualification follows. Generator handling has no local-search invariant; scalar
+orders still change the mixed portfolio's grading landscape, retaining the earlier
+trapping and cost losses as admission constraints. The four empty screens provide
+no reason to expand a mixed comparison. Raw records, original sources, hashes and
+resource receipts remain outside Git in
+`klause-evidence/campaigns/objective-preserving-symmetry-2026-10-28/`.
+
+## Fixture provenance
 
 Fixtures with a directory README record their identities and licenses there:
 the [smoke corpus](smoke-corpus/README.md) and the

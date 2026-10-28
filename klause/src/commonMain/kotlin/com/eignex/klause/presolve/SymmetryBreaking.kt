@@ -139,7 +139,9 @@ internal object SymmetryBreaking {
         // For an orbit whose members are *individually* interchangeable (each single transposition is
         // itself an automorphism — a scalar symmetric group, not a lockstep matrix), the full total
         // order is sound and strictly stronger than the generator lex, so post it too.
-        val scalarLex = scalarTotalOrders(problem, generators, variableHeldInts, variableHeldBools, objective, cancellation)
+        val scalarLex = scalarTotalOrders(
+            problem, generators, variableHeldInts, variableHeldBools, objective, cancellation,
+        )
         val valuePins = breakValueSymmetry(problem, active, heldInts, cancellation, chainPrecedence = true)
         val extra = ArrayList<Factor>()
         if (generators.isNotEmpty()) extra.add(SymmetryHandling(generators))
@@ -1103,7 +1105,8 @@ internal object SymmetryBreaking {
  * canonical total order colour ids are assigned in.
  */
 internal class RefineKey(private val words: LongArray) : Comparable<RefineKey> {
-    fun withCoefficient(coefficient: Long?): RefineKey = if (coefficient == null) this else RefineKey(words + coefficient)
+    fun withCoefficient(coefficient: Long?): RefineKey =
+        if (coefficient == null) this else RefineKey(words + coefficient)
 
     override fun equals(other: Any?): Boolean =
         this === other || (other is RefineKey && words.contentEquals(other.words))
