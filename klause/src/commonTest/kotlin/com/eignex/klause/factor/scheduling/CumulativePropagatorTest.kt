@@ -2,12 +2,16 @@ package com.eignex.klause.factor.scheduling
 
 import com.eignex.klause.factor.ConflictReasonOracle
 import com.eignex.klause.factor.PropagationReasonOracle
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.factorAt
 import com.eignex.klause.propagation.mark
@@ -27,6 +31,178 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class CumulativePropagatorTest {
+
+    @Test
+    fun `a high demand subset should conflict without compulsory parts`() {
+        val problem = Problem(0, 4, arrayOf(
+            IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(100, 100),
+        ), arrayOf<Factor>(Cumulative(
+            intArrayOf(0, 1, 2, 3), longArrayOf(2, 2, 2, 1), longArrayOf(2, 2, 2, 1), 3,
+        )))
+
+        val session = PropagationSession(PropagationProblem(problem), cumulativeUnarySubsets = true)
+
+        assertTrue(session.isUnsatAtRoot)
+    }
+
+    @Test
+    fun `a subset start bound should reach a linked row`() {
+        val problem = Problem(0, 6, arrayOf(
+            IntDomain(0, 5), IntDomain(0, 4), IntDomain(0, 3), IntDomain(0, 6),
+            IntDomain(100, 100), IntDomain(0, 10),
+        ), arrayOf(
+            Cumulative(intArrayOf(4, 0, 1, 2, 3), longArrayOf(1, 1, 2, 3, 2), longArrayOf(1, 2, 2, 2, 2), 3),
+            Linear(intArrayOf(1, 1), intArrayOf(3, 5), LinearOp.LE, 10),
+        ))
+
+        val session = PropagationSession(PropagationProblem(problem), cumulativeUnarySubsets = true)
+
+        assertEquals(IntDomain(0, 4), session.intDomain(5))
+    }
+
+    @Test
+    fun `the general capacity should still enforce low demand tasks`() {
+        val problem = Problem(0, 5, arrayOf(
+            IntDomain(0, 0), IntDomain(0, 4), IntDomain(0, 4), IntDomain(0, 0), IntDomain(0, 0),
+        ), arrayOf<Factor>(Cumulative(
+            intArrayOf(0, 1, 2, 3, 4), longArrayOf(2, 2, 2, 2, 2), longArrayOf(2, 2, 2, 1, 1), 3,
+        )))
+
+        val session = PropagationSession(PropagationProblem(problem), cumulativeUnarySubsets = true)
+
+        assertTrue(session.isUnsatAtRoot)
+    }
+
+    @Test
+    fun `subset deductions should exclude zero load tasks`() {
+        val problem = Problem(0, 6, arrayOf(
+            IntDomain(0, 4), IntDomain(0, 4), IntDomain(0, 4), IntDomain(1, 1),
+            IntDomain(1, 1), IntDomain(100, 100),
+        ), arrayOf<Factor>(Cumulative(
+            intArrayOf(0, 1, 2, 3, 4, 5), longArrayOf(2, 2, 2, 0, 2, 1), longArrayOf(2, 2, 2, 2, 0, 1), 3,
+        )))
+
+        val session = PropagationSession(PropagationProblem(problem), cumulativeUnarySubsets = true)
+
+        assertFalse(session.isUnsatAtRoot)
+    }
+
+    @Test
+    fun `subset projection should decline optional and live attributes`() {
+        for (kind in listOf("presence", "duration", "demand", "capacity")) {
+            val factor = Cumulative(
+                intArrayOf(0, 1, 2, 3), longArrayOf(2, 2, 2, 1), longArrayOf(2, 2, 2, 1), 3,
+                presents = if (kind == "presence") IntArray(4) { Lit.make(0, true) } else intArrayOf(),
+                durationVars = if (kind == "duration") intArrayOf(4, 4, 4, 5) else intArrayOf(),
+                resourceVars = if (kind == "demand") intArrayOf(4, 4, 4, 5) else intArrayOf(),
+                capacityVar = if (kind == "capacity") 6 else -1,
+            )
+
+            val subset = factor.highDemandUnarySubset()
+
+            assertNull(subset, kind)
+        }
+    }
+
+    @Test
+    fun `subset filtering should decline wide and unsafe time windows`() {
+        for ((offset, upper) in listOf(0L to 10000L, (1L shl 40) + 1 to 6L)) {
+            val problem = Problem(0, 5, arrayOf(
+                IntDomain(offset, offset + 4), IntDomain(offset, offset + 4), IntDomain(offset, offset + 4),
+                IntDomain(offset, offset + upper), IntDomain(100, 100),
+            ), arrayOf<Factor>(Cumulative(
+                intArrayOf(0, 1, 2, 3, 4), longArrayOf(2, 2, 2, 2, 1), longArrayOf(2, 2, 2, 2, 1), 3,
+            )))
+
+            val session = PropagationSession(PropagationProblem(problem), cumulativeUnarySubsets = true)
+
+            assertFalse(session.isUnsatAtRoot)
+            assertEquals(offset, session.intDomain(3).min)
+        }
+    }
+
+    @Test
+    fun `subset reasons should imply their bounds through aliases and holes`() {
+        for (lower in listOf(false, true)) for (offset in listOf(-4L, 0L)) for (alias in listOf(false, true)) {
+            val highMax = offset + if (lower) 3 else 4
+            val candidateMax = offset + if (lower) 4 else 3
+            val problem = Problem(0, 5, arrayOf(
+                IntDomain(offset, highMax), IntDomain(offset, highMax), IntDomain(offset, highMax),
+                IntDomain(offset, candidateMax), IntDomain(offset + 20, offset + 20),
+            ), arrayOf<Factor>(Cumulative(
+                intArrayOf(if (alias) 0 else 4, 2, 0, 1, 3), LongArray(5) { 1 }, longArrayOf(1, 2, 2, 2, 2), 3,
+            )))
+
+            PropagationReasonOracle.assertReasonsImply(problem, "subset $lower $offset $alias") { state ->
+                state.cumulativeUnarySubsets = true
+                (0 until 3).all {
+                    if (lower) state.tightenIntMax(it, offset + 2) else state.tightenIntMin(it, offset + 2)
+                } && state.excludeIntValue(3, offset + 1)
+            }
+        }
+    }
+
+    @Test
+    fun `subset reasons should retain historical start bounds`() {
+        val problem = Problem(0, 5, arrayOf(
+            IntDomain(0, 9), IntDomain(0, 9), IntDomain(0, 9), IntDomain(0, 8), IntDomain(100, 100),
+        ), arrayOf<Factor>(Cumulative(
+            intArrayOf(4, 0, 1, 2, 3), longArrayOf(1, 2, 2, 2, 2), longArrayOf(1, 2, 2, 2, 2), 3,
+        )))
+        val state = PropagationState(problem, Assumptions.None)
+        state.cumulativeUnarySubsets = true
+        state.undoLogging = true
+        state.currentLevel = 1
+        check((0 until 3).all { state.tightenIntMax(it, 4) })
+        state.currentFactor = 0
+        check(state.factorAt(0).propagate(state, 0))
+        val recorded = state.intMinAntecedents[3]
+        state.currentFactor = -1
+        state.currentLevel = 2
+        check(state.tightenIntMax(0, 2))
+
+        val reason = requireNotNull(state.reasonOf(recorded))
+
+        val bounds = reason.map { lit ->
+            val atom = Lit.variable(lit) - problem.numBoolVars
+            "${state.atoms.intVar[atom]} ${state.atoms.kind[atom]} ${state.atoms.threshold[atom]}"
+        }
+        assertTrue("0 LE 4" in bounds)
+        assertFalse("0 LE 2" in bounds)
+    }
+
+    @Test
+    fun `undo should discard interrupted subset deductions and filter a sibling`() {
+        val problem = Problem(0, 5, arrayOf(
+            IntDomain(0, 9), IntDomain(0, 9), IntDomain(0, 9), IntDomain(0, 8), IntDomain(100, 100),
+        ), arrayOf<Factor>(Cumulative(
+            intArrayOf(4, 0, 1, 2, 3), longArrayOf(1, 2, 2, 2, 2), longArrayOf(1, 2, 2, 2, 2), 3,
+        )))
+        val state = PropagationState(problem, Assumptions.None)
+        state.cumulativeUnarySubsets = true
+        state.beginRootFixpoint().forEach { }
+        while (state.rootFixpointPending) assertNull(state.advanceRootFixpoint(Cancellation.Never))
+        state.undoLogging = true
+        val root = state.mark()
+        state.currentLevel = 1
+        check((0 until 3).all { state.tightenIntMax(it, 4) })
+        state.beginSeedFixpoint().forEach { }
+        val token = object : Cancellation {
+            override fun isCancelled(): Boolean = state.intDomains[3].min == 6L
+            override fun workMeter(): WorkMeter = WorkMeter { }
+        }
+
+        assertNull(state.advanceRootFixpoint(token))
+
+        assertTrue(state.rootFixpointPending)
+        assertEquals(6L, state.intDomains[3].min)
+        state.undoTo(root)
+        state.currentLevel = 1
+        check((0 until 3).all { state.tightenIntMin(it, 4) })
+        assertNull(state.runToFixpoint(allFactors = false))
+        assertFalse(state.runCancelled)
+        assertEquals(IntDomain(0, 3), state.intDomains[3])
+    }
 
     @Test
     fun `unrepresentable energy windows should leave demand bounds unchanged`() {

@@ -393,6 +393,7 @@ internal class ResumableMinimize(
                 params.propagationCancelFloor,
                 nativeSat = params.nativeSat ?: true,
                 pbLearning = params.pbLearning ?: (problem.numIntVars == 0),
+                cumulativeUnarySubsets = problem.numRealVars == 0 && params.useCumulativeUnarySubsets,
             )).also { if (params.integerRowLearning) it.enableIntegerRowLearning() },
             branching = CpBranching.None,
         ).also {

@@ -53,6 +53,7 @@ class PropagationSession private constructor(
     preparedBuffers: PropagationSessionBuffers? = null,
     preparedMark: PropagationState.LevelMark? = null,
     initialAssumptions: Assumptions = Assumptions.None,
+    cumulativeUnarySubsets: Boolean = false,
 ) {
     /** Construct a private propagation projection over [problem]. */
     constructor(
@@ -69,7 +70,9 @@ class PropagationSession private constructor(
         propagationCancelFloor: Int = PROPAGATION_CANCEL_FLOOR,
         nativeSat: Boolean = false,
         pbLearning: Boolean = false,
-    ) : this(projection.problem, cancellation, propagationCancelFloor, nativeSat, pbLearning, projection)
+        cumulativeUnarySubsets: Boolean = false,
+    ) : this(projection.problem, cancellation, propagationCancelFloor, nativeSat, pbLearning, projection,
+        cumulativeUnarySubsets = cumulativeUnarySubsets)
 
     internal fun checkSelectedProjection(
         checks: SelectedProjectionChecks? = projection.selection?.originalChecks,
@@ -88,6 +91,7 @@ class PropagationSession private constructor(
             pbLearning = pbLearning,
         ).also {
             it.cancelFloor = propagationCancelFloor
+            it.cumulativeUnarySubsets = cumulativeUnarySubsets
         }
 
     /** Subscribe to per-variable unassign events fired by every backtrack/undo; see

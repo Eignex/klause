@@ -26,6 +26,7 @@ internal class PreparingMinimize(
     private var preparation: PropagationPreparation? = PropagationPreparation(
         solver.problem, propagationToken, params.propagationCancelFloor,
         params.pbLearning ?: (solver.problem.numIntVars == 0),
+        cumulativeUnarySubsets = solver.problem.numRealVars == 0 && params.useCumulativeUnarySubsets,
     )
     private var search: ResumableMinimize? = null
     private var installing: ResumableMinimize? = null

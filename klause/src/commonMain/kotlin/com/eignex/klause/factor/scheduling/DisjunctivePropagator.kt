@@ -10,6 +10,7 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.boolPinnedAt
 import com.eignex.klause.propagation.boundLiteral
+import com.eignex.klause.propagation.checkFiniteWork
 import com.eignex.klause.propagation.domainAt
 import com.eignex.klause.propagation.lazyReason
 import com.eignex.klause.util.CheckedLongOverflowException
@@ -47,6 +48,7 @@ internal class DisjunctivePropagator(
     private val presents: IntArray,
     private val durationVars: IntArray,
     private val n: Int,
+    private val reasonPrefix: Int = -1,
 ) : Propagator {
 
     override val expensiveBake: Boolean get() = true
@@ -116,11 +118,15 @@ internal class DisjunctivePropagator(
 
     private fun now(state: PropagationState) = View(state, state.undo.size, state.currentLevel)
 
+    private fun checkSubsetWork(state: PropagationState) {
+        if (reasonPrefix >= 0) state.checkFiniteWork()
+    }
+
     // A deduction's reason, recorded for [explain] to build from [payload] if analysis reads it.
     private fun reasonFor(state: PropagationState, payload: IntArray): IntArray? = when {
         state.currentLevel == 0 -> null
 
-        state.undoLogging -> state.lazyReason(payload)
+        state.undoLogging -> state.lazyReason(if (reasonPrefix < 0) payload else intArrayOf(reasonPrefix) + payload)
 
         else -> now(state).run {
             explainPayload(payload)
@@ -338,6 +344,7 @@ internal class DisjunctivePropagator(
             return false
         }
         for (i in 0 until n) {
+            checkSubsetWork(state)
             if (!OptionalPresence.isDefinitelyPresent(presents, i, state)) continue
             val d = effDur[i]
             if (d == 0L) continue
@@ -351,6 +358,7 @@ internal class DisjunctivePropagator(
     private fun mandatoryProfile(state: PropagationState, effDur: LongArray): MandatoryProfile {
         val profile = MandatoryProfile()
         for (i in 0 until n) {
+            checkSubsetWork(state)
             if (!OptionalPresence.isDefinitelyPresent(presents, i, state)) continue
             val d = effDur[i]
             if (d == 0L) continue
@@ -370,6 +378,7 @@ internal class DisjunctivePropagator(
         val ownsMandatory = lstI < ectI
         var newMin = dom.min
         while (newMin <= state.intDomains[v].max) {
+            checkSubsetWork(state)
             if (profile.overloadsAt(newMin, newMin + d, r = 1L, cap = 1L, ownsMandatory, lstI, ectI)) {
                 newMin++
             } else {
@@ -383,6 +392,7 @@ internal class DisjunctivePropagator(
         }
         var newMax = state.intDomains[v].max
         while (newMax >= state.intDomains[v].min) {
+            checkSubsetWork(state)
             if (profile.overloadsAt(newMax, newMax + d, r = 1L, cap = 1L, ownsMandatory, lstI, ectI)) {
                 newMax--
             } else {
@@ -403,6 +413,7 @@ internal class DisjunctivePropagator(
      *  i must come strictly after j. Tighten `start_i.min ≥ est_j + dur_j`. */
     private fun detectablePrecedences(state: PropagationState, effDur: LongArray): Boolean {
         for (i in 0 until n) {
+            checkSubsetWork(state)
             if (effDur[i] == 0L) continue
             if (!OptionalPresence.isDefinitelyPresent(presents, i, state)) continue
             val vi = starts[i]
@@ -410,6 +421,7 @@ internal class DisjunctivePropagator(
             var newMinI = di.min
             var by = -1
             for (j in 0 until n) {
+                checkSubsetWork(state)
                 if (j == i) continue
                 if (effDur[j] == 0L) continue
                 if (!OptionalPresence.isDefinitelyPresent(presents, j, state)) continue
@@ -478,6 +490,7 @@ internal class DisjunctivePropagator(
         val sweep = EdgeSweep(tree, taskIds, durs, ests, energies, lctOrder, reversed)
         var k = 0
         while (k < m) {
+            checkSubsetWork(state)
             val tau = lcts[lctOrder[k]]
             while (k < m && lcts[lctOrder[k]] == tau) {
                 val j = lctOrder[k]
@@ -511,6 +524,7 @@ internal class DisjunctivePropagator(
     private fun edgeFindingTasks(state: PropagationState, effDur: LongArray): IntArrayList {
         val active = IntArrayList()
         for (i in 0 until n) {
+            checkSubsetWork(state)
             if (!OptionalPresence.isDefinitelyPresent(presents, i, state)) continue
             if (effDur[i] > 0) active.add(i)
         }
@@ -527,6 +541,7 @@ internal class DisjunctivePropagator(
         reversed: Boolean,
     ) {
         for (t in taskIds.indices) {
+            checkSubsetWork(state)
             val dom = state.intDomains[starts[taskIds[t]]]
             if (!reversed) {
                 ests[t] = dom.min
@@ -550,6 +565,7 @@ internal class DisjunctivePropagator(
         val tree = sweep.tree
         val reversed = sweep.reversed
         for (ki in from until sweep.lctOrder.size) {
+            checkSubsetWork(state)
             val cand = sweep.lctOrder[ki]
             tree.activate(cand, sweep.ests[cand], sweep.energies[cand])
             val envWith = tree.envOfTheta()

@@ -103,6 +103,8 @@ class PropagationState private constructor(
     /** Immutable model data addressed by this state. */
     val problem: Problem get() = projection.problem
 
+    internal var cumulativeUnarySubsets: Boolean = false
+
     private val usesNativeSat = nativeSat && projection.isNativeSatEligible
 
     /** Two-bit-per-var three-valued pin store. [boolAssigned] says whether the variable has

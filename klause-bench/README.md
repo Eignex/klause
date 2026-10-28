@@ -4605,6 +4605,108 @@ satisfaction projections, with no original-objective, independent MiniZinc
 witness/proof or throughput claim. Explicit annotations remain authoritative;
 the pair-first arm is only a separate diagnostic control.
 
+### High-demand cumulative unary subsets
+
+The bounded projection admits 3–32 mandatory positive-duration tasks whose fixed
+demands exceed half a fixed capacity, retaining the original cumulative. Optional
+tasks, live attributes, factors above 128 tasks and unsafe arithmetic ranges decline.
+The temporary `CumulativeSubsetProfile` harness is retained in the cited frozen
+revisions, outside the maintained profile entry points. Its diagnostics use
+Linux/amd64, JDK 25.0.4.1, one CPU and 4,608 MiB. Root stages allow three seconds
+and 50M preparation work; search stages allow three seconds and 256 decisions.
+Original objectives participate in preparation; the initial search controls are
+satisfaction projections with input-order/minimum-value selection.
+
+[9011](https://lab.eignex.com/jobs/9011) retains 48 authored records before a
+FlatZinc declaration-order error interrupts the pair-order cases.
+[9026](https://lab.eignex.com/jobs/9026) completes the corrected pair controls and
+records active LP work. Unary projection detects the authored overloads and raises
+the linked control's target start to 6, reducing its consumer's upper bound to 4
+before preparation. Default/aggressive preparation retain the target bound. Source
+reconstruction is not applied to the captured prepared columns, so the wider
+consumer slot after preparation is not a source-domain claim.
+With posted pair orders, ordinary search falls from five nodes/two conflicts to
+four/zero; impact probing uses three nodes in both arms. LP work on the bound
+control without pair orders rises from 126,026 to 499,024 despite identical nodes.
+All twelve witnesses in 9026 pass the original FlatZinc model's native checker;
+no independent MiniZinc witness or exported refutation check is claimed.
+
+[9019](https://lab.eignex.com/jobs/9019), at `fb1cb1eeaa`, compiles original
+`2013/rcpsp/11` with MiniZinc 2.10.1. Model/data hashes match archive revision
+`a8448864fc`; compiler, libraries, output mapping and runtime receipts are retained.
+Its posted incompatible pair orders remain, and four eligible unary subsets retain
+all four general cumulatives. Ordinary/default/aggressive captures have identical
+domains. Default preparation work rises from 6,436,051 to 6,485,432; both aggressive
+arms exhaust 50M work. Unprepared ordinary search has 217 nodes and 56 conflicts
+in both arms; both witnesses pass the native FlatZinc checker. Three-second LP arms
+stop without witnesses, so their differing node counts establish no improvement.
+
+[9027](https://lab.eignex.com/jobs/9027) compares the ordinary prepared source and
+the subset projection at identical captured domains and Boolean pins. Seeds 3/7,
+LP off/active, each finish satisfaction search at 38 nodes with no conflicts. All
+152 paired snapshots complete without an additional bound or conflict. The active
+LP arms each execute a root query. These deterministic selector controls do not
+represent independent random paths or original-objective optimization results.
+Thread allocation, construction/search/check timings and resource receipts remain
+with the captures. Fixed arm order and JFR establish neither throughput nor peak
+storage or disposal-cost improvements.
+
+[9043](https://lab.eignex.com/jobs/9043) retains five eligible fixed mineral-flow
+subsets on original `2014/smelt/smelt_2`, whose model posts no pair-order clauses.
+Its variable line-choice demands decline selection. Captured root domains agree;
+default preparation work rises from 2,805,421 to 2,848,737, and both aggressive
+arms exhaust 50M work. Ordinary satisfaction search has 146 nodes and 11 conflicts
+in both arms, with propagation work 310,234/312,882. Timed probing and LP outcomes
+differ under fixed cold-JVM arm order; those results supply no speedup claim.
+
+Original-objective captures [9050](https://lab.eignex.com/jobs/9050) and
+[9052](https://lab.eignex.com/jobs/9052), at `b8cbc0a398`, inspect up to 512 actual
+prepared optimization prefixes at seed 3, CP only, with a 15-second deadline.
+RCPSP supplies no additional deduction. Smelt supplies additional bounds at 20
+prefixes, including repeated bounds across alternatives: start 37 rises from 5 to
+10, while another prefix raises start 32 from 8 to 10 and integer 42 from 14 to 16.
+Native integers 32/42 map to source start/completion of task 2, linked by
+`end(2) = start(2) + 6`; its completion consumes the subset bound. These shadow
+fixpoints do not guide the original traversal. Native-checked best reported
+objectives are 121 and 13,076, both unproved at the decision allowance.
+
+[9038](https://lab.eignex.com/jobs/9038) cannot compile the unchanged 2008 RCPSP
+model's obsolete string-valued search annotations with MiniZinc 2.10.1 and supplies
+no solver result.
+
+[9065](https://lab.eignex.com/jobs/9065) compares native prototype `eb360cad62` with
+`b8cbc0a398` in 16 serial ten-second P1 resource captures over both sources and
+seeds 3/7. Original annotated search and single-worker default-LP CP retain their
+separate controls. On Smelt, the annotated prototype reports a native optimum 69
+in 4.00/3.80 seconds and 1,231 nodes, versus unproved 1,068 at ten seconds and
+10,290/8,872 nodes. Default LP instead reports 1,998, versus baseline 80/69, all
+unproved. The unconditional policy fails admission despite its annotated benefit.
+The bounded worker policy enables the projection only without the LP family;
+shared preparation and LP workers retain their ordinary propagation.
+
+[9069](https://lab.eignex.com/jobs/9069) compares that policy at `8611494aef` with
+`b8cbc0a398`: 24 serial ten-second P1 captures, seeds 3/7, retained Smelt 2 and
+held-out Smelt 3, original annotated search, conflict-driven CP without LP, and
+single-worker default-LP CP. All exit zero on the same automatic host, with
+matching source hashes, MiniZinc 2.10.1 compiler/library identities and runtime
+options; build fingerprints distinguish the installed distributions.
+Annotated Smelt 2 repeats native optimum 69 in 3.72/3.88 seconds, 1,231 nodes
+and 9,950,827 propagation work, versus unproved 1,068 and 92.36M/78.49M work.
+CP without LP improves unproved Smelt 2 objectives from 6,543/6,486 to 589/570,
+but increases work from 40.43M/43.46M to 50.96M/53.61M. On Smelt 3 it improves
+26,872/26,872 to 19,883/19,883 with 63.76M/62.93M versus 60.69M/60.64M work.
+Annotated Smelt 3 remains at 12,107 in both arms, with mixed work costs.
+Default-LP objectives agree at 69 on Smelt 2 and 8,119 on Smelt 3; root work
+agrees, while deadline-limited traversal and work vary. This supports the finite
+worker policy without an LP improvement or general throughput claim.
+Per-process CPU, wall-time and peak-RSS receipts cover construction, repeated
+propagation and teardown together; they do not isolate subset allocation or
+disposal cost. The seed-3 annotated Smelt 2 process uses 127,768 KiB peak RSS and
+3.50 user-CPU seconds, versus baseline 138,092 KiB and 10.09 seconds; this is one
+whole-process comparison, not a projection storage bound. Independent MiniZinc
+assignment checking is unsupported in both CLI campaigns, and native optimality
+is not an independently checked certificate.
+
 ### Optional unary source admission
 
 `bench.profile.OptionalUnaryProfile` captures the authored three-task optional
