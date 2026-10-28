@@ -6,6 +6,7 @@ import com.eignex.klause.localsearch.scoring.MoveScoring
 import com.eignex.klause.localsearch.strategy.AxisToken
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
+import com.eignex.klause.meta.coreguided.CoreRefinementMode
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.util.Cancellation
@@ -19,6 +20,29 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class ExecutionOptionsTest {
+    @Test
+    fun `typed weighted search controls should match their parsed scenario`() {
+        val typed = ExecutionOptions(ExecutionOption.coreEarly(true),
+            ExecutionOption.coreRefinement(CoreRefinementMode.REASONS))
+        val parsed = ExecutionOptions.parse(listOf("core-early=true", "core-refinement=reasons"))
+
+        val expected = buildPortfolioScenario(typed.reader(), 3L, 1, Kind.COP, EngineMix.MIXED, 6)
+        val actual = buildPortfolioScenario(parsed.reader(), 3L, 1, Kind.COP, EngineMix.MIXED, 6)
+
+        assertEquals(expected, actual)
+        assertTrue(actual.earlyCoreAdmission)
+        assertEquals(CoreRefinementMode.REASONS, actual.coreRefinement)
+    }
+
+    @Test
+    fun `unknown objective core refinement should be rejected before worker creation`() {
+        val options = ExecutionOptions.parse(listOf("core-refinement=unbounded"))
+
+        assertFailsWith<PipelineConfigException> {
+            buildPortfolioScenario(options.reader(), 3L, 1, Kind.COP, EngineMix.MIXED, 6)
+        }
+    }
+
     @Test
     fun `parsed and typed luby units should reject non-positive values before recipe construction`() {
         for (base in listOf(0L, -1L, Long.MIN_VALUE)) {

@@ -109,7 +109,8 @@ restart schedule takes precedence.
   format's declared policies. Unsupported exact lowering declines explicitly.
 - `--param <key>=<value>`: repeatable engine parameters. Unknown keys exit with
   status 2. The families are CP and LS strategy settings, portfolio slice policy
-  (`slice-work`, `slice-max-work`, `slice-growth`), resource work
+  (`slice-work`, `slice-max-work`, `slice-growth`), weighted objective controls
+  (`core-early`, `core-refinement`, see [core search](12-portfolio.md#boolean-objective-core-search)), resource work
   (`node-limit`, `presolve-work-limit`, see [resource allowances](06-sessions.md#resource-allowances)),
   `dry-run-presolve=true` for a preparation summary without solving, and presolve
   effort ([presolve](07-presolve.md)).

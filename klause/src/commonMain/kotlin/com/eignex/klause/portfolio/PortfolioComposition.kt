@@ -12,6 +12,7 @@ import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.lp.bounding.LpTechnique
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
+import com.eignex.klause.meta.coreguided.CoreRefinementMode
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.solver.Sample
@@ -145,9 +146,17 @@ data class PortfolioScenario(
     val sliceGrowth: Double = 1.5,
     /** Opt-in single-lane diagnostic allowance in charged node-equivalents; null uses elapsed policy. */
     val diagnosticWorkLimit: Long? = null,
+    /** Allow the curated core worker before the first incumbent after ordinary complete workers receive coverage. */
+    val earlyCoreAdmission: Boolean = false,
+    /** Bounded private objective-core refinement; disabled by default. */
+    val coreRefinement: CoreRefinementMode = CoreRefinementMode.NONE,
 ) {
     init {
         require(cores >= 1) { "cores must be ≥ 1" }
+        require(!earlyCoreAdmission ||
+            (cores == 1 && kind == Kind.COP && engine == EngineMix.MIXED && btPool == null)) {
+            "core-early requires a mixed optimization pool with automatic backtrack workers on one core"
+        }
         require(diagnosticWorkLimit == null || (cores == 1 && diagnosticWorkLimit > 0L)) {
             "portfolio-work requires one core and a positive work limit"
         }
@@ -186,6 +195,7 @@ data class PortfolioScenario(
  */
 internal sealed interface WorkerConfig {
     fun withNodeBudget(budget: NodeBudget): WorkerConfig
+    fun withCoreRefinement(mode: CoreRefinementMode): WorkerConfig = this
     fun withLsResiduals(): WorkerConfig = this
     fun withLsPhaseTimes(): WorkerConfig = this
 

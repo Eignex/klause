@@ -42,6 +42,46 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class PortfolioBuilderTest {
+    @Test
+    fun `early core admission should preserve its pool and ordinary worker admission`() {
+        val problem = Problem(2, 0, emptyArray(), emptyArray()).bake()
+        val objective = LinearObjective(longArrayOf(1, 2))
+        val scenario = PortfolioScenario.sequential(Kind.COP)
+        val baseline = PortfolioBuilder.build(problem, scenario, objective)
+        val early = PortfolioBuilder.build(problem, scenario.copy(earlyCoreAdmission = true), objective)
+
+        try {
+            assertEquals(baseline.map { it.label }, early.map { it.label })
+            assertEquals(baseline.filter { it.label != "bt/core-guided" }.map { it.improvementOnly },
+                early.filter { it.label != "bt/core-guided" }.map { it.improvementOnly })
+            val ordinary = baseline.single { it.label == "bt/core-guided" }
+            val candidate = early.single { it.label == "bt/core-guided" }
+            assertTrue(ordinary.improvementOnly)
+            assertFalse(candidate.improvementOnly)
+            assertTrue(ordinary.auxiliaryProof && candidate.auxiliaryProof)
+        } finally {
+            baseline.forEach { it.close() }
+            early.forEach { it.close() }
+        }
+    }
+
+    @Test
+    fun `early core admission should retain the auxiliary time allowance`() {
+        val problem = Problem(2, 0, emptyArray(), emptyArray()).bake()
+        val objective = LinearObjective(longArrayOf(1, 2))
+        val scenario = PortfolioScenario.sequential(Kind.COP).copy(earlyCoreAdmission = true)
+        val workers = PortfolioBuilder.build(problem, scenario, objective)
+
+        try {
+            val core = workers.single { it.label == "bt/core-guided" }
+            requireNotNull(core.newResumableSearch({ Double.POSITIVE_INFINITY }, Cancellation.Never)).use {
+                assertEquals(2_000L, it.stats.coreGuided.activeMillisLimit)
+            }
+        } finally {
+            workers.forEach { it.close() }
+        }
+    }
+
 
     @Test
     fun `private objective coordinates should use the full slot beside the canonical primary`() {

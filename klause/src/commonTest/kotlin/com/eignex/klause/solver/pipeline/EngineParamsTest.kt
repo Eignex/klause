@@ -23,6 +23,11 @@ class EngineParamsTest {
     }
 
     @Test
+    fun `early objective core admission should reject parallel portfolios`() {
+        assertFailsWith<PipelineConfigException> { scenario(2, listOf("core-early=true")) }
+    }
+
+    @Test
     fun `objective guidance must not create an automatic recipe pool`() {
         assertFailsWith<PipelineConfigException> {
             resolveLocalSearchRecipes(EngineParams(listOf("objective-guidance=geometric")))

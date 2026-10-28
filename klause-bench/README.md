@@ -150,7 +150,11 @@ Run it through the lab with a bounded profile allowance. It writes the original
 source, installed-build provenance, exact floor/core-weight/threshold and accepted
 incumbent trajectories, preparation/threshold/verification visits, query counts,
 traversal work and a summary including source preparation and disposal time.
-The summary retains slice count and final work after private retirement.
+The summary retains slice count and final work after private retirement. Each
+accepted incumbent writes its reconstructed source and lowered Boolean values to
+`incumbent-N.json`, bound to the source hash and exact objective; array index `i`
+names source variable `i+1`. Capture admits at most 128 witnesses and two million
+Boolean values; exhaustion fails qualification instead of dropping witnesses.
 The timeout contains source preparation, native point checking and trajectory
 writing; these instrumented observations establish no throughput claim. Native
 Boolean point checks and native bound authority are separate from the lab's

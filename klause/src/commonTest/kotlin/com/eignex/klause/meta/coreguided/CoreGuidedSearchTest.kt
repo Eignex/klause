@@ -58,6 +58,26 @@ import kotlin.time.TestTimeSource
 
 class CoreGuidedSearchTest {
     @Test
+    fun `wide integer cost frontiers should exhaust their allowance without claiming attainment`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1_000_000_000L) }, arrayOf(
+            Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1_000_000_000L),
+        )).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(Long.MAX_VALUE, Long.MAX_VALUE))
+        val search = CoreGuidedSearch(problem, objective, BacktrackParams(nativeSat = false, randomSeed = 3L),
+            maximumWork = 2L)
+
+        val stopped = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { error("unattained objective") }
+        val charged = search.work
+        val resumed = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { error("renewed allowance") }
+
+        assertEquals(TerminationReason.BudgetExhausted, assertIs<MinimizeResult.Unknown>(stopped).reason)
+        assertEquals(stopped, resumed)
+        assertEquals(charged, search.work)
+        assertTrue(search.stats.coreGuided.cores > 0L)
+        assertTrue(search.lowerBound < BigFraction.ofLong(Long.MAX_VALUE) * BigFraction.ofLong(1_000_000_000L))
+    }
+
+    @Test
     fun `work scheduled queries should retain policy through preparation and ignore the slice clock`() {
         val clock = TestTimeSource()
         var marked = false
