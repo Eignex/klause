@@ -326,11 +326,13 @@ interrupted migration can resume.
 
 `bench.profile.SymmetryAdmissionProfile` captures ordinary protected preparation
 and opt-in `default,+objective-symmetry` preparation for one to eight hash-pinned
-XCSP3 optimization sources. Submit it as a lab profile with `request64=` containing
-a base64 JSON array of `{suite, problem, sha256}` entries. Each preparation has an
+XCSP3 optimization sources or `wcnf-core` sources. Submit it as a lab profile with
+`request64=` containing a base64 JSON array of `{suite, problem, sha256}` entries. Each preparation has an
 eight-second containing token and 550 million phase units. The capture retains
 original sources, replacement objectives, source symmetry markers, moved generator
-coordinates and their coefficients, pass outcomes, elapsed time and charged work.
+coordinates and their coefficients, retained integral rows, root integer domains,
+pass outcomes, elapsed time and charged work. Tagged row references use the IR's
+`Term` encoding; diagnostic rows retain exact coefficients, bounds and activators.
 It executes no search and makes no source-verdict or runtime-gain claim. Stopped
 preparations remain incomplete observations. Use ordinary source-checked lab solves
 for consumed pruning, quality, proof and total-cost qualification.
@@ -424,6 +426,73 @@ speedup evidence. Neither witnesses nor proofs receive independent checker credi
 Raw states, timings, source/build/runtime hashes and resource receipts remain in
 `klause-evidence/campaigns/conditional-symmetry-3760/` outside Git. Queued profile
 8883 was cancelled before execution when the explicit LP control was added.
+
+## Equality and complemented Boolean controls
+
+[Preparation 8880](https://lab.eignex.com/jobs/8880), at `49289e403e`, completes
+four captures of the independent [cost symmetry sources](smoke-corpus/cost-symmetry/README.md).
+The transportation source retains all nine 0..2 domains and its original objective.
+Dependent-row removal drops the column-0 equation, leaving three row equations and
+two column equations. The exact source cost certificate still uses retained rows,
+with zero right side, but transpose fails full factor-multiset verification on this
+prepared representation. Neither protected nor coefficient-colored preparation
+finds a generator. The latter adds 328 phase units without a reduction.
+
+[Transportation 8878](https://lab.eignex.com/jobs/8878) proves 90 in all three
+ordinary controls, each with 63 nodes and 230 propagations. All three original-source
+witnesses pass the independent XCSP3 checker. Disabling LP harvest leaves the tree
+unchanged; these directly selected `conflictDriven` workers report no LP work, so
+this comparison does not establish that a tight LP bound was consumed.
+
+[Boolean 8879](https://lab.eignex.com/jobs/8879) proves 2 in all four controls.
+Preparation preserves the signed weights `[1,-1,1,-1]` and offset 2. Existing
+objective admission finds the two unsigned swaps and scalar orders, reducing
+10 nodes to 7 while adding 3,707 preparation units. Direct core-guided search
+uses two cores, an exact lower bound of 2 and two nodes. Its existing preferred-literal
+orientation retains positive penalty weights and the source constant. The four
+optimal source assignments already form one orbit under the unsigned swaps;
+the complemented reversal's additional source orbit relates nonoptimal points.
+WCNF has no independent lab checker here: its witnesses and native proof labels
+retain the `reported-result-v1` limit.
+
+[Strong LP 8906](https://lab.eignex.com/jobs/8906) selects the `lp-aggressive`
+worker on both sources. Transportation attains 90 and closes the root with its
+certified bound of 90, zero search nodes and one bound prune. Root LP work is
+1,518 units; the node LP spends 1,235 units. Its original-source witness also
+passes the independent XCSP3 checker; none of these witness checks certifies a
+native optimality proof. The Boolean control reports no LP work and retains
+10 nodes, so it supplies no LP-consumption claim. Core-guided search remains
+the stronger existing Boolean control.
+
+All nine solves use normal preparation, P1, seed 3 and five-second budgets on
+Linux/amd64 with JDK 25.0.4.1+1-LTS, a hard one-vCPU/4608-MiB cgroup and
+`-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=1`. Physical whole-CLI
+measurements include construction and search; they are one ordered repeat,
+not a throughput comparison. The JFR preparation captures are separate diagnostics.
+
+| Source and control | Nodes / propagations | Preparation ms / work | CLI wall / user CPU s | Peak RSS KiB |
+| --- | ---: | ---: | ---: | ---: |
+| Transportation protected | 63 / 230 | 249 / 164219 | 1.52 / 1.32 | 102664 |
+| Transportation coefficient-colored | 63 / 230 | 264 / 164547 | 1.55 / 1.31 | 102816 |
+| Transportation without LP harvest | 63 / 230 | 196 / 164219 | 1.51 / 1.22 | 103308 |
+| Boolean protected | 10 / 6 | 178 / 2773 | 1.52 / 1.18 | 95864 |
+| Boolean unsigned admission | 7 / 7 | 138 / 6480 | 1.36 / 1.12 | 100360 |
+| Boolean symmetry disabled | 10 / 6 | 155 / 2563 | 1.34 / 1.04 | 96356 |
+| Boolean core-guided | 2 / 3 | 163 / 2773 | 1.23 / 0.97 | 96740 |
+| Transportation LP worker | 0 / 0 | 260 / 164219 | 1.52 / 1.40 | 107580 |
+| Boolean LP worker | 10 / 6 | 166 / 2773 | 1.53 / 1.15 | 95856 |
+
+The equality gate stops at the prepared-factor check and consumed LP closure.
+The complemented-image gate stops at existing optimum-orbit coverage and consumed
+core bounds. These independent negative results admit neither a row-certificate
+API nor a signed-image consumer. No ordinary-source gain, default promotion or
+mixed-local-search qualification follows; the earlier landscape losses remain
+admission constraints. Source coordinates, objectives and conservative query,
+scope and unread-column protections retain their existing contracts.
+Raw sources, records, preparation captures, hashes and resource receipts remain
+outside Git in `klause-evidence/campaigns/cost-symmetry-gates-2026-10-28/`.
+Superseded jobs 8874/8875/8876 and the ceiling-only 8904 were cancelled with zero
+executed commands. No local compilation, tests or numerical workloads were run.
 
 ## Fixture provenance
 
