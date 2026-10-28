@@ -77,7 +77,9 @@ internal object RegularPrefixProfile {
             val problem = when (reference.format) {
                 Format.XCSP3 -> {
                     directory.resolve("source.xml").writeBytes(bytes)
-                    Xcsp3.parse(bytes.decodeToString()).problem
+                    val parsed = Xcsp3.parse(bytes.decodeToString())
+                    require(parsed.objective == null)
+                    parsed.problem
                 }
                 Format.MINIZINC -> {
                     require(reference.data == null)
@@ -86,7 +88,9 @@ internal object RegularPrefixProfile {
                     compiler.compileFzn(reference).copyTo(directory.resolve("source.fzn"))
                     compiler.compileOutput(reference).copyTo(directory.resolve("source.ozn"))
                     Reports.writeJson(directory.resolve("compiler.json").path, MiniZincCompatibility.compiler)
-                    compiler.resolve(reference).problem
+                    val resolved = compiler.resolve(reference)
+                    require(resolved.objective == null)
+                    resolved.problem
                 }
                 else -> error("prefix capture requires XCSP3 or a self-contained MiniZinc source")
             }
@@ -196,7 +200,7 @@ internal object RegularPrefixProfile {
                 put("javaVersion", System.getProperty("java.version"))
                 put("sourceVerdictClaim", false)
                 put("searchExecuted", false)
-                put("regularReplayAdmitted", model.factors.any { it is Regular })
+                put("regularPresent", model.factors.any { it is Regular })
             }
             out.resolve("$mode-report.json").writeText(report.toString())
             println("${out.name}/$mode: $report")
