@@ -1088,6 +1088,22 @@ factor batches are separate controls.
 
 ## Profiling
 
+`bench.profile.AssignmentCostProfile` screens the direct and retained-output
+three-variable weighted AllDifferent controls and hash-pinned `evidence-latin4`.
+With no arguments it compares input-order/minimum-value traversal after off,
+default and aggressive preparation, with LP off or explicit bounding, cuts and
+Lagrangian pruning. `order=default seed=3` selects ordinary VSIDS/random-value
+traversal after default preparation; it is a separate control. Each preparation
+has four seconds and 100 million phase units, each solve two seconds. Submit the
+profile through the lab with a two-minute containing limit.
+The capture retains source bytes/hashes, prepared objectives, domains, global
+scopes, incumbent sequences, branch states and native work/prune counters. Native
+source checks use reconstructed original coordinates; they supply no independent
+proof or witness validation. The input-order control also tests the explicit
+improving query `f <= 10` against existing bounded hole probing and retains the
+source-feasible cost-11 witness. No conditional assignment filter is installed;
+these observations qualify applicability rather than a speedup or default policy.
+
 `bench.profile.ProjectedCountProfile` compares component and monolithic exact
 projected counting over retained DIMACS sources with disjoint Boolean XOR pairs
 and a connected holdout. Options are `pairs=2,4,8 repeats=3 maxChecks=10000`.
