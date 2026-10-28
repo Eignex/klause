@@ -487,8 +487,17 @@ internal class LpEngine(
      * solves still advance the next one — so there is nothing to gain from silencing it entirely that a
      * floor does not already get.
      */
+    private fun sparseTrialRemainingWork(): Long {
+        val cap = minOf(params.lpPlan.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK,
+            SPARSE_LP_MAX_WORK)
+        var remaining = (cap - minOf(cap, totalSolveOps)).coerceAtLeast(0L)
+        lpEffortGovernor.remainingWork()?.let { remaining = minOf(remaining, it) }
+        nodeWorkAllowance()?.let { remaining = minOf(remaining, it.coerceAtLeast(0L)) }
+        return remaining
+    }
+
     internal fun nodeWorkBudget(): Long {
-        if (sparseTrialActive) return lpEffortGovernor.remainingWork()?.coerceAtLeast(1L) ?: 1L
+        if (sparseTrialActive) return sparseTrialRemainingWork().coerceAtLeast(1L)
         val budget = when {
             !adaptiveWork -> 0L
             lpEffortGovernor.isDemoted -> MIN_NODE_WORK_OPS
@@ -500,13 +509,15 @@ internal class LpEngine(
     }
 
     internal fun nodeQueryWorkBudget(): Long? {
-        if (sparseTrialActive) return lpEffortGovernor.remainingWork()?.coerceAtLeast(1L)
+        if (sparseTrialActive) return sparseTrialRemainingWork().coerceAtLeast(1L)
         val offered = nodeWorkAllowance()?.coerceAtLeast(1L) ?: return null
         val containing = nodeWorkBudget()
         return if (containing == 0L) offered else minOf(containing, offered)
     }
 
-    internal fun nodePreparationWorkBudget(): Long = if (separateNodePreparation) {
+    internal fun nodePreparationWorkBudget(): Long = if (sparseTrialActive) {
+        nodeWorkBudget()
+    } else if (separateNodePreparation) {
         lpEffortGovernor.remainingWork()?.coerceAtLeast(1L) ?: nodeWorkBudget()
     } else nodeWorkBudget()
 
@@ -1113,7 +1124,8 @@ internal class LpEngine(
         params.lpConfig?.let { config ->
             val plan = with(LpAutoConfig) {
                 prepare(problem, config, requestedPlan, objective, params.cancellation,
-                    sparseTrialAllowed = projections?.builtInRelaxation != false) { admission ->
+                    sparseTrialAllowed = projections?.builtInRelaxation != false,
+                    sparseTrialWork = sparseTrialRemainingWork()) { admission ->
                     elementIndexes = admission.elementIndexes
                     admission.sparseTrial?.let { trial ->
                         sparseTrialActive = trial.admitted

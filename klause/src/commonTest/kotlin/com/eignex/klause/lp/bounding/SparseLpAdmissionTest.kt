@@ -23,6 +23,21 @@ import kotlin.test.assertTrue
 
 class SparseLpAdmissionTest {
     @Test
+    fun `source preparation respects a smaller caller root allowance`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
+            settings = ProblemSettings(lpCeilingTableauCells = 1L))
+        val sink = SolveStatsSink("small-root-allowance")
+
+        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, 1)),
+            LpParams(lpConfig = LpConfig.parse("default,+sparse-trial"), lpPlan = LpPlan(rootMaxWork = 1L)),
+            sink).use { engine -> assertFalse(engine.params.lpPlan.bounding) }
+
+        assertEquals(1L, sink.snapshot().lp.sparseTrial["DeclinePreparationWork"])
+        assertEquals(0.0, sink.snapshot().lp.rootPasses.sum)
+    }
+
+    @Test
     fun `unreserved custom projections decline before emission`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 2)),
             listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1)),

@@ -139,7 +139,10 @@ handoff requires matching source identities and root scopes, and live bound adop
 rechecks authority before reusing its basis.
 
 Preparation is capped at eight million modeled work units; root and node LP work
-share at most 150 million units and the containing invocation's smaller allowance.
+stop at 150 million units or the containing invocation's smaller allowance.
+Preparation admission respects the remaining caller root, slice and LP work limits;
+tighter root deadlines and work shares remain in force. Bounded atomic numerical
+operations can finish past a work boundary, and the ledger retains their actual cost.
 The two-GiB modeled storage envelope includes source authority, sparse owners,
 scratch and capped factor construction. Each sparse factor attempt reserves entries
 before writing input, fill or factors, and stops at two million entries or eight

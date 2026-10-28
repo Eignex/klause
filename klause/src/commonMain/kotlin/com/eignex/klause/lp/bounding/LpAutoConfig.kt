@@ -118,7 +118,7 @@ object LpAutoConfig {
      */
     const val SMALL_HULL_DIM: Long = 128L
 
-    /** `base` with every structurally-applicable LP technique enabled — i.e. [resolve] at the
+    /** `base` with every ordinary structurally-applicable LP technique enabled — i.e. [resolve] at the
      *  [LpEmphasis.AGGRESSIVE] ceiling (no cost gating). */
     fun recommend(problem: Problem, base: LpPlan = LpPlan()): LpPlan = resolve(problem, LpConfig.AGGRESSIVE, base)
 
@@ -161,6 +161,7 @@ object LpAutoConfig {
         objective: LinearObjective? = null,
         cancellation: Cancellation = Cancellation.Never,
         sparseTrialAllowed: Boolean = true,
+        sparseTrialWork: Long = SPARSE_LP_MAX_WORK,
         observe: ((LpAdmission) -> Unit)? = null,
     ): LpPlan {
         var visits = 0
@@ -401,12 +402,17 @@ object LpAutoConfig {
         val sparse = if (config.resolved(LpTechnique.SPARSE_TRIAL) && !base.bounding &&
             structApplicable && config.resolved(LpTechnique.BOUNDING)
         ) {
-            if (sparseTrialAllowed) prepareSparseLpAdmission(problem, objective, cancellation)
+            if (sparseTrialAllowed) prepareSparseLpAdmission(problem, objective, cancellation, sparseTrialWork)
             else SparseLpAdmission(mapOf("DeclineProjection" to 1L))
         } else null
         if (sparse?.admitted == true) {
-            plan = LpPlan(bounding = true, boundMaxDepth = 0, learn = true,
-                probe = false, rootCutHarvest = false, rootMaxWork = SPARSE_LP_MAX_WORK)
+            plan = LpPlan(
+                bounding = true, boundMaxDepth = 0, learn = true, probe = false, rootCutHarvest = false,
+                rootMaxWork = minOf(base.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK, SPARSE_LP_MAX_WORK),
+                rootBudgetFraction = base.rootBudgetFraction, rootBudgetMillis = base.rootBudgetMillis,
+                lpWorkBudgetFraction = base.lpWorkBudgetFraction, boundMaxPivots = base.boundMaxPivots,
+                boundEvery = base.boundEvery, warmStart = base.warmStart, branching = base.branching,
+            )
         }
         observe?.invoke(LpAdmission(rows, baseCols, cells, structApplicable,
             config.resolved(LpTechnique.BOUNDING), coneRequested || cells <= ceilingCap, base.bounding, plan,
