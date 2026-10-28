@@ -34,7 +34,6 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.explainAtoms
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.IntArrayList
 import com.sun.management.ThreadMXBean
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
@@ -238,11 +237,13 @@ internal object RegularPrefixReplay {
             val atoms = state.javaClass.declaredMethods.single {
                 it.name.startsWith("getAtoms") && it.parameterCount == 0
             }.invoke(state)
-            val atomVariables = atoms.javaClass.getMethod("getIntVar").invoke(atoms) as IntArrayList
+            val atomVariables = atoms.javaClass.getMethod("getIntVar").invoke(atoms)
+            val atomVariable = atomVariables.javaClass.getMethod("get", Int::class.javaPrimitiveType)
             val helperIntegerClauses = (0 until native.learnedClauseCount).filter { index ->
                 (clauseGetter.invoke(native, index) as IntArray).any {
                     val variable = Lit.variable(it)
-                    variable >= model.numBoolVars && atomVariables[variable - model.numBoolVars] >= source.numIntVars
+                    variable >= model.numBoolVars &&
+                        (atomVariable.invoke(atomVariables, variable - model.numBoolVars) as Int) >= source.numIntVars
                 }
             }
             val record = buildJsonObject {

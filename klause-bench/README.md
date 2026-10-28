@@ -2704,7 +2704,9 @@ without an independent source-format proof certificate or a production default c
 ### Regular prefix snapshots and replay
 
 `bench.profile.RegularPrefixProfile` takes `request64=<base64 JSON array>` with one
-to four hash-pinned XCSP3 requests containing `suite`, `problem` and `sha256`.
+to four hash-pinned XCSP3 or self-contained MiniZinc requests containing `suite`,
+`problem` and `sha256`. MiniZinc captures also retain compiler identity and the
+compiled FlatZinc/output mapping; sources with separate data files decline this path.
 It retains original bytes, source and prepared models, runtime/build identities,
 default/aggressive preparation costs and four modulo-three controls. Each preparation
 has twelve seconds and an 825-million work allowance; reaching that allowance does

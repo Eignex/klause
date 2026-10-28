@@ -2,7 +2,11 @@ package com.eignex.klause.bench.profile
 
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.sha256
+import com.eignex.klause.bench.catalog.Catalog
+import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.report.Reports
+import com.eignex.klause.bench.runner.MiniZincCompatibility
+import com.eignex.klause.bench.runner.MiniZincRunner
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.formats.json.ProblemJson
@@ -67,8 +71,25 @@ internal object RegularPrefixProfile {
                 null,
             )
             val directory = out.resolve("source-$index").apply { mkdirs() }
-            directory.resolve("source.xml").writeBytes(bytes)
-            capture(Xcsp3.parse(bytes.decodeToString()).problem, directory, replay, fixed)
+            val reference = Catalog.uncapped(source.getValue("suite").jsonPrimitive.content).problems
+                .single { it.name == source.getValue("problem").jsonPrimitive.content }
+            val problem = when (reference.format) {
+                Format.XCSP3 -> {
+                    directory.resolve("source.xml").writeBytes(bytes)
+                    Xcsp3.parse(bytes.decodeToString()).problem
+                }
+                Format.MINIZINC -> {
+                    require(reference.data == null)
+                    directory.resolve("source.mzn").writeBytes(bytes)
+                    val compiler = MiniZincRunner(timeoutSec = 30)
+                    compiler.compileFzn(reference).copyTo(directory.resolve("source.fzn"))
+                    compiler.compileOutput(reference).copyTo(directory.resolve("source.ozn"))
+                    Reports.writeJson(directory.resolve("compiler.json").path, MiniZincCompatibility.compiler)
+                    compiler.resolve(reference).problem
+                }
+                else -> error("prefix capture requires XCSP3 or a self-contained MiniZinc source")
+            }
+            capture(problem, directory, replay, fixed)
         }
     }
 
@@ -166,10 +187,13 @@ internal object RegularPrefixProfile {
                 put("javaVersion", System.getProperty("java.version"))
                 put("sourceVerdictClaim", false)
                 put("searchExecuted", false)
+                put("regularReplayAdmitted", model.factors.any { it is Regular })
             }
             out.resolve("$mode-report.json").writeText(report.toString())
             println("${out.name}/$mode: $report")
-            if (replay && mode == "default" && prepared.presolve?.infeasible != true && !stop()) {
+            if (replay && mode == "default" && model.factors.any { it is Regular } &&
+                prepared.presolve?.infeasible != true && !stop()
+            ) {
                 RegularPrefixReplay.capture(
                     model,
                     sha256(
