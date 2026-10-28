@@ -452,7 +452,7 @@ object ConditionalComponentTrace {
 
     private class Seen(var epoch: Long, var sightings: Int, var reencounters: Int = 0)
 
-    private class Probe(
+    internal class Probe(
         val sample: Long,
         val level: Int,
         val values: BooleanArray,
@@ -469,7 +469,7 @@ object ConditionalComponentTrace {
     private class Component(var live: Int = 0, var free: Int = 0, var h1: Long = 0L, var h2: Long = 0L)
 
     /** Accumulates residual component statistics over sampled branch points. */
-    private class Recorder(
+    internal class Recorder(
         private val prepared: Problem,
         private val traceCapNanos: Long,
         private val maxProbes: Int,
@@ -496,6 +496,7 @@ object ConditionalComponentTrace {
         private var capSkipped = 0L
         private var keyCapHits = 0L
         private var atomClauses = 0L
+        private var lateDischarges = 0L
         private var unitAtFixpoint = 0L
         private var root: JsonObject? = null
         private var splitSamples = 0L
@@ -577,8 +578,10 @@ object ConditionalComponentTrace {
                 var h2 = fi.toLong() * HASH_B
                 var rep = -1
                 if (f is Clause && f.allLiteralsBool(numBool)) {
+                    // Membership must not depend on literal order, so a clause joins nothing until every
+                    // literal is known not to discharge it.
                     var satisfied = false
-                    var freeLits = 0
+                    var freeBeforeTrue = false
                     for (lit in f.literals) {
                         when (session.litTruth(lit)) {
                             true -> {
@@ -586,18 +589,24 @@ object ConditionalComponentTrace {
                                 break
                             }
 
-                            null -> {
-                                val v = Lit.variable(lit)
-                                if (rep < 0) rep = v else union(rep, v)
-                                freeLits++
-                                h1 = (h1 xor lit.toLong()) * HASH_A
-                                h2 = (h2 + lit.toLong()) * HASH_B
-                            }
-
+                            null -> freeBeforeTrue = true
                             false -> Unit
                         }
                     }
-                    if (satisfied || rep < 0) continue
+                    if (satisfied) {
+                        if (freeBeforeTrue) lateDischarges++
+                        continue
+                    }
+                    var freeLits = 0
+                    for (lit in f.literals) {
+                        if (session.litTruth(lit) != null) continue
+                        val v = Lit.variable(lit)
+                        if (rep < 0) rep = v else union(rep, v)
+                        freeLits++
+                        h1 = (h1 xor lit.toLong()) * HASH_A
+                        h2 = (h2 + lit.toLong()) * HASH_B
+                    }
+                    if (rep < 0) continue
                     if (freeLits == 1) unitAtFixpoint++
                 } else {
                     if (f is Clause) atomClauses++
@@ -791,6 +800,7 @@ object ConditionalComponentTrace {
             put("samplesOutsidePreparedModel", foreignSamples)
             root?.let { put("root", it) }
             put("atomClauses", atomClauses)
+            put("dischargedAfterFreeLiteral", lateDischarges)
             put("unitClausesAtFixpoint", unitAtFixpoint)
             put("maxComponents", maxComponents)
             put("splitSamples", splitSamples)
