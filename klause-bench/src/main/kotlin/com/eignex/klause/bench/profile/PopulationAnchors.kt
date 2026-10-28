@@ -49,6 +49,10 @@ internal object PopulationAnchors {
         val captureStarted = System.nanoTime()
         val captureAllocated = trajectoryThreadBytes()
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
+        require(options.keys.all { it in setOf("suite", "problem", "sha256", "source64", "sourceGzip64",
+            "seed", "offers64", "presolve") })
+        val presolve = options["presolve"] ?: "off"
+        require(presolve in setOf("off", "default"))
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         val bytes = trajectorySourceBytes(options.getValue("suite"), options.getValue("problem"),
             options.getValue("sha256"), options["source64"], options["sourceGzip64"])
@@ -74,7 +78,7 @@ internal object PopulationAnchors {
         val prepared = FinitePipeline.prepare(FinitePipelineRequest(
             requireNotNull(plan.model), FiniteEngine.LOCAL_SEARCH, objective,
             cancellation = stop, solveCancellation = stop, preparedPlan = plan,
-            presolveConfig = PresolveConfig.NONE, randomSeed = seed,
+            presolveConfig = if (presolve == "off") PresolveConfig.NONE else PresolveConfig.DEFAULT, randomSeed = seed,
         ))
         val problem = prepared.problem as BakedProblem
         val workingObjective = requireNotNull(prepared.objective)
@@ -88,6 +92,7 @@ internal object PopulationAnchors {
             put("workingFactors", problem.numFactors)
             put("definitions", sweep?.size ?: 0)
             put("mapped", coordinates != null)
+            put("presolve", presolve)
             put("runtime", System.getProperty("java.runtime.version"))
             put("os", System.getProperty("os.name"))
             put("architecture", System.getProperty("os.arch"))
@@ -114,6 +119,7 @@ internal object PopulationAnchors {
                     crossoverRate = if (mode == "kick") 0.0 else if (mode == "walk") 0.25 else 1.0,
                     linkageAware = mode == "factor", perturbationKind = PerturbationKind.BasinHopping)
                 val state = LocalSearchState(problem, Random(seed))
+                state.invariants = sweep?.network(problem.numIntVars, problem.numBoolVars)
                 fun checked(working: Sample): Sample? {
                     val point = prepared.reconstruct(working)
                     if (stop() || !FiniteConflictSelection.checkSource(source, point, stop) ||
@@ -162,7 +168,15 @@ internal object PopulationAnchors {
                                 sweep?.sweep(state.assignment, state.rootDomains, problem.factors)
                                 state.recompute()
                             }
-                            require(decline == null) { "source projection declined: $decline" }
+                            if (decline != null) {
+                                writer.appendLine(buildJsonObject {
+                                    put("mode", mode); put("dedup", dedup)
+                                    put("projectionDecline", decline)
+                                    put("elapsedNanos", System.nanoTime() - captureStarted)
+                                    put("allocatedBytes", trajectoryThreadBytes() - captureAllocated)
+                                }.toString())
+                                return
+                            }
                             ingress.onFeasibleStall(state, state.assignment.snapshot(),
                                 workingObjective.evaluate(state.assignment))
                         }
