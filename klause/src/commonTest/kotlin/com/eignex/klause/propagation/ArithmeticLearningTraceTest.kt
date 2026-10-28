@@ -22,18 +22,21 @@ import kotlin.test.assertTrue
 
 class ArithmeticLearningTraceTest {
     @Test
-    fun `capture should attribute PB rejection of an integer reason`() {
+    fun `capture should attribute PB rejection of a nonboolean reason`() {
         val state = PropagationState(Problem(1, 1, arrayOf(IntDomain(0, 6)), emptyArray()), Assumptions.None)
-        val trace = ArithmeticLearningTrace()
-        state.arithmeticLearningTrace = trace
-        val atom = state.atomVarGe(0, 1)
-        val resolvent = PbConflictResolvent(state, state.conflictAnalyzer)
+        val integer = state.atomVarGe(0, 1)
+        val unavailable = state.problem.numBoolVars + state.atoms.intVar.size + 1
+        for (atom in intArrayOf(integer, unavailable)) {
+            val trace = ArithmeticLearningTrace()
+            state.arithmeticLearningTrace = trace
+            val resolvent = PbConflictResolvent(state, state.conflictAnalyzer)
 
-        resolvent.resolve(intArrayOf(Lit.make(atom, false)), 1)
+            resolvent.resolve(intArrayOf(Lit.make(atom, false)), 1)
 
-        assertTrue(resolvent.failed)
-        assertEquals("pb.decline.non-boolean-reason", trace.events.last().kind)
-        assertFalse(trace.truncated)
+            assertTrue(resolvent.failed)
+            assertEquals("pb.decline.non-boolean-reason", trace.events.last().kind)
+            assertFalse(trace.truncated)
+        }
     }
 
     @Test
