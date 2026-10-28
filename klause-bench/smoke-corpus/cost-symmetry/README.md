@@ -6,8 +6,9 @@ Self-authored Apache-2.0 sources retain two independent transform questions.
 sums of two. Its cost equals `90 + x00 + x11 + x22` on feasible points.
 Transposition changes the cost by `10*(colSum1-rowSum1) +
 20*(colSum2-rowSum2)`, so the doubled forward and reverse three-cycles both cost
-90. Changing a diagonal cost distinguishes the equality certificate from mere
-constraint invariance. Preparation may remove dependent equations; source
+90. Increasing the `x01` cost by one makes those cycle costs 92 and 90,
+distinguishing the equality certificate from mere constraint invariance.
+Preparation may remove dependent equations; source
 symmetry alone does not establish a prepared-model automorphism.
 
 `signed-cost.wcnf` has hard clauses `(b0 or b2)` and `(not b1 or not b3)`.
