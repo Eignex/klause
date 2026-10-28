@@ -39,6 +39,7 @@ internal object SolverInvocation {
         val exact: Boolean = false,
         val captureDirectory: File? = null,
         val measureResources: Boolean = false,
+        val completeAssignment: Boolean = false,
     )
 
     /** One subprocess solve: verdict, best objective + time-to-best, proof status, the captured
@@ -141,6 +142,7 @@ internal object SolverInvocation {
             add("-s")
             if (s.params.any { it.startsWith("portfolio-work=") }) add("-v")
             if (s.exact) add("--exact")
+            if (s.completeAssignment && entry.ref.format == Format.MINIZINC) add("--output-complete-assignment")
             if (optimize) {
                 add("-a")
                 // Emit `_objective = <value>;` per solution. The objective var is usually not in the

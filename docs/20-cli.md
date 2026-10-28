@@ -115,6 +115,10 @@ restart schedule takes precedence.
   effort ([presolve](07-presolve.md)).
 - `--ozn FILE` (MiniZinc mode): render output with the native `.ozn` applier
   instead of `solns2out`.
+- `--output-complete-assignment` (MiniZinc mode): include bounded original integer
+  and Boolean coordinates as diagnostic comments, including hidden FlatZinc variables.
+  The [output contract](04-finite-formats.md#minizinc-output-rendering) defines limits
+  and unavailable markers. This capture does not validate the assignment.
 
 ### Arithmetic routes
 

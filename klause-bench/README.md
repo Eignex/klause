@@ -51,12 +51,19 @@ and `#` starts a comment. They bypass default suite family caps.
 | `lp=off\|conservative\|default\|aggressive[±id…]` | LP ceiling and technique overrides |
 | `presolve=off\|conservative\|default\|aggressive[,±pass…]` | Presolve emphasis and pass overrides |
 | `exact=true\|false`, `param=key=value` | Exact mode and repeatable CLI parameters |
+| `complete-assignment=true\|false` | Opt-in bounded complete integer/Boolean FlatZinc coordinates as witness comments |
 
 Each run writes `<problem>.out` and `<problem>.json` under `out`, including failed
 loads and solves. Records retain solver reports, statistics, source hashes,
 installed-build identity and available witnesses. Inspect the JSON record even
 when the bench process exits successfully. Independent source validation runs in
 the lab; the bench records `validationPolicy=reported-result-v1`.
+
+`complete-assignment=true` also works in lab request parameters and stays off by
+default. The final witness preserves its framed comments after model reconstruction;
+normal model output stays unchanged. Retain `report/model.fzn`, `model.ozn`, the
+native output and compiler identity with the witness. A missing or unavailable
+block cannot certify hidden coordinates; capture itself is not an independent check.
 
 ## Run through eignex-lab
 

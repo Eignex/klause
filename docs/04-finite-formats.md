@@ -385,6 +385,14 @@ symbolic; expansion, comprehensions and Cartesian products are limited to
 1,000,000 elements. Overflow, unsupported sizes and invalid subscripts raise
 `OznParseException` without publishing a partial solution block.
 
+The CLI's optional complete-assignment comments retain original named integer and
+Boolean coordinates after reconstruction, including variables absent from the output
+model, and the original objective. A framed block precedes the solution separator;
+it carries no validation or proof claim. Capture admits at most 65,536 names, four
+MiB of name characters and eight MiB of assignment text. Float or set coordinates
+and exceeded limits emit an unavailable marker instead of a partial block. Capture
+is disabled by default and spends the invocation's output work and time.
+
 ---
 
 Previous: [3. Input semantics and the schema DSL](03-input-semantics.md) · [Contents](README.md) · Next: [5. MPS and SMT-LIB](05-arithmetic-formats.md)

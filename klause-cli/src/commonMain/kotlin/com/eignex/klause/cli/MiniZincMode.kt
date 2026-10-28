@@ -1,5 +1,6 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.formats.flatzinc.FlatZincProgram
 import com.eignex.klause.formats.flatzinc.OznApplier
 import com.eignex.klause.formats.flatzinc.SolveDirective
 import com.eignex.klause.formats.flatzinc.flatZincSemantics
@@ -39,6 +40,7 @@ internal object MiniZincMode : CliMode {
     private class Session : ModeSession {
         private var oznPath: String? = null
         private var outputObjective = false
+        private var completeAssignment = false
         private var floatApproximation = false
         private var sourceSemantics: EffectiveSourceSemantics? = null
 
@@ -55,6 +57,9 @@ internal object MiniZincMode : CliMode {
             // when the objective var is not in the model's `output` section. Off by default — the
             // standard MiniZinc flow renders objectives through solns2out, not this binary.
             FlagSpec(listOf("--output-objective"), false) { outputObjective = true },
+            FlagSpec(listOf("--output-complete-assignment"), false,
+                help = "Include bounded original integer and Boolean coordinates as diagnostic comments",
+            ) { completeAssignment = true },
         )
 
         override fun load(path: String, common: CommonOptions): Solvable {
@@ -78,7 +83,10 @@ internal object MiniZincMode : CliMode {
             }
             val applier = oznPath?.let { OznApplier(readTextFile(it)) }
             val render: (Sample) -> String = { sample ->
-                applier?.render(original, sample) ?: writeFlatZincSolution(original, sample, outputObjective)
+                val text = applier?.render(original, sample) ?: writeFlatZincSolution(original, sample, outputObjective)
+                if (completeAssignment) withCompleteAssignment(original, text) {
+                    writeFlatZincSolution(original.copy(outputItems = null), sample, true)
+                } else text
             }
 
             val objective = original.linearObjective()
@@ -125,9 +133,40 @@ internal object MiniZincMode : CliMode {
                 )
             }
             return preparedSourceSolvable(invocation, render, { assignment ->
-                applier?.render(original, assignment)
+                val text = applier?.render(original, assignment)
                     ?: writeFlatZincSolution(original, assignment, outputObjective)
+                if (completeAssignment) withCompleteAssignment(original, text) {
+                    writeFlatZincSolution(original.copy(outputItems = null), assignment, true)
+                } else text
             }, lpStats, elapsed)
+        }
+
+        private fun withCompleteAssignment(
+            program: FlatZincProgram,
+            rendered: String,
+            renderPoint: () -> String,
+        ): String {
+            val count = program.boolVarsByName.size.toLong() + program.intVarsByName.size
+            val decline = when {
+                program.floatVarsByName.isNotEmpty() || program.setVarsByName.isNotEmpty() ->
+                    "integer and Boolean coordinates required"
+                count > 65_536 -> "coordinate limit"
+                (program.boolVarsByName.keys.asSequence() + program.intVarsByName.keys.asSequence())
+                    .sumOf { it.length.toLong() } > 4 * 1024 * 1024 -> "name limit"
+                else -> null
+            }
+            val point = if (decline == null) renderPoint().removeSuffix("----------\n") else null
+            val encodedSize = point?.lineSequence()?.filter { it.isNotEmpty() }
+                ?.sumOf { it.length.toLong() + "% klause-assignment: ".length + 1 }?.plus(100) ?: 0
+            val reason = decline ?: if (encodedSize > 8 * 1024 * 1024) "text limit" else null
+            val evidence = if (reason != null) "% klause-assignment-unavailable: $reason\n" else buildString {
+                append("% klause-assignment-begin: flatzinc-integer-v1\n")
+                for (line in checkNotNull(point).lineSequence().filter { it.isNotEmpty() }) {
+                    append("% klause-assignment: ").append(line).append('\n')
+                }
+                append("% klause-assignment-end\n")
+            }
+            return rendered.removeSuffix("----------\n") + evidence + "----------\n"
         }
 
         override fun output(common: CommonOptions): OutputProtocol = MiniZincOutput(floatApproximation, sourceSemantics)
