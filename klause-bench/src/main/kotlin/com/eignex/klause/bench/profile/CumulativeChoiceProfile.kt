@@ -60,7 +60,8 @@ internal object CumulativeChoiceProfile {
             val budget = PresolveBudget(500_000_000L)
             val preparation = emphasis?.let {
                 FinitePipeline.prepare(FinitePipelineRequest(
-                    parsed.problem, FiniteEngine.BACKTRACK, parsed.linearObjective(), presolveConfig = PresolveConfig(it),
+                    parsed.problem, FiniteEngine.BACKTRACK, parsed.linearObjective(),
+                    presolveConfig = PresolveConfig(it),
                     explicitPresolveConfig = true, cancellation = stop, solveCancellation = stop,
                     presolveBudget = budget, randomSeed = 3L,
                 ))

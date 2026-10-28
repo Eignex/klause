@@ -61,17 +61,19 @@ class CumulativePropagatorTest {
     }
 
     @Test
-    fun `unrepresentable window areas should decline demand filtering`() {
-        val problem = Problem(0, 3, arrayOf(IntDomain(0, 4), IntDomain(0, 4), IntDomain(0, 1)),
-            arrayOf<Factor>(Cumulative(
-                intArrayOf(0, 1), longArrayOf(2, 2), longArrayOf(1, 1), Long.MAX_VALUE,
-                resourceVars = intArrayOf(2, 2),
-            )))
-        val state = PropagationState(problem, Assumptions.None)
+    fun `unrepresentable energy windows should decline demand filtering`() {
+        for ((duration, capacity) in listOf(2L to Long.MAX_VALUE, Long.MAX_VALUE to 1L)) {
+            val problem = Problem(0, 3, arrayOf(IntDomain(0, 4), IntDomain(0, 4), IntDomain(0, 1)),
+                arrayOf<Factor>(Cumulative(
+                    intArrayOf(0, 1), longArrayOf(duration, duration), longArrayOf(1, 1), capacity,
+                    resourceVars = intArrayOf(2, 2),
+                )))
+            val state = PropagationState(problem, Assumptions.None)
 
-        assertTrue(problem.propagators[0].propagate(state, 0))
+            assertTrue(problem.propagators[0].propagate(state, 0))
 
-        assertEquals(IntDomain(0, 1), state.intDomains[2])
+            assertEquals(IntDomain(0, 1), state.intDomains[2])
+        }
     }
 
     @Test
@@ -151,6 +153,36 @@ class CumulativePropagatorTest {
 
         PropagationReasonOracle.assertReasonsImply(problem, "subwindow-narrowed") { state ->
             state.tightenIntMax(1, 6)
+        }
+    }
+
+    @Test
+    fun `subwindow exclusions should depend on the capacity ceiling`() {
+        val problem = Problem(0, 7, arrayOf(
+            IntDomain(0, 4), IntDomain(4, 6), IntDomain(4, 6), IntDomain(4, 6),
+            IntDomain(1, 1), IntDomain(0, 1), IntDomain(1, 2),
+        ), arrayOf<Factor>(Cumulative(
+            intArrayOf(0, 1, 2, 3), longArrayOf(1, 2, 2, 2), longArrayOf(1, 1, 1, 1), 2,
+            resourceVars = intArrayOf(4, 4, 4, 5), capacityVar = 6,
+        )))
+
+        PropagationReasonOracle.assertReasonsImply(problem, "subwindow-capacity") { state ->
+            state.tightenIntMax(6, 1)
+        }
+    }
+
+    @Test
+    fun `subwindow demand bounds should cite holes used by bound rounding`() {
+        val problem = Problem(0, 7, arrayOf(
+            IntDomain(0, 4), IntDomain(4, 6), IntDomain(4, 6), IntDomain(4, 6),
+            IntDomain(2, 2), IntDomain(1, 1), IntDomain(0, 2),
+        ), arrayOf<Factor>(Cumulative(
+            intArrayOf(0, 1, 2, 3), longArrayOf(1, 2, 2, 2), longArrayOf(1, 2, 1, 2), 2,
+            resourceVars = intArrayOf(5, 4, 5, 6),
+        )))
+
+        PropagationReasonOracle.assertReasonsImply(problem, "subwindow-hole") { state ->
+            state.excludeIntValue(6, 1)
         }
     }
 
