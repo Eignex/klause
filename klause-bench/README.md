@@ -2722,8 +2722,12 @@ not claim the best possible projected reason. All modes retain native Regular
 filtering. Exact transition Tables and equality reification define actual run
 states, including an absorbing rejecting state for missing transitions. Matching
 kernels share prefix coordinates independently of accepting sets. Corpus replay
-selects one Regular; the small controls share both chains. Admission caps length
-at 32, states at 64, alphabet at 16 and added transition cells at 32,768.
+selects one Regular; the small controls share both chains. Admission permits lengths
+3–32, states up to 64, alphabet up to 16 and at most 32,768 added transition/acceptance cells.
+At most four factors are selected from a model with at most 4,096 Boolean and
+4,096 integer columns and 8,192 factors. Unsupported snapshots retain their factor
+shape and an explicit codec decline; they supply no replay identity. Objective
+sources decline the satisfaction diagnostic.
 
 Each search has two seconds and 2,048 decisions. Reports separate definition
 construction, native work, decisions/conflicts, stored clauses, current-thread
@@ -3143,6 +3147,73 @@ before relation admission. The self-metered pass charges its own visits and uses
 unit-weight scheduling normalization. The scheduling failures in
 [8164](https://lab.eignex.com/jobs/8164) are errors and supply no UNKNOWN verdict
 or search evidence.
+
+### Reusable Regular prefix states
+
+Reject the bounded static state-chain selection for solver integration and online
+expansion. Exact predicates remain a diagnostic capability; the ordinary-source
+gate establishes no useful consumed state deduction.
+
+[8973](https://lab.eignex.com/jobs/8973) retains default-prepared modulo-three
+controls and two original Regular sources. The controls survive native preparation.
+Exact deterministic transition Tables, full state-equality reification and shared
+prefix identities preserve each source word's unique extension; missing transitions
+enter an absorbing rejecting state. Native Regular filtering stays installed.
+The [contract tests](src/test/kotlin/com/eignex/klause/bench/profile/RegularPrefixReplayTest.kt)
+cover total/partial transitions, shared prefixes, sibling undo and a retained state
+exclusion pruning a different prefix. The generated control's source and normally
+prepared IR are identical.
+
+The completed controls in [8989](https://lab.eignex.com/jobs/8989) and
+[8991](https://lab.eignex.com/jobs/8991) retain the costs as well as the mathematical
+capability. At prefix length three, native UNSAT search uses 365 work units and two
+conflicts; state branching uses 1,383 and one conflict. Learning with source decisions
+keeps native's two decisions/two conflicts and spends 1,961 units. At length six,
+learning keeps 20 decisions/22 conflicts while work rises from 6,227 to 21,144.
+Synthetic SAT points pass native original-model checking. These native refutations
+have no independently checked proof certificate. Both jobs subsequently fail an
+unqualified cross-session import replay; only single-owner retention is qualified.
+
+[8994](https://lab.eignex.com/jobs/8994) stops every ordinary-source arm at two
+seconds, so its different prefixes establish no efficiency comparison.
+[8999](https://lab.eignex.com/jobs/8999) resolves that ambiguity with 64 decisions,
+five seconds, and both original and reversed arm orders on Linux/amd64, Java
+25.0.4.1. Both prepared hashes match 8973. Each source selects its first Regular
+and midpoint boundary before measurement. No search reaches its deadline; every
+source-order decision trace matches with and without definitions, in both orders.
+Conservative complete-source-prefix reason controls also match each other.
+
+| Prepared source | Native work | Definitions with native learning |
+| --- | ---: | ---: |
+| BinaryPuzzle regular 020 | 20,484,609 | 20,576,410 |
+| NurseRostering roster 5-00-02 | 333,558 | 465,714 |
+
+Definition construction additionally records 6.1 ms/590,576 thread-allocated bytes
+and 1.3 ms/280,712 bytes respectively. State-Boolean clauses are absent; the 59/43
+stored clauses containing helper integer atoms have no recorded use. Store counts
+include generated atom constraints and establish no novel conflict. State branching
+spends 44/28 of its 64 decisions on helpers, changing source coverage; its lower
+work/conflict counts establish no reusable deduction or equal progress. Timing and
+allocation advantages change with arm order, so these JFR captures establish no
+throughput gain. Both original sources remain unresolved at the fixed cap.
+
+The historical MiniZinc Nonogram control is `hakank/nonogram/nonogram`, model hash
+`78ea8f2e801d`. [9000](https://lab.eignex.com/jobs/9000) confirms zero Regular factors
+before and after preparation: its 789 integer/974 Boolean columns encode run starts
+and arithmetic. Its model, solver-library and configuration hashes match retained
+[8071](https://lab.eignex.com/jobs/8071); the compiler version is MiniZinc 2.10.1,
+with platform-specific executable/standard-library identities retained separately.
+Earlier summaries' Regular label is corrected to MiniZinc. The table Nonogram
+already declares its automaton-state columns. The containing 8999 job fails later
+on a missing prepared `DifferenceSystem` codec; 9000 retains the factor shape and
+explicit snapshot decline without rewriting the model or adding a codec.
+
+The rejection applies to this selected static vocabulary. No production
+transformation, default policy,
+online namespace or cross-worker transport is admitted. Objective, weighted counting,
+enumeration, sampling, user-core and proof-export contracts remain outside this
+satisfaction diagnostic; exact auxiliary uniqueness alone does not qualify those
+public operations through preparation.
 
 ### Global and extensional scoring comparisons
 
@@ -3908,10 +3979,10 @@ Source hashes, runtime, options and non-solver dependency bytes match.
 | Eternity | 1839–1879 nodes, 20.12–20.13 s, unknown | 2000 nodes, 3.39–3.47 s, unknown |
 | WordDesign2 | 13–14 nodes, 20.12–20.15 s, unknown | 11–12 nodes, 20.12 s, unknown |
 | Table Nonogram | 348 nodes, 2.51–2.64 s, valid witness | 614 nodes, 1.39–1.41 s, valid witness |
-| Regular Nonogram | 398 nodes, 0.89–0.91 s, valid witness | 398 nodes, 0.89–0.91 s, valid witness |
+| MiniZinc Nonogram | 398 nodes, 0.89–0.91 s, valid witness | 398 nodes, 0.89–0.91 s, valid witness |
 
 Random-order Eternity preserves 5644 failures and depth 27 at 2000 nodes, with
-similar process times; random Table/Regular Nonograms preserve nodes and failures.
+similar process times; random Table/MiniZinc Nonograms preserve nodes and failures.
 Random WordDesign reaches 70–77 nodes instead of 67–68, with different failures.
 Support ordering changes trajectories: Eternity's depth reaches 37 instead of 19,
 while WordDesign reaches fewer nodes. WordSquare support ordering raises peak RSS
@@ -3938,7 +4009,7 @@ dependency identities match within each comparison.
 The full-pass prototype reaches six WordDesign nodes instead of 70–77; the
 changed-layer variant reaches 8–9 instead of 70–77. All remain unknown at
 20 seconds. Changed-layer peak RSS is 1620016–1632864 KiB instead of
-1191856–1203760 KiB. Table/Regular holdouts preserve nodes and failures, while
+1191856–1203760 KiB. Table/MiniZinc holdouts preserve nodes and failures, while
 WordSquare remains unknown. The prototype passes JVM/native historical-reason,
 cancellation and sparse-arc restoration controls, but its measured continuation
 cost does not justify replacing CSR. This rejects the tested bounded variant;
@@ -3964,7 +4035,7 @@ return; all 22 reported witnesses pass independent checks, with matching sources
 runtime, options and non-solver dependencies. WordSquare's 20-second tail remains
 20.87–20.97 s in both revisions. Eternity's 2001 reached-node control grows from
 3.50–3.55 to 3.54–3.68 s; the 2-second candidate reaches fewer nodes. Table Nonogram
-has different sliced paths and modest overhead; Regular preserves its work.
+has different sliced paths and modest overhead; MiniZinc preserves its work.
 These controls establish neither a deadline-tail fix nor a throughput gain for
 publication alone. Atomic hole-history and atom maintenance remain separate work.
 
@@ -3977,7 +4048,7 @@ unknown with two nodes at 20 seconds: elapsed ranges are 21.02–21.15 s for the
 parent and 20.58–21.19 s for the candidate, establishing no consistent tail gain.
 Eternity reports 2001 nodes with different failure paths and 3.75–3.85 s instead
 of 3.53–3.54 s. Table Nonogram reaches 814 instead of 922 nodes but takes
-1.98–2.07 s instead of 1.86–1.90 s; both 2-second arms remain unknown. Regular
+1.98–2.07 s instead of 1.86–1.90 s; both 2-second arms remain unknown. MiniZinc
 keeps similar timing with slightly different sliced paths. Native atom visits
 also change the work charged to slices. These are bounded-execution and authority
 changes with measured cost, not a throughput or hard-source recovery gain.
@@ -3995,7 +4066,7 @@ at 60 s. Peak RSS rises from 429344–442176 KiB in the completed controls to
 1307344–1347968 KiB on the longer reached conflict/learning trajectory. The index
 bounds its own primitive buffers, not whole-search retained memory. Eternity's
 2000-node median time changes from 3.296 to 2.992 s with different work and reasons.
-Table Nonogram drops from 613 to 231 nodes; Regular keeps identical work.
+Table Nonogram drops from 613 to 231 nodes; MiniZinc keeps identical work.
 WordDesign remains unknown at 39–41 nodes, with elapsed ranges of 21.73–21.76 s
 for the scan and 21.77–23.44 s for the index arm. These are mechanism and trajectory
 observations, not a uniform speedup or a source-recovery claim.
@@ -4024,8 +4095,8 @@ paths differ, so this does not isolate explanation time. Recorded peak RSS range
 are 235872–273120 KiB and 236784–237920 KiB respectively.
 
 The table Nonogram control takes 613 rather than 375 nodes, with median process
-time 1.258 s rather than 1.087 s. All twelve table/Regular witnesses pass original
-source checking. Regular and BlockedQueens work match; deadline-limited MDD runs
+time 1.258 s rather than 1.087 s. All twelve table/MiniZinc witnesses pass original
+source checking. MiniZinc and BlockedQueens work match; deadline-limited MDD runs
 reach 39–41 nodes and remain unknown. These controls support the focused reason
 change with a search tradeoff, not a general speedup. The measured Table source
 is unchanged by its rebase onto the MDD contract. See
@@ -4043,7 +4114,7 @@ versus 481840–486352 KiB with the index. This is a lookup improvement with ext
 memory, and cancellation still substantially overruns the requested deadline.
 
 Eternity's median process time changes from 6.150 to 5.906 s with identical
-2000-node work and unknown verdicts. Table Nonogram and Regular medians remain
+2000-node work and unknown verdicts. Table Nonogram and MiniZinc medians remain
 near 2.26 and 1.12 s with identical work; all twelve witnesses pass original-source
 checking. The comparison establishes neither a general speedup nor a solve gain.
 The indexed history and undo sources are unchanged by rebase onto main.
@@ -4058,7 +4129,7 @@ All remain unknown; the 20-second deadline still overruns by 7.9–10.9 s with
 batching, so domain reconstruction does not explain the entire overrun.
 
 Eternity retains its search counts with mixed timings (median 5.909/5.959 s).
-Table Nonogram and Regular retain identical work and nearly equal medians
+Table Nonogram and MiniZinc retain identical work and nearly equal medians
 (2.320/2.319 s and 1.110/1.112 s); all twelve witnesses pass original-source
 checking. These controls support the focused pruning change without a general
 solve-speed claim. The measured Table and mutation sources survive rebase unchanged.

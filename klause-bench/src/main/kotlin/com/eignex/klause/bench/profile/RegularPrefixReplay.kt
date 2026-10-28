@@ -47,18 +47,21 @@ internal data class RegularPrefixDefinitions(val problem: Problem, val states: I
 
 internal fun regularPrefixDefinitions(source: Problem): RegularPrefixDefinitions {
     require(source.numRealVars == 0)
+    require(source.numIntVars <= 4096 && source.numBoolVars <= 4096 && source.factors.size <= 8192)
     val selected = source.factors.filterIsInstance<Regular>().let {
         if (source.numIntVars <= 8) it else it.take(1)
     }
-    require(selected.isNotEmpty())
+    require(selected.size in 1..4)
     val domains = (0 until source.numIntVars).map { requireNotNull(source.intDomainOrNull(it)) }.toMutableList()
     val factors = source.factors.toMutableList()
     val prefixes = HashMap<String, Int>()
     var cells = 0
     var chosen = IntArray(0)
     for (factor in selected) {
-        require(factor.seq.size <= 32 && factor.numStates <= 64 && factor.alphabetSize <= 16)
+        require(factor.seq.size in 3..32 && factor.numStates <= 64 && factor.alphabetSize <= 16)
+        require(factor.transitions.all { it in 0L..factor.numStates.toLong() })
         require(factor.seq.toSet().size == factor.seq.size)
+        require(factor.accepting.size in 1..64 && factor.accepting.all { it in 1..factor.numStates })
         require(factor.seq.all { domains[it].min >= 1 && domains[it].max <= factor.alphabetSize })
         val kernel = "${factor.numStates}/${factor.alphabetSize}/${factor.q0}/${factor.transitions.joinToString(",")}:"
         val chain = IntArray(factor.seq.size + 1)
@@ -95,6 +98,8 @@ internal fun regularPrefixDefinitions(source: Problem): RegularPrefixDefinitions
                 }
             }
         }
+        cells += factor.accepting.size
+        require(cells <= 32_768)
         factors.add(Table(intArrayOf(chain.last()), factor.accepting.map(Int::toLong).toLongArray()))
         if (chain.size > chosen.size) chosen = chain
     }
