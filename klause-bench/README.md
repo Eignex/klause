@@ -2635,6 +2635,15 @@ Raw snapshots belong in `klause-evidence/campaigns/`, outside Git. An opt-in
 `ConditionalComponentTrace.run` consumer receives `ResidualProbeContext`, retaining
 the in-process reconstruction route for separately bounded policy experiments.
 
+`bench.profile.ScopedComponentProfile` runs bounded lab-only cutoff and one-variable
+separator controls (`millis=2000 seed=3`). Child satisfaction queries enforce an exact
+strict integral PB budget. A refutation raises a scoped lower bound; a feasible point
+supplies only an upper bound until a matching lower bound is checked. Child budgets
+subtract fixed/isolated costs and sibling lower bounds. Both separator polarities
+share one deadline, decision ledger, visit cap and cumulative modeled storage cap.
+Records separate construction, checking, search and structural costs. These controls
+do not admit production traversal, caching or source-family policies.
+
 ### Table profiling
 
 `bench.profile.ExtensionalCompositionProfile` accepts `suite=ID problem=NAME

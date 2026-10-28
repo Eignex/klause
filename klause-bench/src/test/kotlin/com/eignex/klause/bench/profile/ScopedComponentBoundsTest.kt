@@ -63,9 +63,10 @@ class ScopedComponentBoundsTest {
     fun `refutation should reject a different condition or restriction`() {
         val original = scope(0, conditions = mapOf(7 to true))
         val child = ComponentCostBounds.opening(original)
-        val altered = listOf(original.copy(conditions = mapOf(7 to false)),
-            original.copy(clauses = emptyList()), original.copy(source = "another-source"),
-            original.copy(variables = listOf(1)), original.copy(weights = listOf(2L)))
+        val altered = listOf(scope(0, conditions = mapOf(7 to false)),
+            ComponentCostScope("source", original.conditions, listOf(0), emptyList(), listOf(1L)),
+            ComponentCostScope("another-source", original.conditions, listOf(0), original.clauses, listOf(1L)),
+            scope(1, conditions = original.conditions), scope(0, 2L, original.conditions))
 
         for (scope in altered) assertFailsWith<IllegalArgumentException> {
             child.refutedBelow(scope, BigInteger.ONE)
@@ -80,6 +81,22 @@ class ScopedComponentBoundsTest {
         val composition = ScopedComponentBounds(BigInteger.ZERO, listOf(right))
 
         assertFailsWith<IllegalArgumentException> { composition.floor(children) }
+    }
+
+    @Test
+    fun `captured scope should survive mutation of its input buffers`() {
+        val conditions = mutableMapOf(7 to true)
+        val literals = mutableListOf(0)
+        val weights = mutableListOf(1L)
+        val scope = ComponentCostScope("source", conditions, listOf(0), listOf(literals), weights)
+
+        conditions[7] = false
+        literals[0] = 1
+        weights[0] = 9L
+
+        assertEquals(mapOf(7 to true), scope.conditions)
+        assertTrue(scope.accepts(listOf(true)))
+        assertEquals(BigInteger.ONE, scope.cost(listOf(true)))
     }
 
     @Test
