@@ -1,6 +1,8 @@
 package com.eignex.klause.solver.evidence
 
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.lp.optimization.LinearPinnedRefutation
+import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -105,6 +107,21 @@ class SourceIntegerAggregateSplitTest {
     fun `cancelled aggregate coverage should supply no refutation`() {
         val result = SourceEvidenceVerifier(source).verify(
             SourceEvidence(scope, SourceClaim.Refutation, proof()), Cancellation { true })
+
+        assertIs<SourceEvidenceCheck.Unavailable>(result)
+    }
+
+    @Test
+    fun `aggregate semantic children should debit the containing proof allowance`() {
+        val context = source.withLinearAuthority()
+        val derivation = SourceIntegerAggregateSplit(below,
+            LinearPinnedRefutation(child("lower", below)), LinearPinnedRefutation(child("upper", above)))
+        val evidence = SourceEvidence(scope, SourceClaim.Refutation, derivation)
+        var polls = 0
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(context).verify(evidence, Cancellation { polls++; false }))
+
+        val result = SourceEvidenceVerifier(context, maximumSteps = polls - 1).verify(evidence)
 
         assertIs<SourceEvidenceCheck.Unavailable>(result)
     }
