@@ -1317,7 +1317,8 @@ private fun LpEngine.sparseRootLpRelaxationBound(
     relaxer: CpToLpRelaxation,
     cancellation: Cancellation,
 ): Double {
-    val relaxation = nodeRelaxation(relaxer, PropagationSession(problem, cancellation)) ?: return Double.NaN
+    val root = PropagationSession(problem, cancellation)
+    val relaxation = nodeRelaxation(relaxer, root) ?: return Double.NaN
     if (relaxation.model.n == 0) return Double.NaN
     val attempt = solveNode(relaxation.model, null, cancellation) ?: return Double.NaN
     return try {
@@ -1331,6 +1332,8 @@ private fun LpEngine.sparseRootLpRelaxationBound(
         val metrics = if (nodeUsesTrail) propagator.lastMetrics.copy(preparationOps = 0L)
             else attempt.first.lastMetrics
         observeRootSolve(attempt.first, metrics)
+        val retained = cpAdapter.retainTrialRoot(root)
+        sink.lp.sparseTrial = sink.lp.sparseTrial + ("RootOwnerRetained" to if (retained) 1L else 0L)
     }
 }
 

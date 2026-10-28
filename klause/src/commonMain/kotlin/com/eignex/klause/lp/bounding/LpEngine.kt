@@ -1112,7 +1112,8 @@ internal class LpEngine(
     internal fun preparation(): Iterator<Unit> = sequence {
         params.lpConfig?.let { config ->
             val plan = with(LpAutoConfig) {
-                prepare(problem, config, requestedPlan, objective, params.cancellation) { admission ->
+                prepare(problem, config, requestedPlan, objective, params.cancellation,
+                    sparseTrialAllowed = projections?.builtInRelaxation != false) { admission ->
                     elementIndexes = admission.elementIndexes
                     admission.sparseTrial?.let { trial ->
                         sparseTrialActive = trial.admitted

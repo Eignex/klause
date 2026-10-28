@@ -160,6 +160,7 @@ object LpAutoConfig {
         base: LpPlan,
         objective: LinearObjective? = null,
         cancellation: Cancellation = Cancellation.Never,
+        sparseTrialAllowed: Boolean = true,
         observe: ((LpAdmission) -> Unit)? = null,
     ): LpPlan {
         var visits = 0
@@ -400,7 +401,8 @@ object LpAutoConfig {
         val sparse = if (config.resolved(LpTechnique.SPARSE_TRIAL) && !base.bounding &&
             structApplicable && config.resolved(LpTechnique.BOUNDING)
         ) {
-            prepareSparseLpAdmission(problem, objective, cancellation)
+            if (sparseTrialAllowed) prepareSparseLpAdmission(problem, objective, cancellation)
+            else SparseLpAdmission(mapOf("DeclineProjection" to 1L))
         } else null
         if (sparse?.admitted == true) {
             plan = LpPlan(bounding = true, boundMaxDepth = 0, learn = true,
