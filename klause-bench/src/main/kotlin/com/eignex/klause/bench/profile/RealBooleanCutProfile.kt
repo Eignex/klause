@@ -73,7 +73,8 @@ internal object RealBooleanCutProfile {
                         val allocated = bean.getThreadAllocatedBytes(thread)
                         val start = System.nanoTime()
                         val replays = conditions.map { condition ->
-                            replay(context.atScope(context.scope.copy(condition = condition)), arm == "composed")
+                            replay(context.atScope(context.scope.copy(condition = condition)), arm == "composed",
+                                conditions.size)
                         }
                         val elapsed = System.nanoTime() - start
                         val bytes = bean.getThreadAllocatedBytes(thread) - allocated
@@ -131,7 +132,7 @@ internal object RealBooleanCutProfile {
             objective = SourceObjective("difference", ObjectiveSense.MINIMIZE)), objective))
     }
 
-    private fun replay(source: SourceProofContext, composed: Boolean): Any {
+    private fun replay(source: SourceProofContext, composed: Boolean, alternatives: Int): Any {
         val stop = Cancellation.after(3.seconds)
         val captureType = Class.forName(PREFIX + "LinearAuthorityCapture")
         val capture = captureType.declaredConstructors.single { it.parameterCount == 4 }
@@ -141,7 +142,8 @@ internal object RealBooleanCutProfile {
         val query = (field(capture, "retained") as List<*>).single()
         val type = Class.forName(PREFIX + "LinearAuthorityReplay")
         return type.declaredMethods.single { it.name == "activeRows" }
-            .invoke(type.getField("INSTANCE").get(null), query, 20_000_000L, 67_108_864L, stop, composed)
+            .invoke(type.getField("INSTANCE").get(null), query, 20_000_000L / alternatives,
+                67_108_864L / alternatives, stop, composed)
     }
 
     private fun inspect(source: SourceProofContext, file: File) {
@@ -160,7 +162,9 @@ internal object RealBooleanCutProfile {
         val quarter = BigFraction.ofLong(4).reciprocal()
         val common = consequences.single { it.claim == SourceClaim.Consequence(
             SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.MINUS_ONE), quarter)) }
-        val bound = SourceEvidence(source.scope, SourceClaim.Bound(quarter.negated()), SourceDerivation.Import(common))
+        val bound = SourceEvidence(source.scope, SourceClaim.Bound(quarter.negated()),
+            SourceDerivation.Combination(listOf(SourceDerivation.Combination.Term(BigFraction.ONE,
+                SourceDerivation.Import(common)))))
         check(SourceEvidenceVerifier(source).verify(bound) == SourceEvidenceCheck.Checked)
         file.writeText(buildJsonObject {
             put("complete", field(result, "complete") as Boolean)
