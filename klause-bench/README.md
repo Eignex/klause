@@ -2439,8 +2439,15 @@ follows a free one), and every other factor, including clauses with atom literal
 coordinates. The objective is treated as additive, so splits are an upper bound for a
 decomposition that must also respect an incumbent cutoff. A component's key hashes each
 live factor's residual in factor order; a key seen again after an intervening retraction,
-conflict or restart counts as a re-encountered child obligation. Every eighth sample re-joins with
-learned clauses, with and without permanent incumbent-scoped entries. Up to `probes` split
+conflict or restart counts as a re-encountered child obligation. Every eighth sample
+reports source-only and all-enforcing incidence, including full learned PB support,
+weights, degree and established values. Discharged restrictions add no incidence.
+The observation admits at most one million terms and polls the containing trace deadline;
+unsupported learned kinds, unnameable atoms or interruption withhold completeness.
+Permanent marks retention only; logical scope and cutoff provenance are unavailable
+from that mark. Entry counters count observations, including repeat observations of
+the same constraint, and store positions apply only to that observation.
+Up to `probes` split
 nodes keep their residual clauses; after the search each component and the joint residual
 are solved as fresh `satOptimized` models, and the joint residual twice more, with
 `LpConfig(LpEmphasis.DEFAULT)` as the ordinary-bounds control and with `objectiveGuidedValues`
