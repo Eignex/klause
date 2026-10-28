@@ -51,15 +51,18 @@ internal class NonlinearIntegerResidues(
         if (!multivariate) false else {
             reserve(nodes.size * 3 + nodes.sumOf { it.args.size } + equations.size * 2 + variables.size)
             var refuted = false
-            for (modulus in MODULI) {
-                step()
-                if (!hasSupport(modulus)) {
-                    // A final containing poll is required before publishing a completed negative fact.
+            for (imagesOnly in listOf(true, false)) {
+                for (modulus in MODULI) {
                     step()
-                    stats = stats.copy(refuted = stats.refuted + 1)
-                    refuted = true
-                    break
+                    if (!hasSupport(modulus, imagesOnly)) {
+                        // A final containing poll is required before publishing a completed negative fact.
+                        step()
+                        stats = stats.copy(refuted = stats.refuted + 1)
+                        refuted = true
+                        break
+                    }
                 }
+                if (refuted) break
             }
             refuted
         }
@@ -198,7 +201,7 @@ internal class NonlinearIntegerResidues(
         return result
     }
 
-    private fun hasSupport(modulus: Int): Boolean {
+    private fun hasSupport(modulus: Int, imagesOnly: Boolean): Boolean {
         val bigModulus = bigIntOf(modulus)
         fun residue(value: BigInt): Int {
             step()
@@ -217,6 +220,7 @@ internal class NonlinearIntegerResidues(
             val denominator = commonDenominator(nodes[left].denominator, nodes[right].denominator)
             residue(denominator / nodes[left].denominator) to residue(denominator / nodes[right].denominator)
         }
+        if (imagesOnly) return imagesOverlap(modulus, constants, scales, equalityScales)
         val tuple = IntArray(variables.size)
         val values = IntArray(nodes.size)
         while (true) {
@@ -261,6 +265,69 @@ internal class NonlinearIntegerResidues(
                 return false
             }
         }
+    }
+
+    private fun imagesOverlap(
+        modulus: Int,
+        constants: IntArray,
+        scales: List<List<Int>>,
+        equalityScales: List<Pair<Int, Int>>,
+    ): Boolean {
+        reserve(nodes.size)
+        val images = IntArray(nodes.size)
+        for ((id, node) in nodes.withIndex()) {
+            step()
+            images[id] = when (val expression = node.expression) {
+                is PolynomialExpression.Constant -> 1 shl constants[id]
+                is PolynomialExpression.Variable -> (1 shl modulus) - 1
+                is PolynomialExpression.Power -> mapImage(images[node.args.single()], modulus) {
+                    modularPower(it, expression.exponent, modulus)
+                }
+                is PolynomialExpression.Sum -> node.args.indices.fold(1) { image, index ->
+                    combineImages(image, images[node.args[index]], modulus) { a, b ->
+                        (a + b * scales[id][index]) % modulus
+                    }
+                }
+                is PolynomialExpression.Product -> node.args.fold(2) { image, child ->
+                    combineImages(image, images[child], modulus) { a, b -> a * b % modulus }
+                }
+            }
+        }
+        for (index in equations.indices) {
+            step()
+            val (left, right) = equations[index]
+            val (a, b) = equalityScales[index]
+            val leftImage = mapImage(images[left], modulus) { it * a % modulus }
+            val rightImage = mapImage(images[right], modulus) { it * b % modulus }
+            if (leftImage and rightImage == 0) {
+                stats = stats.copy(rings = stats.rings + 1)
+                return false
+            }
+        }
+        return true
+    }
+
+    private inline fun mapImage(image: Int, modulus: Int, transform: (Int) -> Int): Int {
+        var result = 0
+        for (value in 0 until modulus) {
+            step()
+            if (image and (1 shl value) != 0) result = result or (1 shl transform(value))
+        }
+        return result
+    }
+
+    // Independent operand images overapproximate aliases; only disjoint images carry proof authority.
+    private inline fun combineImages(left: Int, right: Int, modulus: Int, combine: (Int, Int) -> Int): Int {
+        var result = 0
+        for (a in 0 until modulus) {
+            step()
+            if (left and (1 shl a) == 0) continue
+            for (b in 0 until modulus) {
+                step()
+                if (right and (1 shl b) != 0) result = result or (1 shl combine(a, b))
+            }
+        }
+        return result
     }
 
     private fun modularPower(value: Int, exponent: Int, modulus: Int): Int {

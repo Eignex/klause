@@ -40,7 +40,7 @@ class NonlinearIntegerResiduesTest {
             assertIs<QfNraResult.Unsatisfiable>(execution.result, assertion)
             assertEquals(1L, execution.stats.residues.refuted, assertion)
             assertEquals(0L, execution.stats.checks, assertion)
-            assertTrue(execution.stats.residues.tuples > 0, assertion)
+            assertTrue(execution.stats.residues.work > 0, assertion)
         }
     }
 
@@ -99,11 +99,9 @@ class NonlinearIntegerResiduesTest {
     }
 
     @Test
-    fun `denominator growth and incomplete enumeration should decline without proof`() {
+    fun `denominator growth should decline without proof`() {
         for (assertion in listOf(
             "(assert (= (+ (* (^ (/ 1 2) 10000) x x) (* y y)) 3))",
-            "(assert (= (+ (^ x 2147483646) (^ y 2147483646) " +
-                "(^ z 2147483646) (^ w 2147483646)) 7))",
         )) {
             val residues = NonlinearIntegerResidues(source(assertion), PolynomialArithmetic(), PolynomialLimits())
 
@@ -111,6 +109,58 @@ class NonlinearIntegerResiduesTest {
             assertEquals(0L, residues.stats.refuted)
             assertEquals(1L, residues.stats.declined)
         }
+    }
+
+    @Test
+    fun `compositional images should refute large powers before enumerating tuples`() {
+        val source = source("(assert (= (+ (^ x 2147483646) (^ y 2147483646) " +
+            "(^ z 2147483646) (^ w 2147483646)) 7))")
+
+        val execution = solveNonlinearIntegers(source, NonlinearIntegerParams(residueRefutation = true))
+
+        assertIs<QfNraResult.Unsatisfiable>(execution.result)
+        assertEquals(1L, execution.stats.residues.refuted)
+        assertEquals(0L, execution.stats.residues.tuples)
+        assertEquals(0L, execution.stats.checks)
+        assertEquals(0L, execution.stats.residues.declined)
+    }
+
+    @Test
+    fun `overlapping images should preserve realizable sums aliases and rational scales`() {
+        for (assertion in listOf(
+            "(assert (= (+ (^ x 2147483646) (^ y 2147483646) " +
+                "(^ z 2147483646) (^ w 2147483646)) 3))",
+            "(assert (= (+ (^ x 2147483646) (^ y 2147483646) " +
+                "(^ z 2147483646) (^ w 2147483646)) 4))",
+            "(assert (= (+ (^ x 2) (^ x 2) (^ y 2)) 3))",
+            "(assert (= (+ (* (/ 1 2) (^ x 2)) (* (/ 1 3) (^ y 2))) (/ 5 6)))",
+            "(assert (= (+ (^ x 2) (- (^ x 2)) (^ y 2)) 1))",
+        )) {
+            val residues = NonlinearIntegerResidues(source(assertion), PolynomialArithmetic(), PolynomialLimits())
+
+            assertFalse(residues.refutes(), assertion)
+            assertEquals(0L, residues.stats.refuted, assertion)
+        }
+    }
+
+    @Test
+    fun `scaled disjoint images should preserve exact denominator edge factors`() {
+        val residues = NonlinearIntegerResidues(source(
+            "(assert (= (+ (* (/ 1 2) (^ x 2)) (* (/ 1 2) (^ y 2))) (/ 3 2)))",
+        ), PolynomialArithmetic(), PolynomialLimits())
+
+        assertTrue(residues.refutes())
+        assertEquals(0L, residues.stats.tuples)
+    }
+
+    @Test
+    fun `overlapping individual equations should retain shared tuple refutations`() {
+        val residues = NonlinearIntegerResidues(source(
+            "(assert (= (* x y) 2)) (assert (= (+ x y) 4))",
+        ), PolynomialArithmetic(), PolynomialLimits())
+
+        assertTrue(residues.refutes())
+        assertTrue(residues.stats.tuples > 0)
     }
 
     @Test
