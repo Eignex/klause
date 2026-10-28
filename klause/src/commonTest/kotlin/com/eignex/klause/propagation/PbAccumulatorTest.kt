@@ -7,6 +7,12 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class PbAccumulatorTest {
+    @Test
+    fun `an overflowing activity should decline before saturation`() {
+        val a = acc { loadPb(longArrayOf(Long.MAX_VALUE, 1), intArrayOf(Lit.make(0, true), Lit.make(1, true)), 1) }
+
+        assertFalse(a.hasSafeActivity())
+    }
 
     private fun acc(block: PbAccumulator.() -> Unit) = PbAccumulator().apply(block)
 
