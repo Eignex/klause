@@ -344,6 +344,8 @@ reason scans.
 
 Native CP and shared first-UIP outcomes are reported separately. Non-asserting counts
 identify chronological fallback, while zero does not establish explanation coverage.
+Native learned-constraint counts include integer rows; their terms do not count as
+Boolean learned literals.
 Missing metrics stay absent, including root theory results that never enter traversal.
 `smtCompleteSearch*` stage observations overlap and cannot be summed as a work total.
 [SearchStats](../klause/src/commonMain/kotlin/com/eignex/klause/solver/result/SearchStats.kt)
