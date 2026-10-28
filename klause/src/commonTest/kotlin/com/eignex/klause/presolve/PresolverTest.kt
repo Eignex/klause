@@ -169,7 +169,8 @@ class PresolverTest {
             else Presolver.run(problem.bake(), config).problem
 
             assertTrue(reduced.factors.filterIsInstance<Linear>().any {
-                it.vars.contentEquals(intArrayOf(3)) && it.op == LinearOp.LE && it.coeff(0) == 1L && it.bound == 2L
+                it.vars.contentEquals(intArrayOf(3)) &&
+                    it.op == LinearOp.LE && it.coeff(0) == 1L && it.bound == 2L
             })
         }
     }
@@ -194,7 +195,8 @@ class PresolverTest {
 
             assertTrue((reduced as? BakedProblem)?.rootIntDomain(3)?.max == 2L ||
                 reduced.factors.filterIsInstance<Linear>().any {
-                it.vars.contentEquals(intArrayOf(3)) && it.op == LinearOp.LE && it.coeff(0) == 1L && it.bound == 2L
+                it.vars.contentEquals(intArrayOf(3)) &&
+                    it.op == LinearOp.LE && it.coeff(0) == 1L && it.bound == 2L
             })
             assertEquals(
                 listOf(PresolveInvocationOutcome.COMPLETE_MISS, PresolveInvocationOutcome.CHANGED),

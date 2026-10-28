@@ -195,7 +195,7 @@ object Presolver {
                     val delta = pass.applySource(current, ctx.withCancellation(token))
                     if (delta.infeasible) return@observeRoundPass PassOutcome.INFEASIBLE
                     if (delta.isEmpty) {
-                        if (pass.tracksLinearInputs) inputRevision(pass)
+                        trackAfterCompletedMiss(pass, invocation) { inputRevision(pass) }
                         return@observeRoundPass PassOutcome.UNCHANGED
                     }
                     invocation.recordDelta(current.factors, delta.droppedIndices, delta.addedFactors)
@@ -243,6 +243,17 @@ object Presolver {
             SourceRebuilds.compose(host.rebuilds),
             ctx.linearObjective,
         )
+    }
+
+    private fun trackAfterCompletedMiss(
+        pass: PresolvePass,
+        invocation: PresolveInvocation?,
+        revision: () -> Long?,
+    ) {
+        if (!pass.tracksLinearInputs || invocation?.interrupted == true) return
+        revision()
+        // Dependency tracking follows the completed kernel; its stop cannot revoke that completion.
+        if (invocation != null) invocation.interrupted = false
     }
 
     private fun problemPasses(
@@ -357,7 +368,7 @@ object Presolver {
                     val delta = pass.applyFinite(current, ctx.withCancellation(token))
                     if (delta.infeasible) return@observeRoundPass PassOutcome.INFEASIBLE
                     if (delta.isEmpty) {
-                        if (pass.tracksLinearInputs) inputRevision(pass)
+                        trackAfterCompletedMiss(pass, invocation) { inputRevision(pass) }
                         return@observeRoundPass PassOutcome.UNCHANGED
                     }
                     invocation.recordDelta(current.factors, delta.droppedIndices, delta.addedFactors)
@@ -493,7 +504,7 @@ object Presolver {
                     val delta = pass.applyFinite(input, base.withCancellation(token))
                     if (delta.infeasible) return@observeRoundPass PassOutcome.INFEASIBLE
                     if (delta.isEmpty) {
-                        if (pass.tracksLinearInputs) inputRevision(pass)
+                        trackAfterCompletedMiss(pass, invocation) { inputRevision(pass) }
                         return@observeRoundPass PassOutcome.UNCHANGED
                     }
                     invocation.recordDelta(input.factors, delta.droppedIndices, delta.addedFactors)
