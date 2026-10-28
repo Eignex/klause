@@ -1,0 +1,26 @@
+<instance format="XCSP3" type="COP">
+  <variables>
+    <array id="x" size="[4]"> 0..1 </array>
+    <array id="c" size="[6]"> 0..1 </array>
+  </variables>
+  <constraints>
+    <group>
+      <extension>
+        <list> %0 %1 %2 </list>
+        <supports> (0,0,1)(0,1,0)(1,0,0)(1,1,1) </supports>
+      </extension>
+      <args> x[0] x[1] c[0] </args>
+      <args> x[0] x[2] c[1] </args>
+      <args> x[0] x[3] c[2] </args>
+      <args> x[1] x[2] c[3] </args>
+      <args> x[1] x[3] c[4] </args>
+      <args> x[2] x[3] c[5] </args>
+    </group>
+  </constraints>
+  <objectives>
+    <minimize type="sum">
+      <list> x[] c[] </list>
+      <coeffs> 1 2 4 8 64 65 66 67 68 69 </coeffs>
+    </minimize>
+  </objectives>
+</instance>
