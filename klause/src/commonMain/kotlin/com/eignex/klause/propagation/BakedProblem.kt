@@ -230,6 +230,34 @@ class BakedProblem private constructor(
     )
 
     internal companion object {
+        fun fromAugmentedRoot(base: BakedProblem, booleans: Int, factors: Array<Factor>): BakedProblem = BakedProblem(
+            numBoolVars = booleans,
+            numIntVars = base.numIntVars,
+            foldedIntDomains = base.rootIntDomainsInPlace,
+            alreadyFolded = true,
+            factors = factors,
+            seedDeductions = PropagationResult.Implied.EMPTY,
+            impliedFactorMask = null,
+            hasSymmetryBreaking = base.hasSymmetryBreaking,
+            numRealVars = base.numRealVars,
+            realLower = base.realLower,
+            realUpper = base.realUpper,
+            openIntLo = null,
+            openIntHi = null,
+            packedOpenIntLo = base.intBounds.openLowerBits,
+            packedOpenIntHi = base.intBounds.openUpperBits,
+            modelBounds = null,
+            cancellation = base.cancellation,
+            settings = base.settings,
+            projectionProviders = base.projectionProviders,
+            projectionSelection = base.factorProjections?.let { captured ->
+                { view -> captured.withAppendedFactors(view) }
+            },
+            semantics = base.semantics,
+            // Source deductions remain valid after strengthening. The traversal owns the augmented fixpoint.
+            trustedRootDeductions = base.rootDeductions,
+        )
+
         // Only for presolve's established root state: domains carry integer deductions and the result
         // carries captured Boolean pins or a root conflict, including after their defining factors drop.
         fun fromPresolvedRoot(

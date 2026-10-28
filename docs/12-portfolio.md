@@ -501,6 +501,14 @@ and relaxes the core with a reified cardinality, replacing its violation count `
 `1 + sum(k = 2..n, s >= k)`; only the first unspent threshold of each count is
 materialized. Weights and the bound use arbitrary-precision integers.
 
+Objective terms, residual-core updates, maximum-weight scans, core projection and
+query-pin selection retain private cursors across slices. A completed pin set stays
+with its query model across interrupted openings; resuming does not repeat its
+threshold scan. Preparation visits and source-verification propagation spend the
+same cumulative worker allowance as query traversal. Augmented queries retain the
+source's established root domains, deductions and captured projections; their
+additional constraints propagate in the query session.
+
 Internal core refinement is default-disabled. Seed-proof projection uses the
 [historical reasons](09-learning.md#explanation-lifetime) of the existing query,
 without another propagation session or solve; unsupported seed conflicts and tree
