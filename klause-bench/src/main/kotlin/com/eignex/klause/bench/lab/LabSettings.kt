@@ -32,6 +32,9 @@ internal data class LabSettings(val parameters: Map<String, String>) {
         for (key in listOf("max", "per-family")) parameters[key]?.let { require(it.toInt() > 0) }
         parameters["seed"]?.toLong()
         parameters.filterKeys { it.startsWith("param.") }.forEach { (key, value) ->
+            require(key !in setOf("param.source-validation", "param.source-validation-gzip")) {
+                "$key is a lab control; use bench.sourceValidation outside bench.request.parameters"
+            }
             require(key.removePrefix("param.").matches(Regex("[A-Za-z][A-Za-z0-9_.-]*")) && value.isNotBlank())
             require(value.none(Char::isISOControl))
         }

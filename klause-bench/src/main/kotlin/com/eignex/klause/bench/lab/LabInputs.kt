@@ -86,8 +86,7 @@ internal object LabInputs {
     private fun input(path: Path, role: String): BenchInput {
         val actual = path.toRealPath()
         val source = CorpusFetcher.workspaceRoot().toPath().toRealPath()
-        val corpus = CorpusFetcher.cacheRoot.toPath().toAbsolutePath().normalize()
-        val root = if (actual.startsWith(source)) source else corpus
+        val root = if (actual.startsWith(source)) source else CorpusFetcher.cacheRoot.toPath().toRealPath()
         require(actual.startsWith(root)) { "Input outside source and corpus: $actual" }
         return BenchInput(
             root.relativize(actual).toString().replace('\\', '/'),
