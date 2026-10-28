@@ -7471,3 +7471,21 @@ both routes. Job 8861 was cancelled during preparation after that finding and
 executed no cases. Raw records, source points, hashes, JFR, resource receipts,
 CI reports and the cancelled attempt are retained outside Git under
 `klause-evidence/campaigns/finite-conflict-learning-3727-3728/` beside the primary checkout.
+
+### Guarded integer conflict rows
+
+`GuardedIntegerRowProfile` keeps the finite reified source `r iff 2*x+y<=z`
+(and its negative-indicator equivalent), with mandatory `2*x-y<=0` and domains
+`x=0..6`, `y=0..12`, `z=0..24`. Clause and opt-in row arms acquire a conflict at
+`guard,z<=7,x>=2`, then retract the guard and reuse at `z<=11` and `15`.
+The row must own the sibling bound reason; false guards retain a feasible region.
+One warmup per configuration precedes one measured lifecycle. Native point rechecks
+are separate from independent source-witness or proof verification.
+
+Each lifecycle records construction, acquisition, cumulative native work, constraints,
+current-thread allocation, total elapsed time and explicit store disposal. Cumulative
+checkpoints overlap and must not be summed. Conditioned-root controls capture ordinary
+solution-set-preserving preparation and the existing exact-certified LP relaxation
+with objective `-x`, a ten-second containing deadline and 200,000 floating work units.
+They retain prepared factor/domain shapes and establish only conditional authority.
+These instrumented controls do not qualify defaults or establish whole-CLI throughput.
