@@ -9194,3 +9194,50 @@ Linux/amd64 Java 25.0.4.1 with a one-CPU, 4608-MiB execution ceiling. Checks are
 native original lowered-source checks, without independent witness or proof
 certification. No production best tracking, lifecycle state or solution-set
 operation changes.
+
+### Feasible assignment-feature penalties
+
+The bounded assignment-feature proposal in [#3816](https://github.com/Eignex/klause/pull/3816)
+is rejected for adoption. Its [experimental source](https://github.com/Eignex/klause/commit/84f9e8f64a02c1632e1b8a33003e67c43714a7b5)
+uses private source/value counts, unit feature costs and maximal present utility
+`1/(1+p)`. Monotone and sixteen-update halving modes retain memory across slices
+and assignment restarts, with at most 4,096 entries and eight updates per restart.
+Complete probes preserve pins, definitions and rollback; canonical objectives,
+source checks, candidate generation and proof authority remain separate.
+Thirteen mechanism regressions pass JVM and Native CI; JVM total is 51 ms and the
+longest test is 19 ms. No local builds or solver workloads were run.
+
+[9102](https://lab.eignex.com/jobs/9102) executes the four-choice Element-cost
+control: guided pair descent reaches 19 from 20, while canonical strict descent
+stays at 20. Existing non-monotone acceptance and reheating also reach 19.
+The closed assignment-cycle control admits no pair transition under any energy;
+other existing operators can still cross that source. This establishes different
+scoring, without exclusive reachability or corpus benefit.
+
+[9119](https://lab.eignex.com/jobs/9119) and [9120](https://lab.eignex.com/jobs/9120)
+reuse original-source-checked team centers from [7701](https://lab.eignex.com/jobs/7701),
+with matching model/data hashes. Ordinary preparation retains all 60/93 nonfixed
+`Team` choices, excludes fixed labels and auxiliary indicators from features, and
+preserves maximization of `1000*happiness-balance`. Unit strength and the frozen
+normalization `root objective interval width/(4*feature count)` give strengths
+1 versus 145.7625/200.2581. All four guided modes accept 31/61 neutral pair steps
+in 64 picks, but retain the starting source objectives 16921/42711.
+
+Ten standalone controls use 512 native instructions, five seconds per arm, seeded
+64-work slices, default greedy restart repair and class-normalized weights. Canonical
+scoring, tabu, non-monotone greedy, reheating, ILS, extended rotations and both guided
+modes at both strengths all retain those same best objectives. Bounded complete CP
+returns no improving point or closure in 513 actual decision attempts. Additional
+accepted points and changed scores supply no useful objective or revisit benefit,
+so the consumption gate fails. No further scalar search or default promotion is selected.
+
+These captures use Linux/amd64, JDK 25.0.4.1, one vCPU and a 4,608 MiB cgroup.
+Recorded transition prefixes and final witnesses pass native original-FlatZinc
+checks. Only the reused starting vectors have independent MiniZinc/Gecode checks;
+new walks have no independent witness or proof certificate. Timings and allocation
+include capture, checks and disposal and establish no intrinsic throughput claim.
+Earlier frame/center failures and repair-disabled captures remain non-results,
+not evidence of penalty benefit. Sources, runtime/compiler/resource receipts and
+all negative observations remain outside Git in
+`klause-evidence/campaigns/issue-3809-guided-penalties/`. No penalty implementation
+or worker admission is added to the library.
