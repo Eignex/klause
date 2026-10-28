@@ -15,6 +15,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.CpSearchComponent
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
@@ -25,7 +26,6 @@ import com.eignex.klause.solver.pipeline.FinitePipelineRequest
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
-import com.eignex.klause.propagation.bake
 import com.eignex.klause.util.Cancellation
 import com.sun.management.ThreadMXBean
 import java.io.File
@@ -58,7 +58,7 @@ internal object CoreQueryLearningProfile {
         out.resolve("source.cnf").writeText(sourceText)
         val objective = LinearObjective(longArrayOf(0, 0, 0, 1, 1, 0, 0))
         out.resolve("objective.txt").writeText("0,0,0,1,1,0,0")
-        val source = Dimacs.parseCnf(sourceText).toProblem()
+        val source = Dimacs.parse(sourceText).toProblem()
         val sourceBaked = source.bake()
         out.resolve("learning.jsonl").bufferedWriter().use { output ->
             for (prepared in listOf(false, true)) for (repeat in 0..2) {
