@@ -12,6 +12,7 @@ import com.eignex.klause.lp.engine.exactBounds
 import com.eignex.klause.lp.engine.exactConstant
 import com.eignex.klause.lp.engine.exactCost
 import com.eignex.klause.lp.engine.exactRhs
+import com.eignex.klause.lp.engine.exactShift
 import com.eignex.klause.lp.engine.forEachRationalColumn
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
@@ -145,11 +146,16 @@ internal fun estimateSparseLpAdmission(
     for (row in 0 until model.m) number(model.exactRhs(row))
     for (column in 0 until model.numVars) {
         number(model.exactCost(column))
+        if (column < model.n) number(model.exactShift(column))
         val bounds = model.exactBounds(column)
         bounds.lower?.let { number(it.number.value) }
         bounds.upper?.let { number(it.number.value) }
     }
     number(model.exactConstant())
+    model.exactState?.model?.objective?.let {
+        number(it.scale.value)
+        number(it.externalConstant.value)
+    }
     val componentRows = IntArray(parent.size)
     val componentColumns = IntArray(parent.size)
     for (row in 0 until model.m) componentRows[root(row)]++

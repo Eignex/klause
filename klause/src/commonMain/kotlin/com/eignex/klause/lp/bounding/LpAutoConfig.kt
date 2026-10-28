@@ -402,7 +402,8 @@ object LpAutoConfig {
         val sparse = if (config.resolved(LpTechnique.SPARSE_TRIAL) && !base.bounding &&
             structApplicable && config.resolved(LpTechnique.BOUNDING)
         ) {
-            if (sparseTrialAllowed) prepareSparseLpAdmission(problem, objective, cancellation, sparseTrialWork)
+            if (sparseTrialAllowed) prepareSparseLpAdmission(problem, objective, cancellation,
+                minOf(sparseTrialWork, base.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK))
             else SparseLpAdmission(mapOf("DeclineProjection" to 1L))
         } else null
         if (sparse?.admitted == true) {
