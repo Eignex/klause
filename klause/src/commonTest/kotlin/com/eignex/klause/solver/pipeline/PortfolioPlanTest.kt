@@ -21,6 +21,18 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class PortfolioPlanTest {
+    @Test
+    fun `diagnostic work should require a single lane`() {
+        val params = EngineParams(listOf("portfolio-work=1000"))
+
+        val scenario = buildPortfolioScenario(params, 17L, 1, Kind.COP, EngineMix.MIXED, 6)
+
+        assertEquals(1000L, scenario.diagnosticWorkLimit)
+        assertFailsWith<PipelineConfigException> {
+            buildPortfolioScenario(params, 17L, 2, Kind.COP, EngineMix.MIXED, 6)
+        }
+    }
+
 
     @Test
     fun `automatic sequential clausal satisfaction should use one arm per family`() {
@@ -134,6 +146,8 @@ class PortfolioPlanTest {
             listOf("slice-growth=0.5"),
             listOf("slice-growth=NaN"),
             listOf("slice-growth=Infinity"),
+            listOf("portfolio-work=0"),
+            listOf("portfolio-work=-1"),
         )) {
             assertFailsWith<PipelineConfigException> {
                 buildPortfolioScenario(EngineParams(params), 1L, 1, Kind.COP, EngineMix.MIXED, 6)

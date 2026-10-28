@@ -100,7 +100,7 @@ internal class PoolCutExchange(
         tally?.let { t -> sharing.drainImportUses { from, uses -> t.note(Contribution.Cut, from, uses.toDouble()) } }
         val exported = sharing.exportGlobalCuts().filter { seen.add(it.key) }
         pool.publish(exported, origin)
-        meter?.imported(SharingChannel.Cuts, fresh.size)
+        meter?.imported(SharingChannel.Cuts, fresh.size, drained.cursor.toLong())
         meter?.duplicates(SharingChannel.Cuts, drained.cuts.size - fresh.size)
         meter?.exported(SharingChannel.Cuts, exported.size)
     }

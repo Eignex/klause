@@ -143,9 +143,14 @@ data class PortfolioScenario(
     val maxSliceWork: Long = 150_000L,
     /** Geometric growth after an ordinary scheduled segment; preparation revisits keep the base allowance. */
     val sliceGrowth: Double = 1.5,
+    /** Opt-in single-lane diagnostic allowance in charged node-equivalents; null uses elapsed policy. */
+    val diagnosticWorkLimit: Long? = null,
 ) {
     init {
         require(cores >= 1) { "cores must be ≥ 1" }
+        require(diagnosticWorkLimit == null || (cores == 1 && diagnosticWorkLimit > 0L)) {
+            "portfolio-work requires one core and a positive work limit"
+        }
         require(arms >= 1) { "arms must be ≥ 1" }
         require(clauseShareMaxLbd >= 0 && clauseShareMaxLen >= 0) { "clause-share filter bounds must be ≥ 0" }
         require(reseedStaleThreshold >= 0) { "reseedStaleThreshold must be >= 0" }

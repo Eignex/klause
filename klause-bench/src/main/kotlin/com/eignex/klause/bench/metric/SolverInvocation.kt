@@ -139,6 +139,7 @@ internal object SolverInvocation {
             add("-r")
             add(s.seed.toString())
             add("-s")
+            if (s.params.any { it.startsWith("portfolio-work=") }) add("-v")
             if (s.exact) add("--exact")
             if (optimize) {
                 add("-a")

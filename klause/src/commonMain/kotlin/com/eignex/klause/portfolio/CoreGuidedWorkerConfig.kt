@@ -27,6 +27,9 @@ internal class CoreGuidedWorkerConfig(
     internal fun withActiveTimeLimit(): CoreGuidedWorkerConfig =
         CoreGuidedWorkerConfig(nodeBudget, maximumWork, 2_000L, edit)
 
+    internal fun withWorkLimit(limit: Long): CoreGuidedWorkerConfig =
+        CoreGuidedWorkerConfig(nodeBudget, limit, null, edit)
+
     override fun materialize(
         problem: BakedProblem,
         index: Int,

@@ -91,6 +91,16 @@ Profile mains live in [bench/profile/](src/main/kotlin/com/eignex/klause/bench/p
 and run as lab profile jobs; consult the selected main for its arguments and
 retain its output through `$OUT`.
 
+For repeatable finite portfolio diagnostics, use one processor, a fixed solver seed,
+`param.portfolio-work=N` and explicit `param.slice-work`, `param.slice-max-work` and
+`param.slice-growth` settings. The containing timeout is an emergency stop. Keep it
+large enough for the work limit to finish, then compare the `portfolio ` event lines
+in retained CLI stderr across repeats. The bench enables verbose output for this
+option. Retain source hashes, effective parameters and installed build/runtime
+provenance with the traces. Compare logical events separately from physical timing,
+and report an emergency-interrupted last segment as partial. Default scheduling,
+parallel deterministic batches and throughput qualification remain separate controls.
+
 ## Corpus and build identity
 
 `corpus status` lists cached collections, `corpus gc` applies the cache cap and

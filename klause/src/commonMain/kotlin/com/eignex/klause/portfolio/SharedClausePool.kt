@@ -169,7 +169,7 @@ internal class PoolClauseExchange(
                 imported++
             }
         }
-        meter?.imported(SharingChannel.Clauses, imported)
+        meter?.imported(SharingChannel.Clauses, imported, drained.cursor)
         meter?.duplicates(SharingChannel.Clauses, drained.clauses.size - imported)
         countUses(session)
         export(session)

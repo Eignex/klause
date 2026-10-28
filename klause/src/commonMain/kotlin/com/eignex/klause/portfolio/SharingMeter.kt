@@ -11,6 +11,7 @@ import kotlin.time.TimeSource
  * so the meter needs no lock.
  */
 internal class SharingMeter {
+    internal var onImport: ((SharingChannel, Long, Int) -> Unit)? = null
     private val nanos = LongArray(CHANNELS)
     private val exported = LongArray(CHANNELS)
     private val imported = LongArray(CHANNELS)
@@ -37,8 +38,9 @@ internal class SharingMeter {
     }
 
     /** Count [count] entries taken in from other arms on [channel]. */
-    fun imported(channel: SharingChannel, count: Int) {
+    fun imported(channel: SharingChannel, count: Int, cursor: Long = 0L) {
         imported[channel.ordinal] += count.toLong()
+        onImport?.invoke(channel, cursor, count)
     }
 
     /** Count [count] entries received on [channel] that were already seen. */

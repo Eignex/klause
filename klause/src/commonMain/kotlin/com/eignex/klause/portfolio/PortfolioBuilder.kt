@@ -131,7 +131,7 @@ object PortfolioBuilder {
             }
             FinitePortfolioFactory(armId, family) { index, seed, budget ->
                 val admitted = if (config is CoreGuidedWorkerConfig && deferCore) {
-                    config.withActiveTimeLimit()
+                    scenario.diagnosticWorkLimit?.let { config.withWorkLimit(it) } ?: config.withActiveTimeLimit()
                 } else {
                     config
                 }

@@ -238,6 +238,39 @@ The scheduler assigns bounded slices, revisits pending preparation and reseeds s
 workers under the containing [allowance](06-sessions.md#resource-allowances).
 Scheduling changes work order, never publication authority.
 
+### Reproducible diagnostics
+
+`portfolio-work=N` opts finite Boolean/integer portfolios into a single-lane
+diagnostic schedule with a containing charged-work limit. `PortfolioDiagnostics`
+provides the same control to low-level callers. Selection retains seeded reward
+sampling and stable arm order, but minimum shares, feasibility coverage and retained
+proof coverage use charged work. Candidate checks run at every improving proposal;
+auxiliary preparation and search retire by work. Deferred core search uses a work
+allowance. Numerical companions and parallel execution reject this mode.
+
+Each segment offers the smaller of its work allowance and the containing remainder.
+Initialization work reported by a retained handle is included. A zero-work return
+charges its offered allowance, bounding private preparation and unsuccessful pauses
+that expose no finer counter; this reservation is explicit in the trace. Each
+coordinator verification request charges one additional unit, including rejected or
+indeterminate checks. This logical price is separate from measured verification time.
+Atomic work may overspend. An uncounted, non-resumable worker is rejected. Work limits preserve
+incomplete results and do not establish exhaustion.
+
+The caller's cancellation remains an emergency stop. Its deadline is hidden from
+worker policy, segment time caps are absent, and an emergency interruption ends the
+invocation before another selection. Timing statistics remain physical observations.
+Reproducibility applies to completed logical work on identical source, parameters,
+worker seeds and numerical platform; a clock-interrupted final segment is partial.
+
+The optional streaming listener records scheduler seed, selected slot and worker,
+offered and charged work, import cursors, reward updates, reseeds, retirements and
+termination. Clause cursors include compaction generations; cut cursors identify
+their append position. Empty drains remain visible. Events run inline and the solver
+retains no trace buffer. Finite source invocations forward these events through
+`SearchEvent.PortfolioDiagnostic`; CLI verbose output renders them without a clock.
+The ordinary scheduler remains the default.
+
 ### Slice accounting and coverage
 
 The counted schedule starts at 5000 node equivalents, grows by 1.5 after an ordinary

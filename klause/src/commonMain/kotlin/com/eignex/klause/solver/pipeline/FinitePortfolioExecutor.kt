@@ -9,6 +9,7 @@ import com.eignex.klause.portfolio.ArmFault
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioBuilder
+import com.eignex.klause.portfolio.PortfolioDiagnostics
 import com.eignex.klause.portfolio.PortfolioEvidence
 import com.eignex.klause.portfolio.PortfolioExecutor
 import com.eignex.klause.portfolio.PortfolioScenario
@@ -73,6 +74,9 @@ internal fun FinitePipeline.portfolioExecutor(
     numericalCompanions: TheoryParams? = null,
     objectiveCoordinates: ObjectiveCoordinateView? = null,
 ): PortfolioInvocation {
+    require(scenario.diagnosticWorkLimit == null || problem.numRealVars == 0) {
+        "portfolio-work requires a finite Boolean/integer source without numerical companions"
+    }
     val profile = ProblemProfile.of(problem, scenario.kind == Kind.COP)
     val identity = ModelIdentity.of(problem, objective)
     val binding = EngineInvocation(preparedPlan, identity, objective)
@@ -110,6 +114,11 @@ internal fun FinitePipeline.portfolioExecutor(
             baseSliceWork = scenario.sliceWork, maxSliceWork = scenario.maxSliceWork,
             sliceGrowth = scenario.sliceGrowth, phaseRetention = scenario.phaseRetention,
             reseedStaleThreshold = scenario.reseedStaleThreshold,
+            diagnostics = scenario.diagnosticWorkLimit?.let { limit ->
+                PortfolioDiagnostics(limit, scenario.seed) { event ->
+                    onEvent?.invoke("portfolio", SearchEvent.PortfolioDiagnostic(event))
+                }
+            },
         ),
         PortfolioEvidence(
             identity,
