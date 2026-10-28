@@ -4108,6 +4108,35 @@ establish deadline handling without independent witness or proof validation.
 Instrumented profiles establish no throughput result; charged scheduling visits
 also change the units included in propagation-work totals.
 
+### Cumulative demand-window qualification
+
+`bench.profile.CumulativeChoiceProfile` captures ordinary propagation and
+off/default/aggressive finite preparation, with a 500-million-work allowance and
+20-second cancellation per stage. No arguments select the self-authored FlatZinc
+choice control; `suite=ID problem=NAME` compiles an original MiniZinc identity and
+preserves its model, data and FlatZinc bytes. The original objective participates
+in preparation. Reports retain complete native equality rows, demand domains,
+runtime/build identities and current-thread allocation. The compiler must be on
+the worker's `PATH`; these instrumented captures establish no throughput result
+or independently checked source verdict.
+
+On matching control bytes, [baseline 8881](https://lab.eignex.com/jobs/8881)
+retains `q=0..1` and `machine=1..3`, while
+[candidate 8889](https://lab.eignex.com/jobs/8889), at `b9854a4548`, fixes `q=0`
+and removes interior `machine=2`. A baseline failed-choice probe also refutes
+that value, and default/aggressive preparation fixes the demand in both arms.
+The control therefore establishes consumed inference before those preparation
+controls, without a post-preparation search gain or default-admission conclusion.
+The first inspector omitted equality rows containing constant columns; its raw
+demand/machine observations remain separate from that incomplete row count.
+
+The original TestScheduling-20 [capture 8882](https://lab.eignex.com/jobs/8882)
+and all four [pilot 8888](https://lab.eignex.com/jobs/8888) cases decline before
+solving because their auto workers lack MiniZinc. The pilot pairs baseline and
+candidate under default and aggressive preparation/LP, P1, seed 3 and ten seconds.
+Those load declines supply no source verdict, witness, cost comparison or
+original-source applicability result.
+
 ### Source task-order applicability
 
 [Task-order capture 8898](https://lab.eignex.com/jobs/8898), at `f41e018c2a`,

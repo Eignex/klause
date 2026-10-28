@@ -451,6 +451,8 @@ unrepresentable completion times, window areas or energy sums decline the scan.
 Reasons reconstruct only participating start bounds, demand minima and presences
 at the deduction's trail position, together with the capacity ceiling. The scan
 polls finite propagation work and retains no state across interruption or undo.
+The running-prefix energy check also declines unrepresentable completion times,
+window areas and energy sums.
 
 Unary resources also check overload over minimum durations while a duration is
 unfixed or a presence unknown. Present tasks whose minima cannot fit between their
