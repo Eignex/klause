@@ -145,4 +145,13 @@ class ScopedComponentBoundsTest {
         assertFailsWith<IllegalArgumentException> { composition.closes(BigInteger.valueOf(4), children) }
         assertNull(composition.exact(children))
     }
+
+    @Test
+    fun `empty component set should retain the containing cutoff scope`() {
+        val composition = ScopedComponentBounds(BigInteger.ONE, emptyList(), BigInteger.ONE)
+
+        assertTrue(composition.closes(BigInteger.ONE, emptyList()))
+        assertFailsWith<IllegalArgumentException> { composition.closes(BigInteger.TWO, emptyList()) }
+        assertNull(composition.exact(emptyList()))
+    }
 }
