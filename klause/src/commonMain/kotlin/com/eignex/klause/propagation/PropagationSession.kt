@@ -529,7 +529,9 @@ class PropagationSession private constructor(
         for (i in restrictions.intSetKeys.indices) {
             if (seedCancelled()) return@sequence
             val variable = restrictions.intSetKeys[i]
-            yield(pushRestriction(variable) { state.restrictIntToSurvivors(variable, restrictions.intSetSurvivorsAt(i)) })
+            yield(pushRestriction(variable) {
+                state.restrictIntToSurvivors(variable, restrictions.intSetSurvivorsAt(i))
+            })
         }
     }
 
