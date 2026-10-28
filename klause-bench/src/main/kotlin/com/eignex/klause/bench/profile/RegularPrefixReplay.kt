@@ -298,7 +298,7 @@ internal object RegularPrefixReplay {
                 val session = PropagationSession(if (mode == "native-source-clause") source else definitions.problem)
                 if (mode == "definitions-learned-state") {
                     clauses.forEach { session.importClause(it) }
-                    check(session.seed(Assumptions.None) is PropagationResult.Implied)
+                    check(session.implyIntAtMost(0, session.intDomain(0).max) is PropagationResult.Implied)
                     check(session.boolValue(definitions.booleans[0]) == false)
                 } else {
                     check(

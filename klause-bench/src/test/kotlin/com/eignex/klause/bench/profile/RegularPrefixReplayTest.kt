@@ -1,18 +1,59 @@
 package com.eignex.klause.bench.profile
 
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
-import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.ValueSource
+import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchAtomRegistry
+import com.eignex.klause.solver.search.SearchConflictResolution
+import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchLearnedConflictResult
+import com.eignex.klause.solver.search.SearchSession
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 
 class RegularPrefixReplayTest {
+    @Test
+    fun `an imported state exclusion prunes a different source prefix`() {
+        val transitions = longArrayOf(1, 2, 2, 3, 3, 1)
+        val source = Problem(
+            0, 5, Array(5) { IntDomain(1, 2) },
+            arrayOf(
+                Regular(intArrayOf(0, 1, 2), 3, 2, transitions, 1, intArrayOf(1, 2, 3)),
+                Regular(intArrayOf(0, 1, 2, 3, 4), 3, 2, transitions, 1, intArrayOf(1)),
+                Linear(intArrayOf(1, -1), intArrayOf(3, 4), LinearOp.NE, 0),
+            ),
+        )
+        val definitions = regularPrefixDefinitions(source)
+        val producer = PropagationSession(definitions.problem)
+        val cp = CpSearchComponent(producer)
+        val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(definitions.problem.numBoolVars))
+        assertIs<ComponentResult.Consistent>(shared.initialize())
+        assertIs<ComponentResult.Conflict>(shared.push(SearchDecision.Bool(Lit.make(definitions.booleans[0], true))))
+        val learned = assertIs<SearchConflictResolution.Backjump>(cp.resolveConflict(shared)).conflict
+        shared.popTo(learned.decisionLevel)
+        assertEquals(SearchLearnedConflictResult.Resume, learned.apply(shared))
+        val receiver = PropagationSession(definitions.problem)
+
+        producer.exportGlueClauses(2, 128).forEach { receiver.importClause(it) }
+        assertIs<PropagationResult.Implied>(receiver.implyIntAtMost(0, receiver.intDomain(0).max))
+        assertIs<PropagationResult.Implied>(receiver.pinInt(0, 2))
+        assertIs<PropagationResult.Implied>(receiver.pinInt(1, 2))
+
+        assertFalse(2L in receiver.intDomain(2))
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `each accepted source word has exactly its deterministic state extension`(partial: Boolean) {
