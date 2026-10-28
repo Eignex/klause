@@ -129,7 +129,8 @@ internal class LinearAuthorityTraversal(
     private var peakPending = 1L
     private var retained = 1L
 
-    fun observations(): Map<String, Long> = observations + authority.cutObservations().mapValues { (key, value) ->
+    fun observations(): Map<String, Long> = observations + activeRows?.observations.orEmpty() +
+        authority.cutObservations().mapValues { (key, value) ->
         if (key.endsWith("Work") || key.startsWith("numericalCutSelection"))
             value - (initialCutObservations[key] ?: 0L) else value
     } + mapOf(

@@ -45,6 +45,8 @@ internal class LinearActiveRows(
     private var pending: LinearAuthorityQuery? = null
     private var finished = false
     private var ownerOpen = false
+    private val compositionObservations = linkedMapOf<String, Long>()
+    val observations: Map<String, Long> get() = compositionObservations.toMap()
 
     fun check(
         condition: SourceCondition, cancellation: Cancellation, begin: () -> Boolean = { true },
@@ -77,8 +79,15 @@ internal class LinearActiveRows(
                 val prepared = LinearBooleanCutPreparation.prepare(branch, funded, { work, allocation ->
                     budget.observe(preparation = work)
                     budget.funding?.charge(0L, allocation)
-                })
-                budget.funding?.charge(0L, branch.coordinateCount * 48L + branch.premiseCount * 64L)
+                }, LinearBooleanCutLimits(work = minOf(65_536L, budget.funding?.availableWork ?: 65_536L),
+                    allocation = minOf(1_048_576L, budget.funding?.remainingAllocation ?: 1_048_576L)))
+                val status = if (prepared.complete) "numericalBooleanCutComplete" else "numericalBooleanCutLimited"
+                compositionObservations[status] = (compositionObservations[status] ?: 0L) + 1L
+                val proofAllocation = branch.coordinateCount * 48L + branch.premiseCount * 64L
+                if (proofAllocation > (budget.funding?.remainingAllocation ?: Long.MAX_VALUE)) {
+                    return LinearActiveResult(attempted = true, captureDeclined = true)
+                }
+                budget.funding?.charge(0L, proofAllocation)
                 if (funded()) return LinearActiveResult(attempted = true, paused = budget.funding?.paused == true)
                 var work = 0L
                 val allowance = minOf(100_000L, budget.funding?.availableWork ?: 100_000L)
@@ -86,7 +95,10 @@ internal class LinearActiveRows(
                     prepared.consequences, Cancellation { if (work >= allowance) true else { work++; funded() } })
                 budget.observe(boundCertification = work)
                 if (funded()) return LinearActiveResult(attempted = true, paused = budget.funding?.paused == true)
-                prepared.consequences.filterIndexed { index, _ -> checks[index] == SourceEvidenceCheck.Checked }
+                prepared.consequences.filterIndexed { index, _ -> checks[index] == SourceEvidenceCheck.Checked }.also {
+                    compositionObservations["numericalBooleanCutChecked"] =
+                        (compositionObservations["numericalBooleanCutChecked"] ?: 0L) + it.size
+                }
             } else emptyList()
             LinearAuthorityQuery.prepare(numeric, null, cancellation, consequences = consequences)
                 ?.also { pending = it }

@@ -176,7 +176,8 @@ class LinearBooleanCutsTest {
             it.claim == SourceClaim.Consequence(row)
         }
 
-        val bound = SourceEvidence(scope, SourceClaim.Bound(quarter.negated()), SourceDerivation.Import(common))
+        val bound = SourceEvidence(scope, SourceClaim.Bound(quarter.negated()), SourceDerivation.Combination(listOf(
+            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Import(common)))))
 
         assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(bound))
     }
