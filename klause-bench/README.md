@@ -2733,6 +2733,9 @@ satisfaction diagnostic with no online definitions or public assumption, objecti
 counting, enumeration, sampling or proof-export contract. JFR timings establish no
 throughput comparison, and native source checks are separate from independent
 witness/proof checking.
+`fixed=true` uses 64 decisions and five seconds per search, then repeats the modes
+in reverse order. It retains the committed decision trace and separates clauses
+containing state Booleans from clauses containing helper integer-state atoms.
 
 ### Table profiling
 

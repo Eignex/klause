@@ -34,9 +34,11 @@ import kotlin.time.Duration.Companion.seconds
 internal object RegularPrefixProfile {
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.size in 1..3 && args.first().startsWith("request64="))
-        require(args.drop(1).all { it == "replay=true" || it in setOf("controls=3", "controls=6", "controls=off") })
+        require(args.size in 1..4 && args.first().startsWith("request64="))
+        val allowed = setOf("replay=true", "fixed=true", "controls=3", "controls=6", "controls=off")
+        require(args.drop(1).all { it in allowed })
         val replay = "replay=true" in args
+        val fixed = "fixed=true" in args
         val sizes = when (args.firstOrNull { it.startsWith("controls=") }) {
             "controls=3" -> listOf(3)
             "controls=6" -> listOf(6)
@@ -52,7 +54,7 @@ internal object RegularPrefixProfile {
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
         for (k in sizes) {
             for (allowTwo in listOf(false, true)) {
-                capture(control(k, allowTwo), out.resolve("control-$k-$allowTwo"), replay)
+                capture(control(k, allowTwo), out.resolve("control-$k-$allowTwo"), replay, fixed)
             }
         }
         sources.forEachIndexed { index, input ->
@@ -66,7 +68,7 @@ internal object RegularPrefixProfile {
             )
             val directory = out.resolve("source-$index").apply { mkdirs() }
             directory.resolve("source.xml").writeBytes(bytes)
-            capture(Xcsp3.parse(bytes.decodeToString()).problem, directory, replay)
+            capture(Xcsp3.parse(bytes.decodeToString()).problem, directory, replay, fixed)
         }
     }
 
@@ -91,7 +93,7 @@ internal object RegularPrefixProfile {
         )
     }
 
-    private fun capture(source: Problem, out: File, replay: Boolean) {
+    private fun capture(source: Problem, out: File, replay: Boolean, fixed: Boolean) {
         out.mkdirs()
         val codec = ProblemJson()
         out.resolve("source.json").writeText(codec.encodeToJsonElement(source).toString())
@@ -176,6 +178,7 @@ internal object RegularPrefixProfile {
                     out,
                     source,
                     prepared.reconstruct,
+                    fixed,
                 )
             }
         }
