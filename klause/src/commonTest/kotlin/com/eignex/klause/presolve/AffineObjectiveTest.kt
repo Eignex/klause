@@ -53,7 +53,7 @@ class AffineObjectiveTest {
 
         assertTrue(outcome.problem.factors.filterIsInstance<SymmetryHandling>().isNotEmpty())
         assertTrue(outcome.problem.factors.all { 0 !in it.intVars })
-        assertEquals(4, assignments.size)
+        assertEquals(4, assignments.map { outcome.reconstruct(it).ints.toList() }.toSet().size)
         for (sample in assignments) outcome.mapping.requireObjectivePreserved(cost, transformed, sample)
     }
 

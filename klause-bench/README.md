@@ -324,6 +324,17 @@ interrupted migration can resume.
 
 ## Fixture provenance
 
+`bench.profile.SymmetryAdmissionProfile` captures ordinary protected preparation
+and opt-in `default,+objective-symmetry` preparation for one to eight hash-pinned
+XCSP3 optimization sources. Submit it as a lab profile with `request64=` containing
+a base64 JSON array of `{suite, problem, sha256}` entries. Each preparation has an
+eight-second containing token and 550 million phase units. The capture retains
+original sources, replacement objectives, source symmetry markers, moved generator
+coordinates and their coefficients, pass outcomes, elapsed time and charged work.
+It executes no search and makes no source-verdict or runtime-gain claim. Stopped
+preparations remain incomplete observations. Use ordinary source-checked lab solves
+for consumed pruning, quality, proof and total-cost qualification.
+
 Fixtures with a directory README record their identities and licenses there:
 the [smoke corpus](smoke-corpus/README.md) and the
 [basis corpus](../klause/src/jvmTest/resources/basis-corpus/README.md). The
