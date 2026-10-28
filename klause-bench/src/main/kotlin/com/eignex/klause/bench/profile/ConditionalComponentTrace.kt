@@ -63,7 +63,7 @@ import kotlin.time.Duration.Companion.milliseconds
  * reported independence is an upper bound for any decomposition that must also respect the incumbent
  * cutoff. A component's key hashes the residual of each of its live factors in factor order; a key seen
  * again after an intervening retraction, conflict or restart is a re-encountered child obligation. Learned
- * clauses are added on every eighth trace to count components they would merge. Sampling time and the trace
+ * restrictions are inspected on every eighth trace to count components they would merge. Sampling time and the trace
  * allowance are excluded from the search deadline.
  *
  * Up to `probes` split nodes, at least 256 samples apart, keep their residual clauses. After the search,
@@ -84,14 +84,6 @@ object ConditionalComponentTrace {
     private const val HASH_A = -0x61c8864680b583ebL
     private const val HASH_B = -0x3d4d51c2d82b14b1L
     private val sizeBuckets = longArrayOf(1, 2, 4, 16, 256)
-
-    // Learned literals are internal to the solver module; the trace reads them without widening its API.
-    private val learnedClauseLiterals = PropagationSession::class.java.declaredMethods.single {
-        it.name.startsWith("learnedClauseLiterals") && it.parameterCount == 1
-    }.apply { isAccessible = true }
-    private val isLearnedClause = PropagationSession::class.java.declaredMethods.single {
-        it.name.startsWith("isLearnedClause") && it.parameterCount == 1
-    }.apply { isAccessible = true }
 
     private class Input(
         val label: String,
@@ -528,7 +520,13 @@ object ConditionalComponentTrace {
         private var learnedSamples = 0L
         private var learnedSplitSamples = 0L
         private var learnedMergedSplits = 0L
-        private var globalLearnedMergedSplits = 0L
+        private var incompleteEnforcingSamples = 0L
+        private var permanentRetentionEntries = 0L
+        private var learnedPbEntries = 0L
+        private var dischargedLearnedEntries = 0L
+        private var unknownLearnedEntries = 0L
+        private var lastEnforcing: JsonObject? = null
+        private var observationDeadline = Long.MAX_VALUE
 
         fun observe(session: PropagationSession) {
             picks++
@@ -542,6 +540,7 @@ object ConditionalComponentTrace {
             }
             if (picks > DENSE_PICKS && picks % SPARSE_STRIDE != 0L) return
             val started = System.nanoTime()
+            observationDeadline = started + minOf(traceCapNanos - traceNanos, Long.MAX_VALUE - started)
             analyze(session)
             traceNanos += System.nanoTime() - started
         }
@@ -717,17 +716,10 @@ object ConditionalComponentTrace {
                 lastProbe = samples
                 probes += capture(session, components, live, level)
             }
-            if (samples % LEARNED_STRIDE == 0L && second >= MIN_CHILD_LIVE) {
+            if (samples % LEARNED_STRIDE == 0L) {
                 learnedSamples++
-                learnedSplitSamples++
-                val roots = components.keys.toList()
-                val saved = parent.copyOf()
-                if (mergesWithLearned(session, roots, skipPermanent = true)) globalLearnedMergedSplits++
-                saved.copyInto(parent)
-                if (mergesWithLearned(session, roots, skipPermanent = false)) learnedMergedSplits++
-                saved.copyInto(parent)
-            } else if (samples % LEARNED_STRIDE == 0L) {
-                learnedSamples++
+                if (second >= MIN_CHILD_LIVE) learnedSplitSamples++
+                observeEnforcing(session, components)
             }
         }
 
@@ -773,25 +765,37 @@ object ConditionalComponentTrace {
             if (now == null) 0 to 0 else (now.sightings - then.first) to (now.reencounters - then.second)
         }
 
-        // Permanent entries are incumbent-scoped assertions, so they count only toward the cutoff-inclusive merge.
-        private fun mergesWithLearned(session: PropagationSession, roots: List<Int>, skipPermanent: Boolean): Boolean {
-            for (i in 0 until session.learnedClauseCount) {
-                if (isLearnedClause.invoke(session, i) != true) continue
-                if (skipPermanent && session.learnedClausePermanent(i)) continue
-                val lits = learnedClauseLiterals.invoke(session, i) as IntArray
-                if (lits.any { Lit.variable(it) >= numBool } || lits.any { session.litTruth(it) == true }) continue
-                var rep = -1
-                for (lit in lits) {
-                    if (session.litTruth(lit) != null) continue
-                    val v = Lit.variable(lit)
-                    if (rep < 0) {
-                        rep = v
-                    } else {
-                        union(rep, v)
-                    }
-                }
+        private fun observeEnforcing(session: PropagationSession, components: Map<Int, Component>) {
+            val inspection = LearnedResidualRestrictions.inspect(session, Cancellation {
+                System.nanoTime() >= observationDeadline
+            })
+            permanentRetentionEntries += inspection.entries.count { it.permanentRetention }
+            learnedPbEntries += inspection.entries.count { it.kind == "PseudoBooleanPropagator" }
+            dischargedLearnedEntries += inspection.entries.count { it.discharged }
+            unknownLearnedEntries += inspection.entries.count { it.support == null }
+            if (!inspection.complete) incompleteEnforcingSamples++
+            val roots = components.keys.toList()
+            val saved = parent.copyOf()
+            val active = roots.toMutableSet()
+            for (entry in inspection.entries) {
+                if (entry.discharged) continue
+                val scope = entry.support ?: continue
+                val rep = scope.firstOrNull() ?: continue
+                active.addAll(scope)
+                for (v in scope) union(rep, v)
             }
-            return roots.map(::find).toSet().size < roots.size
+            val merged = roots.map(::find).distinct().size < roots.size
+            val complete = inspection.complete && atomClauses == 0L && problem.numRealVars == 0
+            if (complete && merged) learnedMergedSplits++
+            lastEnforcing = buildJsonObject {
+                put("sourceOnlyComponents", components.size)
+                put("allEnforcingComponents", if (complete) active.map(::find).distinct().size else null)
+                put("allEnforcingIncidenceComplete", complete)
+                put("decline", inspection.decline)
+                put("logicalScope", "unavailable")
+                put("entries", inspection.storeCount)
+            }
+            saved.copyInto(parent)
         }
 
         private fun bucket(size: Int): Int {
@@ -831,8 +835,13 @@ object ConditionalComponentTrace {
             put("reencounterLiveBuckets", bucketLabels(reencounterBuckets))
             put("learnedSamples", learnedSamples)
             put("learnedSplitSamples", learnedSplitSamples)
-            put("globalLearnedMergedSplits", globalLearnedMergedSplits)
-            put("allLearnedMergedSplits", learnedMergedSplits)
+            put("allEnforcingMergedSourceSplits", learnedMergedSplits)
+            put("incompleteEnforcingSamples", incompleteEnforcingSamples)
+            put("permanentRetentionEntryObservations", permanentRetentionEntries)
+            put("learnedPbEntryObservations", learnedPbEntries)
+            put("dischargedLearnedEntryObservations", dischargedLearnedEntries)
+            put("unknownLearnedEntryObservations", unknownLearnedEntries)
+            lastEnforcing?.let { put("lastEnforcingIncidence", it) }
         }
 
         private fun bucketLabels(counts: LongArray): String = counts.indices.joinToString(",") { b ->

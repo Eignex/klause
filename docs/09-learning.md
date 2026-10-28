@@ -146,7 +146,12 @@ rounds the reason up after division by its pivot coefficient, then adds it to ca
 the pivot. Weakening and saturation keep coefficients bounded and canonical. These
 nonnegative combinations with Chvátal-Gomory rounding preserve implication. A step
 that declines, including signed-word overflow, falls back to clause resolution.
-Learned pseudo-Boolean constraints share clause retention.
+Learned pseudo-Boolean constraints share clause retention. A permanent-retention
+mark prevents forgetting; it does not establish logical scope. Source-valid atom
+channeling clauses and incumbent restrictions can both have that mark. Observers
+of enforcing incidence read complete PB terms and established values, because the
+weighted covering watch set is only a propagation wakeup index. Unknown constraint
+kinds or unnameable atoms withhold a complete-incidence claim.
 
 ## Integer row learning
 
