@@ -95,8 +95,8 @@ internal class NonlinearIntegerResidues(
             step()
             when (val formula = pending.removeLast()) {
                 is PolynomialRealFormula.And -> {
+                    reserve(formula.operandCount)
                     val children = formula.operands
-                    reserve(children.size)
                     pending.addAll(children)
                 }
                 is PolynomialRealFormula.Atom -> if (formula.relation == PolynomialRelation.EQ) {
@@ -125,6 +125,13 @@ internal class NonlinearIntegerResidues(
             ) throw ResidueDecline()
             val key = ResidueExpressionKey(expression)
             if (key in indices) continue
+            val childCount = when (expression) {
+                is PolynomialExpression.Sum -> expression.operandCount
+                is PolynomialExpression.Product -> expression.operandCount
+                is PolynomialExpression.Power -> 1
+                else -> 0
+            }
+            if (childCount > capacity - cells) throw ResidueDecline()
             val children = when (expression) {
                 is PolynomialExpression.Sum -> expression.operands
                 is PolynomialExpression.Product -> expression.operands
