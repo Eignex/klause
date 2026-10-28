@@ -85,6 +85,7 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
 
     override fun resolve(reason: IntArray, currentLevel: Int) {
         if (failed) return
+        state.arithmeticLearningTrace?.clause("pb.reason", reason, state)
         if (!booleanLiterals(reason)) {
             decline("non-boolean-reason")
             return
