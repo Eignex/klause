@@ -14,6 +14,7 @@ import com.eignex.klause.formats.dimacs.toProblem
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.propagation.BakedProblem
@@ -84,7 +85,7 @@ internal object ConditionalSymmetryProfile {
                         session.popToLevel(0)
                         put("undo", snapshot(session))
                         put("solves", buildJsonArray {
-                            for (arm in listOf("ordinary", "lp-off", "pb-cutoff", "prefix-first")) {
+                            for (arm in listOf("ordinary", "lp-bound", "lp-off", "pb-cutoff", "prefix-first")) {
                                 val token = Cancellation.after(5.seconds)
                                 val trace = ArrayList<JsonObject>()
                                 val base = BacktrackPresets.conflictDriven(randomSeed = 3, cancellation = token)
@@ -102,7 +103,8 @@ internal object ConditionalSymmetryProfile {
                                     }
                                 }
                                 val params: BacktrackParams = base.copy(variableSelector = selector,
-                                    lpConfig = if (arm == "ordinary") LpConfig.AUTO else LpConfig.OFF,
+                                    lpConfig = if (arm in listOf("ordinary", "lp-bound")) LpConfig.AUTO else LpConfig.OFF,
+                                    lpPlan = LpPlan(bounding = arm == "lp-bound"),
                                     pbObjectiveCutoff = arm == "pb-cutoff", objectiveGuidedValues = arm == "prefix-first")
                                 val solveStart = System.nanoTime()
                                 val result = BacktrackSolver(model).minimize(requireNotNull(prepared.objective), params)
