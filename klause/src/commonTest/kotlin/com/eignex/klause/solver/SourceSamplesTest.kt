@@ -34,7 +34,9 @@ class SourceSamplesTest {
             {"reals":[{}],"factors":[{"exactRealEquality":{"real":0,"value":{"exp":"1"}}}]}
         """.trimIndent())
         val pi = ExactRealJson.decodeFromString("""{"pi":{}}""")
-        val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(3.141592653589793), symbolicReals = listOf(pi))
+        val sample = Sample(
+            booleanArrayOf(), longArrayOf(), doubleArrayOf(3.141592653589793), symbolicReals = listOf(pi),
+        )
         assertEquals(false, problem.checkExactRealSample(sample))
         assertEquals(null, problem.checkExactRealSample(sample, com.eignex.klause.util.Cancellation { true }))
     }
