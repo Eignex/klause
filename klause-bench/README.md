@@ -6493,6 +6493,84 @@ succeeds. [8780](https://lab.eignex.com/jobs/8780) stopped at the first numerica
 on a stale reflective constructor lookup, and the 8742 submission named an
 unresolvable abbreviated ref. Neither supplied a comparison.
 
+#### Bounded equality directions
+
+`bench.profile.EqualityMoveReplay` takes `suite`, `problem`, `sha256`, a
+comma-separated source `center`, and optional `presolve`/`seed`. The frozen
+`integer-kernel-v1` set names the [weighted, ring and transport controls](smoke-corpus/finite-repair-evidence/README.md).
+It records the actual source/finite preparation, exact rows, domains and complete
+reconstructed source round trip. Unmapped slots with no occurrence, definition or
+objective use are pinned as inert storage; live unmapped coordinates decline.
+
+`kernel=true` compares residual network cycles with zero columns of the existing
+Hermite transform: at most 40 integer columns, 64 equality rows, 16-bit input
+coefficients and 16 complete directions with 256-bit entries, under two seconds
+and 2M charged work. Hermite operations remain cooperative atomic work. Each
+direction passes exact `A*g=0`; blocks containing maintained integers decline.
+Unit and box-endpoint steps use wide arithmetic,
+full domain membership, live pins, definitions, owners and whole sink admission.
+Every factor is graded, only a native original-source-checked improvement is
+applied, and the center is restored even on a failed check. Interrupted extraction
+publishes no direction. Private workspaces retire after capture; failed work,
+checking and restoration remain in its time/allocation totals.
+
+`completion=true` observes the existing source-row planner under 1M source work
+and 4 MB modeled allocation; incomplete packets receive no transition credit.
+`owners=true` replays LS with restarts, cold/retained CP and cold/retained mixed
+repair on the whole prepared block and each consumed direction's exact freedoms,
+pinning every complement. Identical sets share one replay. Each query has 2,000
+decision equivalents and two seconds. Preparation/ordinary proposals have 30 seconds;
+the complete lab profile has 180 seconds. Work currencies remain separate.
+
+Default preparation in [9032](https://lab.eignex.com/jobs/9032) and
+[9034](https://lab.eignex.com/jobs/9034), at `b20fa2bbb6`, retains all three weighted
+inputs and all 33 ring inputs, with 32 ring equalities. Structured moves offer
+nothing and ordinary objective steps fail native source checks. All five existing
+repair owners reach objectives 0 and -66. CP spends six and two decision equivalents;
+LS spends its 2,000-unit allowance with 98 and 14 restarts. Explicitly freeing 33
+inputs does not change the default mixed selector's 32-input cap.
+
+[9035](https://lab.eignex.com/jobs/9035), at `7f3337517e`, recovers `(-4,1,1)`
+and applies `(0,2,2)` as one checked three-input transition. The network matrix
+declines; every movable source-row seed is unrepairable. The cold kernel capture
+spends 25,535 work, 10 ms and 0.85 MB thread allocation, excluding shared preparation.
+[9053](https://lab.eignex.com/jobs/9053), at `58c385b8bf`, interrupts ring extraction
+at 2,034,128 charged work, including cooperative overshoot: 75 ms and 1.89 MB
+without a direction or point. Every movable row-completion seed is unrepairable;
+CP again reaches the checked `-66` point in two decision equivalents.
+
+[9059](https://lab.eignex.com/jobs/9059), at `8ac3d5b696`, retains the transport's
+nine inputs and five equalities. Network and Hermite both consume the same checked
+four-input cycle, objective 15 to 10. Every matched repair owner reaches 10 on those
+exact four freedoms; CP spends two decision equivalents. All whole-block owners
+reach 6. Source-row completion supplies complete packets, consistent with
+[8781](https://lab.eignex.com/jobs/8781)'s retained consumed cycles. Cold network
+extraction takes 1.5 ms/24 KB versus Hermite's 8.8 ms/741 KB; the combined capture
+takes 19 ms/1.13 MB, including checks and restoration.
+
+[9060](https://lab.eignex.com/jobs/9060), at the same revision, retains
+`x+4z=8`, reconstructs `y=z` and narrows `x` to `{0,4,8}` with
+`default,+sparsify`. The ordinary objective source already reaches checked
+`(4,1,1)` through channeling. Hermite adds the endpoint `(0,2,2)`, which all five
+matched owners also reach; CP spends four decision equivalents. Its cold kernel
+capture costs 7,511 work, 8 ms and 0.82 MB.
+
+Retain the diagnostic and reject a production kernel source on these scopes:
+existing owners cover the admitted points within their allowances, sparsification
+exposes the weighted transition, and ring extraction exhausts its cap. No larger
+campaign or default policy is selected. These Linux/amd64 Java 25.0.4.1 JFR captures
+retain source, JAR/dependency and resource receipts; 9053 has a hard one-CPU,
+4,608-MiB cgroup ceiling. One seed and cold class initialization give no paired
+throughput claim. Thread allocation is distinct from RSS/live storage. Native
+original lowered-source checks give no independent witness/proof certification;
+sampled directions establish neither box/hole connectivity nor completeness.
+
+9014 was cancelled before execution; 9017 lacked replay metadata and 9033 declined
+an unused unmapped slot. 9046/9047 failed capture compilation and 9048 was cancelled
+after that fault was known. Those attempts supply no owner/mechanism comparison;
+their successful replacements above retain the negative preparation/extraction
+outcomes separately from build or capture failures.
+
 ### Prepared board-restart outcomes
 
 The coordinate-changing treatment in [#3447](https://github.com/Eignex/klause/pull/3447)
