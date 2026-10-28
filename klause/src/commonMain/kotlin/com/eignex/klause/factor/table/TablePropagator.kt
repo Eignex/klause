@@ -182,6 +182,50 @@ internal class TablePropagator(
         }
     }
 
+    internal fun historicalAlternative(
+        state: PropagationState,
+        payload: IntArray,
+        atTrail: Int,
+        preferred: IntHashSet,
+    ): IntArray? {
+        if (hi != null || payload.size != 4 || numTuples > 256 || arity > 64 ||
+            numTuples.toLong() * arity > 4096
+        ) return null
+        val col = payload[0]
+        val kind = payload[1]
+        val value = (payload[2].toLong() shl 32) or (payload[3].toLong() and 0xFFFFFFFFL)
+        val snapshot = ExplanationSnapshot(state, xs, atTrail)
+        if (kind != VALUE && snapshot.domains[col].holeCount > 62) return null
+        val out = LitSet()
+        if (kind != VALUE) columnLiterals(state, col, snapshot, out)
+        val pick = IntArrayList()
+        for (row in 0 until numTuples) {
+            state.checkFiniteWork()
+            val target = cellLo(row, col)
+            if (when (kind) { LOWER -> target >= value; UPPER -> target <= value; else -> target != value }) continue
+            if (kind != VALUE && cellAt(state, row, col, snapshot, null) == Cell.KILLED) continue
+            var chosen = Lit.NONE
+            var killed = false
+            for (c in 0 until arity) {
+                state.checkFiniteWork()
+                if (c == col) continue
+                pick.clear()
+                if (cellAt(state, row, c, snapshot, pick) == Cell.LIVE) continue
+                killed = true
+                if (pick.size == 0 || out.has(pick[0])) {
+                    chosen = Lit.NONE
+                    break
+                }
+                if (chosen == Lit.NONE || preferred.contains(pick[0])) chosen = pick[0]
+                if (preferred.contains(chosen)) break
+            }
+            if (!killed) return null
+            if (chosen != Lit.NONE) out.add(chosen)
+            if (out.size > 64) return null
+        }
+        return out.toArray()
+    }
+
     /**
      * Reason for column [col]'s prune as of undo-log position [atTrail], or with [col] = -1 for the table running
      * out of tuples: the column's own domain then, which every bound it moves rests on, and for each ruled-out
@@ -378,6 +422,8 @@ internal class TablePropagator(
     private class LitSet {
         private val seen = IntHashSet()
         private val lits = IntArrayList()
+
+        val size: Int get() = lits.size
 
         fun has(lit: Int) = seen.contains(lit)
 

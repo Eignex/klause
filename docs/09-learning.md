@@ -54,6 +54,15 @@ Index construction admits at most 32 MiB of primitive buffers including sort scr
 larger relations keep the scan path. A reason visits only the target value or bound
 range's postings, then checks the deduction's historical domains. Mutable live
 prefixes and explanation caches remain state-local.
+An internal opt-in conflict analysis can retry one unextended ground-table reason
+against the ordinary minimized clause's frozen literals. Reconstruction admits at
+most 256 rows, 4096 cells, 64 columns and 64 retained premises; bound deductions
+with more than 62 historical target holes decline. It retains target-domain scope
+premises and chooses only blockers present at the deduction's trail position.
+The retry runs both minimization passes and replaces an asserting ordinary clause
+only for a lexicographically smaller backjump level, LBD or clause size. A local
+decline retains ordinary learning. Frontier-dependent reasons belong only to that
+analysis and never enter the marker-only lazy memo.
 Support-index construction and historical reconstruction poll the state's invocation
 token. Interrupted construction publishes no shared index or reason memo. A stopped
 lazy reason is unavailable; it cannot become an empty premise list, and conflict
