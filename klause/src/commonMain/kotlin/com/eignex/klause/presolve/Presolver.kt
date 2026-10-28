@@ -164,8 +164,15 @@ object Presolver {
             val entrySize = PresolveEntrySize(ctx.presolveBudget)
             val booleanPins = PresolveBooleanPins()
             var parityInputs: ParityInputRevision? = null
+            val linearInputs = HashMap<PresolvePass, LinearInputRevision>()
 
             override fun inputRevision(pass: PresolvePass): Long? {
+                if (pass == PresolvePass.STRENGTHEN_COEFFICIENTS || pass == PresolvePass.SPARSIFY_LINEAR_ROWS) {
+                    val inputs = linearInputs.getOrPut(pass) {
+                        LinearInputRevision(current, pass, ctx.presolveBudget?.orSpent(cancellation) ?: cancellation)
+                    }
+                    return inputs.current(current)
+                }
                 if (pass != PresolvePass.DERIVE_XOR_UNITS) return null
                 val inputs = parityInputs ?: ParityInputRevision(
                     current, ctx.presolveBudget?.orSpent(cancellation) ?: cancellation,
@@ -198,6 +205,9 @@ object Presolver {
                         delta.droppedIndices,
                         delta.addedFactors,
                         deductionsChanged = delta.bounds != null,
+                    )
+                    for (inputs in linearInputs.values) inputs.recordDelta(
+                        current.factors, delta.droppedIndices, delta.addedFactors, deductionsChanged = delta.bounds != null,
                     )
                     current = current.withSourcePassDelta(delta) ?: return@observeRoundPass PassOutcome.INFEASIBLE
                     ctx = ctx.withObjective(delta.objective)
@@ -313,8 +323,15 @@ object Presolver {
             val entrySize = PresolveEntrySize(ctx.presolveBudget)
             val booleanPins = PresolveBooleanPins()
             var parityInputs: ParityInputRevision? = null
+            val linearInputs = HashMap<PresolvePass, LinearInputRevision>()
 
             override fun inputRevision(pass: PresolvePass): Long? {
+                if (pass == PresolvePass.STRENGTHEN_COEFFICIENTS || pass == PresolvePass.SPARSIFY_LINEAR_ROWS) {
+                    val inputs = linearInputs.getOrPut(pass) {
+                        LinearInputRevision(current, pass, ctx.presolveBudget?.orSpent(cancellation) ?: cancellation)
+                    }
+                    return inputs.current(current)
+                }
                 if (pass != PresolvePass.DERIVE_XOR_UNITS) return null
                 val inputs = parityInputs ?: ParityInputRevision(
                     current, ctx.presolveBudget?.orSpent(cancellation) ?: cancellation,
@@ -344,6 +361,9 @@ object Presolver {
                     val root = current.rootDeductions as? PropagationResult.Implied
                     booleanPins.record(invocation, delta.addedFactors) { root?.boolValueOrNull(it) != null }
                     parityInputs?.recordDelta(current.factors, delta.droppedIndices, delta.addedFactors)
+                    for (inputs in linearInputs.values) {
+                        inputs.recordDelta(current.factors, delta.droppedIndices, delta.addedFactors)
+                    }
                     current = current.withPassDelta(delta, ctx.bakeConfig)
                     ctx = ctx.withObjective(delta.objective)
                     PassOutcome.CHANGED
@@ -411,8 +431,20 @@ object Presolver {
             var subsumeMark: PresolveSession.ChangeMark? = null
             val booleanPins = PresolveBooleanPins()
             var parityInputs: ParityInputRevision? = null
+            val linearInputs = HashMap<PresolvePass, LinearInputRevision>()
 
             override fun inputRevision(pass: PresolvePass): Long? {
+                if (pass == PresolvePass.STRENGTHEN_COEFFICIENTS || pass == PresolvePass.SPARSIFY_LINEAR_ROWS) {
+                    val inputs = linearInputs.getOrPut(pass) {
+                        LinearInputRevision(
+                            session.passInput(), pass, ctx.presolveBudget?.orSpent(cancellation) ?: cancellation,
+                        )
+                    }
+                    return inputs.current { v ->
+                        val domain = session.intDomainOf(v)
+                        domain.min to domain.max
+                    }
+                }
                 if (pass != PresolvePass.DERIVE_XOR_UNITS) return null
                 val inputs = parityInputs ?: ParityInputRevision(
                     session.passInput(), ctx.presolveBudget?.orSpent(cancellation) ?: cancellation,
@@ -461,6 +493,9 @@ object Presolver {
                     changed += changedUnitsOf(delta, input.rootIntDomainsInPlace, invocation)
                     booleanPins.record(invocation, delta.addedFactors) { session.boolValueOf(it) != null }
                     parityInputs?.recordDelta(input.factors, delta.droppedIndices, delta.addedFactors)
+                    for (inputs in linearInputs.values) {
+                        inputs.recordDelta(input.factors, delta.droppedIndices, delta.addedFactors)
+                    }
                     session.applyDelta(delta)
                     ctx = ctx.withObjective(delta.objective)
                     PassOutcome.CHANGED
