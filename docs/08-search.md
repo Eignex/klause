@@ -446,6 +446,18 @@ Range-aware cumulative prefix energy also declines unrepresentable completions,
 window widths, areas and energy sums. Capacity ceilings use quotient and remainder
 so their rounding cannot overflow a representable surface.
 
+Finite backtrack workers with the LP family disabled enable a redundant unary
+projection inside fixed-data mandatory cumulatives over positive-duration tasks
+whose demands exceed half capacity. The original factor
+enforces every task. Selection keeps source task indices and admits 3–32 tasks
+from at most 128, capacities through `2^20`, durations through 4,096, and live
+windows through 4,096 with time magnitudes through `2^40`. Other shapes decline.
+The unary passes share the containing propagation allowance; their historical
+start reasons dispatch through the original cumulative. Retraction and interrupted
+fixpoints discard pending subset failure context with the containing factor.
+Shared preparation and workers using LP leave this projection disabled. Its policy
+belongs to the worker; propagators read only their state-owned admission flag.
+
 Unary resources also check overload over minimum durations while a duration is
 unfixed or a presence unknown. Present tasks whose minima cannot fit between their
 earliest start and latest completion conflict, and an unknown task whose minimum

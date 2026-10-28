@@ -44,10 +44,12 @@ internal class CumulativePropagator(
     private val resourceVars: IntArray,
     private val capacityVar: Int,
     private val n: Int,
+    private val unarySubset: HighDemandUnarySubset? = null,
 ) : InterruptiblePropagator {
 
     override fun interrupted(state: PropagationState, factorId: Int) {
         state.propagatorFailures.remove(this)
+        unarySubset?.clearFailure(state)
     }
 
     override val expensiveBake: Boolean get() = true
@@ -62,7 +64,9 @@ internal class CumulativePropagator(
         )
 
     override fun explain(state: PropagationState, factorId: Int, payload: IntArray, atTrail: Int, atLevel: Int) =
-        View(state, atTrail, atLevel).run {
+        if (payload[0] == HighDemandUnarySubset.REASON_TAG) {
+            requireNotNull(unarySubset).explain(state, factorId, payload, atTrail, atLevel)
+        } else View(state, atTrail, atLevel).run {
             explainPayload(payload)
             literals()
         }
@@ -219,7 +223,12 @@ internal class CumulativePropagator(
             }
             if (newMax != oldMax && !tightenMax(state, v, newMax, packed(TIME_TABLE, i, 0, newMax))) return false
         }
-        return true
+        val subset = unarySubset?.takeIf { state.cumulativeUnarySubsets } ?: return true
+        subset.clearFailure(state)
+        if (subset.propagate(state, factorId)) return true
+        subset.conflictReason(state, factorId)?.let { state.propagatorFailures[this] = it }
+        subset.clearFailure(state)
+        return false
     }
 
     private fun minDur(state: PropagationState, i: Int): Long =

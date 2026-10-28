@@ -10,6 +10,7 @@ internal class PropagationPreparation(
     private val cancellation: Cancellation,
     private val propagationCancelFloor: Int,
     private val pbLearning: Boolean,
+    private val cumulativeUnarySubsets: Boolean = false,
 ) {
     private val projections = PropagationProblem.preparation(problem)
     private var projection: PropagationProblem? = null
@@ -38,6 +39,7 @@ internal class PropagationPreparation(
             val builder = states ?: PropagationState.preparation(projected, pbLearning).also { states = it }
             state = builder.next()?.also {
                 it.cancelFloor = propagationCancelFloor
+                it.cumulativeUnarySubsets = cumulativeUnarySubsets
                 states = null
             }
             return null

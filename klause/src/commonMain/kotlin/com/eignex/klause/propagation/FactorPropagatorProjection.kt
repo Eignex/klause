@@ -209,6 +209,7 @@ private fun Cumulative.cumulativePropagator(): Propagator = if (unary) {
         resourceVars,
         capacityVar,
         n,
+        highDemandUnarySubset(),
     )
 }
 

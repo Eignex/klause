@@ -18,6 +18,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -29,6 +30,7 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.minimizeInt
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.UnsoundnessException
@@ -56,6 +58,34 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class BacktrackSolverTest {
+    @Test
+    fun `LP free satisfaction should consume a cumulative subset conflict before deciding`() {
+        val problem = Problem(0, 4, arrayOf(
+            IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(100, 100),
+        ), arrayOf<Factor>(Cumulative(
+            intArrayOf(0, 1, 2, 3), longArrayOf(2, 2, 2, 1), longArrayOf(2, 2, 2, 1), 3,
+        )))
+
+        val result = BacktrackSolver(problem.bake()).solve(BacktrackParams(maxDecisions = 0))
+
+        assertIs<SolveResult.Unsat>(result)
+    }
+
+    @Test
+    fun `LP free minimization should consume a cumulative subset conflict before deciding`() {
+        val problem = Problem(0, 4, arrayOf(
+            IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(100, 100),
+        ), arrayOf<Factor>(Cumulative(
+            intArrayOf(0, 1, 2, 3), longArrayOf(2, 2, 2, 1), longArrayOf(2, 2, 2, 1), 3,
+        )))
+
+        val result = BacktrackSolver(problem.bake()).minimize(
+            problem.minimizeInt(0), BacktrackParams(maxDecisions = 0),
+        )
+
+        assertIs<MinimizeResult.Infeasible>(result)
+    }
+
     @Test
     fun `a completed satisfaction call should release its additional peers`() {
         var closes = 0

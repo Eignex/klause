@@ -431,3 +431,9 @@ data class BacktrackParams(
         private fun merge(a: Assumptions, b: Assumptions): Assumptions = a.mergedWith(b)
     }
 }
+
+// Additional native scheduling bounds can disrupt LP branch guidance.
+internal val BacktrackParams.useCumulativeUnarySubsets: Boolean
+    get() = lpPlan.copy(branching = true, rootCutHarvest = true) == LpPlan() && lpConfig.let { config ->
+        config == null || (config.emphasis == LpEmphasis.OFF && config.overrides.values.none { it })
+    }
