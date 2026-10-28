@@ -16,6 +16,7 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.solver.ResumableSearch
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.FiniteEngine
@@ -126,6 +127,15 @@ internal object CoreQueryLearningProfile {
                         ))
                         val elapsed = System.nanoTime() - begin
                         val allocated = bean.getThreadAllocatedBytes(thread) - beginBytes
+                        val checkStart = System.nanoTime()
+                        val point = (result as? SolveResult.Sat)?.assignment?.let { assignment ->
+                            val local = Sample(BooleanArray(model.numBoolVars) { assignment.boolValue(it) },
+                                LongArray(model.numIntVars) { assignment.intValue(it) })
+                            ordinary?.reconstruct?.invoke(local) ?: local
+                        }
+                        val accepted = point?.let { CoreQueryProfile.checkPoint(sourceBaked, it) }
+                        if (point != null) check(accepted == true)
+                        val checkNs = System.nanoTime() - checkStart
                         val record = buildJsonObject {
                             put("sourceSha256", sha256(sourceText.encodeToByteArray()))
                             put("prepared", prepared)
@@ -148,6 +158,9 @@ internal object CoreQueryLearningProfile {
                             put("propagation", result.stats.search.propagationWork.sum)
                             put("falseQVisits", falseQVisits)
                             put("sourceQCoordinatesAvailable", !prepared)
+                            put("sourceAccepted", accepted)
+                            put("sourceObjective", point?.let { objective.evaluateLong(it) })
+                            put("sourceCheckNs", checkNs)
                             put("elapsedNsIncludingConstruction", elapsed)
                             put("threadBytesIncludingConstruction", allocated)
                             put("priorVerificationNs", verificationNs)
@@ -180,6 +193,22 @@ internal object CoreQueryLearningProfile {
                 }.toString())
                 output.flush()
             }
+            val conditioned = Problem(2, 0, emptyArray(), arrayOf(
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            )).bake()
+            val rejectedUnit = BacktrackSolver(conditioned).solve(BacktrackParams(
+                assumptions = Assumptions(bools = mapOf(0 to false)),
+                cancellation = lifetime or Cancellation.after(500.milliseconds),
+            ))
+            check(rejectedUnit is SolveResult.Sat)
+            out.resolve("conditioned-unit.json").writeText(buildJsonObject {
+                put("source", "q or a")
+                put("candidate", "q, implied under a=false")
+                put("sourceNegationResult", rejectedUnit.javaClass.simpleName)
+                put("retained", false)
+                put("privateAuxiliariesAdmitted", false)
+                put("crossSourceImportAdmitted", false)
+            }.toString())
         }
     }
 
