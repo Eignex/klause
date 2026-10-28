@@ -245,6 +245,10 @@ scratch, watchers and failure contexts belong to each state. Undo discards pendi
 failure context, and fresh presolve rebuilds keep the originating cancellation token;
 see [presolve](07-presolve.md).
 
+Learned integer rows subscribe to lower/upper bound events in the dynamic watch
+index. Learned-store compaction removes retired subscriptions and remaps surviving
+factor identities; static event and delta-consumer indexes retain their source ids.
+
 Boolean-only models journal each pin without integer-state padding. Integer undo
 replays saved domains and interior carves. Unconditional root carves are kept in
 state-owned interval runs, so late equality atoms and historical queries still see

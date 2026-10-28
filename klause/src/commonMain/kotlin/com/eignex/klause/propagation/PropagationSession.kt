@@ -9,6 +9,7 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.result.ValueOrderingStatsSink
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
@@ -693,6 +694,38 @@ class PropagationSession private constructor(
     ): PropagationResult =
         registerAndPropagate(base = state.undoTop) { state.addLearnedPb(weights, literals, degree, lbd, permanent) }
 
+    /** Enable bounded mandatory integer-row learning for subsequent finite conflicts. */
+    fun enableIntegerRowLearning() {
+        check(!state.incremental)
+        state.integerRowLearning = true
+        state.integerLearningTrailAtLevel = { level ->
+            if (level in 0 until levelTop) levelStates[level]?.undoSize else null
+        }
+    }
+
+    internal fun addLearnedIntegerRow(row: IntegerConflictRow, lbd: Int): PropagationResult =
+        registerAndPropagate(base = state.undoTop) { state.addLearnedIntegerRow(row, lbd) }
+
+    internal fun learnedConstraintSatisfied(learned: ConflictAnalyzer.AnalysisResult.LearnedConstraint): Boolean =
+        when (learned) {
+            is ConflictAnalyzer.AnalysisResult.Learned -> learned.literals.any { litTruth(it) == true }
+            is ConflictAnalyzer.AnalysisResult.LearnedPb -> {
+                var trueWeight = 0L
+                for (index in learned.literals.indices) {
+                    if (litTruth(learned.literals[index]) == true) trueWeight += learned.weights[index]
+                }
+                trueWeight >= learned.degree
+            }
+            is ConflictAnalyzer.AnalysisResult.LearnedIntegerRow -> try {
+                learned.row.maximum(state) <= learned.row.bound
+            } catch (_: CheckedLongOverflowException) {
+                false
+            } catch (_: FinitePropagationInterrupted) {
+                state.runCancelled = true
+                false
+            }
+        }
+
     /** Shared body of [addLearnedClause] / [addLearnedPb]: register the constraint via [register], fire it
      *  once, and either surface the cascaded conflict or re-baseline the level with the asserted facts. */
     private inline fun registerAndPropagate(base: Int, register: () -> Int): PropagationResult {
@@ -816,7 +849,7 @@ class PropagationSession private constructor(
      *  not the general database, so clause-database introspection routes differently. */
     val usesNativeSat: Boolean get() = state.nativeEngine != null
 
-    /** Current learned-clause count. Used by the engine to decide whether to invoke
+    /** Current learned-constraint count, including PB constraints and integer rows. Used to invoke
      *  [forgetLearnedClauses] based on `BacktrackParams.maxLearnedClauses`. */
     val learnedClauseCount: Int get() = state.nativeEngine?.count ?: state.learnedClauses.size
 

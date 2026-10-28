@@ -11,6 +11,7 @@ Commands run from the repository root unless shown otherwise.
 |---|---|
 | Select problems or solve one | [Build](#build-and-run), [selection](#selection-and-named-sets), [corpus](#catalog-and-corpus) |
 | Run experiments, comparisons or schedules | [Klause-lab](#klause-lab) |
+| Integrate a repository-owned suite | [Bench SDK adapter](#bench-sdk-adapter) |
 | Read a solve record | [Provenance](#installed-build-provenance), [records](#saved-results), [witnesses](#witness-records) |
 | Investigate cost | [Profiling](#profiling), [LP replay](#lp-capture-and-replay) |
 | Review retained design decisions | [Design evidence](#design-evidence) |
@@ -71,6 +72,44 @@ Write experiments as described in the lab's
 and profile jobs as in its
 [profile jobs guide](https://github.com/Eignex/klause-lab/blob/main/deploy/SETUP.md#profile-jobs).
 Arm values are `solve-one` options; `param.<name>` becomes `--param <name>=<value>`.
+
+## Bench SDK adapter
+
+`lab/bench.json` owns the build tasks, main and classpath for the JVM adapter.
+It builds the installed CLI with `installJvmDist` and the bench distribution
+with `installDist`. Only `klause-bench` imports `com.eignex:lab-bench:0.1.0`.
+
+The default dependency resolves [Lab Bench 0.1.0](https://github.com/Eignex/eignex-lab/releases/tag/lab-bench-v0.1.0)
+from public GitHub Release assets without a GitHub login or token. Prepare the adapter with:
+
+```sh
+./gradlew :klause-cli:installJvmDist :klause-bench:installDist
+```
+
+`-PlabBenchVersion=VERSION` selects a different SDK release. To develop against a
+local SDK checkout, run `./gradlew :lab-bench:stageAdapterRepository -PbenchVersion=0.1.0`
+in that checkout, then add
+`-PlabBenchRepository=file:///absolute/eignex-lab/lab-bench/build/adapter-repository`
+to the consumer build. Refresh dependencies when restaging the same version.
+
+A lab submission uses `repository: "Eignex/klause"` and
+`bench: {"manifest":"klause-bench/lab/bench.json","request":{"parameters":{"suite":"dimacs-core","name":"php4","timeout-ms":"1000"}}}`.
+The planner accepts the catalog selectors `suite`, `set`, `name`, `category`,
+`tag`, `kind`, `per-family`, `seed`, `max` and `balance`, and expands `engines`,
+`solver-seeds` and `repeats`. Runtime keys are `cpus`, `memory-mib` (at least
+2048), `timeout-ms`, `lp`, `presolve`, `exact` and `param.NAME`.
+
+Plans pin resolved file inputs, their hashes, corpus locations and problem
+metadata. Execution reconstructs the file-backed reference from those frozen
+inputs without repeating corpus selection. MiniZinc companion/include files
+travel with the corpus. In-code problems are unavailable to this subprocess adapter.
+Each case retains its complete solve record, including exact objective text,
+witness, attribution, validation policy, source hashes, compiler identity and
+build/runtime provenance. Generic elapsed/time-to-best metrics supplement that
+record. Unsupported inputs remain domain outcomes; load and process errors fail
+the SDK case. The adapter sizes CLI heap and processor limits from its declared
+resources. The legacy experiment path remains available for reference arms and
+paired A/B comparisons; a bench request names one source revision.
 
 ## Selection and named sets
 
@@ -7213,40 +7252,46 @@ Mixed automatic admission remains disabled. Raw records, JFR, distribution hashe
 resource receipts and the failed attempt are retained outside Git under
 `klause-evidence/campaigns/finite-conflict-learning-3727-3728/` beside the primary checkout.
 
-## Bench SDK adapter
+### Finite integer conflict rows
 
-`lab/bench.json` owns the build tasks, main and classpath for the JVM adapter.
-It builds the installed CLI with `installJvmDist` and the bench distribution
-with `installDist`. Only `klause-bench` imports `com.eignex:lab-bench:0.1.0`.
+`IntegerRowLearningProfile` compares clause and explicitly enabled integer-row
+learning with PB disabled on the retained finite projection `2*x+y<=z`,
+`2*x-y<=0`, `x=0..6`, `y=0..12`, `z=0..24`. It reaches the same conflict at
+`z<=7`, `x>=2`, applies the shared/native backjump contract, then reuses the store
+after undo at `z<=11`, `15` and `23`. The row `4*x<=z` asserts `x<=1`
+and tighten sibling upper bounds to `2`, `3` and `5`; individual rows reach
+`5`, `6` and `6`, and the original endpoint clause is inactive there.
 
-The default dependency resolves [Lab Bench 0.1.0](https://github.com/Eignex/eignex-lab/releases/tag/lab-bench-v0.1.0)
-from public GitHub Release assets without a GitHub login or token. Prepare the adapter with:
+The eight records retain actual row reason identities, native/shared store counts,
+cumulative finite work, total elapsed/current-thread allocations and explicit
+feasible source points checked in fresh native sessions. There is no independent
+witness or exported-proof check. Construction deliberately retains the finite
+projection without presolve or LP: difference extraction excludes the three-term
+and non-unit coefficient shapes, binary substitution requires Boolean domains,
+and LP/OBBT can discharge the inference. This applicability control establishes no
+advantage over preparation or default admission. Later qualification must compare
+consumed reuse and full costs with ordinary CP, normal presolve/LP and clause controls.
 
-```sh
-./gradlew :klause-cli:installJvmDist :klause-bench:installDist
-```
+[Lab 8863](https://lab.eignex.com/jobs/8863) completes all eight records at
+`1ce848b6e06d77f86ffc8569ff601c9b40b92b76`, with PB disabled. One stored row owns
+the original assertion and all three later sibling deductions; the clause arm
+retains no row and reaches the weaker sibling bounds above. All eight emitted
+source points pass fresh native checks. The Linux amd64, Temurin
+`25.0.4.1+1-LTS` execution has a hard cgroup budget of one vCPU and 4608 MiB.
 
-`-PlabBenchVersion=VERSION` selects a different SDK release. To develop against a
-local SDK checkout, run `./gradlew :lab-bench:stageAdapterRepository -PbenchVersion=0.1.0`
-in that checkout, then add
-`-PlabBenchRepository=file:///absolute/eignex-lab/lab-bench/build/adapter-repository`
-to the consumer build. Refresh dependencies when restaging the same version.
+Final cumulative native finite work is 233 for clauses and 370 for row learning;
+native store counts are 8 and 12, including channeling clauses, and shared stores
+remain empty. Cumulative elapsed/current-thread allocation checkpoints include
+preparation, point rechecks and prior record writing. The first clause arm includes
+class loading: its final checkpoint is about 389 ms/10.24 MB versus 20.5 ms/0.658 MB
+for the subsequent row arm. Ordered warmup and overlapping cumulative checkpoints
+prevent any timing/allocation advantage claim; do not sum checkpoints. No normal
+presolve/LP comparison or broad qualification was run. The experimental flag stays
+disabled by default.
 
-A lab submission uses `repository: "Eignex/klause"` and
-`bench: {"manifest":"klause-bench/lab/bench.json","request":{"parameters":{"suite":"dimacs-core","name":"php4","timeout-ms":"1000"}}}`.
-The planner accepts the catalog selectors `suite`, `set`, `name`, `category`,
-`tag`, `kind`, `per-family`, `seed`, `max` and `balance`, and expands `engines`,
-`solver-seeds` and `repeats`. Runtime keys are `cpus`, `memory-mib` (at least
-2048), `timeout-ms`, `lp`, `presolve`, `exact` and `param.NAME`.
-
-Plans pin resolved file inputs, their hashes, corpus locations and problem
-metadata. Execution reconstructs the file-backed reference from those frozen
-inputs without repeating corpus selection. MiniZinc companion/include files
-travel with the corpus. In-code problems are unavailable to this subprocess adapter.
-Each case retains its complete solve record, including exact objective text,
-witness, attribution, validation policy, source hashes, compiler identity and
-build/runtime provenance. Generic elapsed/time-to-best metrics supplement that
-record. Unsupported inputs remain domain outcomes; load and process errors fail
-the SDK case. The adapter sizes CLI heap and processor limits from its declared
-resources. The legacy experiment path remains available for reference arms and
-paired A/B comparisons; a bench request names one source revision.
+Initial native CI exposed a failed shared-scope backjump mapping in the direct
+controls; the production traversal control passed, and the corrected mapping passes
+both routes. Job 8861 was cancelled during preparation after that finding and
+executed no cases. Raw records, source points, hashes, JFR, resource receipts,
+CI reports and the cancelled attempt are retained outside Git under
+`klause-evidence/campaigns/finite-conflict-learning-3727-3728/` beside the primary checkout.

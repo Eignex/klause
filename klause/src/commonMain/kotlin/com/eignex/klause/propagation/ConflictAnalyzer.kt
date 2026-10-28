@@ -88,8 +88,10 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
             /** True iff popping to [backjumpLevel] makes the constraint unit-propagate its asserting literal. */
             val asserting: Boolean
 
-            /** Literals used by the engine's assert guards (already-true check) and the relearn-cycle hash. */
+            /** Literal metadata for clauses and PB constraints; integer rows expose no endpoint disjunction. */
             val guardLiterals: IntArray
+
+            val isContradiction: Boolean get() = this is Learned && literals.isEmpty()
         }
 
         /** A learned conflict clause with its backjump target and glue metric. */
@@ -155,6 +157,17 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
                     "backjumpLevel=$backjumpLevel, lbd=$lbd)"
         }
 
+        class LearnedIntegerRow(
+            val row: IntegerConflictRow,
+            override val backjumpLevel: Int,
+            override val lbd: Int,
+            override val decisionLevels: IntArray,
+            val fallbackClause: Learned,
+        ) : LearnedConstraint {
+            override val asserting: Boolean = true
+            override val guardLiterals: IntArray = EmptyIntArray
+        }
+
         /** Analysis couldn't produce a usable nogood (no conflict reason, or a conflict at the root). */
         data object NotApplicable : AnalysisResult
     }
@@ -195,9 +208,9 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
 
     private inline fun boundedAnalysis(analyze: () -> AnalysisResult): AnalysisResult = try {
         state.finiteWork.begin()
-        if (pbResolvent != null) state.finiteWork.checkNow()
+        if (pbResolvent != null || state.integerRowLearning) state.finiteWork.checkNow()
         val result = analyze()
-        if (pbResolvent != null) state.finiteWork.checkNow()
+        if (pbResolvent != null || state.integerRowLearning) state.finiteWork.checkNow()
         if (state.runCancelled) AnalysisResult.NotApplicable else result
     } catch (_: FinitePropagationInterrupted) {
         state.runCancelled = true
@@ -275,6 +288,21 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
     private fun analyzeFromSeed(seedReason: IntArray, currentLevel: Int, seedFactorId: Int = -1): AnalysisResult {
         if (currentLevel <= 0) return AnalysisResult.NotApplicable
         universe = state.problem.numBoolVars + state.atoms.intVar.size
+
+        if (state.integerRowLearning && seedFactorId >= 0) {
+            val fallback = runResolution(clauseResolvent, seedReason, currentLevel)
+            val row = (fallback as? AnalysisResult.Learned)?.let {
+                IntegerConflictLearner(state).learn(seedFactorId, currentLevel, it)
+            }
+            if (row != null) {
+                lastResolvent = clauseResolvent
+                return row
+            }
+            if (pbResolvent == null) {
+                lastResolvent = clauseResolvent
+                return fallback
+            }
+        }
 
         pbResolvent?.let { pb ->
             pb.seedFactorId = seedFactorId

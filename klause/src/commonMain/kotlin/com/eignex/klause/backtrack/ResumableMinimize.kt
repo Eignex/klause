@@ -387,13 +387,13 @@ internal class ResumableMinimize(
             params = params.copy(valueSelector = SolutionGuided(IndomainBest(objective)))
         }
         cp = CpSearchComponent(
-            preparedSession ?: PropagationSession(
+            (preparedSession ?: PropagationSession(
                 solver.propagationProjection(params.nativeSat ?: true, problem),
                 cancelledWhen(::runDeadline) { solveCancelled() },
                 params.propagationCancelFloor,
                 nativeSat = params.nativeSat ?: true,
                 pbLearning = params.pbLearning ?: (problem.numIntVars == 0),
-            ),
+            )).also { if (params.integerRowLearning) it.enableIntegerRowLearning() },
             branching = CpBranching.None,
         ).also {
             it.conflictStats = sink.ca
@@ -1249,7 +1249,7 @@ internal class ResumableMinimize(
             val learned = lpEngine.lastBackjump()
             return if (learned != null &&
                 learned.asserting &&
-                learned.guardLiterals.none { session.litTruth(it) == true }
+                !session.learnedConstraintSatisfied(learned)
             ) {
                 sink.lp.observeBackjump()
                 SearchNodeDisposition.Backjump(LpLearnedConflict(learned))
@@ -1267,7 +1267,7 @@ internal class ResumableMinimize(
         override val decisionLevels: IntArray get() = learned.decisionLevels
 
         override fun apply(session: com.eignex.klause.solver.search.SearchSession): SearchLearnedConflictResult {
-            if (!learned.asserting || learned.guardLiterals.isEmpty()) {
+            if (!learned.asserting || learned.isContradiction) {
                 return SearchLearnedConflictResult.Chronological
             }
             val result = when (learned) {
@@ -1282,6 +1282,10 @@ internal class ResumableMinimize(
                         learned.degree,
                         learned.lbd,
                     )
+                }
+
+                is com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.LearnedIntegerRow -> {
+                    this@ResumableMinimize.session.addLearnedIntegerRow(learned.row, learned.lbd)
                 }
             }
             return when (result) {
@@ -1305,7 +1309,7 @@ internal class ResumableMinimize(
                     when {
                         next == null -> SearchLearnedConflictResult.Chronological
 
-                        next.backjumpLevel == 0 && next.guardLiterals.isEmpty() -> {
+                        next.backjumpLevel == 0 && next.isContradiction -> {
                             SearchLearnedConflictResult.Exhausted
                         }
 

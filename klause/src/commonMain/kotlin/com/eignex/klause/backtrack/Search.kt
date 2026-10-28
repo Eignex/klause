@@ -177,7 +177,7 @@ internal class CpSatisfactionTraversal(
             params.propagationCancelFloor,
             nativeSat = params.nativeSat ?: true,
             pbLearning = params.pbLearning ?: (problem.numIntVars == 0),
-        ),
+        ).also { if (params.integerRowLearning) it.enableIntegerRowLearning() },
         branching = CpBranching.None,
     ).also {
         it.conflictStats = sink?.ca

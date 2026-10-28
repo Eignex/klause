@@ -148,6 +148,30 @@ nonnegative combinations with Chvátal-Gomory rounding preserve implication. A s
 that declines, including signed-word overflow, falls back to clause resolution.
 Learned pseudo-Boolean constraints share clause retention.
 
+## Integer row learning
+
+`integerRowLearning` is opt-in and independent of pseudo-Boolean learning. Mandatory
+finite `Linear` inequalities and the explaining half of equalities provide integer
+rows. Each resolved endpoint must name an unextended historical linear reason from
+the same source row; historical holes, reification, disequalities, wide constants
+and unsupported projections retain clause fallback.
+
+Opposite-sign nonnegative combinations use checked signed arithmetic and integer
+gcd normalization. Each combination must remain conflicting. A retained row must
+propagate against the session's historical domains at its native backjump and the
+mapped shared target; literal counts do not establish assertion. Foreign unavailable
+bound premises retain clause analysis. The producer admits at most 16 terms, 16
+combinations, 64 native levels and 64 stored rows, with bounded duplicate lookup.
+
+Rows share the learned store and integer bounds propagation. Eager reasons freeze
+the historical clause premises without a compactable lazy factor id. Integer bound
+event subscriptions wake rows after undo and are remapped or removed on forgetting.
+Later conflicts use these retained rows' clause explanations; row combination loads
+only original mandatory source rows.
+Only clauses are shared across arms. Row satisfaction tests the complete maximum
+activity; a satisfied endpoint literal cannot discharge the row or certify a root
+contradiction.
+
 ## Learned-clause retention
 
 Native forgetting runs at restart boundaries only with a configured cap. Permanent
@@ -320,6 +344,8 @@ reason scans.
 
 Native CP and shared first-UIP outcomes are reported separately. Non-asserting counts
 identify chronological fallback, while zero does not establish explanation coverage.
+Native learned-constraint counts include integer rows; their terms do not count as
+Boolean learned literals.
 Missing metrics stay absent, including root theory results that never enter traversal.
 `smtCompleteSearch*` stage observations overlap and cannot be summed as a work total.
 [SearchStats](../klause/src/commonMain/kotlin/com/eignex/klause/solver/result/SearchStats.kt)

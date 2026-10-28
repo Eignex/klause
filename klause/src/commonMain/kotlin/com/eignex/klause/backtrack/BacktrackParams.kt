@@ -22,14 +22,14 @@ import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.ClauseExchange
 import com.eignex.klause.propagation.PROPAGATION_CANCEL_FLOOR
-import com.eignex.klause.solver.forInvocation
-import com.eignex.klause.solver.withLifetime
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolverParams
+import com.eignex.klause.solver.forInvocation
 import com.eignex.klause.solver.incumbent.IncumbentSource
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SharingChannel
 import com.eignex.klause.solver.search.SearchComponent
+import com.eignex.klause.solver.withLifetime
 import com.eignex.klause.util.Cancellation
 
 /**
@@ -383,6 +383,8 @@ data class BacktrackParams(
      * in any reached reason retains clause fallback.
      */
     val pbLearning: Boolean? = null,
+    /** Learn bounded mandatory integer rows from finite conflicts; disabled by default. */
+    val integerRowLearning: Boolean = false,
     /**
      * Enforce the incumbent as a refutable pseudo-Boolean cutoff for a pure-Boolean weighted objective
      * (no single objective variable): at the root each incumbent `K` posts `Σ boolWeights·x ≤ K − 1` as a

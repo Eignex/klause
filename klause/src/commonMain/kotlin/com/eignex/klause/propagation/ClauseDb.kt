@@ -121,6 +121,23 @@ internal fun PropagationState.addLearnedPb(
     return newFid
 }
 
+internal fun PropagationState.addLearnedIntegerRow(row: IntegerConflictRow, lbd: Int): Int {
+    check(intEvents.on)
+    val propagator = LearnedIntegerPropagator(row)
+    val factor = totalFactorCount
+    learned.store.add(propagator)
+    val rows = learned.integerRows ?: ArrayList<LearnedIntegerPropagator>().also { learned.integerRows = it }
+    rows.add(propagator)
+    learned.lbds.add(lbd)
+    learned.permanent.add(0)
+    learned.tier.add(ClauseTier.UNSET.ordinal)
+    learned.usedFlags.add(0)
+    learned.origins.add(OWN_ORIGIN)
+    refPayloadStore.add(null)
+    for (watch in propagator.initialIntEventWatches) intEvents.subscribeMidlife(watch, factor)
+    return factor
+}
+
 /** Convenience overload that converts a structural [Clause] to its [ClausePropagator] before registering. */
 internal fun PropagationState.addLearnedClause(
     clause: Clause,
@@ -216,9 +233,12 @@ internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd
     }
     if (newCount == n) return // nothing dropped
 
+    learned.integerRows?.clear()
     var w = 0
     for (i in 0 until n) {
         if (remap[i] >= 0) {
+            val propagator = learned.store[i]
+            if (propagator is LearnedIntegerPropagator) learned.integerRows?.add(propagator)
             learned.store[w] = learned.store[i]
             learned.lbds[w] = learned.lbds[i]
             learned.permanent[w] = learned.permanent[i]
@@ -300,6 +320,7 @@ internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd
     // surviving here indexes past the compacted clause array on the next drain.
     remapQueue(propQueue, remap, refBase)
     remapQueue(atoms.dirtyFactors, remap, refBase)
+    if (learned.integerRows != null) intEvents.remapLearned(remap, refBase)
 
     // The per-variable reason fields record which factor forced each currently-implied
     // value, learned-clause ids included. Level-0 facts — e.g. a permanent blocking nogood
