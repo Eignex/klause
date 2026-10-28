@@ -10,18 +10,74 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.factorAt
+import com.eignex.klause.propagation.mark
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.propagation.reasonOf
+import com.eignex.klause.propagation.undoTo
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class CumulativePropagatorTest {
+
+    @Test
+    fun `interrupted cumulative windows should rebuild before completing their root`() {
+        for (limit in listOf(4, 10, 30)) {
+            val n = 48
+            val problem = Problem(0, n, Array(n) { IntDomain(0, 100L + it) }, arrayOf<Factor>(
+                Cumulative(IntArray(n) { it }, LongArray(n) { 1L }, LongArray(n) { 1L }, n.toLong()),
+            ))
+            val state = PropagationState(problem, Assumptions.None)
+            state.beginRootFixpoint().forEach { }
+            var polls = 0
+
+            assertNull(state.advanceRootFixpoint(Cancellation { ++polls >= limit }))
+
+            assertTrue(state.rootFixpointPending)
+            assertFalse(state.runCancelled)
+            assertEquals(limit, polls)
+            while (state.rootFixpointPending) assertNull(state.advanceRootFixpoint(Cancellation.Never))
+            for (v in 0 until n) assertEquals(problem.intDomains[v], state.intDomains[v])
+        }
+    }
+
+    @Test
+    fun `undo should discard an interrupted cumulative bound and preserve sibling filtering`() {
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 4) }, arrayOf<Factor>(
+            Cumulative(intArrayOf(0, 1, 2), longArrayOf(2, 2, 2), longArrayOf(1, 1, 1), 2),
+        ))
+        val state = PropagationState(problem, Assumptions.None)
+        assertNull(state.runToFixpoint(allFactors = true))
+        state.undoLogging = true
+        val root = state.mark()
+        state.currentLevel = 1
+        check(state.tightenIntMax(0, 0))
+        check(state.tightenIntMax(1, 0))
+        val token = object : Cancellation {
+            override fun isCancelled(): Boolean = state.intDomains[2].min == 2L
+            override fun workMeter(): WorkMeter = WorkMeter { }
+        }
+
+        assertNull(state.runToFixpoint(allFactors = false, cancellation = token))
+
+        assertTrue(state.runCancelled)
+        assertEquals(2L, state.intDomains[2].min)
+        state.undoTo(root)
+        state.currentLevel = 1
+        check(state.tightenIntMin(0, 3))
+        check(state.tightenIntMin(1, 3))
+        assertNull(state.runToFixpoint(allFactors = false))
+        assertFalse(state.runCancelled)
+        assertEquals(IntDomain(0, 1), state.intDomains[2])
+    }
 
     @Test
     fun `cumulative deductions over optional tasks should be implied by their reasons`() {
