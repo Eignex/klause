@@ -172,7 +172,9 @@ class SymmetryBreakingTest {
 
             assertEquals(24, original.size)
             assertEquals(4, representatives.size)
-            assertEquals(original.map(objective::evaluateLong).toSet(), representatives.map(objective::evaluateLong).toSet())
+            assertEquals(
+                original.map(objective::evaluateLong).toSet(), representatives.map(objective::evaluateLong).toSet(),
+            )
             assertTrue(delta.addedFactors.none { it is ValuePrecede })
         }
     }
@@ -216,7 +218,9 @@ class SymmetryBreakingTest {
 
             assertEquals(7, original.size)
             assertEquals(3, representatives.size)
-            assertEquals(original.map(objective::evaluateLong).toSet(), representatives.map(objective::evaluateLong).toSet())
+            assertEquals(
+                original.map(objective::evaluateLong).toSet(), representatives.map(objective::evaluateLong).toSet(),
+            )
         }
     }
 
@@ -238,11 +242,15 @@ class SymmetryBreakingTest {
         val pass = PresolvePass.BREAK_OBJECTIVE_SYMMETRIES
 
         for (context in listOf(
-            PresolveContext.of(objective), exact.copy(solutionSetSensitive = true), exact.copy(modelBreaksSymmetry = true),
+            PresolveContext.of(objective),
+            exact.copy(solutionSetSensitive = true),
+            exact.copy(modelBreaksSymmetry = true),
         )) assertTrue(pass.applyFinite(problem, context).isEmpty)
         assertFalse(PresolveConfig.DEFAULT.resolved(pass, exact))
         assertFalse(PresolveConfig.parse("default,+objective-symmetry").forLocalSearch().resolved(pass, exact))
-        assertFalse(PresolveConfig.parse("off,+objective-symmetry").resolved(pass, exact.copy(solutionSetSensitive = true)))
+        assertFalse(PresolveConfig.parse("off,+objective-symmetry").resolved(
+            pass, exact.copy(solutionSetSensitive = true),
+        ))
     }
 
     @Test
@@ -262,7 +270,9 @@ class SymmetryBreakingTest {
     @Test
     fun `objective symmetry should keep unread objective columns fixed`() {
         val problem = Problem(0, 3, Array(3) { IntDomain(0, 3) }, listOf(AllDifferent(intArrayOf(0, 2)))).bake()
-        val context = PresolveContext.of(LinearObjective(intCoefficients = longArrayOf(1, 1, 1)), transformObjective = true)
+        val context = PresolveContext.of(
+            LinearObjective(intCoefficients = longArrayOf(1, 1, 1)), transformObjective = true,
+        )
 
         val delta = PresolvePass.BREAK_OBJECTIVE_SYMMETRIES.applyFinite(problem, context)
 
@@ -274,7 +284,9 @@ class SymmetryBreakingTest {
     fun `an interrupted objective symmetry scan should post no break`() {
         val problem = Problem(0, 3, Array(3) { IntDomain(0, 3) }, listOf(AllDifferent(intArrayOf(0, 1, 2)))).bake()
         val budget = PresolveBudget(1)
-        val context = PresolveContext.of(LinearObjective(intCoefficients = longArrayOf(1, 1, 1)), transformObjective = true)
+        val context = PresolveContext.of(
+            LinearObjective(intCoefficients = longArrayOf(1, 1, 1)), transformObjective = true,
+        )
             .withCancellation(budget.orSpent(Cancellation.Never))
 
         assertTrue(PresolvePass.BREAK_OBJECTIVE_SYMMETRIES.applyFinite(problem, context).isEmpty)
