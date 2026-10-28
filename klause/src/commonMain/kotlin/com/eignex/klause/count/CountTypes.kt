@@ -75,8 +75,10 @@ data class Count(
 /**
  * Configuration for anytime exact (projected) model counting
  * ([com.eignex.klause.solver.Solver.exactCount]). Counting walks the projection variables in a
- * fixed order, proving each partial assignment feasible or not via the solver; the result is a
- * deterministic interval that tightens to exact when the space is fully explored.
+ * fixed order, proving each partial assignment feasible or not via the solver. Independent Boolean
+ * clause components multiply their projected intervals under one shared feasibility-check budget;
+ * components without projected variables contribute existential feasibility. The deterministic
+ * interval tightens to exact when the count is established and representable.
  */
 data class ExactCountConfig(
     /** Boolean variable ids to count over; see [ApproxCountConfig.samplingSet] for defaulting. */
