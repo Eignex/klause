@@ -4137,73 +4137,69 @@ stages reach the 500-million-work allowance. Source model/data hashes match;
 FlatZinc differs only in generated path comments, with comment-free payload hash
 `7a5f6ba081138be4702d0d79fa4a7255ce9cd64524197f4a03d5bfb1ded5d9ef`.
 
-[Pilot 8936](https://lab.eignex.com/jobs/8936) compares main `56a06e3194` with
-candidate `6214c20e57` on that original identity, P1/seed 3, serial ten-second CP
-cases. Each pins one `lp-default` or `lp-aggressive` arm with matching preparation
-and LP ceilings. Linux/amd64 JDK 25.0.4.1 has a hard one-CPU, 4,608 MiB cgroup.
-Each pair below is baseline → candidate; all reported objectives remain unproven.
+[PR #3768](https://github.com/Eignex/klause/pull/3768) retains the single-identity/seed
+[pilot 8936](https://lab.eignex.com/jobs/8936): worse default progress and no aggressive
+improvement. Its legacy Gecode completion check is neither assignment-only validation
+nor an optimality proof. Compiler declines [8882](https://lab.eignex.com/jobs/8882)/
+[8888](https://lab.eignex.com/jobs/8888) and incompatible fixed/LP controls
+[8932](https://lab.eignex.com/jobs/8932) supply no search or cost result.
 
-| Controls | Reported objective | Nodes | CP propagation work | Peak CLI RSS (KiB) |
-|---|---:|---:|---:|---:|
-| Default | 1295 → 6581 | 524 → 292 | 18,952,922 → 56,358,713 | 239,680 → 221,008 |
-| Aggressive | 6581 → 6581 | 104 → 103 | 79,799 → 890,484 | 256,244 → 271,796 |
+Non-root captures use temporary `CumulativeWindowProfile` implementations at
+`c3b7fcb211` and `9ad04bea0f`, original TestScheduling instances, default preparation,
+seeds 3/7, 512 decisions and a 20-second safety deadline. Controls disable the pass,
+scan exhaustively, sweep completion-ordered energy with suffix minimum slack, or
+add zero-load, fixed-profile and global-energy eligibility guards. Hooks attach at
+the first selector pick; every control shares initial preparation/root propagation.
+These instrumented captures establish no throughput or source-verdict claim.
 
-Whole-CLI wall time is 10.40–10.48 seconds; LP runs in all four cases. The lab
-records legacy `lab-minizinc-gecode-v1` checks as valid after completing the model
-with reported output variables fixed. These receipts do not establish an
-assignment-only checker or an optimality proof. The single-identity/seed pilot
-supports rejecting this candidate's default admission, without a universal
-performance claim. That pilot does not settle non-root filter yield or justify
-closing the broader resource-choice work.
-Earlier [8882](https://lab.eignex.com/jobs/8882)/[8888](https://lab.eignex.com/jobs/8888)
-compiler declines and [8932](https://lab.eignex.com/jobs/8932)'s invalid fixed-engine
-LP configuration establish no search or cost result.
+[8961](https://lab.eignex.com/jobs/8961) and [8962](https://lab.eignex.com/jobs/8962)
+retain six/eight strict demand bounds on `2023/test-scheduling/t20m10r10-17` and
+five/19 on `2018/test-scheduling/t30m10r3-15`. A recorded channel consumes demand
+44's bound to zero: machine variable 5 changes from `1..7` to `2..7`.
+[8979](https://lab.eignex.com/jobs/8979)'s guards preserve every completed domain/choice
+digest. Each pair below is seeds 3/7; work counts cover native propagation visits.
 
-Non-root admission captures at `c3b7fcb211` use a temporary, opt-in
-`CumulativeWindowProfile` over the original sources, default preparation, seeds
-3/7 and 512 decisions with a 20-second safety deadline. Controls disable the pass,
-retain the exhaustive scan, skip zero-load scans, or use the guarded completion
-sweep. Hooks attach at the first selector pick; preparation and initial root use
-the same sweep in every control. Retained root domains match. These instrumented
-runs diagnose yield, without CLI throughput or source-verdict claims.
+| Instance | Exhaustive work | Fully guarded work | Pass disabled |
+|---|---:|---:|---:|
+| 20 tasks | 51.0M / 50.8M | 9.0M / 10.0M | 8.6M / 9.6M |
+| 30 tasks | 109.3M / 62.1M | 10.8M / 4.5M | 8.7M / 2.8M |
 
-[8961](https://lab.eignex.com/jobs/8961) retains six/eight strict demand bounds on
-TestScheduling-20 with LP off. A saved channel consumes demand 44's bound to zero:
-machine variable 5 changes from `1..7` to `2..7`. The exhaustive scan and guarded
-sweep retain the same bound snapshots. Total propagation work is 51.0M/50.8M for
-the exhaustive scan, 11.2M/11.9M for the sweep and 8.6M/9.6M with it disabled.
-[8957](https://lab.eignex.com/jobs/8957) with default LP records no extra demand
-bounds: 36.8M → 17.0M work, versus 15.1M disabled.
-[8962](https://lab.eignex.com/jobs/8962) on original
-`2018/test-scheduling/t30m10r3-15` retains five/19 bounds; work is 109.3M/62.1M
-exhaustive, 15.0M/5.6M swept and 8.7M/2.8M disabled. All searches complete their
-decision allowance. Nodes and failures match the disabled controls, so these
-captures establish consumed inference and scan reduction, not avoided search or
-default admission. The temporary hooks and alternate scans are absent from runtime
-code; their frozen captures retain the diagnostic implementation.
+[8968](https://lab.eignex.com/jobs/8968)'s exact native domain digests differ at
+two/six completed picks on 20 tasks and 12/68 on 30 tasks; selected variables and
+levels match. [8966](https://lab.eignex.com/jobs/8966) extends the 20-task control
+to 4,096 decisions with unchanged nodes/failures and the same six/eight bounds.
+Default-LP captures [8957](https://lab.eignex.com/jobs/8957) emit no extra demand
+bounds; fixed-profile eligibility [8972](https://lab.eignex.com/jobs/8972) cuts scans
+from 3,629 to 26, with 15.29M work versus 15.07M disabled. Native failed-choice
+probes at four saved, hash-matched prefixes are retained in
+[8996](https://lab.eignex.com/jobs/8996). Each selected demand remains `0..1` under
+ordinary propagation; probing 1 refutes that choice and undo restores its parent
+domains and level. These are choice-relative native refutations, not source verdicts.
 
-[8968](https://lab.eignex.com/jobs/8968), at `610423671c`, compares exact canonical
-domain digests at completed selector picks. The 20-task instance differs at two/six
-picks and the 30-task instance at 12/68; selected variables and levels match throughout.
-The exclusions therefore survive ordinary fixpoints, but do not change these branch
-choices. [8966](https://lab.eignex.com/jobs/8966) extends the 20-task control to 4,096
-decisions with the same six/eight bounds and unchanged nodes/failures.
+The uninstrumented sweep [8965](https://lab.eignex.com/jobs/8965) fails its 48-case
+cost gate; [8977](https://lab.eignex.com/jobs/8977)'s 16 first-fail controls show no
+repeatable gain. Final gate [8988](https://lab.eignex.com/jobs/8988) compares original
+`48ff493b06`, overflow-only `c183bab38f` and fully guarded `0f3cb352b8` in 56 serial
+P1 ten-second resource captures. CP controls use old/safe/candidate/candidate/safe/old
+ordering; default/aggressive LP use safe/candidate ABBA, on both instances and seeds.
 
-Fixed-profile eligibility captures [8971](https://lab.eignex.com/jobs/8971) preserve
-every completed domain/choice digest on both instances. Under default LP,
-[8972](https://lab.eignex.com/jobs/8972) reduces scans from 3,629 to 26; its propagation
-work is 15.29M versus 15.07M with the window pass disabled. Global-energy eligibility
-and deferred scratch allocation require a separate uninstrumented admission check.
+| Control | Overflow-only baseline | Fully guarded candidate |
+|---|---|---|
+| 20 tasks, default LP | Reports 1295 in 3/4 runs | Reports 6581 in 4/4 runs |
+| 30 tasks, CP only | Reports a witness in 4/4 runs | Reports a witness in 3/4 runs |
+| Both, aggressive LP | No candidate objective improvement | Same reported cutoffs |
 
-[8965](https://lab.eignex.com/jobs/8965) is the rejected uninstrumented sweep control
-at `215627f9f1`: 48 serial P1 ten-second CP/default-LP/aggressive-LP cases, two original
-instances, seeds 3/7 and balanced ABBA replicas against `48ff493b06`. On the 30-task
-CP-only instance, four baseline runs report a witness and four candidate runs report
-none. [8977](https://lab.eignex.com/jobs/8977)'s 16 first-fail cases establish no
-repeatable gain. The maintained lab reports assignment-only MiniZinc checking as
-unsupported, so these objectives are reported values, not independently checked source
-results or optimality claims. An overflow-only prefix control separates checked
-arithmetic cost from the window mechanism in subsequent comparisons.
+All 56 captures are uninstrumented with debug statistics enabled. The lab reports
+assignment-only MiniZinc checking as unsupported for 55 reported witnesses; one run
+has no witness. These objectives are reported values, without independent source
+validation or optimality claims. Runtime/resource receipts and original-source hashes
+are retained with the jobs.
+
+Admission is declined for the eager, at-most-32-task fixed-duration demand-window
+mechanism: observed inference and scan reduction do not offset its total pipeline
+cost in these controls. Runtime propagation retains the ordinary passes with
+overflow-safe prefix arithmetic. This bounded rejection makes no universal claim
+about other subwindow mechanisms or source families.
 
 ### Source task-order applicability
 
