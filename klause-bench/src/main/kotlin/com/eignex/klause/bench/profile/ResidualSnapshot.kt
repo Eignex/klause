@@ -121,9 +121,10 @@ internal object ResidualSnapshots {
                 sourceIdentity, preparationIdentity)
             val learned = inspection.entries.map { entry ->
                 check(!stop()) { "interrupted" }
+                val retained = model(prepared.numBoolVars, listOf(requireNotNull(entry.factor)))
                 ResidualRestrictionDocument(
                     entry.storeIndex, entry.permanentRetention, "unavailable", condition,
-                    codec.encodeToJsonElement(model(prepared.numBoolVars, listOf(requireNotNull(entry.factor))))),
+                    codec.encodeToJsonElement(retained),
                 )
             }
             val source = sourceClauses(prepared, values, stop)
