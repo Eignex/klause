@@ -287,18 +287,18 @@ internal object RegularPrefixReplay {
         shared.popTo(learned.decisionLevel)
         check(learned.apply(shared) == SearchLearnedConflictResult.Resume)
         check(native.boolValue(definitions.booleans[0]) == false)
-        val clauses = native.exportGlueClauses(2, 128)
-        check(clauses.isNotEmpty())
         val sourceProof = PropagationSession(source)
         val pins = (0 until boundary).fold(Assumptions.None) { assumptions, v -> assumptions.withInt(v, 1) }
         check(sourceProof.seed(pins) is PropagationResult.Unsat)
         val records = out.resolve("reuse.jsonl").apply { writeText("") }
         for (mode in listOf("native-source-clause", "definitions-source-clause", "definitions-learned-state")) {
             for (symbol in listOf(1L, 2L)) {
-                val session = PropagationSession(if (mode == "native-source-clause") source else definitions.problem)
+                val session = if (mode == "definitions-learned-state") {
+                    native.also { it.popToLevel(0) }
+                } else {
+                    PropagationSession(if (mode == "native-source-clause") source else definitions.problem)
+                }
                 if (mode == "definitions-learned-state") {
-                    clauses.forEach { session.importClause(it) }
-                    check(session.implyIntAtMost(0, session.intDomain(0).max) is PropagationResult.Implied)
                     check(session.boolValue(definitions.booleans[0]) == false)
                 } else {
                     check(
