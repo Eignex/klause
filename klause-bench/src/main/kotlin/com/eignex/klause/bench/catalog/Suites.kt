@@ -32,6 +32,7 @@ internal object Suites {
         ) + QfNraSuites.all + QfNraCanonicalSuite.suite + QfNraPartialConflictSuite.suite +
             QfNraCoupledSuite.suite + QfNraPreparedSupportSuite.suite +
             NonlinearIntegerSuite.suite + NonlinearIntegerCellSuite.suite + NonlinearIntegerResidueSuite.suite +
+            NonlinearIntegerImageSuite.suite +
             DivModSuite.suite + AbsSuite.suite +
             ContinuousArithmeticSuite.suite + MpsLinearSourceSuite.suite +
             SourceOwnershipSuite.suite + ExactGlobalsSuite.suite + SourceEqualitySuite.suite

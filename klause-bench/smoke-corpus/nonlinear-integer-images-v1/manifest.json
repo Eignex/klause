@@ -1,0 +1,21 @@
+{
+  "license": "Apache-2.0",
+  "attribution": "Self-authored Eignex Klause fixtures",
+  "cases": [
+    {
+      "name": "powers-seven",
+      "sha256": "304af96d2b3885da7750ff09b77e372edf6f08e33406771e7b2b262310e2bb04",
+      "expected": "UNSAT"
+    },
+    {
+      "name": "powers-three",
+      "sha256": "c3d624c962d5d049d07cb1535f48e810823d05b58a8f90221fa8b05743df880d",
+      "expected": "SAT"
+    },
+    {
+      "name": "powers-four",
+      "sha256": "27633bdb4e84fb4f7da04b684815d97c1b21759ebfc2c100d6f8017753d05435",
+      "expected": "SAT"
+    }
+  ]
+}
