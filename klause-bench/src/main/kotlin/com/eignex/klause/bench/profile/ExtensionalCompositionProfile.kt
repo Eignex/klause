@@ -64,6 +64,7 @@ internal object ExtensionalCompositionProfile {
             put("preparedFactors", problem.factors.size)
             put("allDifferent", problem.factors.count { it is AllDifferent })
         }.toString())
+        if (preparationToken() || preparation?.stats?.infeasible == true) return
         val tables = problem.factors.filterIsInstance<Table>()
         val diagrams = problem.factors.filterIsInstance<Mdd>()
         val shapes = buildJsonObject {
@@ -72,6 +73,28 @@ internal object ExtensionalCompositionProfile {
                     .forEach { (shape, count) ->
                         add(buildJsonObject { put("arity/rows/intervals", shape); put("count", count) })
                     }
+            })
+            put("tableScopes", buildJsonArray {
+                for ((id, table) in tables.withIndex()) add(buildJsonObject {
+                    put("table", id)
+                    put("scope", table.xs.joinToString(","))
+                    put("sourcePayloads", source.factors.indices.filter {
+                        val original = source.factors[it] as? Table
+                        original != null && original.tuples.contentEquals(table.tuples)
+                    }.joinToString(","))
+                })
+            })
+            put("tablePairs", buildJsonArray {
+                for (a in tables.indices) for (b in a + 1 until tables.size) {
+                    val shared = tables[a].xs.count { it in tables[b].xs }
+                    if (shared == 0) continue
+                    add(buildJsonObject { put("left", a); put("right", b); put("shared", shared) })
+                }
+            })
+            put("allDifferentScopes", buildJsonArray {
+                for (factor in problem.factors.filterIsInstance<AllDifferent>()) {
+                    add(buildJsonObject { put("scope", factor.vars.joinToString(",")) })
+                }
             })
             put("diagrams", buildJsonArray {
                 diagrams.groupingBy { diagramShape(it) }

@@ -1,6 +1,7 @@
 package com.eignex.klause.presolve.structural
 
 import com.eignex.klause.factor.table.Table
+import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 
 internal object CyclicTableComposition {
@@ -20,8 +21,9 @@ internal object CyclicTableComposition {
         right: Table,
         visit: () -> Boolean,
         cells: Int,
+        bridgeVariables: IntArray? = null,
     ): ExtensionalIntersection? {
-        val bridge = left.xs.filter { it in right.xs && it !in target.xs }.toIntArray()
+        val bridge = bridgeVariables ?: sharedOutsideTarget(target, left, right, visit) ?: return null
         if (bridge.isEmpty()) return null
         val storage = Storage(cells)
         val a = project(target, left, bridge, visit, storage) ?: return null
@@ -53,6 +55,16 @@ internal object CyclicTableComposition {
         else ExtensionalIntersection.Restricted(Table(target.xs, kept.toLongArray()))
     }
 
+    fun sharedOutsideTarget(target: Table, left: Table, right: Table, visit: () -> Boolean): IntArray? {
+        val bridge = IntArrayList()
+        for (variable in left.xs) {
+            val other = position(right.xs, variable, visit) ?: return null
+            val own = position(target.xs, variable, visit) ?: return null
+            if (other >= 0 && own < 0) bridge.add(variable)
+        }
+        return bridge.toIntArray()
+    }
+
     private class Storage(var remaining: Int) {
         fun retain(cells: Int): Boolean {
             if (cells > remaining) return false
@@ -68,17 +80,25 @@ internal object CyclicTableComposition {
         visit: () -> Boolean,
         storage: Storage,
     ): Projection? {
-        val shared = source.xs.filter { it in target.xs }.toIntArray()
-        if (shared.isEmpty()) return null
-        val sourceColumns = shared.map { source.xs.indexOf(it) }.toIntArray()
-        val targetColumns = shared.map { target.xs.indexOf(it) }.toIntArray()
-        val bridgeColumns = bridge.map { source.xs.indexOf(it) }.toIntArray()
+        val sourceColumns = IntArrayList()
+        val targetColumns = IntArrayList()
+        for (column in source.xs.indices) {
+            val other = position(target.xs, source.xs[column], visit) ?: return null
+            if (other >= 0) {
+                sourceColumns.add(column)
+                targetColumns.add(other)
+            }
+        }
+        if (sourceColumns.isEmpty()) return null
+        val bridgeColumns = IntArray(bridge.size)
+        for (i in bridge.indices) bridgeColumns[i] = position(source.xs, bridge[i], visit) ?: return null
+        val columns = sourceColumns.toIntArray()
         val supports = HashMap<Tuple, MutableSet<Tuple>>()
         for (row in 0 until source.numTuples) {
-            val key = tuple(source, row, sourceColumns, visit) ?: return null
+            val key = tuple(source, row, columns, visit) ?: return null
             val support = tuple(source, row, bridgeColumns, visit) ?: return null
             val values = supports[key] ?: run {
-                if (!storage.retain(shared.size + 1)) return null
+                if (!storage.retain(columns.size + 1)) return null
                 HashSet<Tuple>().also { supports[key] = it }
             }
             if (support !in values) {
@@ -86,7 +106,15 @@ internal object CyclicTableComposition {
                 values.add(support)
             }
         }
-        return Projection(targetColumns, supports)
+        return Projection(targetColumns.toIntArray(), supports)
+    }
+
+    private fun position(scope: IntArray, variable: Int, visit: () -> Boolean): Int? {
+        for (i in scope.indices) {
+            if (!visit()) return null
+            if (scope[i] == variable) return i
+        }
+        return -1
     }
 
     private fun tuple(table: Table, row: Int, columns: IntArray, visit: () -> Boolean): Tuple? {

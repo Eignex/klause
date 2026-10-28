@@ -118,16 +118,15 @@ internal object ExtensionalComposition {
             }
             val left = neighbors[a]
             val right = neighbors[b]
-            repeat(left.arity * (right.arity + current.arity)) {
-                if (!meter.visit()) {
-                    return if (current === target) null else ExtensionalIntersection.Restricted(current)
-                }
+            val bridge = CyclicTableComposition.sharedOutsideTarget(current, left, right, meter::visit)
+            if (bridge == null) {
+                return if (current === target) null else ExtensionalIntersection.Restricted(current)
             }
-            if (left.xs.none { it in right.xs && it !in current.xs }) continue
+            if (bridge.isEmpty()) continue
             meter.cyclicAttempts++
             meter.pairRemaining = meter.limits.cyclicWork
             val intersection = CyclicTableComposition.intersect(
-                current, left, right, meter::visit, meter.limits.cyclicCells,
+                current, left, right, meter::visit, meter.limits.cyclicCells, bridge,
             ) ?: continue
             if (intersection === ExtensionalIntersection.Refuted) return intersection
             val next = (intersection as ExtensionalIntersection.Restricted).factor as Table

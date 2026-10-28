@@ -190,4 +190,20 @@ class CyclicTableCompositionTest {
         assertEquals(2, assignments.size)
         assertEquals(before.toSet(), assignments.toSet())
     }
+
+    @Test
+    fun `cyclic admission should decline interval tables and repeated aliases`() {
+        for (target in listOf(
+            Table(intArrayOf(0, 1), longArrayOf(0, 0), longArrayOf(1, 1)),
+            Table(intArrayOf(0, 0), longArrayOf(0, 1)),
+        )) {
+            val left = Table(intArrayOf(0, 2), longArrayOf(0, 0, 1, 1))
+            val right = Table(intArrayOf(1, 2), longArrayOf(0, 1, 1, 0))
+
+            val delta = ExtensionalComposition.reduce(arrayOf(target, left, right), Cancellation.Never)
+
+            assertTrue(delta.isEmpty)
+            assertFalse(delta.infeasible)
+        }
+    }
 }
