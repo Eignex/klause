@@ -2609,6 +2609,24 @@ preparation but close neither gap and cost the incumbent, so curated pools keep
 Boolean-only admission. Raw records are under
 `klause-evidence/campaigns/finite-cost-core-avenue/lazy-3738/`.
 
+### Residual scope capture and replay
+
+[Capture 8903](https://lab.eignex.com/jobs/8903), at `09b97f920b` on Mac/aarch64,
+retains the conditioned two-cycle root in 2,256 bytes. The case times out before an
+auctions record, so it supplies no ordinary-source applicability result.
+[Replay 8923](https://lab.eignex.com/jobs/8923), at `d1a6e116c0` on cloud Linux/amd64,
+loads those exact bytes without fetching a corpus or retracing search. Both use
+JDK 25.0.4.1. Re-encoding and reloading preserve every byte and the residual meaning.
+The two source components close at 3 each, plus the fixed separator cost 1; joint,
+objective-ordered and ordinary LP controls agree at 7. The retained incumbent has
+strict cutoff 7, which joins both cycles into one enforcing component. Every enforcing
+control refutes that cutoff-conditioned workload, while the source relaxation remains
+feasible. Native prepared witnesses are checked; original-source reconstruction and
+independent optimality certificates are unavailable offline. This establishes replay
+and scope fidelity, with no portfolio or reuse-speed claim. Runtime/resource receipts,
+hashes, snapshots and the timed-out source attempt remain under
+`klause-evidence/campaigns/residual-snapshots-3740-3741/`.
+
 ### Bounded retained integer probing
 
 Default metered finite satisfaction preparation funds one retained root, 128 probe
