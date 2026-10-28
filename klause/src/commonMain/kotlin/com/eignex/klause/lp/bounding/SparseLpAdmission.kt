@@ -44,18 +44,24 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
     problem: Problem,
     objective: LinearObjective?,
     cancellation: Cancellation = Cancellation.Never,
+    workAllowance: Long = SPARSE_LP_MAX_WORK,
 ): SparseLpAdmission {
     val columns = problem.numIntVars.toLong() + problem.numBoolVars + problem.numRealVars
     val rows = problem.factors.size.toLong()
     var entries = 0L
+    var inspected = 0L
+    val preparationAllowance = minOf(MAX_PREPARATION_WORK, workAllowance.coerceAtLeast(0L))
     fun decline(reason: String) = SparseLpAdmission(mapOf("Decline$reason" to 1L,
-        "PreparationWork" to (entries + rows + columns)))
+        "PreparationWork" to inspected))
     if ((problem as? BakedProblem)?.factorProjections?.builtInRelaxation == false) return decline("Projection")
     if (columns + rows > MAX_DIMENSION) {
         return decline("Shape")
     }
+    if (cancellation()) return decline("Cancelled")
+    if (32L * (columns + rows) > preparationAllowance) return decline("PreparationWork")
     for ((index, factor) in problem.factors.withIndex()) {
         if (cancellation()) return decline("Cancelled")
+        inspected++
         entries += when (factor) {
             is Linear -> if (factor.integerConstants != null && factor.op != LinearOp.NE) factor.vars.size
                 else return decline("Source")
@@ -64,7 +70,7 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
             is SymmetryHandling -> 0
             else -> return decline("Source")
         }
-        if (entries > MAX_ENTRIES || 32L * (entries + columns + rows) > MAX_PREPARATION_WORK) {
+        if (entries > MAX_ENTRIES || 32L * (entries + columns + rows) > preparationAllowance) {
             return decline("PreparationWork")
         }
         if ((index + 1) % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
