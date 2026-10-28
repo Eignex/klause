@@ -8,12 +8,13 @@ import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.formats.json.ProblemJson
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.checkExactRealSample
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
 import com.eignex.klause.solver.pipeline.FinitePipelineRequest
@@ -47,17 +48,17 @@ internal object HistoricalTableReasonProfile {
         for (variant in 0..2) {
             val source = source(variant)
             out.resolve("source-$variant.fzn").writeText(source)
-            for (pass in 0..1) for (prepared in listOf(false, true)) {
+            for (pass in 0..1) for (route in 0..2) {
                 for (enabled in if (pass == 0) listOf(false, true) else listOf(true, false)) {
                     val before = bean.getThreadAllocatedBytes(thread)
                     val start = System.nanoTime()
-                    val observation = invoke(source, prepared, enabled)
+                    val observation = invoke(source, route, enabled)
                     val elapsed = System.nanoTime() - start
                     val allocated = bean.getThreadAllocatedBytes(thread) - before
                     val record = buildJsonObject {
                         put("variant", variant)
                         put("sourceSha256", sha256(source.encodeToByteArray()))
-                        put("prepared", prepared)
+                        put("route", listOf("original", "prepared-satisfaction", "prepared-solution-set")[route])
                         put("enabled", enabled)
                         put("warmup", pass == 0)
                         put("elapsedNs", elapsed)
@@ -80,12 +81,22 @@ internal object HistoricalTableReasonProfile {
             val result = BacktrackSolver(preparation.problem as BakedProblem).solve(BacktrackParams(
                 randomSeed = 3L, maxDecisions = 128, cancellation = stop))
             val point = (result as? SolveResult.Sat)?.assignment?.let(preparation.reconstruct)
+            val checked = point?.let { sample ->
+                val fixed = program.problem.withIntDomains(Array(program.problem.numIntVars) {
+                    val value = sample.intValue(it)
+                    IntDomain(value, value)
+                })
+                val checker = PropagationSession(fixed, cancellation = stop)
+                !checker.isUnsatAtRoot && (0 until program.problem.numBoolVars).all {
+                    checker.pinBool(it, sample.boolValue(it)) is PropagationResult.Implied
+                } && !checker.fixpointCancelled && !stop()
+            }
             val record = buildJsonObject {
                 put("variant", variant)
                 put("control", "ordinary prepared backtrack with automatic LP")
                 put("verdict", result::class.simpleName)
                 put("stats", result.stats.toString())
-                put("originalSourceNativeCheck", point?.let { program.problem.checkExactRealSample(it, stop) })
+                put("originalSourceNativeCheck", checked)
                 put("independentWitnessOrProofCheck", false)
                 put("sourceSha256", sha256(source.encodeToByteArray()))
                 put("cancelled", stop())
@@ -95,12 +106,13 @@ internal object HistoricalTableReasonProfile {
         }
     }
 
-    private fun invoke(source: String, prepare: Boolean, enabled: Boolean): JsonObject {
+    private fun invoke(source: String, route: Int, enabled: Boolean): JsonObject {
         val stop = Cancellation.after(2.seconds)
         val program = parseFlatZinc(source)
         val original = program.problem
-        val preparation = if (prepare) FinitePipeline.prepare(FinitePipelineRequest(
-            original, FiniteEngine.BACKTRACK, cancellation = stop, solveCancellation = stop)) else null
+        val preparation = if (route > 0) FinitePipeline.prepare(FinitePipelineRequest(
+            original, FiniteEngine.BACKTRACK, cancellation = stop, solveCancellation = stop,
+            solutionSetSensitive = route == 2)) else null
         val problem = preparation?.problem ?: original
         val mapping = if (preparation == null) VarRemap(IntArray(original.numBoolVars) { it },
             IntArray(original.numIntVars) { it }) else {
@@ -129,8 +141,11 @@ internal object HistoricalTableReasonProfile {
         var size: Int? = null
         var lbd: Int? = null
         var application: String? = null
+        var prefixQ: Boolean? = null
         var siblingQ: Boolean? = null
         val initialized = shared.initialize()
+        val initialQ = if (q >= 0) native.boolValue(q) else null
+        var resolution: String? = null
         if (b >= 0 && a >= 0 && q >= 0 && initialized is ComponentResult.Consistent) {
             val decisions = listOf(SearchDecision.IntAtLeast(b, 1), SearchDecision.IntAtLeast(a, 1),
                 SearchDecision.Bool(Lit.make(q, true)))
@@ -139,16 +154,17 @@ internal object HistoricalTableReasonProfile {
                 outcomes.add(result::class.simpleName ?: "unknown")
                 if (result is ComponentResult.Conflict) {
                     val learned = cp.resolveConflict(shared)
+                    resolution = learned::class.simpleName
                     if (learned is SearchConflictResolution.Backjump) {
                         target = learned.conflict.decisionLevel
                         size = learned.conflict.guardLiterals.size
                         lbd = learned.conflict.lbd
                         shared.popTo(target)
                         application = learned.conflict.apply(shared)::class.simpleName
-                        if (target == 1) {
-                            shared.push(SearchDecision.IntAtMost(a, 0))
-                            siblingQ = native.boolValue(q)
-                        }
+                        shared.popTo(1)
+                        prefixQ = native.boolValue(q)
+                        shared.push(SearchDecision.IntAtMost(a, 0))
+                        siblingQ = native.boolValue(q)
                     }
                     break
                 }
@@ -166,11 +182,14 @@ internal object HistoricalTableReasonProfile {
             put("presolve", preparation?.presolve.toString())
             put("sourceCoordinatesRetained", b >= 0 && a >= 0 && q >= 0)
             put("initialized", initialized::class.simpleName)
+            put("initialQ", initialQ)
+            put("resolution", resolution)
             put("decisions", outcomes.joinToString())
             put("backjump", target)
             put("lbd", lbd)
             put("learnedSize", size)
             put("application", application)
+            put("aFreePrefixQ", prefixQ)
             put("aZeroSiblingQ", siblingQ)
             put("learnedCount", learnedCount)
             put("finiteWork", work)
@@ -200,15 +219,12 @@ internal object HistoricalTableReasonProfile {
             var 0..1: b;
             var 0..1: c;
             var bool: q;
-            var bool: x1;
-            var bool: b0;
-            ${if (variant == 0) "" else "var bool: d;"}
+            ${if (variant == 0) "var bool: x1; var bool: b0;" else "var bool: d;"}
             constraint table_int([$names], [$cells]);
-            constraint int_eq_reif(x, 1, x1);
-            constraint int_eq_reif(b, 0, b0);
+            ${if (variant == 0) "constraint int_eq_reif(x, 1, x1); constraint int_eq_reif(b, 0, b0);" else ""}
             constraint int_eq_imp(c, 1, q);
             ${if (variant == 0) "constraint bool_clause([x1,b0], [q]);" else
-                "constraint bool_clause([d], [q]); constraint bool_clause([x1,b0], [d]);"}
+                "constraint bool_clause([d], [q]); constraint int_lin_le_imp([1,-1], [b,x], 0, d);"}
             solve satisfy;
         """.trimIndent()
     }
