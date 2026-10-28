@@ -2338,7 +2338,8 @@ live factor's residual in factor order; a key seen again after an intervening re
 conflict or restart counts as a re-encountered child obligation. Every eighth sample re-joins with
 learned clauses, with and without permanent incumbent-scoped entries. Up to `probes` split
 nodes keep their residual clauses; after the search each component and the joint residual
-are solved as fresh `satOptimized` models. The children share one allowance equal to the
+are solved as fresh `satOptimized` models, and the joint residual once more with
+`LpConfig(LpEmphasis.DEFAULT)` as the ordinary-bounds control. The children share one allowance equal to the
 joint solve's, carry no incumbent cutoff or learned clause, and an unfinished child leaves
 the composition open. The composed witness is reconstructed and checked against the
 original clauses, and later sightings of each probed key are reported. Records retain

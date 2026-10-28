@@ -15,6 +15,8 @@ import com.eignex.klause.formats.dimacs.toProblem
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
@@ -318,6 +320,10 @@ object ConditionalComponentTrace {
             componentVars.flatMap { it.toList() }.sorted().toIntArray(), probe.clauses.flatten(), weights,
             Cancellation.after(settings.probeMillis.milliseconds), settings.seed,
         )
+        val jointLp = solveResidual(
+            joint.vars, probe.clauses.flatten(), weights,
+            Cancellation.after(settings.probeMillis.milliseconds), settings.seed, lp = true,
+        )
         val childOptima = children.map { (it.result as? MinimizeResult.Optimal)?.objectiveValue?.toLong() }
         val childSum = if (childOptima.all { it != null }) childOptima.sumOf { it ?: 0L } else null
         val jointOptimum = (joint.result as? MinimizeResult.Optimal)?.objectiveValue?.toLong()
@@ -344,6 +350,12 @@ object ConditionalComponentTrace {
             put("jointNodes", joint.result?.stats?.search?.nodes?.sum ?: 0.0)
             put("jointSolveMs", joint.solveNanos / 1_000_000.0)
             put("jointBuildMs", joint.buildNanos / 1_000_000.0)
+            put("jointLpVerdict", jointLp.result?.let { it::class.simpleName } ?: "NotRun")
+            put("jointLpNodes", jointLp.result?.stats?.search?.nodes?.sum ?: 0.0)
+            put("jointLpSolveMs", jointLp.solveNanos / 1_000_000.0)
+            put("jointLpOptimum", (jointLp.result as? MinimizeResult.Optimal)?.objectiveValue?.toLong()?.let {
+                fixed + isolated + it
+            })
             put("nodeFixedObjective", fixed)
             put("nodeIsolatedObjective", isolated)
             put("composedOptimum", childSum?.let { fixed + isolated + it })
@@ -364,6 +376,7 @@ object ConditionalComponentTrace {
         weights: LongArray,
         stop: Cancellation,
         seed: Long,
+        lp: Boolean = false,
     ): Residual {
         if (stop()) return Residual(vars, null, 0L, 0L)
         val built = System.nanoTime()
@@ -375,9 +388,10 @@ object ConditionalComponentTrace {
         val baked = Problem(vars.size, 0, emptyArray(), factors.toTypedArray()).bake()
         val objective = LinearObjective(LongArray(vars.size) { weights.getOrElse(vars[it]) { 0L } })
         val solving = System.nanoTime()
+        val base = BacktrackPresets.satOptimized(randomSeed = seed, cancellation = stop)
         val result = BacktrackSolver(baked).minimize(
             objective,
-            BacktrackPresets.satOptimized(randomSeed = seed, cancellation = stop),
+            if (lp) base.copy(lpConfig = LpConfig(LpEmphasis.DEFAULT)) else base,
         )
         return Residual(vars, result, solving - built, System.nanoTime() - solving)
     }
