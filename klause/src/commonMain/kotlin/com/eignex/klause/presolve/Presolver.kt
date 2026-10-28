@@ -167,7 +167,7 @@ object Presolver {
             val linearInputs = HashMap<PresolvePass, LinearInputRevision>()
 
             override fun inputRevision(pass: PresolvePass): Long? {
-                if (pass == PresolvePass.STRENGTHEN_COEFFICIENTS || pass == PresolvePass.SPARSIFY_LINEAR_ROWS) {
+                if (pass.tracksLinearInputs) {
                     val inputs = linearInputs.getOrPut(pass) {
                         LinearInputRevision(current, pass, ctx.presolveBudget?.orSpent(cancellation) ?: cancellation)
                     }
@@ -194,7 +194,10 @@ object Presolver {
                     if (token()) return@observeRoundPass PassOutcome.UNCHANGED
                     val delta = pass.applySource(current, ctx.withCancellation(token))
                     if (delta.infeasible) return@observeRoundPass PassOutcome.INFEASIBLE
-                    if (delta.isEmpty) return@observeRoundPass PassOutcome.UNCHANGED
+                    if (delta.isEmpty) {
+                        if (pass.tracksLinearInputs) inputRevision(pass)
+                        return@observeRoundPass PassOutcome.UNCHANGED
+                    }
                     invocation.recordDelta(current.factors, delta.droppedIndices, delta.addedFactors)
                     val narrowed = delta.bounds?.let { narrowedColumns(current.intBounds, it, invocation) } ?: 0
                     invocation?.narrowedColumns = narrowed
@@ -207,7 +210,8 @@ object Presolver {
                         deductionsChanged = delta.bounds != null,
                     )
                     for (inputs in linearInputs.values) inputs.recordDelta(
-                        current.factors, delta.droppedIndices, delta.addedFactors, deductionsChanged = delta.bounds != null,
+                        current.factors, delta.droppedIndices, delta.addedFactors,
+                        deductionsChanged = delta.bounds != null,
                     )
                     current = current.withSourcePassDelta(delta) ?: return@observeRoundPass PassOutcome.INFEASIBLE
                     ctx = ctx.withObjective(delta.objective)
@@ -326,7 +330,7 @@ object Presolver {
             val linearInputs = HashMap<PresolvePass, LinearInputRevision>()
 
             override fun inputRevision(pass: PresolvePass): Long? {
-                if (pass == PresolvePass.STRENGTHEN_COEFFICIENTS || pass == PresolvePass.SPARSIFY_LINEAR_ROWS) {
+                if (pass.tracksLinearInputs) {
                     val inputs = linearInputs.getOrPut(pass) {
                         LinearInputRevision(current, pass, ctx.presolveBudget?.orSpent(cancellation) ?: cancellation)
                     }
@@ -352,7 +356,10 @@ object Presolver {
                     if (token()) return@observeRoundPass PassOutcome.UNCHANGED
                     val delta = pass.applyFinite(current, ctx.withCancellation(token))
                     if (delta.infeasible) return@observeRoundPass PassOutcome.INFEASIBLE
-                    if (delta.isEmpty) return@observeRoundPass PassOutcome.UNCHANGED
+                    if (delta.isEmpty) {
+                        if (pass.tracksLinearInputs) inputRevision(pass)
+                        return@observeRoundPass PassOutcome.UNCHANGED
+                    }
                     invocation.recordDelta(current.factors, delta.droppedIndices, delta.addedFactors)
                     delta.reconstruct?.let(reconstructs::add)
                     if (delta.reconstruct != null && delta.rebuild.isEmpty) liftDescribedByRebuild = false
@@ -434,7 +441,7 @@ object Presolver {
             val linearInputs = HashMap<PresolvePass, LinearInputRevision>()
 
             override fun inputRevision(pass: PresolvePass): Long? {
-                if (pass == PresolvePass.STRENGTHEN_COEFFICIENTS || pass == PresolvePass.SPARSIFY_LINEAR_ROWS) {
+                if (pass.tracksLinearInputs) {
                     val inputs = linearInputs.getOrPut(pass) {
                         LinearInputRevision(
                             session.passInput(), pass, ctx.presolveBudget?.orSpent(cancellation) ?: cancellation,
@@ -485,7 +492,10 @@ object Presolver {
                     val base = passContext(pass)
                     val delta = pass.applyFinite(input, base.withCancellation(token))
                     if (delta.infeasible) return@observeRoundPass PassOutcome.INFEASIBLE
-                    if (delta.isEmpty) return@observeRoundPass PassOutcome.UNCHANGED
+                    if (delta.isEmpty) {
+                        if (pass.tracksLinearInputs) inputRevision(pass)
+                        return@observeRoundPass PassOutcome.UNCHANGED
+                    }
                     invocation.recordDelta(input.factors, delta.droppedIndices, delta.addedFactors)
                     delta.reconstruct?.let(reconstructs::add)
                     if (delta.reconstruct != null && delta.rebuild.isEmpty) liftDescribedByRebuild = false
