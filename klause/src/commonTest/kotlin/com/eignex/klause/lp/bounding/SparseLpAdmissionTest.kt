@@ -1,16 +1,19 @@
 package com.eignex.klause.lp.bounding
 
+import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ProblemSettings
+import com.eignex.klause.ir.Term
 import com.eignex.klause.lp.RelaxationProjection
 import com.eignex.klause.lp.RelaxationProjectionProvider
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.RelaxationCapability
 import com.eignex.klause.solver.objective.LinearObjective
@@ -22,6 +25,27 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class SparseLpAdmissionTest {
+    @Test
+    fun `mixed source root bounds preserve original objective units`() {
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0, 1)),
+            listOf(ExactLinear.of(intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
+                listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.GE, BigFraction.ONE)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            settings = ProblemSettings(lpCeilingTableauCells = 1L),
+        )
+        val objective = LinearObjective(intCoefficients = longArrayOf(1),
+            realCoefficients = doubleArrayOf(1.0), constant = 7L)
+        val sink = SolveStatsSink("mixed-root-units")
+
+        val lower = LpEngine(problem, objective,
+            LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")), sink).use { engine ->
+            engine.rootLpRelaxationBound(requireNotNull(engine.lpRelaxer), emptyList())
+        }
+
+        assertEquals(8.0, lower)
+    }
+
     @Test
     fun `source preparation respects a smaller caller root allowance`() {
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },

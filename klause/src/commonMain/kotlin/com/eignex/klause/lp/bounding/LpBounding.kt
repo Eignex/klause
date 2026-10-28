@@ -479,6 +479,7 @@ internal fun LpEngine.sparseSafePrune(
     // would drop the most valuable work from the average.
     if (nodeUsesTrail) {
         sink.lp.observeEngineCost(LpRoute.NODE, propagator.lastMetrics)
+        observeSparseTrial(simplex)
         noteSolveOps(propagator.lastMetrics.workOps)
     } else {
         observeSolveCost(sink, simplex)
