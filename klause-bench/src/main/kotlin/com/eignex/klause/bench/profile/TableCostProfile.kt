@@ -1,9 +1,12 @@
 package com.eignex.klause.bench.profile
 
 import com.eignex.klause.bench.catalog.Catalog
+import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
+import com.eignex.klause.bench.runner.MiniZincCompatibility
+import com.eignex.klause.bench.runner.MiniZincRunner
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.factor.table.Table
@@ -29,7 +32,7 @@ internal object TableCostProfile {
     @JvmStatic
     fun main(args: Array<String>) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
-        require(options.keys == setOf("suite", "problem", "sha256"))
+        require(options.keys - "dataSha256" == setOf("suite", "problem", "sha256"))
         val reference = Catalog.uncapped(options.getValue("suite")).problems
             .single { it.name == options.getValue("problem") }
         val bytes = CorpusFiles.open(CorpusFetcher.resolve(reference.source)).use {
@@ -38,19 +41,34 @@ internal object TableCostProfile {
         require(bytes.size <= 64 * 1024 * 1024 && sha256(bytes) == options.getValue("sha256"))
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
-        out.resolve("source.xml").writeBytes(bytes)
+        out.resolve(if (reference.format == Format.MINIZINC) "source.mzn" else "source.xml").writeBytes(bytes)
         out.resolve("request.txt").writeText(args.joinToString("\n"))
-        val parsed = Xcsp3.parse(bytes.decodeToString())
-        val objective = requireNotNull(parsed.objective).toLinearObjective().let {
-            if (parsed.sense == ObjectiveSense.MAXIMIZE) it.negated() else it
+        val (problem, objective) = if (reference.format == Format.MINIZINC) {
+            val data = CorpusFiles.open(CorpusFetcher.resolve(requireNotNull(reference.data))).use {
+                it.readNBytes(64 * 1024 * 1024 + 1)
+            }
+            require(data.size <= 64 * 1024 * 1024 && sha256(data) == options.getValue("dataSha256"))
+            out.resolve("source.dzn").writeBytes(data)
+            out.resolve("compiler.txt").writeText(MiniZincCompatibility.compiler.toString())
+            val runner = MiniZincRunner(timeoutSec = 60)
+            runner.compileFzn(reference).copyTo(out.resolve("source.fzn"))
+            runner.compileOutput(reference).copyTo(out.resolve("source.ozn"))
+            val resolved = runner.resolve(reference)
+            resolved.problem to requireNotNull(resolved.objective)
+        } else {
+            require(reference.format == Format.XCSP3 && "dataSha256" !in options)
+            val parsed = Xcsp3.parse(bytes.decodeToString())
+            parsed.problem to requireNotNull(parsed.objective).toLinearObjective().let {
+                if (parsed.sense == ObjectiveSense.MAXIMIZE) it.negated() else it
+            }
         }
-        out.resolve("source.json").writeText(snapshot(parsed.problem, objective).toString())
+        out.resolve("source.json").writeText(snapshot(problem, objective).toString())
         for (config in listOf("off", "default")) {
             val stop = Cancellation.after(30.seconds)
             val budget = PresolveBudget(1_650_000_000L)
             val start = System.nanoTime()
             val prepared = FinitePipeline.prepare(FinitePipelineRequest(
-                parsed.problem, FiniteEngine.MIXED, objective,
+                problem, FiniteEngine.MIXED, objective,
                 presolveConfig = PresolveConfig.parse(config), explicitPresolveConfig = true,
                 cancellation = stop, solveCancellation = stop, presolveBudget = budget, randomSeed = 3L,
             ))
