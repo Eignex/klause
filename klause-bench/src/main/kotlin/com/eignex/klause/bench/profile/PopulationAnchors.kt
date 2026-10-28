@@ -168,10 +168,10 @@ internal object PopulationAnchors {
                                 sweep?.sweep(state.assignment, state.rootDomains, problem.factors)
                                 state.recompute()
                             }
-                            if (decline != null) {
+                            if (decline != null || state.cost != 0L) {
                                 writer.appendLine(buildJsonObject {
                                     put("mode", mode); put("dedup", dedup)
-                                    put("projectionDecline", decline)
+                                    put("projectionDecline", decline ?: "working-infeasible")
                                     put("elapsedNanos", System.nanoTime() - captureStarted)
                                     put("allocatedBytes", trajectoryThreadBytes() - captureAllocated)
                                 }.toString())

@@ -9061,7 +9061,10 @@ an ingress filter for exact equality of named source inputs. It accepts the
 trajectory runner's `suite`, `problem`, `sha256`, `source64`/`sourceGzip64` and
 optional `seed` arguments. `offers64` supplies a base64 JSON array of complete
 `{"bools":[],"ints":[]}` source assignments for a bounded restart replay; omitting
-it runs 1600 moves of the existing plateau recipe. Replay uses 64 draws each from
+it runs 1600 moves of the existing plateau recipe. `presolve=off|default` selects
+optional preparation, with `off` the control default. Only finite integer
+minimization sources under unchanged, empty caller conditions are admitted.
+Replay uses 64 draws each from
 uniform crossover, factor-scope crossover and basin-hopping perturbation, followed
 by a bounded whole-source CP control. Source preparation, reconstruction, native
 source verification, exact objective agreement, input comparisons and allocations
@@ -9078,3 +9081,48 @@ checks are not independent XCSP3 checking. Exact source-input equality excludes
 auxiliary-only changes; unequal inputs do not establish distinct symmetry classes
 or whole-recipe basins. This diagnostic changes no production policy, canonical
 best admission, global cutoff, proof authority or solution-set operation.
+
+[Initial equal-cost replay 9087](https://lab.eignex.com/jobs/9087), at
+`28e518f215`, and [unequal-cost replay 9097](https://lab.eignex.com/jobs/9097),
+at `48a1e11740`, inject A/A/A/B from the two independent assignment cycles of
+lengths four and five. The unequal-cost source has A=28, B=29 and C=19, so A/B
+are not a cost-preserving symmetry pair. Unchanged retention fills three slots
+with A; input deduplication retains A/B in two slots. Existing factor-scope
+crossover produces 16 checked improving children in 64 draws after deduplication,
+versus zero without it. Uniform crossover produces no checked dedup child in
+these draws; basin-hopping kicks improve once without deduplication and zero
+times with it. Retain those negative consumers alongside the factor-scope gain.
+
+[Default preparation 9105](https://lab.eignex.com/jobs/9105), at `a5afceb19c`,
+retains the unequal-cost source's nine integers, two AllDifferent factors and
+complete source round trips. It reproduces all those consumer counts. Existing
+plateau and extended structured recipes each reach checked cost 19 from both
+anchors within 512 moves; whole-source CP reaches 19 in four nodes. The complete
+capture takes 2.40 seconds and 73.51 MB of thread allocation, including 1.51
+seconds and 44.23 MB of preparation. These are injected anchors, not established
+whole-recipe basins or exclusive reachability evidence.
+
+Natural acquisition pilots at `c16a5e11a4`, with optional presolve off and seed 1,
+use 1600 moves per arm. [AircraftLanding airland01 9091](https://lab.eignex.com/jobs/9091)
+ties at checked cost 197000: both arms offer seven points, observe no duplicates
+and consume eight anchored restarts. [CarpetCutting test01 9092](https://lab.eignex.com/jobs/9092)
+ties at checked cost 1150: duplicate filtering changes offers/restarts from 26
+to 18, with six versus two duplicate offers. Both retain three samples.
+Their full captures cost 3.39 seconds/292.35 MB and 14.60 seconds/99.25 MB of
+thread allocation. Ordered cold/warm arms establish no throughput improvement;
+allocation is distinct from live storage and RSS. The first AircraftLanding
+preparation was drained before execution and recovered under the same job;
+that infrastructure loss supplies no solver or source-applicability verdict.
+
+Retain the diagnostic and the existing production policy. Exact input deduplication
+already accounts for the motivating checked combination, and existing repair
+reaches its endpoint. The semantic-archive/relinker stage therefore fails its
+entry gate; no additional machinery is selected. The natural pilots supply no
+quality gain that justifies production admission of the filter. This scoped
+decision preserves the negative perturbation and representation-admission results;
+it does not reject every future archive or establish family-wide superiority.
+All captures retain source bytes, JAR/compiler/runtime and cgroup receipts on
+Linux/amd64 Java 25.0.4.1 with a one-CPU, 4608-MiB execution ceiling. Checks are
+native original lowered-source checks, without independent witness or proof
+certification. No production best tracking, lifecycle state or solution-set
+operation changes.
