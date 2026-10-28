@@ -739,6 +739,23 @@ bytes and installed-build/runtime identity. Alternating repeats follow one warmu
 per path and shape. Run it through one bounded lab profile job; instrumented times
 and allocations establish no ordinary-source throughput or physical RSS claim.
 
+[Capture 8902](https://lab.eignex.com/jobs/8902), at `e387b8f450`, compares seven
+source/projection cases with three alternating repeats on Linux/amd64, JDK
+25.0.4.1 and a one-CPU cgroup. All 42 measured traversals return matching native
+exact counts: 4, 16 and 256 for the disjoint pairs, and 129 for the connected
+holdout. These counts have no independent counting certificate. Original DIMACS
+bytes/hashes, installed-build identity, runtime and resource receipts are retained.
+
+For eight pairs, full-projection median total time is 4.08 ms versus 260.63 ms
+monolithic, with 3.76 MB versus 120.09 MB of current-thread allocation. X-only
+medians are 2.03 ms versus 84.79 ms and 1.71 MB versus 42.30 MB. Negatives remain:
+one two-pair full repeat takes 69.93 ms versus 7.88 ms, and one four-pair x-only
+repeat takes 66.41 ms versus 10.41 ms. The connected fallback adds 6–38 kB of
+allocation per paired repeat. JFR and recorded cgroup throttling make these
+diagnostic timings, not a throughput claim. The bounded result supports Boolean
+clause products; it supplies no wider factor admission. The lab retried one lost
+upload automatically; these observations use its committed second attempt.
+
 `ExactLinearScoringProfile` compares identical dyadic mixed-row candidate sequences
 at widths 8/64/512/4096, including committed choices and a fresh final score.
 Three warmup batches precede five measured batches of 4096 primitive candidates
