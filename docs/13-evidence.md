@@ -60,6 +60,8 @@ original scope and rechecks both alternatives against the consumer's source
 premises. The LP partial-refutation adapter retains dormant numeric premises for
 this reconstruction; their guards still require establishment inside each proof
 branch.
+Substituted Boolean coefficients keep their pins as guards, including when an
+import is checked in a weaker scope.
 
 An active-linear refutation substitutes only established Boolean coefficients and
 uses rows with established Boolean guards and independently established integer
