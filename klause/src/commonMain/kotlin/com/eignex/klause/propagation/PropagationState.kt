@@ -351,6 +351,7 @@ class PropagationState private constructor(
     val intMaxReason: IntArray = prepared?.intMaxReason ?: (IntArray(problem.numIntVars) { -1 })
 
     internal var integerRowLearning = false
+    internal var arithmeticLearningTrace: ArithmeticLearningTrace? = null
     internal var integerLearningTrailAtLevel: ((Int) -> Int?)? = null
 
     /** Factor whose [Propagator.propagate] is currently running. Read by the impl methods so

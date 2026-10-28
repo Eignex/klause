@@ -214,6 +214,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         if (state.runCancelled) AnalysisResult.NotApplicable else result
     } catch (_: FinitePropagationInterrupted) {
         state.runCancelled = true
+        state.arithmeticLearningTrace?.record("analysis.cancelled")
         AnalysisResult.NotApplicable
     }
 
@@ -286,15 +287,22 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
      * externally-supplied clause seed.
      */
     private fun analyzeFromSeed(seedReason: IntArray, currentLevel: Int, seedFactorId: Int = -1): AnalysisResult {
+        state.arithmeticLearningTrace?.record("analysis.seed", seedFactorId.toLong(), currentLevel.toLong())
+        state.arithmeticLearningTrace?.clause("analysis.seed-clause", seedReason, state)
         if (currentLevel <= 0) return AnalysisResult.NotApplicable
         universe = state.problem.numBoolVars + state.atoms.intVar.size
 
         if (state.integerRowLearning && seedFactorId >= 0) {
             val fallback = runResolution(clauseResolvent, seedReason, currentLevel)
+            (fallback as? AnalysisResult.Learned)?.let {
+                state.arithmeticLearningTrace?.clause("integer.fallback", it.literals, state)
+            }
             val row = (fallback as? AnalysisResult.Learned)?.let {
                 IntegerConflictLearner(state).learn(seedFactorId, currentLevel, it)
             }
             if (row != null) {
+                state.arithmeticLearningTrace?.row("integer.derived", row.row, state)
+                state.arithmeticLearningTrace?.record("integer.native-target", row.backjumpLevel.toLong())
                 lastResolvent = clauseResolvent
                 return row
             }
@@ -308,6 +316,12 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
             pb.seedFactorId = seedFactorId
             val r = runResolution(pb, seedReason, currentLevel)
             if (!pb.failed) {
+                state.arithmeticLearningTrace?.record(if (r is AnalysisResult.LearnedPb) "pb.derived" else "pb.clause")
+                if (r is AnalysisResult.LearnedPb) {
+                    state.arithmeticLearningTrace?.clause("pb.literals", r.literals, state)
+                    if (r.weights.size <= 64) state.arithmeticLearningTrace?.record("pb.weights", *r.weights)
+                    state.arithmeticLearningTrace?.record("pb.target", r.degree, r.backjumpLevel.toLong())
+                }
                 val result = if (r is AnalysisResult.LearnedPb && state.problem.numIntVars > 0) {
                     val fallback = runResolution(clauseResolvent, seedReason, currentLevel) as? AnalysisResult.Learned
                     r.copy(fallbackClause = fallback)

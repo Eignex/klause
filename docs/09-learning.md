@@ -205,6 +205,23 @@ contradiction.
 
 ## Learned-clause retention
 
+### Arithmetic diagnostics
+
+An optional native-session `ArithmeticLearningTrace` records bounded arithmetic
+analysis events before conflict retraction. It retains seed and fallback literals,
+integer endpoint markers and historical row domains, native/shared targets, decline
+categories and stored arithmetic consumers. Literal metadata distinguishes cached
+atom levels from the analyzer's effective conflict level. Historical domain holes
+exclude later journalled carves; endpoint factor ids describe the live reason owner.
+Storage identities survive factor compaction and retire when their constraint is
+forgotten. Only actual changed bounds or Boolean pins count as consumer events.
+
+The trace is absent by default. Its fixed event and scalar-word allowances and
+per-payload limits stop capture with explicit truncation. It reads existing state,
+does not reconstruct new reasons or run propagation, and supplies no proof or source
+mapping authority. Source and preparation identities belong to the containing
+diagnostic invocation; an incomplete trace cannot establish exhaustive applicability.
+
 Native forgetting runs at restart boundaries only with a configured cap. Permanent
 and glue clauses (default LBD at most 2) survive; remaining space favors lower LBD.
 The SAT preset enables capped tiered retention:

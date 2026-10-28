@@ -29,6 +29,11 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
     var failed = false
         private set
 
+    private fun decline(cause: String) {
+        failed = true
+        state.arithmeticLearningTrace?.record("pb.decline.$cause")
+    }
+
     override val bumpBoolVars = IntArrayList()
     override val bumpIntVars = IntArrayList()
     override val offTrailFrontier = IntArrayList()
@@ -81,19 +86,19 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
     override fun resolve(reason: IntArray, currentLevel: Int) {
         if (failed) return
         if (!booleanLiterals(reason)) {
-            failed = true
+            decline("non-boolean-reason")
             return
         }
         if (!seeded) {
             conflictLevel = currentLevel
             seeded = true
-            if (!loadSeed(reason) || !acc.hasSafeActivity()) failed = true else bumpAll(acc)
+            if (!loadSeed(reason) || !acc.hasSafeActivity()) decline("seed-or-activity") else bumpAll(acc)
             return
         }
         val pivot = pendingPivot
         pendingPivot = -1
         if (pivot < 0) {
-            failed = true
+            decline("missing-pivot")
             return
         }
         cancel(pivot, reason)
@@ -118,14 +123,14 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
      */
     private fun cancel(pivot: Int, fallbackReasonLits: IntArray) {
         if (!loadPivotReason(pivot, fallbackReasonLits) || !reason.hasSafeActivity()) {
-            failed = true
+            decline("pivot-reason-or-activity")
             return
         }
         val a = acc.coefOf(pivot)
         val b = reason.coefOf(pivot)
         // Cancellation needs opposite-sign coefficients on the pivot in the two constraints.
         if (a == 0L || b == 0L || (a > 0L) == (b > 0L)) {
-            failed = true
+            decline("pivot-sign")
             return
         }
         val absA = if (a < 0L) -a else a
@@ -140,7 +145,7 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
         reason.divideRoundUp(absB)
         // acc + absA·reason cancels the pivot (opposite signs, |reason pivot| now 1). acc is not scaled.
         if (!acc.addScaled(reason, mulSelf = 1L, mulOther = absA) || !acc.hasSafeActivity()) {
-            failed = true
+            decline("combination-overflow")
             return
         }
         acc.saturate()
@@ -168,6 +173,7 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
      *  clause path avoids this by reading `boolAntecedents`), so an out-of-range id falls back to the
      *  clause-form reason rather than indexing a compacted store. */
     private fun loadFactor(fid: Int, target: PbAccumulator, forcedLit: Int): Boolean {
+        state.arithmeticLearningTrace?.record("pb.source", fid.toLong(), forcedLit.toLong())
         if (fid < 0 || fid >= state.totalFactorCount) return false
         return when (val f = state.factorAt(fid)) {
             is PseudoBooleanPropagator -> admitSource(f.literals) && f.loadReason(target, forcedLit, state)
@@ -184,7 +190,7 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
         }
 
     private fun admitSource(literals: IntArray): Boolean = booleanLiterals(literals).also {
-        if (!it) failed = true
+        if (!it) decline("non-boolean-source")
     }
 
     private fun bumpAll(a: PbAccumulator) {
@@ -196,11 +202,11 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
     override fun finalizeResult(currentLevel: Int): ConflictAnalyzer.AnalysisResult {
         if (failed) return ConflictAnalyzer.AnalysisResult.NotApplicable
         val m = acc.materialize() ?: run {
-            failed = true
+            decline("materialization")
             return ConflictAnalyzer.AnalysisResult.NotApplicable
         }
         if (m.degree > Long.MAX_VALUE - (m.weights.maxOrNull() ?: 0L)) {
-            failed = true
+            decline("assertion-overflow")
             return ConflictAnalyzer.AnalysisResult.NotApplicable
         }
         val levels = distinctLevels(m.literals)
@@ -208,7 +214,7 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
         // A non-asserting PB nogood makes the engine backtrack chronologically *without learning* — worse
         // than the clause 1UIP the clause resolvent always yields. Defer to it instead of emitting one.
         if (!asserting) {
-            failed = true
+            decline("non-asserting")
             return ConflictAnalyzer.AnalysisResult.NotApplicable
         }
         // A unit-weight, degree-1 constraint is exactly a clause; emit it as one so it flows the clause
