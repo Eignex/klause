@@ -19,7 +19,16 @@ internal object CoreRefinement {
             problem.numFactors > 4_096 || cancellation()
         ) return literals
         var session: PropagationSession? = null
-        val stop = cancellation or Cancellation { (session?.work ?: 0L) >= 32_768L }
+        var charged = 0L
+        fun settle() {
+            val work = session?.work ?: 0L
+            charge(work - charged)
+            charged = work
+        }
+        val stop = Cancellation {
+            settle()
+            charged >= 32_768L
+        } or cancellation
         return try {
             session = PropagationSession(problem, stop, propagationCancelFloor = 0)
             var current = literals
@@ -36,7 +45,7 @@ internal object CoreRefinement {
             }
             current
         } finally {
-            charge(session?.work ?: 0L)
+            settle()
         }
     }
 }
