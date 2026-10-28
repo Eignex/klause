@@ -324,6 +324,21 @@ class LinearActiveRowsTest {
     }
 
     @Test
+    fun `an ordinary partial refutation should not inspect oversized dormant rows`() {
+        val large = BigFraction.of(BIG_ONE shl 4096, BIG_ONE)
+        val source = SourceProofContext(scope, setOf(real, bool), mapOf(
+            "conflict" to SourcePremise(SourceInequality(emptyMap(), BigFraction.MINUS_ONE)),
+            "dormant" to SourcePremise(SourceInequality(mapOf(real to large), BigFraction.ZERO), mapOf(0 to true)),
+        ), emptyMap())
+        val evidence = SourceEvidence(scope, SourceClaim.Refutation,
+            LinearActiveRefutation(SourceDerivation.Premise("conflict")))
+
+        val verdict = SourceEvidenceVerifier(source.withLinearAuthority()).verify(evidence)
+
+        assertEquals(SourceEvidenceCheck.Checked, verdict)
+    }
+
+    @Test
     fun `interrupted row capture should withhold a partial context`() {
         val source = SourceProofContext(scope, setOf(real, bool), mapOf(
             "row" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ZERO)),
