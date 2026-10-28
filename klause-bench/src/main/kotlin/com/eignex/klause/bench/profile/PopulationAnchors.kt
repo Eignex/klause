@@ -13,6 +13,8 @@ import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.PerturbationKind
 import com.eignex.klause.localsearch.RestartPolicy
+import com.eignex.klause.localsearch.movesource.ConfiguredSource
+import com.eignex.klause.localsearch.movesource.SatisfiedStructured
 import com.eignex.klause.portfolio.LocalSearchCatalog
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.propagation.BakedProblem
@@ -192,6 +194,37 @@ internal object PopulationAnchors {
                 }
             }
             if (offers != null && !stop()) {
+                for ((index, point) in offers.distinctBy { trajectorySource(it).toString() }.withIndex()) {
+                    for (extended in listOf(false, true)) {
+                        if (stop()) break
+                        val recipe = LocalSearchCatalog.byLabel("cbls-plateau/fixed").let {
+                            if (!extended) it else it.withSources { sources ->
+                                sources + ConfiguredSource(SatisfiedStructured.sampledExtended(8))
+                            }
+                        }
+                        val projected = projectedSourceCenter(point, problem, coordinates, sweep, prepared.reconstruct)
+                        val started = System.nanoTime()
+                        val result = projected.first?.let {
+                            LocalSearchSolver(problem, strategy = recipe.strategy,
+                                optimizeStrategy = recipe.optimizeStrategy, definitionalSweep = sweep,
+                                perMoveInvariants = sweep != null).minimize(workingObjective, LocalSearchParams(
+                                randomSeed = seed, maxFlips = 512, initialAssignment = it, cancellation = stop))
+                        }
+                        writer.appendLine(buildJsonObject {
+                            put("mode", "existing-recipe-control"); put("center", index); put("extended", extended)
+                            put("projectionDecline", projected.second)
+                            put("objective", result?.objectiveValue)
+                            put("moves", result?.stats?.ls?.moves?.sum)
+                            put("elapsedNanos", System.nanoTime() - started)
+                            result?.assignment?.let {
+                                put("nativeSourceAccepted", FiniteConflictSelection.checkSource(
+                                    source, prepared.reconstruct(it), stop))
+                            }
+                            put("independentWitnessCheck", false)
+                        }.toString())
+                        writer.flush()
+                    }
+                }
                 val started = System.nanoTime()
                 val result = BacktrackSolver(source).minimize(objective, BacktrackParams(
                     maxDecisions = 1000, cancellation = stop, randomSeed = seed))
