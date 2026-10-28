@@ -4137,6 +4137,26 @@ point checks and installed/runtime identities remain in the capture. Instrumente
 elapsed time and cumulative thread allocation include parse, preparation, replay,
 application and retraction; they establish no ordinary CLI throughput or physical
 memory claim. No independent proof or witness check is implied.
+`controlsOnly=true` runs only the three ordinary controls with explicit `LpConfig.AUTO`.
+
+[Qualification 9051](https://lab.eignex.com/jobs/9051), at `b11849197d`, retains
+36 replay cells on Linux/amd64, one CPU and a 4608 MiB memory envelope. The delayed
+integer source's minimized clause changes from three literals, LBD 3 and backjump
+2 to two literals, LBD 2 and backjump 1, both before preparation and under normal
+solution-set-preserving preparation. Native application pins `Q=false` at `B=1`
+while `A` is free; the ordinary clause leaves `Q` unset there. Both arms infer
+`Q=false` in the `A=0` sibling, so that sibling alone establishes no advantage.
+
+The same replay costs 824 to 837 finite work before preparation and 902 to 915
+after solution-set preparation. Measured thread allocation changes from 242792
+to 253288 and 434904 to 444648 bytes. The prepared treatment's instrumented elapsed
+time is 72.8 ms versus 4.34 ms for its control; one measured pass under JFR
+supplies no throughput claim. The preferred-column control already retains the
+two-literal clause; its retry declines with 30 extra finite work. The reified-alias
+source has no eligible deduction. Satisfaction preparation pins `Q=false` through
+dual fixing on every source, removing this conflict opportunity. These controls
+retain the internal option with ordinary learning as fallback and provide no default
+activation evidence.
 
 Retain the per-variable search-time hole index. [Comparison 7993](https://lab.eignex.com/jobs/7993)
 pairs `443b3c12a` with `4a3642171` on Linux/amd64, CP/LP-off, one conflict-driven

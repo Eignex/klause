@@ -209,9 +209,9 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
 
     private inline fun boundedAnalysis(analyze: () -> AnalysisResult): AnalysisResult = try {
         state.finiteWork.begin()
-        if (pbResolvent != null || state.integerRowLearning) state.finiteWork.checkNow()
+        if (pbResolvent != null || state.integerRowLearning || state.historicalTableReasons) state.finiteWork.checkNow()
         val result = analyze()
-        if (pbResolvent != null || state.integerRowLearning) state.finiteWork.checkNow()
+        if (pbResolvent != null || state.integerRowLearning || state.historicalTableReasons) state.finiteWork.checkNow()
         if (state.runCancelled) AnalysisResult.NotApplicable else result
     } catch (_: FinitePropagationInterrupted) {
         state.runCancelled = true

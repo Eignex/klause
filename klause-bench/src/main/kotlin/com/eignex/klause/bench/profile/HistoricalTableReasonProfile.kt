@@ -12,6 +12,7 @@ import com.eignex.klause.formats.json.ProblemJson
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.VarRemap
+import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationResult
@@ -40,7 +41,7 @@ import kotlin.time.Duration.Companion.seconds
 internal object HistoricalTableReasonProfile {
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.isEmpty())
+        require(args.isEmpty() || args.contentEquals(arrayOf("controlsOnly=true")))
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
         val records = out.resolve("historical-table.jsonl").apply { writeText("") }
@@ -50,7 +51,7 @@ internal object HistoricalTableReasonProfile {
         for (variant in 0..2) {
             val source = source(variant)
             out.resolve("source-$variant.fzn").writeText(source)
-            for (pass in 0..1) for (route in 0..2) {
+            if (args.isEmpty()) for (pass in 0..1) for (route in 0..2) {
                 for (enabled in if (pass == 0) listOf(false, true) else listOf(true, false)) {
                     val before = bean.getThreadAllocatedBytes(thread)
                     val start = System.nanoTime()
@@ -65,7 +66,7 @@ internal object HistoricalTableReasonProfile {
                         put("warmup", pass == 0)
                         put("elapsedNs", elapsed)
                         put("threadAllocatedBytes", allocated)
-                        put("measurement", "instrumented parse, preparation, replay, application, sibling and disposal")
+                        put("measurement", "instrumented parse, preparation, replay, application, sibling and retraction")
                         put("independentWitnessOrProofCheck", false)
                         put("physicalRssOrGcMeasured", false)
                         put("javaVersion", System.getProperty("java.version"))
@@ -76,12 +77,14 @@ internal object HistoricalTableReasonProfile {
                     println(record)
                 }
             }
+            val controlStart = System.nanoTime()
+            val controlBefore = bean.getThreadAllocatedBytes(thread)
             val program = parseFlatZinc(source)
             val stop = Cancellation.after(2.seconds)
             val preparation = FinitePipeline.prepare(FinitePipelineRequest(
                 program.problem, FiniteEngine.BACKTRACK, cancellation = stop, solveCancellation = stop))
             val result = BacktrackSolver(preparation.problem as BakedProblem).solve(BacktrackParams(
-                randomSeed = 3L, maxDecisions = 128, cancellation = stop))
+                lpConfig = LpConfig.AUTO, randomSeed = 3L, maxDecisions = 128, cancellation = stop))
             val point = (result as? SolveResult.Sat)?.assignment?.let(preparation.reconstruct)
             val checked = point?.let { sample ->
                 val fixed = program.problem.withIntDomains(Array(program.problem.numIntVars) {
@@ -96,6 +99,9 @@ internal object HistoricalTableReasonProfile {
             val record = buildJsonObject {
                 put("variant", variant)
                 put("control", "ordinary prepared backtrack with automatic LP")
+                put("lpPolicy", "AUTO")
+                put("elapsedNs", System.nanoTime() - controlStart)
+                put("threadAllocatedBytes", bean.getThreadAllocatedBytes(thread) - controlBefore)
                 put("verdict", result::class.simpleName)
                 put("stats", result.stats.toString())
                 put("originalSourceNativeCheck", checked)
