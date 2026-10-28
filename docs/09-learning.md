@@ -160,8 +160,13 @@ finite `Linear` inequalities and the explaining half of equalities provide integ
 rows. Reified integer rows preserve the signed indicator selecting the inequality
 or equality side, including the strict integer complement of an inequality. Each
 resolved endpoint must name an unextended historical linear reason from the same
-source row, with its exact guard false-literal and historical guard truth. Historical
-holes, disequalities, wide constants and unsupported projections retain clause fallback.
+source row, with its exact guard false-literal and historical guard truth.
+
+The raw requested bound, reconstructed at the deduction's trail position, must
+support the eliminated live endpoint; a hole-snapped stronger endpoint retains
+clause fallback. Interior holes in the remaining terms stay in the actual domains
+and do not prevent a source-implied combination. Disequalities, wide constants
+and unsupported projections retain clause fallback.
 
 A selected variable-array `Element` can seed a conflict from either side of its
 selected equality. Its positive index-equality atom retains the source index,
@@ -173,7 +178,10 @@ cells retain their selected index guard, and a result alias supplies no arithmet
 Opposite-sign nonnegative combinations use checked signed arithmetic and integer
 gcd normalization. Each combination must remain conflicting. A retained row must
 propagate against the session's historical domains at its native backjump and the
-mapped shared target; literal counts do not establish assertion. Foreign unavailable
+mapped shared target. The raw assertion target must have been a member of its
+historical domain; a later carve cannot remove that earlier membership, and a
+historical hole cannot supply a raw bound assertion. Literal counts do not establish
+assertion. Foreign unavailable
 bound premises retain clause analysis. The producer admits at most 16 terms, 16
 combinations, 64 native levels and 64 stored rows, with bounded duplicate lookup.
 
