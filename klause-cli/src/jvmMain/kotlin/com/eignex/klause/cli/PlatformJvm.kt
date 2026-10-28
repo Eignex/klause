@@ -2,6 +2,7 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.util.CharSource
 import java.io.File
+import java.io.IOException
 import java.io.Reader
 import java.lang.management.ManagementFactory
 import java.util.concurrent.atomic.AtomicBoolean
@@ -32,7 +33,7 @@ internal actual fun openFileSource(path: String): CharSource {
         val input = File(path).inputStream()
         return try {
             ReaderCharSource(GZIPInputStream(input).bufferedReader())
-        } catch (failure: Throwable) {
+        } catch (failure: IOException) {
             input.close()
             throw failure
         }
