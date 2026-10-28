@@ -461,6 +461,14 @@ and relaxes the core with a reified cardinality, replacing its violation count `
 `1 + sum(k = 2..n, s >= k)`; only the first unspent threshold of each count is
 materialized. Weights and the bound use arbitrary-precision integers.
 
+An internal, default-disabled refinement control tries deleting each member of a
+completed core with a fresh propagation refutation of the augmented hard model and
+the retained caller pins. It admits at most 32 members and 32,768 propagation visits,
+never removes the final member, and retains the original certified core on a stop.
+Its construction, trials and disposal share the core worker's work and active-time
+allowances. It performs no additional search and does not promise a minimal core;
+tree refutations unavailable to propagation keep their original members.
+
 Selecting `core-guided` directly also accepts exact integer costs over columns whose
 source bounds are closed on both sides; curated pools still admit it only for Boolean
 objectives. A cost `c·x` starts at its cheapest root value and becomes the gaps between

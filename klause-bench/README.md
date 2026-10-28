@@ -57,6 +57,16 @@ controls and establish no solver throughput or verdict claim.
 
 ## Klause-lab
 
+`bench.profile.CoreQueryProfile` compares retained and ordinarily prepared Boolean
+core controls with unrelated cheap objective pins. It takes no arguments. Two source
+shapes, three OLL policies and three repeats give 36 two-second cases within a
+180-second lab profile. It retains source/objective hashes, actual query/core
+sequences, source point checks, preparation and complete-handle time/allocation,
+work and thresholds. The opt-in propagation-deletion control shares the worker's
+allowance. Separate helper calls retain the existing opt-in deletion minimizer's
+actual seed-path behavior. These native controls establish no independently checked
+proof or whole-CLI throughput claim.
+
 [Klause-lab](https://github.com/Eignex/klause-lab) owns everything that runs more than
 one case: experiments and A/B comparisons, regression schedules, reference solving and
 reference results, witness checking and profiling. It builds the Klause revisions an
