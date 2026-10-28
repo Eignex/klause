@@ -244,8 +244,11 @@ object ScopedComponentProfile {
             residual.fixed,
             { allowance.visit() },
             retain = allowance::retain,
-        )
-            ?: return buildJsonObject { put("decline", "no-bounded-separator") }
+        ) ?: return buildJsonObject {
+            put("decline", if (allowance.stop()) "separator-allowance" else "no-positive-bounded-separator")
+            put("candidateLimit", 32)
+            put("boundedAnalysisComplete", !allowance.stop())
+        }
         val analysis = System.nanoTime() - start
         val branches = separator.branches.map { branch ->
             composition(
@@ -336,10 +339,15 @@ object ScopedComponentProfile {
         override fun fresh(): VariableSelector = DecisionTrace(delegate.fresh(), biased, trace)
 
         override fun pick(session: PropagationSession, rng: Random): VarRef? {
-            val choice = if (biased != null && session.boolValue(biased) == null) {
+            val ordinary = delegate.pick(session, rng)
+            val choice = if (ordinary != null && biased != null && session.boolValue(biased) == null) {
                 VarRef.Bool(biased)
             } else {
-                delegate.pick(session, rng)
+                ordinary
+            }
+            if (ordinary != null && choice != ordinary) {
+                // VSIDS removes its proposal on pick; an overridden proposal remains undecided.
+                delegate.onUnassign(ordinary)
             }
             if (trace.size < 32) {
                 trace += buildJsonObject {

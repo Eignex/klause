@@ -317,8 +317,14 @@ object ConditionalComponentTrace {
                         if (consumer != null) {
                             val consuming = System.nanoTime()
                             val consumed = runCatching {
-                                consumer(ResidualProbeContext(ResidualSnapshots.load(bytes.decodeToString()),
-                                    prepared.reconstruct, input.problem, input.objective))
+                                consumer(ResidualProbeContext(
+                                    ResidualSnapshots.load(bytes.decodeToString()),
+                                    prepared.reconstruct,
+                                    input.problem,
+                                    input.objective,
+                                    baked,
+                                    objective,
+                                ))
                             }.getOrElse { buildJsonObject { put("failure", it.toString()) } }
                             put("consumer", consumed)
                             put("consumerNs", System.nanoTime() - consuming)
