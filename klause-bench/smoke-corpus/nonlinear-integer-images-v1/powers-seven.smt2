@@ -1,0 +1,7 @@
+(set-logic ALL)
+(declare-const x Int)
+(declare-const y Int)
+(declare-const z Int)
+(declare-const w Int)
+(assert (= (+ (^ x 2147483646) (^ y 2147483646) (^ z 2147483646) (^ w 2147483646)) 7))
+(check-sat)

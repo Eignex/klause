@@ -1,0 +1,3 @@
+smtlib-nonlinear-integer-images-v1/powers-seven
+smtlib-nonlinear-integer-images-v1/powers-three
+smtlib-nonlinear-integer-images-v1/powers-four
