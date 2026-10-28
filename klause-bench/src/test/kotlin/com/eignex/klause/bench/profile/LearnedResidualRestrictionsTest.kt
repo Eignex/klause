@@ -2,6 +2,7 @@ package com.eignex.klause.bench.profile
 
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.util.Cancellation
@@ -97,7 +98,7 @@ class LearnedResidualRestrictionsTest {
 
     @Test
     fun `an unnameable atom should withhold complete enforcing incidence`() {
-        val session = PropagationSession(Problem(1, 1, arrayOf(com.eignex.klause.ir.IntDomain(0, 2)), emptyArray()))
+        val session = PropagationSession(Problem(1, 1, arrayOf(IntDomain(0, 2)), emptyArray()))
         val atom = session.boundGeLit(0, 1, positive = true)
         session.addLearnedClause(Clause(intArrayOf(Lit.make(0, true), atom)), 2)
 
