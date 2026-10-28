@@ -12,8 +12,8 @@ import com.eignex.klause.factor.codec.FactorCodecs
 import com.eignex.klause.factor.codec.MissingFactorCodecException
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.formats.FormatException
-import com.eignex.klause.formats.flatzinc.FlatZincProgram
 import com.eignex.klause.formats.flatzinc.FlatZincArray
+import com.eignex.klause.formats.flatzinc.FlatZincProgram
 import com.eignex.klause.formats.flatzinc.OznApplier
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.formats.flatzinc.writeFlatZincSolution
@@ -30,10 +30,12 @@ import java.io.File
 import java.lang.management.ManagementFactory
 import java.net.URI
 import java.util.concurrent.TimeUnit
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
@@ -59,13 +61,17 @@ internal object OptionalUnaryProfile {
                 directory.resolve("data.dzn").writeText("mode = $mode;\n")
                 inspectPair(directory, out, listOf("off"))
             }
+            archive(out)
             return
         }
         val control = out.resolve("control").apply { mkdirs() }
         File(CorpusFetcher.workspaceRoot(), "klause-mzn-lib/test-models/optional-unary.mzn")
             .copyTo(control.resolve("source.mzn"))
         inspectPair(control, out)
-        if (args.isNotEmpty()) return
+        if (args.isNotEmpty()) {
+            archive(out)
+            return
+        }
         val workforce = out.resolve("workforce").apply { mkdirs() }
         val url = "https://raw.githubusercontent.com/MiniZinc/mzn-challenge/" +
             "$WORKFORCE_REVISION/2026/workforce-alloc/scheduling_model.mzn"
@@ -84,6 +90,20 @@ internal object OptionalUnaryProfile {
             original_start = [0, 0, 0];
         """.trimIndent() + "\n")
         inspectPair(workforce, out)
+        archive(out)
+    }
+
+    private fun archive(out: File) {
+        val files = out.walkTopDown().filter { it.isFile && it.name != "profile.jfr" }.toList()
+        ZipOutputStream(out.resolve("capture.zip").outputStream()).use { zip ->
+            for (file in files) {
+                zip.putNextEntry(ZipEntry(file.relativeTo(out).invariantSeparatorsPath))
+                file.inputStream().use { it.copyTo(zip) }
+                zip.closeEntry()
+            }
+        }
+        for (file in files) check(file.delete())
+        out.walkBottomUp().filter { it.isDirectory && it != out }.forEach { check(it.delete()) }
     }
 
     private fun inspectPair(source: File, out: File, prepares: List<String> = listOf("off", "default", "aggressive")) {
