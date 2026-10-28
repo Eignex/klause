@@ -164,7 +164,7 @@ object Presolver {
             val entrySize = PresolveEntrySize(ctx.presolveBudget)
             val booleanPins = PresolveBooleanPins()
             var parityInputs: ParityInputRevision? = null
-            val linearInputs = HashMap<PresolvePass, LinearInputRevision>()
+            val linearInputs = LinkedHashMap<PresolvePass, LinearInputRevision>()
 
             override fun inputRevision(pass: PresolvePass): Long? {
                 if (pass.tracksLinearInputs) {
@@ -327,7 +327,7 @@ object Presolver {
             val entrySize = PresolveEntrySize(ctx.presolveBudget)
             val booleanPins = PresolveBooleanPins()
             var parityInputs: ParityInputRevision? = null
-            val linearInputs = HashMap<PresolvePass, LinearInputRevision>()
+            val linearInputs = LinkedHashMap<PresolvePass, LinearInputRevision>()
 
             override fun inputRevision(pass: PresolvePass): Long? {
                 if (pass.tracksLinearInputs) {
@@ -438,7 +438,7 @@ object Presolver {
             var subsumeMark: PresolveSession.ChangeMark? = null
             val booleanPins = PresolveBooleanPins()
             var parityInputs: ParityInputRevision? = null
-            val linearInputs = HashMap<PresolvePass, LinearInputRevision>()
+            val linearInputs = LinkedHashMap<PresolvePass, LinearInputRevision>()
 
             override fun inputRevision(pass: PresolvePass): Long? {
                 if (pass.tracksLinearInputs) {
