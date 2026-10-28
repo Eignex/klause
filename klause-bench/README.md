@@ -9065,7 +9065,11 @@ it runs 1600 moves of the existing plateau recipe. Replay uses 64 draws each fro
 uniform crossover, factor-scope crossover and basin-hopping perturbation, followed
 by a bounded whole-source CP control. Source preparation, reconstruction, native
 source verification, exact objective agreement, input comparisons and allocations
-are included in the diagnostic's containing deadline. Each invocation owns its
+are included in the diagnostic's cost records. The lab job cap contains source
+loading; a shared 120-second deadline contains preparation and all comparisons.
+Costs whose exact source value is not representable by the policy's `Double`
+comparator decline. Existing plateau and extended structured recipe controls each
+receive 512 moves from every distinct supplied center. Each invocation owns its
 policy and clears the three samples on exit. Unsupported projections decline.
 
 The report distinguishes retained samples, duplicate offers, consumed restarts,
