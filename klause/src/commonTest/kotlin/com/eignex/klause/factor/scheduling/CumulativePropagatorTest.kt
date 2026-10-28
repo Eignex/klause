@@ -115,7 +115,7 @@ class CumulativePropagatorTest {
     @Test
     fun `subwindow reasons should omit an early spectator and survive later tightening`() {
         val problem = Problem(0, 6, arrayOf(
-            IntDomain(0, 4), IntDomain(4, 7), IntDomain(4, 6), IntDomain(4, 6),
+            IntDomain(0, 4), IntDomain(4, 8), IntDomain(4, 6), IntDomain(4, 6),
             IntDomain(1, 1), IntDomain(0, 1),
         ), arrayOf<Factor>(Cumulative(
             intArrayOf(0, 1, 2, 3), longArrayOf(1, 2, 2, 2), longArrayOf(1, 1, 1, 1), 1,
@@ -137,6 +137,21 @@ class CumulativePropagatorTest {
         assertFalse(after.any { state.atoms.intVar[Lit.variable(it)] == 0 })
         state.undoTo(root)
         assertEquals(IntDomain(0, 1), state.intDomains[5])
+    }
+
+    @Test
+    fun `subwindow exclusions should follow narrowed participating windows`() {
+        val problem = Problem(0, 6, arrayOf(
+            IntDomain(0, 4), IntDomain(4, 8), IntDomain(4, 6), IntDomain(4, 6),
+            IntDomain(1, 1), IntDomain(0, 1),
+        ), arrayOf<Factor>(Cumulative(
+            intArrayOf(0, 1, 2, 3), longArrayOf(1, 2, 2, 2), longArrayOf(1, 1, 1, 1), 1,
+            resourceVars = intArrayOf(4, 4, 4, 5),
+        )))
+
+        PropagationReasonOracle.assertReasonsImply(problem, "subwindow-narrowed") { state ->
+            state.tightenIntMax(1, 6)
+        }
     }
 
     @Test
