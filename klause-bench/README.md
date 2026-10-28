@@ -704,12 +704,17 @@ The lab runs no shell scripts, so a new measurement is a class in that package.
 
 `SourceStageProfile` accepts `request64=<base64 JSON array>` for stage attribution.
 A source request has `suite`, `problem`, decoded-source `sha256`, `engine`
-(`default`, `cp`, or `ls`) and `exact`. It profiles the installed CLI for ten seconds
-at seed 3 with one active processor, a 3 GiB heap, Serial GC and debug statistics,
+(`default`, `cp`, `ls` or `mixed`) and `exact`. MPS and XCSP3 sources are supported.
+Optional `timeout` (1,000–60,000 milliseconds) and `seed` default to ten seconds
+and seed 3. It profiles the installed CLI with one active processor, a 3 GiB heap, Serial GC and debug statistics,
 then runs the existing JFR phase/caller analyzer. It retains the command, source,
 streams and recording. These instrumented runs diagnose stages without a throughput
-or source-verdict claim. Three spaced `jcmd Thread.print` snapshots provide a
+or source-verdict claim. Four spaced `jcmd Thread.print` snapshots through one third
+beyond the requested deadline provide a
 second view when JFR sampling is sparse; attach can pause the measured process.
+JFR closes 35 seconds after the deadline so a later process kill preserves its
+completed recording. A process still alive 50 seconds after the deadline is killed;
+that failed capture retains its diagnostics and establishes no source verdict.
 A `{job, sha256}` request instead checks and summarizes an
 existing profile job's `cases/0/out/profile.jfr` without executing a solver. An
 optional `recording` selects `cli.jfr` or `profile.jfr`, optionally beneath a
