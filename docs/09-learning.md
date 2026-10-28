@@ -155,8 +155,8 @@ An assumption is a decision premise, never an unconditional source fact. Learned
 clauses preserve those premises through resolution. Permanent objective bounds and
 model blockers belong to the containing search scope. Clause exchange requires
 compatible problem and objective contexts; repair pools filter permanent assertions.
-Clauses attributed to another origin retain it and are not re-exported. PB and integer rows
-are not clause-portable. Shared component clauses remain session-local; source
+Clauses attributed to another origin retain it and are not re-exported. PB and
+integer rows are not clause-portable. Shared component clauses remain session-local; source
 refutations import only into conditions that imply their recorded support.
 
 Retraction removes assignments, not admitted deductions. Learned units are examined

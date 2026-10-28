@@ -20,16 +20,17 @@ internal class LearnedClauseDb(
      *  pass — never correctness. */
     var binaryClauseCount: Int,
 ) {
-    /** Learned constraints accumulated during search (LCG-style nogoods produced by [ConflictAnalyzer]).
-     *  Their factor ids live in `[problem.numFactors, totalFactorCount)` — treat them like any other
-     *  [Propagator] via `factorAt`; they participate in propagation through the per-literal watcher index
-     *  just like static factors. Survives `restore` (learned constraints are facts about the original
-     *  problem, not trail state); pruned by `forgetLearnedClauses`. */
     val lifecycle = LearnedLifecycle()
     val stages = IntArrayList()
     val pendingAttach = IntArrayList()
     val units = IntArrayList()
     var unitsPending = false
+
+    /** Learned constraints accumulated during search (LCG-style nogoods produced by [ConflictAnalyzer]).
+     *  Their factor ids live in `[problem.numFactors, totalFactorCount)` — treat them like any other
+     *  [Propagator] via `factorAt`; they participate in propagation through the per-literal watcher index
+     *  just like static factors. Survives `restore` (learned constraints are facts about the original
+     *  problem, not trail state); pruned by `forgetLearnedClauses`. */
     val store = ArrayList<LearnedPropagator>()
 
     internal var integerRows: ArrayList<LearnedIntegerPropagator>? = null

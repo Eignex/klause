@@ -5,6 +5,16 @@ import kotlin.test.assertEquals
 
 class SearchStatsTest {
     @Test
+    fun `learning diagnostics should survive copies and combine worker lifetimes`() {
+        val first = SearchStats(learning = mapOf("learningClauseConsumed" to 2L))
+        val second = SearchStats(learning = mapOf("learningClauseConsumed" to 3L))
+
+        val combined = first.copy().mergedWith(second)
+
+        assertEquals(mapOf("learningClauseConsumed" to 5L), combined.learning)
+    }
+
+    @Test
     fun `value guidance observations should add across worker lifetimes`() {
         val first = SearchStats(valueOrdering = ValueOrderingStats(1, 2, 3, 4, 5, 6))
         val second = SearchStats(valueOrdering = ValueOrderingStats(6, 5, 4, 3, 2, 1))

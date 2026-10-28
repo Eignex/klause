@@ -63,7 +63,7 @@ internal class NativeSatState(private val state: PropagationState) {
     val importUses = OriginCounts()
 
     // Keep learned positions separate so the first learned clause cannot double the base allocation.
-    // A single-literal clause watches nothing (its unit is pinned at root and never unassigned).
+    // Single-literal clauses are examined directly after retraction instead of watching a literal.
     private val watchPos = IntArray(2 * baseCount)
     private val learnedWatchPos = IntArrayList()
 
@@ -326,7 +326,7 @@ internal class NativeSatState(private val state: PropagationState) {
         val remap = IntArray(learnedCount)
         var survivors = 0
         for (i in 0 until learnedCount) {
-            remap[i] = if (referenced[i] || keep(i, learnedLbd[i])) survivors++ else -1
+            remap[i] = if (learnedPermanent[i] == 1 || referenced[i] || keep(i, learnedLbd[i])) survivors++ else -1
         }
         if (survivors == learnedCount) return
 
