@@ -768,6 +768,10 @@ internal object Suites {
             vendored(name, Category.CSP, if (name.endsWith("unsat")) Expected.Unsat else Expected.Sat,
                 relPath = "extensional-overlap/$name.xml")
         }
+        vendored("cyclic-mod3-unsat", Category.OPTIMIZATION, Expected.Unsat,
+            relPath = "extensional-overlap/cyclic-mod3-unsat.xml", license = "Apache-2.0")
+        vendored("cyclic-mod3-sat", Category.OPTIMIZATION, Expected.Opt(4L),
+            relPath = "extensional-overlap/cyclic-mod3-sat.xml", license = "Apache-2.0")
     }
 
     private val lpComponentSplit = suite("lp-component-split", "Targeted separable and linked dense LP models") {
