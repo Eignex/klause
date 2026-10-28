@@ -35,6 +35,7 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
 import java.io.File
 import java.security.MessageDigest
+import java.util.HexFormat
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -120,7 +121,7 @@ object ConditionalComponentTrace {
                 buildJsonObject { put("failure", it.toString()) }
             }
             val label = record["label"]?.toString()?.trim('"') ?: "input"
-            out.resolve("%02d-%s.json".format(index, label.replace(Regex("[^A-Za-z0-9_.-]"), "_")))
+            out.resolve("${index.toString().padStart(2, '0')}-${label.replace(Regex("[^A-Za-z0-9_.-]"), "_")}.json")
                 .writeText(record.toString())
             println(record)
         }
@@ -203,7 +204,7 @@ object ConditionalComponentTrace {
                 put("elapsedMs", prepareNanos / 1_000_000)
                 put("stopped", stop())
                 put("infeasible", prepared.presolve?.infeasible == true)
-                put("passes", prepared.presolve?.passes?.joinToString(",") ?: "")
+                put("passes", prepared.presolve?.passes?.joinToString(",").orEmpty())
                 put("constraintsRemoved", prepared.presolve?.constraintsRemoved ?: 0)
             }
         }
@@ -261,7 +262,7 @@ object ConditionalComponentTrace {
             f.literals.none { sample.boolValue(Lit.variable(it)) == Lit.isPositive(it) }
     }
 
-    private fun hex(bytes: ByteArray): String = bytes.joinToString("") { "%02x".format(it) }
+    private fun hex(bytes: ByteArray): String = HexFormat.of().formatHex(bytes)
 
     /** Forwards every hook to [delegate] and lets [recorder] observe each branch point first. */
     private class TracingSelector(private val delegate: VariableSelector, private val recorder: Recorder) :
