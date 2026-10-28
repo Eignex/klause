@@ -139,6 +139,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
             override val lbd: Int,
             override val decisionLevels: IntArray,
             override val asserting: Boolean = true,
+            val fallbackClause: Learned? = null,
         ) : LearnedConstraint {
             override val guardLiterals: IntArray get() = literals
             override fun equals(other: Any?): Boolean = other is LearnedPb &&
@@ -279,8 +280,13 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
             pb.seedFactorId = seedFactorId
             val r = runResolution(pb, seedReason, currentLevel)
             if (!pb.failed) {
+                val result = if (r is AnalysisResult.LearnedPb && state.problem.numIntVars > 0) {
+                    r.copy(fallbackClause = runResolution(clauseResolvent, seedReason, currentLevel) as? AnalysisResult.Learned)
+                } else {
+                    r
+                }
                 lastResolvent = pb
-                return r
+                return result
             }
         }
         lastResolvent = clauseResolvent

@@ -50,6 +50,7 @@ class CpSearchComponent(
         }
     }
     private var sharedRootLevel = 0
+    private var analysisSharedLevel = 0
     private val nativeLevelBySharedLevel = IntArrayList().apply { add(0) }
     private var lastResult: PropagationResult? = null
     internal val lastConflict: PropagationResult.Unsat? get() = lastResult as? PropagationResult.Unsat
@@ -73,7 +74,36 @@ class CpSearchComponent(
 
     override val prefersNativeConflictAnalysis: Boolean
         get() = session.problem.numIntVars == 0 ||
-            lastConflict?.learnedClause is ConflictAnalyzer.AnalysisResult.LearnedPb
+            (lastConflict?.learnedClause as? ConflictAnalyzer.AnalysisResult.LearnedPb)?.let(::usableMixedPb) == true
+
+    private fun usableMixedPb(learned: ConflictAnalyzer.AnalysisResult.LearnedPb): Boolean {
+        val context = sharedContext ?: return false
+        var nativeTarget = sharedRootLevel
+        for (level in minOf(nativeLevelBySharedLevel.size - 1, analysisSharedLevel - 1) downTo 0) {
+            if (nativeLevelBySharedLevel[level] <= learned.backjumpLevel) {
+                nativeTarget = nativeLevelBySharedLevel[level]
+                break
+            }
+        }
+        val state = session.explanationState
+        var available = 0L
+        var maxFree = 0L
+        for (i in learned.literals.indices) {
+            if (context.cancelled()) return false
+            val literal = learned.literals[i]
+            val variable = Lit.variable(literal)
+            val sharedValue = context.boolValue(variable)
+            if (sharedValue != null && context.explainAtoms(
+                    SearchAtomPremise.Asserted(SearchDecision.Bool(Lit.make(variable, sharedValue))),
+                ) == null
+            ) return false
+            val freed = !state.boolAssignedAt(variable) || state.boolLevel[variable] > nativeTarget
+            if (freed || state.boolValueAt(variable) == Lit.isPositive(literal)) available += learned.weights[i]
+            if (freed) maxFree = maxOf(maxFree, learned.weights[i])
+        }
+        val slack = available - learned.degree
+        return slack >= 0 && maxFree > slack
+    }
 
     /** Align shared decision level zero with CP's post-seed root. */
     fun rebase() {
@@ -182,6 +212,7 @@ class CpSearchComponent(
     ): ComponentResult {
         sharedContext = context
         lastResult = null
+        analysisSharedLevel = context.decisionLevel
         if (session.fixpointCancelled) return ComponentResult.Indeterminate
         if (decision is SearchDecision.Bool && Lit.variable(decision.literal) >= session.problem.numBoolVars) {
             return if (context.atomLiteral(decision) != null) {
@@ -275,7 +306,11 @@ class CpSearchComponent(
     }
 
     private fun conflict(result: PropagationResult.Unsat): ComponentResult.Conflict = ComponentResult.Conflict(
-        (result.learnedClause as? ConflictAnalyzer.AnalysisResult.Learned)
+        (when (val learned = result.learnedClause) {
+            is ConflictAnalyzer.AnalysisResult.Learned -> learned
+            is ConflictAnalyzer.AnalysisResult.LearnedPb -> learned.fallbackClause
+            else -> null
+        })
             ?.literals
             ?.takeIf { literals -> literals.all { Lit.variable(it) < session.problem.numBoolVars } }
             ?.let(::SearchExplanation),
@@ -436,7 +471,10 @@ class CpSearchComponent(
 
     override fun resolveConflict(context: com.eignex.klause.solver.search.SearchContext): SearchConflictResolution {
         val unsat = lastResult as? PropagationResult.Unsat ?: return SearchConflictResolution.Chronological
-        val learned = unsat.learnedClause as? ConflictAnalyzer.AnalysisResult.LearnedConstraint
+        var learned = unsat.learnedClause as? ConflictAnalyzer.AnalysisResult.LearnedConstraint
+        if (session.problem.numIntVars > 0 && learned is ConflictAnalyzer.AnalysisResult.LearnedPb && !usableMixedPb(learned)) {
+            learned = learned.fallbackClause
+        }
         if (learned == null) {
             conflictStats?.observeNotApplicable()
             return SearchConflictResolution.Chronological
