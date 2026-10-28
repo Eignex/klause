@@ -59,7 +59,7 @@ class LpPrimalHeuristicsTest {
         assertNull(proposal)
         assertTrue(session.fixpointCancelled)
         assertEquals(4, polls)
-        assertEquals(problem.intDomains[1], session.intDomain(1))
+        assertEquals(IntDomain(0, 101), session.intDomain(1))
     }
 
     @Test

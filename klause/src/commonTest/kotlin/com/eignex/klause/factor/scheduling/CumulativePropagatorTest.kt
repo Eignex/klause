@@ -45,7 +45,7 @@ class CumulativePropagatorTest {
             assertFalse(state.runCancelled)
             assertEquals(limit, polls)
             while (state.rootFixpointPending) assertNull(state.advanceRootFixpoint(Cancellation.Never))
-            for (v in 0 until n) assertEquals(problem.intDomains[v], state.intDomains[v])
+            for (v in 0 until n) assertEquals(IntDomain(0, 100L + v), state.intDomains[v])
         }
     }
 
