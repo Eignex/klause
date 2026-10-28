@@ -61,8 +61,9 @@ controls and establish no solver throughput or verdict claim.
 core controls with unrelated cheap objective pins. Two source shapes, five OLL
 policies and three repeats give 60 two-second core cases, alongside 24 matched
 native-SAT BnB controls with LP off/forced bounding. Allow 300 seconds for the full
-profile. `confirm=true` selects one equal-weight retained source and one repeat:
-five core policies, two BnB cases and two helper calls, each capped at two seconds.
+profile. `confirm=true` selects one equal-weight source, both preparation policies
+and one repeat: ten core cases, four BnB cases and four helper calls, each capped at
+two seconds.
 It retains source/objective hashes, actual query/core
 sequences, source point checks, preparation and complete-handle time/allocation,
 work and thresholds. Policies include removing root-satisfied cost pins, bounded
