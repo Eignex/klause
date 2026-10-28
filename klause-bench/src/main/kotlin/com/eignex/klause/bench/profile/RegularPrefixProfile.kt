@@ -8,6 +8,7 @@ import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.MiniZincCompatibility
 import com.eignex.klause.bench.runner.MiniZincRunner
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.codec.MissingFactorCodecException
 import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.formats.json.ProblemJson
 import com.eignex.klause.formats.xcsp3.Xcsp3
@@ -136,7 +137,14 @@ internal object RegularPrefixProfile {
             )
             val preparationNs = System.nanoTime() - started
             val model = prepared.problem
-            out.resolve("$mode-prepared.json").writeText(codec.encodeToJsonElement(model).toString())
+            val snapshot = try {
+                codec.encodeToJsonElement(model).toString().also {
+                    out.resolve("$mode-prepared.json").writeText(it)
+                }
+            } catch (failure: MissingFactorCodecException) {
+                out.resolve("$mode-snapshot-decline.txt").writeText(failure.message.orEmpty())
+                null
+            }
             val root = if (prepared.presolve?.infeasible != true && !stop()) {
                 PropagationSession(
                     model,
@@ -154,6 +162,7 @@ internal object RegularPrefixProfile {
                 put("preparedIntegers", model.numIntVars)
                 put("preparedBooleans", model.numBoolVars)
                 put("preparedFactorKinds", kinds(model))
+                put("preparedSnapshotAvailable", snapshot != null)
                 put("infeasible", prepared.presolve?.infeasible == true || root is PropagationResult.Unsat)
                 put("stopped", stop())
                 put("preparationNs", preparationNs)
@@ -191,14 +200,12 @@ internal object RegularPrefixProfile {
             }
             out.resolve("$mode-report.json").writeText(report.toString())
             println("${out.name}/$mode: $report")
-            if (replay && mode == "default" && model.factors.any { it is Regular } &&
+            if (replay && mode == "default" && snapshot != null && model.factors.any { it is Regular } &&
                 prepared.presolve?.infeasible != true && !stop()
             ) {
                 RegularPrefixReplay.capture(
                     model,
-                    sha256(
-                        codec.encodeToJsonElement(model).toString().toByteArray(),
-                    ),
+                    sha256(snapshot.toByteArray()),
                     out,
                     source,
                     prepared.reconstruct,
