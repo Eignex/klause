@@ -2477,6 +2477,25 @@ The retained scope shows no consumed reuse under containing allowances, so no tr
 or cache integration follows. Raw records are under
 `klause-evidence/campaigns/conditional-components-3724/`.
 
+### Integer cost cores
+
+Lazy integer cost frontiers for a directly selected `core-guided` worker were compared
+in job [8869](https://lab.eignex.com/jobs/8869) at `e180dc3d4b` against mixed defaults
+and `lp=aggressive`: P1/20s, seeds 3/17, Linux/amd64, debug enabled, independent XCSP3
+witness checks. On `xcsp3-core/pair-cover-costs` every arm proves 6; the core arm
+returns two two-literal cores with floors 3 and 6 in 2 nodes, against 20 nodes for
+the others. A Boolean threshold view of the same source reaches those floors with a
+five-literal second core, because its seed prefix includes the eager suffix selectors.
+
+On Wordpress-04-10-500_c24, whose reference optimum is 1442, defaults and aggressive LP
+reach 1442 unproven with root bound 0. The core arm raises an exact floor to 343 and
+394 after 199 and 250 cores, but finds no witness. On FAPP-aux-01-0200_c25 two cores
+reach 8,930,251 against a best known 99,955,504, and no arm finds a witness. Both
+MiniZinc candidates failed to load in every arm. These floors survive ordinary
+preparation but close neither gap and cost the incumbent, so curated pools keep
+Boolean-only admission. Raw records are under
+`klause-evidence/campaigns/finite-cost-core-avenue/lazy-3738/`.
+
 ### Bounded retained integer probing
 
 Default metered finite satisfaction preparation funds one retained root, 128 probe
