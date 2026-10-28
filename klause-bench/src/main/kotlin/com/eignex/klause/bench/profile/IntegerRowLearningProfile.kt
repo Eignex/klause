@@ -79,6 +79,7 @@ internal object IntegerRowLearningProfile {
                 if (retained) check(reasons[0] - problem.factors.size in rowIndices)
                 val x = if (upper == 7L) 1L else 2L
                 val y = if (2 * x == hole) 2 * x + 1 else 2 * x
+                check(y in yDomain && y in native.intDomain(1))
                 val point = problem.withIntDomains(arrayOf(IntDomain(x, x), IntDomain(y, y), IntDomain(upper, upper)))
                 val checker = PropagationSession(point)
                 check(!checker.isUnsatAtRoot)
