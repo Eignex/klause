@@ -4163,12 +4163,13 @@ LP configuration establish no search or cost result.
 branch-and-bound on an original MiniZinc identity. Required arguments are `suite`
 and `problem`; optional `prepare`, `lp`, `seeds` (comma-separated) and `decisions`
 default to `default`, `off`, `3,7` and 512. Each search has a 20-second safety
-deadline and alternates the order of disabled, unconditional and zero-load-guarded
-passes between seeds. Private opt-in counters record calls, zero-load eligibility,
-windows, task visits, strict demand bounds and conflicts; up to 32 bound snapshots
+deadline and alternates the order of disabled, unconditional, zero-load-guarded and
+guarded completion-sweep passes between seeds. Private opt-in counters record calls,
+zero-load eligibility, windows, task/suffix visits, strict demand bounds and conflicts;
+up to 32 bound snapshots
 retain the channels and their subsequent decision fixpoints. Hooks attach at the
-first selector pick, so preparation and initial root propagation share the
-unconditional prototype. Root snapshots must match before comparing these search
+first selector pick, so preparation and initial root propagation share the guarded
+completion sweep. Root snapshots must match before comparing these search
 controls. Counts exclude preparation and the initial root; a subsequent fixpoint
 snapshot is evidence only for the domains it actually retains. These instrumented
 runs diagnose yield and supply neither CLI throughput nor a source-verdict claim.
