@@ -6,6 +6,7 @@ import com.eignex.klause.formats.xcsp3.Xcsp3
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.localsearch.movesource.MoveSource
 import com.eignex.klause.localsearch.movesource.MoveSourceCatalog
 import com.eignex.klause.localsearch.movesource.SatisfiedStructured
 import com.eignex.klause.presolve.PresolveBudget
@@ -69,7 +70,9 @@ internal object EqualityMoveReplay {
         val gradient = hints?.let { LocalSearchTrajectory.getter(it, "getObjective") as IncrementalObjective? }
         val state = LocalSearchState(problem, Random(options["seed"]?.toLong() ?: 1L))
         state.invariants = sweep?.network(problem.numIntVars, problem.numBoolVars)
-        state.shaping.objective = gradient ?: prepared.objective
+        state.shaping.javaClass.methods.single {
+            it.name.substringBefore('$') == "setObjective" && it.parameterCount == 1
+        }.invoke(state.shaping, gradient ?: prepared.objective)
         val view = TrajectoryView("prepared", state, coordinates, state.shaping.objective,
             prepared.reconstruct, { sweep?.sweep(state.assignment, state.rootDomains) })
         val decline = view.load(center)
@@ -90,8 +93,7 @@ internal object EqualityMoveReplay {
         }.toString())
         if (decline != null) return
         check(state.cost == 0L)
-        val sources = linkedMapOf("all-structured" to SatisfiedStructured.all())
-            .mapValues { it.value as com.eignex.klause.localsearch.movesource.MoveSource }.toMutableMap()
+        val sources = linkedMapOf<String, MoveSource>("all-structured" to SatisfiedStructured.all())
         for (label in (options["sources"] ?: "objective,extended-structured,pair-swap").split(',')) {
             sources[label] = MoveSourceCatalog.configured(label).source
         }
