@@ -46,7 +46,7 @@ internal class CumulativePropagator(
     private val n: Int,
 ) : InterruptiblePropagator {
     // Private, opt-in admission instrumentation; the bench attaches it after the search root.
-    private var subwindowMode = 1
+    private var subwindowMode = 3
     private var subwindowMetrics: LongArray? = null
     private var subwindowWitness: ((Int, Long, Long, Long) -> Unit)? = null
 
@@ -262,13 +262,14 @@ internal class CumulativePropagator(
         if (!positiveMinimum && !demandAboveCapacity) {
             metrics?.let { it[1]++ }
             // Every containing window is at least the target's duration, so its bound is >= capacity.
-            if (subwindowMode == 2) return true
+            if (subwindowMode >= 2) return true
         }
         metrics?.let { it[2]++ }
         return try {
             val ids = active.toIntArray()
             val est = LongArray(ids.size) { state.intDomains[starts[ids[it]]].min }
             val lct = LongArray(ids.size) { addExact(state.intDomains[starts[ids[it]]].max, durations[ids[it]]) }
+            if (subwindowMode == 3) return subwindowDemandSweep(state, ids, est, lct, metrics)
             val lefts = est.distinct()
             val rights = lct.distinct()
             for (left in lefts) {
@@ -309,6 +310,72 @@ internal class CumulativePropagator(
         } catch (_: CheckedLongOverflowException) {
             true
         }
+    }
+
+    private fun subwindowDemandSweep(
+        state: PropagationState,
+        ids: IntArray,
+        est: LongArray,
+        lct: LongArray,
+        metrics: LongArray?,
+    ): Boolean {
+        val order = argsortBy(ids.size) { a, b -> lct[a].compareTo(lct[b]) }
+        val rights = lct.distinct().sorted()
+        val completion = IntArray(ids.size) { rights.binarySearch(lct[it]) }
+        val slack = LongArray(rights.size)
+        val bestRight = IntArray(rights.size)
+        val cap = capMax(state)
+        for (left in est.distinct()) {
+            var energy = 0L
+            var cursor = 0
+            for (j in rights.indices) {
+                state.checkFiniteWork()
+                val right = rights[j]
+                while (cursor < order.size && lct[order[cursor]] <= right) {
+                    state.checkFiniteWork()
+                    metrics?.let { it[4]++ }
+                    val k = order[cursor++]
+                    if (est[k] >= left) {
+                        energy = addExact(energy, mulExact(durations[ids[k]], minHeight(state, ids[k])))
+                    }
+                }
+                if (right <= left) {
+                    slack[j] = Long.MAX_VALUE
+                    continue
+                }
+                metrics?.let { it[3]++ }
+                val budget = mulExact(subExact(right, left), cap)
+                if (energy > budget) {
+                    metrics?.let { it[7]++ }
+                    return fail(state) { subwindowReason(-1, left, right) }
+                }
+                slack[j] = budget - energy
+            }
+            // A target admits every right endpoint at or beyond its latest completion.
+            var best = rights.lastIndex
+            for (j in rights.indices.reversed()) {
+                state.checkFiniteWork()
+                metrics?.let { it[8]++ }
+                if (slack[j] <= slack[best]) best = j
+                bestRight[j] = best
+            }
+            for (k in ids.indices) {
+                state.checkFiniteWork()
+                metrics?.let { it[5]++ }
+                if (est[k] < left) continue
+                val i = ids[k]
+                val demand = state.intDomains[resourceVars[i]]
+                if (demand.min == demand.max) continue
+                val j = bestRight[completion[k]]
+                val bound = addExact(slack[j] / durations[i], demand.min)
+                if (bound < demand.max) {
+                    metrics?.let { it[6]++ }
+                    subwindowWitness?.invoke(i, left, rights[j], bound)
+                    if (!tightenMax(state, resourceVars[i], bound, packed(SUBWINDOW, i, left, rights[j]))) return false
+                }
+            }
+        }
+        return true
     }
 
     /**

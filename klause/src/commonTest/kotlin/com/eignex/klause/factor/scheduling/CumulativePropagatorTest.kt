@@ -45,6 +45,22 @@ class CumulativePropagatorTest {
     }
 
     @Test
+    fun `demand filtering should select a later completion before a loose zero load endpoint`() {
+        val problem = Problem(0, 8, arrayOf(
+            IntDomain(0, 100), IntDomain(100, 103), IntDomain(100, 103), IntDomain(100, 102),
+            IntDomain(0, 199), IntDomain(1, 1), IntDomain(0, 1), IntDomain(0, 0),
+        ), arrayOf<Factor>(Cumulative(
+            intArrayOf(0, 1, 2, 3, 4), longArrayOf(1, 3, 3, 2, 1), longArrayOf(1, 1, 1, 1, 0), 1,
+            resourceVars = intArrayOf(5, 5, 5, 6, 7),
+        )))
+        val state = PropagationState(problem, Assumptions.None)
+
+        assertTrue(problem.propagators[0].propagate(state, 0))
+
+        assertEquals(IntDomain(0, 0), state.intDomains[6])
+    }
+
+    @Test
     fun `subwindow demand filtering should preserve holes and repeated demand aliases`() {
         val problem = Problem(0, 6, arrayOf(
             IntDomain(0, 100), IntDomain(100, 102), IntDomain(100, 102), IntDomain(100, 102),

@@ -446,6 +446,10 @@ With fixed durations and ranged demands, cumulative propagation checks contained
 energy in bounded subwindows over at most 32 tasks. Definitely present positive-duration
 tasks contribute their minimum demand. Remaining window capacity bounds each contained
 task's demand from above; its channel consumes that bound through ordinary propagation.
+For each left endpoint, a completion-order sweep accumulates contained energy; suffix
+minimum slack selects the strongest right endpoint containing each target. This takes
+quadratic task/window visits. A zero minimum load with every maximum demand at most
+capacity skips the scan, since each containing window spans at least its target's duration.
 Historical reasons cite the participating start bounds, other minimum demands and
 capacity ceiling. Negative minimum demands or unrepresentable window arithmetic decline
 the pass. Window scratch belongs to one fire and is rebuilt after interruption or undo.

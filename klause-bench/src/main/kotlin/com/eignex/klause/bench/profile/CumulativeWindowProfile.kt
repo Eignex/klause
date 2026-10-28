@@ -38,7 +38,7 @@ import kotlinx.serialization.json.put
 
 internal object CumulativeWindowProfile {
     private val counters = listOf("calls", "zeroLoadCalls", "scans", "windows", "energyVisits", "targetVisits",
-        "tightenings", "conflicts")
+        "tightenings", "conflicts", "suffixVisits")
 
     @JvmStatic
     fun main(args: Array<String>) {
@@ -61,7 +61,7 @@ internal object CumulativeWindowProfile {
         require(decisions in 1L..10_000L)
         val records = out.resolve("windows.jsonl").apply { writeText("") }
         for ((pass, seed) in (options["seeds"] ?: "3,7").split(',').map(String::toLong).withIndex()) {
-            val modes = if (pass % 2 == 0) listOf(0, 1, 2) else listOf(2, 1, 0)
+            val modes = if (pass % 2 == 0) listOf(0, 1, 2, 3) else listOf(3, 2, 1, 0)
             for (mode in modes) {
                 val directory = out.resolve("seed-$seed-mode-$mode").apply { mkdirs() }
                 val parsed = parseFlatZinc(text)
@@ -112,7 +112,7 @@ internal object CumulativeWindowProfile {
                     put("fails", result.stats.search.fails.sum)
                     put("propagationWork", result.stats.search.propagationWork.sum)
                     put("attachedSessions", trace.sessions.size)
-                    put("scope", "after first selector pick; preparation and initial root use unconditional prototype")
+                    put("scope", "after first selector pick; preparation and initial root use guarded completion sweep")
                     put("counters", buildJsonObject {
                         for (index in counters.indices) put(counters[index], trace.metrics[index])
                     })
