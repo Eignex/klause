@@ -7,3 +7,5 @@ The mathematical optimum is 136 at labels 1100; that expectation is independent
 of measured native solver results. Each individual source row has a feasible
 completion. The separate Table hulls admit labels 1/2 and zero costs at 7.5.
 A relaxed diagram's underestimated path cost cannot replace a source cost equality.
+
+SHA-256: `4e5a097b9f6c2997ef0cc552c888f74ae823b5a18e131b0aea8a60893ef8da03`.
