@@ -111,7 +111,11 @@ class FlatZincGlobalConstraintsTest {
     fun `the optional bridge should decline variable durations`() {
         for (domain in listOf("0..1", "1..2")) {
             assertFailsWith<FlatZincParseException> {
-                parseFlatZinc("var $domain: d; constraint klause_disjunctive_opt([true,true],[0,1],[1,d]); solve satisfy;")
+                parseFlatZinc("""
+                    var $domain: d;
+                    constraint klause_disjunctive_opt([true,true],[0,1],[1,d]);
+                    solve satisfy;
+                """.trimIndent())
             }
         }
     }
