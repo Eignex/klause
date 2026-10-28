@@ -27,23 +27,28 @@ import com.eignex.klause.solver.pipeline.SourceAttachment
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.util.Cancellation
-import java.io.File
-import kotlin.random.Random
-import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import kotlin.random.Random
+import kotlin.time.Duration.Companion.seconds
 
 internal object EqualityMoveReplay {
     @JvmStatic
     fun main(args: Array<String>) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
-        val bytes = trajectorySourceBytes(options.getValue("suite"), options.getValue("problem"),
-            options.getValue("sha256"), options["source64"], options["sourceGzip64"])
+        val bytes = trajectorySourceBytes(
+            options.getValue("suite"),
+            options.getValue("problem"),
+            options.getValue("sha256"),
+            options["source64"],
+            options["sourceGzip64"],
+        )
         out.resolve("source.xml").writeBytes(bytes)
         out.resolve("request.txt").writeText(args.joinToString("\n"))
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
@@ -58,14 +63,28 @@ internal object EqualityMoveReplay {
         val objective = requireNotNull(parsed.objective).toLinearObjective()
         val center = Sample(booleanArrayOf(), options.getValue("center").split(',').map(String::toLong).toLongArray())
         check(FiniteConflictSelection.checkSource(source, center, stop))
-        val invocation = SourceSetup.prepare(SourceSetupRequest(
-            SourceAttachment(parsed.problem, parsed.definitionHints), ExecutionOperation.OPTIMIZE,
-            FiniteEngine.LOCAL_SEARCH, objective = objective, cancellation = stop))
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+            SourceAttachment(parsed.problem, parsed.definitionHints),
+            ExecutionOperation.OPTIMIZE,
+            FiniteEngine.LOCAL_SEARCH,
+            objective = objective,
+            cancellation = stop,
+        )
+        )
         val plan = requireNotNull(invocation.preparedPlan)
-        val prepared = FinitePipeline.prepare(FinitePipelineRequest(requireNotNull(plan.model),
-            FiniteEngine.LOCAL_SEARCH, objective, cancellation = stop, solveCancellation = stop,
+        val prepared = FinitePipeline.prepare(
+            FinitePipelineRequest(
+            requireNotNull(plan.model),
+            FiniteEngine.LOCAL_SEARCH,
+            objective,
+            cancellation = stop,
+            solveCancellation = stop,
             presolveBudget = PresolveBudget(1_375_000_000L),
-            presolveConfig = PresolveConfig.parse(options["presolve"]), preparedPlan = plan))
+            presolveConfig = PresolveConfig.parse(options["presolve"]),
+            preparedPlan = plan,
+        )
+        )
         check(!stop() && prepared.presolve?.infeasible != true)
         val problem = prepared.problem as BakedProblem
         val coordinates = requireNotNull(LocalSearchTrajectory.trajectoryCoordinates(invocation, prepared, stop))
@@ -76,20 +95,31 @@ internal object EqualityMoveReplay {
         state.invariants = sweep?.network(problem.numIntVars, problem.numBoolVars)
         val mapped = (0 until coordinates.intCount).map(coordinates::int).toSet()
         val coefficients = prepared.objective?.intCoefficients ?: longArrayOf()
-        val unused = if (gradient != null) emptyList() else (0 until problem.numIntVars).filter {
+        val unused = if (gradient != null) {
+            emptyList()
+        } else {
+            (0 until problem.numIntVars).filter {
             it !in mapped && state.projection.intOccurrences[it].isEmpty() &&
                 state.invariants?.isDefinedInt(it) != true &&
                 (coefficients.getOrNull(it) ?: 0L) == 0L
+        }
         }
         state.assumptions = Assumptions(ints = unused.associateWith { state.rootDomains[it].min })
         state.moveSink.setAssumptions(state.assumptions)
         state.shaping.javaClass.methods.single {
             it.name.substringBefore('$') == "setObjective" && it.parameterCount == 1
         }.invoke(state.shaping, gradient ?: prepared.objective)
-        val view = TrajectoryView("prepared", state, coordinates, state.shaping.objective,
-            prepared.reconstruct, { sweep?.sweep(state.assignment, state.rootDomains) })
+        val view = TrajectoryView(
+            "prepared",
+            state,
+            coordinates,
+            state.shaping.objective,
+            prepared.reconstruct,
+            { sweep?.sweep(state.assignment, state.rootDomains) },
+        )
         val decline = view.load(center)
-        out.resolve("preparation.json").writeText(buildJsonObject {
+        out.resolve("preparation.json").writeText(
+            buildJsonObject {
             put("decline", decline)
             put("elapsedNs", System.nanoTime() - started)
             put("threadBytes", trajectoryThreadBytes() - allocated)
@@ -100,26 +130,48 @@ internal object EqualityMoveReplay {
             put("unusedSlotPins", JsonArray(unused.map(::JsonPrimitive)))
             put("snapshot", view.snapshot())
             put("domains", JsonArray(state.rootDomains.map { JsonPrimitive(it.toString()) }))
-            put("factors", buildJsonArray {
-                for (factor in problem.factors) add(buildJsonObject {
+            put(
+                "factors",
+                buildJsonArray {
+                for (factor in problem.factors) {
+                    add(
+                        buildJsonObject {
                     put("kind", factor::class.simpleName)
-                    put("rows", buildJsonArray {
-                        for (row in factor.impliedLinearRows) add(buildJsonObject {
+                    put(
+                        "rows",
+                        buildJsonArray {
+                        for (row in factor.impliedLinearRows) {
+                            add(
+                                buildJsonObject {
                             put("relation", row.relation.toString())
                             put("activator", row.activator)
                             put("strict", row.strict)
                             put("refs", JsonArray((0 until row.size).map { JsonPrimitive(row.ref(it)) }))
                             val constants = row.constants as? IntegralConstants
-                            put("coefficients", constants?.let { exact -> JsonArray((0 until row.size).map {
-                                JsonPrimitive(exact.exactCoeff(it).toString())
-                            }) } ?: JsonNull)
+                            put(
+                                "coefficients",
+                                constants?.let { exact ->
+                                JsonArray(
+                                    (0 until row.size).map {
+                                    JsonPrimitive(exact.exactCoeff(it).toString())
+                                }
+                                )
+                            } ?: JsonNull
+                            )
                             put("bound", constants?.exactBound?.toString())
-                        })
-                    })
-                })
-            })
+                        }
+                            )
+                        }
+                    }
+                    )
+                }
+                    )
+                }
+            }
+            )
             put("sourceCheck", "native original lowered source; no independent witness/proof checker")
-        }.toString())
+        }.toString()
+        )
         if (decline != null) return
         check(state.cost == 0L)
         val sources = linkedMapOf<String, MoveSource>("all-structured" to SatisfiedStructured.all())
@@ -136,63 +188,95 @@ internal object EqualityMoveReplay {
                 val allocation = trajectoryThreadBytes() - generationBytes
                 val moves = sink.list
                 require(moves.size <= 4096)
-                writer.appendLine(buildJsonObject {
+                writer.appendLine(
+                    buildJsonObject {
                     put("source", label)
                     put("generationNs", generationNs)
                     put("generationThreadBytes", allocation)
-                    put("candidates", buildJsonArray {
+                    put(
+                        "candidates",
+                        buildJsonArray {
                         for (move in moves) {
                             check(!stop())
                             val inspection = state.inspectMove(move, state.shaping.objective)
                             val point = prepared.reconstruct(inspection.assignment)
-                            add(buildJsonObject {
+                            add(
+                                buildJsonObject {
                                 put("move", move.toString())
                                 put("netDelta", inspection.netDelta)
                                 put("objectiveDelta", inspection.objectiveDelta.toString())
                                 put("source", trajectorySource(point))
-                                put("sourceChanges", (0 until center.numIntVars).count {
+                                put(
+                                    "sourceChanges",
+                                    (0 until center.numIntVars).count {
                                     center.intValue(it) != point.intValue(it)
-                                })
+                                }
+                                )
                                 put("nativeSourceCheck", FiniteConflictSelection.checkSource(source, point, stop))
                                 put("sourceObjective", objective.evaluateExact(point).toString())
-                            })
+                            }
+                            )
                         }
-                    })
-                }.toString())
+                    }
+                    )
+                }.toString()
+                )
             }
         }
-        val kernelScopes = if (options["kernel"] == "true") EqualityKernelReplay.capture(view, out.resolve("kernel.json"),
-            objective::evaluateExact) {
-            point, token -> FiniteConflictSelection.checkSource(source, point, token)
-        } else emptyMap()
-        if (options["completion"] == "true") equalityRowCompletion(state, requireNotNull(prepared.objective),
-            state.assignment.snapshot(), stop, out.resolve("completion.json"))
+        val kernelScopes = if (options["kernel"] == "true") {
+            EqualityKernelReplay.capture(
+            view,
+            out.resolve("kernel.json"),
+            objective::evaluateExact,
+        ) { point, token ->
+            FiniteConflictSelection.checkSource(source, point, token)
+        }
+        } else {
+            emptyMap()
+        }
+        if (options["completion"] == "true") {
+            equalityRowCompletion(
+            state,
+            requireNotNull(prepared.objective),
+            state.assignment.snapshot(),
+            stop,
+            out.resolve("completion.json"),
+        )
+        }
         if (options["owners"] == "true") {
             val controls = out.resolve("controls.jsonl")
-            val scopes = linkedMapOf((0 until problem.numIntVars).filter { it !in unused } to
-                arrayListOf("whole-prepared-block"))
+            val scopes = linkedMapOf(
+                (0 until problem.numIntVars).filter { it !in unused } to
+                    arrayListOf("whole-prepared-block"),
+            )
             for ((mode, inputs) in kernelScopes) {
                 scopes.getOrPut(inputs.sorted()) { arrayListOf() }.add("kernel-$mode")
             }
-            controls.writeText(scopes.entries.joinToString("\n", postfix = "\n") { (inputs, selectors) ->
+            controls.writeText(
+                scopes.entries.joinToString("\n", postfix = "\n") { (inputs, selectors) ->
                 buildJsonObject {
                     put("center", trajectorySource(state.assignment.snapshot()))
                     put("centerObjective", requireNotNull(prepared.objective).evaluate(state.assignment))
                     put("effectiveInts", JsonArray(inputs.map(::JsonPrimitive)))
                     put("selector", selectors.joinToString("+"))
                 }.toString()
-            })
-            RepairOwnerReplay.replay(controls, problem, requireNotNull(prepared.objective), prepared, source,
+            }
+            )
+            RepairOwnerReplay.replay(
+                controls, problem, requireNotNull(prepared.objective), prepared, source,
                 parsed.intVarNames.values.distinct().toIntArray(), out.resolve("owners.jsonl"),
-                options["seed"]?.toLong() ?: 1L, allowance = 10_000L, fragmentAllowance = 2_000L)
+                options["seed"]?.toLong() ?: 1L, allowance = 10_000L, fragmentAllowance = 2_000L,
+            )
         }
-        out.resolve("runtime.json").writeText(buildJsonObject {
+        out.resolve("runtime.json").writeText(
+            buildJsonObject {
             put("java", System.getProperty("java.runtime.version"))
             put("os", System.getProperty("os.name"))
             put("arch", System.getProperty("os.arch"))
             put("totalElapsedNs", System.nanoTime() - started)
             put("totalThreadBytes", trajectoryThreadBytes() - allocated)
             put("independentCheck", false)
-        }.toString())
+        }.toString()
+        )
     }
 }

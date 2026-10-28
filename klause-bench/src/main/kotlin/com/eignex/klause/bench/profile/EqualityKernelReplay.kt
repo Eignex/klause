@@ -9,15 +9,16 @@ import com.eignex.klause.localsearch.Move
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
-import java.io.File
-import java.math.BigInteger
-import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import java.math.BigInteger
+import kotlin.time.Duration.Companion.seconds
 
 internal object EqualityKernelReplay {
     private val zero = BigInteger.ZERO
@@ -30,7 +31,10 @@ internal object EqualityKernelReplay {
     private class Matrix(val columns: List<Int>, val rows: List<Array<BigInteger>>)
     private class Arc(val from: Int, val to: Int, val column: Int, val sign: Int)
 
-    fun capture(view: TrajectoryView, file: File, score: (Sample) -> BigFraction,
+    fun capture(
+        view: TrajectoryView,
+        file: File,
+        score: (Sample) -> BigFraction,
         cancellation: Cancellation = Cancellation.Never,
         verify: (Sample, Cancellation) -> Boolean,
     ): Map<String, IntArray> {
@@ -40,60 +44,54 @@ internal object EqualityKernelReplay {
         val clock = Cancellation.after(2.seconds) or cancellation
         val stop = object : Cancellation {
             override fun isCancelled(): Boolean = work >= MAX_WORK || clock()
-            override fun charge(units: Long) { work += units }
+            override fun charge(units: Long) {
+                work += units
+            }
         }
         val matrix = matrix(view, stop)
         val center = view.reconstruct(view.state.assignment.snapshot())
         val consumedScopes = LinkedHashMap<String, IntArray>()
         val records = buildJsonArray {
-            if (matrix != null) for (mode in listOf("network", "hermite")) {
-                val extractionStart = System.nanoTime()
-                val extractionBytes = trajectoryThreadBytes()
-                val directions = if (mode == "network") network(matrix, view, stop) else hermite(matrix, stop)
-                val extractionNs = System.nanoTime() - extractionStart
-                val extractionAllocation = trajectoryThreadBytes() - extractionBytes
-                var selected: Move? = null
-                var best = score(center)
-                add(buildJsonObject {
-                    put("mode", mode)
-                    put("extractionNs", extractionNs)
-                    put("extractionThreadBytes", extractionAllocation)
-                    put("declined", directions == null)
-                    put("directions", buildJsonArray {
-                        for (direction in directions.orEmpty()) {
-                            check(matrix.rows.all { row -> row.indices.fold(zero) { sum, i ->
-                                sum + row[i] * direction[i]
-                            } == zero })
-                            add(buildJsonObject {
-                                put("g", JsonArray(direction.map { JsonPrimitive(it.toString()) }))
-                                put("exactAgZero", true)
-                                put("candidates", candidates(matrix, direction, view, stop, verify) { move, point ->
-                                    val value = score(point)
-                                    if (value < best) { best = value; selected = move }
+            if (matrix != null) {
+                for (mode in listOf("network", "hermite")) {
+                    val extractionStart = System.nanoTime()
+                    val extractionBytes = trajectoryThreadBytes()
+                    val directions = if (mode == "network") network(matrix, view, stop) else hermite(matrix, stop)
+                    val extractionNs = System.nanoTime() - extractionStart
+                    val extractionAllocation = trajectoryThreadBytes() - extractionBytes
+                    var selected: Move? = null
+                    var best = score(center)
+                    add(buildJsonObject {
+                        put("mode", mode)
+                        put("extractionNs", extractionNs)
+                        put("extractionThreadBytes", extractionAllocation)
+                        put("declined", directions == null)
+                        put("directions", buildJsonArray {
+                            for (direction in directions.orEmpty()) {
+                                check(matrix.rows.all { row ->
+                                    row.indices.fold(zero) { sum, i -> sum + row[i] * direction[i] } == zero
                                 })
-                            })
-                        }
-                    })
-                    put("consumed", selected?.takeUnless { stop() }?.let { move ->
-                        try {
-                            view.state.apply(move)
-                            val point = view.reconstruct(view.state.assignment.snapshot())
-                            if (view.state.cost != 0L || stop() || !verify(point, stop)) null else buildJsonObject {
-                                val inputs = (move as Move.Compound).parts.map { (it as Move.IntSet).varId }
-                                consumedScopes[mode] = inputs.toIntArray()
-                                put("preparedInputs", JsonArray(inputs.map(::JsonPrimitive)))
-                                put("source", trajectorySource(point))
-                                put("sourceObjective", score(point).toString())
-                                put("sourceChanges", (0 until center.numIntVars).count {
-                                    center.intValue(it) != point.intValue(it)
+                                add(buildJsonObject {
+                                    put("g", JsonArray(direction.map { JsonPrimitive(it.toString()) }))
+                                    put("exactAgZero", true)
+                                    put("candidates", candidates(matrix, direction, view, stop, verify) { move, point ->
+                                        val value = score(point)
+                                        if (value < best) {
+                                            best = value
+                                            selected = move
+                                        }
+                                    })
                                 })
-                                put("nativeSourceCheck", true)
                             }
-                        } finally {
-                            check(view.load(center) == null)
+                        })
+                        val move = selected as? Move.Compound
+                        val consumed = move?.let { consume(view, it, center, score, stop, verify) }
+                        if (consumed != null && move != null) {
+                            consumedScopes[mode] = move.parts.map { (it as Move.IntSet).varId }.toIntArray()
                         }
-                    } ?: JsonNull)
-                })
+                        put("consumed", consumed ?: JsonNull)
+                    })
+                }
             }
         }
         file.writeText(buildJsonObject {
@@ -112,11 +110,47 @@ internal object EqualityKernelReplay {
         return consumedScopes
     }
 
+    private fun consume(
+        view: TrajectoryView,
+        move: Move.Compound,
+        center: Sample,
+        score: (Sample) -> BigFraction,
+        stop: Cancellation,
+        verify: (Sample, Cancellation) -> Boolean,
+    ): JsonObject? {
+        if (stop()) return null
+        try {
+            view.state.apply(move)
+            val working = view.state.assignment.snapshot()
+            if (view.state.cost != 0L || !honorsPins(view, working) || stop()) return null
+            val point = view.reconstruct(working)
+            if (!verify(point, stop)) return null
+            return buildJsonObject {
+                put("preparedInputs", JsonArray(move.parts.map { JsonPrimitive((it as Move.IntSet).varId) }))
+                put("source", trajectorySource(point))
+                put("sourceObjective", score(point).toString())
+                put("sourceChanges", (0 until center.numIntVars).count {
+                    center.intValue(it) != point.intValue(it)
+                })
+                put("nativeSourceCheck", true)
+            }
+        } finally {
+            check(view.load(center) == null)
+        }
+    }
+
+    private fun honorsPins(view: TrajectoryView, point: Sample): Boolean {
+        var honored = true
+        view.state.assumptions.forEachInt { id, value -> if (point.intValue(id) != value) honored = false }
+        view.state.assumptions.forEachBool { id, value -> if (point.boolValue(id) != value) honored = false }
+        return honored
+    }
     private fun matrix(view: TrajectoryView, stop: Cancellation): Matrix? {
         val state = view.state
         if (state.problem.semantics.effective.feasibilityTolerance?.isExact == false) return null
         val sparse = ArrayList<Map<Int, BigInteger>>()
-        for (factor in state.problem.factors) for (row in factor.impliedLinearRows) {
+        for (factor in state.problem.factors) {
+            for (row in factor.impliedLinearRows) {
             stop.charge(1L + row.size)
             if (stop()) return null
             if (row.relation != LinearOp.EQ || row.activator != LinearRow.ALWAYS || row.strict) continue
@@ -135,8 +169,10 @@ internal object EqualityKernelReplay {
             sparse += kept
             if (sparse.size > MAX_ROWS) return null
         }
+        }
         val columns = sparse.flatMap { it.keys }.distinct().sorted()
         if (columns.isEmpty() || columns.size > MAX_COLUMNS) return null
+        if (columns.any { state.invariants?.isDefinedInt(it) == true }) return null
         return Matrix(columns, sparse.map { row -> Array(columns.size) { row[columns[it]] ?: zero } })
     }
 
@@ -160,7 +196,10 @@ internal object EqualityKernelReplay {
             if (stop()) return null
             if (h.filterNotNull().any {
                     it.javaClass.getMethod("get", Int::class.javaPrimitiveType).invoke(it, column) != zero
-                }) continue
+                }
+            ) {
+                    continue
+                }
             val direction = Array(matrix.columns.size) { entry.invoke(v, it, column) as BigInteger }
             if (direction.any { it.abs().bitLength() > 256 }) return null
             result += direction
@@ -170,9 +209,11 @@ internal object EqualityKernelReplay {
     }
 
     private fun network(matrix: Matrix, view: TrajectoryView, stop: Cancellation): List<Array<BigInteger>>? {
-        val incidence = matrix.columns.indices.map { column -> matrix.rows.indices.filter {
-            matrix.rows[it][column] != zero
-        } }
+        val incidence = matrix.columns.indices.map { column ->
+            matrix.rows.indices.filter {
+                matrix.rows[it][column] != zero
+            }
+        }
         if (incidence.any { it.size !in 1..2 } || matrix.rows.any { row -> row.any { it.abs() > one } }) return null
         val signs = IntArray(matrix.rows.size)
         for (root in signs.indices) {
@@ -189,7 +230,10 @@ internal object EqualityKernelReplay {
                     val sign = -signs[row] * matrix.rows[row][column].signum() *
                         matrix.rows[peer][column].signum()
                     if (signs[peer] != 0 && signs[peer] != sign) return null
-                    if (signs[peer] == 0) { signs[peer] = sign; queue.addLast(peer) }
+                    if (signs[peer] == 0) {
+                        signs[peer] = sign;
+                        queue.addLast(peer)
+                    }
                 }
             }
         }
@@ -201,10 +245,12 @@ internal object EqualityKernelReplay {
             val variable = matrix.columns[column]
             val current = BigInteger.valueOf(view.state.assignment.intValue(variable))
             val domain = view.state.rootDomains[variable]
-            if (current < BigInteger.valueOf(domain.max) && (current + one).toLong() in domain)
+            if (current < BigInteger.valueOf(domain.max) && (current + one).toLong() in domain) {
                 arcs += Arc(negative, positive, column, 1)
-            if (current > BigInteger.valueOf(domain.min) && (current - one).toLong() in domain)
+            }
+            if (current > BigInteger.valueOf(domain.min) && (current - one).toLong() in domain) {
                 arcs += Arc(positive, negative, column, -1)
+            }
         }
         val directions = linkedMapOf<List<BigInteger>, Array<BigInteger>>()
         for (first in arcs) {
@@ -232,16 +278,23 @@ internal object EqualityKernelReplay {
                 direction[arc.column] = BigInteger.valueOf(arc.sign.toLong())
                 node = arc.from
             }
-            val canonical = if (direction.first { it != zero } < zero) Array(direction.size) { -direction[it] }
-                else direction
+            val canonical = if (direction.first { it != zero } < zero) {
+                Array(direction.size) { -direction[it] }
+            } else {
+                direction
+            }
             directions[canonical.toList()] = canonical
             if (directions.size == MAX_DIRECTIONS) break
         }
         return directions.values.toList()
     }
 
-    private fun candidates(matrix: Matrix, direction: Array<BigInteger>, view: TrajectoryView,
-        stop: Cancellation, check: (Sample, Cancellation) -> Boolean,
+    private fun candidates(
+        matrix: Matrix,
+        direction: Array<BigInteger>,
+        view: TrajectoryView,
+        stop: Cancellation,
+        check: (Sample, Cancellation) -> Boolean,
         improving: (Move, Sample) -> Unit,
     ) = buildJsonArray {
         val state = view.state
@@ -252,8 +305,11 @@ internal object EqualityKernelReplay {
                 if (g[i] == zero) continue
                 val current = BigInteger.valueOf(state.assignment.intValue(id))
                 val domain = state.rootDomains[id]
-                val limit = if (g[i] > zero) (BigInteger.valueOf(domain.max) - current) / g[i]
-                    else (current - BigInteger.valueOf(domain.min)) / -g[i]
+                val limit = if (g[i] > zero) {
+                    (BigInteger.valueOf(domain.max) - current) / g[i]
+                } else {
+                    (current - BigInteger.valueOf(domain.min)) / -g[i]
+                }
                 maximum = maximum?.min(limit) ?: limit
             }
             val cap = maximum ?: continue
@@ -267,7 +323,10 @@ internal object EqualityKernelReplay {
                     if (target < BigInteger.valueOf(Long.MIN_VALUE) || target > BigInteger.valueOf(Long.MAX_VALUE) ||
                         target.toLong() !in state.rootDomains[id] || state.assumptions.isFrozenInt(id) ||
                         state.invariants?.isDefinedInt(id) == true || (state.seeding.ownerInt?.get(id) ?: -1) >= 0
-                    ) { admissible = false; break }
+                    ) {
+                        admissible = false;
+                        break
+                    }
                     parts += Move.IntSet(id, target.toLong())
                 }
                 if (!admissible || parts.size < 2) continue
@@ -276,10 +335,12 @@ internal object EqualityKernelReplay {
                 val move = sink.list.singleOrNull() as? Move.Compound ?: continue
                 if (move.parts != parts) continue
                 val inspection = state.inspectMove(move, view.objective)
+                if (!honorsPins(view, inspection.assignment)) continue
                 val source = view.reconstruct(inspection.assignment)
                 val accepted = check(source, stop)
                 if (inspection.netDelta == 0L && accepted) improving(move, source)
-                add(buildJsonObject {
+                add(
+                    buildJsonObject {
                     put("step", (step * sign).toString())
                     put("move", move.toString())
                     put("netDelta", inspection.netDelta)
@@ -287,7 +348,8 @@ internal object EqualityKernelReplay {
                     put("nativeSourceCheck", accepted)
                     put("objectiveDelta", inspection.objectiveDelta.toString())
                     put("wholeSinkAdmission", true)
-                })
+                }
+                )
             }
         }
     }
