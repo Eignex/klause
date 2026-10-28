@@ -46,7 +46,7 @@ internal fun PropagationSession.projectSeedCore(
         var pivot: Int? = null
         for (literal in resolvent) {
             val variable = Lit.variable(literal)
-            if (variable >= problem.numBoolVars) return conflict
+            if (variable !in 0 until problem.numBoolVars) return conflict
             val index = assumptions.boolKeys.binarySearchInt(variable)
             if (index in 0 until applied && assumptions.boolValues[index] == !Lit.isPositive(literal)) {
                 needed.add(index + 1)

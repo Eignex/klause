@@ -470,9 +470,9 @@ augmented query.
 A separate deletion control tries deleting each member of a
 completed core with a fresh propagation refutation of the augmented hard model and
 the retained caller pins. It admits at most 32 members, 4,096 columns, 4,096 factors
-and 32,768 structural entries and propagation visits, over clauses and reified
-cardinalities,
-never removes the final member, and retains the original certified core on a stop.
+and 32,768 structural entries and propagation visits, over built-in projections
+of clauses and reified cardinalities. It never removes the final member and retains
+the original certified core on a stop.
 Its construction, trials and disposal share the core worker's work and active-time
 allowances. It performs no additional search and does not promise a minimal core;
 tree refutations unavailable to propagation keep their original members.

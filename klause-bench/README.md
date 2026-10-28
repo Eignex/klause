@@ -2531,6 +2531,51 @@ the recorded witnesses against the original MiniZinc source.
 
 ## Design evidence
 
+### Objective core projection and completed-query replay
+
+[8917](https://lab.eignex.com/jobs/8917) runs 48 core and 24 ordinary BnB controls
+at `4f90f3e94b`, over two self-authored CNF/linear-objective pairs, retained/default
+preparation and three repeats. Every result is native optimal 100 with an accepted
+source point. Stratification handles the unequal-weight control in one two-input
+core; ordinary OLL takes two cores, first with three inputs. For eight unrelated
+equal-weight terms, preparation retains the ten-input core, stratification does
+not shrink it, and no cost pin is root-satisfied. Bounded propagation deletion
+reduces the core to two inputs and search nodes from nine to one, but allocates
+about 39 KiB extra and supplies no stable total-time gain. The existing helper's
+`minimizeCore=true` retains all ten seed-prefix pins. The configured default LP
+control executes no LP passes, so it is an applicability decline.
+
+[8926](https://lab.eignex.com/jobs/8926) confirms in-place seed-proof projection
+at `2ac7fe5453` on that equal-weight source, with both preparation policies and
+one repeat. Actual query traces retain the unrelated cheap pins while OLL consumes
+the two-input core and reaches checked objective 100 in one node. The prepared
+projected handle allocates 223,568 bytes, versus 233,304 for ordinary OLL and
+271,496 for deletion. Timing includes a 57 ms projected outlier; this single
+confirmation establishes no speedup. Explicitly forced LP bounding also certifies
+100 and closes at zero nodes. Seed projection remains an internal, default-disabled
+bounded capability; these controls justify no automatic admission change.
+
+[8918](https://lab.eignex.com/jobs/8918) captures six two-query sequences at
+`4f90f3e94b`. An incidental source-valid `q` learned before the first completed
+refutation survives a fresh source check and is replayed after the OLL transition.
+Later search nodes fall from six to five, with checked source objective 1. In the
+two non-warmup retained repeats, verification alone costs 1.54–2.03 ms, against
+0.92–0.95 ms for rebuilding/search without replay; replay adds construction and
+allocation. [8927](https://lab.eignex.com/jobs/8927) confirms the completed-query
+sequence at `2ac7fe5453`: the later `q=false` assertion count falls from one to zero,
+with unchanged checked source outcomes. A conditioned `q or a` negative rejects
+the unit obtained under `a=false`. Prepared-coordinate identity deliberately
+declines, so its zero assertion counters in the older captures are unavailable,
+not evidence that preparation discharged `q`. No production replay cache or mutable
+query owner is admitted: total replay cost exceeds the avoided obligation.
+
+These are instrumented native controls on one Linux/amd64 vCPU, a 4,608 MiB cgroup
+and JDK 25.0.4.1. Installed harness/runtime hashes, resource receipts and source
+bytes are retained with the jobs. In 8917/8926, the historical `sourceSha256` field
+hashes the CNF concatenated with its coefficient CSV; source and objective byte
+hashes are distinct fields in the maintained profile. Native refutations are not
+independently proof-checked. No default-route or whole-CLI throughput gain is claimed.
+
 ### Conditional component composition
 
 [Conditional component traces](#conditional-component-traces) cover the eleven
