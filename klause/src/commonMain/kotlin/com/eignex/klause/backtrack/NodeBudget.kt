@@ -24,7 +24,7 @@ class NodeBudget private constructor(internal val allowance: NodeAllowance) {
     /** Completed decision-node equivalents, including cooperative overspend. */
     val spent: Long get() = allowance.spent
 
-    /** Whether completed work has consumed this allowance. */
+    /** Whether completed work has consumed this allowance or a containing allowance. */
     fun exhausted(): Boolean = allowance.exhausted()
 
     internal fun spend() = allowance.spend()

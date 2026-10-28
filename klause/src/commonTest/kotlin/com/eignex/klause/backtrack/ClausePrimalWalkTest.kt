@@ -94,12 +94,35 @@ class ClausePrimalWalkTest {
             listOf(0),
             Assumptions.None,
             3L,
-            NodeBudget(1L),
+            NodeBudget(1L).apply { spend() },
         )
         walk.begin(0, Cancellation.Never)
 
         val outcome = walk.advance(Cancellation.Never, -1L)
 
         assertEquals(null, outcome)
+    }
+
+    @Test
+    fun `clausal repair should use a move covered by the integer charge`() {
+        val clauses = listOf(
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true))),
+            Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
+        )
+        val budget = NodeBudget(1L)
+        val walk = ClausePrimalWalk(
+            Sample(booleanArrayOf(true, false, false), longArrayOf()),
+            clauses,
+            listOf(0),
+            Assumptions.None,
+            3L,
+            budget,
+        )
+        walk.begin(0, Cancellation.Never)
+
+        val outcome = walk.advance(Cancellation.Never, -1L)
+
+        assertEquals(true, outcome)
+        assertEquals(1L, budget.spent)
     }
 }

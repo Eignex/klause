@@ -28,14 +28,11 @@ internal class NodeAllowance private constructor(
         if (count > 0L) record(nodes = 0L, instructions = count)
     }
 
-    internal fun decisionsLeft(): Long = ledger.lock.withLock { (limit - spentUnlocked()).coerceAtLeast(0L) }
+    internal fun decisionsLeft(): Long = ledger.lock.withLock { decisionsLeftUnlocked() }
 
-    internal fun movesLeft(): Long = ledger.lock.withLock {
-        val capacity = instructionsFor((limit - used).coerceAtLeast(0L))
-        (capacity - moves).coerceAtLeast(0L)
-    }
+    internal fun movesLeft(): Long = ledger.lock.withLock { movesLeftUnlocked() }
 
-    fun exhausted(): Boolean = ledger.lock.withLock { spentUnlocked() >= limit }
+    fun exhausted(): Boolean = ledger.lock.withLock { decisionsLeftUnlocked() == 0L }
 
     internal fun quotas(count: Int): List<NodeAllowance> = mapQuotas(count) { it }
 
@@ -45,7 +42,7 @@ internal class NodeAllowance private constructor(
             require(it.size == count) { "a solve allowance cannot be repartitioned for another worker count" }
             return@withLock map(it)
         }
-        val remaining = (limit - spentUnlocked()).coerceAtLeast(0L)
+        val remaining = decisionsLeftUnlocked()
         val share = remaining / count
         val remainder = remaining % count
         List(count) { index -> NodeAllowance(share + if (index < remainder) 1L else 0L, ledger, this) }
@@ -53,6 +50,17 @@ internal class NodeAllowance private constructor(
     }
 
     private fun spentUnlocked(): Long = saturatedSum(used, pricedInstructions(moves))
+
+    private fun decisionsLeftUnlocked(): Long {
+        val remaining = (limit - spentUnlocked()).coerceAtLeast(0L)
+        return parent?.let { minOf(remaining, it.decisionsLeftUnlocked()) } ?: remaining
+    }
+
+    private fun movesLeftUnlocked(): Long {
+        val capacity = instructionsFor((limit - used).coerceAtLeast(0L))
+        val remaining = (capacity - moves).coerceAtLeast(0L)
+        return parent?.let { minOf(remaining, it.movesLeftUnlocked()) } ?: remaining
+    }
 
     private fun record(nodes: Long, instructions: Long) {
         used = saturatedSum(used, nodes)
