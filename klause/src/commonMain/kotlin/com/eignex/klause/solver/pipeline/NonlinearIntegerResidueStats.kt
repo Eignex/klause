@@ -6,11 +6,11 @@ data class NonlinearIntegerResidueStats(
     val completedRings: Long,
     /** Shared-coordinate residue tuples evaluated, including unfinished rings. */
     val tuples: Long,
-    /** Charged preparation and enumeration work, included in total polynomial work. */
+    /** Completed residue steps, included in the containing polynomial work counter. */
     val workSpent: Long,
     /** Completed empty residue systems consumed as refutations. */
     val refutedScopes: Long,
-    /** Checks declined by private work, storage or representation ceilings. */
+    /** Checks declined for unsupported source support or private work, storage and representation ceilings. */
     val declinedChecks: Long,
 )
 
