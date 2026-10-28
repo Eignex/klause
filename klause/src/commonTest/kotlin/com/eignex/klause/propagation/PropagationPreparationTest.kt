@@ -10,11 +10,27 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PropagationPreparationTest {
+    @Test
+    fun `a prepared seed conflict should retain its certified named prefix`() {
+        val problem = Problem(3, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
+        ))
+        val preparation = PropagationPreparation(problem, Cancellation.Never, 0, false)
+        var session: PropagationSession? = null
+        while (session == null) session = preparation.advance()
+        val assumptions = Assumptions(bools = mapOf(0 to false, 1 to false, 2 to false))
+
+        val result = session.prepareSeed(assumptions).asSequence().filterNotNull().last()
+
+        assertEquals(listOf(1, 2, 3), assertIs<PropagationResult.Unsat>(result).conflictLevels.toList())
+    }
+
     @Test
     fun `paused root propagation should preserve deductions and pending wakes`() {
         val variables = 260

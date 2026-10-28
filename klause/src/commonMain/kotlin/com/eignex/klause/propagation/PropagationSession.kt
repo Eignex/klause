@@ -314,7 +314,7 @@ class PropagationSession private constructor(
         for (i in assumptions.boolKeys.indices) {
             for (result in preparePin(true, assumptions.boolKeys[i], if (assumptions.boolValues[i]) 1L else 0L)) {
                 if (result is PropagationResult.Unsat) {
-                    yield(result)
+                    yield(result.copy(conflictLevels = IntArray(i + 1) { it + 1 }))
                     return@sequence
                 }
                 yield(null)
@@ -323,7 +323,7 @@ class PropagationSession private constructor(
         for (i in assumptions.intKeys.indices) {
             for (result in preparePin(false, assumptions.intKeys[i], assumptions.intValues[i])) {
                 if (result is PropagationResult.Unsat) {
-                    yield(result)
+                    yield(result.copy(conflictLevels = IntArray(assumptions.numBools + i + 1) { it + 1 }))
                     return@sequence
                 }
                 yield(null)

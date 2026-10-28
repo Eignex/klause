@@ -490,13 +490,15 @@ internal class CoreGuidedSearch(
             params.assumptions.numInts)
         querySofts = literals.toIntArray()
         queryPins = params.assumptions.mergedWith(Assumptions(bools = pins))
-        if (queryModel == null) {
-            recordPreparation(nextBool.toLong() + base.numIntVars)
+        yieldAll(prepareQueryConstruction())
+    }.iterator()
+
+    private fun prepareQueryConstruction(): Iterator<Unit> = sequence {
+        recordPreparation(nextBool.toLong() + base.numIntVars)
+        yield(Unit)
+        for (factor in factors) {
+            recordPreparation(1L + factor.structuralKeyWeight)
             yield(Unit)
-            for (factor in factors) {
-                recordPreparation(1L + factor.structuralKeyWeight)
-                yield(Unit)
-            }
         }
     }.iterator()
 
@@ -525,6 +527,7 @@ internal class CoreGuidedSearch(
             settleQuery(failure.stats, failure.work)
             // A native opening is atomic; after a stop the retained general preparer guarantees progress.
             resumableOpening = true
+            queryPreparation = prepareQueryConstruction()
             throw failure
         }
     }
@@ -556,6 +559,9 @@ internal class CoreGuidedSearch(
             queryModel = null
             queryPins = null
             resumableOpening = false
+        } else {
+            resumableOpening = true
+            queryPreparation = prepareQueryConstruction()
         }
     }
 
