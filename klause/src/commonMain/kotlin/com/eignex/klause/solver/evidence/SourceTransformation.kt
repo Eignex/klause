@@ -60,6 +60,9 @@ class SourceTransformationVerifier(
         if (!declaredCondition(source) || !declaredCondition(target)) {
             return SourceEvidenceCheck.Rejected("transformation invocation references undeclared coordinates")
         }
+        if (source.scope.condition.integerRows.isNotEmpty() || target.scope.condition.integerRows.isNotEmpty()) {
+            return SourceEvidenceCheck.Unavailable("aggregate invocation projection requires an integral image proof")
+        }
         if (transformation.images.keys != target.coordinates) {
             return SourceEvidenceCheck.Unavailable("transformation lacks a total target coordinate image")
         }

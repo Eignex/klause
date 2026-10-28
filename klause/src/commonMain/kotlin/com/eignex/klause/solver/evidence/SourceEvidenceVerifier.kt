@@ -10,6 +10,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.magnitudeBitLength
 
 /** An original-source inequality, optionally guarded by Boolean and exact integer source pins. */
 class SourcePremise(
@@ -159,7 +160,16 @@ class SourceEvidenceVerifier(
 
         private fun validCondition(condition: SourceCondition): Boolean =
             condition.bools.keys.all { SourceCoordinate(SourceCoordinate.Kind.Boolean, it) in coordinates } &&
-                (condition.lower.keys + condition.upper.keys).all { it in coordinates }
+                (condition.lower.keys + condition.upper.keys).all { it in coordinates } &&
+                condition.integerRows.size <= 128 && condition.integerRows.all { validIntegerRow(it) }
+
+        private fun validIntegerRow(row: SourceInequality): Boolean =
+            !row.strict && row.supportSize in 1..32 && row.rhs.den == BIG_ONE &&
+                row.rhs.num.magnitudeBitLength() <= 4096 && row.coefficients.all { (id, value) ->
+                    step(0)
+                    id.kind == SourceCoordinate.Kind.Integer && id in coordinates && value.den == BIG_ONE &&
+                        value.num.magnitudeBitLength() <= 4096
+                }
 
         private fun claim(
             claim: SourceClaim, derivation: SourceDerivation, scope: SourceScope, depth: Int,
@@ -167,6 +177,17 @@ class SourceEvidenceVerifier(
             step(depth)
             when (derivation) {
                 is SourceDerivation.Unavailable -> return SourceEvidenceCheck.Unavailable(derivation.reason)
+                is SourceIntegerAggregateSplit -> {
+                    val row = derivation.below
+                    if (!validIntegerRow(row)) return reject(
+                        "aggregate coverage requires integral activity over declared integers and an integral threshold")
+                    return both(claim(claim, derivation.whenBelow, scope.copy(condition =
+                        scope.condition.integerBound(row)), depth + 1)) {
+                        claim(claim, derivation.whenAbove, scope.copy(condition =
+                            scope.condition.integerBound(row.adjacentIntegerAbove())), depth + 1)
+                    }
+                }
+                is SourceIntegerRowAssumption -> Unit
                 is SourceDerivation.Extension -> return context.semanticsChecker?.derivation(claim,
                     derivation, scope, cancellation)
                     ?: SourceEvidenceCheck.Unavailable("source-specific derivation checker unavailable")
@@ -302,6 +323,13 @@ class SourceEvidenceVerifier(
         private fun inequality(derivation: SourceDerivation, scope: SourceScope, depth: Int): SourceInequality {
             step(depth)
             return when (derivation) {
+                is SourceIntegerRowAssumption -> {
+                    step(depth)
+                    if (!validIntegerRow(derivation.row) || derivation.row !in scope.condition.integerRows) {
+                        rejectProof("integer aggregate assumption is absent from the invocation")
+                    }
+                    derivation.row
+                }
                 is SourceDerivation.Premise -> {
                     val premise = premises[derivation.id]
                         ?: rejectProof("unknown original-source premise ${derivation.id}")

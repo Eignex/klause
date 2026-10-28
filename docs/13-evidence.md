@@ -63,6 +63,16 @@ branch.
 Substituted Boolean coefficients keep their pins as guards, including when an
 import is checked in a weaker scope.
 
+Internal aggregate coverage splits an integral affine activity over declared
+source integers at an integral threshold. Its complementary restrictions enter
+the immutable branch condition and can be cited only in that scope. The checker
+requires both children under one containing proof allowance, with at most 32
+nonzero terms and 4,096-bit scalars. Fractional coefficients need an integral
+scaling before this rule applies. Witnesses and recession checks enforce the
+aggregate restrictions; coordinate and Boolean alternatives provide no aggregate
+assumption. Affine mapping declines aggregate restrictions without a proved
+integral image.
+
 An active-linear refutation substitutes only established Boolean coefficients and
 uses rows with established Boolean guards and independently established integer
 pins. Its checker reconstructs that subset from the original source in the claimed

@@ -262,8 +262,9 @@ internal class LinearAuthority(
         ) return null
         if (budget.funding != null) {
             val condition = source.scope.condition
+            budget.funding.charge(0L, condition.integerRows.sumOf { 128L + 64L * it.supportSize })
             var work = source.coordinates.size.toLong() + condition.bools.size + condition.lower.size +
-                condition.upper.size
+                condition.upper.size + condition.integerRows.sumOf { it.supportSize.toLong() + 1L }
             try {
                 for (premise in source.premises.values) {
                     if (cancellation()) return null

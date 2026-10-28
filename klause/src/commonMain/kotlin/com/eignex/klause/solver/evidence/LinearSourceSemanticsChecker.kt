@@ -80,7 +80,8 @@ class LinearSourceSemanticsChecker(
                 }
             }
             if (scope.condition.lower.keys.any { (direction[it] ?: BigFraction.ZERO) < BigFraction.ZERO } ||
-                scope.condition.upper.keys.any { (direction[it] ?: BigFraction.ZERO) > BigFraction.ZERO }
+                scope.condition.upper.keys.any { (direction[it] ?: BigFraction.ZERO) > BigFraction.ZERO } ||
+                scope.condition.integerRows.any { dot(it.coefficients, direction) > BigFraction.ZERO }
             ) return@checked SourceEvidenceCheck.Rejected("ray leaves the invocation restrictions")
             val objectiveScope = scope.objective
                 ?: return@checked SourceEvidenceCheck.Rejected("ray has no objective scope")
