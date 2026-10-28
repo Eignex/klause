@@ -44,7 +44,7 @@ internal class ComponentCostScope(
     override fun hashCode(): Int = listOf(source, conditions, variables, clauses, weights, restrictionCutoff).hashCode()
 }
 
-internal data class ComponentCostBounds private constructor(
+internal class ComponentCostBounds private constructor(
     val scope: ComponentCostScope,
     val lower: BigInteger,
     val witness: List<Boolean>?,
@@ -57,19 +57,21 @@ internal data class ComponentCostBounds private constructor(
         require(!sourceInfeasible && scope.accepts(values))
         val cost = scope.cost(values)
         require(cost >= lower)
-        return if (upper == null || cost < checkNotNull(upper)) copy(witness = values.toList()) else this
+        return if (upper == null || cost < checkNotNull(upper)) {
+            ComponentCostBounds(scope, lower, values.toList(), false)
+        } else this
     }
 
     // A complete check of source AND cost < threshold proves a floor, never source infeasibility.
     fun refutedBelow(checkedScope: ComponentCostScope, threshold: BigInteger): ComponentCostBounds {
         require(checkedScope == scope)
         require(upper == null || threshold <= checkNotNull(upper))
-        return copy(lower = maxOf(lower, threshold))
+        return ComponentCostBounds(scope, maxOf(lower, threshold), witness, sourceInfeasible)
     }
 
     fun refutedSource(checkedScope: ComponentCostScope): ComponentCostBounds {
         require(checkedScope == scope && witness == null && scope.restrictionCutoff == null)
-        return copy(sourceInfeasible = true)
+        return ComponentCostBounds(scope, lower, null, true)
     }
 
     companion object {
@@ -109,7 +111,8 @@ internal class ScopedComponentBounds(
 
     fun exact(children: List<ComponentCostBounds>): BigInteger? {
         checkScopes(children)
-        if (restrictionCutoff != null || children.any { it.exact == null || it.scope.restrictionCutoff != null }) return null
+        val incomplete = children.any { it.exact == null || it.scope.restrictionCutoff != null }
+        if (restrictionCutoff != null || incomplete) return null
         return children.fold(fixedAndIsolated) { total, child -> total + checkNotNull(child.exact) }
     }
 

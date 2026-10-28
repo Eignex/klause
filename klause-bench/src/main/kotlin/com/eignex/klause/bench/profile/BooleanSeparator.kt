@@ -71,7 +71,9 @@ internal object BooleanSeparators {
                 if (!visit()) return null
                 require(lit >= 0 && Lit.variable(lit) in 0 until variables)
                 val value = fixed[Lit.variable(lit)]
-                if (value == null) free += lit else if (Lit.evaluate(lit, value)) satisfied = true
+                if (value == null) free += lit else if (Lit.evaluate(lit, value)) {
+                    satisfied = true
+                }
             }
             if (satisfied) continue
             if (free.isEmpty()) conflict = true
