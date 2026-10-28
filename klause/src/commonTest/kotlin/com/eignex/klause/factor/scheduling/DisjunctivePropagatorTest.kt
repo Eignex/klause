@@ -255,6 +255,23 @@ class DisjunctivePropagatorTest {
         assertNull(state.boolValues[0])
     }
 
+    @Test
+    fun `an unrepresentable completion time should decline the guard check`() {
+        val top = Long.MAX_VALUE - 1
+        val problem = Problem(
+            numBoolVars = 1,
+            numIntVars = 2,
+            intDomains = Array(2) { IntDomain(top, top) },
+            factors = arrayOf<Factor>(guardedPair(true)),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.currentFactor = 0
+
+        check(state.factorAt(0).propagate(state, 0))
+
+        assertNull(state.boolValues[0])
+    }
+
     private fun guardedPair(positive: Boolean) = Cumulative.unary(
         starts = intArrayOf(0, 1),
         durations = longArrayOf(2, 2),
