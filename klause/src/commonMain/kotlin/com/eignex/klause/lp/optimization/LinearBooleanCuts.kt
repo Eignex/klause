@@ -145,7 +145,7 @@ internal object LinearBooleanCutPreparation {
                 for ((key, left) in whenFalse) {
                     reserve(1L)
                     val right = whenTrue[key] ?: continue
-                    val rhs = maxOf(left.row.rhs, right.row.rhs)
+                    val rhs = if (left.row.rhs > right.row.rhs) left.row.rhs else right.row.rhs
                     val strict = (left.row.rhs < rhs || left.row.strict) && (right.row.rhs < rhs || right.row.strict)
                     val common = SourceInequality(key, rhs, strict)
                     if (unconditional.any { it.row.coefficients == key && stronger(it.row, common) } ||

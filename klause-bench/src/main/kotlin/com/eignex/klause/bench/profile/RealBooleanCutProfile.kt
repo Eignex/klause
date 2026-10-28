@@ -10,6 +10,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.optimization.withLinearAuthority
+import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
@@ -27,6 +28,16 @@ import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.sourceProofContext
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.pipeline.ExecutionOperation
+import com.eignex.klause.solver.pipeline.ExecutionOption
+import com.eignex.klause.solver.pipeline.ExecutionOptions
+import com.eignex.klause.solver.pipeline.FiniteEngine
+import com.eignex.klause.solver.pipeline.SourceAttachment
+import com.eignex.klause.solver.pipeline.SourceExecutionRequest
+import com.eignex.klause.solver.pipeline.SourceExecutionResult
+import com.eignex.klause.solver.pipeline.SourceSetup
+import com.eignex.klause.solver.pipeline.SourceSetupRequest
+import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.util.Cancellation
 import com.sun.management.ThreadMXBean
@@ -45,7 +56,7 @@ internal object RealBooleanCutProfile {
 
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.isEmpty())
+        require(args.isEmpty() || args.toList() == listOf("preparationOnly=true"))
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
         val bean = ManagementFactory.getThreadMXBean() as ThreadMXBean
@@ -55,7 +66,8 @@ internal object RealBooleanCutProfile {
         out.resolve("comparisons.jsonl").bufferedWriter().use { writer ->
             for (refutation in listOf(false, true)) {
                 val name = if (refutation) "coupled-refutation" else "feasible"
-                val source = source(refutation)
+                val source = source(refutation, out)
+                if (args.isNotEmpty()) continue
                 val system = buildJsonObject {
                     put("scope", NumericalFrontierSnapshot.scope(source.scope))
                     put("system", NumericalFrontierSnapshot.system(source))
@@ -116,7 +128,7 @@ internal object RealBooleanCutProfile {
         }
     }
 
-    private fun source(refutation: Boolean): SourceProofContext {
+    private fun source(refutation: Boolean, out: File): SourceProofContext {
         val model = Problem(1, 0, emptyArray(), buildList {
             for (id in 0..1) add(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(id),
                 doubleArrayOf(1.0), LinearOp.LE, 0.0))
@@ -126,10 +138,39 @@ internal object RealBooleanCutProfile {
                 doubleArrayOf(-1.0, 1.0), LinearOp.LE, -0.5))
         }, numRealVars = 2, realLower = doubleArrayOf(-1.0, -1.0), realUpper = doubleArrayOf(1.0, 1.0))
         val objective = LinearObjective(realCoefficients = doubleArrayOf(-1.0, 1.0))
+        val scope = SourceScope(SourceRevision("coupled-real-$refutation", "klause-ir-exact-v1"),
+            objective = SourceObjective("difference", ObjectiveSense.MINIMIZE))
+        val stop = Cancellation.after(3.seconds)
+        val started = System.nanoTime()
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(model), ExecutionOperation.OPTIMIZE,
+            FiniteEngine.BACKTRACK, objective, cancellation = stop))
+        val ordinary = SourceSetup.execute(SourceExecutionRequest(invocation,
+            ExecutionOptions(ExecutionOption.dryRunPresolve(true)), timeout = stop,
+            presolveBudget = PresolveBudget(100_000L)))
+        val preparation = (ordinary as? SourceExecutionResult.Prepared)?.result
+        val numeric = preparation?.takeUnless { it.infeasible }?.model?.sourceProofContext(scope, objective)
+        val candidate = numeric?.let { prepare(it) { _, _ -> } }
+        val receipt = buildJsonObject {
+            put("revision", Reports.readGitSha())
+            put("resultKind", ordinary::class.simpleName)
+            put("defaultPresolve", true)
+            put("elapsedNs", System.nanoTime() - started)
+            put("stopped", stop())
+            put("infeasible", preparation?.infeasible)
+            put("factors", preparation?.model?.factors?.size)
+            put("booleans", preparation?.model?.numBoolVars)
+            put("reals", preparation?.model?.numRealVars)
+            put("passes", preparation?.stats?.passes?.joinToString(","))
+            put("capturedPremises", numeric?.premises?.size)
+            put("guardedPremises", numeric?.premises?.values?.count { it.guards.isNotEmpty() })
+            put("commonRows", candidate?.let { (field(it, "consequences") as List<*>).size })
+            put("scanComplete", candidate?.let { field(it, "complete") as Boolean })
+            numeric?.let { put("system", NumericalFrontierSnapshot.system(it)) }
+        }
+        out.resolve("ordinary-preparation-$refutation.json").writeText(receipt.toString())
+        println(receipt)
         val prepared = requireNotNull(model.prepareExecutionPlan(objective).model)
-        return requireNotNull(prepared.sourceProofContext(SourceScope(
-            SourceRevision("coupled-real-$refutation", "klause-ir-exact-v1"),
-            objective = SourceObjective("difference", ObjectiveSense.MINIMIZE)), objective))
+        return requireNotNull(prepared.sourceProofContext(scope, objective))
     }
 
     private fun replay(source: SourceProofContext, composed: Boolean, alternatives: Int): Any {
@@ -147,13 +188,9 @@ internal object RealBooleanCutProfile {
     }
 
     private fun inspect(source: SourceProofContext, file: File) {
-        val type = Class.forName(PREFIX + "LinearBooleanCutPreparation")
-        val limits = Class.forName(PREFIX + "LinearBooleanCutLimits").getDeclaredConstructor().newInstance()
         var work = 0L
         var allocation = 0L
-        val result = type.declaredMethods.single { it.name == "prepare" }
-            .invoke(type.getField("INSTANCE").get(null), source, Cancellation.after(3.seconds),
-                { steps: Long, bytes: Long -> work += steps; allocation += bytes }, limits)
+        val result = prepare(source) { steps, bytes -> work += steps; allocation += bytes }
         @Suppress("UNCHECKED_CAST")
         val consequences = field(result, "consequences") as List<SourceEvidence>
         val rounding = Class.forName(PREFIX + "LinearAuthorityCuts").getField("Companion").get(null)
@@ -187,6 +224,13 @@ internal object RealBooleanCutProfile {
                 })
             } })
         }.toString())
+    }
+
+    private fun prepare(source: SourceProofContext, cost: (Long, Long) -> Unit): Any {
+        val type = Class.forName(PREFIX + "LinearBooleanCutPreparation")
+        val limits = Class.forName(PREFIX + "LinearBooleanCutLimits").getDeclaredConstructor().newInstance()
+        return type.declaredMethods.single { it.name == "prepare" }
+            .invoke(type.getField("INSTANCE").get(null), source, Cancellation.after(3.seconds), cost, limits)
     }
 
     private fun proof(value: SourceDerivation): JsonObject = buildJsonObject {
