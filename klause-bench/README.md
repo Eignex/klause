@@ -4288,20 +4288,28 @@ Earlier [8882](https://lab.eignex.com/jobs/8882)/[8888](https://lab.eignex.com/j
 compiler declines and [8932](https://lab.eignex.com/jobs/8932)'s invalid fixed-engine
 LP configuration establish no search or cost result.
 
-`CumulativeWindowProfile` measures the exploratory subwindow pass during native
-branch-and-bound on an original MiniZinc identity. Required arguments are `suite`
-and `problem`; optional `prepare`, `lp`, `seeds` (comma-separated) and `decisions`
-default to `default`, `off`, `3,7` and 512. Each search has a 20-second safety
-deadline and alternates the order of disabled, unconditional, zero-load-guarded and
-guarded completion-sweep passes between seeds. Private opt-in counters record calls,
-zero-load eligibility, windows, task/suffix visits, strict demand bounds and conflicts;
-up to 32 bound snapshots
-retain the channels and their subsequent decision fixpoints. Hooks attach at the
-first selector pick, so preparation and initial root propagation share the guarded
-completion sweep. Root snapshots must match before comparing these search
-controls. Counts exclude preparation and the initial root; a subsequent fixpoint
-snapshot is evidence only for the domains it actually retains. These instrumented
-runs diagnose yield and supply neither CLI throughput nor a source-verdict claim.
+Non-root admission captures at `c3b7fcb211` use a temporary, opt-in
+`CumulativeWindowProfile` over the original sources, default preparation, seeds
+3/7 and 512 decisions with a 20-second safety deadline. Controls disable the pass,
+retain the exhaustive scan, skip zero-load scans, or use the guarded completion
+sweep. Hooks attach at the first selector pick; preparation and initial root use
+the same sweep in every control. Retained root domains match. These instrumented
+runs diagnose yield, without CLI throughput or source-verdict claims.
+
+[8961](https://lab.eignex.com/jobs/8961) retains six/eight strict demand bounds on
+TestScheduling-20 with LP off. A saved channel consumes demand 44's bound to zero:
+machine variable 5 changes from `1..7` to `2..7`. The exhaustive scan and guarded
+sweep retain the same bound snapshots. Total propagation work is 51.0M/50.8M for
+the exhaustive scan, 11.2M/11.9M for the sweep and 8.6M/9.6M with it disabled.
+[8957](https://lab.eignex.com/jobs/8957) with default LP records no extra demand
+bounds: 36.8M → 17.0M work, versus 15.1M disabled.
+[8962](https://lab.eignex.com/jobs/8962) on original
+`2018/test-scheduling/t30m10r3-15` retains five/19 bounds; work is 109.3M/62.1M
+exhaustive, 15.0M/5.6M swept and 8.7M/2.8M disabled. All searches complete their
+decision allowance. Nodes and failures match the disabled controls, so these
+captures establish consumed inference and scan reduction, not avoided search or
+default admission. The temporary hooks and alternate scans are absent from runtime
+code; their frozen captures retain the diagnostic implementation.
 
 ### Source task-order applicability
 
