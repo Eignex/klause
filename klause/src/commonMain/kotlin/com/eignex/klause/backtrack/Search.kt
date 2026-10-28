@@ -733,7 +733,9 @@ private class LpFeasibilityComponent(
     solveContext: LpSolveContext,
 ) : LpSearchResource {
     private var preparationToken: Cancellation? = null
-    private val cancellation = cancelledWhen({ params.cancellation.deadline() }, { params.cancellation.workScheduled() }) {
+    private val cancellation = cancelledWhen(
+        { params.cancellation.deadline() }, { params.cancellation.workScheduled() },
+    ) {
         params.cancellation() || preparationToken?.invoke() == true
     }
     val engine = LpEngine(
