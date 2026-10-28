@@ -39,6 +39,8 @@ import java.lang.management.ManagementFactory
 import kotlin.time.Duration.Companion.seconds
 
 internal object HistoricalTableReasonProfile {
+    private val routes = listOf("original", "prepared-satisfaction", "prepared-solution-set")
+
     @JvmStatic
     fun main(args: Array<String>) {
         require(args.isEmpty() || args.contentEquals(arrayOf("controlsOnly=true")))
@@ -51,7 +53,9 @@ internal object HistoricalTableReasonProfile {
         for (variant in 0..2) {
             val source = source(variant)
             out.resolve("source-$variant.fzn").writeText(source)
-            if (args.isEmpty()) for (pass in 0..1) for (route in 0..2) {
+            if (args.isEmpty()) {
+                for (pass in 0..1) {
+                    for (route in 0..2) {
                 for (enabled in if (pass == 0) listOf(false, true) else listOf(true, false)) {
                     val before = bean.getThreadAllocatedBytes(thread)
                     val start = System.nanoTime()
@@ -61,12 +65,12 @@ internal object HistoricalTableReasonProfile {
                     val record = buildJsonObject {
                         put("variant", variant)
                         put("sourceSha256", sha256(source.encodeToByteArray()))
-                        put("route", listOf("original", "prepared-satisfaction", "prepared-solution-set")[route])
+                        put("route", routes[route])
                         put("enabled", enabled)
                         put("warmup", pass == 0)
                         put("elapsedNs", elapsed)
                         put("threadAllocatedBytes", allocated)
-                        put("measurement", "instrumented parse through application, sibling check and retraction")
+                        put("measurement", "parse/preparation/replay/application/sibling/retraction; JFR")
                         put("independentWitnessOrProofCheck", false)
                         put("physicalRssOrGcMeasured", false)
                         put("javaVersion", System.getProperty("java.version"))
@@ -77,20 +81,36 @@ internal object HistoricalTableReasonProfile {
                     println(record)
                 }
             }
+                }
+            }
             val controlStart = System.nanoTime()
             val controlBefore = bean.getThreadAllocatedBytes(thread)
             val program = parseFlatZinc(source)
             val stop = Cancellation.after(2.seconds)
-            val preparation = FinitePipeline.prepare(FinitePipelineRequest(
-                program.problem, FiniteEngine.BACKTRACK, cancellation = stop, solveCancellation = stop))
-            val result = BacktrackSolver(preparation.problem as BakedProblem).solve(BacktrackParams(
-                lpConfig = LpConfig.AUTO, randomSeed = 3L, maxDecisions = 128, cancellation = stop))
+            val preparation = FinitePipeline.prepare(
+                FinitePipelineRequest(
+                program.problem,
+                FiniteEngine.BACKTRACK,
+                cancellation = stop,
+                solveCancellation = stop,
+            )
+            )
+            val result = BacktrackSolver(preparation.problem as BakedProblem).solve(
+                BacktrackParams(
+                lpConfig = LpConfig.AUTO,
+                randomSeed = 3L,
+                maxDecisions = 128,
+                cancellation = stop,
+            )
+            )
             val point = (result as? SolveResult.Sat)?.assignment?.let(preparation.reconstruct)
             val checked = point?.let { sample ->
-                val fixed = program.problem.withIntDomains(Array(program.problem.numIntVars) {
+                val fixed = program.problem.withIntDomains(
+                    Array(program.problem.numIntVars) {
                     val value = sample.intValue(it)
                     IntDomain(value, value)
-                })
+                }
+                )
                 val checker = PropagationSession(fixed, cancellation = stop)
                 !checker.isUnsatAtRoot && (0 until program.problem.numBoolVars).all {
                     checker.pinBool(it, sample.boolValue(it)) is PropagationResult.Implied
@@ -118,17 +138,36 @@ internal object HistoricalTableReasonProfile {
         val stop = Cancellation.after(2.seconds)
         val program = parseFlatZinc(source)
         val original = program.problem
-        val preparation = if (route > 0) FinitePipeline.prepare(FinitePipelineRequest(
-            original, FiniteEngine.BACKTRACK, cancellation = stop, solveCancellation = stop,
-            solutionSetSensitive = route == 2)) else null
+        val preparation = if (route > 0) {
+            FinitePipeline.prepare(
+                FinitePipelineRequest(
+            original,
+            FiniteEngine.BACKTRACK,
+            cancellation = stop,
+            solveCancellation = stop,
+            solutionSetSensitive = route == 2,
+        )
+            )
+        } else {
+            null
+        }
         val problem = preparation?.problem ?: original
-        val mapping = if (preparation == null) VarRemap(IntArray(original.numBoolVars) { it },
-            IntArray(original.numIntVars) { it }) else {
-            val captured = preparation.javaClass.getDeclaredField("sourceMapping").apply { isAccessible = true }
-                .get(preparation)
-            if (captured == null) null else Class.forName("com.eignex.klause.presolve.SourceMappingKt")
+        val mapping = if (preparation == null) {
+            VarRemap(
+            IntArray(original.numBoolVars) { it },
+            IntArray(original.numIntVars) { it },
+        )
+        } else {
+            val mappingField = preparation.javaClass.getDeclaredField("sourceMapping")
+                .apply { isAccessible = true }
+            val captured = mappingField.get(preparation)
+            if (captured == null) {
+                null
+            } else {
+                Class.forName("com.eignex.klause.presolve.SourceMappingKt")
                 .getDeclaredMethod("retainedCoordinates", captured.javaClass, Cancellation::class.java)
                 .invoke(null, captured, stop) as VarRemap?
+            }
         }
         val b = mapping?.int(program.intVarsByName.getValue("b")) ?: -1
         val a = mapping?.int(program.intVarsByName.getValue("a")) ?: -1
@@ -138,12 +177,14 @@ internal object HistoricalTableReasonProfile {
         val state = native.javaClass.getDeclaredField("state").apply { isAccessible = true }.get(native)
         val flag = state.javaClass.getDeclaredField("historicalTableReasons").apply { isAccessible = true }
         flag.setBoolean(state, enabled)
-        val traceField = state.javaClass.getDeclaredField("arithmeticLearningTrace").apply { isAccessible = true }
+        val traceField = state.javaClass.getDeclaredField("arithmeticLearningTrace")
+            .apply { isAccessible = true }
         val trace = Class.forName("com.eignex.klause.propagation.ArithmeticLearningTrace")
             .getConstructor().newInstance()
         traceField.set(state, trace)
         val cp = CpSearchComponent(native)
-        val shared = SearchSession(listOf(cp), cancellation = stop, atoms = SearchAtomRegistry(problem.numBoolVars))
+        val atoms = SearchAtomRegistry(problem.numBoolVars)
+        val shared = SearchSession(listOf(cp), cancellation = stop, atoms = atoms)
         val outcomes = ArrayList<String>()
         var target: Int? = null
         var size: Int? = null
@@ -155,8 +196,11 @@ internal object HistoricalTableReasonProfile {
         val initialQ = if (q >= 0) native.boolValue(q) else null
         var resolution: String? = null
         if (b >= 0 && a >= 0 && q >= 0 && initialized is ComponentResult.Consistent) {
-            val decisions = listOf(SearchDecision.IntAtLeast(b, 1), SearchDecision.IntAtLeast(a, 1),
-                SearchDecision.Bool(Lit.make(q, true)))
+            val decisions = listOf(
+                SearchDecision.IntAtLeast(b, 1),
+                SearchDecision.IntAtLeast(a, 1),
+                SearchDecision.Bool(Lit.make(q, true)),
+            )
             for (decision in decisions) {
                 val result = shared.push(decision)
                 outcomes.add(result::class.simpleName ?: "unknown")
@@ -179,43 +223,70 @@ internal object HistoricalTableReasonProfile {
             }
         }
         val learnedCount = native.learnedClauseCount
-        val work = state.javaClass.declaredMethods.single { it.name.startsWith("getWork") && it.parameterCount == 0 }
-            .invoke(state) as Long
+        val workGetter = state.javaClass.declaredMethods.single {
+            it.name.startsWith("getWork") && it.parameterCount == 0
+        }
+        val work = workGetter.invoke(state) as Long
         shared.popTo(0)
         flag.setBoolean(state, false)
         traceField.set(state, null)
         return buildJsonObject {
             put("original", codec.encodeToString(original))
-            put("prepared", buildJsonObject {
+            put(
+                "prepared",
+                buildJsonObject {
                 put("bools", problem.numBoolVars)
-                put("ints", buildJsonArray {
-                    for (v in 0 until problem.numIntVars) add(JsonPrimitive(problem.intDomainOrNull(v).toString()))
-                })
-                put("factors", buildJsonArray { for (factor in problem.factors) {
-                    add(try {
-                        FactorCodecs.builtin.encodeToJsonElement(factor)
-                    } catch (_: MissingFactorCodecException) {
-                        check(factor.javaClass.simpleName == "DifferenceSystem")
-                        buildJsonObject {
-                            put("derivedClass", factor.javaClass.name)
-                            val privateVertices = factor.javaClass.getMethod("getPrivateVertices").invoke(factor)
-                            val indexGuards = factor.javaClass.getMethod("getIndexGuards").invoke(factor)
-                            put("privateVertices", privateVertices.toString())
-                            put("indexGuards", indexGuards.toString())
-                            put("edges", buildJsonArray {
-                                for (edge in factor.javaClass.getMethod("getEdges").invoke(factor) as List<*>) {
-                                    val value = requireNotNull(edge)
-                                    add(buildJsonObject {
-                                        for (name in listOf("Source", "Target", "Bound", "Guard", "DomainBound")) {
-                                            put(name, value.javaClass.getMethod("get$name").invoke(value).toString())
+                put(
+                    "ints",
+                    buildJsonArray {
+                    for (v in 0 until problem.numIntVars) {
+                        val domain = problem.intDomainOrNull(v)
+                        add(JsonPrimitive(domain.toString()))
+                    }
+                }
+                )
+                put(
+                    "factors",
+                    buildJsonArray {
+                    for (factor in problem.factors) {
+                        add(
+                            try {
+                            FactorCodecs.builtin.encodeToJsonElement(factor)
+                        } catch (_: MissingFactorCodecException) {
+                            check(factor.javaClass.simpleName == "DifferenceSystem")
+                            val kind = factor.javaClass
+                            val edges = kind.getMethod("getEdges").invoke(factor) as List<*>
+                            val edgeFields = listOf("Source", "Target", "Bound", "Guard", "DomainBound")
+                            buildJsonObject {
+                                put("derivedClass", factor.javaClass.name)
+                                val privateVertices = kind.getMethod("getPrivateVertices").invoke(factor)
+                                val indexGuards = kind.getMethod("getIndexGuards").invoke(factor)
+                                put("privateVertices", privateVertices.toString())
+                                put("indexGuards", indexGuards.toString())
+                                put(
+                                    "edges",
+                                    buildJsonArray {
+                                    for (edge in edges) {
+                                        val value = requireNotNull(edge)
+                                        add(
+                                            buildJsonObject {
+                                            for (name in edgeFields) {
+                                                val getter = value.javaClass.getMethod("get$name")
+                                                put(name, getter.invoke(value).toString())
+                                            }
                                         }
-                                    })
+                                        )
+                                    }
                                 }
-                            })
+                                )
+                            }
                         }
-                    })
-                } })
-            })
+                        )
+                    }
+                }
+                )
+            }
+            )
             put("presolve", preparation?.presolve.toString())
             put("sourceCoordinatesRetained", b >= 0 && a >= 0 && q >= 0)
             put("scriptCoordinates", "a=$a b=$b q=$q")
@@ -231,16 +302,26 @@ internal object HistoricalTableReasonProfile {
             put("aZeroSiblingQ", siblingQ)
             put("learnedCount", learnedCount)
             put("finiteWork", work)
-            put("trace", buildJsonArray {
+            put(
+                "trace",
+                buildJsonArray {
                 for (event in trace.javaClass.getMethod("getEvents").invoke(trace) as List<*>) {
                     requireNotNull(event)
-                    add(buildJsonObject {
+                    add(
+                        buildJsonObject {
                         put("kind", event.javaClass.getMethod("getKind").invoke(event) as String)
-                        put("data", JsonArray((event.javaClass.getMethod("getData").invoke(event) as LongArray)
-                            .map(::JsonPrimitive)))
-                    })
+                        put(
+                            "data",
+                            JsonArray(
+                            (event.javaClass.getMethod("getData").invoke(event) as LongArray)
+                                .map(::JsonPrimitive),
+                        )
+                        )
+                    }
+                    )
                 }
-            })
+            }
+            )
             put("cancelled", stop())
         }
     }
@@ -254,9 +335,14 @@ internal object HistoricalTableReasonProfile {
         val declarations = if (variant == 0) "var bool: x1; var bool: b0;" else "var bool: d;"
         val aliases = if (variant == 0) {
             "constraint int_eq_reif(x, 1, x1); constraint int_eq_reif(b, 0, b0);"
-        } else ""
-        val implication = if (variant == 0) "constraint bool_clause([x1,b0], [q]);" else
+        } else {
+            ""
+        }
+        val implication = if (variant == 0) {
+            "constraint bool_clause([x1,b0], [q]);"
+        } else {
             "constraint bool_clause([d], [q]); " + "constraint int_lin_le_imp([1,-1], [b,x], 0, d);"
+        }
         return """
             var 0..1: x;
             var 0..1: a;
