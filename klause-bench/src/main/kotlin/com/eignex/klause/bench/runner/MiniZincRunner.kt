@@ -62,7 +62,8 @@ internal class MiniZincRunner(
         val mzn = CorpusFetcher.resolve(ref.source)
         val dzn = ref.data?.let { CorpusFetcher.resolve(it) }
         val includes = CorpusFetcher.includeDirs(ref.source)
-        val includedFiles = includes.flatMap { it.walkTopDown().filter(File::isFile).toList() }.distinctBy { it.canonicalPath }.sortedBy { it.path }
+        val includedFiles = includes.flatMap { it.walkTopDown().filter(File::isFile).toList() }
+            .distinctBy { it.canonicalPath }.sortedBy { it.path }
         val workDir = File(root, "klause-bench/build/mzn-fzn-output-v3-seed$MZN_RANDOM_SEED").apply { mkdirs() }
         val digest = MessageDigest.getInstance("SHA-256")
         digest.update(MiniZincCompatibility.compiler.toString().toByteArray())
@@ -147,7 +148,10 @@ internal class MiniZincRunner(
             add(libDir.absolutePath)
             add("--output-fzn-to-file")
             add(tmp.absolutePath)
-            includes.forEach { add("-I"); add(it.absolutePath) }
+            includes.forEach {
+                add("-I")
+                add(it.absolutePath)
+            }
             add(mzn.absolutePath)
             if (dzn != null) add(dzn.absolutePath)
         }

@@ -83,8 +83,9 @@ internal class MiniZincCompileFailure(
 
 internal object MiniZincCompatibility {
     val compiler: MiniZincCompilerIdentity by lazy {
-        val executable = System.getenv("PATH").orEmpty().split(File.pathSeparator)
-            .map { File(it, "minizinc") }.firstOrNull { it.isFile && it.canExecute() }?.canonicalFile
+        val executable = System.getProperty("klause.bench.minizinc")?.let(::File)?.canonicalFile
+            ?: System.getenv("PATH").orEmpty().split(File.pathSeparator)
+                .map { File(it, "minizinc") }.firstOrNull { it.isFile && it.canExecute() }?.canonicalFile
             ?: error("MiniZinc compiler is unavailable")
         val config = Json.parseToJsonElement(query(executable, "--config-dirs")).jsonObject
         val standard = File(config.getValue("mznStdlibDir").jsonPrimitive.content)

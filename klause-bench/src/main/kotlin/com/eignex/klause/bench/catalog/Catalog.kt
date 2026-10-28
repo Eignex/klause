@@ -2,6 +2,7 @@ package com.eignex.klause.bench.catalog
 
 import com.eignex.klause.bench.source.CorpusSelection
 import com.eignex.klause.ir.Problem
+import java.io.File
 
 /*
  * The benchmark catalog groups [ProblemRef] entries into named [Suite]s by [Category].
@@ -129,7 +130,7 @@ internal data class ExternalCollection(
 /** Where a problem's bytes come from. Resolved to a concrete file by `source.CorpusFetcher`. */
 internal sealed interface ProblemSource {
     /** A file resolved and pinned by the lab planner, without corpus discovery during execution. */
-    data class Prepared(val file: java.io.File, val includes: List<java.io.File> = emptyList()) : ProblemSource
+    data class Prepared(val file: File, val includes: List<File> = emptyList()) : ProblemSource
 
     /** A file tracked in this repository, path relative to the workspace root. Use [corpus]
      *  for the common case of a file under `klause-bench/smoke-corpus/`. */
@@ -232,7 +233,10 @@ internal object Catalog {
             dynamic.provider(selection)
         } else {
             CorpusSelection.applyAdmittedSelectionBy(
-                discovered(dynamic), selection, { it.family ?: it.name.substringBefore('/') }, admit,
+                discovered(dynamic),
+                selection,
+                { it.family ?: it.name.substringBefore('/') },
+                admit,
             )
         }
         return Suite(dynamic.id, dynamic.description, problems)

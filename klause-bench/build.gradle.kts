@@ -100,3 +100,14 @@ tasks.withType<Test> {
     maxHeapSize = "4g"
 }
 
+val prepareLabRuntime = tasks.register<Exec>("prepareLabRuntime") {
+    group = "build"
+    description = "Stage the pinned Linux x86_64 MiniZinc compiler and standard library for lab jobs."
+    commandLine(
+        "bash",
+        layout.projectDirectory.file("scripts/prepare-lab-runtime.sh").asFile,
+        layout.buildDirectory.dir("lab-runtime/minizinc").get().asFile,
+    )
+    inputs.file("scripts/prepare-lab-runtime.sh")
+    outputs.dir(layout.buildDirectory.dir("lab-runtime/minizinc"))
+}

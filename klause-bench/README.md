@@ -105,41 +105,77 @@ Arm values are `solve-one` options; `param.<name>` becomes `--param <name>=<valu
 
 ## Bench SDK adapter
 
-`lab/bench.json` owns the build tasks, main and classpath for the JVM adapter.
-It builds the installed CLI with `installJvmDist` and the bench distribution
-with `installDist`. Only `klause-bench` imports `com.eignex:lab-bench:0.1.0`.
+`lab/bench.json` owns the adapter's build tasks, classpath and JVM launch options.
+Its tasks install the CLI, bench distribution and a checksum-pinned MiniZinc 2.10.1
+compiler with its standard library. Preparation downloads the compiler anonymously
+from the public MiniZinc release; execution needs no download or system MiniZinc.
+The manifest targets Linux x86_64 and requires JDK 25, GNU time and the ordinary
+Linux C/C++ runtime libraries. The planner retains its platform requirements.
 
-The default dependency resolves [Lab Bench 0.1.0](https://github.com/Eignex/eignex-lab/releases/tag/lab-bench-v0.1.0)
-from public GitHub Release assets without a GitHub login or token. Prepare the adapter with:
+Only `klause-bench` imports `com.eignex:lab-bench:0.1.0`, resolved anonymously
+from [public GitHub Release assets](https://github.com/Eignex/eignex-lab/releases/tag/lab-bench-v0.1.0).
+Build the complete adapter with:
 
 ```sh
-./gradlew :klause-cli:installJvmDist :klause-bench:installDist
+./gradlew :klause-cli:installJvmDist :klause-bench:installDist :klause-bench:prepareLabRuntime
 ```
 
-`-PlabBenchVersion=VERSION` selects a different SDK release. To develop against a
-local SDK checkout, run `./gradlew :lab-bench:stageAdapterRepository -PbenchVersion=0.1.0`
-in that checkout, then add
-`-PlabBenchRepository=file:///absolute/eignex-lab/lab-bench/build/adapter-repository`
-to the consumer build. Refresh dependencies when restaging the same version.
+`-PlabBenchVersion=VERSION` selects another SDK release. A local SDK checkout can
+stage its repository with `./gradlew :lab-bench:stageAdapterRepository -PbenchVersion=0.1.0`;
+pass `-PlabBenchRepository=file:///absolute/eignex-lab/lab-bench/build/adapter-repository`
+to the consumer build, refreshing dependencies after restaging the same version.
 
-A lab submission uses `repository: "Eignex/klause"` and
+Submit `repository: "Eignex/klause"` and
 `bench: {"manifest":"klause-bench/lab/bench.json","request":{"parameters":{"suite":"dimacs-core","name":"php4","timeout-ms":"1000"}}}`.
 The planner accepts the catalog selectors `suite`, `set`, `name`, `category`,
-`tag`, `kind`, `per-family`, `seed`, `max` and `balance`, and expands `engines`,
-`solver-seeds` and `repeats`. Runtime keys are `cpus`, `memory-mib` (at least
-2048), `timeout-ms`, `lp`, `presolve`, `exact` and `param.NAME`.
+`tag`, `kind`, `per-family`, `seed`, `max` and `balance`. It expands
+`engines`, `solver-seeds` and `repeats` into distinct cases. Catalog file formats
+include DIMACS, WCNF, OPB, JSON schema, XCSP3, SMT-LIB, MPS and MiniZinc model/data;
+in-code problems have no subprocess input and are rejected.
 
-Plans pin resolved file inputs, their hashes, corpus locations and problem
-metadata. Execution reconstructs the file-backed reference from those frozen
-inputs without repeating corpus selection. MiniZinc companion/include files
-travel with the corpus. In-code problems are unavailable to this subprocess adapter.
-Each case retains its complete solve record, including exact objective text,
-witness, attribution, validation policy, source hashes, compiler identity and
-build/runtime provenance. Generic elapsed/time-to-best metrics supplement that
-record. Unsupported inputs remain domain outcomes; load and process errors fail
-the SDK case. The adapter sizes CLI heap and processor limits from its declared
-resources. The legacy experiment path remains available for reference arms and
-paired A/B comparisons; a bench request names one source revision.
+| Control | Contract |
+|---|---|
+| `cpus`, `memory-mib` | Reserved case resources; memory is at least 2048 MiB |
+| `timeout-ms`, `compile-timeout-sec` | Solve deadline and MiniZinc compile ceiling; the supervised case allowance also covers preflight and shutdown |
+| `heap-mib` | CLI heap, reserving 1536 MiB for both harness JVMs and native overhead |
+| `gc` | `default`, `serial`, `parallel`, `g1` or `z` |
+| `lp`, `presolve`, `exact`, `param.NAME` | CLI solve controls; engine-specific parameter semantics are checked by the CLI |
+| `debug` | Strict Boolean; defaults to runtime statistics enabled |
+| `measurement` | `none`, `resources`, `jfr`, `compilation` or `compilation+log` |
+
+Plans freeze model/data files, include trees, relative companion includes and the
+bundled compiler. File and directory digests are checked after relocation and before
+execution; required inputs cannot escape the source or corpus roots. Absolute
+MiniZinc include declarations are rejected. Execution reconstructs the file-backed
+reference without catalog discovery. JVM argument files preserve paths containing
+spaces, and CLI processes receive the planned controls without inherited solver or
+instrumentation settings. Version preflight uses separate, uninstrumented options.
+
+Each case retains its full solve record: exact objective text, proof/feasibility,
+portfolio attribution, final witness, source hashes, compiler identity, validation
+policy and installed build/runtime provenance. The runtime manifest and argument
+files retain the effective capture settings. Generic elapsed, first-feasible,
+best-incumbent and direction-aware objective metrics supplement the domain record;
+resource captures add GNU time CPU, wall and peak-RSS metrics. JFR and HotSpot logs
+remain separate artifacts. Instrumented captures are diagnostics, not comparable
+solver-throughput controls.
+
+UNSAT, UNKNOWN, unsupported models and solver deadlines retain their domain
+semantics. Load errors, crashes and nonzero exits after a published verdict fail the
+SDK case while retaining available records and artifacts. Stdout/stderr are flushed
+to durable files during solving, and compiler failures retain their diagnostics.
+A worker cancellation or hard kill can leave these partial files without a terminal
+solve record; the lab's supervisor owns that execution outcome and artifact transfer.
+
+The SDK's one-revision cases do not replace reference arms, paired revision
+comparisons, schedules/sweeps, independent source-witness checks, confirmation or
+specialized profile mains. The generic lab path currently rejects legacy source-check
+controls on bench jobs, so `validationPolicy=reported-result-v1` does not claim an
+independent check. Removing the legacy lab executor requires generic orchestration
+for those workflows, a checker request/result contract, declared JDK/runtime
+prerequisites and cancellation/partial-result semantics. The lab can already consume
+this manifest for prepared solve execution and ingest its metrics, records and
+artifacts; deployment and capacity pools must advertise the declared platform tags.
 
 ## Selection and named sets
 
