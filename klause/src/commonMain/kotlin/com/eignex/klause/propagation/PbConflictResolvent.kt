@@ -6,6 +6,7 @@ import com.eignex.klause.factor.bool.PseudoBooleanPropagator
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.addExact
 
 // Resolves pseudo-Boolean conflicts with coefficient-carrying reasons. If a sound PB derivation is not
 // available, [failed] sends the conflict through [ClauseResolvent].
@@ -87,7 +88,7 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
         if (!seeded) {
             conflictLevel = currentLevel
             seeded = true
-            if (!loadSeed(reason)) failed = true else bumpAll(acc)
+            if (!loadSeed(reason) || !acc.hasSafeActivity()) failed = true else bumpAll(acc)
             return
         }
         val pivot = pendingPivot
@@ -117,7 +118,7 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
      * LCM-scaling resolution loses. Saturate afterward to keep the constraint canonical.
      */
     private fun cancel(pivot: Int, fallbackReasonLits: IntArray) {
-        if (!loadPivotReason(pivot, fallbackReasonLits)) {
+        if (!loadPivotReason(pivot, fallbackReasonLits) || !reason.hasSafeActivity()) {
             failed = true
             return
         }
@@ -139,7 +140,7 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
         // Divide the reason by its pivot coefficient, rounding up ⇒ its pivot coefficient becomes ±1.
         reason.divideRoundUp(absB)
         // acc + absA·reason cancels the pivot (opposite signs, |reason pivot| now 1). acc is not scaled.
-        if (!acc.addScaled(reason, mulSelf = 1L, mulOther = absA)) {
+        if (!acc.addScaled(reason, mulSelf = 1L, mulOther = absA) || !acc.hasSafeActivity()) {
             failed = true
             return
         }
@@ -193,6 +194,10 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
     override fun finalizeResult(currentLevel: Int): ConflictAnalyzer.AnalysisResult {
         if (failed) return ConflictAnalyzer.AnalysisResult.NotApplicable
         val m = acc.materialize() ?: run {
+            failed = true
+            return ConflictAnalyzer.AnalysisResult.NotApplicable
+        }
+        if (addExact(m.degree, m.weights.maxOrNull() ?: 0L) == null) {
             failed = true
             return ConflictAnalyzer.AnalysisResult.NotApplicable
         }

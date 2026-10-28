@@ -51,6 +51,28 @@ internal class PbAccumulator {
 
     fun isEmpty(): Boolean = coef.isEmpty()
 
+    fun hasSafeActivity(): Boolean {
+        var total = 0L
+        var degree = rhs
+        var safe = true
+        coef.forEach { _, c ->
+            if (safe) {
+                if (c == Long.MIN_VALUE) {
+                    safe = false
+                } else {
+                    val magnitude = if (c < 0L) -c else c
+                    val next = addExact(total, magnitude)
+                    if (next == null) safe = false else total = next
+                    if (c < 0L) {
+                        val nextDegree = addExact(degree, magnitude)
+                        if (nextDegree == null) safe = false else degree = nextDegree
+                    }
+                }
+            }
+        }
+        return safe && degree > 0L
+    }
+
     private fun put(v: Int, c: Long) {
         if (c == 0L) coef.remove(v) else coef.put(v, c)
     }
