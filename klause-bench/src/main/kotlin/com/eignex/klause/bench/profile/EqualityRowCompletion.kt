@@ -1,5 +1,6 @@
 package com.eignex.klause.bench.profile
 
+import com.eignex.klause.bench.profile.LocalSearchTrajectory.getter
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.simplex.exact.BigFraction
@@ -32,18 +33,18 @@ internal fun equalityRowCompletion(
         state.assumptions.isFrozenInt(it) ||
             state.invariants?.isDefinedInt(it) == true || (state.seeding.ownerInt?.get(it) ?: -1) >= 0
     }
-    val stopped: () -> Boolean = { stop() || LocalSearchTrajectory.getter(funding, "getPaused") == true }
+    val stopped: () -> Boolean = { stop() || getter(funding, "getPaused") == true }
     val type = Class.forName("com.eignex.klause.solver.pipeline.SourceRowCompletion")
     val planner = if (source == null) {
         null
     } else {
         type.constructors.single().newInstance(
-        state.model.problem,
-        source,
-        funding,
-        frozen,
-        stopped,
-    )
+            state.model.problem,
+            source,
+            funding,
+            frozen,
+            stopped,
+        )
     }
     val seeds = (0 until state.problem.numIntVars).flatMap { listOf(it to -1, it to 1) }
     val supported: (Int) -> Boolean = { false }
@@ -57,42 +58,45 @@ internal fun equalityRowCompletion(
     }
     file.writeText(
         buildJsonObject {
-        put("elapsedNs", System.nanoTime() - started)
-        put("threadBytes", trajectoryThreadBytes() - allocated)
-        put("work", LocalSearchTrajectory.getter(funding, "getSpent") as Long)
-        put("modeledAllocation", LocalSearchTrajectory.getter(funding, "getAllocated") as Long)
-        put("declined", packets == null)
-        put(
-            "packets",
-            buildJsonArray {
-            for (packet in packets.orEmpty().filterNotNull()) {
-                add(
-                    buildJsonObject {
-                put("outcome", LocalSearchTrajectory.getter(packet, "getOutcome").toString())
-                put("seed", LocalSearchTrajectory.getter(packet, "getSeed").toString())
-                put(
-                    "members",
-                    buildJsonArray {
-                    val members = LocalSearchTrajectory.getter(packet, "getMembers") as List<*>
-                    for (member in members.filterNotNull()) {
+            put("elapsedNs", System.nanoTime() - started)
+            put("threadBytes", trajectoryThreadBytes() - allocated)
+            put("work", getter(funding, "getSpent") as Long)
+            put("modeledAllocation", getter(funding, "getAllocated") as Long)
+            put("declined", packets == null)
+            put(
+                "packets",
+                buildJsonArray {
+                    for (packet in packets.orEmpty().filterNotNull()) {
                         add(
                             buildJsonObject {
-                        val coordinate = LocalSearchTrajectory.getter(member, "getCoordinate") as SourceCoordinate
-                        val value = LocalSearchTrajectory.getter(member, "getValue") as BigFraction
-                        put("coordinate", coordinate.id)
-                        put("value", value.toString())
-                        put("row", LocalSearchTrajectory.getter(member, "getRow") as String?)
-                    }
+                                put("outcome", getter(packet, "getOutcome").toString())
+                                put("seed", getter(packet, "getSeed").toString())
+                                put(
+                                    "members",
+                                    buildJsonArray {
+                                        val members = getter(packet, "getMembers") as List<*>
+                                        for (member in members.filterNotNull()) {
+                                            add(
+                                                buildJsonObject {
+                                                    val coordinate = getter(
+                                                        member,
+                                                        "getCoordinate",
+                                                    ) as SourceCoordinate
+                                                    val value = getter(member, "getValue") as BigFraction
+                                                    put("coordinate", coordinate.id)
+                                                    put("value", value.toString())
+                                                    put("row", getter(member, "getRow") as String?)
+                                                },
+                                            )
+                                        }
+                                    },
+                                )
+                                put("role", "requested freedoms; incomplete packets are not source transitions")
+                            },
                         )
                     }
-                }
-                )
-                put("role", "requested freedoms; incomplete packets are not source transitions")
-            }
-                )
-            }
-        }
-        )
-    }.toString()
+                },
+            )
+        }.toString(),
     )
 }
