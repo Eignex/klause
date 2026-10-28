@@ -4304,6 +4304,52 @@ one archive bounds per-file transfer overhead. Keep raw evidence outside Git und
 Serial JFR timings and native factor counts establish no throughput or default
 benefit. Source-channel deductions and original output semantics determine admission.
 
+[Compiler/preparation capture 8969](https://lab.eignex.com/jobs/8969), at
+`0e4980bad2`, uses MiniZinc 2.10.1 on Linux/amd64 with JDK 25.0.4.1 under a hard
+one-CPU, 4,608 MiB cgroup. All four original model/data compilations succeed,
+and all twelve reconstructed satisfaction points pass their complete compiled
+factor check without exhausting the containing deadlines. The model and data
+bytes match across library arms. The workforce source is the unchanged upstream
+model; its small data is authored here, not a published corpus instance.
+
+With default preparation, the decomposition leaves the control's original `p`
+open, while the actual bridge fixes `p=false` at the root. Preparation work falls
+from 355,349 to 115,497 units and finite work from 713 to 108; conflicts fall
+from two to zero, while nodes rise from one to two. On workforce, pinning the
+first allocation to team A leaves the third allocation at A/B in the decomposition
+and fixes it to B with retention. The source requires the first two tasks to share
+their team. Default preparation work is 21,202,000 versus 10,147,371 units;
+finite work is 16,649 versus 5,487, with five/four nodes and three/zero conflicts.
+Aggressive preparation reaches the allocation deduction in both arms, so it
+supplies no additional native deduction there. These are bounded consumed-choice
+and charged-work observations, not a corpus, throughput or default-policy claim.
+
+[Semantic capture 8967](https://lab.eignex.com/jobs/8967), at `33b85ef407`, compiles
+all twenty library/source combinations. Sixteen SAT points pass the compiled
+factor checker; the four UNSAT outcomes have no independent proof check.
+Zero-duration, variable-duration, reified and negated controls retain byte-identical
+FlatZinc bodies after generated comments are removed, including strict zero-task
+separation. Default absent-zero and explicit noncanonical controls keep their
+distinct feasibility. Shared complemented guards, repeated starts and statically
+absent inputs compile through the positive fragment.
+
+The capture harness appended a second solution terminator after the writer's
+existing terminator. [Output replay 8975](https://lab.eignex.com/jobs/8975) reuses
+the frozen points and output models with that empty block removed; it runs no
+solver. Some authored output models also contain an undefined absent `deopt` or
+an undeclared `int_ne`; both libraries retain these compiler-output declines.
+They supply no complete-source output validation. The original control and
+workforce output checks are separate from these limits and from the native factor
+checks. The lab has no independent MiniZinc assignment/proof checker.
+
+Initial capture 8950 retains its incorrect mandatory-only include and output-harness
+failure. Capture 8951 records the corrected source with a smaller, solution-set-
+sensitive preparation budget and a redundant native overlay; it is not the actual
+bridge comparison. Jobs 8958, 8959 and 8964 expire during remote preparation or
+artifact upload and supply no accepted source/solver result. Those failures and
+all raw receipts remain in the external campaign. No local compilation, test,
+solver, benchmark or profiler workload ran.
+
 ### Portfolio slice policy
 
 Retain the finite schedule's base 5000, maximum 150000 and growth 1.5; alternatives
