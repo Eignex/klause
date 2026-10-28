@@ -32,8 +32,12 @@ class EqualityKernelMoveTest {
     @Test
     fun `a direction outside the exact integer kernel supplies no steps`() {
         val steps = EqualityKernelMove.steps(
-            listOf(0, 1), listOf(arrayOf(BigInteger.ONE, -BigInteger.ONE)),
-            arrayOf(BigInteger.ONE, -BigInteger.ONE), { 0L }, { IntDomain(0, 2) }, { true },
+            listOf(0, 1),
+            listOf(arrayOf(BigInteger.ONE, -BigInteger.ONE)),
+            arrayOf(BigInteger.ONE, -BigInteger.ONE),
+            { 0L },
+            { IntDomain(0, 2) },
+            { true },
         )
 
         assertTrue(steps.isEmpty())
@@ -45,8 +49,11 @@ class EqualityKernelMoveTest {
         val assumptions = Assumptions(ints = mapOf(pinned to 0L))
 
         val steps = EqualityKernelMove.steps(
-            listOf(0, 1), listOf(arrayOf(BigInteger.ONE, -BigInteger.ONE)),
-            arrayOf(BigInteger.ONE, BigInteger.ONE), { 0L }, { IntDomain(0, 2) },
+            listOf(0, 1),
+            listOf(arrayOf(BigInteger.ONE, -BigInteger.ONE)),
+            arrayOf(BigInteger.ONE, BigInteger.ONE),
+            { 0L },
+            { IntDomain(0, 2) },
             { !assumptions.isFrozenInt(it) },
         )
 
@@ -68,16 +75,24 @@ class EqualityKernelMoveTest {
     @Test
     fun `maintained outputs cannot be dropped from an equality direction`() {
         val problem = Problem(
-            0, 2, Array(2) { IntDomain(0, 2) },
+            0,
+            2,
+            Array(2) { IntDomain(0, 2) },
             listOf(Linear(longArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0)),
         )
-        val sweep = assertNotNull(DefinitionalSweep.fromSource(
+        val sweep = assertNotNull(
+            DefinitionalSweep.fromSource(
             problem,
-            listOf(DefinitionHint.Linear(
-                1, longArrayOf(1, -1),
-                arrayOf(DefinitionHint.Operand.Variable(0), DefinitionHint.Operand.Variable(1)), 0,
-            )),
-        ))
+            listOf(
+                DefinitionHint.Linear(
+                1,
+                longArrayOf(1, -1),
+                arrayOf(DefinitionHint.Operand.Variable(0), DefinitionHint.Operand.Variable(1)),
+                0,
+            )
+            ),
+        )
+        )
         val step = EqualityKernelMove.Step(
             BigInteger.ONE,
             Move.Compound(listOf(Move.IntSet(0, 1), Move.IntSet(1, 1))),
@@ -93,8 +108,12 @@ class EqualityKernelMoveTest {
         val domain = IntDomain(0, 2).excludeValue(1)
 
         val steps = EqualityKernelMove.steps(
-            listOf(0, 1), listOf(arrayOf(BigInteger.ONE, -BigInteger.ONE)),
-            arrayOf(BigInteger.ONE, BigInteger.ONE), { 0L }, { domain }, { true },
+            listOf(0, 1),
+            listOf(arrayOf(BigInteger.ONE, -BigInteger.ONE)),
+            arrayOf(BigInteger.ONE, BigInteger.ONE),
+            { 0L },
+            { domain },
+            { true },
         )
 
         assertEquals(listOf(BigInteger.TWO), steps.map { it.scalar })
@@ -106,14 +125,18 @@ class EqualityKernelMoveTest {
         val center = longArrayOf(Long.MIN_VALUE + 1, Long.MAX_VALUE)
 
         val steps = EqualityKernelMove.steps(
-            listOf(0, 1), listOf(arrayOf(BigInteger.ONE, BigInteger.ONE)),
-            arrayOf(BigInteger.ONE, -BigInteger.ONE), { center[it] },
-            { IntDomain(Long.MIN_VALUE + 1, Long.MAX_VALUE) }, { true },
+            listOf(0, 1),
+            listOf(arrayOf(BigInteger.ONE, BigInteger.ONE)),
+            arrayOf(BigInteger.ONE, -BigInteger.ONE),
+            { center[it] },
+            { IntDomain(Long.MIN_VALUE + 1, Long.MAX_VALUE) },
+            { true },
         )
 
         val endpoint = steps.single { it.scalar == BigInteger("18446744073709551614") }
         assertEquals(
-            listOf(Move.IntSet(0, Long.MAX_VALUE), Move.IntSet(1, Long.MIN_VALUE + 1)), endpoint.move.parts,
+            listOf(Move.IntSet(0, Long.MAX_VALUE), Move.IntSet(1, Long.MIN_VALUE + 1)),
+            endpoint.move.parts,
         )
     }
 
@@ -124,12 +147,16 @@ class EqualityKernelMoveTest {
         val stop = Cancellation { cancelled }
 
         val steps = EqualityKernelMove.steps(
-            listOf(0, 1), listOf(arrayOf(BigInteger.ONE, -BigInteger.ONE)),
-            arrayOf(BigInteger.ONE, BigInteger.ONE), { 0L },
+            listOf(0, 1),
+            listOf(arrayOf(BigInteger.ONE, -BigInteger.ONE)),
+            arrayOf(BigInteger.ONE, BigInteger.ONE),
+            { 0L },
             {
                 if (++domains == 4) cancelled = true
                 IntDomain(0, 2)
-            }, { true }, stop,
+            },
+            { true },
+            stop,
         )
 
         assertTrue(steps.isEmpty())
@@ -153,7 +180,9 @@ class EqualityKernelMoveTest {
     @Test
     fun `every retained global is graded before a source point is accepted`() {
         val problem = Problem(
-            0, 2, Array(2) { IntDomain(0, 2) },
+            0,
+            2,
+            Array(2) { IntDomain(0, 2) },
             listOf(
                 Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 2),
                 AllDifferent(intArrayOf(0, 1)),
@@ -165,9 +194,11 @@ class EqualityKernelMoveTest {
         assertNull(view.load(center))
         val move = Move.Compound(listOf(Move.IntSet(0, 1), Move.IntSet(1, 1)))
 
-        val probe = assertNotNull(EqualityKernelMove.probe(view, move, Cancellation.Never) { point, _ ->
+        val probe = assertNotNull(
+            EqualityKernelMove.probe(view, move, Cancellation.Never) { point, _ ->
             point.intValue(0) != point.intValue(1)
-        })
+        }
+        )
 
         assertTrue(probe.inspection.netDelta > 0)
         assertFalse(probe.accepted)
@@ -177,7 +208,9 @@ class EqualityKernelMoveTest {
     @Test
     fun `a complete kernel move is applied and the checked center is restored`() {
         val problem = Problem(
-            0, 2, Array(2) { IntDomain(0, 2) },
+            0,
+            2,
+            Array(2) { IntDomain(0, 2) },
             listOf(Linear(longArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0)),
         )
         val state = LocalSearchState(problem.bake(), Random(0))
@@ -187,9 +220,15 @@ class EqualityKernelMoveTest {
         assertNull(view.load(center))
         val move = Move.Compound(listOf(Move.IntSet(0, 2), Move.IntSet(1, 2)))
 
-        val applied = assertNotNull(EqualityKernelMove.consume(
-            view, move, center, objective::evaluateExact, Cancellation.Never,
-        ) { _, _ -> true })
+        val applied = assertNotNull(
+            EqualityKernelMove.consume(
+            view,
+            move,
+            center,
+            objective::evaluateExact,
+            Cancellation.Never,
+        ) { _, _ -> true }
+        )
 
         assertEquals(Sample(booleanArrayOf(), longArrayOf(2, 2)), applied.source)
         assertEquals("-2", applied.value.toString())
@@ -200,7 +239,9 @@ class EqualityKernelMoveTest {
     @ValueSource(booleans = [false, true])
     fun `an unsuccessful source check during consumption restores the checked center`(throws: Boolean) {
         val problem = Problem(
-            0, 2, Array(2) { IntDomain(0, 2) },
+            0,
+            2,
+            Array(2) { IntDomain(0, 2) },
             listOf(Linear(longArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0)),
         )
         val state = LocalSearchState(problem.bake(), Random(0))
@@ -219,9 +260,16 @@ class EqualityKernelMoveTest {
                 EqualityKernelMove.consume(view, move, center, objective::evaluateExact, Cancellation.Never, verify)
             }
         } else {
-            assertNull(EqualityKernelMove.consume(
-                view, move, center, objective::evaluateExact, Cancellation.Never, verify,
-            ))
+            assertNull(
+                EqualityKernelMove.consume(
+                view,
+                move,
+                center,
+                objective::evaluateExact,
+                Cancellation.Never,
+                verify,
+            )
+            )
         }
 
         assertEquals(center, state.assignment.snapshot())

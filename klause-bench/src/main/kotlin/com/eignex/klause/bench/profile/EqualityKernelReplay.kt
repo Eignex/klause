@@ -62,71 +62,76 @@ internal object EqualityKernelReplay {
                     var best = score(center)
                     add(
                         buildJsonObject {
-                        put("mode", mode)
-                        put("extractionNs", extractionNs)
-                        put("extractionThreadBytes", extractionAllocation)
-                        put("declined", directions == null)
-                        put(
-                            "directions",
-                            buildJsonArray {
-                            for (direction in directions.orEmpty()) {
-                                check(
-                                    matrix.rows.all { row ->
-                                    row.indices.fold(zero) { sum, i -> sum + row[i] * direction[i] } == zero
-                                }
-                                )
-                                add(
-                                    buildJsonObject {
-                                    put("g", JsonArray(direction.map { JsonPrimitive(it.toString()) }))
-                                    put("exactAgZero", true)
-                                    put(
-                                        "candidates",
-                                        candidates(matrix, direction, view, stop, verify) { move, point ->
-                                        val value = score(point)
-                                        if (value < best) {
-                                            best = value
-                                            selected = move
-                                        }
+                            put("mode", mode)
+                            put("extractionNs", extractionNs)
+                            put("extractionThreadBytes", extractionAllocation)
+                            put("declined", directions == null)
+                            put(
+                                "directions",
+                                buildJsonArray {
+                                    for (direction in directions.orEmpty()) {
+                                        check(
+                                            matrix.rows.all { row ->
+                                                row.indices.fold(zero) { sum, i -> sum + row[i] * direction[i] } == zero
+                                            },
+                                        )
+                                        add(
+                                            buildJsonObject {
+                                                put("g", JsonArray(direction.map { JsonPrimitive(it.toString()) }))
+                                                put("exactAgZero", true)
+                                                put(
+                                                    "candidates",
+                                                    candidates(matrix, direction, view, stop, verify) { move, point ->
+                                                        val value = score(point)
+                                                        if (value < best) {
+                                                            best = value
+                                                            selected = move
+                                                        }
+                                                    },
+                                                )
+                                            },
+                                        )
                                     }
-                                    )
+                                },
+                            )
+                            val move = selected as? Move.Compound
+                            val consumed = move?.let {
+                                EqualityKernelMove.consume(view, it, center, score, stop, verify)
+                            }
+                            if (consumed != null) {
+                                consumedScopes[mode] = consumed.inputs
+                            }
+                            put(
+                                "consumed",
+                                consumed?.let {
+                                buildJsonObject {
+                                    put("preparedInputs", JsonArray(it.inputs.map(::JsonPrimitive)))
+                                    put("source", trajectorySource(it.source))
+                                    put("sourceObjective", it.value.toString())
+                                    put("sourceChanges", it.changes)
+                                    put("nativeSourceCheck", true)
                                 }
-                                )
-                            }
-                        }
-                        )
-                        val move = selected as? Move.Compound
-                        val consumed = move?.let { EqualityKernelMove.consume(view, it, center, score, stop, verify) }
-                        if (consumed != null) {
-                            consumedScopes[mode] = consumed.inputs
-                        }
-                        put("consumed", consumed?.let {
-                            buildJsonObject {
-                                put("preparedInputs", JsonArray(it.inputs.map(::JsonPrimitive)))
-                                put("source", trajectorySource(it.source))
-                                put("sourceObjective", it.value.toString())
-                                put("sourceChanges", it.changes)
-                                put("nativeSourceCheck", true)
-                            }
-                        } ?: JsonNull)
-                    }
+                            } ?: JsonNull
+                            )
+                        },
                     )
                 }
             }
         }
         file.writeText(
             buildJsonObject {
-            put("eligibleMatrix", matrix != null)
-            put("columns", JsonArray(matrix?.columns.orEmpty().map(::JsonPrimitive)))
-            put("rows", matrix?.rows?.size ?: 0)
-            put("work", work)
-            put("workLimit", MAX_WORK)
-            put("elapsedNs", System.nanoTime() - started)
+                put("eligibleMatrix", matrix != null)
+                put("columns", JsonArray(matrix?.columns.orEmpty().map(::JsonPrimitive)))
+                put("rows", matrix?.rows?.size ?: 0)
+                put("work", work)
+                put("workLimit", MAX_WORK)
+                put("elapsedNs", System.nanoTime() - started)
                 put("threadBytes", trajectoryThreadBytes() - allocated)
-            put("interrupted", stop())
-            put("scope", "cold bounded diagnostic; no retained source or default policy")
-            put("records", records)
-            put("connectivityOrCompletenessClaim", false)
-        }.toString()
+                put("interrupted", stop())
+                put("scope", "cold bounded diagnostic; no retained source or default policy")
+                put("records", records)
+                put("connectivityOrCompletenessClaim", false)
+            }.toString(),
         )
         return consumedScopes
     }
@@ -285,7 +290,10 @@ internal object EqualityKernelReplay {
     ) = buildJsonArray {
         val state = view.state
         val steps = EqualityKernelMove.steps(
-            matrix.columns, matrix.rows, direction, state.assignment::intValue,
+            matrix.columns,
+            matrix.rows,
+            direction,
+            state.assignment::intValue,
             { state.rootDomains[it] },
             { id ->
                 !state.assumptions.isFrozenInt(id) && state.invariants?.isDefinedInt(id) != true &&
