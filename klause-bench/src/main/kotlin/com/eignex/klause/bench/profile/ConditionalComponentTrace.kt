@@ -835,7 +835,6 @@ object ConditionalComponentTrace {
             learnedPbEntries += inspection.entries.count { it.kind == "PseudoBooleanPropagator" }
             dischargedLearnedEntries += inspection.entries.count { it.discharged }
             unknownLearnedEntries += inspection.entries.count { it.support == null }
-            if (!inspection.complete) incompleteEnforcingSamples++
             val roots = components.keys.toList()
             val saved = parent.copyOf()
             val active = roots.toMutableSet()
@@ -848,12 +847,14 @@ object ConditionalComponentTrace {
             }
             val merged = roots.map(::find).distinct().size < roots.size
             val complete = inspection.complete && atomClauses == 0L && problem.numRealVars == 0
+            if (!complete) incompleteEnforcingSamples++
             if (complete && merged) learnedMergedSplits++
             lastEnforcing = buildJsonObject {
                 put("sourceOnlyComponents", components.size)
                 put("allEnforcingComponents", if (complete) active.map(::find).distinct().size else null)
                 put("allEnforcingIncidenceComplete", complete)
-                put("decline", inspection.decline)
+                put("decline", inspection.decline ?: if (!complete) "unsupported-kind-or-coordinate" else null)
+                put("coverage", "stored-enforcing-restrictions")
                 put("logicalScope", "unavailable")
                 put("entries", inspection.storeCount)
             }
