@@ -67,6 +67,17 @@ allowance. Separate helper calls retain the existing opt-in deletion minimizer's
 actual seed-path behavior. These native controls establish no independently checked
 proof or whole-CLI throughput claim.
 
+`bench.profile.CoreQueryLearningProfile` captures six bounded completed OLL query
+sequences over the incidental-`q` control, with retained/default preparation and
+three repeats. It replays the identical queries with and without a source-checked
+unit from an earlier completed query. Only source-coordinate `q` is eligible;
+remapped prepared coordinates decline. Every source check receives at most 512
+decisions and 500 ms under one 120-second capture deadline. It records actual pins,
+candidate checks, query construction/search time and allocation, source-point
+checks and visits to `q=false`. A conditioned `q or a` negative rejects exporting
+`q` from `a=false`. This is a bounded replay experiment, not a mutable query owner
+or ordinary slice-retention measurement.
+
 [Klause-lab](https://github.com/Eignex/klause-lab) owns everything that runs more than
 one case: experiments and A/B comparisons, regression schedules, reference solving and
 reference results, witness checking and profiling. It builds the Klause revisions an

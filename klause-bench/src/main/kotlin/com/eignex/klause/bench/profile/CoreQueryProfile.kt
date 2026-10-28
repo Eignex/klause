@@ -160,7 +160,7 @@ internal object CoreQueryProfile {
 
     private fun ints(values: IntArray) = JsonArray(values.map(::JsonPrimitive))
 
-    private fun checkPoint(problem: BakedProblem, sample: Sample): Boolean {
+    internal fun checkPoint(problem: BakedProblem, sample: Sample): Boolean {
         val session = PropagationSession(problem)
         val pins = Assumptions(bools = (0 until problem.numBoolVars).associateWith { sample.boolValue(it) })
         return session.seed(pins) !is PropagationResult.Unsat && !session.fixpointCancelled
