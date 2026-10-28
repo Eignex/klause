@@ -115,7 +115,7 @@ internal object CumulativeChoiceProfile {
         }
     }
 
-    fun channelRows(problem: Problem, factor: Cumulative, session: PropagationSession) = buildJsonArray {
+    private fun channelRows(problem: Problem, factor: Cumulative, session: PropagationSession) = buildJsonArray {
         val rows = problem.factors.filterIsInstance<ReifiedLinear>().filter { it.op == LinearOp.EQ }
         for (demand in factor.resourceVars.distinct()) {
             for (channel in rows.filter { demand in it.vars }) add(buildJsonObject {
