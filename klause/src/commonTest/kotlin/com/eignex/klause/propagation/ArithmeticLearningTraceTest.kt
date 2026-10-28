@@ -17,6 +17,7 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ArithmeticLearningTraceTest {
@@ -69,10 +70,13 @@ class ArithmeticLearningTraceTest {
     @Test
     fun `empty events should consume the event allowance`() {
         val trace = ArithmeticLearningTrace(maxEvents = 2, maxWords = 3)
-        repeat(10) { trace.record("decline") }
+        val state = PropagationState(Problem(0, 0, emptyArray(), emptyArray()), Assumptions.None)
+        state.arithmeticLearningTrace = trace
+        repeat(10) { state.arithmeticLearningTrace?.record("decline") }
 
         assertEquals(2, trace.events.size)
         assertTrue(trace.truncated)
+        assertNull(state.arithmeticLearningTrace)
     }
 
     @Test

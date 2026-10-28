@@ -215,7 +215,8 @@ Storage identities survive factor compaction and retire when their constraint is
 forgotten. Only actual changed bounds or Boolean pins count as consumer events.
 
 The trace is absent by default. Its fixed event and scalar-word allowances and
-per-payload limits stop capture with explicit truncation. It reads existing state,
+per-payload limits stop capture with explicit truncation. Event lookups withhold a
+full recorder before later payloads are constructed. The trace reads existing state,
 does not reconstruct new reasons or run propagation, and supplies no proof or source
 mapping authority. Source and preparation identities belong to the containing
 diagnostic invocation; an incomplete trace cannot establish exhaustive applicability.

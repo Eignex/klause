@@ -7788,7 +7788,7 @@ Both learners retain their existing default admission policy.
 
 Each cell has two warmups and two measured invocations, with the second pass in
 reverse order: 48 invocations, at most two seconds each, in one lab profile capped
-at 180 seconds. This is a bounded diagnostic, not a corpus gate. Complete disjoint
+with `profile.runTimeoutSec=180`. This is a bounded diagnostic, not a corpus gate. Complete disjoint
 intervals include parsing, preparation, session construction, analysis, search or
 script replay, original-point checking, release and capture serialization. Record
 file writes are outside the interval. Traces remain optional; warmed JFR timing and
@@ -7828,6 +7828,9 @@ is cancelled and no retained script trace is truncated. Automatic placement chos
 Mac/aarch64, JDK `25.0.4.1+1-LTS`; the one-core/4608 MiB resource receipt is advisory,
 not a hard cgroup limit. Original bytes, complete hashes, runtime/distribution
 fingerprints, commands, JFR and receipts remain outside Git in the campaign above.
+The client request supplied a 180-second base timeout; the execution receipt has a
+300-second outer profile limit and 1.533-second command elapsed. An explicit outer
+profile cap uses `profile.runTimeoutSec` rather than the base solve timeout.
 
 | Source | Retained conflict replay | Normal prepared source |
 |---|---|---|
