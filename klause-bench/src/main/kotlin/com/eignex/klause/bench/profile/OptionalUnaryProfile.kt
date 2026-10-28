@@ -5,9 +5,11 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
+import com.eignex.klause.bench.runner.MZN_RANDOM_SEED
 import com.eignex.klause.bench.runner.MiniZincCompatibility
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.codec.FactorCodecs
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.formats.flatzinc.FlatZincProgram
 import com.eignex.klause.formats.flatzinc.OznApplier
@@ -75,7 +77,7 @@ internal object OptionalUnaryProfile {
         val command = mutableListOf(
             MiniZincCompatibility.compiler.executable, "--solver",
             File(root, "klause-mzn-lib/share/minizinc/solvers/klause.msc").path,
-            "-c", "--output-mode", "dzn", "--output-objective", "--random-seed", "42",
+            "-c", "--output-mode", "dzn", "--output-objective", "--random-seed", MZN_RANDOM_SEED.toString(),
             "-G", File(root, "klause-mzn-lib/share/minizinc/klause").path,
             "--output-ozn-to-file", out.resolve("source.ozn").absolutePath,
             "--output-fzn-to-file", out.resolve("source.fzn").absolutePath,
@@ -136,6 +138,7 @@ internal object OptionalUnaryProfile {
         val prepared = PresolvePipeline.run(model, null, PresolveConfig.parse(prepare),
             solutionSetSensitive = true, cancellation = stop, presolveBudget = budget, randomSeed = 3)
         val preparationNs = System.nanoTime() - started
+        out.resolve("preparation.txt").writeText(prepared.stats.toString())
         dump(prepared.problem, out.resolve("factors.txt"))
         val rootStart = System.nanoTime()
         val session = PropagationSession(prepared.problem, cancellation = stop)
@@ -165,6 +168,7 @@ internal object OptionalUnaryProfile {
         out.resolve("summary.json").writeText(buildJsonObject {
             put("preparationNs", preparationNs)
             put("preparationWork", budget.spent())
+            put("probeCalls", budget.probeCalls)
             put("preparationAllowance", budget.allowance)
             put("rootNs", rootNs)
             put("rootPropagations", session.propagationCount)
@@ -182,6 +186,6 @@ internal object OptionalUnaryProfile {
 
     private fun dump(problem: Problem, file: File) {
         file.writeText("bools=${problem.numBoolVars} ints=${problem.numIntVars}\n" +
-            problem.factors.joinToString("\n") { it.toString() } + "\n")
+            problem.factors.joinToString("\n") { FactorCodecs.builtin.encodeToJsonElement(it).toString() } + "\n")
     }
 }
