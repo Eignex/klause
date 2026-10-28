@@ -759,6 +759,7 @@ internal object Suites {
         }
         vendored("magic-square-3", Category.CSP, Expected.Sat, relPath = "xcsp3/magic-square-3.xml")
         vendored("graph-coloring-tiny", Category.CSP, Expected.Sat, relPath = "xcsp3/graph-coloring-tiny.xml")
+        vendored("coupled-cost-k4", Category.OPTIMIZATION, Expected.Opt(136), relPath = "coupled-cost/k4.xml")
         vendored("assignment-exchange", Category.OPTIMIZATION, Expected.Unknown,
             relPath = "finite-repair/assignment-exchange.xml")
         for (name in listOf("resource-exchange", "placement-exchange", "assignment-cycle", "resource-cycle",
