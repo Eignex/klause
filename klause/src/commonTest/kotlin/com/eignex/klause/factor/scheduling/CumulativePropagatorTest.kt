@@ -61,6 +61,21 @@ class CumulativePropagatorTest {
     }
 
     @Test
+    fun `zero minimum load should still bound a demand above capacity`() {
+        val problem = Problem(0, 4, arrayOf(
+            IntDomain(0, 100), IntDomain(100, 102), IntDomain(0, 0), IntDomain(0, 3),
+        ), arrayOf<Factor>(Cumulative(
+            intArrayOf(0, 1), longArrayOf(1, 2), longArrayOf(0, 3), 1,
+            resourceVars = intArrayOf(2, 3),
+        )))
+        val state = PropagationState(problem, Assumptions.None)
+
+        assertTrue(problem.propagators[0].propagate(state, 0))
+
+        assertEquals(IntDomain(0, 2), state.intDomains[3])
+    }
+
+    @Test
     fun `subwindow demand filtering should preserve holes and repeated demand aliases`() {
         val problem = Problem(0, 6, arrayOf(
             IntDomain(0, 100), IntDomain(100, 102), IntDomain(100, 102), IntDomain(100, 102),
@@ -96,7 +111,7 @@ class CumulativePropagatorTest {
     fun `interrupted ranged demand windows should rebuild without retained partial windows`() {
         val n = 32
         val problem = Problem(0, n + 1, Array(n + 1) {
-            if (it == n) IntDomain(0, 1) else IntDomain(it.toLong(), 64L + it)
+            if (it == n) IntDomain(1, 2) else IntDomain(it.toLong(), 64L + it)
         }, arrayOf<Factor>(Cumulative(
             IntArray(n) { it }, LongArray(n) { 1L }, LongArray(n) { 1L }, n.toLong(),
             resourceVars = IntArray(n) { n },
@@ -109,7 +124,7 @@ class CumulativePropagatorTest {
 
         assertTrue(state.rootFixpointPending)
         while (state.rootFixpointPending) assertNull(state.advanceRootFixpoint(Cancellation.Never))
-        assertEquals(IntDomain(0, 1), state.intDomains[n])
+        assertEquals(IntDomain(1, 2), state.intDomains[n])
     }
 
     @Test
