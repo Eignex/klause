@@ -4,6 +4,8 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearPropagator
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedLinearPropagator
+import com.eignex.klause.factor.table.Element
+import com.eignex.klause.factor.table.ElementPropagator
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.util.addExact
@@ -14,7 +16,7 @@ internal class IntegerSourceRow(val linear: LinearPropagator, val guard: Int = L
 }
 
 internal class GuardedIntegerSource(private val state: PropagationState) {
-    fun source(factorId: Int, trail: Int = state.undo.size): IntegerSourceRow? {
+    fun source(factorId: Int, trail: Int = state.undo.size, forBoundReason: Boolean = false): IntegerSourceRow? {
         if (factorId !in 0 until state.baseFactorCount) return null
         return when (val original = state.problem.factors[factorId]) {
             is Linear -> {
@@ -50,6 +52,24 @@ internal class GuardedIntegerSource(private val state: PropagationState) {
                 }
                 IntegerSourceRow(LinearPropagator(intArrayOf(), source.intVars, source.coeffs, source.vars, op, bound),
                     guard)
+            }
+            is Element -> {
+                if (forBoundReason || !original.arrIsVars) return null
+                val source = state.factorAt(factorId) as? ElementPropagator ?: return null
+                if (source.idx != original.idx || source.result != original.result ||
+                    source.arrIsVars != original.arrIsVars || source.indexOffset != original.indexOffset ||
+                    !source.arr.contentEquals(original.arr)) return null
+                val selected = state.domainAt(original.idx, trail)
+                if (selected.min != selected.max) return null
+                val first = original.indexOffset.toLong()
+                if (selected.min < first || selected.min >= first + original.arr.size) return null
+                val cell = original.arr[(selected.min - first).toInt()]
+                if (cell !in 0 until state.problem.numIntVars.toLong()) return null
+                val variables = intArrayOf(original.result, cell.toInt())
+                val guard = Lit.make(state.atomVarEq(original.idx, selected.min), true)
+                if (!state.integerGuardTrueAt(guard, trail)) return null
+                IntegerSourceRow(LinearPropagator(intArrayOf(), variables, longArrayOf(1, -1), variables,
+                    LinearOp.EQ, 0), guard)
             }
             else -> null
         }

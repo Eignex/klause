@@ -158,6 +158,13 @@ resolved endpoint must name an unextended historical linear reason from the same
 source row, with its exact guard false-literal and historical guard truth. Historical
 holes, disequalities, wide constants and unsupported projections retain clause fallback.
 
+A selected variable-array `Element` can seed a conflict from either side of its
+selected equality. Its positive index-equality atom retains the source index,
+offset and selected cell identity, including when the atom is created after selection.
+Only a bound conflict of that equality is arithmetic; Element support explanations
+remain clause reasons. Support filtering keeps its hole-aware semantics. Repeated
+cells retain their selected index guard, and a result alias supplies no arithmetic row.
+
 Opposite-sign nonnegative combinations use checked signed arithmetic and integer
 gcd normalization. Each combination must remain conflicting. A retained row must
 propagate against the session's historical domains at its native backjump and the
