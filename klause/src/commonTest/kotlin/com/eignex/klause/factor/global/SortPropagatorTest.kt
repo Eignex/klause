@@ -32,6 +32,21 @@ class SortPropagatorTest {
     }
 
     @Test
+    fun `sort preserves feasible tuples with the minimum signed lower bound`() {
+        val problem = sortProblem(arrayOf(
+            IntDomain(Long.MIN_VALUE, 1),
+            IntDomain(1, 1),
+            IntDomain(Long.MIN_VALUE, 0),
+            IntDomain(0, 1),
+        ))
+        val state = PropagationState(problem, Assumptions.None)
+        state.currentFactor = 0
+
+        assertTrue(state.factorAt(0).propagate(state, 0))
+        assertEquals(1L, state.intDomains[3].min)
+    }
+
+    @Test
     fun `two searches sharing one propagator should keep independent per-search state`() {
         // One propagator instance serves concurrent searches, so its working state must live per search.
         val problem = Problem(

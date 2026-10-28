@@ -9,7 +9,6 @@ import com.eignex.klause.lowering.trueLit
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.LongHashSet
-import com.eignex.klause.util.MutableIntIntMap
 
 // `<extension>` (positive/negative table) lowering for the XCSP3 front-end.
 //
@@ -55,8 +54,9 @@ internal fun Compiler.Builder.postConflicts(vars: IntArray, text: String) {
     val rows = parseShortRows(text, vars.size)
     var product = 1L
     for (v in vars) {
-        product *= domainValues(v).size
-        if (product > COMPLEMENT_MATERIALIZE_CEILING) return postConflictClauses(vars, rows)
+        val values = domains[v].spanOrNull(COMPLEMENT_MATERIALIZE_CEILING / product)
+            ?: return postConflictClauses(vars, rows)
+        product *= values.size
     }
     postConflictComplement(vars, rows)
 }
@@ -65,7 +65,7 @@ internal fun Compiler.Builder.postConflicts(vars: IntArray, text: String) {
  *  that matches no forbidden row. An empty complement ⇒ every assignment forbidden ⇒ unsatisfiable. */
 internal fun Compiler.Builder.postConflictComplement(vars: IntArray, rows: ShortRows) {
     val arity = vars.size
-    val doms = vars.map { domainValues(it) }
+    val doms = vars.map { v -> domains[v].span().let { values -> LongArray(values.size) { values.valueAt(it) } } }
     val nRows = rows.lo.size / arity
 
     // A tuple of per-column domain indices encodes to a single mixed-radix [Long] in `[0, product)`,
@@ -77,11 +77,6 @@ internal fun Compiler.Builder.postConflictComplement(vars: IntArray, rows: Short
     for (c in 0 until arity) {
         stride[c] = acc
         acc *= doms[c].size
-    }
-    val valueIndex = Array(arity) { c ->
-        val m = MutableIntIntMap(doms[c].size)
-        for (idx in doms[c].indices) m.put(doms[c][idx], idx)
-        m
     }
 
     // Ground forbidden rows go in the code set; rows with a `*`/range cell are scanned per combination.
@@ -97,7 +92,7 @@ internal fun Compiler.Builder.postConflictComplement(vars: IntArray, rows: Short
         var code = 0L
         var inDomain = true
         for (c in 0 until arity) {
-            val idx = valueIndex[c].getOrDefault(rows.lo[r * arity + c].toInt(), -1)
+            val idx = doms[c].binarySearch(rows.lo[r * arity + c])
             if (idx < 0) {
                 inDomain = false
                 break
@@ -109,10 +104,10 @@ internal fun Compiler.Builder.postConflictComplement(vars: IntArray, rows: Short
 
     val allowed = LongArrayList()
     var count = 0
-    val combo = IntArray(arity)
+    val combo = LongArray(arity)
     fun matchesInterval(): Boolean {
         for (r in intervalRows) {
-            if ((0 until arity).all { combo[it].toLong() in rows.lo[r * arity + it]..rows.hi[r * arity + it] }) {
+            if ((0 until arity).all { combo[it] in rows.lo[r * arity + it]..rows.hi[r * arity + it] }) {
                 return true
             }
         }
@@ -121,7 +116,7 @@ internal fun Compiler.Builder.postConflictComplement(vars: IntArray, rows: Short
     fun rec(p: Int, code: Long) {
         if (p == arity) {
             if (code !in forbiddenPoints && !matchesInterval()) {
-                for (c in 0 until arity) allowed.add(combo[c].toLong())
+                for (c in 0 until arity) allowed.add(combo[c])
                 count++
             }
             return
@@ -202,12 +197,16 @@ internal fun Compiler.Builder.postConflictClauses(vars: IntArray, rows: ShortRow
                 lo == Long.MIN_VALUE && hiC == Long.MAX_VALUE -> Unit
 
                 lo == hiC -> lits.add(
-                    Lit.negate(reifyLinear(intArrayOf(1), intArrayOf(vars[c]), LinearOp.EQ, lo.toInt())),
+                    Lit.negate(reifyLinear(longArrayOf(1), intArrayOf(vars[c]), LinearOp.EQ, lo)),
                 )
 
                 else -> {
-                    lits.add(reifyLinear(intArrayOf(1), intArrayOf(vars[c]), LinearOp.LE, (lo - 1).toInt())) // x < lo
-                    lits.add(reifyLinear(intArrayOf(1), intArrayOf(vars[c]), LinearOp.GE, (hiC + 1).toInt())) // x > hi
+                    if (lo != Long.MIN_VALUE) {
+                        lits.add(reifyLinear(longArrayOf(1), intArrayOf(vars[c]), LinearOp.LE, lo - 1))
+                    }
+                    if (hiC != Long.MAX_VALUE) {
+                        lits.add(reifyLinear(longArrayOf(1), intArrayOf(vars[c]), LinearOp.GE, hiC + 1))
+                    }
                 }
             }
         }
@@ -249,6 +248,7 @@ internal fun Compiler.Builder.parseShortRows(text: String, arity: Int): ShortRow
     var k = 0
 
     fun put(cellLo: Long, cellHi: Long) {
+        require(cellLo <= cellHi) { "invalid table interval $cellLo..$cellHi" }
         lo[k] = cellLo
         if (cellHi != cellLo) {
             val hi = intervals ?: LongArray(cells).also { fresh ->
@@ -280,13 +280,18 @@ internal fun Compiler.Builder.parseShortRows(text: String, arity: Int): ShortRow
         var p = a
         val neg = p < b && text[p] == '-'
         if (neg || (p < b && text[p] == '+')) p++
-        require(p < b) { "empty integer in table tuple" }
+        require(p < b && text[p] in '0'..'9') { "empty integer in table tuple" }
         var v = 0L
         while (p < b && text[p] in '0'..'9') {
-            v = v * 10 + (text[p] - '0')
+            val digit = text[p] - '0'
+            require(v >= Long.MIN_VALUE / 10) { "table integer exceeds the supported 64-bit range" }
+            v *= 10
+            require(v >= Long.MIN_VALUE + digit) { "table integer exceeds the supported 64-bit range" }
+            v -= digit
             p++
         }
-        val first = if (neg) -v else v
+        require(neg || v != Long.MIN_VALUE) { "table integer exceeds the supported 64-bit range" }
+        val first = if (neg) v else -v
         if (p >= b) {
             put(first, first)
         } else {
@@ -360,10 +365,15 @@ private fun parseLongIn(text: String, from: Int, to: Int): Long {
     while (a < to) {
         val c = text[a]
         require(c in '0'..'9') { "non-digit '$c' in table tuple" }
-        v = v * 10 + (c - '0')
+        val digit = c - '0'
+        require(v >= Long.MIN_VALUE / 10) { "table integer exceeds the supported 64-bit range" }
+        v *= 10
+        require(v >= Long.MIN_VALUE + digit) { "table integer exceeds the supported 64-bit range" }
+        v -= digit
         a++
     }
-    return if (neg) -v else v
+    require(neg || v != Long.MIN_VALUE) { "table integer exceeds the supported 64-bit range" }
+    return if (neg) v else -v
 }
 
 /** Invoke [cell] with each trimmed comma-separated field of every `(...)` group in [text], then [endRow]

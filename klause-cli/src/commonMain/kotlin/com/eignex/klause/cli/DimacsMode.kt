@@ -22,7 +22,7 @@ internal object DimacsMode : CliMode {
 
         override fun load(path: String, common: CommonOptions): Solvable {
             val overrides = common.sourceOverrides(dimacsSemantics)
-            val problem = Dimacs.parse(openFileSource(path)).toProblem(
+            val problem = openFileSource(path).useSource { Dimacs.parse(it) }.toProblem(
                 common.config.problemSettings(), semanticOverrides = overrides,
             )
             cliLogger(common.verbose).v {

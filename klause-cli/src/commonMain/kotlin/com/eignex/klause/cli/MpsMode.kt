@@ -45,7 +45,7 @@ internal object MpsMode : CliMode {
             val start = TimeSource.Monotonic.markNow()
             outputState = MpsOutputState()
             val overrides = common.sourceOverrides(mpsSemantics)
-            val parsed = Mps.parse(openFileSource(path))
+            val parsed = openFileSource(path).useSource { Mps.parse(it) }
             return common.routingPreparationCancellation().use { stop ->
                 val source = parsed.toLinearSourceProblem(overrides, stop) ?: return interruptedSolvable(
                     if (stop()) TerminationReason.Timeout else TerminationReason.Cancelled,

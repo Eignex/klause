@@ -25,7 +25,7 @@ internal object OpbMode : CliMode {
 
         override fun load(path: String, common: CommonOptions): Solvable {
             val overrides = common.sourceOverrides(opbSemantics)
-            val parsed = Opb.parse(openFileSource(path)).toProblem(
+            val parsed = openFileSource(path).useSource { Opb.parse(it) }.toProblem(
                 common.config.problemSettings(), semanticOverrides = overrides,
             )
             cliLogger(common.verbose).v {

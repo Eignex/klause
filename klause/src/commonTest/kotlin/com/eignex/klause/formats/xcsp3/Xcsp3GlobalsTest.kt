@@ -62,6 +62,28 @@ class Xcsp3GlobalsTest {
     private val threeVars = """<var id="x">1..3</var><var id="y">1..3</var><var id="z">1..3</var>"""
 
     @Test
+    fun `strict sum conditions should retain thresholds beyond 32-bit limits`() {
+        for (condition in listOf("(lt,-2147483648)", "(gt,2147483647)")) {
+            val parsed = parse(
+                "<sum><list>x</list><condition>$condition</condition></sum>",
+                """<var id="x">0</var>""",
+            )
+
+            assertEquals(emptySet(), solutions(parsed, 1), condition)
+        }
+    }
+
+    @Test
+    fun `precedence should retain declared values beyond the 32-bit range`() {
+        val parsed = parse(
+            "<precedence>x y</precedence>",
+            """<var id="x">4294967296..4294967297</var><var id="y">4294967296..4294967297</var>""",
+        )
+
+        assertEquals(setOf(listOf(4294967296L, 4294967296L), listOf(4294967296L, 4294967297L)), solutions(parsed, 2))
+    }
+
+    @Test
     fun `binary one counts should preserve source multiplicities without equality channels`() {
         val parsed = parse(
             "<count><list>x x y</list><values>1</values><condition>(eq,n)</condition></count>",

@@ -12,10 +12,9 @@ internal abstract class AbstractIntDomain(val storage: DomainStorageSettings) : 
     // survivors); ContiguousDomain (no holes) and RunsDomain (whose `size` saturates) override.
     override val holeCount: Long
         get() {
-            val span = max - min
-            if (span < 0) return Long.MAX_VALUE
-            val present = spanOrNull(Long.MAX_VALUE)?.let { it.size.toLong() } ?: (span + 1)
-            return span + 1 - present
+            val present = requireNotNull(spanOrNull()).size.toULong()
+            val holes = (max - min).toULong() - (present - 1uL)
+            return holes.coerceAtMost(Long.MAX_VALUE.toULong()).toLong()
         }
 
     override fun excludeValues(values: LongArray): IntDomain? {

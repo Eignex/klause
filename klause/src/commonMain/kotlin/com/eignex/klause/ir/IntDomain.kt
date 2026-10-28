@@ -145,7 +145,7 @@ interface IntDomain {
         else -> {
             val lo = lower(value)
             val hi = higher(value)
-            if (value - lo <= hi - value) lo else hi
+            if ((value - lo).toULong() <= (hi - value).toULong()) lo else hi
         }
     }
 

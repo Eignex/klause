@@ -10,9 +10,47 @@ import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class InverseInvariantTest {
+
+    @Test
+    fun `identity seed should reject conflicting values for overlapping channel variables`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = Array(2) { IntDomain(0, 1) },
+            factors = arrayOf<Factor>(Inverse(intArrayOf(0, 1), intArrayOf(1, 0))),
+        )
+        val state = LocalSearchState(problem.bake(), Random(0))
+        val before = (0..1).map { state.assignment.intValue(it) }
+
+        val seeded = state.factors[0].seedFeasible(state, 0)
+
+        assertFalse(seeded)
+        assertEquals(before, (0..1).map { state.assignment.intValue(it) })
+    }
+
+    @Test
+    fun `identity seed should support channel values beyond the largest int offset`() {
+        val offset = Int.MAX_VALUE.toLong()
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 4,
+            intDomains = Array(4) { IntDomain(offset, offset + 1) },
+            factors = arrayOf<Factor>(
+                Inverse(intArrayOf(0, 1), intArrayOf(2, 3), Int.MAX_VALUE, Int.MAX_VALUE),
+            ),
+        )
+        val state = LocalSearchState(problem.bake(), Random(0))
+
+        assertTrue(state.factors[0].seedFeasible(state, 0))
+        state.recompute()
+
+        assertEquals(listOf(offset, offset + 1, offset, offset + 1), (0..3).map { state.assignment.intValue(it) })
+        assertEquals(0L, state.cost)
+    }
 
     private val f = intArrayOf(0, 1, 2)
     private val g = intArrayOf(3, 4, 5)

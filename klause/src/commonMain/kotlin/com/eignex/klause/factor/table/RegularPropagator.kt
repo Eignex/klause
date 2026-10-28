@@ -6,6 +6,7 @@ import com.eignex.klause.factor.table.internals.RegularIncrementalState
 import com.eignex.klause.factor.table.internals.allEventWatches
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
+import com.eignex.klause.util.EmptyIntArray
 
 internal class RegularPropagator(
     val boolVars: IntArray,
@@ -39,6 +40,11 @@ internal class RegularPropagator(
         explainer.prune(state, payload[0], atTrail)
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
+        for (variable in seq) {
+            if (!state.tightenIntMin(variable, 1L, EmptyIntArray) ||
+                !state.tightenIntMax(variable, alphabetSize.toLong(), EmptyIntArray)
+            ) return false
+        }
         val inc = (state.refPayload[factorId] as? RegularIncrementalState) ?: run {
             val fresh = RegularIncrementalState(state, seq, numStates, alphabetSize, transitions, q0, accepting)
             state.refPayload[factorId] = fresh

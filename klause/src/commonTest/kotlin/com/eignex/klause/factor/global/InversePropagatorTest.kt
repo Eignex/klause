@@ -8,15 +8,44 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.factorAt
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.solver.SolveResult
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class InversePropagatorTest {
+
+    @Test
+    fun `inverse should preserve channel values beyond the largest int offset`() {
+        val offset = Int.MAX_VALUE.toLong()
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 4,
+            intDomains = arrayOf(
+                IntDomain(offset + 1, offset + 1), IntDomain(offset, offset),
+                IntDomain(offset, offset + 1), IntDomain(offset, offset + 1),
+            ),
+            factors = arrayOf<Factor>(
+                Inverse(intArrayOf(0, 1), intArrayOf(2, 3), Int.MAX_VALUE, Int.MAX_VALUE),
+            ),
+        )
+
+        val state = PropagationState(problem, Assumptions.None)
+        state.currentFactor = 0
+
+        assertTrue(state.factorAt(0).propagate(state, 0))
+
+        assertEquals(offset + 1, state.intDomains[2].min)
+        assertEquals(offset + 1, state.intDomains[2].max)
+        assertEquals(offset, state.intDomains[3].min)
+        assertEquals(offset, state.intDomains[3].max)
+    }
 
     @Test
     fun `inverse deductions should be implied by their reasons under carved holes`() {

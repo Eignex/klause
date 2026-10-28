@@ -48,8 +48,11 @@ internal expect fun exitCli(code: Int): Nothing
  *  the source instead of the whole-file [String], so a huge instance is never fully resident. */
 internal expect fun openFileSource(path: String): CharSource
 
+internal inline fun <T> CharSource.useSource(read: (CharSource) -> T): T =
+    (this as? AutoCloseable).use { read(this) }
+
 /** Read [path] fully into a [String] through [openFileSource], for a consumer that needs the whole text. */
-internal fun readTextFile(path: String): String = openFileSource(path).readText()
+internal fun readTextFile(path: String): String = openFileSource(path).useSource { it.readText() }
 
 private val timeOrigin = TimeSource.Monotonic.markNow()
 

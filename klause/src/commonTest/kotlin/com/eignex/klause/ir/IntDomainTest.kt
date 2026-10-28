@@ -1,6 +1,7 @@
 package com.eignex.klause.ir
 
 import com.eignex.klause.config.DEFAULT_BITSET_THRESHOLD
+import com.eignex.klause.ir.intdomain.intDomainFromSurvivors
 import com.eignex.klause.util.LongArrayList
 import kotlin.random.Random
 import kotlin.test.Test
@@ -112,6 +113,20 @@ class IntDomainTest {
         assertEquals(1, d.clamp(1))
         assertEquals(-1, d.clamp(-5))
         assertEquals(1, d.clamp(5))
+    }
+
+    @Test
+    fun `clamp should compare distances beyond the signed word range`() {
+        val domain = intDomainFromSurvivors(
+            longArrayOf(Long.MIN_VALUE, Long.MAX_VALUE),
+        )
+        val cases = listOf(
+            -1L to Long.MIN_VALUE,
+            0L to Long.MAX_VALUE,
+            1L to Long.MAX_VALUE,
+        )
+
+        for ((value, expected) in cases) assertEquals(expected, domain.clamp(value))
     }
 
     @Test

@@ -33,6 +33,10 @@ first. The registry in
 flags in [CliMode.kt](../klause-cli/src/commonMain/kotlin/com/eignex/klause/cli/CliMode.kt)
 define supported names, aliases and help text.
 
+Each loader closes its input source when parsing returns or fails, including when
+the parser stops before end of file. Compressed sources release their readers and
+decompressor processes with the same lifetime.
+
 Exact objective and unattained-limit rendering follow the
 [arithmetic format contracts](05-arithmetic-formats.md#results-and-objectives);
 [FlatZinc](04-finite-formats.md#minizinc-output-rendering) defines its completion markers.

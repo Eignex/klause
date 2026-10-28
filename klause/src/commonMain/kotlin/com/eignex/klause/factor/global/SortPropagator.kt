@@ -216,12 +216,12 @@ internal class SortWork(private val xs: IntArray, private val ys: IntArray, priv
         // (b2) Greedy matching f': assign each ys[j] (descending) the available xs of largest LB.
         pq.clear()
         for (i in 0 until n) {
-            if (intersect(n - 1, i)) pq.add(i, -xlb(i))
+            if (intersect(n - 1, i)) pq.add(i, xlb(i).inv())
         }
         fPrime[n - 1] = popFPrime(n - 1) ?: return false
         for (j in n - 2 downTo 0) {
             for (i in 0 until n) {
-                if (xub(i) < ylb(j + 1) && xub(i) >= ylb(j)) pq.add(i, -xlb(i))
+                if (xub(i) < ylb(j + 1) && xub(i) >= ylb(j)) pq.add(i, xlb(i).inv())
             }
             fPrime[j] = popFPrime(j) ?: return false
         }

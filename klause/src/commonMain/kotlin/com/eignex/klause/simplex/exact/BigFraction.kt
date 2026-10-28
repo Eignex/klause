@@ -3,6 +3,7 @@ package com.eignex.klause.simplex.exact
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.abs
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.compareTo
 import com.eignex.klause.util.div
@@ -15,6 +16,7 @@ import com.eignex.klause.util.shl
 import com.eignex.klause.util.signum
 import com.eignex.klause.util.times
 import com.eignex.klause.util.toDouble
+import com.eignex.klause.util.toLong
 import com.eignex.klause.util.unaryMinus
 
 /** Immutable rational number over the multiplatform big integer, normalized with a positive denominator. */
@@ -40,8 +42,38 @@ class BigFraction private constructor(
         return if (num.signum() > 0 && !(num % den).isZero()) quotient + BIG_ONE else quotient
     }
 
-    /** Returns this fraction converted to a [Double]. */
-    fun toDouble(): Double = num.toDouble() / den.toDouble()
+    /** Returns the nearest [Double], rounding ties to even. */
+    fun toDouble(): Double {
+        if (den.isOne) return num.toDouble()
+        val numeratorBits = num.magnitudeBitLength()
+        val denominatorBits = den.magnitudeBitLength()
+        if (numeratorBits <= 53 && denominatorBits <= 53) return num.toDouble() / den.toDouble()
+        val sign = if (num.signum() < 0) Long.MIN_VALUE else 0L
+        var exponent = numeratorBits - denominatorBits
+        if (exponent > 1024) return Double.fromBits(sign or 0x7ff0000000000000L)
+        if (exponent < -1075) return Double.fromBits(sign)
+        val magnitude = num.abs()
+        val belowPower = if (exponent >= 0) magnitude < (den shl exponent)
+        else (magnitude shl -exponent) < den
+        if (belowPower) exponent--
+        if (exponent > 1023) return Double.fromBits(sign or 0x7ff0000000000000L)
+        if (exponent < -1075) return Double.fromBits(sign)
+        val shift = if (exponent < -1022) 1074 else 52 - exponent
+        val scaledNumerator = if (shift >= 0) magnitude shl shift else magnitude
+        val scaledDenominator = if (shift >= 0) den else den shl -shift
+        var significand = (scaledNumerator / scaledDenominator).toLong()
+        val remainder = (scaledNumerator % scaledDenominator) shl 1
+        if (remainder > scaledDenominator || (remainder == scaledDenominator && significand and 1L != 0L)) {
+            significand++
+        }
+        if (exponent < -1022) return Double.fromBits(sign or significand)
+        if (significand == (1L shl 53)) {
+            significand = significand ushr 1
+            exponent++
+        }
+        val bits = ((exponent + 1023).toLong() shl 52) + significand - (1L shl 52)
+        return Double.fromBits(sign or bits)
+    }
 
     /** Returns the sum of this fraction and [other]. */
     operator fun plus(other: BigFraction): BigFraction = sum(other.num, other.den)

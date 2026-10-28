@@ -63,11 +63,13 @@ internal object MiniZincMode : CliMode {
             // whole source is never held as one String. Parsing only reads; the base bake runs as
             // presolve step 0, bounded by the presolve deadline.
             val overrides = common.sourceOverrides(flatZincSemantics)
-            val program = parseFlatZinc(
-                settings = config.problemSettings(),
-                source = openFileSource(path),
-                semanticOverrides = overrides,
-            )
+            val program = openFileSource(path).useSource { source ->
+                parseFlatZinc(
+                    settings = config.problemSettings(),
+                    source = source,
+                    semanticOverrides = overrides,
+                )
+            }
             val original = program.sourceProgram
             sourceSemantics = original.semantics
             cliLogger(common.verbose).v {
