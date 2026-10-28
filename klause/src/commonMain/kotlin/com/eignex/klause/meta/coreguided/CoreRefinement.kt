@@ -1,11 +1,15 @@
 package com.eignex.klause.meta.coreguided
 
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.factor.arithmetic.ReifiedCardinality
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.util.Cancellation
+
+internal enum class CoreRefinementMode { NONE, DELETION, REASONS }
 
 internal object CoreRefinement {
     fun refine(
@@ -18,6 +22,14 @@ internal object CoreRefinement {
         if (literals.size !in 2..32 || problem.numBoolVars.toLong() + problem.numIntVars > 4_096L ||
             problem.numFactors > 4_096 || cancellation()
         ) return literals
+        var entries = problem.numBoolVars.toLong() + problem.numIntVars + problem.numFactors
+        for (factor in problem.factors) {
+            charge(1L)
+            if (factor !is Clause && factor !is ReifiedCardinality) return literals
+            val size = factor.structuralKeyWeight
+            if (size > 32_768L - entries || cancellation()) return literals
+            entries += size
+        }
         var session: PropagationSession? = null
         var charged = 0L
         fun settle() {

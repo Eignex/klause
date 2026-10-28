@@ -74,7 +74,7 @@ internal class CoreGuidedSearch(
     private val maximumWork: Long? = null,
     private val maximumMillis: Long? = null,
     private val timeSource: TimeSource = TimeSource.Monotonic,
-    private val refineCores: Boolean = false,
+    private val coreRefinement: CoreRefinementMode = CoreRefinementMode.NONE,
 ) : ResumableSearch,
     ReseedGuard {
     private val opened = timeSource.markNow()
@@ -256,7 +256,9 @@ internal class CoreGuidedSearch(
             val paused = result is SolveResult.Unknown &&
                 (result.reason == TerminationReason.Cancelled || result.reason == TerminationReason.BudgetExhausted) &&
                 segment() && !token() && !quotaExhausted
-            val refutationModel = if (result is SolveResult.Unsat && refineCores) queryModel else null
+            val refutationModel = if (result is SolveResult.Unsat &&
+                coreRefinement == CoreRefinementMode.DELETION
+            ) queryModel else null
             finishQuery(keepModel = paused)
             if (paused) {
                 return if (allowanceExhausted) finish(stopped(TerminationReason.BudgetExhausted)) else null
@@ -442,6 +444,7 @@ internal class CoreGuidedSearch(
                     cutExchange = null,
                 ),
                 ownsWorkDebt = false,
+                projectAssumptionCore = coreRefinement == CoreRefinementMode.REASONS,
             )
         } catch (failure: SearchInitializationCancelled) {
             settleQuery(failure.stats, failure.work)

@@ -461,10 +461,17 @@ and relaxes the core with a reified cardinality, replacing its violation count `
 `1 + sum(k = 2..n, s >= k)`; only the first unspent threshold of each count is
 materialized. Weights and the bound use arbitrary-precision integers.
 
-An internal, default-disabled refinement control tries deleting each member of a
+Internal core refinement is default-disabled. Seed-proof projection uses the
+[historical reasons](09-learning.md#explanation-lifetime) of the existing query,
+without another propagation session or solve; unsupported seed conflicts and tree
+exhaustion keep their certified cores. Caller conditions remain attached to every
+augmented query.
+
+A separate deletion control tries deleting each member of a
 completed core with a fresh propagation refutation of the augmented hard model and
 the retained caller pins. It admits at most 32 members, 4,096 columns, 4,096 factors
-and 32,768 propagation visits,
+and 32,768 structural entries and propagation visits, over clauses and reified
+cardinalities,
 never removes the final member, and retains the original certified core on a stop.
 Its construction, trials and disposal share the core worker's work and active-time
 allowances. It performs no additional search and does not promise a minimal core;

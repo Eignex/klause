@@ -23,6 +23,7 @@ internal class ResumableSatisfaction(
     private val solver: BacktrackSolver,
     params0: BacktrackParams,
     ownsWorkDebt: Boolean = true,
+    projectAssumptionCore: Boolean = false,
 ) : ResumableSolve {
     private val lifetimeToken = params0.cancellation.lifetimeCancellation()
     private var globalToken: Cancellation = params0.cancellation
@@ -48,6 +49,7 @@ internal class ResumableSatisfaction(
         projection = solver.propagationProjection(params.nativeSat ?: true),
         deferredInitialization = true,
         singleModel = true,
+        projectAssumptionCore = projectAssumptionCore,
         slice = TraversalSlice(pauses = { !globalToken() }, beforeBranch = {
             slice.charge()
             slice.workExpired()
