@@ -187,7 +187,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
     fun analyze(conflictFactorId: Int): AnalysisResult = boundedAnalysis {
         beginAnalysis()
         val factor = state.factorAt(conflictFactorId)
-        state.arithmeticLearningTrace?.seedEndpoints(factor.intVars, state)
+        state.arithmeticLearningTrace?.seedEndpoints(state.factorIntVars(conflictFactorId), state)
         val seedReason = factor.conflictReason(state, conflictFactorId)
             ?: return@boundedAnalysis AnalysisResult.NotApplicable
         return@boundedAnalysis analyzeFromSeed(seedReason, conflictLevelOf(seedReason), seedFactorId = conflictFactorId)
