@@ -805,6 +805,22 @@ it writes to `$OUT` (see the lab's
 [profile jobs guide](https://github.com/Eignex/klause-lab/blob/main/deploy/SETUP.md#profile-jobs)).
 The lab runs no shell scripts, so a new measurement is a class in that package.
 
+`TaskOrderProfile` captures native unary and single-pair reified-order controls
+before selecting a task-order consumer. The free-pair and equal-start controls
+compare minimum, midpoint, impact probing, LP and default/aggressive preparation;
+the order overlay adds two existing reified rows and their covering clause.
+Each solve has 256 decisions and five seconds for construction and search.
+Prefix records retain both order polarities and undo; bounded selector traces,
+learning, preparation and thread allocation records include ordinary solver cleanup.
+Thread allocations are cumulative JVM allocations, not peak memory; these serial
+instrumented controls supply no throughput comparison or independent proof check.
+Optional `suite`, `problem`, `modelSha256` and `dataSha256` arguments add one
+MiniZinc source. Its compiler identity, original bytes, FlatZinc and output mapping
+are retained. The annotated control preserves the source selectors; separate free
+controls inspect default preparation and a first-pair overlay. These satisfaction
+projections supply no original MiniZinc objective or proof claim. Optional tasks,
+variable/zero durations and shared starts decline the overlay.
+
 `SourceStageProfile` accepts `request64=<base64 JSON array>` for stage attribution.
 A source request has `suite`, `problem`, decoded-source `sha256`, `engine`
 (`default`, `cp`, `ls` or `mixed`) and `exact`. MPS and XCSP3 sources are supported.

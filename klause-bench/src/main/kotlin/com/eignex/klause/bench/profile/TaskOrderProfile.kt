@@ -164,7 +164,7 @@ internal object TaskOrderProfile {
         out.resolve("$name/prefixes.jsonl").writeText(rows.joinToString("\n", postfix = "\n"))
     }
 
-    private fun withOrderPair(source: Problem): Problem {
+    internal fun withOrderPair(source: Problem): Problem {
         val pair = source.factors.filterIsInstance<Cumulative>().firstOrNull {
             it.unary && it.presents.isEmpty() && it.durationVars.isEmpty() && it.n >= 2 &&
                 it.durations.all { duration -> duration > 0 } && it.starts.toSet().size == it.n
