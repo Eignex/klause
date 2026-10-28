@@ -18,13 +18,13 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 
 internal class ReifiedLinearPropagator(
-    private val auxBoolVar: Int,
+    val auxBoolVar: Int,
     val boolVars: IntArray,
     val intVars: IntArray,
-    private val coeffs: LongArray,
-    private val vars: IntArray,
-    private val op: LinearOp,
-    private val bound: Long,
+    val coeffs: LongArray,
+    val vars: IntArray,
+    val op: LinearOp,
+    val bound: Long,
 ) : Propagator {
 
     private val singleEquality = vars.size == 1 && (op == LinearOp.EQ || op == LinearOp.NE)

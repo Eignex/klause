@@ -717,7 +717,8 @@ class PropagationSession private constructor(
                 trueWeight >= learned.degree
             }
             is ConflictAnalyzer.AnalysisResult.LearnedIntegerRow -> try {
-                learned.row.maximum(state) <= learned.row.bound
+                (learned.row.guard != Lit.NONE && state.litTruth(learned.row.guard) == false) ||
+                    learned.row.maximum(state) <= learned.row.bound
             } catch (_: CheckedLongOverflowException) {
                 false
             } catch (_: FinitePropagationInterrupted) {

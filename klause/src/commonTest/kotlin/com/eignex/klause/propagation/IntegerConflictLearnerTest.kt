@@ -297,7 +297,7 @@ class IntegerConflictLearnerTest {
     }
 
     @Test
-    fun `a reified source reason should retain its Boolean condition in clause fallback`() {
+    fun `a reified source reason should retain its Boolean condition in the row and fallback`() {
         val native = PropagationSession(Problem(1, 3,
             arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)), arrayOf(
                 ReifiedLinear(0, intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
@@ -308,7 +308,8 @@ class IntegerConflictLearnerTest {
 
         val conflict = assertIs<PropagationResult.Unsat>(native.pinIntAtLeast(0, 2))
 
-        val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(conflict.learnedClause)
-        assertTrue(learned.literals.contains(Lit.make(0, false)))
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(conflict.learnedClause)
+        assertEquals(Lit.make(0, true), learned.row.guard)
+        assertTrue(learned.fallbackClause.literals.contains(Lit.make(0, false)))
     }
 }

@@ -93,6 +93,13 @@ class CpSearchComponent(
             val state = session.explanationState
             val trail = state.integerLearningTrailAtLevel?.invoke(nativeTarget) ?: return false
             if (!learned.row.assertsAt(state, trail)) return false
+            if (learned.row.guard != Lit.NONE) {
+                val guard = learned.row.guard
+                if (Lit.variable(guard) >= session.problem.numBoolVars) return false
+                if (context.explainAtoms(SearchAtomPremise.Asserted(SearchDecision.Bool(guard)), maxNodes = 128) == null) {
+                    return false
+                }
+            }
             for (variable in learned.row.variables) {
                 if (context.cancelled()) return false
                 val source = sourceIntId(variable)
