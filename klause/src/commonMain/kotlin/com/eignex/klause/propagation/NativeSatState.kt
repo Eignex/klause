@@ -1,6 +1,8 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.solver.search.LearnedKind
+import com.eignex.klause.solver.search.LearnedStage
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
@@ -179,10 +181,23 @@ internal class NativeSatState(private val state: PropagationState) {
      * already false, or just install watches when two or more literals are still open. The trailing
      * [propagate] call continues BCP from any pin this makes.
      */
+    private val lifecycleStages = IntArrayList()
+    private val learnedUnits = IntArrayList()
+    private var unitsPending = false
+
+    fun onRetraction() {
+        unitsPending = learnedUnits.size > 0
+        pendingConflict = false
+    }
+
     fun addLearned(lits: IntArray, lbd: Int, permanent: Boolean, origin: Int = OWN_ORIGIN): Int {
+        state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Constructed)
         val h = appendLearned(lits, lbd, permanent, origin)
+        state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Admitted)
+        state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Asserted)
         val len = lits.size
         if (len == 1) {
+            learnedUnits.add(h)
             if (litFalse(lits[0])) {
                 recordConflict(h)
                 pendingConflict = true
@@ -245,6 +260,7 @@ internal class NativeSatState(private val state: PropagationState) {
 
     private fun appendLearned(lits: IntArray, lbd: Int, permanent: Boolean, origin: Int): Int {
         val i = learnedCount
+        lifecycleStages.add(0)
         learnedStarts.add(learnedLits.size)
         learnedLits.addAll(lits)
         learnedLbd.add(lbd)
@@ -296,6 +312,10 @@ internal class NativeSatState(private val state: PropagationState) {
     fun markUsed(fid: Int) {
         val i = fid - baseCount
         if (i !in 0 until learnedCount) return
+        if (lifecycleStages[i] == 0) {
+            lifecycleStages[i] = 1
+            state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Consumed)
+        }
         if (learnedUsed[i] == 0) importUses.note(learnedOrigin[i])
         learnedUsed[i] = 1
     }
@@ -308,13 +328,17 @@ internal class NativeSatState(private val state: PropagationState) {
      */
     fun forget(keep: (learnedIndex: Int, lbd: Int) -> Boolean) {
         // old learned index -> new learned index, or -1 if dropped.
+        val protected = state.referencedLearned(learnedCount)
         val remap = IntArray(learnedCount)
         var survivors = 0
         for (i in 0 until learnedCount) {
-            remap[i] = if (keep(i, learnedLbd[i])) survivors++ else -1
+            remap[i] = if (protected[i] || keep(i, learnedLbd[i])) survivors++ else -1
         }
         if (survivors == learnedCount) return
 
+        for (i in 0 until learnedCount) if (remap[i] < 0) {
+            state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Retired)
+        }
         state.remapReasons(state.boolReason, remap, baseCount)
 
         for (lit in watchEntries.indices) {
@@ -340,6 +364,7 @@ internal class NativeSatState(private val state: PropagationState) {
             val end = learnedEnd(i)
             learnedStarts[target] = literalWrite
             for (k in start until end) learnedLits[literalWrite++] = learnedLits[k]
+            lifecycleStages[target] = lifecycleStages[i]
             learnedLbd[target] = learnedLbd[i]
             learnedPermanent[target] = learnedPermanent[i]
             learnedTier[target] = learnedTier[i]
@@ -349,6 +374,7 @@ internal class NativeSatState(private val state: PropagationState) {
             learnedWatchPos[2 * target] = learnedWatchPos[2 * i]
             learnedWatchPos[2 * target + 1] = learnedWatchPos[2 * i + 1]
         }
+        lifecycleStages.truncateTo(survivors)
         learnedLits.truncateTo(literalWrite)
         learnedStarts.truncateTo(survivors)
         learnedLbd.truncateTo(survivors)
@@ -359,6 +385,8 @@ internal class NativeSatState(private val state: PropagationState) {
         learnedScanPos.truncateTo(survivors)
         learnedWatchPos.truncateTo(2 * survivors)
         learnedCount = survivors
+        learnedUnits.clear()
+        for (i in 0 until learnedCount) if (clauseLen(baseCount + i) == 1) learnedUnits.add(baseCount + i)
     }
 
     private fun pinUnit(h: Int, unitIdx: Int): Boolean {
@@ -383,6 +411,21 @@ internal class NativeSatState(private val state: PropagationState) {
             return state.conflictLevels
         }
         state.conflictSeedFactors.clear()
+        if (unitsPending) {
+            unitsPending = false
+            for (i in 0 until learnedUnits.size) {
+                val h = learnedUnits[i]
+                if (litFalse(litOf(h, 0))) {
+                    unitsPending = true
+                    recordConflict(h)
+                    return state.conflictLevels
+                }
+                if (!litTrue(litOf(h, 0)) && !pinUnit(h, 0)) {
+                    unitsPending = true
+                    return state.conflictLevels
+                }
+            }
+        }
         if (allFactors && !initialized) {
             initialized = true
             state.currentLevel = 0

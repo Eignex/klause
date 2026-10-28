@@ -820,6 +820,8 @@ class SearchSession(
     /** Booleans assigned at the root, however deep the search stands: progress no later search undoes. */
     internal val rootFixedCount: Int get() = trail.rootFixedCount
 
+    internal fun learnedLifecycle(): Map<String, Long> = learning.lifecycle.snapshot()
+
     /** Snapshot learned-clause telemetry for a completed open-theory solve. */
     fun learnedClauseStats(): OpenTheoryClauseStats = learning.snapshot()
 
@@ -881,9 +883,15 @@ class SearchSession(
 
     override fun levelOf(literal: Int): Int = trail.levelOf(literal)
 
-    override fun implied(clause: Int, literal: Int): ComponentResult = imply(literal, learning.explanationOf(clause))
+    override fun implied(clause: Int, literal: Int): ComponentResult {
+        learning.consumed(clause)
+        return imply(literal, learning.explanationOf(clause))
+    }
 
-    override fun conflicted(clause: Int): ComponentResult = ComponentResult.Conflict(learning.explanationOf(clause))
+    override fun conflicted(clause: Int): ComponentResult {
+        learning.consumed(clause)
+        return ComponentResult.Conflict(learning.explanationOf(clause))
+    }
 
     private fun literalTruth(literal: Int): Boolean? {
         val value = boolValue(literal ushr 1) ?: return null

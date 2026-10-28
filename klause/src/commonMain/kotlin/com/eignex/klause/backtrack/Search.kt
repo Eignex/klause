@@ -186,6 +186,7 @@ internal class CpSatisfactionTraversal(
         it.conflictStats = sink?.ca
         sink?.search?.let { search ->
             search.propagationWork = { it.session.work }
+            search.learning = { it.session.learnedLifecycle() }
             search.valueOrdering = { it.session.valueOrdering.snapshot() }
             search.rootPropagationWork = { it.session.rootWork }
             search.propagationNanos = { it.session.propagationNanos }

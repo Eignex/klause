@@ -145,6 +145,7 @@ class LinearAuthorityInvocationTest {
             SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
         val stages = assertNotNull(reused.stats.smt.completeSearchStages)
         assertTrue(stages.getValue("numericalAvoidedQueries") > 0L)
+        assertTrue(stages.getValue("learningSourceRefutationConsumed") > 0L)
         assertTrue(reused.stats.smt.sourceLp.operations < baseline.stats.smt.sourceLp.operations)
         assertEquals(0L, stages["numericalPendingLeaves"])
     }
@@ -183,6 +184,7 @@ class LinearAuthorityInvocationTest {
             SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
         val stages = assertNotNull(propagated.stats.smt.completeSearchStages)
         assertTrue(stages.getValue("numericalRefutationUnitDeductions") > 0L)
+        assertTrue(stages.getValue("learningSourceRefutationConsumed") > 0L)
         assertTrue(propagated.stats.smt.sourceLp.operations < cached.stats.smt.sourceLp.operations)
         assertTrue(propagated.stats.openTheory.openTheoryDecisions < cached.stats.openTheory.openTheoryDecisions)
         assertEquals(0L, stages["numericalPendingLeaves"])

@@ -6,6 +6,8 @@ import com.eignex.klause.util.IntArrayList
 import kotlin.time.TimeSource
 
 internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
+    val lifecycle = LearnedLifecycle()
+    private val stages = IntArrayList()
     private val learned = WatchedClauseStore()
     private val pendingAttach = ArrayDeque<Int>()
     private var propagatedTrail = 0
@@ -56,13 +58,17 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
         assertingConflicts,
         nonAssertingConflicts,
         reductionNanos,
+        lifecycle.snapshot(),
     )
 
     fun learn(literals: IntArray, host: ClauseWatchHost) {
+        lifecycle.note(LearnedKind.Clause, LearnedStage.Constructed)
         if (literals.isEmpty()) return
         val lbd = lbdOf(literals, host)
         val index = learned.add(literals.copyOf(), lbd)
         if (index >= 0) {
+            lifecycle.note(LearnedKind.Clause, LearnedStage.Admitted)
+            stages.add(0)
             learnedClauses++
             if (lbd <= GLUE_LBD) glueClauses++
             peakLearnedClauses = maxOf(peakLearnedClauses, learned.size.toLong())
@@ -109,6 +115,12 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
             return
         }
         val dropped = selectDroppedClauses(droppable, survivors)
+        var target = 0
+        for (index in 0 until learned.size) {
+            if (dropped[index]) lifecycle.note(LearnedKind.Clause, LearnedStage.Retired)
+            else stages[target++] = stages[index]
+        }
+        stages.truncateTo(target)
         learned.retain { index -> !dropped[index] }
         reductions++
         droppedClauses += droppable.size - survivors
@@ -152,7 +164,9 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
 
     fun propagate(host: ClauseWatchHost, boolTrail: IntArrayList): ComponentResult {
         while (pendingAttach.isNotEmpty()) {
-            val result = learned.attach(pendingAttach.removeFirst(), host)
+            val index = pendingAttach.removeFirst()
+            lifecycle.note(LearnedKind.Clause, LearnedStage.Asserted)
+            val result = learned.attach(index, host)
             if (result !is ComponentResult.Consistent) return result
         }
         if (unitsPending) {
@@ -176,6 +190,12 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
             }
         }
         return ComponentResult.Consistent
+    }
+
+    fun consumed(index: Int) {
+        if (stages[index] != 0) return
+        stages[index] = 1
+        lifecycle.note(LearnedKind.Clause, LearnedStage.Consumed)
     }
 
     private companion object {

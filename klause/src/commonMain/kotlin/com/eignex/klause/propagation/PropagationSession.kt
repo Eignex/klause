@@ -926,6 +926,8 @@ class PropagationSession private constructor(
      *  not the general database, so clause-database introspection routes differently. */
     val usesNativeSat: Boolean get() = state.nativeEngine != null
 
+    internal fun learnedLifecycle(): Map<String, Long> = state.learned.lifecycle.snapshot()
+
     /** Current learned-constraint count, including PB constraints and integer rows. Used to invoke
      *  [forgetLearnedClauses] based on `BacktrackParams.maxLearnedClauses`. */
     val learnedClauseCount: Int get() = state.nativeEngine?.count ?: state.learnedClauses.size
@@ -1031,8 +1033,9 @@ class PropagationSession private constructor(
     /**
      * Register an imported [shared] nogood (learned by another arm of the same problem) into this
      * session's learned DB, translating its int-atom literals into this session's lazily-allocated
-     * atom space. Call only at decision level 0 (a restart): the literals are then unassigned, so the
-     * clause registers without an immediate unit/conflict and participates from the next fixpoint.
+     * atom space. Call at a restart or the post-assumption root of a compatible search scope.
+     * Attachment evaluates existing root facts, including an immediate unit or conflict, at the
+     * next fixpoint. Native SAT attachment can pin the unit during registration.
      *
      * [origin] names the arm the clause came from, a non-negative id, and is counted each time the clause is used;
      * see [drainImportUses].
@@ -1055,7 +1058,8 @@ class PropagationSession private constructor(
             lits[j++] = Lit.make(virtualVar, positive)
             i += SharedClause.QUAD
         }
-        state.addLearnedClause(Clause(lits), shared.lbd, permanent = false, origin = origin)
+        val fid = state.addLearnedClause(Clause(lits), shared.lbd, permanent = false, origin = origin)
+        if (state.nativeEngine == null) state.learned.pendingAttach.add(fid)
     }
 
     /**

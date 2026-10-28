@@ -1048,6 +1048,9 @@ class PropagationState private constructor(
         try {
             return drainFixpoint(allFactors, initialFactor, initialFactors, cancellation, skipExpensiveBake)
         } finally {
+            if (runCancelled) {
+                while (propQueue.isNotEmpty()) deferLearnedAttachment(propQueue.removeFirst())
+            }
             propagationNanos += start.elapsedNow().inWholeNanoseconds
         }
     }
@@ -1170,6 +1173,16 @@ class PropagationState private constructor(
         // granularity — is never cut mid-propagation.
         val floor = if (allFactors) 0 else cancelFloor
         seedQueue(allFactors, factorCount, initialFactor, initialFactors)
+        for (i in 0 until learned.pendingAttach.size) {
+            val fid = learned.pendingAttach[i]
+            learned.stages[fid - baseFactorCount] = learned.stages[fid - baseFactorCount] and 4.inv()
+            propEnq(fid)
+        }
+        learned.pendingAttach.clear()
+        if (learned.unitsPending) {
+            for (i in 0 until learned.units.size) propEnq(learned.units[i])
+            learned.unitsPending = false
+        }
         return fireQueue(pollable, floor, cancellation, skipExpensiveBake)
     }
 
@@ -1235,6 +1248,7 @@ class PropagationState private constructor(
             work++
             currentLevel = effectiveLevelFor(f, fid)
             if (f is ClausePropagator && !f.allLiteralsBool(problem.numBoolVars)) deferredLevelClause = f.literals
+            noteLearnedAssertion(fid)
             currentFactor = fid
             conflictLevels = null
             val propagated = try {

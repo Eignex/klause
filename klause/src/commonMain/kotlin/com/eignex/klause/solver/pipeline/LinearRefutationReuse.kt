@@ -13,6 +13,9 @@ import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceProofContext
+import com.eignex.klause.solver.search.LearnedKind
+import com.eignex.klause.solver.search.LearnedLifecycle
+import com.eignex.klause.solver.search.LearnedStage
 import com.eignex.klause.solver.search.resolveSearchClauses
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
@@ -28,6 +31,7 @@ internal class LinearRefutationReuse(
     private val resolve: Boolean = false,
 ) {
     class UnitExclusion(
+        val id: Long,
         val coordinate: SourceCoordinate,
         val threshold: BigFraction,
         val upper: Boolean,
@@ -39,12 +43,16 @@ internal class LinearRefutationReuse(
     private data class Side(val coordinate: SourceCoordinate, val upper: Boolean)
     private data class Predicate(val coordinate: SourceCoordinate, val value: BigFraction, val upper: Boolean)
     private class Entry(val evidence: SourceEvidence, val anchor: Side?, val bytes: Long, val restrictions: Long,
-        val clause: IntArray?, val nodes: Int, val depth: Int)
+        val clause: IntArray?, val nodes: Int, val depth: Int) {
+        var consumed = false
+        var asserted = false
+    }
     private class Support {
         val assumptions = linkedSetOf<Side>()
         var nodes = 0
         var bytes = 256L
     }
+    private val lifecycle = LearnedLifecycle()
     private val entries = linkedMapOf<Long, Entry>()
     private val indexed = hashMapOf<Side, MutableSet<Long>>()
     private val unconditional = linkedSetOf<Long>()
@@ -70,7 +78,7 @@ internal class LinearRefutationReuse(
 
     init { require(maximumEntries >= 0 && maximumBytes >= 0L && maximumAllocation >= 0L) }
 
-    fun observations(): Map<String, Long> = counts.mapKeys { "numericalRefutationReuse${it.key}" } + mapOf(
+    fun observations(): Map<String, Long> = counts.mapKeys { "numericalRefutationReuse${it.key}" } + lifecycle.snapshot() + mapOf(
         "numericalRefutationReuseRetained" to entries.size.toLong(),
         "numericalRefutationReuseBytes" to retainedBytes,
         "numericalRefutationReuseNameBytes" to nameBytes,
@@ -210,6 +218,7 @@ internal class LinearRefutationReuse(
     }
 
     fun retain(evidence: SourceEvidence) {
+        lifecycle.note(LearnedKind.SourceRefutation, LearnedStage.Constructed)
         if (retired || maximumEntries == 0 || maximumBytes == 0L || evidence.claim != SourceClaim.Refutation ||
             evidence.scope.revision != source.scope.revision || evidence.scope.objective != source.scope.objective ||
             cancellation() || budget.funding?.paused == true
@@ -277,6 +286,7 @@ internal class LinearRefutationReuse(
         if (anchor == null) unconditional += id else indexed.getOrPut(anchor) { linkedSetOf() }.add(id)
         retainedBytes += bytes
         peakBytes = maxOf(peakBytes, retainedBytes + nameBytes)
+        lifecycle.note(LearnedKind.SourceRefutation, LearnedStage.Admitted)
         observe("RetainedProofs")
         return entry
     }
@@ -345,6 +355,7 @@ internal class LinearRefutationReuse(
                 val second = SourceDerivation.Import(entry.evidence)
                 val proof = SourceDerivation.IntegerSplit(bound.coordinate, threshold,
                     if (bound.upper) first else second, if (bound.upper) second else first)
+                lifecycle.note(LearnedKind.SourceRefutation, LearnedStage.Constructed)
                 val evidence = SourceEvidence(source.scope.copy(condition = required), SourceClaim.Refutation, proof)
                 when (verify(evidence)) {
                     SourceEvidenceCheck.Checked -> {
@@ -373,7 +384,7 @@ internal class LinearRefutationReuse(
             (lower == null || lower < split.threshold + BigFraction.ONE)
     }
 
-    fun find(condition: SourceCondition): SourceEvidence? {
+    fun find(condition: SourceCondition, consume: Boolean = false): SourceEvidence? {
         if (retired || entries.isEmpty() || cancellation() || budget.funding?.paused == true) return null
         proofPolls = 0
         observe("Lookups")
@@ -398,6 +409,8 @@ internal class LinearRefutationReuse(
             when (verify(imported)) {
                 SourceEvidenceCheck.Checked -> {
                     if (retired || cancellation() || budget.funding?.paused == true) return null
+                    asserted(entry)
+                    if (consume) consumed(id)
                     observe("Hits")
                     if (entry.depth > 0) observe("ResolutionHits")
                     if (unfixed) observe("ResolutionUnfixedHits")
@@ -422,7 +435,7 @@ internal class LinearRefutationReuse(
         val bools = condition.bools
         if (!spend(1L + lower.size + upper.size + bools.size, 48L * (lower.size + upper.size + bools.size)) ||
             !condition.implies(source.scope.condition) || !(lower.values + upper.values).all(::admitted)) return null
-        for (entry in entries.values) {
+        for ((id, entry) in entries) {
             if (!spend(1L + entry.restrictions, 96L * entry.restrictions)) return null
             val required = entry.evidence.scope.condition
             if (!required.bools.all { (id, value) -> bools[id] == value }) continue
@@ -448,7 +461,8 @@ internal class LinearRefutationReuse(
                     if (retired || cancellation() || budget.funding?.paused == true) return null
                     observe("UnitChecks")
                     if (entry.depth > 0) observe("ResolutionUnits")
-                    return UnitExclusion(coordinate, threshold, isUpper, imported, required, entry.depth > 0, unfixed)
+                    asserted(entry)
+                    return UnitExclusion(id, coordinate, threshold, isUpper, imported, required, entry.depth > 0, unfixed)
                 }
                 is SourceEvidenceCheck.Rejected -> observe("UnitRejected")
                 is SourceEvidenceCheck.Unavailable -> {
@@ -458,6 +472,19 @@ internal class LinearRefutationReuse(
             }
         }
         return null
+    }
+
+    private fun asserted(entry: Entry) {
+        if (entry.asserted) return
+        entry.asserted = true
+        lifecycle.note(LearnedKind.SourceRefutation, LearnedStage.Asserted)
+    }
+
+    fun consumed(id: Long) {
+        val entry = entries[id] ?: return
+        if (entry.consumed) return
+        entry.consumed = true
+        lifecycle.note(LearnedKind.SourceRefutation, LearnedStage.Consumed)
     }
 
     private fun evict() {
@@ -471,6 +498,7 @@ internal class LinearRefutationReuse(
         if (bucket.isEmpty() && entry.anchor != null) indexed.remove(entry.anchor)
         retainedBytes -= entry.bytes
         charge(1L)
+        lifecycle.note(LearnedKind.SourceRefutation, LearnedStage.Retired)
         observe("Evictions")
     }
 

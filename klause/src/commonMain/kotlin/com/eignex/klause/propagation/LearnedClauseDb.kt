@@ -1,5 +1,8 @@
 package com.eignex.klause.propagation
 
+import com.eignex.klause.solver.search.LearnedKind
+import com.eignex.klause.solver.search.LearnedLifecycle
+import com.eignex.klause.solver.search.LearnedStage
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.OriginCounts
 
@@ -22,6 +25,11 @@ internal class LearnedClauseDb(
      *  [Propagator] via `factorAt`; they participate in propagation through the per-literal watcher index
      *  just like static factors. Survives `restore` (learned constraints are facts about the original
      *  problem, not trail state); pruned by `forgetLearnedClauses`. */
+    val lifecycle = LearnedLifecycle()
+    val stages = IntArrayList()
+    val pendingAttach = IntArrayList()
+    val units = IntArrayList()
+    var unitsPending = false
     val store = ArrayList<LearnedPropagator>()
 
     internal var integerRows: ArrayList<LearnedIntegerPropagator>? = null

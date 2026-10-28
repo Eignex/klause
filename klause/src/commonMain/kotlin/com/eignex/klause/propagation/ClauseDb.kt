@@ -7,6 +7,8 @@ import com.eignex.klause.factor.litVars
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.Propagator
+import com.eignex.klause.solver.search.LearnedKind
+import com.eignex.klause.solver.search.LearnedStage
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
@@ -69,8 +71,12 @@ internal fun PropagationState.addLearnedClause(
     permanent: Boolean = false,
     origin: Int = OWN_ORIGIN,
 ): Int {
+    learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Constructed)
+    learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Admitted)
     val newFid = totalFactorCount
+    learned.stages.add(0)
     learned.store.add(clause)
+    if (clause.literals.size == 1) learned.units.add(newFid)
     learned.lbds.add(lbd)
     learned.permanent.add(if (permanent) 1 else 0)
     learned.tier.add(ClauseTier.UNSET.ordinal)
@@ -98,16 +104,18 @@ internal fun PropagationState.addLearnedPb(
     lbd: Int,
     permanent: Boolean = false,
 ): Int {
+    learned.lifecycle.note(LearnedKind.Pb, LearnedStage.Constructed)
     val prop = PseudoBooleanPropagator(
         literals.litVars(),
         EmptyIntArray,
-        weights,
-        literals,
+        weights.copyOf(),
+        literals.copyOf(),
         PbOp.GE,
         degree,
         watched = true,
     )
     val newFid = totalFactorCount
+    learned.stages.add(0)
     learned.store.add(prop)
     learned.lbds.add(lbd)
     learned.permanent.add(if (permanent) 1 else 0)
@@ -115,6 +123,7 @@ internal fun PropagationState.addLearnedPb(
     learned.usedFlags.add(0)
     learned.origins.add(OWN_ORIGIN)
     refPayloadStore.add(null)
+    learned.lifecycle.note(LearnedKind.Pb, LearnedStage.Admitted)
     val watched = prop.selectWatched(this)
     arithmeticLearningTrace?.stored(newFid, "pb")
     for (lit in watched) installLitWatch(lit, newFid, NO_BLOCKER)
@@ -124,8 +133,11 @@ internal fun PropagationState.addLearnedPb(
 
 internal fun PropagationState.addLearnedIntegerRow(row: IntegerConflictRow, lbd: Int): Int {
     check(intEvents.on)
+    learned.lifecycle.note(LearnedKind.Integer, LearnedStage.Constructed)
+    learned.lifecycle.note(LearnedKind.Integer, LearnedStage.Admitted)
     val propagator = LearnedIntegerPropagator(row)
     val factor = totalFactorCount
+    learned.stages.add(0)
     learned.store.add(propagator)
     val rows = learned.integerRows ?: ArrayList<LearnedIntegerPropagator>().also { learned.integerRows = it }
     rows.add(propagator)
@@ -206,6 +218,7 @@ internal fun PropagationState.noteLearnedUse(fid: Int) {
     }
     val idx = fid - problem.numFactors
     if (idx !in 0 until learned.usedFlags.size) return
+    noteLearnedStage(idx, LearnedStage.Consumed, 2)
     if (learned.usedFlags[idx] == 0) learned.importUses.note(learned.origins[idx])
     learned.usedFlags[idx] = 1
 }
@@ -229,21 +242,28 @@ internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd
     }
     val n = learned.size
     if (n == 0) return
+    val protected = referencedLearned(n)
     val remap = IntArray(n) // remap[i] = new learned index, or -1 if dropped
     var newCount = 0
     for (i in 0 until n) {
-        remap[i] = if (keep(i, learned.lbds[i])) newCount++ else -1
+        remap[i] = if (protected[i] || keep(i, learned.lbds[i])) newCount++ else -1
     }
     if (newCount == n) return // nothing dropped
     arithmeticLearningTrace?.remap(baseFactorCount, remap)
+    for (i in 0 until n) if (remap[i] < 0) {
+        learned.lifecycle.note(learnedKind(i), LearnedStage.Retired)
+    }
 
+    learned.units.clear()
     learned.integerRows?.clear()
     var w = 0
     for (i in 0 until n) {
         if (remap[i] >= 0) {
             val propagator = learned.store[i]
             if (propagator is LearnedIntegerPropagator) learned.integerRows?.add(propagator)
+            if (propagator is ClausePropagator && propagator.literals.size == 1) learned.units.add(baseFactorCount + w)
             learned.store[w] = learned.store[i]
+            learned.stages[w] = learned.stages[i]
             learned.lbds[w] = learned.lbds[i]
             learned.permanent[w] = learned.permanent[i]
             learned.tier[w] = learned.tier[i]
@@ -253,6 +273,7 @@ internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd
         }
     }
     while (learned.store.size > newCount) learned.store.removeAt(learned.store.size - 1)
+    learned.stages.truncateTo(newCount)
     learned.lbds.truncateTo(newCount)
     learned.permanent.truncateTo(newCount)
     learned.tier.truncateTo(newCount)
@@ -323,6 +344,10 @@ internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd
     // fids from before the compaction. Remap them like the watcher lists: a stale fid
     // surviving here indexes past the compacted clause array on the next drain.
     remapQueue(propQueue, remap, refBase)
+    for (i in 0 until learned.pendingAttach.size) {
+        val old = learned.pendingAttach[i] - refBase
+        learned.pendingAttach[i] = refBase + remap[old]
+    }
     remapQueue(atoms.dirtyFactors, remap, refBase)
     if (learned.integerRows != null) intEvents.remapLearned(remap, refBase)
 
@@ -336,6 +361,10 @@ internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd
     remapReasons(boolReason, remap, refBase)
     remapReasons(intMinReason, remap, refBase)
     remapReasons(intMaxReason, remap, refBase)
+    for (i in 0 until undo.size) if (undo.tag[i] == 1) {
+        undo.minReason[i] = remappedReason(undo.minReason[i], remap, refBase)
+        undo.maxReason[i] = remappedReason(undo.maxReason[i], remap, refBase)
+    }
 }
 
 /** Rewrite learned-clause factor ids stored in a per-variable reason array through [remap]
@@ -369,3 +398,54 @@ internal fun PropagationState.remapQueue(queue: IntArrayDeque, remap: IntArray, 
         }
     }
 }
+
+internal fun PropagationState.learnedKind(index: Int): LearnedKind = when (learned.store[index]) {
+    is PseudoBooleanPropagator -> LearnedKind.Pb
+    is LearnedIntegerPropagator -> LearnedKind.Integer
+    else -> LearnedKind.Clause
+}
+
+internal fun PropagationState.noteLearnedAssertion(fid: Int) {
+    val index = fid - baseFactorCount
+    if (index in 0 until learned.size) noteLearnedStage(index, LearnedStage.Asserted, 1)
+}
+
+internal fun PropagationState.recheckRetractedLearning(fid: Int) {
+    val index = fid - baseFactorCount
+    if (index !in 0 until learned.size || learned.store[index] is ClausePropagator) return
+    deferLearnedAttachment(fid)
+}
+
+internal fun PropagationState.deferLearnedAttachment(fid: Int) {
+    val index = fid - baseFactorCount
+    if (index !in 0 until learned.size) return
+    if (learned.stages[index] and 4 != 0) return
+    learned.stages[index] = learned.stages[index] or 4
+    learned.pendingAttach.add(fid)
+}
+
+private fun PropagationState.noteLearnedStage(index: Int, stage: LearnedStage, bit: Int) {
+    if (learned.stages[index] and bit != 0) return
+    learned.stages[index] = learned.stages[index] or bit
+    learned.lifecycle.note(learnedKind(index), stage)
+}
+
+internal fun PropagationState.referencedLearned(count: Int): BooleanArray {
+    val retained = BooleanArray(count)
+    fun protect(fid: Int) {
+        val index = fid - baseFactorCount
+        if (index in retained.indices) retained[index] = true
+    }
+    boolReason.forEach(::protect)
+    intMinReason.forEach(::protect)
+    intMaxReason.forEach(::protect)
+    for (i in 0 until undo.size) if (undo.tag[i] == 1) {
+        protect(undo.minReason[i])
+        protect(undo.maxReason[i])
+    }
+    for (i in 0 until learned.pendingAttach.size) protect(learned.pendingAttach[i])
+    return retained
+}
+
+private fun remappedReason(fid: Int, remap: IntArray, base: Int): Int =
+    if (fid < base) fid else remap.getOrNull(fid - base)?.takeIf { it >= 0 }?.let { base + it } ?: -1
