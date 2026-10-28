@@ -11,6 +11,7 @@ import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.withLifetime
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.cancelledWhen
+import com.eignex.klause.util.workScheduled
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
@@ -21,7 +22,7 @@ internal class PreparingSatisfaction(
 ) : ResumableSolve {
     private val lifetime = params.cancellation.lifetimeCancellation()
     private var token = params.cancellation
-    private val propagationToken = cancelledWhen({ token.deadline() }) { token() }
+    private val propagationToken = cancelledWhen({ token.deadline() }, { token.workScheduled() }) { token() }
     private var preparation: PropagationPreparation? = PropagationPreparation(
         solver.problem, propagationToken, params.propagationCancelFloor,
         params.pbLearning ?: (solver.problem.numIntVars == 0),

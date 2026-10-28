@@ -41,6 +41,7 @@ import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.SchedulingCancellation
 import com.eignex.klause.util.abs
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.compareTo
@@ -48,6 +49,7 @@ import com.eignex.klause.util.minus
 import com.eignex.klause.util.plus
 import com.eignex.klause.util.times
 import com.eignex.klause.util.toDouble
+import com.eignex.klause.util.workScheduled
 import kotlin.math.nextDown
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -188,9 +190,10 @@ internal class CoreGuidedSearch(
         } ?: sliceMillis
         val sliceDuration = minOf(sliceMillis, remainingMillis).milliseconds
         val deadline = TimeSource.Monotonic.markNow() + sliceDuration
-        val segment = object : Cancellation {
-            override fun isCancelled(): Boolean =
-                deadline.hasPassedNow() || (activeSlice?.elapsedNow() ?: Duration.ZERO) >= sliceDuration
+        val segment = object : SchedulingCancellation {
+            override val workScheduled: Boolean get() = token.workScheduled()
+            override fun isCancelled(): Boolean = !workScheduled &&
+                (deadline.hasPassedNow() || (activeSlice?.elapsedNow() ?: Duration.ZERO) >= sliceDuration)
             override fun deadline() = deadline
         }
         val start = work
@@ -201,7 +204,8 @@ internal class CoreGuidedSearch(
         val allowance = if (remainingWork == null) offered else if (offered < 0L) remainingWork
         else minOf(offered, remainingWork)
         if (allowance == 0L) return null
-        val preparation = object : Cancellation {
+        val preparation = object : SchedulingCancellation {
+            override val workScheduled: Boolean get() = token.workScheduled()
             private val meter = object : RootWorkMeter {
                 override fun construction(entries: Long) = charge(entries)
                 override fun propagation(units: Long) = charge(units)
