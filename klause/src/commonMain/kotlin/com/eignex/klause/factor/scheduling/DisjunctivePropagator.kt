@@ -17,6 +17,7 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.addExact
 import com.eignex.klause.util.argsortBy
+import com.eignex.klause.util.argsortByIntKey
 import com.eignex.klause.util.subExact
 
 /**
@@ -28,14 +29,16 @@ import com.eignex.klause.util.subExact
  * Those passes wait for every duration to be fixed. Before them, a Θ-tree overload check over minimum durations
  * runs while a duration is unfixed or a presence unknown: every solution shortens to one where each task runs
  * exactly its minimum, so present tasks whose minima cannot fit between their earliest start and latest
- * completion conflict, and an unknown task whose minimum would overload them is absent.
+ * completion conflict, and an unknown task whose minimum would overload them is absent. Tasks sharing one exact
+ * signed presence literal are present together, so an unknown literal is ruled out when its tasks' minima would
+ * together overload the present tasks.
  *
  * Each deduction cites only the tasks it rests on: a detectable precedence its pair, a time-table shave the
  * tasks whose compulsory parts block the shaved starts, an edge-finding bound the tasks of the overloaded set
- * and of the set the bound comes from, an exclusion the present tasks it would overload and the excluded task's
- * own window and minimum duration, never its presence. The latter three cost O(tasks) and are built only when
- * conflict analysis reads them, from the bounds as they stood ([explain]). Bounds are cited only as far as the
- * deduction needs them.
+ * and of the set the bound comes from, an exclusion the present tasks it would overload and the excluded tasks'
+ * own windows and minimum durations, never their presence. All but the detectable precedence cost O(tasks) and
+ * are built only when conflict analysis reads them, from the bounds as they stood ([explain]). Bounds are cited
+ * only as far as the deduction needs them.
  */
 internal class DisjunctivePropagator(
     val intVars: IntArray,
@@ -49,6 +52,30 @@ internal class DisjunctivePropagator(
     override val expensiveBake: Boolean get() = true
 
     override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars)
+
+    // Tasks whose exact signed presence literal guards another task too, in runs of one literal: run g holds
+    // guarded[guardRuns[g] until guardRuns[g + 1]]. Both are empty unless a literal repeats.
+    private val guarded: IntArray
+    private val guardRuns: IntArray
+
+    init {
+        val order = argsortByIntKey(presents.size) { presents[it] }
+        val tasks = IntArrayList()
+        val runs = IntArrayList()
+        var from = 0
+        while (from < order.size) {
+            var to = from + 1
+            while (to < order.size && presents[order[to]] == presents[order[from]]) to++
+            if (to - from >= 2) {
+                runs.add(tasks.size)
+                for (k in from until to) tasks.add(order[k])
+            }
+            from = to
+        }
+        if (!runs.isEmpty()) runs.add(tasks.size)
+        guarded = tasks.toIntArray()
+        guardRuns = runs.toIntArray()
+    }
 
     /** Effective per-task durations, or null while any duration var is unfixed (propagation then waits). */
     private fun effDurOrNull(state: PropagationState): LongArray? {
@@ -79,6 +106,7 @@ internal class DisjunctivePropagator(
         state.propagatorFailures.remove(this)
         if (n == 0) return true
         if (!overloadCheck(state)) return false
+        if (!guardOverloadCheck(state)) return false
         val effDur = effDurOrNull(state) ?: return true
         if (!timeTable(state, effDur)) return false
         if (!detectablePrecedences(state, effDur)) return false
@@ -104,7 +132,8 @@ internal class DisjunctivePropagator(
         when (payload[0]) {
             TIME_TABLE -> timeTableReason(payload[1], lower = payload[2] == 1, unpack(payload, 3))
             EDGE -> edgeReason(reversed = payload[1] == 1, cand = payload[2], tau = unpack(payload, 3))
-            else -> excludedBy(cand = payload[1], tau = unpack(payload, 3))
+            EXCLUSION -> excludedBy(cand = payload[1], tau = unpack(payload, 3))
+            else -> guardExcludedBy(member = payload[1], tau = unpack(payload, 3))
         }
     }
 
@@ -233,6 +262,58 @@ internal class DisjunctivePropagator(
         }
         pending.truncateTo(kept)
         return true
+    }
+
+    // Rule out each unknown presence literal whose tasks' minimum durations, all present together, overload a window
+    // with the present tasks. One sweep per literal over the present tasks and its own.
+    private fun guardOverloadCheck(state: PropagationState): Boolean {
+        if (guarded.isEmpty()) return true
+        var present: IntArrayList? = null
+        for (g in 0 until guardRuns.size - 1) {
+            // An earlier exclusion may have fixed this literal through its complement's run.
+            if (!isUnknown(state, guarded[guardRuns[g]])) continue
+            val members = IntArrayList()
+            for (r in guardRuns[g] until guardRuns[g + 1]) {
+                if (minDuration(state, guarded[r]) > 0L) members.add(guarded[r])
+            }
+            if (members.size < 2) continue
+            val mandatory = present ?: presentTasks(state).also { present = it }
+            val windows = overloadWindows(state, mandatory, members) ?: continue
+            val tau = overloadTime(windows) ?: continue
+            val lit = presents[members[0]]
+            val reason = reasonFor(state, packed(GUARD, members[0], 0, tau))
+            if (!state.pinBool(Lit.variable(lit), !Lit.isPositive(lit), reason)) return false
+        }
+        return true
+    }
+
+    private fun presentTasks(state: PropagationState): IntArrayList {
+        val out = IntArrayList()
+        for (i in 0 until n) {
+            if (minDuration(state, i) > 0L && OptionalPresence.isDefinitelyPresent(presents, i, state)) out.add(i)
+        }
+        return out
+    }
+
+    // The earliest completion time by which all of [w]'s tasks cannot fit, or null when they fit.
+    private fun overloadTime(w: OverloadWindows): Long? {
+        val m = w.tasks.size
+        val estOrder = argsortBy(m) { a, b -> w.ests[a].compareTo(w.ests[b]) }
+        val leafPos = IntArray(m)
+        for (leafIdx in 0 until m) leafPos[estOrder[leafIdx]] = leafIdx
+        val lctOrder = argsortBy(m) { a, b -> w.lcts[a].compareTo(w.lcts[b]) }
+        val tree = CumulativeThetaTree(n = m, capacity = 1L)
+        tree.setLeafOrder(leafPos)
+        var k = 0
+        while (k < m) {
+            val tau = w.lcts[lctOrder[k]]
+            while (k < m && w.lcts[lctOrder[k]] == tau) {
+                val t = lctOrder[k++]
+                tree.activate(t, w.ests[t], w.durs[t])
+            }
+            if (tree.envOfTheta() > tau) return tau
+        }
+        return null
     }
 
     // Tightening [task]'s start failed against its other bound or a hole: the deduction's reason plus its own domain.
@@ -677,6 +758,24 @@ internal class DisjunctivePropagator(
             }
         }
 
+        // The tasks sharing [member]'s presence literal and completing by [tau] would together overload the present
+        // tasks completing by [tau]: the overloaded set's windows and minimum durations, and the presence of its
+        // present members, never the shared literal.
+        fun guardExcludedBy(member: Int, tau: Long) {
+            val guard = presents[member]
+            val set = theta(reversed = false, tau, except = -1)
+            for (k in 0 until n) {
+                if (presents[k] == guard && dur(k) > 0L && lct(k, reversed = false) <= tau) set.add(k)
+            }
+            val (e, overload) = ectSubset(set, reversed = false)
+            for (k in 0 until overload.size) {
+                val x = overload[k]
+                if (presents[x] == guard) lastsAtLeast(x) else task(x)
+                startGe(x, e)
+                startLe(x, tau - dur(x))
+            }
+        }
+
         fun literals(): IntArray = out.toIntArray()
     }
 
@@ -684,6 +783,7 @@ internal class DisjunctivePropagator(
         const val TIME_TABLE = 0
         const val EDGE = 1
         const val EXCLUSION = 2
+        const val GUARD = 3
 
         fun packed(kind: Int, a: Int, b: Int, value: Long) =
             intArrayOf(kind, a, b, (value ushr 32).toInt(), value.toInt())
