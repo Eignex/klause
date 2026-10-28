@@ -54,6 +54,13 @@ in original objective units and direction; refutations must derive an exact
 contradiction. A branch flag, traversal exhaustion or engine identity supplies no
 authority.
 
+A common inequality proved with `BooleanSplit` can enter another nonnegative
+combination through `Import` of its checked `Consequence`. The import keeps its
+original scope and rechecks both alternatives against the consumer's source
+premises. The LP partial-refutation adapter retains dormant numeric premises for
+this reconstruction; their guards still require establishment inside each proof
+branch.
+
 An active-linear refutation substitutes only established Boolean coefficients and
 uses rows with established Boolean guards and independently established integer
 pins. Its checker reconstructs that subset from the original source in the claimed

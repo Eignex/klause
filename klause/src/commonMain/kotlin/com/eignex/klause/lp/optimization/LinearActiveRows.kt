@@ -32,11 +32,13 @@ internal class LinearActiveRows(
     private val source: SourceProofContext,
     private val budget: SourceLpBudget,
     policy: SparseSourceLpPolicy = SparseSourceLpPolicy(),
+    private val composeBranches: Boolean = false,
 ) : AutoCloseable {
     private data class State(
         val rows: Map<String, SourceInequality>,
         val lower: Map<SourceCoordinate, BigFraction>,
         val upper: Map<SourceCoordinate, BigFraction>,
+        val compositionScope: SourceCondition?,
     )
     private val lp = LinearAuthorityLp(budget, retain = true, guidancePolicy = policy)
     private var state: State? = null
@@ -64,12 +66,30 @@ internal class LinearActiveRows(
             } ?: return LinearActiveResult(paused = budget.funding?.paused == true,
                 captureDeclined = budget.funding?.paused != true && !cancellation())
             if (budget.funding?.paused == true) return LinearActiveResult(paused = true)
-            val next = State(numeric.premises.mapValues { it.value.inequality }, condition.lower, condition.upper)
+            val next = State(numeric.premises.mapValues { it.value.inequality }, condition.lower, condition.upper,
+                if (composeBranches) condition else null)
             if (next == state && finished) return LinearActiveResult(unchanged = true)
             if (!begin()) return LinearActiveResult()
             state = next
             finished = false
-            LinearAuthorityQuery.prepare(numeric, null, cancellation)?.also { pending = it }
+            val consequences = if (composeBranches) {
+                val funded = Cancellation { cancellation() || budget.funding?.paused == true }
+                val prepared = LinearBooleanCutPreparation.prepare(branch, funded, { work, allocation ->
+                    budget.observe(preparation = work)
+                    budget.funding?.charge(0L, allocation)
+                })
+                budget.funding?.charge(0L, branch.coordinateCount * 48L + branch.premiseCount * 64L)
+                if (funded()) return LinearActiveResult(attempted = true, paused = budget.funding?.paused == true)
+                var work = 0L
+                val allowance = minOf(100_000L, budget.funding?.availableWork ?: 100_000L)
+                val checks = SourceEvidenceVerifier(branch, maximumSteps = 100_000).verifyAll(
+                    prepared.consequences, Cancellation { if (work >= allowance) true else { work++; funded() } })
+                budget.observe(boundCertification = work)
+                if (funded()) return LinearActiveResult(attempted = true, paused = budget.funding?.paused == true)
+                prepared.consequences.filterIndexed { index, _ -> checks[index] == SourceEvidenceCheck.Checked }
+            } else emptyList()
+            LinearAuthorityQuery.prepare(numeric, null, cancellation, consequences = consequences)
+                ?.also { pending = it }
                 ?: return LinearActiveResult(attempted = true)
         }
         val zero = BigFraction.ZERO
@@ -156,6 +176,7 @@ internal class LinearActiveRows(
 internal fun SourceProofContext.activeNumericContext(
     cancellation: Cancellation,
     maximumWork: Long = 100_000L,
+    retainGuardedRows: Boolean = false,
     onPreparation: (Long, Long) -> Unit = { _, _ -> },
 ): SourceProofContext? {
     require(maximumWork >= 0L)
@@ -195,7 +216,7 @@ internal fun SourceProofContext.activeNumericContext(
         if (!visit(premises.size)) return null
         for ((id, premise) in premises) {
             if (!visit(1 + premise.guards.size + premise.integerPins.size)) return null
-            if (premise.guards.any { (bool, value) -> booleans[bool] != value }) continue
+            if (!retainGuardedRows && premise.guards.any { (bool, value) -> booleans[bool] != value }) continue
             if (!scalar(premise.inequality.rhs) || !premise.integerPins.values.all(::scalar)) return null
             val coefficients = linkedMapOf<SourceCoordinate, BigFraction>()
             var offset = BigFraction.ZERO
@@ -218,14 +239,15 @@ internal fun SourceProofContext.activeNumericContext(
             }
         }
         if (work >= allowance) return null
-        val bounds = if (rows.values.any { it.integerPins.isNotEmpty() }) {
+        val bounds = if (!retainGuardedRows && rows.values.any { it.integerPins.isNotEmpty() }) {
             SourceProofContext(scope, coordinates, rows, emptyMap(), semantics = semantics)
                 .integerPinBounds(condition, Cancellation { !visit() }) ?: return null
         } else null
         val active = linkedMapOf<String, SourcePremise>()
         for ((id, premise) in rows) {
             if (!visit()) return null
-            if (premise.integerPins.isEmpty() || bounds?.status(premise.integerPins) == IntegerPinStatus.Established) {
+            if (retainGuardedRows || premise.integerPins.isEmpty() ||
+                bounds?.status(premise.integerPins) == IntegerPinStatus.Established) {
                 active[id] = premise
             }
         }
