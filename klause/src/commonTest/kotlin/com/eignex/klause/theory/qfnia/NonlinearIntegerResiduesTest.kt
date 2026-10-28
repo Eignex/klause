@@ -102,11 +102,12 @@ class NonlinearIntegerResiduesTest {
     fun `denominator growth and incomplete enumeration should decline without proof`() {
         for (assertion in listOf(
             "(assert (= (+ (* (^ (/ 1 2) 10000) x x) (* y y)) 3))",
-            "(assert (= (+ (^ x 2147483646) (^ y 2147483646) (^ z 2147483646)) 7))",
+            "(assert (= (+ (^ x 2147483646) (^ y 2147483646) " +
+                "(^ z 2147483646) (^ w 2147483646)) 7))",
         )) {
             val residues = NonlinearIntegerResidues(source(assertion), PolynomialArithmetic(), PolynomialLimits())
 
-            assertFalse(residues.refutes())
+            assertFalse(residues.refutes(), assertion)
             assertEquals(0L, residues.stats.refuted)
             assertEquals(1L, residues.stats.declined)
         }
@@ -176,7 +177,7 @@ class NonlinearIntegerResiduesTest {
 
     private fun source(assertions: String): NonlinearIntegerProblem {
         val parsed = SmtLibPolynomial.parse(
-            "(declare-const x Int) (declare-const y Int) (declare-const z Int) " +
+            "(declare-const x Int) (declare-const y Int) (declare-const z Int) (declare-const w Int) " +
                 "(declare-const r Real) (declare-const b Bool) $assertions", allowIntegers = true,
         )
         return NonlinearIntegerProblem(parsed.formula, parsed.realCount, parsed.boolCount,
