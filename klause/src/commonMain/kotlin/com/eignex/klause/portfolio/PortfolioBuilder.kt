@@ -130,10 +130,11 @@ object PortfolioBuilder {
                 is AlnsWorkerConfig -> ArmFamily.Lns
             }
             FinitePortfolioFactory(armId, family) { index, seed, budget ->
-                val admitted = if (config is CoreGuidedWorkerConfig && deferCore) {
-                    scenario.diagnosticWorkLimit?.let { config.withWorkLimit(it) } ?: config.withActiveTimeLimit()
-                } else {
-                    config
+                val admitted = when {
+                    config is CoreGuidedWorkerConfig && deferCore ->
+                        scenario.diagnosticWorkLimit?.let { config.withWorkLimit(it) } ?: config.withActiveTimeLimit()
+                    config is AlnsWorkerConfig && scenario.diagnosticWorkLimit != null -> config.withWorkScheduling()
+                    else -> config
                 }
                 val completion = if (numericalCompletion) {
                     when (admitted) {

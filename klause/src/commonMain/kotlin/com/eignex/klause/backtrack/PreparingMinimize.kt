@@ -3,9 +3,9 @@ package com.eignex.klause.backtrack
 import com.eignex.klause.propagation.PropagationPreparation
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.baked
-import com.eignex.klause.solver.lifetimeCancellation
 import com.eignex.klause.solver.ReseedGuard
 import com.eignex.klause.solver.ResumableSearch
+import com.eignex.klause.solver.lifetimeCancellation
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
@@ -13,6 +13,7 @@ import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.cancelledWhen
+import com.eignex.klause.util.workScheduled
 import kotlin.time.TimeSource
 
 @Suppress("TooGenericExceptionCaught") // cleanup must preserve arbitrary engine failures
@@ -22,7 +23,9 @@ internal class PreparingMinimize(
     private val params: BacktrackParams,
 ) : ResumableSearch, ReseedGuard {
     private var globalToken = params.cancellation
-    private val propagationToken = cancelledWhen({ globalToken.deadline() }) { globalToken() }
+    private val propagationToken = cancelledWhen({ globalToken.deadline() }, { globalToken.workScheduled() }) {
+        globalToken()
+    }
     private var preparation: PropagationPreparation? = PropagationPreparation(
         solver.problem, propagationToken, params.propagationCancelFloor,
         params.pbLearning ?: (solver.problem.numIntVars == 0),

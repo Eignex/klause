@@ -247,6 +247,7 @@ sampling and stable arm order, but minimum shares, feasibility coverage and reta
 proof coverage use charged work. Candidate checks run at every improving proposal;
 auxiliary preparation and search retire by work. Deferred core search uses a work
 allowance. Numerical companions and parallel execution reject this mode.
+ALNS operator selection and inner repair seeds derive from its worker seed.
 
 Each segment offers the smaller of its work allowance and the containing remainder.
 Initialization work reported by a retained handle is included. A zero-work return
@@ -266,7 +267,8 @@ worker seeds and numerical platform; a clock-interrupted final segment is partia
 The optional streaming listener records scheduler seed, selected slot and worker,
 offered and charged work, import cursors, reward updates, reseeds, retirements and
 termination. Clause cursors include compaction generations; cut cursors identify
-their append position. Empty drains remain visible. Events run inline and the solver
+their append position. Incumbent reads record changed accepted versions, and floor
+reads record changed supplied values as double bits. Empty drains remain visible. Events run inline and the solver
 retains no trace buffer. Finite source invocations forward these events through
 `SearchEvent.PortfolioDiagnostic`; CLI verbose output renders them without a clock.
 The ordinary scheduler remains the default.

@@ -30,7 +30,7 @@ class FinitePortfolioExecutorTest {
             val source = exactlyOneOver(8)
             val objective = LinearObjective(LongArray(8) { (8 - it).toLong() })
             val prepared = source.prepareExecutionPlan(objective, preferFinite = true)
-            val scenario = PortfolioScenario(cores = 1, arms = 3, kind = Kind.COP, engine = EngineMix.MIXED,
+            val scenario = PortfolioScenario(cores = 1, arms = 6, kind = Kind.COP, engine = EngineMix.MIXED,
                 seed = 17, sliceWork = 1, maxSliceWork = 4, diagnosticWorkLimit = 256)
             val trace = mutableListOf<PortfolioEvent>()
             val executor = FinitePipeline.portfolioExecutor(source.bake(), scenario, objective, null, null,

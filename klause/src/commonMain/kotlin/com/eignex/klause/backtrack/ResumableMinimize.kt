@@ -77,6 +77,7 @@ import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.solver.withSourceSemantics
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.cancelledWhen
+import com.eignex.klause.util.workScheduled
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration.Companion.milliseconds
@@ -153,7 +154,7 @@ internal class ResumableMinimize(
     // One-shot calls retain their invocation token. Resumed calls replace it while keeping a bound lifetime scope.
     private val baseCancellation: Cancellation = params0.cancellation
     private var params: BacktrackParams = params0.copy(
-        cancellation = cancelledWhen(::runDeadline) { sliceCancelled() },
+        cancellation = cancelledWhen(::runDeadline, { params0.cancellation.workScheduled() }) { sliceCancelled() },
         minHammingDistance = 0,
         recentWindow = 0,
     )
@@ -194,7 +195,9 @@ internal class ResumableMinimize(
 
     // solveCancelled as a token that also states the run's deadline, so a phase it is handed can budget a share of
     // the time left (Cancellation.shorten) rather than read a bare predicate as having no time limit at all.
-    private fun runEndToken(): Cancellation = cancelledWhen(::runDeadline) { solveCancelled() }
+    private fun runEndToken(): Cancellation = cancelledWhen(::runDeadline, { baseCancellation.workScheduled() }) {
+        solveCancelled()
+    }
 
     private fun runDeadline(): ComparableTimeMark? = (if (pausable) globalToken else baseCancellation).deadline()
 
@@ -389,7 +392,7 @@ internal class ResumableMinimize(
         cp = CpSearchComponent(
             (preparedSession ?: PropagationSession(
                 solver.propagationProjection(params.nativeSat ?: true, problem),
-                cancelledWhen(::runDeadline) { solveCancelled() },
+                cancelledWhen(::runDeadline, { baseCancellation.workScheduled() }) { solveCancelled() },
                 params.propagationCancelFloor,
                 nativeSat = params.nativeSat ?: true,
                 pbLearning = params.pbLearning ?: (problem.numIntVars == 0),
@@ -961,7 +964,8 @@ internal class ResumableMinimize(
             }
             proposal.copy(reals = real.reals, exactReals = real.exactReals)
         } else proposal
-        val budget = cancellation or Cancellation.after(LP_VERIFY_BUDGET)
+        val budget = if (cancellation.workScheduled()) cancellation else
+            cancellation or Cancellation.after(LP_VERIFY_BUDGET)
         if (budget()) return decline("CANCELLED")
         val verifier = ComposedSampleVerifier(problem, objective, budget,
             params.assumptions, onWork, params.toleranceCheck)
@@ -991,7 +995,8 @@ internal class ResumableMinimize(
         val sample = initialCandidate ?: return null
         initialCandidate = null
         if (params.componentFactory != null) return null
-        val token = params.cancellation or Cancellation.after(LP_VERIFY_BUDGET)
+        val token = if (params.cancellation.workScheduled()) params.cancellation else
+            params.cancellation or Cancellation.after(LP_VERIFY_BUDGET)
         if (token() || sample.numBoolVars != problem.numBoolVars || sample.numIntVars != problem.numIntVars) return null
         val validation = PropagationSession(problem, token)
         if (validation.seed(params.assumptions) is PropagationResult.Unsat || validation.isUnsatAtRoot) return null
@@ -1190,7 +1195,8 @@ internal class ResumableMinimize(
         return params.cancellation or
             Cancellation { lpEngine.workSpentExceeds(opsBudget, sink.lp.standaloneWork) ||
                 lpEngine.lpWorkAllowanceSpent(sink.lp.standaloneWork) } or
-            Cancellation.after(budgetMillis.coerceAtLeast(0).milliseconds)
+            if (params.cancellation.workScheduled()) Cancellation.Never else
+                Cancellation.after(budgetMillis.coerceAtLeast(0).milliseconds)
     }
 
     /** Milliseconds left until the effective deadline: the armed slice end (pausable portfolio path),

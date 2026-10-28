@@ -74,7 +74,8 @@ fun interface Cancellation {
     infix fun and(other: Cancellation): Cancellation {
         val self = this
         val meter = self.workMeter() ?: other.workMeter()
-        return object : Cancellation {
+        return object : SchedulingCancellation {
+            override val workScheduled: Boolean = self.workScheduled() || other.workScheduled()
             override fun isCancelled(): Boolean = self.isCancelled() && other.isCancelled()
             override fun workMeter(): WorkMeter? = meter
         }
@@ -132,7 +133,8 @@ private class OrCancellation(
     other: Cancellation,
     private val combined: ComparableTimeMark?,
     private val meter: WorkMeter?,
-) : Cancellation {
+) : SchedulingCancellation {
+    override val workScheduled: Boolean = self.workScheduled() || other.workScheduled()
     private val tokens: Array<Cancellation> = buildList<Cancellation> {
         if (self is OrCancellation) {
             for (token in self.tokens) appendOrdered(token)

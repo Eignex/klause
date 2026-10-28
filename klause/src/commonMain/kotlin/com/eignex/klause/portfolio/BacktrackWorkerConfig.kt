@@ -102,7 +102,9 @@ internal class BacktrackWorkerConfig(
                         } else 0.0
                         matchedPools.contributions.note(Contribution.Floor, index, raise)
                     },
-                    objectiveLowerBoundSupplier = bounds::current,
+                    objectiveLowerBoundSupplier = {
+                        bounds.current().also { meter.observed(SharingChannel.Floor, it.toBits()) }
+                    },
                     sharingTimer = meter::charge,
                 )
                 sharing += Contribution.Floor
