@@ -4058,10 +4058,34 @@ outside the proposed initial guard; preparing the reified rows refutes at root.
 This contradiction therefore supplies no eligible prepared source for a new order
 consumer. The capture retains construction, search, check and cumulative thread
 allocation costs; allocation is not peak storage or RSS.
-No dynamic order consumer is qualified by these controls. Original-source
-consumption remains unavailable: compiler-capable cloud placement was not
-advertised, and the unstarted local-only capture 8913 was cancelled when local
-placement was disallowed.
+
+[Original-source capture 8935](https://lab.eignex.com/jobs/8935), at `0fa5390dca`,
+compiles the hash-pinned `2023/test-scheduling/t20m10r10-17` source with MiniZinc
+2.10.1 on cloud Linux/amd64 and exits 0. It retains the compiler executable,
+standard-library, solver-library and configuration hashes, original bytes,
+FlatZinc and output mapping. Its four controls use the same decision/time caps
+and one-CPU, 4,608 MiB budget. All ten prepared native unary factors retain
+mandatory fixed positive tasks with distinct starts, and the existing difference
+system survives. This source is eligible; compiler availability and prepared
+shape do not supply a rejection.
+
+The first order commits and raises a start lower bound from 0 to 49. Both
+input-order controls, with and without that pair, return native-checked witnesses
+in 74 nodes with no conflicts or learned clauses. The overlay raises propagation
+work from 333,115 to 358,556 and prepared factors from 413 to 416. The annotated
+control preserves the source selectors and reaches the 256-decision cap with
+557 conflicts; default VSIDS reaches it with 44. Both return unknown. These
+selector contrasts establish no order-specific gain. Traces stop at 128 records;
+the complete solve statistics and native witness checks remain recorded.
+
+Stop the bounded first-pair proposal: it enforces the partition and propagates,
+but supplies no useful search reduction or reusable conflict beyond the retained
+controls. Together with the authored prepared shared-start barrier, this does
+not qualify a dynamic consumer. This is a bounded applicability disposition,
+not a claim about every scheduling source or pair policy. The source runs are
+satisfaction projections, with no original-objective, independent MiniZinc
+witness/proof or throughput claim. Explicit annotations remain authoritative;
+the pair-first arm is only a separate diagnostic control.
 
 ### Portfolio slice policy
 
