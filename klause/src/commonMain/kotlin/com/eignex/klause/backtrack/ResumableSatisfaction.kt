@@ -50,7 +50,9 @@ internal class ResumableSatisfaction(
         params,
         sink,
         solver.lpSolveContext,
-        propagationCancellation = Cancellation { globalToken() },
+        propagationCancellation = cancelledWhen({ globalToken.deadline() }, { globalToken.workScheduled() }) {
+            globalToken()
+        },
         projection = preparedSession?.projection ?: solver.propagationProjection(params.nativeSat ?: true),
         deferredInitialization = true,
         singleModel = true,

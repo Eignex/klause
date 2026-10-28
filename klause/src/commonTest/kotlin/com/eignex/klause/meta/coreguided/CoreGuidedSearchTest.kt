@@ -44,6 +44,8 @@ import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.SchedulingCancellation
+import com.eignex.klause.util.workScheduled
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -55,6 +57,33 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TestTimeSource
 
 class CoreGuidedSearchTest {
+    @Test
+    fun `work scheduled queries should retain policy through preparation and ignore the slice clock`() {
+        val clock = TestTimeSource()
+        var marked = false
+        val token = object : SchedulingCancellation {
+            override val workScheduled: Boolean = true
+            override fun isCancelled(): Boolean = false
+        }
+        val params = BacktrackParams(nativeSat = false, componentFactory = {
+            listOf(object : SearchComponent {
+                override fun check(context: SearchContext): ComponentCheck {
+                    marked = context.executionControls.cancellation.workScheduled()
+                    clock += 2.seconds
+                    return ComponentCheck.Feasible
+                }
+            })
+        })
+        val objective = LinearObjective(longArrayOf(1))
+        val search = CoreGuidedSearch(Problem(1, 0, emptyArray(), emptyArray()).bake(), objective,
+            params, timeSource = clock)
+
+        val result = search.runSlice(token, 1_000L, -1L) {}
+
+        assertTrue(marked)
+        assertEquals(0L, objective.evaluateLong(assertIs<MinimizeResult.Optimal>(result).sample))
+    }
+
     @Test
     fun `cancelled prepared delegate construction should retain its query for retry`() {
         var cancelled = false
