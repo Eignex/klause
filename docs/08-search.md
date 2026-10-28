@@ -433,6 +433,14 @@ Cumulative edge-finding runs in both time directions over fixed durations, deman
 and capacity, declining the reversed pass when its arithmetic is not safely
 representable.
 
+Unary resources also check overload over minimum durations while a duration is
+unfixed or a presence unknown. Present tasks whose minima cannot fit between their
+earliest start and latest completion conflict, and an unknown task whose minimum
+would overload them is ruled absent; any channel over that presence then consumes
+the exclusion. Its reason cites the overloaded set's start bounds, minimum
+durations and member presences, never the excluded presence. Zero minima add no
+load, and unrepresentable completion times decline the check.
+
 Diffn's constant-size sweep filters positive-area compulsory parts. Strict boxes
 with a zero dimension also receive the pairwise separation check, so the sweep's
 empty-area shortcut cannot admit an invalid complete assignment. Non-strict boxes

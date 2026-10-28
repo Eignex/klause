@@ -69,8 +69,9 @@ class Cumulative(
     /** Capacity: constant fallback / upper bound (when [capacityVar] ≥ 0 holds the var's ub). */
     val capacity: Long,
     /** Per-task presence literals; empty for the non-opt fast path. Absent tasks contribute
-     *  zero energy and no compulsory part; propagation uses only definitely present tasks, since
-     *  an unpinned task may yet go absent. */
+     *  zero energy and no compulsory part; propagation filters with definitely present tasks only,
+     *  since an unpinned task may yet go absent. In the [unary] shape, an unpinned task whose
+     *  minimum duration would overload the present tasks is ruled absent. */
     override val presents: IntArray = EmptyIntArray,
     /** Per-task duration variables; empty = use [durations] as constants. When set, the
      *  factor reads the current duration from `state.assignment.intValue(durationVars(i))`
