@@ -60,7 +60,8 @@ controls and establish no solver throughput or verdict claim.
 `bench.profile.CoreQueryProfile` compares retained and ordinarily prepared Boolean
 core controls with unrelated cheap objective pins. It takes no arguments. Two source
 shapes, four OLL policies and three repeats give 48 two-second cases within a
-180-second lab profile. It retains source/objective hashes, actual query/core
+180-second lab profile, alongside 24 matched ordinary BnB controls with LP
+off/default. It retains source/objective hashes, actual query/core
 sequences, source point checks, preparation and complete-handle time/allocation,
 work and thresholds. Policies include removing root-satisfied cost pins. The
 opt-in propagation-deletion control shares the worker's
