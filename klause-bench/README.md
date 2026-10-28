@@ -4336,7 +4336,9 @@ absent inputs compile through the positive fragment.
 The capture harness appended a second solution terminator after the writer's
 existing terminator. [Output replay 8975](https://lab.eignex.com/jobs/8975) reuses
 the frozen points and output models with that empty block removed; it runs no
-solver. Some authored output models also contain an undefined absent `deopt` or
+solver. Both original sources render successfully in both libraries, including
+`p=false; task=<>` with the native control's independent `c=2` value and workforce's
+allocation, starts and optional totals. Some authored output models also contain an undefined absent `deopt` or
 an undeclared `int_ne`; both libraries retain these compiler-output declines.
 They supply no complete-source output validation. The original control and
 workforce output checks are separate from these limits and from the native factor
