@@ -7766,3 +7766,41 @@ resource receipts remain outside Git in
 `klause-evidence/campaigns/guarded-integer-rows-3752-3755/` beside the primary checkout.
 Job 8899 failed profile compilation before any case ran; no local builds, tests or
 numerical work ran. Neither gate supplies independent source-witness or proof checking.
+
+### Prepared arithmetic learning replay
+
+`PreparedArithmeticLearningProfile` freezes the two source shapes from the direct
+PB and integer-row controls as OPB and FlatZinc bytes. It compares the learners
+independently, with the other learner disabled. Twelve cells distinguish retained
+finite conflict replay, normal finite preparation followed by the identical replay,
+and production finite solving with normal preparation and automatic LP. The LP
+route answers whether the strong ordinary owner already discharges the source;
+its changed search trajectory is separate from same-conflict deduction comparisons.
+
+The fixed conflict script runs only when lossless canonical and prepared model
+identities match. Rewrites without a qualified coordinate mapping are an explicit
+replay decline, never a guessed source-variable remap or evidence of universal
+inapplicability. Records retain original bytes/hashes, canonical and prepared JSON,
+preparation statistics, conflict/fallback/native/shared levels, historical endpoint
+markers and holes, arithmetic store identities, actual later pins, and truncation.
+Normal preparation may use its ordinary probing/LP passes; capture adds no solve.
+Both learners retain their existing default admission policy.
+
+Each cell has two warmups and two measured invocations, with the second pass in
+reverse order: 48 invocations, at most two seconds each, in one lab profile capped
+at 180 seconds. This is a bounded diagnostic, not a corpus gate. Complete disjoint
+intervals include parsing, preparation, session construction, analysis, search or
+script replay, original-point checking, release and capture serialization. Record
+file writes are outside the interval. Traces remain optional; warmed JFR timing and
+current-thread allocation include their overhead and establish no uninstrumented
+throughput or physical memory advantage. Releasing references does not time future
+GC. Warmups, failed attempts, skips and preparation changes remain in the records.
+
+Script points are explicit feasible original-source controls, separate from search
+witnesses. Production points are reconstructed to original coordinates before a
+fresh native point check. Neither route has an independent witness or exported
+proof checker. Do not add cumulative checkpoints or infer consumption from storage
+alone. Review PB and integer costs independently; no prepared consumer or losing
+total work/storage rejects practical admission for that selected source, without
+claiming a broad negative or enabling a default. Raw records belong under
+`klause-evidence/campaigns/prepared-arithmetic-3757/` beside the primary checkout.
