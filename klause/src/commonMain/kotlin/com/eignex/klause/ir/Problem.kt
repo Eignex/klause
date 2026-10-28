@@ -33,18 +33,19 @@ open class Problem(
      * Per-factor flag marking constraints the model declared as *implied* — MiniZinc's
      * `redundant_constraint` / `symmetry_breaking_constraint` (surfaced via the klause MZN
      * library's annotation) or XCSP3's `redundantConstraints` / `symmetryBreaking` classes.
-     * Indexed parallel to [factors]; `null` (the common case) means no factor is implied. Local search seeds these factors a lower initial violation weight so
-     * the bulk of redundant / symmetry rows don't dominate the weighted-violation landscape
-     * before the structural constraints are satisfied; every other consumer ignores it (the
-     * constraints are still posted and propagate normally).
+     * Indexed parallel to [factors]; `null` (the common case) means no factor is implied. Local
+     * search seeds these factors a lower initial violation weight so the bulk of redundant /
+     * symmetry rows don't dominate the weighted-violation landscape before the structural
+     * constraints are satisfied; every other consumer ignores it (the constraints are still posted
+     * and propagate normally).
      */
     val impliedFactorMask: BooleanArray? = null,
     /**
      * True when the model declared at least one `symmetry_breaking_constraint` or XCSP3
      * `symmetryBreaking` constraint. Presolve uses it to skip its own symmetry breaking
-     * ([com.eignex.klause.presolve.PresolvePass.BREAK_SYMMETRIES])
-     * by default — stacking klause's automorphism break on top of the model's hand-written one
-     * is redundant and the two can interact.
+     * ([com.eignex.klause.presolve.PresolvePass.BREAK_SYMMETRIES]) by default — stacking klause's
+     * automorphism break on top of the model's hand-written one is redundant and the two can
+     * interact.
      */
     val hasSymmetryBreaking: Boolean = false,
     /**
