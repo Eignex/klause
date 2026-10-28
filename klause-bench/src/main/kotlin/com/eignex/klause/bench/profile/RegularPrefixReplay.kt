@@ -78,16 +78,16 @@ internal fun regularPrefixDefinitions(source: Problem): RegularPrefixDefinitions
                     val tuples = ArrayList<Long>()
                     for (q in 0..factor.numStates) {
                         for (symbol in 1..factor.alphabetSize) {
-                        val next = if (q == 0) {
-                            0L
-                        } else {
-                            factor.transitions[(q - 1) * factor.alphabetSize + symbol - 1]
-                            .takeIf { it in 1L..factor.numStates.toLong() } ?: 0L
+                            val next = if (q == 0) {
+                                0L
+                            } else {
+                                factor.transitions[(q - 1) * factor.alphabetSize + symbol - 1]
+                                    .takeIf { it in 1L..factor.numStates.toLong() } ?: 0L
+                            }
+                            tuples.add(q.toLong())
+                            tuples.add(symbol.toLong())
+                            tuples.add(next)
                         }
-                        tuples.add(q.toLong())
-                        tuples.add(symbol.toLong())
-                        tuples.add(next)
-                    }
                     }
                     cells += tuples.size
                     require(cells <= 32_768)
@@ -105,12 +105,12 @@ internal fun regularPrefixDefinitions(source: Problem): RegularPrefixDefinitions
     for (q in 1..count) {
         factors.add(
             ReifiedLinear(
-        booleans[q - 1],
-        longArrayOf(1),
-        intArrayOf(target),
-        LinearOp.EQ,
-        q.toLong(),
-    )
+                booleans[q - 1],
+                longArrayOf(1),
+                intArrayOf(target),
+                LinearOp.EQ,
+                q.toLong(),
+            ),
         )
     }
     val mask = source.impliedFactorMask?.let { original ->
@@ -120,16 +120,17 @@ internal fun regularPrefixDefinitions(source: Problem): RegularPrefixDefinitions
     }
     return RegularPrefixDefinitions(
         Problem(
-        source.numBoolVars + count,
-        domains.size,
-        domains.toTypedArray(),
-        factors.toTypedArray(),
-        impliedFactorMask = mask,
-        hasSymmetryBreaking = source.hasSymmetryBreaking,
-        settings = source.settings,
-        semantics = source.semantics,
-    ),
-        chosen, booleans
+            source.numBoolVars + count,
+            domains.size,
+            domains.toTypedArray(),
+            factors.toTypedArray(),
+            impliedFactorMask = mask,
+            hasSymmetryBreaking = source.hasSymmetryBreaking,
+            settings = source.settings,
+            semantics = source.semantics,
+        ),
+        chosen,
+        booleans,
     )
 }
 
@@ -162,10 +163,10 @@ internal object RegularPrefixReplay {
             val cp = CpSearchComponent(native, branching = originalBranching)
             val component = if (mode.endsWith("source-reasons")) {
                 SourceReasons(
-                cp,
-                source.numIntVars,
-                source.numBoolVars,
-            )
+                    cp,
+                    source.numIntVars,
+                    source.numBoolVars,
+                )
             } else {
                 cp
             }
@@ -239,9 +240,9 @@ internal object RegularPrefixReplay {
                     "helperClauseSamples",
                     JsonArray(
                         helperClauses.take(16).map { index ->
-                    JsonArray((clauseGetter.invoke(native, index) as IntArray).map(::JsonPrimitive))
-                }
-                    )
+                            JsonArray((clauseGetter.invoke(native, index) as IntArray).map(::JsonPrimitive))
+                        },
+                    ),
                 )
                 put("definitionNs", if (mode.startsWith("definitions")) definitionNs else 0)
                 put("definitionThreadBytes", if (mode.startsWith("definitions")) definitionBytes else 0)
@@ -302,16 +303,16 @@ internal object RegularPrefixReplay {
                 } else {
                     check(
                         session.addLearnedClause(
-                        Clause(IntArray(boundary) { session.boundGeLit(it, 2, true) }),
-                        boundary,
-                    ) is PropagationResult.Implied
+                            Clause(IntArray(boundary) { session.boundGeLit(it, 2, true) }),
+                            boundary,
+                        ) is PropagationResult.Implied,
                     )
                 }
                 var completed = 0
                 var beforePin = false
                 for (v in 0 until boundary) {
                     if (symbol !in session.intDomain(v)) {
-                        beforePin = true;
+                        beforePin = true
                         break
                     }
                     if (session.pinInt(v, symbol) is PropagationResult.Unsat) break
