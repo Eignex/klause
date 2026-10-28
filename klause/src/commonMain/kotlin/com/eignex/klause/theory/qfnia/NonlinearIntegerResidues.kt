@@ -41,13 +41,14 @@ internal class NonlinearIntegerResidues(
     private val indices = HashMap<PolynomialExpression, Int>()
     private val variables = LinkedHashMap<Int, Int>()
     private val equations = ArrayList<Pair<Int, Int>>()
+    private var multivariate = false
     private var cells = 0
     var stats = NonlinearIntegerResidueCounts()
         private set
 
     fun refutes(): Boolean = try {
         prepare()
-        if (equations.isEmpty() || variables.size < 2) false else {
+        if (!multivariate) false else {
             reserve(nodes.size * 3 + nodes.sumOf { it.args.size } + equations.size * 2 + variables.size)
             var refuted = false
             for (modulus in MODULI) {
@@ -101,6 +102,9 @@ internal class NonlinearIntegerResidues(
                 is PolynomialRealFormula.Atom -> if (formula.relation == PolynomialRelation.EQ) {
                     val left = compile(formula.left, integers)
                     val right = compile(formula.right, integers)
+                    multivariate = multivariate ||
+                        minOf(nodes[left].firstVariable, nodes[right].firstVariable) <
+                        maxOf(nodes[left].lastVariable, nodes[right].lastVariable)
                     reserve(2)
                     equations.add(left to right)
                 }
@@ -129,7 +133,7 @@ internal class NonlinearIntegerResidues(
                 for (child in children.asReversed()) pending.addLast(child to false)
                 continue
             }
-            reserve(children.size + 4)
+            reserve(children.size + 6)
             val args = children.map { indices.getValue(it) }
             val denominator = when (expression) {
                 is PolynomialExpression.Constant -> {
@@ -148,7 +152,9 @@ internal class NonlinearIntegerResidues(
                 variables.getOrPut(expression.id.index) { variables.size }
             } else -1
             indices[expression] = nodes.size
-            nodes.add(ResidueNode(expression, denominator, args, variable))
+            nodes.add(ResidueNode(expression, denominator, args, variable,
+                if (variable >= 0) variable else args.minOfOrNull { nodes[it].firstVariable } ?: Int.MAX_VALUE,
+                if (variable >= 0) variable else args.maxOfOrNull { nodes[it].lastVariable } ?: -1))
         }
         return indices.getValue(root)
     }
@@ -266,6 +272,8 @@ private class ResidueNode(
     val denominator: BigInt,
     val args: List<Int>,
     val variable: Int,
+    val firstVariable: Int,
+    val lastVariable: Int,
 )
 private class ResidueDecline : RuntimeException()
 private val MODULI = intArrayOf(2, 3, 4, 5, 8)

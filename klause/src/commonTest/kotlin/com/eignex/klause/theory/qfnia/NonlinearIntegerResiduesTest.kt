@@ -78,6 +78,7 @@ class NonlinearIntegerResiduesTest {
             "(assert (< (+ (* x x) (* y y)) 3))",
             "(assert (= (+ (* x x) (* r r)) 3))",
             "(assert (= (+ (* x x) (ite b (* y y) 0)) 3))",
+            "(assert (= (* x x) 2)) (assert (= (* y y) 3))",
         )) {
             val residues = NonlinearIntegerResidues(source(assertion), PolynomialArithmetic(), PolynomialLimits())
 
