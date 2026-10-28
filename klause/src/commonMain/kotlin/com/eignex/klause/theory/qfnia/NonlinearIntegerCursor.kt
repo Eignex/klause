@@ -63,9 +63,10 @@ internal class NonlinearIntegerCursor(
     private var rootWindows = arrayOfNulls<List<BigInt>>(coordinates.size)
     private var rooted = false
     private var rootStats = NonlinearIntegerRootCounts()
+    private var residueStats = NonlinearIntegerResidueCounts()
 
     val stats: NonlinearIntegerStats get() = NonlinearIntegerStats(
-        candidates, moves, repairs, invocation.queries, polynomialStats(), cells.stats, rootStats,
+        candidates, moves, repairs, invocation.queries, polynomialStats(), cells.stats, rootStats, residueStats,
     )
     val isDone: Boolean get() = terminal != null
 
@@ -115,6 +116,15 @@ internal class NonlinearIntegerCursor(
     private fun initialize(): QfNraResult? {
         arithmetic.step()
         if (params.maximumCandidates == 0L) return unknown()
+        if (params.residueRefutation) {
+            val residues = NonlinearIntegerResidues(problem, arithmetic, params.arithmetic.polynomialLimits)
+            val refuted = try {
+                residues.refutes()
+            } finally {
+                residueStats = residues.stats
+            }
+            if (refuted) return QfNraResult.Unsatisfiable(polynomialStats())
+        }
         condition = problem.integerBounds(condition, arithmetic)
         if (condition.lower.any { (id, value) -> condition.upper[id]?.let { it < value } == true }) {
             return QfNraResult.Unsatisfiable(polynomialStats())

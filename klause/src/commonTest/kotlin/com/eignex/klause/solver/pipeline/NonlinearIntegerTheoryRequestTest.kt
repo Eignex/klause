@@ -24,6 +24,23 @@ import kotlin.test.assertTrue
 
 class NonlinearIntegerTheoryRequestTest {
     @Test
+    fun `residue refutations should close complete source search before polynomial completion`() {
+        val source = assertIs<NonlinearIntegerProblem>(SmtLib.parse(
+            "(declare-const x Int) (declare-const y Int) (declare-const z Int) " +
+                "(assert (= (+ (* x x) (* y y)) (+ (* 4 z) 3)))",
+        ).source.originalSource)
+
+        val execution = OpenTheoryPipeline.execute(source.pipelineRequest(),
+            NonlinearIntegerTheoryParams(residueRefutation = true), FiniteEngine.BACKTRACK)
+
+        assertIs<OpenTheoryResult.Unsat>(execution.result)
+        val residues = assertNotNull(execution.integerResidues)
+        assertEquals(1L, residues.refutedScopes)
+        assertTrue(residues.tuples > 0)
+        assertTrue(residues.workSpent <= execution.stats.workSpent)
+    }
+
+    @Test
     fun `a nonlinear request should keep the prepared source declaration mapping`() {
         val source = assertIs<NonlinearIntegerProblem>((
             SmtLib.parse(

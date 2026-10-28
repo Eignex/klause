@@ -104,6 +104,17 @@ Arm values are `solve-one` options; `param.<name>` becomes `--param <name>=<valu
 
 ## Selection and named sets
 
+`nonlinear-integer-residues-v1` and its matching
+`smtlib-nonlinear-integer-residues-v1` suite retain ten synthetic multivariate
+integer equality controls. Their [notes](smoke-corpus/nonlinear-integer-residues-v1/README.md)
+give independent mathematical expectations and pinned source hashes. Compare
+`nia-residues=false` and `true` with identical work and candidate controls;
+`niaResidueRings`, `niaResidueTuples`, `niaResidueWork`,
+`niaResidueRefutedScopes` and `niaResidueDeclines` expose completed and incomplete
+native work. Residue work is included in the containing polynomial allowance.
+The option defaults off; synthetic refutation capability establishes no corpus
+benefit or default activation case.
+
 `sets/<name>.txt` fixes membership as one `<suite>/<problem>` identity per line,
 matching `select`; `@<set>` includes another set and `#` starts a comment.
 Focused sets cover the structural themes reported by `select features=true`:

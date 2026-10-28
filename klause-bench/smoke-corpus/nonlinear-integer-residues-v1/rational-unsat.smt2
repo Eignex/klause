@@ -1,0 +1,6 @@
+(set-logic ALL)
+(declare-const x Int)
+(declare-const y Int)
+(declare-const z Int)
+(assert (= (+ (* (/ 1 2) x x) (* (/ 1 2) y y)) (/ 3 2)))
+(check-sat)
