@@ -12,6 +12,8 @@ import com.eignex.klause.bench.catalog.Catalog
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
+import com.eignex.klause.bench.runner.MiniZincCompatibility
+import com.eignex.klause.bench.runner.MiniZincRunner
 import com.eignex.klause.bench.runner.Runners
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
@@ -122,6 +124,8 @@ internal object TaskOrderProfile {
             put("addedOrderBooleans", model.numBoolVars - source.numBoolVars)
             put("addedOrderFactors", model.factors.size - source.factors.size)
             put("preparedUnaryFactors", baked.factors.filterIsInstance<Cumulative>().count { it.unary })
+            put("preparedUnaryShapes", JsonArray(baked.factors.filterIsInstance<Cumulative>()
+                .filter { it.unary }.map { JsonPrimitive(unaryShape(it)) }))
             put("preparedDifferenceSystems", baked.factors.count { it.javaClass.simpleName == "DifferenceSystem" })
             put("preparedFactors", baked.factors.size)
             put("preparationNs", preparationNs)
@@ -136,6 +140,7 @@ internal object TaskOrderProfile {
             put("learnedClauses", result.stats.search.learnedClauses.sum)
             put("propagationWork", result.stats.search.propagationWork.sum)
             put("traceCapped", trace.size >= TRACE_LIMIT)
+            put("deadlineReached", stop())
         }.toString())
     }
 
@@ -192,6 +197,10 @@ internal object TaskOrderProfile {
             out.resolve("source-$label.txt").writeBytes(bytes)
         }
         val resolved = Runners.resolve(reference)
+        val compiler = MiniZincRunner()
+        compiler.compileFzn(reference).copyTo(out.resolve("source.fzn"))
+        compiler.compileOutput(reference).copyTo(out.resolve("source.ozn"))
+        Reports.writeJson(out.resolve("compiler.json").path, MiniZincCompatibility.compiler)
         val source = resolved.problem
         out.resolve("source-shape.json").writeText(buildJsonObject {
             put("suite", options.getValue("suite"))
@@ -247,4 +256,8 @@ internal object TaskOrderProfile {
             val domain = session.intDomain(it)
             "$it:${domain.min}..${domain.max}"
         }
+
+    private fun unaryShape(factor: Cumulative): String =
+        "tasks=${factor.n},presence=${factor.presents.size},durationVars=${factor.durationVars.size}," +
+            "zeros=${factor.durations.count { it == 0L }},sharedStarts=${factor.n - factor.starts.toSet().size}"
 }
