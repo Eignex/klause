@@ -59,11 +59,17 @@ internal object SymmetryBreaking {
     fun breakObjectiveSymmetries(problem: BakedProblem, context: PresolveContext): PassDelta {
         val objective = context.linearObjective ?: return PassDelta()
         if (context.solutionSetSensitive || context.modelBreaksSymmetry || problem.numRealVars != 0 ||
-            problem.semantics.isApproximate || objective.realCoefficientValues.any { it != 0.0 } ||
-            (context.objectiveIntVars.isEmpty() && context.objectiveBoolVars.isEmpty())
+            problem.semantics.isApproximate || objective.realCoefficientValues.any { it != 0.0 }
         ) return PassDelta()
+        val ints = objective.intCoefficientValues
+        val bools = objective.boolWeightValues
+        context.cancellation.charge(ints.size.toLong() + bools.size)
+        if (context.cancellation()) return PassDelta()
+        val objectiveInts = ints.indices.filter { ints[it] != 0L }.toSet()
+        val objectiveBools = bools.indices.filter { bools[it] != 0L }.toSet()
+        if (objectiveInts.isEmpty() && objectiveBools.isEmpty()) return PassDelta()
         val extra = breakings(
-            problem, FiniteColumns(problem), context.objectiveIntVars, context.objectiveBoolVars,
+            problem, FiniteColumns(problem), objectiveInts, objectiveBools,
             context.cancellation, objective,
         )
         return if (extra.isEmpty()) PassDelta() else PassDelta(addedFactors = extra)

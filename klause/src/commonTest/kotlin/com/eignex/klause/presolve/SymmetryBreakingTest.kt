@@ -268,6 +268,23 @@ class SymmetryBreakingTest {
     }
 
     @Test
+    fun `value protection should follow the exact objective rather than stale support metadata`() {
+        val problem = Problem(
+            0, 3, arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(5, 7)),
+            listOf(AllDifferent(intArrayOf(0, 1)), Table(intArrayOf(2), longArrayOf(5, 6, 7))),
+        ).bake()
+        val context = PresolveContext(
+            objectiveIntCoeffs = mapOf(0 to 1L),
+            linearObjective = LinearObjective(intCoefficients = longArrayOf(0, 0, -1)),
+        )
+
+        val delta = PresolvePass.BREAK_OBJECTIVE_SYMMETRIES.applyFinite(problem, context)
+        val reduced = problem.withPassDelta(delta, BakeConfig.NONE)
+
+        assertTrue(isFeasible(reduced, BooleanArray(0), longArrayOf(0, 1, 7)))
+    }
+
+    @Test
     fun `objective symmetry should keep unread objective columns fixed`() {
         val problem = Problem(0, 3, Array(3) { IntDomain(0, 3) }, listOf(AllDifferent(intArrayOf(0, 2)))).bake()
         val context = PresolveContext.of(
