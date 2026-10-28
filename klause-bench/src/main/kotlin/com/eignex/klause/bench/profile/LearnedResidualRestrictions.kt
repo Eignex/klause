@@ -91,7 +91,7 @@ internal object LearnedResidualRestrictions {
             val bound = if (clause) 1L else field(requireNotNull(prop), "bound") as Long
             val op = if (clause) PbOp.GE else field(requireNotNull(prop), "op") as PbOp
             val supported = literals.all { Lit.variable(it) in 0 until session.problem.numBoolVars } &&
-                (weights == null || weights.size == literals.size && weights.all { it >= 0L }) && op == PbOp.GE
+                (weights == null || (weights.size == literals.size && weights.all { it >= 0L })) && op == PbOp.GE
             if (!supported) {
                 entries += LearnedResidualRestriction(index, kind, permanent, null, null, false)
                 continue
@@ -109,7 +109,9 @@ internal object LearnedResidualRestrictions {
             }
             val factor = if (clause) Clause(literals.copyOf()) else
                 PseudoBoolean(requireNotNull(weights), literals, op, bound)
-            entries += LearnedResidualRestriction(index, kind, permanent, factor, support.sorted(), degree.signum() <= 0)
+            entries += LearnedResidualRestriction(
+                index, kind, permanent, factor, support.sorted(), degree.signum() <= 0,
+            )
         }
         return LearnedResidualInspection(entries, count, null)
     }
