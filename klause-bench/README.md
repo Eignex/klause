@@ -115,6 +115,29 @@ native work. Residue work is included in the containing polynomial allowance.
 The option defaults off; synthetic refutation capability establishes no corpus
 benefit or default activation case.
 
+`nonlinear-integer-boolean-residues-v1` adds complete Boolean coverage and
+negated-support controls; its [notes](smoke-corpus/nonlinear-integer-boolean-residues-v1/README.md)
+give mathematical expectations and pinned hashes. `niaResidueExcludedAtoms` counts
+globally impossible equalities consumed in NIA-owned completion. Cloud
+[9023](https://lab.eignex.com/jobs/9023), at `4ad31e769a`, compares five sources
+with residues off/on, eight candidates, 100,000 containing work units and
+two-second cases on Linux amd64. All ten executions load the original source.
+The frozen guarded alternative changes UNKNOWN to SAT after one exclusion;
+Dolmen accepts its original-source witness. Total native work is 5,061 off and
+1,756 on, including 1,158 residue steps. Process elapsed times are 897 and 924 ms,
+so the work reduction establishes no process-throughput gain.
+
+The two-impossible-alternative source changes UNKNOWN to native UNSAT after two
+exclusions and 2,239 residue steps, with complete Boolean coverage. The negated
+supported equality stays SAT, with both models accepted by Dolmen, while adding
+1,295 native work units. The inconclusive and real-supported sources stay UNKNOWN,
+adding 2,235 and 55 units; the latter records unsupported-coordinate declines.
+Original hashes, revision/build/runtime/platform identities, process costs and
+checker resource receipts remain with the job. Native UNSAT has no exported
+certificate or independent reference replay. The older twelve-source audit has no
+newly impossible admitted atom: its guarded equalities are unary and its open
+product has support. The option remains disabled by default.
+
 The bounded cloud comparison [8976](https://lab.eignex.com/jobs/8976), at
 `6b0ffe9cf1`, uses all ten sources with identical off/on arms, eight candidates,
 100,000 native work units and a two-second case budget on Linux amd64. All sources
