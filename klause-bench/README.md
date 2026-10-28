@@ -2881,6 +2881,21 @@ containing state Booleans from clauses containing helper integer-state atoms.
 
 ### Table profiling
 
+`bench.profile.TableCostProfile` takes `suite=ID problem=NAME sha256=HEX` for
+one XCSP3 optimization source. A MiniZinc source also requires `dataSha256=HEX`.
+It captures source and explicit off/default mixed-route preparation, integer
+domains, objective coefficients, Table shapes and every ternary Table's readers.
+Binary objective views retain their pre-channel problem and integer coefficients
+beside the working Boolean costs. MiniZinc captures include original model/data,
+FlatZinc, output mapping and compiler identity. These are preparation observations,
+without search or source verdicts.
+
+Inputs admit 64 MiB per source file, 100,000 integer columns and factors,
+1,048,576 integer incidences, 4,096 ternary Tables and 1,048,576 reported reader
+references. Tuple payloads are captured only up to 64 rows per Table. Each
+preparation has 30 seconds and 1.65 billion phase work units; interrupted captures
+do not establish complete applicability. MiniZinc compilation has 60 seconds.
+
 `bench.profile.ExtensionalCompositionProfile` accepts `suite=ID problem=NAME
 sha256=HEX` for one XCSP3 source. It retains original bytes and build identity and
 reports table/MDD scope shapes, shared positions, bounded composition work,
