@@ -38,14 +38,14 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             }
             LinearOp.NE -> null
         } ?: return null
-        if (!row.holeFree(state) || row.minimum(state) <= row.bound) return null
+        if (row.minimum(state) <= row.bound) return null
         val used = mutableSetOf<Pair<Int, Int>>()
         repeat(INTEGER_LEARNING_STEPS) {
             state.checkFiniteWork()
             val event = reason(row, used) ?: return null
             used.add(event.key)
             row = row.resolve(event.row, event.variable) ?: return null
-            if (!row.holeFree(state) || row.minimum(state) <= row.bound) return null
+            if (row.minimum(state) <= row.bound) return null
             if (state.learned.integerRows?.any { it.row.sameAs(row) } == true) return null
             for (level in 0 until currentLevel) {
                 val trail = state.integerLearningTrailAtLevel?.invoke(level) ?: continue
@@ -91,9 +91,9 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             if ((source.linear.op == LinearOp.LE && !useLo) || (source.linear.op == LinearOp.GE && useLo)) continue
             val sourceRow = source.row(useLo) ?: continue
             if ((sourceRow.coefficient(variable) > 0L) == lower) continue
-            if (!sourceRow.holeFree(state, marker[2])) continue
             val proposed = sourceRow.boundFor(state, variable, marker[2]) ?: continue
             val domain = state.intDomains[variable]
+            // A snapped endpoint needs its crossed exclusions; the raw row alone must support the pivot.
             if ((lower && proposed < domain.min) || (!lower && proposed > domain.max)) continue
             latest = BoundEvent(sourceRow, variable, marker[2], key)
         }

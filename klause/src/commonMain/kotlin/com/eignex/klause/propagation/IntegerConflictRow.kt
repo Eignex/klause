@@ -39,11 +39,6 @@ internal class IntegerConflictRow private constructor(
         return sum
     }
 
-    fun holeFree(state: PropagationState, trail: Int? = null): Boolean = variables.all {
-        state.checkFiniteWork()
-        domain(state, it, trail).holeCount == 0L
-    }
-
     fun boundFor(state: PropagationState, variable: Int, trail: Int): Long? {
         val pivot = variables.indexOf(variable)
         if (pivot < 0) return null
@@ -62,14 +57,14 @@ internal class IntegerConflictRow private constructor(
 
     fun assertsAt(state: PropagationState, trail: Int): Boolean {
         if (!state.integerGuardTrueAt(guard, trail)) return false
-        if (!holeFree(state, trail)) return false
         val minimum = minimum(state, trail)
         if (minimum > bound) return false
         for (variable in variables) {
             val next = boundFor(state, variable, trail) ?: return false
             val domain = domain(state, variable, trail)
-            if (coefficient(variable) > 0L && next < domain.max) return true
-            if (coefficient(variable) < 0L && next > domain.min) return true
+            val tightens = if (coefficient(variable) > 0L) next < domain.max else next > domain.min
+            // Admission certifies a raw bound assertion, without relying on sparse snapping.
+            if (tightens && state.inDomainAt(variable, next, trail, domain)) return true
         }
         return false
     }
