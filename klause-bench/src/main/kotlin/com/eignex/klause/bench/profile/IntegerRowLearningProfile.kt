@@ -18,6 +18,7 @@ import com.sun.management.ThreadMXBean
 import java.io.File
 import java.lang.management.ManagementFactory
 import java.security.MessageDigest
+import java.util.HexFormat
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -86,8 +87,8 @@ internal object IntegerRowLearningProfile {
                 val record = buildJsonObject {
                     put("revision", Reports.readGitSha())
                     put("source", source)
-                    put("sourceSha256", MessageDigest.getInstance("SHA-256").digest(source.toByteArray())
-                        .joinToString("") { "%02x".format(it) })
+                    put("sourceSha256", HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                        .digest(source.toByteArray())))
                     put("hole", hole?.toString() ?: "none")
                     put("preparation", "retained finite projection; no presolve, difference/binary substitution or LP")
                     put("integerRowLearning", learning)
