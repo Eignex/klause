@@ -19,13 +19,15 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
 import com.eignex.klause.solver.pipeline.FinitePipelineRequest
-import com.eignex.klause.solver.search.ComponentCheck
+import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
+import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.util.Cancellation
 import com.sun.management.ThreadMXBean
 import java.io.File
@@ -43,7 +45,8 @@ internal object CoreQueryLearningProfile {
 
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.isEmpty())
+        require(args.isEmpty() || args.contentEquals(arrayOf("confirm=true")))
+        val repeats = if (args.isEmpty()) 0..2 else 1..1
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
         val lifetime = Cancellation.after(120.seconds)
@@ -61,7 +64,7 @@ internal object CoreQueryLearningProfile {
         val source = Dimacs.parse(sourceText).toProblem()
         val sourceBaked = source.bake()
         out.resolve("learning.jsonl").bufferedWriter().use { output ->
-            for (prepared in listOf(false, true)) for (repeat in 0..2) {
+            for (prepared in listOf(false, true)) for (repeat in repeats) {
                 if (lifetime()) break
                 val before = bean.getThreadAllocatedBytes(thread)
                 val started = System.nanoTime()
@@ -101,6 +104,11 @@ internal object CoreQueryLearningProfile {
                 val captureResult = handle.use { it.runSlice(stop, 2_000L, -1L) {} }
                 val captureNs = System.nanoTime() - started
                 val captureBytes = bean.getThreadAllocatedBytes(thread) - before
+                val capturePoint = (captureResult as? MinimizeResult.WithSample)?.sample?.let {
+                    ordinary?.reconstruct?.invoke(it) ?: it
+                }
+                val captureAccepted = capturePoint?.let { CoreQueryProfile.checkPoint(sourceBaked, it) }
+                if (capturePoint != null) check(captureAccepted == true)
                 var verificationNs = 0L
                 var verificationBytes = 0L
                 var validationNodes = 0L
@@ -114,9 +122,11 @@ internal object CoreQueryLearningProfile {
                     for (replay in listOf(false, true)) {
                         var falseQVisits = 0
                         val observer = object : SearchComponent {
-                            override fun check(context: SearchContext): ComponentCheck {
-                                if (!prepared && context.boolValue(0) == false) falseQVisits++
-                                return ComponentCheck.Feasible
+                            override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
+                                if (!prepared && decision is SearchDecision.Bool &&
+                                    decision.literal == Lit.make(0, false)
+                                ) falseQVisits++
+                                return ComponentResult.Consistent
                             }
                         }
                         val beginBytes = bean.getThreadAllocatedBytes(thread)
@@ -150,6 +160,8 @@ internal object CoreQueryLearningProfile {
                             put("captureNsIncludingDisposal", captureNs)
                             put("captureThreadBytesIncludingDisposal", captureBytes)
                             put("captureResult", captureResult?.javaClass?.simpleName)
+                            put("captureSourceAccepted", captureAccepted)
+                            put("captureSourceObjective", capturePoint?.let { objective.evaluateLong(it) })
                             put("preparedBooleans", model.numBoolVars)
                             put("preparedFactors", model.numFactors)
                             put("query", index)
@@ -160,6 +172,8 @@ internal object CoreQueryLearningProfile {
                             put("availableUnits", JsonArray(available.map { JsonPrimitive(it.single()) }))
                             put("learnedCandidates", JsonArray(candidates.map(::JsonPrimitive)))
                             put("nativeResult", result.javaClass.simpleName)
+                            put("originalQueryResult", (field(captured.handle, "done") as? SolveResult)
+                                ?.javaClass?.simpleName)
                             put("nodes", result.stats.search.nodes.sum)
                             put("propagation", result.stats.search.propagationWork.sum)
                             put("falseQVisits", falseQVisits)
@@ -195,6 +209,8 @@ internal object CoreQueryLearningProfile {
                     put("prepared", prepared)
                     put("repeat", repeat)
                     put("captureResult", captureResult?.javaClass?.simpleName)
+                    put("captureSourceAccepted", captureAccepted)
+                    put("captureSourceObjective", capturePoint?.let { objective.evaluateLong(it) })
                     put("queryCount", 0)
                     put("openedQueryPins", JsonArray(openedPins.map(::JsonPrimitive)))
                 }.toString())
