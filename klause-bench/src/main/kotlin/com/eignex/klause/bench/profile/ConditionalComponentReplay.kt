@@ -41,6 +41,8 @@ object ConditionalComponentReplay {
         require(digest == options.getValue("sha256")) { "snapshot hash mismatch" }
         val started = System.nanoTime()
         val snapshot = ResidualSnapshots.load(bytes.decodeToString())
+        val encoded = ResidualSnapshots.encode(snapshot)
+        check(ResidualSnapshots.load(encoded) == snapshot) { "snapshot meaning changed during round trip" }
         val loadNanos = System.nanoTime() - started
         val out = File(System.getenv("OUT") ?: "build/profile-out").apply { mkdirs() }
         out.resolve("input.residual.json").writeBytes(bytes)
@@ -52,6 +54,8 @@ object ConditionalComponentReplay {
             put("snapshotSha256", digest)
             put("snapshotBytes", bytes.size)
             put("loadAndVerifyNs", loadNanos)
+            put("roundTripMeaningVerified", true)
+            put("roundTripBytesIdentical", bytes.contentEquals(encoded.toByteArray()))
             put("conditionIdentity", snapshot.conditionIdentity)
             put("originalSourceReplay", snapshot.originalSourceReplay)
             put("sourceVerdictClaim", false)

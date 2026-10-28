@@ -197,9 +197,6 @@ internal object ResidualSnapshots {
         require(codec.encodeToJsonElement(expected) == snapshot.allEnforcingProblem) { "enforcing residual mismatch" }
     }
 
-    fun sourceProblem(snapshot: ResidualSnapshot): Problem = model(snapshot.values.size,
-        snapshot.residualClauses.map { Clause(it.toIntArray()) })
-
     fun enforcingProblem(snapshot: ResidualSnapshot): Problem =
         codec.decodeFromJsonElement(snapshot.allEnforcingProblem)
 
