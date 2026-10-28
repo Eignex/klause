@@ -23,14 +23,23 @@ import kotlin.test.assertTrue
 class NonlinearIntegerResiduesTest {
     @Test
     fun `globally impossible alternatives should leave a checked integer witness`() {
-        val source = source("(assert (or (= (+ (* x x) (* y y)) 3) (and (= x 1) (= y 1))))")
+        for (assertion in listOf(
+            "(assert (or (= (+ (* x x) (* y y)) 3) (and (= x 1) (= y 1))))",
+            "(define-fun square ((n Int)) Int (* n n)) " +
+                "(assert (let ((a x) (c y)) " +
+                "(or (= (+ (square a) (square c)) 3) (and (= a 1) (= c 1)))))",
+            "(assert (or (= (+ (* (/ 1 2) x x) (* (/ 1 2) y y)) (/ 3 2)) " +
+                "(and (= x 1) (= y 1))))",
+        )) {
+            val source = source(assertion)
 
-        val execution = solveNonlinearIntegers(source, NonlinearIntegerParams(residueRefutation = true))
+            val execution = solveNonlinearIntegers(source, NonlinearIntegerParams(residueRefutation = true))
 
-        val witness = assertIs<QfNraResult.Satisfiable>(execution.result).assignment
-        assertTrue(checkNonlinearSource(source.formula, witness, PolynomialArithmetic()))
-        assertEquals(1L, execution.stats.residues.excluded)
-        assertEquals(0L, execution.stats.residues.refuted)
+            val witness = assertIs<QfNraResult.Satisfiable>(execution.result, assertion).assignment
+            assertTrue(checkNonlinearSource(source.formula, witness, PolynomialArithmetic()), assertion)
+            assertEquals(1L, execution.stats.residues.excluded)
+            assertEquals(0L, execution.stats.residues.refuted)
+        }
     }
 
     @Test
