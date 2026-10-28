@@ -2725,7 +2725,7 @@ kernels share prefix coordinates independently of accepting sets. Corpus replay
 selects one Regular; the small controls share both chains. Admission permits lengths
 3–32, states up to 64, alphabet up to 16 and at most 32,768 added transition/acceptance cells.
 At most four factors are selected from a model with at most 4,096 Boolean and
-4,096 integer columns and 8,192 factors. Unsupported snapshots retain their factor
+4,096 closed integer columns and 8,192 factors. Unsupported snapshots retain their factor
 shape and an explicit codec decline; they supply no replay identity. Objective
 sources decline the satisfaction diagnostic.
 
