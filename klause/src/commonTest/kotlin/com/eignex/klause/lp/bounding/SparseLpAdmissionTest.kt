@@ -26,6 +26,22 @@ import kotlin.test.assertTrue
 
 class SparseLpAdmissionTest {
     @Test
+    fun `strict source completion stays outside bounded root trial admission`() {
+        val problem = Problem(
+            0, 0, emptyArray(),
+            listOf(ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                LinearOp.GE, BigFraction.ZERO, strict = true)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            settings = ProblemSettings(lpCeilingTableauCells = 1L),
+        )
+
+        val admission = LpAutoConfig.admission(problem, LpConfig.parse("default,+sparse-trial"), LpPlan())
+
+        assertFalse(admission.plan.bounding)
+        assertEquals(1L, requireNotNull(admission.sparseTrial).metrics["DeclineStrictRow"])
+    }
+
+    @Test
     fun `mixed source root bounds preserve original objective units`() {
         val problem = Problem(
             0, 1, arrayOf(IntDomain(0, 1)),
