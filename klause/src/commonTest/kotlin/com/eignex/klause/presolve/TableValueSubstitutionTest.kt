@@ -12,6 +12,7 @@ import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.conditionedRoot
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
@@ -43,7 +44,7 @@ class TableValueSubstitutionTest {
         val blockers = listOf(
             Table(intArrayOf(0, 2), longArrayOf(0, 0, 1, 1, 2, 0)),
             AllDifferent(intArrayOf(0, 2)),
-            ReifiedLinear(0, intArrayOf(0), longArrayOf(1), LinearOp.EQ, 1),
+            ReifiedLinear(0, longArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
             Linear(longArrayOf(1, -1), intArrayOf(0, 2), LinearOp.GE, 0),
         )
         val context = PresolveContext.of(LinearObjective(intCoefficients = longArrayOf(1, 0, 0)),
@@ -186,5 +187,35 @@ class TableValueSubstitutionTest {
             .map { prepared.reconstruct(it).intValue(0) }.toSet()
 
         assertEquals(setOf(0L, 1L, 2L), values)
+    }
+
+    @Test
+    fun `tuple comparisons should stop at the call work ceiling without publishing exclusions`() {
+        val tuples = LongArray(4096) { cell -> if (cell % 2 == 0) (cell / 2048).toLong() else (cell / 2 % 1024).toLong() }
+        val table = Table(intArrayOf(0, 1), tuples)
+        val problem = Problem(0, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 1023)), listOf(table)).bake()
+        val budget = PresolveBudget(Long.MAX_VALUE)
+        val context = PresolveContext.of(LinearObjective(intCoefficients = longArrayOf(1, 0)),
+            transformObjective = true).withCancellation(budget.orSpent(Cancellation.Never))
+
+        val delta = TableValueSubstitution.reduce(problem, context)
+
+        assertTrue(delta.isEmpty)
+        assertEquals(262_144L, budget.spent())
+    }
+
+    @Test
+    fun `captured opening pins should reject a cheaper unavailable value`() {
+        val table = Table(intArrayOf(0, 1), longArrayOf(0, 0, 1, 0, 2, 0))
+        val source = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 0)), listOf(table)).bake()
+        val conditioned = source.conditionedRoot(Assumptions.None.withInt(0, 1), Cancellation.Never)
+        val context = PresolveContext.of(LinearObjective(intCoefficients = longArrayOf(1, 0)),
+            transformObjective = true)
+
+        val delta = TableValueSubstitution.reduce(conditioned, context)
+
+        assertTrue(delta.isEmpty)
+        assertEquals(1L, conditioned.rootIntDomain(0).min)
+        assertEquals(3L, source.rootIntDomain(0).valueCount)
     }
 }
