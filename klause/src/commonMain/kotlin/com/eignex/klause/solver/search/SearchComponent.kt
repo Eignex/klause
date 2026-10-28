@@ -205,7 +205,7 @@ interface SearchLearnedConflict {
     /** Literal block distance of the consequence. */
     val lbd: Int
 
-    /** Literals used to reject satisfied or repeatedly derived consequences. */
+    /** Literal metadata for learned-conflict activity and telemetry; non-literal constraint kinds may expose none. */
     val guardLiterals: IntArray
 
     /** Decision levels participating in the analysis, for assumption-core accounting. */

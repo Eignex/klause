@@ -88,7 +88,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
             /** True iff popping to [backjumpLevel] makes the constraint unit-propagate its asserting literal. */
             val asserting: Boolean
 
-            /** Literals used by the engine's assert guards (already-true check) and the relearn-cycle hash. */
+            /** Literal metadata for clauses and PB constraints; integer rows expose no endpoint disjunction. */
             val guardLiterals: IntArray
 
             val isContradiction: Boolean get() = this is Learned && literals.isEmpty()

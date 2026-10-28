@@ -7219,7 +7219,7 @@ resource receipts and the failed attempt are retained outside Git under
 learning with PB disabled on the retained finite projection `2*x+y<=z`,
 `2*x-y<=0`, `x=0..6`, `y=0..12`, `z=0..24`. It reaches the same conflict at
 `z<=7`, `x>=2`, applies the shared/native backjump contract, then reuses the store
-after undo at `z<=11`, `15` and `23`. The row `4*x<=z` should assert `x<=1`
+after undo at `z<=11`, `15` and `23`. The row `4*x<=z` asserts `x<=1`
 and tighten sibling upper bounds to `2`, `3` and `5`; individual rows reach
 `5`, `6` and `6`, and the original endpoint clause is inactive there.
 
@@ -7232,3 +7232,27 @@ and non-unit coefficient shapes, binary substitution requires Boolean domains,
 and LP/OBBT can discharge the inference. This applicability control establishes no
 advantage over preparation or default admission. Later qualification must compare
 consumed reuse and full costs with ordinary CP, normal presolve/LP and clause controls.
+
+[Lab 8863](https://lab.eignex.com/jobs/8863) completes all eight records at
+`1ce848b6e06d77f86ffc8569ff601c9b40b92b76`, with PB disabled. One stored row owns
+the original assertion and all three later sibling deductions; the clause arm
+retains no row and reaches the weaker sibling bounds above. All eight emitted
+source points pass fresh native checks. The Linux amd64, Temurin
+`25.0.4.1+1-LTS` execution has a hard cgroup budget of one vCPU and 4608 MiB.
+
+Final cumulative native finite work is 233 for clauses and 370 for row learning;
+native store counts are 8 and 12, including channeling clauses, and shared stores
+remain empty. Cumulative elapsed/current-thread allocation checkpoints include
+preparation, point rechecks and prior record writing. The first clause arm includes
+class loading: its final checkpoint is about 389 ms/10.24 MB versus 20.5 ms/0.658 MB
+for the subsequent row arm. Ordered warmup and overlapping cumulative checkpoints
+prevent any timing/allocation advantage claim; do not sum checkpoints. No normal
+presolve/LP comparison or broad qualification was run. The experimental flag stays
+disabled by default.
+
+Initial native CI exposed a failed shared-scope backjump mapping in the direct
+controls; the production traversal control passed, and the corrected mapping passes
+both routes. Job 8861 was cancelled during preparation after that finding and
+executed no cases. Raw records, source points, hashes, JFR, resource receipts,
+CI reports and the cancelled attempt are retained outside Git under
+`klause-evidence/campaigns/finite-conflict-learning-3727-3728/` beside the primary checkout.

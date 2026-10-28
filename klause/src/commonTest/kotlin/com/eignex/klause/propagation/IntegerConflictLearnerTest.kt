@@ -20,6 +20,7 @@ import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
@@ -28,6 +29,38 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class IntegerConflictLearnerTest {
+    @Test
+    fun `a retained row reason should keep its historical premises after factor ids move`() {
+        val native = PropagationSession(Problem(1, 3,
+            arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)), arrayOf(
+                Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+                Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+            ))).apply { enableIntegerRowLearning() }
+        assertIs<PropagationResult.Implied>(native.seed(Assumptions.None.withInt(2, 7)))
+        val dummy = native.learnedClauseCount
+        val tautology = Clause(intArrayOf(Lit.make(0, true), Lit.make(0, false)))
+        native.addLearnedClause(tautology, lbd = 3)
+        val cp = CpSearchComponent(native)
+        cp.rebase()
+        val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(1))
+        assertIs<ComponentResult.Consistent>(shared.initialize())
+        assertIs<ComponentResult.Conflict>(shared.push(SearchDecision.IntAtLeast(0, 2)))
+        val backjump = assertIs<SearchConflictResolution.Backjump>(cp.resolveConflict(shared)).conflict
+        shared.popTo(backjump.decisionLevel)
+        assertIs<SearchLearnedConflictResult.Resume>(backjump.apply(shared))
+        val state = native.explanationState
+        val row = requireNotNull(state.learned.integerRows).single()
+        val prior = assertNotNull(state.reasonOf(state.intMaxAntecedents[0])).copyOf()
+        assertTrue(prior.isNotEmpty())
+
+        native.forgetLearnedClauses { index, _ -> index != dummy }
+        native.addLearnedClause(tautology, lbd = 3)
+        state.lazyReasonMemo.clear()
+
+        assertSame(row, state.factorAt(state.intMaxReason[0]))
+        assertContentEquals(prior, state.reasonOf(state.intMaxAntecedents[0]))
+    }
+
     @Test
     fun `a full row store should fall back until forgetting releases capacity`() {
         val native = PropagationSession(Problem(0, 4,
