@@ -85,7 +85,7 @@ internal data class LpAdmission(
  *    structural fact that [CumulativeRelaxation] proves a makespan link, so this also lets the
  *    scheduling globals turn the LP bounding stack on; size-gated like the other relaxation flags.
  *
- * The LP-relaxation flags are additionally gated by a **size guard** bounding per-node solve cost. Ordinary LP is declined once
+ * The LP-relaxation flags have a **size guard** bounding per-node solve cost. Ordinary LP is declined once
  * the estimated relaxation size (`rows × (cols + rows + 1)`) exceeds the ceiling [KlauseConfig.lpCeilingTableauCells].
  * The gated hulls (circuit / element / table / nvalue / regular / mdd / gcc-count / time-indexed) then compete for a
  * hull budget — the base cap [KlauseConfig.lpMaxTableauCells] when the base relaxation fits it, else the ceiling —

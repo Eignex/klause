@@ -132,7 +132,9 @@ source assembly, then inspects emitted nonzeros, connected-component dimensions,
 exact scalar width and row-intersection fill risk. Sparse storage is reserved
 independently of the ordinary dense cost proxy. The root trial uses the ordinary
 bound, fixing and conflict consumers with their existing exact checks; cuts,
-expanded hulls and primal probes stay outside its allowance.
+expanded hulls and primal probes stay outside its allowance. The initial root
+bound and subsequent root propagation share the existing scoped numerical owner;
+live bound adoption rechecks authority before reusing its basis.
 
 Preparation is capped at eight million modeled work units; root and node LP work
 share at most 150 million units and the containing invocation's smaller allowance.

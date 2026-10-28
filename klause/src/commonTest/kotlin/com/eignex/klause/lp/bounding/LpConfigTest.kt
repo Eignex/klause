@@ -12,6 +12,7 @@ class LpConfigTest {
         for (emphasis in LpEmphasis.entries) {
             assertFalse(LpConfig(emphasis).resolved(LpTechnique.SPARSE_TRIAL))
         }
+        assertFalse(LpConfig.parse("all").resolved(LpTechnique.SPARSE_TRIAL))
         assertTrue(LpConfig.parse("default,+sparse-trial").resolved(LpTechnique.SPARSE_TRIAL))
     }
 
