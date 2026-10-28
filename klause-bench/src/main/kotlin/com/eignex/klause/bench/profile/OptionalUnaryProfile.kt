@@ -10,6 +10,7 @@ import com.eignex.klause.bench.runner.MiniZincCompatibility
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.codec.FactorCodecs
+import com.eignex.klause.factor.codec.MissingFactorCodecException
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.formats.flatzinc.FlatZincProgram
 import com.eignex.klause.formats.flatzinc.OznApplier
@@ -172,6 +173,9 @@ internal object OptionalUnaryProfile {
             put("preparationAllowance", budget.allowance)
             put("rootNs", rootNs)
             put("rootPropagations", session.propagationCount)
+            program.boolVarsByName["p"]?.takeIf { it < prepared.problem.numBoolVars }?.let {
+                put("originalPAtRoot", session.boolValue(it))
+            }
             put("solveNs", solveNs)
             put("result", result.javaClass.simpleName)
             put("nodes", result.stats.search.nodes.sum)
@@ -186,6 +190,21 @@ internal object OptionalUnaryProfile {
 
     private fun dump(problem: Problem, file: File) {
         file.writeText("bools=${problem.numBoolVars} ints=${problem.numIntVars}\n" +
-            problem.factors.joinToString("\n") { FactorCodecs.builtin.encodeToJsonElement(it).toString() } + "\n")
+            problem.factors.joinToString("\n") { factor ->
+                try {
+                    FactorCodecs.builtin.encodeToJsonElement(factor).toString()
+                } catch (_: MissingFactorCodecException) {
+                    buildJsonObject {
+                        put("derivedClass", factor.javaClass.name)
+                        put("boolVars", factor.boolVars.contentToString())
+                        put("intVars", factor.intVars.contentToString())
+                        for (name in listOf("getEdges", "getPrivateVertices", "getIndexGuards")) {
+                            factor.javaClass.methods.singleOrNull { it.name == name }?.let {
+                                put(name, it.invoke(factor).toString())
+                            }
+                        }
+                    }.toString()
+                }
+            } + "\n")
     }
 }
