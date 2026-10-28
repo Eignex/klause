@@ -1,6 +1,7 @@
 package com.eignex.klause.bench.profile
 
 import com.eignex.klause.bench.metric.InstalledBuild
+import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.count.Count
 import com.eignex.klause.count.ExactCountConfig
@@ -11,7 +12,6 @@ import com.eignex.klause.propagation.bake
 import com.sun.management.ThreadMXBean
 import java.io.File
 import java.lang.management.ManagementFactory
-import java.security.MessageDigest
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -52,8 +52,7 @@ internal object ProjectedCountProfile {
                 val source = source(pairs, connected)
                 val name = "pairs-$pairs-${if (connected) "connected" else "disjoint"}"
                 out.resolve("$name.cnf").writeText(source)
-                val hash = MessageDigest.getInstance("SHA-256").digest(source.toByteArray())
-                    .joinToString("") { "%02x".format(it) }
+                val hash = sha256(source.toByteArray())
                 for (projectX in if (connected) listOf(false) else listOf(false, true)) {
                     val config = ExactCountConfig(
                         samplingSet = if (projectX) IntArray(pairs) { it * 2 } else null,

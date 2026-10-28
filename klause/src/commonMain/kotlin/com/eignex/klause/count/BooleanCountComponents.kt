@@ -6,6 +6,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_TWO
 import com.eignex.klause.util.BIG_ZERO
@@ -59,16 +60,18 @@ internal class BooleanCountComponents private constructor(
 
     companion object {
         fun partition(problem: BakedProblem, config: ExactCountConfig): BooleanCountComponents? {
+            val providers = problem.projectionProviders
             if (problem.numFactors < 2 || problem.numIntVars != 0 || problem.numRealVars != 0 ||
-                problem.projectionProviders != null ||
-                problem.hasSymmetryBreaking || problem.rootDeductions is PropagationResult.Unsat ||
-                problem.factors.any { it !is Clause || !it.allLiteralsBool(problem.numBoolVars) }
+                (providers != null && providers !== FactorProjectionProviders.Default) ||
+                problem.hasSymmetryBreaking || problem.rootDeductions is PropagationResult.Unsat
             ) return null
             val projection = config.samplingSet
                 ?: if (config.intSamplingSet == null) problem.allBoolVars() else intArrayOf()
-            if (config.intSamplingSet?.isNotEmpty() == true || projection.toSet().size != projection.size ||
+            if (projection.isEmpty() || config.intSamplingSet?.isNotEmpty() == true ||
+                projection.toSet().size != projection.size ||
                 projection.any { it !in 0 until problem.numBoolVars }
             ) return null
+            if (problem.factors.any { it !is Clause || !it.allLiteralsBool(problem.numBoolVars) }) return null
 
             val fixed = arrayOfNulls<Boolean>(problem.numBoolVars)
             (problem.rootDeductions as? PropagationResult.Implied)?.let { deductions ->
