@@ -68,6 +68,8 @@ class SparseLpAdmissionTest {
             listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
             settings = ProblemSettings(lpCeilingTableauCells = 1L))
         val sink = SolveStatsSink("small-root-allowance")
+        val plan = LpAutoConfig.resolve(problem, LpConfig.parse("default,+sparse-trial"), LpPlan(rootMaxWork = 1L))
+        assertFalse(plan.bounding)
 
         LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, 1)),
             LpParams(lpConfig = LpConfig.parse("default,+sparse-trial"), lpPlan = LpPlan(rootMaxWork = 1L)),
@@ -101,16 +103,22 @@ class SparseLpAdmissionTest {
 
     @Test
     fun `wide exact scalars decline numerical admission`() {
-        val model = LpBuilder().apply {
-            addRealVar(0.0, 1.0)
-            addRealRow(intArrayOf(0), doubleArrayOf(Double.MIN_VALUE), Relation.LE, 1.0)
-        }.build(Sense.MINIMIZE)
+        for (originOnly in listOf(false, true)) {
+            val model = LpBuilder().apply {
+                if (originOnly) {
+                    addRealVar(Double.MIN_VALUE, Double.MIN_VALUE)
+                } else {
+                    addRealVar(0.0, 1.0)
+                    addRealRow(intArrayOf(0), doubleArrayOf(Double.MIN_VALUE), Relation.LE, 1.0)
+                }
+            }.build(Sense.MINIMIZE)
 
-        val estimate = estimateSparseLpAdmission(model)
+            val estimate = estimateSparseLpAdmission(model)
 
-        assertFalse(estimate.admitted)
-        assertEquals(1L, estimate.metrics["DeclineScalarWidth"])
-        assertTrue(requireNotNull(estimate.metrics["ScalarBits"]) > 128L)
+            assertFalse(estimate.admitted)
+            assertEquals(1L, estimate.metrics["DeclineScalarWidth"])
+            assertTrue(requireNotNull(estimate.metrics["ScalarBits"]) > 128L)
+        }
     }
 
     @Test
