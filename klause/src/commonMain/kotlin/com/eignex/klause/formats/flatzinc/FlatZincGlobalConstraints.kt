@@ -320,6 +320,20 @@ internal fun FlatZincCompiler.emitDisjunctive(c: FznConstraint, strict: Boolean)
     }
 }
 
+internal fun FlatZincCompiler.emitOptionalDisjunctive(c: FznConstraint) {
+    expectArity(c, 3)
+    val presents = evalBoolVarArray(c.args[0])
+    val starts = evalIntVarArray(c.args[1])
+    val durations = evalIntConstArrayLong(c.args[2])
+    if (presents.size != starts.size || durations.size != starts.size) {
+        unsupportedHere("klause_disjunctive_opt arrays must have the same length")
+    }
+    if (durations.any { it <= 0L }) {
+        unsupportedHere("klause_disjunctive_opt requires fixed strictly positive durations")
+    }
+    factors.add(Cumulative.unary(starts = starts, durations = durations, presents = presents))
+}
+
 private fun FlatZincCompiler.resolveIntArrayConstOrVars(e: FznExpr): Pair<LongArray, IntArray> {
     val asConst = tryEvalIntConstArrayLong(e)
     if (asConst != null) return asConst to EmptyIntArray

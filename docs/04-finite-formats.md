@@ -302,6 +302,16 @@ length before narrowing. Strict disjunctive scheduling adds separation for zero-
 tasks: they may touch an endpoint but cannot lie inside another task. Ordinary
 disjunctive scheduling permits that placement.
 
+Asserted optional disjunctives with at least two fixed strictly positive durations
+retain a unary `Cumulative` through `klause_disjunctive_opt`. The library forwards
+the original `occurs` literals and `deopt` starts; it adds no absent-value
+canonicalization. A statically absent task uses an ignored constant start, so
+`deopt(<>)` is never evaluated. Repeated starts, durations and presence channels
+keep their positions. Ordinary and strict forms agree on this positive-duration
+fragment. Zero or variable durations, smaller arrays and whole-constraint
+reification or negation keep the standard exact decompositions, including strict
+zero-task separation. Output reconstruction keeps the compiler's original mapping.
+
 Set universes and constant members require signed 32-bit values; ordering excludes
 `Int.MIN_VALUE`. Automaton indexes, inverse offsets and constant GCC occurrence
 bounds also require signed 32-bit parameters. Window sums and counted values keep
