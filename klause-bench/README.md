@@ -4123,6 +4123,20 @@ change with a search tradeoff, not a general speedup. The measured Table source
 is unchanged by its rebase onto the MDD contract. See
 [explanation lifetime](../docs/09-learning.md#table-explanations).
 
+`bench.profile.HistoricalTableReasonProfile` captures the issue's binary ground-table
+control, a delayed implication and an ordinary blocker-order control. One invocation
+has 24 replay cells: original/prepared sources, the internal historical-reason option
+off/on, and a warmup/measured pass with reversed option order. It applies the native
+learned constraint and inspects the `A=0` sibling when the backjump reaches level one.
+Source-coordinate mapping declines reconstructed coordinates rather than guessing
+ids. Three ordinary prepared backtrack runs retain automatic LP as strong controls.
+Each cell has a two-second stop; use a 180-second lab profile envelope. Original
+FlatZinc bytes, hashes, prepared relations, reconstruction availability, native source
+point checks and installed/runtime identities remain in the capture. Instrumented
+elapsed time and cumulative thread allocation include parse, preparation, replay,
+application and retraction; they establish no ordinary CLI throughput or physical
+memory claim. No independent proof or witness check is implied.
+
 Retain the per-variable search-time hole index. [Comparison 7993](https://lab.eignex.com/jobs/7993)
 pairs `443b3c12a` with `4a3642171` on Linux/amd64, CP/LP-off, one conflict-driven
 arm, seed 3, three repeats, 2000 nodes and a 20-second deadline. Ordinary CLI runs
