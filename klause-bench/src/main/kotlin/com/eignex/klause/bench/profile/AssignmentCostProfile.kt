@@ -72,11 +72,15 @@ internal object AssignmentCostProfile {
                         val base = BacktrackParams(randomSeed = seed)
                         val delegate = if (order == "input") InputOrder else base.variableSelector
                         val trace = ArrayList<JsonObject>()
+                        var observations = 0
+                        var incumbent: Double? = null
                         val selector = object : VariableSelector by delegate {
                             override fun fresh(): VariableSelector = this
                             override fun pick(session: PropagationSession, rng: Random): VarRef? {
+                                observations++
                                 if (trace.size < 32) trace += buildJsonObject {
                                     put("level", session.decisionLevel)
+                                    put("incumbent", incumbent)
                                     put("domains", JsonArray((0 until prepared.problem.numIntVars).map {
                                         JsonPrimitive(session.intDomain(it).toString())
                                     }))
@@ -91,7 +95,9 @@ internal object AssignmentCostProfile {
                             lpPlan = LpPlan(bounding = lp, cuts = lp, lagrangian = lp))
                         val solveStart = System.nanoTime()
                         val improvements = BacktrackSolver(prepared.problem.bake())
-                            .improvements(requireNotNull(prepared.objective), params).toList()
+                            .improvements(requireNotNull(prepared.objective), params).onEach {
+                                incumbent = it.objectiveValue ?: incumbent
+                            }.toList()
                         val solveNs = System.nanoTime() - solveStart
                         val report = buildJsonObject {
                             put("revision", Reports.readGitSha())
@@ -117,6 +123,7 @@ internal object AssignmentCostProfile {
                             put("solveNs", solveNs)
                             put("solveStopped", solveStop())
                             put("trace", JsonArray(trace))
+                            put("traceTruncated", observations > trace.size)
                             put("improvements", JsonArray(improvements.map { result -> buildJsonObject {
                                 put("kind", result::class.simpleName)
                                 put("objective", result.objectiveValue)
