@@ -1,0 +1,136 @@
+package com.eignex.klause.bench.profile
+
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.backtrack.selector.IndomainMin
+import com.eignex.klause.backtrack.selector.InputOrder
+import com.eignex.klause.backtrack.selector.VariableSelector
+import com.eignex.klause.bench.metric.InstalledBuild
+import com.eignex.klause.bench.metric.sha256
+import com.eignex.klause.bench.report.Reports
+import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.formats.xcsp3.Xcsp3
+import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.presolve.PresolveBudget
+import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.solver.objective.toLinearObjective
+import com.eignex.klause.solver.pipeline.FiniteEngine
+import com.eignex.klause.solver.pipeline.FinitePipeline
+import com.eignex.klause.solver.pipeline.FinitePipelineRequest
+import com.eignex.klause.solver.search.VarRef
+import com.eignex.klause.util.Cancellation
+import java.io.File
+import kotlin.random.Random
+import kotlin.time.Duration.Companion.seconds
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+
+internal object AssignmentCostProfile {
+    @JvmStatic
+    fun main(args: Array<String>) {
+        require(args.isEmpty())
+        val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
+        Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
+        val latin = trajectorySourceBytes("xcsp3-core", "evidence-latin4",
+            "d805214f71a168095eb818281431968d000d4bac556c73e4fcd3333c084c3828", null)
+        val controls = mapOf("direct" to control(false).encodeToByteArray(),
+            "alias" to control(true).encodeToByteArray(), "latin4" to latin)
+        out.resolve("screen.jsonl").bufferedWriter().use { output ->
+            for ((name, bytes) in controls) {
+                out.resolve("$name.xml").writeBytes(bytes)
+                for (mode in listOf("off", "default", "aggressive")) {
+                    val stop = Cancellation.after(4.seconds)
+                    val parsed = Xcsp3.parse(bytes.decodeToString(), recoveryCancellation = stop)
+                    val objective = requireNotNull(parsed.objective).toLinearObjective()
+                    val budget = PresolveBudget(100_000_000L)
+                    val started = System.nanoTime()
+                    val prepared = FinitePipeline.prepare(FinitePipelineRequest(
+                        parsed.problem, FiniteEngine.BACKTRACK, objective, PresolveConfig.parse(mode),
+                        explicitPresolveConfig = true, cancellation = stop, solveCancellation = stop,
+                        presolveBudget = budget, randomSeed = 3,
+                    ))
+                    val preparationNs = System.nanoTime() - started
+                    for (lp in listOf(false, true)) {
+                        val trace = ArrayList<JsonObject>()
+                        val selector = object : VariableSelector by InputOrder {
+                            override fun fresh(): VariableSelector = this
+                            override fun pick(session: PropagationSession, rng: Random): VarRef? {
+                                if (trace.size < 32) trace += buildJsonObject {
+                                    put("level", session.decisionLevel)
+                                    put("domains", JsonArray((0 until prepared.problem.numIntVars).map {
+                                        JsonPrimitive(session.intDomain(it).toString())
+                                    }))
+                                }
+                                return InputOrder.pick(session, rng)
+                            }
+                        }
+                        val solveStop = Cancellation.after(2.seconds)
+                        val params = BacktrackParams(variableSelector = selector, valueSelector = IndomainMin,
+                            cancellation = solveStop, lpConfig = if (lp) LpConfig.AUTO else LpConfig.OFF,
+                            lpPlan = LpPlan(bounding = lp, cuts = lp, lagrangian = lp))
+                        val solveStart = System.nanoTime()
+                        val improvements = BacktrackSolver(prepared.problem)
+                            .improvements(requireNotNull(prepared.objective), params).toList()
+                        val solveNs = System.nanoTime() - solveStart
+                        val report = buildJsonObject {
+                            put("revision", Reports.readGitSha())
+                            put("source", name)
+                            put("sourceSha256", sha256(bytes))
+                            put("presolve", mode)
+                            put("lp", lp)
+                            put("preparationNs", preparationNs)
+                            put("preparationWork", budget.spent())
+                            put("preparationStopped", stop())
+                            put("preparationInfeasible", prepared.presolve?.infeasible)
+                            put("preparedObjective", prepared.objective.toString())
+                            put("preparedFactors", JsonArray(prepared.problem.factors.map {
+                                JsonPrimitive(it::class.simpleName)
+                            }))
+                            put("allDifferentScopes", JsonArray(prepared.problem.factors
+                                .filterIsInstance<AllDifferent>().map { JsonPrimitive(it.vars.joinToString(",")) }))
+                            put("solveNs", solveNs)
+                            put("solveStopped", solveStop())
+                            put("trace", JsonArray(trace))
+                            put("improvements", JsonArray(improvements.map { result -> buildJsonObject {
+                                put("kind", result::class.simpleName)
+                                put("objective", result.objectiveValue)
+                                put("nodes", result.stats.search.nodes.sum)
+                                put("fails", result.stats.search.fails.sum)
+                                put("lpRootBound", result.stats.lp.rootBound.takeIf { it.isFinite() })
+                                put("lpWork", result.stats.lp.workOps.sum)
+                                result.assignment?.let(prepared.reconstruct)?.let { sample ->
+                                    put("sourceObjective", objective.evaluateExact(sample).toString())
+                                    put("sourceIntegers", JsonArray((0 until parsed.problem.numIntVars)
+                                        .map { JsonPrimitive(sample.intValue(it)) }))
+                                }
+                            } }))
+                            put("independentSourceCheck", false)
+                            put("conditionalPruningInstalled", false)
+                        }
+                        output.appendLine(report.toString())
+                        output.flush()
+                        println(report)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun control(alias: Boolean): String = """
+        <instance format="XCSP3" type="COP">
+          <variables><var id="x">0 1 2</var><var id="y">1 3</var><var id="z">3 4</var>
+            ${if (alias) "<var id=\"o\">5..12</var>" else ""}
+          </variables>
+          <constraints><allDifferent>x y z</allDifferent>
+            ${if (alias) "<sum><list>x y z o</list><coeffs>1 2 1 -1</coeffs><condition>(eq,0)</condition></sum>" else ""}
+          </constraints>
+          <objectives>${if (alias) "<minimize>o</minimize>" else
+              "<minimize type=\"sum\"><list>x y z</list><coeffs>1 2 1</coeffs></minimize>"}</objectives>
+        </instance>
+    """.trimIndent()
+}
