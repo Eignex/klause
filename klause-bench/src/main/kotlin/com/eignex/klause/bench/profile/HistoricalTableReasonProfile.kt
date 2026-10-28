@@ -5,15 +5,17 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
+import com.eignex.klause.factor.codec.FactorCodecs
+import com.eignex.klause.factor.codec.MissingFactorCodecException
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.formats.json.ProblemJson
-import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.CpSearchComponent
-import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
@@ -25,8 +27,8 @@ import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.util.Cancellation
 import com.sun.management.ThreadMXBean
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -178,9 +180,37 @@ internal object HistoricalTableReasonProfile {
         traceField.set(state, null)
         return buildJsonObject {
             put("original", codec.encodeToString(original))
-            put("prepared", codec.encodeToString(problem))
+            put("prepared", buildJsonObject {
+                put("bools", problem.numBoolVars)
+                put("ints", buildJsonArray {
+                    for (v in 0 until problem.numIntVars) add(JsonPrimitive(problem.intDomainOrNull(v).toString()))
+                })
+                put("factors", buildJsonArray { for (factor in problem.factors) {
+                    add(try {
+                        FactorCodecs.builtin.encodeToJsonElement(factor)
+                    } catch (_: MissingFactorCodecException) {
+                        check(factor.javaClass.simpleName == "DifferenceSystem")
+                        buildJsonObject {
+                            put("derivedClass", factor.javaClass.name)
+                            put("privateVertices", factor.javaClass.getMethod("getPrivateVertices").invoke(factor).toString())
+                            put("indexGuards", factor.javaClass.getMethod("getIndexGuards").invoke(factor).toString())
+                            put("edges", buildJsonArray {
+                                for (edge in factor.javaClass.getMethod("getEdges").invoke(factor) as List<*>) {
+                                    val value = requireNotNull(edge)
+                                    add(buildJsonObject {
+                                        for (name in listOf("Source", "Target", "Bound", "Guard", "DomainBound")) {
+                                            put(name, value.javaClass.getMethod("get$name").invoke(value).toString())
+                                        }
+                                    })
+                                }
+                            })
+                        }
+                    })
+                } })
+            })
             put("presolve", preparation?.presolve.toString())
             put("sourceCoordinatesRetained", b >= 0 && a >= 0 && q >= 0)
+            put("scriptCoordinates", "a=$a b=$b q=$q")
             put("initialized", initialized::class.simpleName)
             put("initialQ", initialQ)
             put("resolution", resolution)
