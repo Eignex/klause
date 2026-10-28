@@ -98,7 +98,7 @@ class LearnedResidualRestrictionsTest {
     @Test
     fun `an unnameable atom should withhold complete enforcing incidence`() {
         val session = PropagationSession(Problem(1, 1, arrayOf(com.eignex.klause.ir.IntDomain(0, 2)), emptyArray()))
-        val atom = session.boundGeLit(0, 1)
+        val atom = session.boundGeLit(0, 1, positive = true)
         session.addLearnedClause(Clause(intArrayOf(Lit.make(0, true), atom)), 2)
 
         val observed = LearnedResidualRestrictions.inspect(session)
