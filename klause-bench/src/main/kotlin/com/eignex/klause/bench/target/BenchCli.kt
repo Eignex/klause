@@ -184,7 +184,9 @@ object BenchCli {
             lp = f["lp"],
             presolve = f["presolve"],
             exact = f["exact"]?.toBooleanStrict() ?: false,
-            captureDirectory = File(out, "diagnostics").takeIf { args.any { it.startsWith("param=portfolio-work=") } },
+            captureDirectory = File(out, "diagnostics").takeIf {
+                args.any { argument -> argument.startsWith("param=portfolio-work=") }
+            },
         )
         val budget = f["timeout"]?.toLongOrNull()?.let { Budget(it) } ?: Budget()
         val record = SolveMetric.solveOne(ref, budget, settings, File(out))

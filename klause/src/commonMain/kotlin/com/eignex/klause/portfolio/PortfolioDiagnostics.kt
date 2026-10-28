@@ -3,7 +3,7 @@ package com.eignex.klause.portfolio
 import com.eignex.klause.solver.result.SharingChannel
 
 /**
- * Opt-in single-lane scheduling by charged work. [workLimit] bounds the complete invocation;
+ * Opt-in single-lane scheduling by charged work. [workLimit] bounds the complete schedule;
  * atomic preparation and verification can overspend. [Portfolio.thompson] uses [seed] for scheduler
  * choices independently of worker seeds. [onEvent] streams events without retaining a trace in the solver.
  * An external cancellation is an emergency stop, with no deadline exposed to worker policy.
@@ -49,7 +49,7 @@ sealed interface PortfolioEvent {
         val channel: SharingChannel,
         /** Pool cursor, accepted version or supplied floor bits, according to the channel. */
         val cursor: Long,
-        /** Imported entries; zero for an empty drain. */
+        /** Entries or changed scalar views observed; zero for an empty pool drain. */
         val count: Int,
     ) : PortfolioEvent
 
@@ -80,10 +80,16 @@ sealed interface PortfolioEvent {
     ) : PortfolioEvent
 
     /** A worker leaves the live schedule. */
-    data class Retired(/** Retired worker slot. */ val arm: Int) : PortfolioEvent
+    data class Retired(
+        /** Retired worker slot. */
+        val arm: Int,
+    ) : PortfolioEvent
 
     /** A retained worker discards its handle before another scheduled opening. */
-    data class Reseeded(/** Reseeded worker slot. */ val arm: Int) : PortfolioEvent
+    data class Reseeded(
+        /** Reseeded worker slot. */
+        val arm: Int,
+    ) : PortfolioEvent
 
     /** Invocation termination: completed, work-limit, external-stop, retired or failure. */
     data class Finished(

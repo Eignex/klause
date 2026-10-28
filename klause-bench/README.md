@@ -96,7 +96,8 @@ For repeatable finite portfolio diagnostics, use one processor, a fixed solver s
 `param.slice-growth` settings. The containing timeout is an emergency stop. Keep it
 large enough for the work limit to finish, then compare the `portfolio ` event lines
 in retained CLI stderr across repeats. The bench enables verbose output for this
-option. Retain source hashes, effective parameters and installed build/runtime
+option. Use `presolve=off` or freeze prepared inputs separately: this scheduler
+control does not replace source preparation policy. Retain source hashes, effective parameters and installed build/runtime
 provenance with the traces. Compare logical events separately from physical timing,
 and report an emergency-interrupted last segment as partial. Default scheduling,
 parallel deterministic batches and throughput qualification remain separate controls.
