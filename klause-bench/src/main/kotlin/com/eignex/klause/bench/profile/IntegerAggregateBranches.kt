@@ -62,11 +62,11 @@ internal object IntegerAggregateBranches {
         val setupStarted = System.nanoTime()
         val prepared = SourceSetup.prepare(
             SourceSetupRequest(
-            parsed.source,
-            ExecutionOperation.SATISFY,
-            FiniteEngine.BACKTRACK,
-            cancellation = preparationStop,
-        )
+                parsed.source,
+                ExecutionOperation.SATISFY,
+                FiniteEngine.BACKTRACK,
+                cancellation = preparationStop,
+            ),
         )
         val setupNs = System.nanoTime() - setupStarted
         val contextStarted = System.nanoTime()
@@ -78,11 +78,11 @@ internal object IntegerAggregateBranches {
             original.sourceProofContext(
                 scope,
                 LinearObjective(
-            LongArray(original.numBoolVars),
-            LongArray(original.numIntVars),
-        ),
-            preparationStop
-            )
+                    LongArray(original.numBoolVars),
+                    LongArray(original.numIntVars),
+                ),
+                preparationStop,
+            ),
         )
         val contextNs = System.nanoTime() - contextStarted
         Reports.writeJson(out.resolve("native-system.json").path, NumericalFrontierSnapshot.system(context))
@@ -153,21 +153,25 @@ internal object IntegerAggregateBranches {
                     put(
                         "aggregateBelow",
                         buildJsonObject {
-                        put("rhs", row.rhs.toString())
-                        put(
-                            "coefficients",
-                            buildJsonObject {
-                            row.coefficients.forEach { (id, value) -> put("${id.kind}/${id.id}", value.toString()) }
-                        }
-                        )
-                    }
+                            put("rhs", row.rhs.toString())
+                            put(
+                                "coefficients",
+                                buildJsonObject {
+                                    row.coefficients.forEach { (id, value) ->
+                                        put("${id.kind}/${id.id}", value.toString())
+                                    }
+                                },
+                            )
+                        },
                     )
                 }
                 put(
                     "stages",
                     buildJsonObject {
-                    stats.smt.completeSearchStages.orEmpty().toSortedMap().forEach { (key, value) -> put(key, value) }
-                }
+                        stats.smt.completeSearchStages.orEmpty().toSortedMap().forEach { (key, value) ->
+                            put(key, value)
+                        }
+                    },
                 )
                 put("sourceLp", stats.smt.sourceLp.toString())
                 put("javaVersion", System.getProperty("java.version"))
@@ -176,8 +180,8 @@ internal object IntegerAggregateBranches {
                 put(
                     "jvmOptions",
                     buildJsonArray {
-                    ManagementFactory.getRuntimeMXBean().inputArguments.forEach { add(JsonPrimitive(it)) }
-                }
+                        ManagementFactory.getRuntimeMXBean().inputArguments.forEach { add(JsonPrimitive(it)) }
+                    },
                 )
             }
         } finally {
@@ -188,9 +192,9 @@ internal object IntegerAggregateBranches {
         Reports.writeJson(
             out.resolve("report.json").path,
             buildJsonObject {
-            report.forEach { (key, value) -> put(key, value) }
-            put("disposalNs", disposalNs)
-        }
+                report.forEach { (key, value) -> put(key, value) }
+                put("disposalNs", disposalNs)
+            },
         )
     }
 
@@ -208,42 +212,43 @@ internal object IntegerAggregateBranches {
             Reports.writeJson(
                 out.resolve("hermite.json").path,
                 buildJsonObject {
-                put("revision", Reports.readGitSha())
-                put("originalSha256", hash)
-                put("scope", "direct-exact-theory-first-branch")
-                put("globalVerdictClaim", false)
-                put("initialization", initialized.toString())
-                put("rootCheck", checked.toString())
-                put(
-                    "alternatives",
-                    buildJsonArray {
-                    branches.orEmpty().forEach { decision ->
-                        val theory = (decision as? SearchDecision.Theory)?.decision as? RegisteredTheoryDecision
-                        val atom = (theory?.payload as? SourceBoundPredicate)?.sourceBound
-                        add(
-                            buildJsonObject {
-                            put("kind", decision.javaClass.simpleName)
-                            put("threshold", atom?.threshold?.toString())
-                            put("upper", atom?.upper)
-                            put(
-                                "terms",
-                                buildJsonArray {
-                                atom?.terms.orEmpty().forEach { term ->
-                                    add(
-                                        buildJsonObject {
-                                        put("source", term.source.toString())
-                                        put("coefficient", term.coefficient.toString())
-                                    }
-                                    )
-                                }
+                    put("revision", Reports.readGitSha())
+                    put("originalSha256", hash)
+                    put("scope", "direct-exact-theory-first-branch")
+                    put("globalVerdictClaim", false)
+                    put("initialization", initialized.toString())
+                    put("rootCheck", checked.toString())
+                    put(
+                        "alternatives",
+                        buildJsonArray {
+                            branches.orEmpty().forEach { decision ->
+                                val payload = (decision as? SearchDecision.Theory)?.decision
+                                val theory = payload as? RegisteredTheoryDecision
+                                val atom = (theory?.payload as? SourceBoundPredicate)?.sourceBound
+                                add(
+                                    buildJsonObject {
+                                        put("kind", decision.javaClass.simpleName)
+                                        put("threshold", atom?.threshold?.toString())
+                                        put("upper", atom?.upper)
+                                        put(
+                                            "terms",
+                                            buildJsonArray {
+                                                atom?.terms.orEmpty().forEach { term ->
+                                                    add(
+                                                        buildJsonObject {
+                                                            put("source", term.source.toString())
+                                                            put("coefficient", term.coefficient.toString())
+                                                        },
+                                                    )
+                                                }
+                                            },
+                                        )
+                                    },
+                                )
                             }
-                            )
-                        }
-                        )
-                    }
-                }
-                )
-            }
+                        },
+                    )
+                },
             )
             session.popTo(0)
         }
