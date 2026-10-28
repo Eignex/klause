@@ -161,20 +161,27 @@ internal object EqualityMoveReplay {
                 }.toString())
             }
         }
-        if (options["kernel"] == "true") EqualityKernelReplay.capture(view, out.resolve("kernel.json"),
+        val kernelScopes = if (options["kernel"] == "true") EqualityKernelReplay.capture(view, out.resolve("kernel.json"),
             objective::evaluateExact) {
             point, token -> FiniteConflictSelection.checkSource(source, point, token)
-        }
+        } else emptyMap()
         if (options["completion"] == "true") equalityRowCompletion(state, requireNotNull(prepared.objective),
             state.assignment.snapshot(), stop, out.resolve("completion.json"))
         if (options["owners"] == "true") {
             val controls = out.resolve("controls.jsonl")
-            controls.writeText(buildJsonObject {
-                put("center", trajectorySource(state.assignment.snapshot()))
-                put("centerObjective", requireNotNull(prepared.objective).evaluate(state.assignment))
-                put("effectiveInts", JsonArray((0 until problem.numIntVars).map(::JsonPrimitive)))
-                put("selector", "whole-prepared-block")
-            }.toString() + "\n")
+            val scopes = linkedMapOf((0 until problem.numIntVars).filter { it !in unused } to
+                arrayListOf("whole-prepared-block"))
+            for ((mode, inputs) in kernelScopes) {
+                scopes.getOrPut(inputs.sorted()) { arrayListOf() }.add("kernel-$mode")
+            }
+            controls.writeText(scopes.entries.joinToString("\n", postfix = "\n") { (inputs, selectors) ->
+                buildJsonObject {
+                    put("center", trajectorySource(state.assignment.snapshot()))
+                    put("centerObjective", requireNotNull(prepared.objective).evaluate(state.assignment))
+                    put("effectiveInts", JsonArray(inputs.map(::JsonPrimitive)))
+                    put("selector", selectors.joinToString("+"))
+                }.toString()
+            })
             RepairOwnerReplay.replay(controls, problem, requireNotNull(prepared.objective), prepared, source,
                 parsed.intVarNames.values.distinct().toIntArray(), out.resolve("owners.jsonl"),
                 options["seed"]?.toLong() ?: 1L, allowance = 10_000L, fragmentAllowance = 2_000L)

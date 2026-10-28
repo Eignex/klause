@@ -19,6 +19,7 @@ import java.io.File
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNull
@@ -226,5 +227,27 @@ class EqualityKernelReplayTest {
         assertTrue(candidates.filter { it.jsonObject.getValue("step").jsonPrimitive.content.removePrefix("-") == "1" }
             .all { it.jsonObject.getValue("nativeSourceCheck").jsonPrimitive.content == "false" })
         assertTrue(records.any { it.jsonObject.getValue("consumed") != JsonNull })
+    }
+
+    @Test
+    fun `a failed source check during consumption restores the checked center`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 2) }, listOf(
+            Linear(longArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0)))
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(-1, 0))
+        val view = TrajectoryView("restored", state, VarRemap(intArrayOf(), intArrayOf(0, 1)), objective)
+        val center = Sample(booleanArrayOf(), longArrayOf(0, 0))
+        assertEquals(null, view.load(center))
+        var checks = 0
+
+        assertFailsWith<IllegalStateException> {
+            EqualityKernelReplay.capture(view, directory.resolve("failed.json"), objective::evaluateExact) { _, _ ->
+                if (++checks == 3) error("failed source check")
+                true
+            }
+        }
+
+        assertEquals(center, state.assignment.snapshot())
+        assertEquals(0L, state.cost)
     }
 }
