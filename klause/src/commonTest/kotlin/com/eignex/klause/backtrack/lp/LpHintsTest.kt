@@ -168,31 +168,43 @@ class LpHintsTest {
     }
 
     @Test
-    fun `missing current optimum uses the existing score instead of directional history`() {
-        val b = LpBuilder()
-        b.addVar(0, 10, cost = 1)
-        val trail = LpBoundTrail(assertNotNull(b.build(Sense.MINIMIZE).authoritativeModel()))
-        val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
-            booleanArrayOf(false), 0L, intArrayOf(0), IntArray(0))
-        val hints = LpHints(1, 0, directionalGains = true)
-        repeat(2) {
-            hints.beginNode(0, 100.0)
-            hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
-            hints.recordObjective(relaxation, 10.0)
-            hints.branch(VarRef.IntVar(0))
-            for (up in listOf(false, true)) {
-                hints.commit(if (up) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2), 1)
-                hints.beginNode(1, 100.0)
+    fun `missing or cut changed current optima keep the existing score`() {
+        for (change in listOf("missing", "cut")) {
+            val b = LpBuilder()
+            b.addVar(0, 10, cost = 1)
+            val trail = LpBoundTrail(assertNotNull(b.build(Sense.MINIMIZE).authoritativeModel()))
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+                booleanArrayOf(false), 0L, intArrayOf(0), IntArray(0))
+            val hints = LpHints(1, 0, directionalGains = true)
+            repeat(2) {
+                hints.beginNode(0, 100.0)
                 hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
-                hints.recordObjective(relaxation, if (up) 13.0 else 11.0)
+                hints.recordObjective(relaxation, 10.0)
+                hints.branch(VarRef.IntVar(0))
+                for (up in listOf(false, true)) {
+                    hints.commit(if (up) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2), 1)
+                    hints.beginNode(1, 100.0)
+                    hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+                    hints.recordObjective(relaxation, if (up) 13.0 else 11.0)
+                }
             }
+            assertTrue(hints.directionalScore(VarRef.IntVar(0)).isFinite())
+
+            hints.beginNode(1, 100.0)
+            hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+
+            if (change == "cut") {
+                hints.recordObjective(relaxation, 10.0)
+                assertTrue(trail.append(
+                    LpScopedRow(0L, listOf(0 to ExactLpNumber.of(1L)), ExactLpNumber.of(8L),
+                        ExactLpColumn(ExactLpBounds(lower = ExactLpSide(ExactLpNumber.of(0L))))),
+                    scoped = false,
+                ))
+                hints.finishNode(trail.state)
+            } else hints.finishNode()
+
+            assertTrue(hints.directionalScore(VarRef.IntVar(0)).isNaN())
+            assertTrue(hints.branchScore(VarRef.IntVar(0)).isFinite())
         }
-        assertTrue(hints.directionalScore(VarRef.IntVar(0)).isFinite())
-
-        hints.beginNode(1, 100.0)
-        hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
-
-        assertTrue(hints.directionalScore(VarRef.IntVar(0)).isNaN())
-        assertTrue(hints.branchScore(VarRef.IntVar(0)).isFinite())
     }
 }
