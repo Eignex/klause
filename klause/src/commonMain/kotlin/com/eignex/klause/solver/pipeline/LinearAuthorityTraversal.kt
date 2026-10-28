@@ -511,6 +511,7 @@ internal class LinearAuthorityTraversal(
         if (current.coveredBound != null) return SearchNodeDisposition.Prune
         result.split?.let { (coordinate, threshold) ->
             aggregateBranches?.propose(branch, cancellation)?.let { row ->
+                budget.funding?.charge(0L, 256L + 128L * row.supportSize)
                 current.split = CoverageSplit.Aggregate(row, current.condition)
                 splitCreated()
                 observe("numericalAggregateSplits")
