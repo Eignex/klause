@@ -157,7 +157,9 @@ internal object CoreQueryProfile {
                         val sourceAccepted = point?.let { checkPoint(sourceBaked, it) }
                         if (point != null) check(sourceAccepted == true)
                         val record = buildJsonObject {
-                            put("sourceSha256", identity)
+                            put("sourceSha256", sha256(sourceText.encodeToByteArray()))
+                            put("objectiveSha256", sha256(weights.joinToString(",").encodeToByteArray()))
+                            put("sourceObjectivePairSha256", identity)
                             put("unrelated", unrelated)
                             put("prepared", prepared)
                             put("policy", policy)
@@ -212,7 +214,9 @@ internal object CoreQueryProfile {
                         val accepted = point?.let { checkPoint(sourceBaked, it) }
                         if (point != null) check(accepted == true)
                         out.resolve("ordinary.jsonl").appendText(buildJsonObject {
-                            put("sourceSha256", identity)
+                            put("sourceSha256", sha256(sourceText.encodeToByteArray()))
+                            put("objectiveSha256", sha256(weights.joinToString(",").encodeToByteArray()))
+                            put("sourceObjectivePairSha256", identity)
                             put("unrelated", unrelated)
                             put("prepared", prepared)
                             put("repeat", repeat)

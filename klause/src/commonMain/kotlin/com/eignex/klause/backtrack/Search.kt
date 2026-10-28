@@ -23,8 +23,8 @@ import com.eignex.klause.propagation.LeafColumns
 import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.propagation.projectSeedCore
 import com.eignex.klause.propagation.baked
+import com.eignex.klause.propagation.projectSeedCore
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.IncumbentSubscription
 import com.eignex.klause.solver.incumbent.Verification

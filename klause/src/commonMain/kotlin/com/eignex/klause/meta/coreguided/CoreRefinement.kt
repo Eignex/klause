@@ -1,12 +1,13 @@
 package com.eignex.klause.meta.coreguided
 
-import com.eignex.klause.ir.Lit
 import com.eignex.klause.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.util.Cancellation
 
 internal enum class CoreRefinementMode { NONE, DELETION, REASONS }
@@ -22,11 +23,16 @@ internal object CoreRefinement {
         if (literals.size !in 2..32 || problem.numBoolVars.toLong() + problem.numIntVars > 4_096L ||
             problem.numFactors > 4_096 || cancellation()
         ) return literals
+        val providers = problem.projectionProviders
+        if (providers != null && providers != FactorProjectionProviders.Default) return literals
         var entries = problem.numBoolVars.toLong() + problem.numIntVars + problem.numFactors
         for (factor in problem.factors) {
             charge(1L)
-            if (factor !is Clause && factor !is ReifiedCardinality) return literals
-            val size = factor.structuralKeyWeight
+            val size = when (factor) {
+                is Clause -> factor.literals.size.toLong()
+                is ReifiedCardinality -> factor.literals.size.toLong() + 1L
+                else -> return literals
+            }
             if (size > 32_768L - entries || cancellation()) return literals
             entries += size
         }
@@ -34,7 +40,7 @@ internal object CoreRefinement {
         var charged = 0L
         fun settle() {
             val work = session?.work ?: 0L
-            charge(work - charged)
+            if (work > charged) charge(work - charged)
             charged = work
         }
         val stop = Cancellation {

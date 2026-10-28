@@ -153,6 +153,7 @@ internal object CoreQueryLearningProfile {
                         val checkNs = System.nanoTime() - checkStart
                         val record = buildJsonObject {
                             put("sourceSha256", sha256(sourceText.encodeToByteArray()))
+                            put("objectiveSha256", sha256("0,0,0,1,1,0,0".encodeToByteArray()))
                             put("prepared", prepared)
                             put("repeat", repeat)
                             put("warmup", repeat == 0)
@@ -176,7 +177,7 @@ internal object CoreQueryLearningProfile {
                                 ?.javaClass?.simpleName)
                             put("nodes", result.stats.search.nodes.sum)
                             put("propagation", result.stats.search.propagationWork.sum)
-                            put("falseQVisits", falseQVisits)
+                            put("falseQVisits", if (prepared) null else falseQVisits)
                             put("sourceQCoordinatesAvailable", !prepared)
                             put("sourceAccepted", accepted)
                             put("sourceObjective", point?.let { objective.evaluateLong(it) })

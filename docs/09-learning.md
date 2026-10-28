@@ -29,6 +29,7 @@ across values already occupied by that set, and holes inside its union need no p
 Assumption cores keep the applied seed prefix when propagation refutes it, or the full
 assumption set when the tree is exhausted. Cores are jointly refuted with the hard
 model and need not be minimal; an interrupted seeding cannot certify the full seed.
+
 An internal opt-in seed projection starts from the historical forcing clause of a
 Boolean pin contradicted by the next named assumption. It resolves eager Boolean
 antecedents until every remaining literal is negated by an applied named pin, keeping
