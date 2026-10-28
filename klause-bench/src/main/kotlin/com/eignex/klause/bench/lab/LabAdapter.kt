@@ -1,0 +1,244 @@
+package com.eignex.klause.bench.lab
+
+import com.eignex.klause.bench.catalog.Category
+import com.eignex.klause.bench.catalog.Expected
+import com.eignex.klause.bench.catalog.Format
+import com.eignex.klause.bench.catalog.ProblemRef
+import com.eignex.klause.bench.catalog.ProblemSource
+import com.eignex.klause.bench.metric.InstalledBuild
+import com.eignex.klause.bench.metric.SolveMetric
+import com.eignex.klause.bench.metric.SolveRecord
+import com.eignex.klause.bench.metric.SolverInvocation
+import com.eignex.klause.bench.report.Reports
+import com.eignex.klause.bench.runner.Budget
+import com.eignex.klause.bench.target.collectionOf
+import com.eignex.lab.bench.*
+import kotlinx.serialization.json.JsonObject
+import java.nio.file.Files
+import java.nio.file.Path
+import java.time.Instant
+import com.eignex.klause.bench.target.BenchCli as KlauseCli
+
+/** Repository-owned lab planning and installed-CLI execution entry point. */
+fun main(args: Array<String>) {
+    val protocolOutput = System.out
+    System.setOut(System.err)
+    System.getenv("LAB_WORKTREE")?.let { tree ->
+        System.setProperty("klause.workspace.root", tree)
+        System.setProperty("klause.bench.minizinc", Path.of(tree, LabInputs.RUNTIME, "bin/minizinc").toString())
+    }
+    System.getenv("LAB_CORPUS")?.let { System.setProperty("klause.bench.corpusCache", it) }
+    System.setProperty("klause.bench.cache", "false")
+    if (args.firstOrNull() == "solve-record") {
+        require(args.size == 3)
+        val case = BenchProtocol.json.decodeFromString<BenchCase>(Files.readString(Path.of(args[1])))
+        val output = Path.of(args[2])
+        val record = KlauseLabSuite.solveRecord(
+            case,
+            BenchContext(
+                output.parent,
+                worktree = Path.of(requireNotNull(System.getenv("LAB_WORKTREE"))),
+                corpusDirectory = System.getenv("LAB_CORPUS")?.let(Path::of),
+            ),
+        )
+        Files.writeString(
+            output.resolve("solve-record.json"),
+            Reports.json.encodeToString(SolveRecord.serializer(), record),
+        )
+    } else {
+        BenchCli.execute(KlauseLabSuite, args, stdout = protocolOutput)
+    }
+}
+
+internal object KlauseLabSuite : BenchSuite {
+    override fun describe() = BenchDescriptor(
+        "klause-bench",
+        "Frozen catalog workloads and installed CLI solve records",
+    )
+
+    override fun plan(request: BenchRequest): List<BenchCase> {
+        val settings = LabSettings(request.parameters)
+        val selection = request.parameters.filterKeys { it in LabSettings.SELECTORS }
+            .ifEmpty { mapOf("suite" to "dimacs-core", "name" to "php4") }
+        return KlauseCli.selectProblems(selection).flatMap { selected ->
+            val ref = selected.ref
+            require(ref.source !is ProblemSource.InCode) { "Lab subprocess solves require file-backed inputs" }
+            val inputs = LabInputs.resolve(ref)
+            val trees = LabInputs.treeHashes(inputs)
+            settings.engines.flatMap { engine ->
+                settings.seeds.flatMap { seed ->
+                    (0 until settings.repeats).map { repeat ->
+                        BenchCase(
+                            "${selected.suite}/${ref.name}/$engine/$seed/$repeat",
+                            settings.caseParameters(engine, seed),
+                            settings.resources(),
+                            inputs = inputs,
+                            attributes = trees + mapOf(
+                                "suite" to selected.suite,
+                                "problem" to ref.name,
+                                "collection" to collectionOf(ref),
+                                "family" to (ref.family ?: ref.name.substringBefore('/')),
+                                "format" to ref.format.name,
+                                "category" to ref.category.name,
+                                "license" to ref.license,
+                                "expected" to ref.expected.toString(),
+                                "tags" to ref.tags.sorted().joinToString(","),
+                                "recordSchema" to "solver-v1",
+                                "repeat" to repeat.toString(),
+                                "validationPolicy" to "reported-result-v1",
+                            ),
+                        )
+                    }
+                }
+            }
+        }.also { require(it.isNotEmpty()) { "Selection matched no problems" } }
+    }
+
+    internal fun solveRecord(case: BenchCase, context: BenchContext): SolveRecord {
+        LabInputs.verify(case, context)
+        fun source(input: BenchInput) = ProblemSource.Prepared(LabInputs.path(input, context).toFile())
+        val includes = case.inputs.filter { it.role == "include" }.map { source(it).file }
+        val ref = ProblemRef(
+            case.attributes.getValue("problem"),
+            Format.valueOf(case.attributes.getValue("format")),
+            source(case.inputs.single { it.role == "model" }).copy(includes = includes),
+            Category.valueOf(case.attributes.getValue("category")),
+            Expected.Unknown,
+            data = case.inputs.singleOrNull { it.role == "data" }?.let(::source),
+        )
+        val p = case.parameters
+        System.setProperty("klause.bench.mzn.timeoutSec", p.getValue("compile-timeout-sec"))
+        val settings = SolverInvocation.Settings(
+            engine = p.getValue("engine").takeUnless { it == "default" },
+            processors = case.resources.cpus,
+            seed = p.getValue("seed").toLong(),
+            params = p.filterKeys { it.startsWith("param.") }.map { (k, v) -> "${k.removePrefix("param.")}=$v" },
+            lp = p["lp"],
+            presolve = p["presolve"],
+            exact = p["exact"]?.toBooleanStrict() ?: false,
+            captureDirectory = context.outputDirectory.resolve("report").toFile(),
+            measureResources = p.getValue("measurement") != "none",
+        )
+        val budget = Budget(p.getValue("timeout-ms").toLong())
+        val record = if (ref.format == Format.JSON_SCHEMA) {
+            val reason = "JSON schema is an in-process catalog format; the installed CLI has no schema frontend"
+            SolveMetric.loadFailureRecord(
+                ref,
+                settings,
+                budget,
+                Instant.now().toString(),
+                Reports.readGitSha(),
+                IllegalArgumentException(reason),
+            ).copy(
+                command = "UNSUPPORTED",
+                stats = mapOf("unsupported" to reason),
+                buildProvenance = InstalledBuild.current,
+            )
+        } else {
+            SolveMetric.solveOne(ref, budget, settings, context.outputDirectory.resolve("report").toFile())
+        }
+        val provenance = record.buildProvenance?.let { build ->
+            build.copy(
+                runtimeOptions = build.runtimeOptions +
+                    ("lab.cli.args" to Files.readString(context.outputDirectory.resolve("cli.args"))),
+            )
+        }
+        val retained = record.copy(
+            buildProvenance = provenance,
+            buildFingerprint = provenance?.fingerprint,
+            stats = record.stats + mapOf(
+                "labMeasurement" to p.getValue("measurement"),
+                "labDebug" to p.getValue("debug"),
+            ),
+        )
+        val recordPath = context.outputDirectory.resolve("report/${ref.name.replace('/', '_')}.json")
+        Files.writeString(recordPath, Reports.json.encodeToString(SolveRecord.serializer(), retained))
+        return retained
+    }
+
+    internal fun failure(record: SolveRecord): String? = record.stats["loadError"] ?: record.stats["errorMessage"]
+        ?: when {
+            record.command == "ERROR" -> "CLI solve failed"
+
+            record.stats["exit"]?.toIntOrNull()?.let { it != 0 } == true && "unsupported" !in record.stats &&
+                record.stats["killed"] != "hard-timeout" ->
+                "CLI exited ${record.stats["exit"]} after publishing its result"
+
+            else -> null
+        }
+
+    override fun run(case: BenchCase, context: BenchContext): BenchResult {
+        val report = context.reportPath()
+        Files.createDirectories(report)
+        val input = context.outputDirectory.resolve("input.json")
+        Files.writeString(input, BenchProtocol.json.encodeToString(BenchCase.serializer(), case))
+        val environment = LabRuntime.environment(case, context)
+        var record: SolveRecord? = null
+        val error = runCatching {
+            LabInputs.verify(case, context)
+            val exit = LabRuntime.process(
+                context,
+                listOf(
+                    Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+                    "-Xmx512m",
+                    "--enable-native-access=ALL-UNNAMED",
+                    "--add-modules=jdk.incubator.vector",
+                    "-cp",
+                    System.getProperty("java.class.path"),
+                    "com.eignex.klause.bench.lab.LabAdapterKt",
+                    "solve-record",
+                    input.toString(),
+                    report.toString(),
+                ),
+                environment,
+            )
+            val file = report.resolve("solve-record.json")
+            record = if (Files.isRegularFile(file)) {
+                Reports.json.decodeFromString<SolveRecord>(Files.readString(file))
+            } else {
+                null
+            }
+            record?.let(::failure) ?: if (exit != 0 || record == null) {
+                "CLI adapter failed (exit $exit); inspect solve.log"
+            } else {
+                null
+            }
+        }.getOrElse { "CLI adapter failed: ${it.message}" }
+        val metrics = record?.let(::metrics).orEmpty() + LabRuntime.resourceMetrics(report)
+        val artifacts = context.artifacts() + listOf(
+            "input.json",
+            "runtime.json",
+            "cli.args",
+            "preflight.args",
+            "solve.log",
+        )
+            .filter { Files.isRegularFile(context.outputDirectory.resolve(it)) }.map { context.artifact(it) }
+        return BenchResult(
+            case.id,
+            if (error == null) BenchStatus.SUCCESS else BenchStatus.FAILED,
+            metrics = metrics,
+            artifacts = artifacts,
+            details = record?.let { Reports.json.encodeToJsonElement(SolveRecord.serializer(), it) as JsonObject },
+            message = error,
+        )
+    }
+
+    internal fun metrics(record: SolveRecord): List<BenchMetric> = buildList {
+        fun time(name: String, value: Long?) {
+            value?.let { add(BenchMetric(name, it.toDouble(), "ms", MetricDirection.LOWER)) }
+        }
+        time("elapsed", record.elapsedMs)
+        time("time-to-first-feasible", record.timeToFirstFeasibleMs)
+        time("time-to-best", record.timeToBestMs)
+        record.objective?.takeIf(Double::isFinite)?.let {
+            add(
+                BenchMetric(
+                    "objective",
+                    it,
+                    "objective",
+                    if (record.maximize) MetricDirection.HIGHER else MetricDirection.LOWER,
+                ),
+            )
+        }
+    }
+}

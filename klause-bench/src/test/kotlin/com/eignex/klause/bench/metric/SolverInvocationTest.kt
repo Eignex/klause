@@ -1,8 +1,9 @@
 package com.eignex.klause.bench.metric
 
-import java.io.File
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import java.io.File
+import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -124,8 +125,11 @@ class SolverInvocationTest {
     @ValueSource(strings = ["", "-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=1"])
     fun `version preflight should leave solve recording options private to the solve`(preflight: String) {
         val solve = "-Xmx3g -XX:StartFlightRecording=filename=solve.jfr -XX:LogFile=solve.xml"
-        val environment = mapOf("KLAUSE_CLI_OPTS" to solve, "KLAUSE_CLI_PREFLIGHT_OPTS" to preflight,
-            "JAVA_HOME" to "/runtime")
+        val environment = mapOf(
+            "KLAUSE_CLI_OPTS" to solve,
+            "KLAUSE_CLI_PREFLIGHT_OPTS" to preflight,
+            "JAVA_HOME" to "/runtime",
+        )
 
         val command = SolverInvocation.cliVersionCommand(File("/installed/klause-cli"), environment)
 
@@ -154,7 +158,8 @@ class SolverInvocationTest {
             }
             for (exit in listOf(0, 7)) {
                 val result = SolverInvocation.invoke(
-                    listOf("sh", "-c", "printf '%s\\n' '$verdict'; exit $exit"), dialect,
+                    listOf("sh", "-c", "printf '%s\\n' '$verdict'; exit $exit"),
+                    dialect,
                 )
 
                 assertEquals(exit.toString(), result.stats["exit"])
@@ -424,5 +429,35 @@ class SolverInvocationTest {
             SolverInvocation.quarantines(stderr),
         )
         assertNull(SolverInvocation.quarantines("WARNING: Using incubator modules\n"))
+    }
+
+    @Test
+    fun `a failed process retains its complete stdout and stderr artifacts`() {
+        val directory = Files.createTempDirectory("cli-capture-").toFile()
+        try {
+            assertFailsWith<IllegalStateException> {
+                SolverInvocation.invoke(
+                    listOf("sh", "-c", "echo partial; echo failed >&2; exit 7"),
+                    SolverInvocation.Dialect.MINIZINC,
+                    captureDirectory = directory,
+                )
+            }
+            assertEquals("partial\n", directory.resolve("cli.stdout").readText())
+            assertEquals("failed\n", directory.resolve("cli.stderr").readText())
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `a hard timeout retains its incumbent and termination reason`() {
+        val result = SolverInvocation.invoke(
+            listOf("sh", "-c", "echo sat; exec sleep 5"),
+            SolverInvocation.Dialect.SMT_LIB,
+            hardTimeoutMs = 100,
+        )
+        assertEquals(true, result.feasible)
+        assertEquals("hard-timeout", result.stats["killed"])
+        assertFalse(result.proven)
     }
 }

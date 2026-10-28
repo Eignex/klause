@@ -11,6 +11,7 @@ Commands run from the repository root unless shown otherwise.
 |---|---|
 | Select problems or solve one | [Build](#build-and-run), [selection](#selection-and-named-sets), [corpus](#catalog-and-corpus) |
 | Run experiments, comparisons or schedules | [Klause-lab](#klause-lab) |
+| Integrate a repository-owned suite | [Bench SDK adapter](#bench-sdk-adapter) |
 | Read a solve record | [Provenance](#installed-build-provenance), [records](#saved-results), [witnesses](#witness-records) |
 | Investigate cost | [Profiling](#profiling), [LP replay](#lp-capture-and-replay) |
 | Review retained design decisions | [Design evidence](#design-evidence) |
@@ -101,6 +102,84 @@ Write experiments as described in the lab's
 and profile jobs as in its
 [profile jobs guide](https://github.com/Eignex/klause-lab/blob/main/deploy/SETUP.md#profile-jobs).
 Arm values are `solve-one` options; `param.<name>` becomes `--param <name>=<value>`.
+
+## Bench SDK adapter
+
+`lab/bench.json` owns the adapter's build tasks, classpath and JVM launch options.
+Its tasks install the CLI, bench distribution and a checksum-pinned MiniZinc 2.10.1
+compiler with its standard library. Gradle resolves the compiler archive anonymously
+from the public MiniZinc release; execution needs no download or system MiniZinc.
+The manifest targets Linux x86_64 and requires JDK 25, GNU time and the ordinary
+Linux C/C++ runtime libraries. The planner retains its platform requirements.
+
+Only `klause-bench` imports `com.eignex:lab-bench:0.1.0`, resolved anonymously
+from [public GitHub Release assets](https://github.com/Eignex/eignex-lab/releases/tag/lab-bench-v0.1.0).
+Build the complete adapter with:
+
+```sh
+./gradlew :klause-cli:installJvmDist :klause-bench:installDist :klause-bench:prepareLabRuntime
+```
+
+`-PlabBenchVersion=VERSION` selects another SDK release. A local SDK checkout can
+stage its repository with `./gradlew :lab-bench:stageAdapterRepository -PbenchVersion=0.1.0`;
+pass `-PlabBenchRepository=file:///absolute/eignex-lab/lab-bench/build/adapter-repository`
+to the consumer build, refreshing dependencies after restaging the same version.
+
+Submit `repository: "Eignex/klause"` and
+`bench: {"manifest":"klause-bench/lab/bench.json","request":{"parameters":{"suite":"dimacs-core","name":"php4","timeout-ms":"1000"}}}`.
+The planner accepts the catalog selectors `suite`, `set`, `name`, `category`,
+`tag`, `kind`, `per-family`, `seed`, `max` and `balance`. It expands
+`engines`, `solver-seeds` and `repeats` into distinct cases. Catalog file formats
+include DIMACS, WCNF, OPB, XCSP3, SMT-LIB, MPS and MiniZinc model/data.
+JSON schema catalog entries retain a labelled unsupported result because the CLI
+has no schema frontend; in-code problems have no subprocess input and are rejected.
+
+| Control | Contract |
+|---|---|
+| `cpus`, `memory-mib` | Reserved case resources; memory is at least 2048 MiB |
+| `timeout-ms`, `compile-timeout-sec` | Solve deadline and MiniZinc compile ceiling; the supervised case allowance also covers preflight and shutdown |
+| `heap-mib` | CLI heap, reserving 1536 MiB for both harness JVMs and native overhead |
+| `gc` | `default`, `serial`, `parallel`, `g1` or `z` |
+| `lp`, `presolve`, `exact`, `param.NAME` | CLI solve controls; engine-specific parameter semantics are checked by the CLI |
+| `debug` | Strict Boolean; defaults to runtime statistics enabled |
+| `measurement` | `none`, `resources`, `jfr`, `compilation` or `compilation+log` |
+
+Plans freeze model/data files, include trees, relative companion includes and the
+bundled compiler. File and directory digests are checked after relocation and before
+execution; required inputs cannot escape the source or corpus roots. Absolute
+MiniZinc include declarations are rejected. Execution reconstructs the file-backed
+reference without catalog discovery. JVM argument files preserve paths containing
+spaces, and CLI processes receive the planned controls without inherited solver or
+instrumentation settings. Version preflight uses separate, uninstrumented options.
+
+Each case retains its full solve record: exact objective text, proof/feasibility,
+portfolio attribution, final witness, source hashes, compiler identity, validation
+policy and installed build/runtime provenance. The runtime manifest and argument
+files retain the effective capture settings. Generic elapsed, first-feasible,
+best-incumbent and direction-aware objective metrics supplement the domain record;
+resource captures add GNU time CPU, wall and peak-RSS metrics. JFR and HotSpot logs
+remain separate artifacts. Instrumented captures are diagnostics, not comparable
+solver-throughput controls.
+
+UNSAT, UNKNOWN, unsupported models and solver deadlines retain their domain
+semantics. Load errors, crashes and nonzero exits after a published verdict fail the
+SDK case while retaining available records and artifacts. Stdout/stderr are flushed
+to durable files during solving, and compiler failures retain their diagnostics.
+Compiled FlatZinc, output mappings and exact CLI argv are retained as artifacts.
+A worker cancellation or hard kill can leave these partial files without a terminal
+solve record; the lab's supervisor owns that execution outcome and artifact transfer.
+
+The SDK's one-revision cases do not replace reference arms, paired revision
+comparisons, schedules/sweeps, independent source-witness checks, confirmation or
+specialized profile mains. The generic lab path currently rejects legacy source-check
+controls on bench jobs, so `validationPolicy=reported-result-v1` does not claim an
+independent check. Removing the legacy lab executor requires generic orchestration
+for those workflows, a checker request/result contract, declared JDK/runtime
+prerequisites and cancellation/partial-result semantics. In particular, the
+coordinator accepts run-level deadline receipts only for profile jobs; a forced
+bench run-level deadline retains partial worker files but its receipt is rejected. The lab can already consume
+this manifest for prepared solve execution and ingest its metrics, records and
+artifacts; deployment and capacity pools must advertise the declared platform tags.
 
 ## Selection and named sets
 

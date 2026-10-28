@@ -1,4 +1,6 @@
 import java.io.FileOutputStream
+import java.security.MessageDigest
+import java.util.HexFormat
 
 plugins {
     id("com.eignex.jvm") version "1.3.5"
@@ -16,7 +18,40 @@ tasks.withType<org.jetbrains.dokka.gradle.tasks.DokkaGenerateTask>().configureEa
     enabled = false
 }
 
+repositories {
+    exclusiveContent {
+        forRepository {
+            ivy {
+                name = "labBenchReleases"
+                url = uri(providers.gradleProperty("labBenchRepository")
+                    .getOrElse("https://github.com/Eignex/eignex-lab/releases/download"))
+                patternLayout { artifact("lab-bench-v[revision]/[artifact]-[revision](-[classifier]).[ext]") }
+                metadataSources { gradleMetadata() }
+            }
+        }
+        filter { includeModule("com.eignex", "lab-bench") }
+    }
+    exclusiveContent {
+        forRepository {
+            ivy {
+                name = "miniZincReleases"
+                url = uri("https://github.com/MiniZinc/MiniZincIDE/releases/download")
+                patternLayout { artifact("[revision]/MiniZincIDE-[revision]-[classifier].[ext]") }
+                metadataSources { artifact() }
+            }
+        }
+        filter { includeModule("org.minizinc", "minizinc") }
+    }
+}
+val labBenchVersion = providers.gradleProperty("labBenchVersion").getOrElse("0.1.0")
+val labMiniZinc = configurations.create("labMiniZinc") {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+}
+
 dependencies {
+    add(labMiniZinc.name, "org.minizinc:minizinc:2.10.1:x86_64-linux-gnu@tgz")
+    implementation("com.eignex:lab-bench:$labBenchVersion")
     implementation(project(":klause"))
     implementation("org.jetbrains.kotlin:kotlin-compiler-embeddable:2.4.21")
     testImplementation("org.junit.jupiter:junit-jupiter")
@@ -83,3 +118,40 @@ tasks.withType<Test> {
     maxHeapSize = "4g"
 }
 
+val prepareLabRuntime = tasks.register("prepareLabRuntime") {
+    group = "build"
+    description = "Stage the pinned Linux x86_64 MiniZinc compiler and standard library for lab jobs."
+    notCompatibleWithConfigurationCache("Uses Gradle archive operations to stage the compiler")
+    val destination = layout.buildDirectory.dir("lab-runtime/minizinc")
+    val archive = labMiniZinc
+    val checksum = "b63dd88491d47b05d0eb0ff4aa1112d1e6f77292c023800b20b98851458ce01c"
+    inputs.files(archive)
+    inputs.property("checksum", checksum)
+    outputs.dir(destination)
+    doLast {
+        require(System.getProperty("os.name") == "Linux" && System.getProperty("os.arch") in setOf("amd64", "x86_64")) {
+            "Lab MiniZinc runtime requires Linux x86_64"
+        }
+        val file = archive.singleFile
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { stream ->
+            val buffer = ByteArray(65536)
+            while (true) {
+                val read = stream.read(buffer)
+                if (read < 0) break
+                digest.update(buffer, 0, read)
+            }
+        }
+        check(HexFormat.of().formatHex(digest.digest()) == checksum) { "MiniZinc release checksum mismatch" }
+        project.sync {
+            from(tarTree(resources.gzip(file)))
+            include("*/bin/minizinc", "*/share/minizinc/std/**")
+            eachFile { relativePath = RelativePath(!isDirectory, *relativePath.segments.drop(1).toTypedArray()) }
+            includeEmptyDirs = false
+            into(destination)
+        }
+        val root = destination.get().asFile
+        check(root.resolve("bin/minizinc").setExecutable(true))
+        root.resolve("sha256").writeText("$checksum\n")
+    }
+}

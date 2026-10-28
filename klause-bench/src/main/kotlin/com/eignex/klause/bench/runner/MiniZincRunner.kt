@@ -61,11 +61,14 @@ internal class MiniZincRunner(
         val root = CorpusFetcher.workspaceRoot()
         val mzn = CorpusFetcher.resolve(ref.source)
         val dzn = ref.data?.let { CorpusFetcher.resolve(it) }
+        val includes = CorpusFetcher.includeDirs(ref.source)
+        val includedFiles = includes.flatMap { it.walkTopDown().filter(File::isFile).toList() }
+            .distinctBy { it.canonicalPath }.sortedBy { it.path }
         val workDir = File(root, "klause-bench/build/mzn-fzn-output-v3-seed$MZN_RANDOM_SEED").apply { mkdirs() }
         val digest = MessageDigest.getInstance("SHA-256")
         digest.update(MiniZincCompatibility.compiler.toString().toByteArray())
         for (
-        source in listOfNotNull(mzn, dzn) +
+        source in listOfNotNull(mzn, dzn) + includedFiles +
             File(root, "klause-mzn-lib/share/minizinc").walkTopDown().filter { it.isFile }.sortedBy { it.path }.toList()
         ) {
             digest.update(source.readBytes())
@@ -76,7 +79,7 @@ internal class MiniZincRunner(
         val upToDate = fzn.exists() && outputFile(fzn).exists() &&
             fzn.lastModified() >= mzn.lastModified() &&
             (dzn == null || fzn.lastModified() >= dzn.lastModified())
-        if (fresh || !upToDate) compile(root, mzn, dzn, fzn)
+        if (fresh || !upToDate) compile(root, mzn, dzn, fzn, includes)
         return fzn
     }
 
@@ -118,7 +121,7 @@ internal class MiniZincRunner(
 
     private fun outputFile(fzn: File): File = File(fzn.parentFile, "${fzn.nameWithoutExtension}.ozn")
 
-    private fun compile(root: File, mzn: File, dzn: File?, out: File) {
+    private fun compile(root: File, mzn: File, dzn: File?, out: File, includes: List<File>) {
         val sourceHashes = buildMap {
             put("model", MiniZincCompatibility.hash(mzn))
             if (dzn != null) put("data", MiniZincCompatibility.hash(dzn))
@@ -145,6 +148,10 @@ internal class MiniZincRunner(
             add(libDir.absolutePath)
             add("--output-fzn-to-file")
             add(tmp.absolutePath)
+            includes.forEach {
+                add("-I")
+                add(it.absolutePath)
+            }
             add(mzn.absolutePath)
             if (dzn != null) add(dzn.absolutePath)
         }

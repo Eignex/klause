@@ -1,15 +1,17 @@
 package com.eignex.klause.bench.metric
 
 import com.eignex.klause.bench.catalog.Format
+import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.MiniZincRunner
 import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.tools.CliProfile
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
 import java.io.File
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
-import kotlinx.serialization.Serializable
 
 /**
  * Runs `klause-cli` as a subprocess on the model: the compiled `.fzn` for a MiniZinc instance, or the
@@ -35,6 +37,8 @@ internal object SolverInvocation {
         /** klause-cli `--presolve` (presolve emphasis + per-pass deltas); null = unset. */
         val presolve: String? = null,
         val exact: Boolean = false,
+        val captureDirectory: File? = null,
+        val measureResources: Boolean = false,
     )
 
     /** One subprocess solve: verdict, best objective + time-to-best, proof status, the captured
@@ -65,7 +69,13 @@ internal object SolverInvocation {
         // Hard wall-clock ceiling: a solve that ignores its `-t` deadline (e.g. an expensive move source
         // that polls cancellation too rarely) must not hang the harness. Generous over the budget so it
         // only ever kills a genuine runaway, never a solve that's merely flushing at the deadline.
-        return invoke(cmd, dialectFor(entry.ref.format), hardTimeoutMs = budget.timeoutMillis * 2 + 20_000)
+        return invoke(
+            cmd,
+            dialectFor(entry.ref.format),
+            hardTimeoutMs = budget.timeoutMillis * 2 + 20_000,
+            captureDirectory = settings.captureDirectory,
+            measureResources = settings.measureResources,
+        )
             .copy(buildProvenance = InstalledBuild.current)
     }
 
@@ -175,9 +185,27 @@ internal object SolverInvocation {
         else -> Dialect.MINIZINC
     }
 
-    internal fun invoke(cmd: List<String>, dialect: Dialect, hardTimeoutMs: Long = Long.MAX_VALUE): Result {
+    internal fun invoke(
+        cmd: List<String>,
+        dialect: Dialect,
+        hardTimeoutMs: Long = Long.MAX_VALUE,
+        captureDirectory: File? = null,
+        measureResources: Boolean = false,
+    ): Result {
         val startNanos = System.nanoTime()
-        val process = ProcessBuilder(cmd).redirectErrorStream(false).start()
+        captureDirectory?.mkdirs()
+        val measured = if (measureResources) {
+            listOf(
+                "/usr/bin/time",
+                "--format=peakRssKiB=%M\nuserSeconds=%U\nsystemSeconds=%S\nwallSeconds=%e\nexit=%x",
+                "--output=${requireNotNull(captureDirectory).resolve("resources.txt")}",
+            ) + cmd
+        } else {
+            cmd
+        }
+        captureDirectory?.resolve("cli-command.json")?.writeText(Reports.json.encodeToString(measured))
+        val process = ProcessBuilder(measured).redirectErrorStream(false).start()
+        val stdoutCapture = captureDirectory?.resolve("cli.stdout")?.bufferedWriter()
         // Watchdog: force-kill a runaway that blew past [hardTimeoutMs] so the read loop below (which
         // blocks until the child's stdout closes) can't hang forever on a child that never exits. A
         // killed child's stream closes, the loop returns, and the partial output is scored as usual.
@@ -186,6 +214,7 @@ internal object SolverInvocation {
             runCatching {
                 if (!process.waitFor(hardTimeoutMs, TimeUnit.MILLISECONDS)) {
                     killed.set(true)
+                    process.descendants().forEach { it.destroyForcibly() }
                     process.destroyForcibly()
                 }
             }
@@ -196,7 +225,15 @@ internal object SolverInvocation {
         val stderr = StringBuilder()
         val stderrDrained = AtomicBoolean(false)
         val drain = Thread {
-            process.errorStream.bufferedReader().forEachLine { stderr.appendLine(it) }
+            captureDirectory?.resolve("cli.stderr")?.bufferedWriter().use { capture ->
+                process.errorStream.bufferedReader().forEachLine {
+                    stderr.appendLine(it)
+                    capture?.apply {
+                        appendLine(it)
+                        flush()
+                    }
+                }
+            }
             stderrDrained.set(true)
         }
         drain.isDaemon = true
@@ -238,6 +275,10 @@ internal object SolverInvocation {
         fun recordStat(kv: String) = kv.split('=', limit = 2)
             .takeIf { it.size == 2 }?.let { stats[it[0].trim()] = it[1].trim() }
         process.inputStream.bufferedReader().forEachLine { rawLine ->
+            stdoutCapture?.apply {
+                appendLine(rawLine)
+                flush()
+            }
             raw.appendLine(rawLine)
             val line = rawLine.trim()
             when (dialect) {
@@ -328,8 +369,10 @@ internal object SolverInvocation {
                 }
             }
         }
+        stdoutCapture?.close()
         if (!process.waitFor(GRACE_MILLIS, TimeUnit.MILLISECONDS)) {
             killed.set(true)
+            process.descendants().forEach { it.destroyForcibly() }
             process.destroyForcibly()
             process.waitFor()
         }
@@ -346,6 +389,7 @@ internal object SolverInvocation {
             // Unsupported models yield labelled undecided results.
             if (refusal != null) stats["unsupported"] = refusal else stats["killed"] = "hard-timeout"
         }
+        if (killed.get()) stats["killed"] = "hard-timeout"
         stats["exit"] = process.exitValue().toString()
         drain.join(STDERR_DRAIN_WAIT_MS)
         quarantines(stderr.toString())?.let { stats[QUARANTINED] = it }

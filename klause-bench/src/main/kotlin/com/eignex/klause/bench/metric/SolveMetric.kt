@@ -14,10 +14,10 @@ import com.eignex.klause.bench.source.ProblemKind
 import com.eignex.klause.formats.flatzinc.UnsupportedFlatZincException
 import com.eignex.klause.formats.smtlib.UnsupportedSmtException
 import com.eignex.klause.formats.xcsp3.UnsupportedXcsp3Exception
-import java.io.File
-import java.time.Instant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
+import java.io.File
+import java.time.Instant
 
 /** One problem's result for one settings+budget — the durable per-problem record the lab reads. */
 @Serializable
@@ -76,20 +76,35 @@ internal object SolveMetric {
     /** Solve the one problem [ref] with klause-cli, writing its [SolveRecord] to `<outDir>/<problem>.json` and the
      *  raw solver output beside it, and return the record. A problem that fails to load gets a record too, its reason
      *  under `stats.unsupported` when klause declines the model and under `stats.loadError` otherwise. */
-    fun solveOne(
-        ref: ProblemRef,
-        budget: Budget,
-        settings: SolverInvocation.Settings,
-        outDir: File,
-    ): SolveRecord {
+    fun solveOne(ref: ProblemRef, budget: Budget, settings: SolverInvocation.Settings, outDir: File): SolveRecord {
         SolverInvocation.klauseCliDefect()?.let { error("the klause dist cannot solve: $it") }
         outDir.mkdirs()
         val timestamp = Instant.now().toString()
         val sha = Reports.readGitSha()
         val name = ref.name.replace('/', '_')
         val (rec, raw) = runCatching { Runners.resolve(ref, settings.exact) }.fold(
-            { entry -> solve(entry, settings, budget, timestamp, sha) },
-            { failure -> loadFailureRecord(ref, settings, budget, timestamp, sha, failure) to null },
+            { entry ->
+                if (ref.format == Format.MINIZINC) {
+                    settings.captureDirectory?.let { directory ->
+                    directory.mkdirs()
+                    val runner = MiniZincRunner()
+                    runner.compileFzn(ref).copyTo(directory.resolve("model.fzn"), overwrite = true)
+                    runner.compileOutput(ref).copyTo(directory.resolve("model.ozn"), overwrite = true)
+                }
+                }
+                solve(entry, settings, budget, timestamp, sha)
+            },
+            { failure ->
+                if (failure is MiniZincCompileFailure) {
+                    settings.captureDirectory?.let { directory ->
+                        directory.mkdirs()
+                        directory.resolve("compiler.log").writeText(failure.diagnostic)
+                        val command = Reports.json.encodeToString(failure.command)
+                        directory.resolve("compiler-command.json").writeText(command)
+                    }
+                }
+                loadFailureRecord(ref, settings, budget, timestamp, sha, failure) to null
+            },
         )
         raw?.let { File(outDir, "$name.out").writeText(it) }
         File(outDir, "$name.json").writeText(Reports.json.encodeToString(rec))

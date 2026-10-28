@@ -64,6 +64,7 @@ internal object CorpusFetcher {
 
     /** Resolve [source] to a file, fetching an external collection if needed. */
     fun resolve(source: ProblemSource): File = when (source) {
+        is ProblemSource.Prepared -> source.file.also { require(it.isFile) }
         is ProblemSource.Vendored -> File(workspaceRoot(), source.workspaceRelPath).also {
             require(it.isFile) { "vendored file missing: ${source.workspaceRelPath}" }
         }
@@ -91,7 +92,9 @@ internal object CorpusFetcher {
     }
 
     /** The MiniZinc include directories [source]'s collection ships, which `minizinc -I` needs beside the model. */
-    fun includeDirs(source: ProblemSource): List<File> = if (source is ProblemSource.External) {
+    fun includeDirs(source: ProblemSource): List<File> = if (source is ProblemSource.Prepared) {
+        source.includes
+    } else if (source is ProblemSource.External) {
         val root = ensure(source.collection)
         source.collection.includeDirs.map { File(root, it) }.filter { it.isDirectory }
     } else {
