@@ -1,0 +1,23 @@
+<instance format="XCSP3" type="COP">
+  <variables>
+    <var id="x">0..2</var>
+    <array id="u" size="[5]">0..1</array>
+    <array id="v" size="[5]">0..1</array>
+  </variables>
+  <constraints>
+    <sum><list>u[0] u[1]</list><condition>(ge,1)</condition></sum>
+    <sum><list>u[1] u[2]</list><condition>(ge,1)</condition></sum>
+    <sum><list>u[2] u[3]</list><condition>(ge,1)</condition></sum>
+    <sum><list>u[3] u[4]</list><condition>(ge,1)</condition></sum>
+    <sum><list>u[4] u[0]</list><condition>(ge,1)</condition></sum>
+    <sum><list>v[0] v[1]</list><condition>(ge,1)</condition></sum>
+    <sum><list>v[1] v[2]</list><condition>(ge,1)</condition></sum>
+    <sum><list>v[2] v[3]</list><condition>(ge,1)</condition></sum>
+    <sum><list>v[3] v[4]</list><condition>(ge,1)</condition></sum>
+    <sum><list>v[4] v[0]</list><condition>(ge,1)</condition></sum>
+    <sum><list>u[0] v[0]</list><condition>(ge,1)</condition></sum>
+    <extension><list>x u[0] u[1]</list><supports>(0,1,0)(0,1,1)(1,1,1)(2,0,1)</supports></extension>
+  </constraints>
+  <objectives><minimize type="sum"><list>x u[] v[]</list><coeffs>1 6 6 6 6 6 5 6 6 6 6</coeffs></minimize></objectives>
+</instance>
+

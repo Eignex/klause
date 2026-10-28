@@ -557,6 +557,19 @@ plain inputs. Hashes use decompressed bytes.
 Compression writes beside the original, verifies SHA-256, then replaces it;
 interrupted migration can resume.
 
+## Strict-cost Table substitution
+
+`bench.profile.TableSubstitutionProfile` accepts `request64=` with one to eight
+hash-pinned XCSP3 `{suite, problem, sha256}` identities. It captures ordinary
+preparation and opt-in `default,+table-substitution`, each under eight seconds and
+550 million containing phase units. Reports retain original sources, exact current
+objectives, cost-coordinate root domains and every enforcing reader kind, pass
+outcomes/work, preparation time, current-thread allocation and build provenance.
+It runs no search; ordered JFR observations establish no throughput gain.
+Use ordinary source-checked lab solve comparisons to qualify consumed exclusions.
+The [fixtures](smoke-corpus/table-substitution/README.md) separate interior
+strict-cost replacement from declared-hole and outside-reader rejections.
+
 ## Objective-preserving symmetry admission
 
 `bench.profile.SymmetryAdmissionProfile` captures ordinary protected preparation

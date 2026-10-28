@@ -408,6 +408,20 @@ enum class PresolvePass(
             Presolve.fixDominatedVariables(problem, ctx.objectiveIntCoeffs, ctx.objectiveBoolCoeffs, ctx.cancellation)
     },
 
+    /** Strict-cost replacement across every unconditional ground Table reading a coordinate. */
+    SUBSTITUTE_TABLE_VALUES(
+        "table-substitution",
+        Stage.PROBLEM,
+        Capability.FINITE,
+        PresolveTiming.MEDIUM,
+        preservesSolutionSet = false,
+        autoEligible = false,
+        skipAfterEmpty = true,
+    ) {
+        override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) =
+            TableValueSubstitution.reduce(problem, ctx)
+    },
+
     /** Construction-time failed-literal SAC: folded into `Problem.baked` at build, read via
      *  [PresolveConfig.resolved] — a [Stage.CONSTRUCTION] pass the round engine never runs. */
     PROBE_FAILED_LITERALS(

@@ -9567,6 +9567,7 @@ public class com/eignex/klause/presolve/PresolvePass : java/lang/Enum {
 	public static final field SPARSIFY_LINEAR_ROWS Lcom/eignex/klause/presolve/PresolvePass;
 	public static final field STRENGTHEN_COEFFICIENTS Lcom/eignex/klause/presolve/PresolvePass;
 	public static final field SUBSTITUTE_BINARY_COLUMNS Lcom/eignex/klause/presolve/PresolvePass;
+	public static final field SUBSTITUTE_TABLE_VALUES Lcom/eignex/klause/presolve/PresolvePass;
 	public static final field SUBSTITUTE_TUPLE_PACKING Lcom/eignex/klause/presolve/PresolvePass;
 	public static final field SUBSUME_CLAUSES Lcom/eignex/klause/presolve/PresolvePass;
 	public static final field VALUE_PRECEDENCE Lcom/eignex/klause/presolve/PresolvePass;
