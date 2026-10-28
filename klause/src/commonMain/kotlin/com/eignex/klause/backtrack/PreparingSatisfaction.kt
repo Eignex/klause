@@ -44,10 +44,11 @@ internal class PreparingSatisfaction(
     }
 
     override val initialWork: Long = 0L
-    override val work: Long get() = if (closed) retainedWork else query?.work ?: propagationWork / PROPAGATION_WORK_PER_NODE
+    override val work: Long
+        get() = if (closed) retainedWork else query?.work ?: propagationWork / PROPAGATION_WORK_PER_NODE
     override val stats: SolveStats get() = if (closed) retainedStats else query?.stats ?: sink.snapshot()
     override val isDone: Boolean get() = query?.isDone == true
-    internal val preparationPending: Boolean get() = query == null
+    internal val preparationPending: Boolean get() = query?.preparationPending ?: true
 
     override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long): SolveResult? {
         query?.let {
