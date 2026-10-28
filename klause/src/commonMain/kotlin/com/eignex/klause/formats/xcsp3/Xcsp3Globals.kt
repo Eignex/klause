@@ -933,7 +933,8 @@ internal fun Compiler.Builder.cardinality(e: XmlElement) {
 internal fun Compiler.Builder.eqValue01(x: Int, value: Long): Int {
     val byValue = valueIndicators.getOrPut(x) { MutableLongIntMap() }
     val existing = byValue.getOrDefault(value, -1)
-    if (existing >= 0) return existing
+    if (existing >= 0) return existing.also { classes.define(it, factors.size) }
+    val start = factors.size
     val eq = newBool()
     factors.add(ReifiedLinear(eq, longArrayOf(1), intArrayOf(x), LinearOp.EQ, value))
     val literal = Lit.make(eq, true)
@@ -944,6 +945,7 @@ internal fun Compiler.Builder.eqValue01(x: Int, value: Long): Int {
         eq, longArrayOf(1), arrayOf(DefinitionHint.Operand.Variable(x)), value, LinearOp.EQ,
     ))
     definitionHints.add(DefinitionHint.BooleanValue(indicator, literal))
+    classes.define(indicator, start)
     return indicator.also { byValue.put(value, it) }
 }
 

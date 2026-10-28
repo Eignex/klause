@@ -182,6 +182,20 @@ and a variable divisor requires a nonnegative dividend and positive divisor (see
 without enumerating the domain span (see
 [distinct-value counts](02-model.md#distinct-value-counts)).
 
+### Constraint classes
+
+A `class` attribute applies to its constraint and to everything nested inside a
+classed `block`, `group` or `slide`, including group and slide templates; nested
+classes combine and end with their element. `symmetryBreaking` and
+`redundantConstraints`, and their hyphenated spellings `symmetry-breaking` and
+`redundant-constraints`, mark the emitted factors in `Problem.impliedFactorMask`;
+any `symmetryBreaking` constraint sets `Problem.hasSymmetryBreaking`, even when it
+only restricts domains. Other classes are inert. A shared definition stays marked
+only while every constraint that reads it is classified, and a recovered `Distinct`
+only when all its source rows are. Classified constraints stay enforced; the two
+fields feed the same local search weights and presolve symmetry gate as
+[FlatZinc's source annotations](#source-annotation-constraints).
+
 ## FlatZinc
 
 FlatZinc is MiniZinc's flat constraint language. The frontend keeps source names,
