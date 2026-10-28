@@ -4153,11 +4153,25 @@ records legacy `lab-minizinc-gecode-v1` checks as valid after completing the mod
 with reported output variables fixed. These receipts do not establish an
 assignment-only checker or an optimality proof. The single-identity/seed pilot
 supports rejecting this candidate's default admission, without a universal
-performance claim. The runtime subwindow prototype is withdrawn; ordinary
-cumulative propagation remains the control, and no heldout campaign follows.
+performance claim. That pilot does not settle non-root filter yield or justify
+closing the broader resource-choice work.
 Earlier [8882](https://lab.eignex.com/jobs/8882)/[8888](https://lab.eignex.com/jobs/8888)
 compiler declines and [8932](https://lab.eignex.com/jobs/8932)'s invalid fixed-engine
 LP configuration establish no search or cost result.
+
+`CumulativeWindowProfile` measures the exploratory subwindow pass during native
+branch-and-bound on an original MiniZinc identity. Required arguments are `suite`
+and `problem`; optional `prepare`, `lp`, `seeds` (comma-separated) and `decisions`
+default to `default`, `off`, `3,7` and 512. Each search has a 20-second safety
+deadline and alternates the order of disabled, unconditional and zero-load-guarded
+passes between seeds. Private opt-in counters record calls, zero-load eligibility,
+windows, task visits, strict demand bounds and conflicts; up to 32 bound snapshots
+retain the channels and their subsequent decision fixpoints. Hooks attach at the
+first selector pick, so preparation and initial root propagation share the
+unconditional prototype. Root snapshots must match before comparing these search
+controls. Counts exclude preparation and the initial root; a subsequent fixpoint
+snapshot is evidence only for the domains it actually retains. These instrumented
+runs diagnose yield and supply neither CLI throughput nor a source-verdict claim.
 
 ### Source task-order applicability
 

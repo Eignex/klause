@@ -442,6 +442,14 @@ Cumulative edge-finding runs in both time directions over fixed durations, deman
 and capacity, declining the reversed pass when its arithmetic is not safely
 representable.
 
+With fixed durations and ranged demands, cumulative propagation checks contained-task
+energy in bounded subwindows over at most 32 tasks. Definitely present positive-duration
+tasks contribute their minimum demand. Remaining window capacity bounds each contained
+task's demand from above; its channel consumes that bound through ordinary propagation.
+Historical reasons cite the participating start bounds, other minimum demands and
+capacity ceiling. Negative minimum demands or unrepresentable window arithmetic decline
+the pass. Window scratch belongs to one fire and is rebuilt after interruption or undo.
+
 Unary resources also check overload over minimum durations while a duration is
 unfixed or a presence unknown. Present tasks whose minima cannot fit between their
 earliest start and latest completion conflict, and an unknown task whose minimum
