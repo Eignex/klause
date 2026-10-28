@@ -15,6 +15,9 @@ import com.eignex.klause.solver.evidence.SourcePremise
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
+import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchComponentSet
+import com.eignex.klause.solver.search.SearchNodeDisposition
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -52,6 +55,24 @@ class LinearAggregateBranchesTest {
     }
 
     @Test
+    fun `unequal primitive terms should preserve the integer activity lattice`() {
+        val ids = (0..3).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val coefficients = ids.zip(listOf(101L, 102L, 201L, 202L).map(BigFraction::ofLong)).toMap()
+        val premises = mapOf(
+            "lower" to SourcePremise(SourceInequality(coefficients.mapValues { it.value.negated() },
+                BigFraction.ofLong(-450))),
+            "upper" to SourcePremise(SourceInequality(coefficients, BigFraction.ofLong(451))),
+        ) + ids.associate { id -> "lower/${id.id}" to
+            SourcePremise(SourceInequality(mapOf(id to BigFraction.MINUS_ONE), BigFraction.ZERO)) }
+        val context = SourceProofContext(scope, ids.toSet(), premises)
+
+        val row = LinearAggregateBranches(SourceLpBudget()).propose(context, Cancellation.Never)
+
+        assertEquals(SourceInequality(ids.zip(listOf(1L, 1L, 2L, 2L).map(BigFraction::ofLong)).toMap(),
+            BigFraction.ofLong(4)), row)
+    }
+
+    @Test
     fun `aggregate proposals should spend the containing allocation allowance`() {
         val funding = SourceLpFunding(1_000_000L, 1L).also { it.grant(1_000_000L) }
         val policy = LinearAggregateBranches(SourceLpBudget(funding = funding))
@@ -72,5 +93,28 @@ class LinearAggregateBranchesTest {
         assertEquals(SourceClaim.Refutation, evidence.claim)
         assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority()).verify(evidence))
         assertEquals(1L, result.stats.smt.completeSearchStages?.get("numericalAggregateSplits"))
+    }
+
+    @Test
+    fun `an aggregate child should replay after a backjump without another query`() {
+        val budget = SourceLpBudget(maxOperations = 16)
+        LinearAuthorityTraversal(source, budget, Cancellation.Never, { false }, {}, { null },
+            aggregateBranching = true).use { component ->
+            val session = SearchComponentSet(listOf(component)).session()
+            assertEquals(ComponentResult.Consistent, session.initialize())
+            assertEquals(SearchNodeDisposition.Expand, component.beforeBranch(session))
+            val alternatives = assertNotNull(component.nextBranch(session))
+            assertEquals(ComponentResult.Consistent, session.push(alternatives.first()))
+            assertEquals(SearchNodeDisposition.Prune, component.beforeBranch(session))
+            val operations = budget.operations
+            session.popTo(0)
+
+            assertEquals(SearchNodeDisposition.Expand, component.beforeBranch(session))
+            assertEquals(ComponentResult.Consistent, session.push(alternatives.first()))
+            assertEquals(SearchNodeDisposition.Prune, component.beforeBranch(session))
+
+            assertEquals(operations, budget.operations)
+            session.popTo(0)
+        }
     }
 }

@@ -32,9 +32,12 @@ class SourceIntegerAggregateSplitTest {
 
     @Test
     fun `adjacent aggregate alternatives should cover declared integers`() {
-        val result = SourceEvidenceVerifier(source).verify(SourceEvidence(scope, SourceClaim.Refutation, proof()))
+        for (split in listOf(proof(),
+            SourceIntegerAggregateSplit(above, child("upper", above), child("lower", below)))) {
+            val result = SourceEvidenceVerifier(source).verify(SourceEvidence(scope, SourceClaim.Refutation, split))
 
-        assertEquals(SourceEvidenceCheck.Checked, result)
+            assertEquals(SourceEvidenceCheck.Checked, result)
+        }
     }
 
     @Test
