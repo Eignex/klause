@@ -305,7 +305,19 @@ internal object OptionalUnaryProfile {
                         put("derivedClass", factor.javaClass.name)
                         put("boolVars", factor.boolVars.contentToString())
                         put("intVars", factor.intVars.contentToString())
-                        for (name in listOf("getEdges", "getPrivateVertices", "getIndexGuards")) {
+                        factor.javaClass.methods.singleOrNull { it.name == "getEdges" }?.let { getter ->
+                            val edges = getter.invoke(factor) as List<*>
+                            put("edges", JsonArray(edges.map { edge ->
+                                buildJsonObject {
+                                    val value = requireNotNull(edge)
+                                    for (name in listOf("Source", "Target", "Bound", "Guard", "DomainBound")) {
+                                        val field = value.javaClass.getMethod("get$name").invoke(value)
+                                        put(name, field.toString())
+                                    }
+                                }
+                            }))
+                        }
+                        for (name in listOf("getPrivateVertices", "getIndexGuards")) {
                             factor.javaClass.methods.singleOrNull { it.name == name }?.let {
                                 put(name, it.invoke(factor).toString())
                             }
