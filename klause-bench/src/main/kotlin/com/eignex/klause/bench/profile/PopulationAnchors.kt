@@ -19,6 +19,7 @@ import com.eignex.klause.portfolio.LocalSearchCatalog
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.ExecutionOperation
@@ -109,7 +110,8 @@ internal object PopulationAnchors {
                 fun checked(working: Sample): Sample? {
                     val point = prepared.reconstruct(working)
                     if (stop() || !FiniteConflictSelection.checkSource(source, point, stop) ||
-                        workingObjective.evaluateExact(working) != objective.evaluateExact(point)
+                        workingObjective.evaluateExact(working) != objective.evaluateExact(point) ||
+                        BigFraction.ofDouble(workingObjective.evaluate(working)) != objective.evaluateExact(point)
                     ) return null
                     return point
                 }
