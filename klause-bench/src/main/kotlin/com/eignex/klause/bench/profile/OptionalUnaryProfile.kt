@@ -43,7 +43,7 @@ internal object OptionalUnaryProfile {
 
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.isEmpty() || args.contentEquals(arrayOf("mode=control")))
+        require(args.isEmpty() || args.singleOrNull() in setOf("mode=control", "mode=semantics"))
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         Reports.writeJson(out.resolve("build.json").path, InstalledBuild.reference)
         Reports.writeJson(out.resolve("compiler.json").path, MiniZincCompatibility.compiler)
@@ -51,6 +51,16 @@ internal object OptionalUnaryProfile {
             System.getProperty("os.name"), System.getProperty("os.arch"), System.getProperty("java.version"),
             ManagementFactory.getRuntimeMXBean().inputArguments.toString(),
         ).joinToString("\n"))
+        if (args.singleOrNull() == "mode=semantics") {
+            for (mode in 1..10) {
+                val directory = out.resolve("mode-$mode").apply { mkdirs() }
+                File(CorpusFetcher.workspaceRoot(), "klause-mzn-lib/test-models/optional-unary-semantics.mzn")
+                    .copyTo(directory.resolve("source.mzn"))
+                directory.resolve("data.dzn").writeText("mode = $mode;\n")
+                inspectPair(directory, out, listOf("off"))
+            }
+            return
+        }
         val control = out.resolve("control").apply { mkdirs() }
         File(CorpusFetcher.workspaceRoot(), "klause-mzn-lib/test-models/optional-unary.mzn")
             .copyTo(control.resolve("source.mzn"))
@@ -76,7 +86,7 @@ internal object OptionalUnaryProfile {
         inspectPair(workforce, out)
     }
 
-    private fun inspectPair(source: File, out: File) {
+    private fun inspectPair(source: File, out: File, prepares: List<String> = listOf("off", "default", "aggressive")) {
         val root = CorpusFetcher.workspaceRoot()
         val nativeLibrary = File(root, "klause-mzn-lib/share/minizinc/klause")
         val nativeConfig = File(root, "klause-mzn-lib/share/minizinc/solvers/klause.msc")
@@ -101,11 +111,11 @@ internal object OptionalUnaryProfile {
             val directory = source.resolve(name).apply { mkdirs() }
             source.resolve("source.mzn").copyTo(directory.resolve("source.mzn"))
             source.resolve("data.dzn").takeIf { it.isFile }?.copyTo(directory.resolve("data.dzn"))
-            inspect(directory, library, config)
+            inspect(directory, library, config, prepares)
         }
     }
 
-    private fun inspect(out: File, library: File, config: File) {
+    private fun inspect(out: File, library: File, config: File, prepares: List<String>) {
         val command = mutableListOf(
             MiniZincCompatibility.compiler.executable, "--solver",
             config.absolutePath,
@@ -140,7 +150,7 @@ internal object OptionalUnaryProfile {
         out.resolve("parse-ns.txt").writeText((System.nanoTime() - parseStart).toString())
         out.resolve("names.txt").writeText("${parsed.boolVarsByName}\n${parsed.intVarsByName}\n")
         dump(parsed.problem, out.resolve("factors.txt"))
-        for (prepare in listOf("off", "default", "aggressive")) {
+        for (prepare in prepares) {
             capture(parsed, parsed.problem, prepare, out.resolve(prepare))
         }
     }
