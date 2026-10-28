@@ -1,4 +1,4 @@
-include "disjunctive.mzn";
+include "globals.mzn";
 
 var 0..2: a;
 var 0..2: b;
