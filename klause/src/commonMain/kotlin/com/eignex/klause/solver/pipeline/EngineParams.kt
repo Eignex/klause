@@ -641,6 +641,10 @@ internal fun buildPortfolioScenario(
     val sliceWork = p[ExecutionOption.sliceWork]
     val maxSliceWork = p[ExecutionOption.sliceMaxWork]
     val sliceGrowth = p[ExecutionOption.sliceGrowth]
+    val diagnosticWorkLimit = p[ExecutionOption.portfolioWork]
+    if (diagnosticWorkLimit != null && (diagnosticWorkLimit <= 0L || cores != 1)) {
+        pipelineConfigError("portfolio-work requires one core and a positive work limit")
+    }
     val phaseRetention = p[ExecutionOption.phaseRetention]
     val reseedStaleThreshold = p[ExecutionOption.reseedStaleThreshold]
     val reportLsResiduals = p[ExecutionOption.lsResiduals] ?: false
@@ -655,7 +659,7 @@ internal fun buildPortfolioScenario(
     if (sliceGrowth != null && (!sliceGrowth.isFinite() || sliceGrowth < 1.0)) {
         pipelineConfigError("slice-growth must be finite and >= 1")
     }
-    p.finish("portfolio", "arms, ls, bt, seed, lambda, clause-share-lbd, clause-share-len, slice-work, slice-max-work, slice-growth, phase-retention, reseed-stale-threshold, ls-residuals, ls-phase-times")
+    p.finish("portfolio", "arms, ls, bt, seed, lambda, clause-share-lbd, clause-share-len, slice-work, slice-max-work, slice-growth, portfolio-work, phase-retention, reseed-stale-threshold, ls-residuals, ls-phase-times")
     if (armsParam != null && (ls != null || bt != null)) {
         pipelineConfigError("portfolio: set either `arms=N` or `ls=/bt=`, not both")
     }
@@ -692,6 +696,7 @@ internal fun buildPortfolioScenario(
         sliceWork = effectiveSliceWork,
         maxSliceWork = effectiveMaxSliceWork,
         sliceGrowth = sliceGrowth ?: 1.5,
+        diagnosticWorkLimit = diagnosticWorkLimit,
     )
     clauseShareLbd?.let { scenario = scenario.copy(clauseShareMaxLbd = it) }
     clauseShareLen?.let { scenario = scenario.copy(clauseShareMaxLen = it) }

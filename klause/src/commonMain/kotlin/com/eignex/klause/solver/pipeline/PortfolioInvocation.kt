@@ -6,6 +6,7 @@ import com.eignex.klause.portfolio.ArmFamily
 import com.eignex.klause.portfolio.ArmFault
 import com.eignex.klause.portfolio.AttributedImprovement
 import com.eignex.klause.portfolio.Portfolio
+import com.eignex.klause.portfolio.PortfolioDiagnostics
 import com.eignex.klause.portfolio.PortfolioEvidence
 import com.eignex.klause.portfolio.PortfolioExecutor
 import com.eignex.klause.portfolio.PortfolioIncumbents
@@ -32,6 +33,7 @@ internal data class PortfolioInvocationControls(
     val probeSliceMillis: Long = 1_000,
     val reseedStaleThreshold: Int = 3,
     val phaseRetention: Double = Portfolio.DEFAULT_PHASE_RETENTION,
+    val diagnostics: PortfolioDiagnostics? = null,
 )
 
 internal class PortfolioInvocationPolicy(
@@ -87,6 +89,7 @@ internal class PortfolioInvocation(
             probeSliceMillis = controls.probeSliceMillis,
             reseedStaleThreshold = controls.reseedStaleThreshold, phaseRetention = controls.phaseRetention,
             profile = selected.profile, minShares = selected.shares, onFault = onFault,
+            diagnostics = controls.diagnostics,
         ).also {
             it.exactLinearObjective = objective
             it.evidenceVerification = evidence

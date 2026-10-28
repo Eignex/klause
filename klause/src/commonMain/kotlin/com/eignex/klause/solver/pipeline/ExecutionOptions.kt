@@ -398,6 +398,9 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** The `slice-growth` execution setting. */
         val sliceGrowth: ExecutionOption<Double> = ExecutionOption("slice-growth", ValueKind.DOUBLE)
 
+        /** Opt-in single-lane portfolio diagnostic work allowance. */
+        val portfolioWork: ExecutionOption<Long> = ExecutionOption("portfolio-work", ValueKind.LONG)
+
         /** The `phase-retention` execution setting. */
         val phaseRetention: ExecutionOption<Double> = ExecutionOption("phase-retention", ValueKind.DOUBLE)
 
@@ -435,7 +438,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 minTemp, smoothProb, smoothFactor, tabuTenure, sources,
                 scoring, acceptance, restart, strategy, localSearchArm, objectiveGuidance,
                 lambda, arms, localSearchArms, backtrackArms, clauseShareLbd,
-                clauseShareLen, sliceWork, sliceMaxWork, sliceGrowth, phaseRetention,
+                clauseShareLen, sliceWork, sliceMaxWork, sliceGrowth, portfolioWork, phaseRetention,
                 reseedStaleThreshold, lsResiduals, lsPhaseTimes, backtrackArmsByLabel,
             ).associateBy { it.id }
         }
