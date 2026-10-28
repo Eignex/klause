@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Self-authored XCSP3 COP smoke instance. License: internal. -->
+<!-- minimize x+y+z with every pair summing to at least 3; each cheapest value is feasible alone -->
+<!-- but at most one variable can be 0, so (0,3,3) attains the optimum 6. -->
+<instance format="XCSP3" type="COP">
+  <variables>
+    <var id="x"> 0 3 8 </var>
+    <var id="y"> 0 3 10 </var>
+    <var id="z"> 0 3 11 </var>
+  </variables>
+  <constraints>
+    <sum>
+      <list> x y </list>
+      <condition> (ge,3) </condition>
+    </sum>
+    <sum>
+      <list> x z </list>
+      <condition> (ge,3) </condition>
+    </sum>
+    <sum>
+      <list> y z </list>
+      <condition> (ge,3) </condition>
+    </sum>
+  </constraints>
+  <objectives>
+    <minimize type="sum">
+      <list> x y z </list>
+    </minimize>
+  </objectives>
+</instance>
