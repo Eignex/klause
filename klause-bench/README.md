@@ -179,3 +179,23 @@ root bound, prunes and fixings establish progress and consumption. An admitted
 trial or completed lab job alone establishes no useful deduction or source proof.
 Keep physical RSS separate from modeled storage reservations. Source checking and
 all preparation, failed work and retirement belong to the containing comparison.
+
+[9172](https://lab.eignex.com/jobs/9172) compares default and trial at
+`bde182ce9b`, seed 3, ten seconds and one Linux/amd64 processor, with matching
+source and installed-build/runtime hashes. On `cap6000`, 18,243 nonzeros across
+2,171 rows and 6,000 columns admit the trial. Native exact certification accepts
+the root lower bound -2,451,537, and ordinary search exports it to the shared
+objective floor; the root owner is retained for subsequent queries. The trial
+finds no witness. The default witness at -2,442,801 passes the external MIPLIB
+solchecker; that receipt certifies the witness, not the trial's bound or optimality.
+On `rentacar`, the ordinary root-node query reaches 132 pivots and reduces sampled
+violated basics from 815 to 794 before its work stop, without a certificate.
+
+The trial reserves about 529 MiB and 669 MiB respectively; measured process RSS
+peaks at about 258 MiB and 462 MiB. Preparation includes 287 seconds of remote
+compilation, and the four-case job takes about 417 seconds. These single-repeat
+controls establish bounded execution and useful native bound consumption, with
+large-source no-yield evidence retained. They establish no whole-source speedup,
+independent source proof or basis for default activation. Earlier controls and
+negatives remain in [9134](https://lab.eignex.com/jobs/9134) and
+[9166](https://lab.eignex.com/jobs/9166).
