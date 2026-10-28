@@ -115,7 +115,8 @@ internal object EqualityKernelReplay {
             if (stop()) return null
             if (row.relation != LinearOp.EQ || row.activator != LinearRow.ALWAYS || row.strict) continue
             val constants = row.constants as? IntegralConstants ?: continue
-            if (!row.isIntegerOnly || row.size > MAX_COLUMNS) continue
+            if (!row.isIntegerOnly) continue
+            if (row.size > MAX_COLUMNS) return null
             val terms = HashMap<Int, BigInteger>()
             for (i in 0 until row.size) {
                 val coefficient = BigInteger(constants.exactCoeff(i).toString())
@@ -123,7 +124,9 @@ internal object EqualityKernelReplay {
                 val id = Term.intVar(row.ref(i))
                 terms[id] = (terms[id] ?: zero) + coefficient
             }
-            sparse += terms.filterValues { it != zero }
+            val kept = terms.filterValues { it != zero }
+            if (kept.values.any { it.abs().bitLength() > 16 }) return null
+            sparse += kept
             if (sparse.size > MAX_ROWS) return null
         }
         val columns = sparse.flatMap { it.keys }.distinct().sorted()
