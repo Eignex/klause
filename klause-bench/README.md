@@ -7633,6 +7633,33 @@ executed no cases. Raw records, source points, hashes, JFR, resource receipts,
 CI reports and the cancelled attempt are retained outside Git under
 `klause-evidence/campaigns/finite-conflict-learning-3727-3728/` beside the primary checkout.
 
+The sparse [8905 gate](https://lab.eignex.com/jobs/8905), at
+`bab7a828da2a89911c7647f3ba131f3270094402`, repeats the four endpoints with
+clauses and rows on contiguous domains, `y!=2` and `y!=4`: six sessions, 24
+endpoint records and six disposal records. With the incidental hole at 2, one
+retained row owns `x<=1` and sibling bounds `2`, `3`, `5`; clauses retain bounds
+`5`, `6`, `6`. Sparse membership survives undo. The hole at 4 is clipped by
+`y<=3` in this source order and retains clause fallback. Reversed-row CI also
+covers the requested lower bound 4 snapping to 5. Historical target holes, later
+carves, signed endpoints and the 64-position sparse-tail allowance have separate
+controls. No domain is replaced by its hull.
+
+All 24 source points pass fresh native checks; no independent witness or exported
+proof check is supplied. At the last incidental-hole endpoint, cumulative native
+finite work is 361 for rows and 233 for clauses, plus 48 point-check work units in
+each arm. Stores contain 12 and 8 native constraints before disposal, including
+channeling clauses; every native store is empty after disposal and shared stores
+stay empty. Elapsed/current-thread allocation checkpoints include construction,
+checks, earlier records and disposal. Ordered class loading and overlapping
+checkpoints support no timing or allocation advantage. The Linux amd64 execution
+uses Temurin `25.0.4.1+1-LTS`, one hard cgroup vCPU and 4608 MiB.
+
+Job 8885 retains a failed historical-hole admission prediction and partial records;
+8905 also retains its infrastructure retry before execution. These limits leave
+integer-row learning opt-in, without a preparation/LP or default-performance claim.
+Raw records, source/build hashes, JFR, receipts and CI reports live under
+`klause-evidence/campaigns/integer-provenance-3753-3754/` beside the primary checkout.
+
 ### Guarded integer conflict rows
 
 `GuardedIntegerRowProfile` keeps the finite reified source `r iff 2*x+y<=z`

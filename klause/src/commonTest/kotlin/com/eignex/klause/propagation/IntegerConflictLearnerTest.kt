@@ -358,16 +358,20 @@ class IntegerConflictLearnerTest {
 
     @Test
     fun `historical holes should withhold a row even after the live interval loses the hole`() {
-        val native = PropagationSession(Problem(0, 3,
-            arrayOf(IntDomain(0, 6), IntDomain(0, 12).excludeValue(4), IntDomain(0, 24)), arrayOf(
+        for (reverse in listOf(false, true)) {
+            val rows = listOf(
                 Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
                 Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
-            ))).apply { enableIntegerRowLearning() }
-        assertIs<PropagationResult.Implied>(native.pinIntAtMost(2, 7))
+            )
+            val native = PropagationSession(Problem(0, 3,
+                arrayOf(IntDomain(0, 6), IntDomain(0, 12).excludeValue(4), IntDomain(0, 24)),
+                (if (reverse) rows.reversed() else rows).toTypedArray())).apply { enableIntegerRowLearning() }
+            assertIs<PropagationResult.Implied>(native.pinIntAtMost(2, 7))
 
-        val conflict = assertIs<PropagationResult.Unsat>(native.pinIntAtLeast(0, 2))
+            val conflict = assertIs<PropagationResult.Unsat>(native.pinIntAtLeast(0, 2))
 
-        assertIs<ConflictAnalyzer.AnalysisResult.Learned>(conflict.learnedClause)
+            assertIs<ConflictAnalyzer.AnalysisResult.Learned>(conflict.learnedClause)
+        }
     }
 
     @Test
