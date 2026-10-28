@@ -1,0 +1,5 @@
+# Easy control, current WBO/MaxSAT tails and the weighted incumbent-protection control.
+wcnf-core/conditional-cost
+pb-comp-wbo/WBO/SOFT-LIN/PB10/oliveras/j30/normalized-j308_1-unsat--soft-0-100-0
+pb-comp-wbo/WBO/PARTIAL-LIN/wcsp/mprime/normalized-mprime04ac_wcsp
+maxsat-weighted/haplotyping-pedigrees_wt-ped2.B.recomb1-0.01-3
