@@ -84,7 +84,9 @@ internal class LpDirectionalHistory(
                 false
             }
             is SearchDecision.IntAtLeast -> {
-                if (parent.variable != VarRef.IntVar(decision.variable) || decision.lower.toDouble() != floor + 1.0) return
+                if (parent.variable != VarRef.IntVar(decision.variable) ||
+                    decision.lower.toDouble() != floor + 1.0
+                ) return
                 true
             }
             else -> return
