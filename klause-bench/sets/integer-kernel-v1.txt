@@ -1,0 +1,4 @@
+# Exact equality move controls; source points and hashes are in the fixture README.
+xcsp3-core/evidence-linear-kernel-weighted
+xcsp3-core/evidence-linear-kernel-ring33
+xcsp3-core/evidence-linear-transport

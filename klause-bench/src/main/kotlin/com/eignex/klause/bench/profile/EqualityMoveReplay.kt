@@ -4,6 +4,7 @@ import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.formats.xcsp3.Xcsp3
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.impliedLinearRows
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchState
@@ -13,6 +14,7 @@ import com.eignex.klause.localsearch.movesource.SatisfiedStructured
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.IncrementalObjective
@@ -71,6 +73,14 @@ internal object EqualityMoveReplay {
         val gradient = hints?.let { LocalSearchTrajectory.getter(it, "getObjective") as IncrementalObjective? }
         val state = LocalSearchState(problem, Random(options["seed"]?.toLong() ?: 1L))
         state.invariants = sweep?.network(problem.numIntVars, problem.numBoolVars)
+        val mapped = (0 until coordinates.intCount).map(coordinates::int).toSet()
+        val unused = if (gradient != null) emptyList() else (0 until problem.numIntVars).filter {
+            it !in mapped && state.projection.intOccurrences[it].isEmpty() &&
+                state.invariants?.isDefinedInt(it) != true &&
+                (prepared.objective?.intCoefficientValues?.getOrNull(it) ?: 0L) == 0L
+        }
+        state.assumptions = Assumptions(ints = unused.associateWith { state.rootDomains[it].min })
+        state.moveSink.setAssumptions(state.assumptions)
         state.shaping.javaClass.methods.single {
             it.name.substringBefore('$') == "setObjective" && it.parameterCount == 1
         }.invoke(state.shaping, gradient ?: prepared.objective)
@@ -85,6 +95,7 @@ internal object EqualityMoveReplay {
             put("workingObjective", prepared.objective.toString())
             put("gradient", gradient.toString())
             put("definitions", sweep?.size ?: 0)
+            put("unusedSlotPins", JsonArray(unused.map(::JsonPrimitive)))
             put("snapshot", view.snapshot())
             put("domains", JsonArray(state.rootDomains.map { JsonPrimitive(it.toString()) }))
             put("factors", buildJsonArray {
@@ -96,7 +107,11 @@ internal object EqualityMoveReplay {
                             put("activator", row.activator)
                             put("strict", row.strict)
                             put("refs", JsonArray((0 until row.size).map { JsonPrimitive(row.ref(it)) }))
-                            put("constants", row.constants.toString())
+                            val constants = row.constants as? IntegralConstants
+                            put("coefficients", constants?.let { exact -> JsonArray((0 until row.size).map {
+                                JsonPrimitive(exact.exactCoeff(it).toString())
+                            }) })
+                            put("bound", constants?.exactBound?.toString())
                         })
                     })
                 })

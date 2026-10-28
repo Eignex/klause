@@ -1,0 +1,8 @@
+<instance format="XCSP3" type="COP">
+  <variables><var id="x">0..8</var><var id="y">0..2</var><var id="z">0..2</var></variables>
+  <constraints>
+    <sum><list>x y z</list><coeffs>2 3 5</coeffs><condition>(eq,16)</condition></sum>
+    <sum><list>x y z</list><coeffs>3 5 7</coeffs><condition>(eq,24)</condition></sum>
+  </constraints>
+  <objectives><minimize>x</minimize></objectives>
+</instance>
