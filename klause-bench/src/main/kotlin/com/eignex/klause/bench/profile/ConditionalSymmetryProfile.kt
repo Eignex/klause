@@ -61,7 +61,7 @@ internal object ConditionalSymmetryProfile {
                     presolveBudget = budget, randomSeed = 3,
                 ))
                 val preparationNs = System.nanoTime() - start
-                val model = prepared.problem as BakedProblem
+                val model = prepared.problem
                 val report = buildJsonObject {
                     put("revision", Reports.readGitSha())
                     put("sourceSha256", SOURCE_HASH)
@@ -75,7 +75,7 @@ internal object ConditionalSymmetryProfile {
                     put("passes", JsonArray(prepared.presolve?.passes.orEmpty().map(::JsonPrimitive)))
                     put("factors", factors(model))
                     put("generators", model.factors.filterIsInstance<SymmetryHandling>().sumOf { it.generators.size })
-                    if (!openingPins && !stop()) {
+                    if (!openingPins && model is BakedProblem && !stop() && prepared.presolve?.infeasible != true) {
                         val session = PropagationSession(model, stop)
                         put("root", snapshot(session))
                         session.pinBool(2, true)

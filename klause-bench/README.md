@@ -372,6 +372,26 @@ no reason to expand a mixed comparison. Raw records, original sources, hashes an
 resource receipts remain outside Git in
 `klause-evidence/campaigns/objective-preserving-symmetry-2026-10-28/`.
 
+## Conditional symmetry admission
+
+`bench.profile.ConditionalSymmetryProfile` takes no arguments and captures the
+hash-pinned `wcnf-core/conditional-cost` source. Four preparations compare default
+and opt-in objective symmetry, with and without fresh opening `s=t=true` pins.
+Each preparation has eight seconds and 550 million phase units. The two unpinned
+views retain internal pins and undo in one propagation session, then run ordinary,
+explicit LP-bound, LP-off, PB-cutoff and prefix-first optimization controls, each
+with five seconds and seed 3. The prefix-first control disables LP and chooses
+`s,t` before objective-guided remaining choices. Search captures include their
+instrumentation and retain at most 32 branch states per run; these are applicability
+observations, not timing comparisons. Normal LP admission skips clause-only models,
+so the explicit bound control is distinct from ordinary configuration.
+
+Snapshots retain immutable factors and Boolean values. They omit learned constraints
+and do not certify the complete enforcing residual, authorize pruning, or supply an
+independent source check. Fresh opening preparation is distinct from decisions in a
+retained search. The profile installs no conditional symmetry consumer. Original
+WCNF witness validation belongs to ordinary lab solve cases.
+
 ## Fixture provenance
 
 Fixtures with a directory README record their identities and licenses there:
