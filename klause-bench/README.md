@@ -6294,8 +6294,10 @@ applied, and the center is restored even on a failed check. Interrupted extracti
 publishes no direction. Private workspaces retire after capture; failed work,
 checking and restoration remain in its time/allocation totals.
 
-`completion=true` observes the existing source-row planner under 1M source work
-and 4 MB modeled allocation; incomplete packets receive no transition credit.
+`completion=true` seeds each input's adjacent domain step in both directions,
+without a supported-compensator preference. The existing planner has 1M source
+work and 4 MB modeled allocation; context construction remains in capture time
+and thread allocation. Incomplete packets receive no transition credit.
 `owners=true` replays LS with restarts, cold/retained CP and cold/retained mixed
 repair on the whole prepared block and each consumed direction's exact freedoms,
 pinning every complement. Identical sets share one replay. Each query has 2,000
@@ -6312,11 +6314,11 @@ inputs does not change the default mixed selector's 32-input cap.
 
 [9035](https://lab.eignex.com/jobs/9035), at `7f3337517e`, recovers `(-4,1,1)`
 and applies `(0,2,2)` as one checked three-input transition. The network matrix
-declines; every movable source-row seed is unrepairable. The cold kernel capture
+declines; the row planner reports `Unrepairable` for every movable seed. The cold kernel capture
 spends 25,535 work, 10 ms and 0.85 MB thread allocation, excluding shared preparation.
 [9053](https://lab.eignex.com/jobs/9053), at `58c385b8bf`, interrupts ring extraction
 at 2,034,128 charged work, including cooperative overshoot: 75 ms and 1.89 MB
-without a direction or point. Every movable row-completion seed is unrepairable;
+without a direction or point. The row planner reports `Unrepairable` for every movable seed;
 CP again reaches the checked `-66` point in two decision equivalents.
 
 [9059](https://lab.eignex.com/jobs/9059), at `8ac3d5b696`, retains the transport's

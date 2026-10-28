@@ -36,10 +36,11 @@ internal object EqualityKernelReplay {
         file: File,
         score: (Sample) -> BigFraction,
         cancellation: Cancellation = Cancellation.Never,
+        threadBytes: () -> Long = ::trajectoryThreadBytes,
         verify: (Sample, Cancellation) -> Boolean,
     ): Map<String, IntArray> {
         val started = System.nanoTime()
-        val allocated = trajectoryThreadBytes()
+        val allocated = threadBytes()
         var work = 0L
         val clock = Cancellation.after(2.seconds) or cancellation
         val stop = object : Cancellation {
@@ -55,58 +56,72 @@ internal object EqualityKernelReplay {
             if (matrix != null) {
                 for (mode in listOf("network", "hermite")) {
                     val extractionStart = System.nanoTime()
-                    val extractionBytes = trajectoryThreadBytes()
+                    val extractionBytes = threadBytes()
                     val directions = if (mode == "network") network(matrix, view, stop) else hermite(matrix, stop)
                     val extractionNs = System.nanoTime() - extractionStart
-                    val extractionAllocation = trajectoryThreadBytes() - extractionBytes
+                    val extractionAllocation = threadBytes() - extractionBytes
                     var selected: Move? = null
                     var best = score(center)
-                    add(buildJsonObject {
+                    add(
+                        buildJsonObject {
                         put("mode", mode)
                         put("extractionNs", extractionNs)
                         put("extractionThreadBytes", extractionAllocation)
                         put("declined", directions == null)
-                        put("directions", buildJsonArray {
+                        put(
+                            "directions",
+                            buildJsonArray {
                             for (direction in directions.orEmpty()) {
-                                check(matrix.rows.all { row ->
+                                check(
+                                    matrix.rows.all { row ->
                                     row.indices.fold(zero) { sum, i -> sum + row[i] * direction[i] } == zero
-                                })
-                                add(buildJsonObject {
+                                }
+                                )
+                                add(
+                                    buildJsonObject {
                                     put("g", JsonArray(direction.map { JsonPrimitive(it.toString()) }))
                                     put("exactAgZero", true)
-                                    put("candidates", candidates(matrix, direction, view, stop, verify) { move, point ->
+                                    put(
+                                        "candidates",
+                                        candidates(matrix, direction, view, stop, verify) { move, point ->
                                         val value = score(point)
                                         if (value < best) {
                                             best = value
                                             selected = move
                                         }
-                                    })
-                                })
+                                    }
+                                    )
+                                }
+                                )
                             }
-                        })
+                        }
+                        )
                         val move = selected as? Move.Compound
                         val consumed = move?.let { consume(view, it, center, score, stop, verify) }
-                        if (consumed != null && move != null) {
+                        if (consumed != null) {
                             consumedScopes[mode] = move.parts.map { (it as Move.IntSet).varId }.toIntArray()
                         }
                         put("consumed", consumed ?: JsonNull)
-                    })
+                    }
+                    )
                 }
             }
         }
-        file.writeText(buildJsonObject {
+        file.writeText(
+            buildJsonObject {
             put("eligibleMatrix", matrix != null)
             put("columns", JsonArray(matrix?.columns.orEmpty().map(::JsonPrimitive)))
             put("rows", matrix?.rows?.size ?: 0)
             put("work", work)
             put("workLimit", MAX_WORK)
             put("elapsedNs", System.nanoTime() - started)
-            put("threadBytes", trajectoryThreadBytes() - allocated)
+                put("threadBytes", threadBytes() - allocated)
             put("interrupted", stop())
             put("scope", "cold bounded diagnostic; no retained source or default policy")
             put("records", records)
             put("connectivityOrCompletenessClaim", false)
-        }.toString())
+        }.toString()
+        )
         return consumedScopes
     }
 
@@ -129,9 +144,12 @@ internal object EqualityKernelReplay {
                 put("preparedInputs", JsonArray(move.parts.map { JsonPrimitive((it as Move.IntSet).varId) }))
                 put("source", trajectorySource(point))
                 put("sourceObjective", score(point).toString())
-                put("sourceChanges", (0 until center.numIntVars).count {
+                put(
+                    "sourceChanges",
+                    (0 until center.numIntVars).count {
                     center.intValue(it) != point.intValue(it)
-                })
+                }
+                )
                 put("nativeSourceCheck", true)
             }
         } finally {
@@ -151,24 +169,24 @@ internal object EqualityKernelReplay {
         val sparse = ArrayList<Map<Int, BigInteger>>()
         for (factor in state.problem.factors) {
             for (row in factor.impliedLinearRows) {
-            stop.charge(1L + row.size)
-            if (stop()) return null
-            if (row.relation != LinearOp.EQ || row.activator != LinearRow.ALWAYS || row.strict) continue
-            val constants = row.constants as? IntegralConstants ?: continue
-            if (!row.isIntegerOnly) continue
-            if (row.size > MAX_COLUMNS) return null
-            val terms = HashMap<Int, BigInteger>()
-            for (i in 0 until row.size) {
-                val coefficient = BigInteger(constants.exactCoeff(i).toString())
-                if (coefficient.bitLength() > 16) return null
-                val id = Term.intVar(row.ref(i))
-                terms[id] = (terms[id] ?: zero) + coefficient
+                stop.charge(1L + row.size)
+                if (stop()) return null
+                if (row.relation != LinearOp.EQ || row.activator != LinearRow.ALWAYS || row.strict) continue
+                val constants = row.constants as? IntegralConstants ?: continue
+                if (!row.isIntegerOnly) continue
+                if (row.size > MAX_COLUMNS) return null
+                val terms = HashMap<Int, BigInteger>()
+                for (i in 0 until row.size) {
+                    val coefficient = BigInteger(constants.exactCoeff(i).toString())
+                    if (coefficient.bitLength() > 16) return null
+                    val id = Term.intVar(row.ref(i))
+                    terms[id] = (terms[id] ?: zero) + coefficient
+                }
+                val kept = terms.filterValues { it != zero }
+                if (kept.values.any { it.abs().bitLength() > 16 }) return null
+                sparse += kept
+                if (sparse.size > MAX_ROWS) return null
             }
-            val kept = terms.filterValues { it != zero }
-            if (kept.values.any { it.abs().bitLength() > 16 }) return null
-            sparse += kept
-            if (sparse.size > MAX_ROWS) return null
-        }
         }
         val columns = sparse.flatMap { it.keys }.distinct().sorted()
         if (columns.isEmpty() || columns.size > MAX_COLUMNS) return null
@@ -198,8 +216,8 @@ internal object EqualityKernelReplay {
                     it.javaClass.getMethod("get", Int::class.javaPrimitiveType).invoke(it, column) != zero
                 }
             ) {
-                    continue
-                }
+                continue
+            }
             val direction = Array(matrix.columns.size) { entry.invoke(v, it, column) as BigInteger }
             if (direction.any { it.abs().bitLength() > 256 }) return null
             result += direction
@@ -231,7 +249,7 @@ internal object EqualityKernelReplay {
                         matrix.rows[peer][column].signum()
                     if (signs[peer] != 0 && signs[peer] != sign) return null
                     if (signs[peer] == 0) {
-                        signs[peer] = sign;
+                        signs[peer] = sign
                         queue.addLast(peer)
                     }
                 }
@@ -324,7 +342,7 @@ internal object EqualityKernelReplay {
                         target.toLong() !in state.rootDomains[id] || state.assumptions.isFrozenInt(id) ||
                         state.invariants?.isDefinedInt(id) == true || (state.seeding.ownerInt?.get(id) ?: -1) >= 0
                     ) {
-                        admissible = false;
+                        admissible = false
                         break
                     }
                     parts += Move.IntSet(id, target.toLong())
@@ -341,14 +359,14 @@ internal object EqualityKernelReplay {
                 if (inspection.netDelta == 0L && accepted) improving(move, source)
                 add(
                     buildJsonObject {
-                    put("step", (step * sign).toString())
-                    put("move", move.toString())
-                    put("netDelta", inspection.netDelta)
-                    put("source", trajectorySource(source))
-                    put("nativeSourceCheck", accepted)
-                    put("objectiveDelta", inspection.objectiveDelta.toString())
-                    put("wholeSinkAdmission", true)
-                }
+                        put("step", (step * sign).toString())
+                        put("move", move.toString())
+                        put("netDelta", inspection.netDelta)
+                        put("source", trajectorySource(source))
+                        put("nativeSourceCheck", accepted)
+                        put("objectiveDelta", inspection.objectiveDelta.toString())
+                        put("wholeSinkAdmission", true)
+                    },
                 )
             }
         }
