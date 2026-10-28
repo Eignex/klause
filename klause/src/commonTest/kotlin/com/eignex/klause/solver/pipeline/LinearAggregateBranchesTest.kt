@@ -2,6 +2,10 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.simplex.exact.BigFraction
@@ -15,6 +19,8 @@ import com.eignex.klause.solver.evidence.SourcePremise
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
+import com.eignex.klause.solver.evidence.sourceProofContext
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchNodeDisposition
@@ -97,7 +103,27 @@ class LinearAggregateBranchesTest {
     }
 
     @Test
-    fun `an aggregate child should replay after a backjump without another query`() {
+    fun `declared finite coordinates should retain checked aggregate coverage`() {
+        val model = Problem(0, 2, Array(2) { IntDomain(0, 1) }, listOf(
+            Linear(longArrayOf(101, 102), intArrayOf(0, 1), LinearOp.GE, 150L),
+            Linear(longArrayOf(101, 102), intArrayOf(0, 1), LinearOp.LE, 151L),
+        ))
+        val sourceScope = scope.copy(revision = SourceRevision("finite-aggregate", "klause-ir-exact-v1"))
+        val context = assertNotNull(model.sourceProofContext(sourceScope,
+            LinearObjective(intCoefficients = longArrayOf(0, 0))))
+
+        val result = LinearAuthorityInvocation(context, TheoryParams(sourceLpOperations = 16),
+            aggregateBranching = true).use { it.run { _, _ -> } }
+
+        val terminal = assertNotNull(result.terminal)
+        assertEquals(SourceClaim.Refutation, terminal.claim)
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(context.withLinearAuthority()).verify(terminal))
+        assertEquals(1L, result.stats.smt.completeSearchStages?.get("numericalAggregateSplits"))
+    }
+
+    @Test
+    fun `aggregate coverage should survive backjump replay and restart`() {
         val budget = SourceLpBudget(maxOperations = 16)
         LinearAuthorityTraversal(source, budget, Cancellation.Never, { false }, {}, { null },
             aggregateBranching = true).use { component ->
@@ -115,7 +141,14 @@ class LinearAggregateBranchesTest {
             assertEquals(SearchNodeDisposition.Prune, component.beforeBranch(session))
 
             assertEquals(operations, budget.operations)
+            assertEquals(ComponentResult.Consistent, session.restart())
+            assertEquals(SearchNodeDisposition.Expand, component.beforeBranch(session))
+            assertEquals(ComponentResult.Consistent, session.push(alternatives.last()))
+            assertEquals(SearchNodeDisposition.Prune, component.beforeBranch(session))
             session.popTo(0)
+            val terminal = assertNotNull(component.completed())
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
         }
     }
 
