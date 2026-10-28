@@ -23,6 +23,7 @@ import com.eignex.klause.solver.search.SearchModelBlocker
 import com.eignex.klause.solver.search.SearchModelKey
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.explainAtoms
+import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.bigIntOf
 
@@ -73,8 +74,39 @@ class CpSearchComponent(
         get() = session.problem.numIntVars == 0 && session.problem.factors.isEmpty()
 
     override val prefersNativeConflictAnalysis: Boolean
-        get() = session.problem.numIntVars == 0 ||
-            (lastConflict?.learnedClause as? ConflictAnalyzer.AnalysisResult.LearnedPb)?.let(::usableMixedPb) == true
+        get() = session.problem.numIntVars == 0 || when (val learned = lastConflict?.learnedClause) {
+            is ConflictAnalyzer.AnalysisResult.LearnedPb -> usableMixedPb(learned)
+            is ConflictAnalyzer.AnalysisResult.LearnedIntegerRow -> usableIntegerRow(learned)
+            else -> false
+        }
+
+    private fun usableIntegerRow(learned: ConflictAnalyzer.AnalysisResult.LearnedIntegerRow): Boolean {
+        try {
+            val context = sharedContext as? SearchSession ?: return false
+            var nativeTarget = sharedRootLevel
+            for (level in minOf(nativeLevelBySharedLevel.size - 1, analysisSharedLevel - 1) downTo 0) {
+                if (nativeLevelBySharedLevel[level] <= learned.backjumpLevel) {
+                    nativeTarget = nativeLevelBySharedLevel[level]
+                    break
+                }
+            }
+            val state = session.explanationState
+            val trail = state.integerLearningTrailAtLevel?.invoke(nativeTarget) ?: return false
+            if (!learned.row.assertsAt(state, trail)) return false
+            for (variable in learned.row.variables) {
+                if (context.cancelled()) return false
+                val source = sourceIntId(variable)
+                if (context.explainAtoms(context.intLowerBoundPremise(source), maxNodes = 128) == null) return false
+                if (context.explainAtoms(context.intUpperBoundPremise(source), maxNodes = 128) == null) return false
+            }
+            return !context.cancelled()
+        } catch (_: CheckedLongOverflowException) {
+            return false
+        } catch (_: FinitePropagationInterrupted) {
+            session.explanationState.runCancelled = true
+            return false
+        }
+    }
 
     private fun usableMixedPb(learned: ConflictAnalyzer.AnalysisResult.LearnedPb): Boolean {
         val context = sharedContext as? SearchSession ?: return false
@@ -310,6 +342,7 @@ class CpSearchComponent(
         (when (val learned = result.learnedClause) {
             is ConflictAnalyzer.AnalysisResult.Learned -> learned
             is ConflictAnalyzer.AnalysisResult.LearnedPb -> learned.fallbackClause
+            is ConflictAnalyzer.AnalysisResult.LearnedIntegerRow -> learned.fallbackClause
             else -> null
         })
             ?.literals
@@ -478,6 +511,9 @@ class CpSearchComponent(
         ) {
             learned = learned.fallbackClause
         }
+        if (learned is ConflictAnalyzer.AnalysisResult.LearnedIntegerRow && !usableIntegerRow(learned)) {
+            learned = learned.fallbackClause
+        }
         if (learned == null) {
             conflictStats?.observeNotApplicable()
             return SearchConflictResolution.Chronological
@@ -486,7 +522,7 @@ class CpSearchComponent(
             conflictStats?.observeNonAsserting()
             return SearchConflictResolution.Chronological
         }
-        if (learned.guardLiterals.isEmpty() && learned.backjumpLevel == 0) {
+        if (learned.isContradiction && learned.backjumpLevel == 0) {
             return SearchConflictResolution.Exhausted
         }
         return SearchConflictResolution.Backjump(CpLearnedConflict(learned))
@@ -520,6 +556,9 @@ class CpSearchComponent(
                     learned.degree,
                     learned.lbd,
                 )
+
+                is ConflictAnalyzer.AnalysisResult.LearnedIntegerRow ->
+                    this@CpSearchComponent.session.addLearnedIntegerRow(learned.row, learned.lbd)
             }
             lastResult = result
             return when (result) {
@@ -545,7 +584,7 @@ class CpSearchComponent(
                     val next = result.learnedClause as? ConflictAnalyzer.AnalysisResult.LearnedConstraint
                     when {
                         next == null -> SearchLearnedConflictResult.Chronological
-                        next.backjumpLevel == 0 && next.guardLiterals.isEmpty() -> SearchLearnedConflictResult.Exhausted
+                        next.backjumpLevel == 0 && next.isContradiction -> SearchLearnedConflictResult.Exhausted
                         else -> SearchLearnedConflictResult.Backjump(CpLearnedConflict(next))
                     }
                 }

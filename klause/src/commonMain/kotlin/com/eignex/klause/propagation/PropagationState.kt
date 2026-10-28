@@ -350,6 +350,9 @@ class PropagationState private constructor(
     /** Mirror of [intMinReason] for the upper bound. */
     val intMaxReason: IntArray = prepared?.intMaxReason ?: (IntArray(problem.numIntVars) { -1 })
 
+    internal var integerRowLearning = false
+    internal var integerLearningTrailAtLevel: ((Int) -> Int?)? = null
+
     /** Factor whose [Propagator.propagate] is currently running. Read by the impl methods so
      *  state changes can be attributed back to a factor. `-1` between factor invocations
      *  (decisions, assumption seeding) — those pins/tightenings record `reason = -1`. */
@@ -1389,7 +1392,7 @@ class PropagationState private constructor(
     /** Record [v] in [fid]'s dirty-variable delta if [fid] consumes it ([IntEventMachinery.dirtyMark] dedups).
      *  No-op for non-consumers and when no factor in the problem consumes a delta. */
     private fun accumulateDirtyVar(fid: Int, v: Int) {
-        if (intEvents.dirtyMark.isEmpty()) return
+        if (fid >= intEvents.dirtyMark.size) return
         val mark = intEvents.dirtyMark[fid] ?: return
         val vars = intEvents.dirtyVars[fid] ?: return
         if (mark.add(v)) vars.add(v)

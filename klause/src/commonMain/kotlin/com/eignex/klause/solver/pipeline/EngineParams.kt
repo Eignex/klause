@@ -18,10 +18,10 @@ import com.eignex.klause.backtrack.selector.IndomainMiddle
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.IndomainRandom
 import com.eignex.klause.backtrack.selector.IndomainSplit
-import com.eignex.klause.backtrack.selector.MaxSd
 import com.eignex.klause.backtrack.selector.InputOrder
 import com.eignex.klause.backtrack.selector.LargestDomain
 import com.eignex.klause.backtrack.selector.LargestUpperBound
+import com.eignex.klause.backtrack.selector.MaxSd
 import com.eignex.klause.backtrack.selector.RandomVariable
 import com.eignex.klause.backtrack.selector.RegressionVariableSelector
 import com.eignex.klause.backtrack.selector.SmallestDomain
@@ -212,6 +212,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
     val lpPruneHulls = p[ExecutionOption.lpPruneHulls]
     val lpRootCuts = p[ExecutionOption.lpRootCuts]
     val pbLearning = p[ExecutionOption.pbLearning]
+    val integerRowLearning = p[ExecutionOption.integerRowLearning]
     val pbObjectiveCutoff = p[ExecutionOption.pbObjectiveCutoff]
     val objectiveGuidedValues = p[ExecutionOption.objectiveGuidedValues]
     val varKind = if (allowSelectors) p[ExecutionOption.variableSelector] else null
@@ -221,7 +222,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
         solutionPhasing, rephaseInterval, maxLearned, lbdGlue, tieredDb, midLbd, vivification, vivifyBatch,
         subsumption, subsumeBatch, inprocessingCadence,
         lpCone, lpAutoOff, lpKnapsack, lpComponentSplit, lpBoundMaxPivots, lpAdaptiveWork, lpBranching, lpVariableShaving, lpPruneHulls, lpRootCuts, pbLearning,
-        pbObjectiveCutoff,
+        pbObjectiveCutoff, integerRowLearning,
         objectiveGuidedValues,
     )
     if (scalars.all { it == null } && varKind == null && valKind == null) return null
@@ -256,6 +257,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
         lpPruneHulls?.let { out = out.copy(lpPlan = out.lpPlan.copy(pruneHulls = it)) }
         lpRootCuts?.let { out = out.copy(lpPlan = out.lpPlan.copy(rootCutHarvest = it)) }
         pbLearning?.let { out = out.copy(pbLearning = it) }
+        integerRowLearning?.let { out = out.copy(integerRowLearning = it) }
         pbObjectiveCutoff?.let { out = out.copy(pbObjectiveCutoff = it) }
         objectiveGuidedValues?.let { out = out.copy(objectiveGuidedValues = it) }
         varKind?.let { out = out.copy(variableSelector = it.selector(out.randomSeed)) }

@@ -297,6 +297,9 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** The `pb-learning` execution setting. */
         val pbLearning: ExecutionOption<Boolean> = ExecutionOption("pb-learning", ValueKind.BOOLEAN)
 
+        /** The `integer-row-learning` execution setting. */
+        val integerRowLearning: ExecutionOption<Boolean> = ExecutionOption("integer-row-learning", ValueKind.BOOLEAN)
+
         /** The `pb-objective-cutoff` execution setting. */
         val pbObjectiveCutoff: ExecutionOption<Boolean> = ExecutionOption("pb-objective-cutoff", ValueKind.BOOLEAN)
 
@@ -423,7 +426,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 lbdGlue, tieredDb, midLbd, vivification, vivifyBatch,
                 subsumption, subsumeBatch, inprocessingCadence, lpObjectiveCone, lpAutoOffReprobe,
                 lpKnapsackLagrangian, lpComponentSplit, lpBoundMaxPivots, lpAdaptiveWork, lpBranching,
-                lpVariableShaving, lpPruneHulls, lpRootCuts, pbLearning, pbObjectiveCutoff,
+                lpVariableShaving, lpPruneHulls, lpRootCuts, pbLearning, integerRowLearning, pbObjectiveCutoff,
                 objectiveGuidedValues, variableSelector, valueSelector, seed, dryRunSolver,
                 noise, cb, skewAlpha, initialTemp, coolingRate,
                 minTemp, smoothProb, smoothFactor, tabuTenure, sources,

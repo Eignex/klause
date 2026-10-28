@@ -14,10 +14,10 @@ import com.eignex.klause.propagation.Propagator
 internal class LinearPropagator(
     val boolVars: IntArray,
     val intVars: IntArray,
-    private val coeffs: LongArray,
-    private val vars: IntArray,
-    private val op: LinearOp,
-    private val bound: Long,
+    val coeffs: LongArray,
+    val vars: IntArray,
+    val op: LinearOp,
+    val bound: Long,
 ) : Propagator {
 
     /**
