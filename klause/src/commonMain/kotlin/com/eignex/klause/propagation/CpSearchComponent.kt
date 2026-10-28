@@ -527,9 +527,11 @@ class CpSearchComponent(
         if (session.problem.numIntVars > 0 &&
             learned is ConflictAnalyzer.AnalysisResult.LearnedPb && !usableMixedPb(learned)
         ) {
+            session.explanationState.arithmeticLearningTrace?.record("pb.decline.shared-assertion-or-premise")
             learned = learned.fallbackClause
         }
         if (learned is ConflictAnalyzer.AnalysisResult.LearnedIntegerRow && !usableIntegerRow(learned)) {
+            session.explanationState.arithmeticLearningTrace?.record("integer.decline.shared-assertion-or-premise")
             learned = learned.fallbackClause
         }
         if (learned == null) {
@@ -568,6 +570,9 @@ class CpSearchComponent(
         override val decisionLevels: IntArray get() = learned.decisionLevels
 
         override fun apply(session: SearchSession): SearchLearnedConflictResult {
+            this@CpSearchComponent.session.explanationState.arithmeticLearningTrace?.record(
+                "analysis.mapped-target", learned.backjumpLevel.toLong(), decisionLevel.toLong(),
+                this@CpSearchComponent.session.decisionLevel.toLong())
             val result = when (learned) {
                 is ConflictAnalyzer.AnalysisResult.Learned -> this@CpSearchComponent.session.addLearnedClause(
                     Clause(learned.literals),
