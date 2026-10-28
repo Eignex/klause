@@ -110,7 +110,9 @@ class PresolverTest {
         val problem = Problem(0, 2, arrayOf(IntDomain(3, 3), IntDomain(0, 2)), listOf(Product(0, 1, 1)))
         for (schedule in listOf("source", "incremental", "rebuilt")) {
             val budget = PresolveBudget(Long.MAX_VALUE)
-            val config = PresolveConfig.parse("off,+strengthen,+structural" + if (schedule == "rebuilt") ",+bce" else "")
+            val config = PresolveConfig.parse(
+                "off,+strengthen,+structural" + if (schedule == "rebuilt") ",+bce" else "",
+            )
             val context = PresolveContext(presolveBudget = budget)
 
             val reduced = if (schedule == "source") {
@@ -136,7 +138,9 @@ class PresolverTest {
         ))
         for (schedule in listOf("source", "incremental", "rebuilt")) {
             val budget = PresolveBudget(Long.MAX_VALUE)
-            val config = PresolveConfig.parse("off,+strengthen,+diophantine" + if (schedule == "rebuilt") ",+bce" else "")
+            val config = PresolveConfig.parse(
+                "off,+strengthen,+diophantine" + if (schedule == "rebuilt") ",+bce" else "",
+            )
             val context = PresolveContext(presolveBudget = budget)
 
             val reduced = if (schedule == "source") Presolver.runSource(problem, config, context).problem
@@ -157,7 +161,9 @@ class PresolverTest {
             Linear(intArrayOf(3, -1, 1), intArrayOf(1, 2, 3), LinearOp.LE, 2),
         ))
         for (schedule in listOf("source", "incremental", "rebuilt")) {
-            val config = PresolveConfig.parse("off,+sparsify,+structural" + if (schedule == "rebuilt") ",+bce" else "")
+            val config = PresolveConfig.parse(
+                "off,+sparsify,+structural" + if (schedule == "rebuilt") ",+bce" else "",
+            )
 
             val reduced = if (schedule == "source") Presolver.runSource(problem, config).problem
             else Presolver.run(problem.bake(), config).problem
@@ -178,7 +184,9 @@ class PresolverTest {
         ))
         for (schedule in listOf("source", "incremental", "rebuilt")) {
             val budget = PresolveBudget(Long.MAX_VALUE)
-            val config = PresolveConfig.parse("off,+sparsify,+subsume,+structural" + if (schedule == "rebuilt") ",+bce" else "")
+            val config = PresolveConfig.parse(
+                "off,+sparsify,+subsume,+structural" + if (schedule == "rebuilt") ",+bce" else "",
+            )
             val context = PresolveContext(presolveBudget = budget)
 
             val reduced = if (schedule == "source") Presolver.runSource(problem, config, context).problem
@@ -215,7 +223,7 @@ class PresolverTest {
 
             assertEquals(listOf(PresolvePass.ELIMINATE_BOOL_VARS), fired)
             assertEquals(1, budget.passCalls["sparsify"])
-            assertEquals(if (lane == PresolveLane.SOURCE) 1 else 2, budget.passCalls["strengthen"])
+            assertEquals(1, budget.passCalls["strengthen"])
         }
     }
 

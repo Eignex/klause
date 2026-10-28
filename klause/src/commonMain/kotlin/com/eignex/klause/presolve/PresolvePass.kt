@@ -31,8 +31,8 @@ private const val IMPLICATION_GRAPH_MAX_CANDIDATES = 2_048
  *  override.
  * @property skipAfterEmpty whether the round engine stops re-running this pass once it has run and
  *  changed nothing. Searches that overwhelmingly find nothing to add stay parked after a completed
- *  miss unless the host tracks a changed relevant input revision. Cheap reductions leave it `false`
- *  so they can re-run as the problem shrinks.
+ *  miss unless the host tracks a changed relevant input revision. Other cheap reductions can leave
+ *  it `false` to re-run as the problem shrinks.
  */
 enum class PresolvePass(
     val id: String,
@@ -629,6 +629,9 @@ enum class PresolvePass(
         autoEligible = true,
     ),
     ;
+
+    internal val tracksLinearInputs: Boolean
+        get() = this == STRENGTHEN_COEFFICIENTS || this == SPARSIFY_LINEAR_ROWS
 
     internal fun namespaceEligible(problem: Problem, factorCount: Int = problem.factors.size): Boolean = when (this) {
         SUBSUME_CLAUSES -> OriginalClauseSubsumption.eligible(problem.numBoolVars, factorCount)

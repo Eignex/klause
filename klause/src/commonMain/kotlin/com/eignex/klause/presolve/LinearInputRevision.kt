@@ -27,7 +27,7 @@ internal class LinearInputRevision(
     private var revision = 0L
 
     init {
-        require(pass == PresolvePass.STRENGTHEN_COEFFICIENTS || pass == PresolvePass.SPARSIFY_LINEAR_ROWS)
+        require(pass.tracksLinearInputs)
         val work = ScanMeter(cancellation)
         for (factor in problem.factors) {
             if (!record(factor, 1, work)) {
