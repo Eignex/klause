@@ -137,7 +137,7 @@ class LinearBooleanCutsTest {
     }
 
     @Test
-    fun `composition should decline incomplete alternative and integer guarded support`() {
+    fun `composition should decline an incomplete Boolean alternative`() {
         val source = assertNotNull(model().sourceProofContext(scope, objective))
         val premises = source.premises.filterValues { it.guards[0] != false }
         val incomplete = SourceProofContext(scope, source.coordinates, premises, source.objective)
@@ -146,6 +146,39 @@ class LinearBooleanCutsTest {
 
         assertTrue(result.complete)
         assertTrue(result.consequences.isEmpty())
+    }
+
+    @Test
+    fun `integer typing and additional activation premises should withhold common rows`() {
+        val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
+        val other = SourceCoordinate(SourceCoordinate.Kind.Boolean, 1)
+        val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        for (kind in listOf("integer activity", "integer pin", "other guard")) {
+            val activity = if (kind == "integer activity") integer else x
+            val rows = listOf(false, true).associate { value ->
+                value.toString() to SourcePremise(SourceInequality(mapOf(activity to BigFraction.ONE), quarter),
+                    mapOf(0 to value) + if (kind == "other guard") mapOf(1 to true) else emptyMap(),
+                    if (kind == "integer pin") mapOf(integer to BigFraction.ONE) else emptyMap())
+            }
+            val source = SourceProofContext(scope, setOf(x, bool, other, integer), rows, mapOf(x to BigFraction.ONE))
+
+            val result = LinearBooleanCutPreparation.prepare(source, Cancellation.Never)
+
+            assertTrue(result.consequences.isEmpty(), kind)
+        }
+    }
+
+    @Test
+    fun `a common row should supply an exact checked objective bound`() {
+        val source = assertNotNull(model().sourceProofContext(scope, objective))
+        val row = SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.MINUS_ONE), quarter)
+        val common = LinearBooleanCutPreparation.prepare(source, Cancellation.Never).consequences.single {
+            it.claim == SourceClaim.Consequence(row)
+        }
+
+        val bound = SourceEvidence(scope, SourceClaim.Bound(quarter.negated()), SourceDerivation.Import(common))
+
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(bound))
     }
 
     @Test

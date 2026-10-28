@@ -22,11 +22,12 @@ internal object LinearAuthorityReplay {
         maximumWork: Long,
         maximumAllocation: Long,
         stop: Cancellation,
+        composeBranches: Boolean = false,
     ): LinearAuthorityReplayResult {
         val funding = SourceLpFunding(maximumWork, maximumAllocation).apply { grant(maximumWork) }
         val budget = SourceLpBudget(maxOperations = 2, funding = funding)
         val capture = LinearAuthorityCapture(1, 1_000_000L, 16_777_216L, stop)
-        LinearActiveRows(query.context, budget).use { checker ->
+        LinearActiveRows(query.context, budget, composeBranches = composeBranches).use { checker ->
             var result: LinearActiveResult
             do {
                 result = checker.check(query.context.scope.condition, stop, capture = capture)

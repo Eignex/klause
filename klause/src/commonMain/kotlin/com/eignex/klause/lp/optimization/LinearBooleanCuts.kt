@@ -75,7 +75,7 @@ internal object LinearBooleanCutPreparation {
             }
             val nonzero = coefficients.filterValues { !it.isZero }
             if (nonzero.size > limits.support) throw Stop("support")
-            val first = nonzero.minWithOrNull(compareBy({ it.key.kind.ordinal }, { it.key.id }))?.value
+            val first = nonzero.entries.minWithOrNull(compareBy({ it.key.kind.ordinal }, { it.key.id }))?.value
             val scale = if (first == null) BigFraction.ONE else
                 number((if (first < BigFraction.ZERO) first.negated() else first).reciprocal())
             reserve(1L + nonzero.size, 128L + nonzero.size * 64L)
@@ -92,6 +92,8 @@ internal object LinearBooleanCutPreparation {
             reserve(source.coordinateCount.toLong() + source.premiseCount,
                 source.coordinateCount * 48L + source.premiseCount * 64L)
             val coordinates = source.coordinates
+            val pinned = source.scope.condition.bools
+            reserve(pinned.size.toLong(), pinned.size * 48L)
             val rows = ArrayList<Row>()
             val booleans = linkedSetOf<Int>()
             for ((id, premise) in source.premises) {
@@ -106,7 +108,7 @@ internal object LinearBooleanCutPreparation {
                 if (rows.size >= limits.rows) throw Stop("rows")
                 for (bool in premise.guards.keys) {
                     if (SourceCoordinate(SourceCoordinate.Kind.Boolean, bool) !in coordinates) throw Stop("typing")
-                    if (bool !in source.scope.condition.bools) booleans += bool
+                    if (bool !in pinned) booleans += bool
                     if (booleans.size > limits.booleans) throw Stop("booleans")
                 }
                 rows += Row(id, premise)
