@@ -37,7 +37,7 @@ internal object OptionalUnaryProfile {
 
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.isEmpty())
+        require(args.isEmpty() || args.contentEquals(arrayOf("mode=control")))
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         Reports.writeJson(out.resolve("build.json").path, InstalledBuild.reference)
         Reports.writeJson(out.resolve("compiler.json").path, MiniZincCompatibility.compiler)
@@ -49,6 +49,7 @@ internal object OptionalUnaryProfile {
         File(CorpusFetcher.workspaceRoot(), "klause-mzn-lib/test-models/optional-unary.mzn")
             .copyTo(control.resolve("source.mzn"))
         inspect(control, control = true)
+        if (args.isNotEmpty()) return
         val workforce = out.resolve("workforce").apply { mkdirs() }
         val url = "https://raw.githubusercontent.com/MiniZinc/mzn-challenge/" +
             "$WORKFORCE_REVISION/2026/workforce-alloc/scheduling_model.mzn"
