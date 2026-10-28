@@ -9,6 +9,7 @@ import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.optimization.LinearAuthoritySemantics
 import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.simplex.exact.BigFraction
@@ -85,8 +86,10 @@ internal object RealBooleanCutProfile {
                         val allocated = bean.getThreadAllocatedBytes(thread)
                         val start = System.nanoTime()
                         val replays = conditions.map { condition ->
-                            replay(context.atScope(context.scope.copy(condition = condition)), arm == "composed",
-                                conditions.size)
+                            val scoped = SourceProofContext(context.scope.copy(condition = condition),
+                                context.coordinates, context.premises, context.objective, context.objectiveConstant,
+                                LinearAuthoritySemantics(context), context.semantics)
+                            replay(scoped, arm == "composed", conditions.size)
                         }
                         val elapsed = System.nanoTime() - start
                         val bytes = bean.getThreadAllocatedBytes(thread) - allocated
