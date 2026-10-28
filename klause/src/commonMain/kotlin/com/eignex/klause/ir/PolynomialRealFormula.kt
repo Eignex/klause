@@ -56,6 +56,7 @@ sealed interface PolynomialRealFormula {
     /** Conjunction; an empty conjunction is true. */
     class And(operands: List<PolynomialRealFormula>) : PolynomialRealFormula {
         private val values = operands.toTypedArray()
+        internal val operandCount: Int get() = values.size
         /** Captured operands in syntax order. */
         val operands: List<PolynomialRealFormula> get() = values.toList()
         override fun equals(other: Any?): Boolean = other is And && polynomialFormulasEqual(this, other)
