@@ -663,6 +663,8 @@ internal object Suites {
         vendored("cover-tied", Category.OPTIMIZATION, Expected.Opt(1L))
         vendored("cover-other-reader", Category.OPTIMIZATION, Expected.Opt(1L))
         vendored("weighted-penalty-complements", Category.OPTIMIZATION, Expected.Opt(5L))
+        vendored("signed-cost-symmetry", Category.OPTIMIZATION, Expected.Opt(2L),
+            relPath = "cost-symmetry/signed-cost.wcnf")
     }
 
     private val opbCore = suite("opb-core", "Curated pseudo-Boolean OPB") {
@@ -740,6 +742,8 @@ internal object Suites {
         vendored("pair-cover-costs", Category.OPTIMIZATION, Expected.Unknown, relPath = "xcsp3/pair-cover-costs.xml")
         vendored("evidence-latin4", Category.OPTIMIZATION, Expected.Unknown,
             relPath = "finite-repair-evidence/latin4.xml")
+        vendored("equality-cost-symmetry", Category.OPTIMIZATION, Expected.Opt(90L),
+            relPath = "cost-symmetry/equality-cost.xml")
         for (name in listOf("linear-exchange", "linear-three-cycle", "linear-four-cycle", "linear-knapsack",
             "linear-transport")) {
             vendored("evidence-$name", Category.OPTIMIZATION, Expected.Unknown,

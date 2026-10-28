@@ -3,7 +3,11 @@ package com.eignex.klause.bench.profile
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.factor.symmetry.SymmetryHandling
+import com.eignex.klause.formats.dimacs.Dimacs
+import com.eignex.klause.formats.dimacs.toProblem
 import com.eignex.klause.formats.xcsp3.Xcsp3
+import com.eignex.klause.ir.IntegralConstants
+import com.eignex.klause.ir.impliedLinearRows
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.solver.objective.toLinearObjective
@@ -40,15 +44,21 @@ internal object SymmetryAdmissionProfile {
             val bytes = trajectorySourceBytes(source.getValue("suite").jsonPrimitive.content,
                 source.getValue("problem").jsonPrimitive.content, source.getValue("sha256").jsonPrimitive.content, null)
             val directory = out.resolve("$index").apply { mkdirs() }
-            directory.resolve("source.xml").writeBytes(bytes)
+            val booleanSource = source.getValue("suite").jsonPrimitive.content == "wcnf-core"
+            directory.resolve(if (booleanSource) "source.wcnf" else "source.xml").writeBytes(bytes)
             for (mode in listOf("default", "default,+objective-symmetry")) {
                 val stop = Cancellation.after(8.seconds)
-                val parsed = Xcsp3.parse(bytes.decodeToString(), recoveryCancellation = stop)
-                val objective = requireNotNull(parsed.objective).toLinearObjective()
+                val (problem, objective) = if (booleanSource) {
+                    val parsed = Dimacs.parseWcnf(bytes.decodeToString()).toProblem()
+                    parsed.problem to parsed.objective.toLinearObjective()
+                } else {
+                    val parsed = Xcsp3.parse(bytes.decodeToString(), recoveryCancellation = stop)
+                    parsed.problem to requireNotNull(parsed.objective).toLinearObjective()
+                }
                 val budget = PresolveBudget(550_000_000L)
                 val started = System.nanoTime()
                 val prepared = FinitePipeline.prepare(FinitePipelineRequest(
-                    parsed.problem, FiniteEngine.BACKTRACK, objective, PresolveConfig.parse(mode),
+                    problem, FiniteEngine.BACKTRACK, objective, PresolveConfig.parse(mode),
                     explicitPresolveConfig = true, cancellation = stop, solveCancellation = stop,
                     presolveBudget = budget, randomSeed = 3,
                 ))
@@ -61,14 +71,37 @@ internal object SymmetryAdmissionProfile {
                     put("input", input)
                     put("revision", Reports.readGitSha())
                     put("mode", mode)
-                    put("sourceBreaksSymmetry", parsed.problem.hasSymmetryBreaking)
+                    put("sourceBreaksSymmetry", problem.hasSymmetryBreaking)
                     put("sourceObjective", objective.toString())
                     put("preparedObjective", cost.toString())
-                    put("sourceIntegers", parsed.problem.numIntVars)
-                    put("sourceBooleans", parsed.problem.numBoolVars)
+                    put("sourceIntegers", problem.numIntVars)
+                    put("sourceBooleans", problem.numBoolVars)
                     put("preparedIntegers", model.numIntVars)
                     put("preparedBooleans", model.numBoolVars)
                     put("preparedFactors", model.factors.size)
+                    put("rootIntegerDomains", JsonArray((0 until model.numIntVars).map {
+                        JsonPrimitive(model.rootIntDomain(it).toString())
+                    }))
+                    put("preparedIntegralRows", buildJsonArray {
+                        model.factors.forEachIndexed { factorId, factor ->
+                            for (row in factor.impliedLinearRows) {
+                                val constants = row.constants as? IntegralConstants ?: continue
+                                add(buildJsonObject {
+                                    put("factor", factorId)
+                                    put("relation", row.relation.name)
+                                    put("activator", row.activator)
+                                    put("strict", row.strict)
+                                    put("bound", constants.exactBound.toString())
+                                    put("terms", buildJsonArray {
+                                        for (k in 0 until row.size) add(buildJsonObject {
+                                            put("reference", row.ref(k))
+                                            put("coefficient", constants.exactCoeff(k).toString())
+                                        })
+                                    })
+                                })
+                            }
+                        }
+                    })
                     put("preparationNs", elapsed)
                     put("preparationWork", budget.spent())
                     put("stopped", stop())
