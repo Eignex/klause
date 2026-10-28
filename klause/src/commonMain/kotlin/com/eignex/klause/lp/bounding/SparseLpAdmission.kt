@@ -2,6 +2,7 @@ package com.eignex.klause.lp.bounding
 
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.symmetry.SymmetryHandling
 import com.eignex.klause.ir.IntegerConstants
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
@@ -11,6 +12,7 @@ import com.eignex.klause.lp.engine.exactBounds
 import com.eignex.klause.lp.engine.exactConstant
 import com.eignex.klause.lp.engine.exactCost
 import com.eignex.klause.lp.engine.exactRhs
+import com.eignex.klause.lp.engine.forEachRationalColumn
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.propagation.PropagationSession
@@ -57,6 +59,7 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
                 else return decline("Source")
             is ExactLinear -> if (factor.constants is IntegerConstants && factor.activator == LinearRow.ALWAYS &&
                 factor.relation != LinearOp.NE) factor.size else return decline("Source")
+            is SymmetryHandling -> 0
             else -> return decline("Source")
         }
         if (entries > MAX_ENTRIES || 32L * (entries + columns + rows) > MAX_PREPARATION_WORK) {

@@ -34,6 +34,9 @@ import com.eignex.klause.lp.cut.KnapsackCoverSeparator
 import com.eignex.klause.lp.cut.SharedCut
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.Cut
+import com.eignex.klause.lp.engine.LpCertificationObserver
+import com.eignex.klause.lp.engine.LpCertifier
+import com.eignex.klause.lp.engine.LpCertifierCost
 import com.eignex.klause.lp.engine.LpCounterResults
 import com.eignex.klause.lp.engine.LpFloatTermination
 import com.eignex.klause.lp.engine.LpModel
@@ -138,6 +141,8 @@ internal class LpEngine(
 
     private var closed = false
     private val requestedPlan = params0.lpPlan
+    internal var sparseTrialActive = false
+        private set
     private val sparseTrialRequested = params0.lpConfig?.resolved(LpTechnique.SPARSE_TRIAL) == true
     internal var primalPropagationWork: Long = 0L
     internal var primalSearchWork: Long = 0L
@@ -229,10 +234,24 @@ internal class LpEngine(
         metrics: com.eignex.klause.lp.engine.LpSolveMetrics = solver.lastMetrics,
     ) {
         sink.lp.observeEngineCost(LpRoute.ROOT, metrics)
+        observeSparseTrial(solver)
         chargeWork(metrics.workOps)
     }
 
-    internal fun rootCertificationObserver() = sink.lp.certificationObserver(LpRoute.ROOT)
+    internal fun observeSparseTrial(solver: LpSolver) {
+        if (sparseTrialActive) sink.lp.sparseTrial = sink.lp.sparseTrial + solver.trialProgress
+    }
+
+    internal fun rootCertificationObserver(): LpCertificationObserver {
+        val observer = sink.lp.certificationObserver(LpRoute.ROOT)
+        if (!sparseTrialActive) return observer
+        return object : LpCertificationObserver by observer {
+            override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
+                observer.observe(certifier, success, cost)
+                if (cost is LpCertifierCost.Metered) chargeWork(cost.work)
+            }
+        }
+    }
 
     internal fun observeRootCutAccounting(candidates: Int, selected: Int, active: Int) {
         sink.lp.observeCutAccounting(candidates, selected, active)
@@ -248,8 +267,8 @@ internal class LpEngine(
 
     internal val pricingOptions: LpPricingOptions
         get() = LpPricingOptions(params.zeroObjectivePricing, params.randomSeed ?: 0L,
-            if (params.lpPlan.sparseTrial) SPARSE_LP_MAX_FACTOR_ENTRIES else Long.MAX_VALUE,
-            if (params.lpPlan.sparseTrial) SPARSE_LP_MAX_FACTOR_WORK else Long.MAX_VALUE)
+            if (sparseTrialActive) SPARSE_LP_MAX_FACTOR_ENTRIES else Long.MAX_VALUE,
+            if (sparseTrialActive) SPARSE_LP_MAX_FACTOR_WORK else Long.MAX_VALUE)
 
     private val auxiliarySources = LpAuxiliarySources()
     private var structuralCutSupport = params0.lpPlan.cuts || params0.lpPlan.circuit
@@ -467,7 +486,7 @@ internal class LpEngine(
      * floor does not already get.
      */
     internal fun nodeWorkBudget(): Long {
-        if (params.lpPlan.sparseTrial) return lpEffortGovernor.remainingWork()?.coerceAtLeast(1L) ?: 1L
+        if (sparseTrialActive) return lpEffortGovernor.remainingWork()?.coerceAtLeast(1L) ?: 1L
         val budget = when {
             !adaptiveWork -> 0L
             lpEffortGovernor.isDemoted -> MIN_NODE_WORK_OPS
@@ -479,7 +498,7 @@ internal class LpEngine(
     }
 
     internal fun nodeQueryWorkBudget(): Long? {
-        if (params.lpPlan.sparseTrial) return lpEffortGovernor.remainingWork()?.coerceAtLeast(1L)
+        if (sparseTrialActive) return lpEffortGovernor.remainingWork()?.coerceAtLeast(1L)
         val offered = nodeWorkAllowance()?.coerceAtLeast(1L) ?: return null
         val containing = nodeWorkBudget()
         return if (containing == 0L) offered else minOf(containing, offered)
@@ -577,7 +596,7 @@ internal class LpEngine(
     private val separateNodePreparation: Boolean get() = sparseTrialRequested ||
         rootQueryPolicy != LpRootQueryPolicy.SHARED_WORK
 
-    internal val measuresRootQueries: Boolean get() = params.lpPlan.sparseTrial ||
+    internal val measuresRootQueries: Boolean get() = sparseTrialActive ||
         rootQueryPolicy == LpRootQueryPolicy.INTERRUPTED_WORK ||
         rootQueryPolicy == LpRootQueryPolicy.CHECKPOINTED_WORK
     internal var measuredRootLowerBound: Double? = null
@@ -1094,6 +1113,7 @@ internal class LpEngine(
                 prepare(problem, config, requestedPlan, objective, params.cancellation) { admission ->
                     elementIndexes = admission.elementIndexes
                     admission.sparseTrial?.let { trial ->
+                        sparseTrialActive = trial.admitted
                         sink.lp.sparseTrial = trial.metrics
                         noteNodeOverhead(trial.work)
                     }

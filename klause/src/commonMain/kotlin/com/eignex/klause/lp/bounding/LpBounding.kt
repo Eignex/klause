@@ -210,6 +210,7 @@ internal fun LpEngine.solveNode(
  */
 private fun LpEngine.observeSolveCost(sink: SolveStatsSink, solver: LpSolver) {
     sink.lp.observeEngineCost(LpRoute.NODE, solver.lastMetrics)
+    observeSparseTrial(solver)
     noteSolveOps(solver.lastWorkOps)
 }
 

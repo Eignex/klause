@@ -174,6 +174,8 @@ internal data class LpSolveMetrics(
  * certifying the result downstream ([integerCertify] / [integerFarkasRay]), never from these.
  */
 internal interface LpSolver : AutoCloseable {
+    val trialProgress: Map<String, Long> get() = emptyMap()
+
     // Certified callers validate source feasibility independently. Scaled arithmetic guards remain required.
     fun deferUnscaledSourceDiagnostics() = Unit
 

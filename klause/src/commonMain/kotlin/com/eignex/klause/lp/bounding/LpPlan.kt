@@ -16,8 +16,6 @@ data class LpPlan(
      * problems with no LP-emittable factors (the relaxation is then empty and never prunes).
      */
     val bounding: Boolean = false,
-    /** Bounded sparse root admission; preserves the independent exact-continuation envelope. */
-    val sparseTrial: Boolean = false,
     /**
      * Frequency policy for [bounding]: solve the LP at one in every [boundEvery] pruning checks
      * rather than at every node, since the LP solve dominates a node's cost. `1` solves at every
