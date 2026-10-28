@@ -4157,6 +4157,8 @@ source has no eligible deduction. Satisfaction preparation pins `Q=false` throug
 dual fixing on every source, removing this conflict opportunity. These controls
 retain the internal option with ordinary learning as fallback and provide no default
 activation evidence.
+See [PR #3802](https://github.com/Eignex/klause/pull/3802) for the separate
+explicit-AUTO control receipts and reconstructed native point checks.
 
 Retain the per-variable search-time hole index. [Comparison 7993](https://lab.eignex.com/jobs/7993)
 pairs `443b3c12a` with `4a3642171` on Linux/amd64, CP/LP-off, one conflict-driven
