@@ -321,6 +321,20 @@ enum class PresolvePass(
             Presolve.projectSingletonInequalities(problem, ctx.objectiveIntVars, ctx.cancellation)
     },
 
+    /** Verified finite variable symmetry preserving the exact current objective. Opt-in. */
+    BREAK_OBJECTIVE_SYMMETRIES(
+        "objective-symmetry",
+        Stage.PROBLEM,
+        Capability.FINITE,
+        PresolveTiming.MEDIUM,
+        preservesSolutionSet = false,
+        autoEligible = false,
+        skipAfterEmpty = true,
+    ) {
+        override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) =
+            SymmetryBreaking.breakObjectiveSymmetries(problem, ctx)
+    },
+
     /** Interchangeable-variable / block / value symmetry breaking.
      *
      *  On a source model only the breaks a theory can own are posted; see
