@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
+import com.eignex.klause.arithmetic.real.approximate
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.ir.TranscendentalExpression
 import com.eignex.klause.ir.TranscendentalFormula
@@ -293,11 +294,7 @@ internal class TranscendentalWorkerAdapter(
         val integers = witness.integers
         val reals = witness.reals
         val approximate = DoubleArray(reals.size) { id ->
-            val value = reals[id]
-            value.rational?.toDouble() ?: value.algebraic?.let {
-                it.lowerBound.toDouble() / 2 + it.upperBound.toDouble() / 2
-            }
-                ?: Double.NaN
+            reals[id].approximate()
         }
         val finite = if (integers.all { it.fitsLong() }) {
             LongArray(integers.size) { integers[it].toLongExact() }

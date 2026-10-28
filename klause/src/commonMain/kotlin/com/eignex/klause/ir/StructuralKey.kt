@@ -114,6 +114,7 @@ internal enum class FactorKind {
     DISTINCT,
     REAL_FINITE_DOMAIN,
     ALL_DIFFERENT_TUPLES,
+    EXACT_REAL_EQUALITY,
 }
 
 // Payload builder for `StructuralKey.of`. Appends scalars and length-prefixed array segments into a

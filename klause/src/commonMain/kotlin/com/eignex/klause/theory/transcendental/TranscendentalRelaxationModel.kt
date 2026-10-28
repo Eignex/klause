@@ -88,6 +88,15 @@ internal class TranscendentalRelaxationModel(
     ): Pair<PolynomialExpression, RationalEnclosure?> {
         arithmetic.step()
         return when (source) {
+            is TranscendentalExpression.ExactValue -> {
+                val exact = com.eignex.klause.arithmetic.real.ExactRealArithmetic(
+                    arithmetic, com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic(),
+                )
+                val enclosure = exact.enclose(source.value, terms)
+                val value = fresh()
+                range(value, enclosure)
+                value to enclosure
+            }
             is TranscendentalExpression.Constant -> source.value to RationalEnclosure.point(
                 BigFraction.of(source.value.numerator, source.value.denominator),
             )
