@@ -41,12 +41,21 @@ internal class ArithmeticLearningTrace(
             val literal = literals[index / 5]
             val variable = Lit.variable(literal)
             val atom = variable - state.problem.numBoolVars
+            val knownAtom = atom in 0 until state.atoms.intVar.size
             when (index % 5) {
                 0 -> literal.toLong()
-                1 -> if (atom < 0) state.boolLevel[variable].toLong() else state.atoms.lvl[atom].toLong()
-                2 -> if (atom < 0) -1L else state.atoms.intVar[atom].toLong()
-                3 -> if (atom < 0) -1L else state.atoms.kind[atom].ordinal.toLong()
-                else -> if (atom < 0) state.boolReason[variable].toLong() else state.atoms.threshold[atom]
+                1 -> when {
+                    atom < 0 -> state.boolLevel[variable].toLong()
+                    knownAtom -> state.atoms.lvl[atom].toLong()
+                    else -> -1L
+                }
+                2 -> if (knownAtom) state.atoms.intVar[atom].toLong() else -1L
+                3 -> if (knownAtom) state.atoms.kind[atom].ordinal.toLong() else -1L
+                else -> when {
+                    atom < 0 -> state.boolReason[variable].toLong()
+                    knownAtom -> state.atoms.threshold[atom]
+                    else -> -1L
+                }
             }
         })
     }
