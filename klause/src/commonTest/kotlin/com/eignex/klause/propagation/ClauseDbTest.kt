@@ -24,7 +24,7 @@ class ClauseDbTest {
 
             session.addLearnedClause(Clause(intArrayOf(0)), 1)
             cancelled = false
-            session.popToLevel(0)
+            session.seed(Assumptions.None)
             session.pinBool(1, true)
 
             assertEquals(1, session.learnedClauseCount)
@@ -90,17 +90,49 @@ class ClauseDbTest {
     @Test
     fun `retirement should retain a live clause reason until its pin retracts`() {
         for (nativeSat in listOf(false, true)) {
-            val session = PropagationSession(Problem(2, 0, emptyArray(), emptyArray()), nativeSat = nativeSat)
-            session.pinBool(1, true)
-            session.addLearnedClause(Clause(intArrayOf(0)), 1)
+            val session = PropagationSession(Problem(3, 0, emptyArray(), emptyArray()), nativeSat = nativeSat)
+            session.pinBool(0, false)
+            session.addLearnedClause(Clause(intArrayOf(0, 2)), 1)
 
             session.forgetLearnedClauses { _, _ -> false }
             assertEquals(1, session.learnedClauseCount)
             session.popToLevel(0)
+            session.pinBool(2, true)
             session.forgetLearnedClauses { _, _ -> false }
 
             assertEquals(0, session.learnedClauseCount)
             assertEquals(1L, session.learnedLifecycle()["learningClauseRetired"])
+        }
+    }
+
+    @Test
+    fun `an asserting import should survive a preceding attachment conflict and reseeding`() {
+        for (nativeSat in listOf(false, true)) {
+            val session = PropagationSession(Problem(5, 0, emptyArray(),
+                arrayOf(Clause(intArrayOf(5)))), nativeSat = nativeSat)
+            session.seed(Assumptions.None.withBool(0, true).withBool(1, false))
+            session.importClause(SharedClause(intArrayOf(1, 2), longArrayOf(), 2), origin = 1)
+            session.importClause(SharedClause(intArrayOf(4, 6), longArrayOf(), 2), origin = 2)
+            assertIs<PropagationResult.Unsat>(session.pinBool(4, true))
+
+            session.seed(Assumptions.None.withBool(0, false))
+
+            assertEquals(true, session.boolValue(3))
+        }
+    }
+
+    @Test
+    fun `a nonunit assertion should be restored when its false root premise survives undo`() {
+        for (nativeSat in listOf(false, true)) {
+            val session = PropagationSession(Problem(3, 0, emptyArray(),
+                arrayOf(Clause(intArrayOf(1)))), nativeSat = nativeSat)
+            session.pinBool(2, true)
+            session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
+            session.popToLevel(0)
+
+            session.pinBool(2, false)
+
+            assertEquals(true, session.boolValue(1))
         }
     }
 

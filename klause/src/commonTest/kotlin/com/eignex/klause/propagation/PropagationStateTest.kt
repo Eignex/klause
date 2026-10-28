@@ -303,25 +303,24 @@ class PropagationStateTest {
     }
 
     @Test
-    fun `forget should remap learned reason ids and clear dropped ones`() {
+    fun `forget should retain referenced reasons and remap their factor ids`() {
         val s = state()
         val base = s.problem.numFactors // 2
         val fids = IntArray(4) { i ->
             s.addLearnedClause(Clause(intArrayOf(Lit.make(0, true), Lit.make((i % 4), false))), lbd = 2)
         }
-        s.boolReason[0] = fids[3] // learned idx 3 — kept, renumbered
-        s.boolReason[1] = fids[2] // learned idx 2 — dropped
-        s.intMinReason[0] = fids[3] // kept, renumbered
-        s.intMaxReason[0] = fids[2] // dropped
-        s.boolReason[2] = 0 // a static factor id — must pass through untouched
+        s.boolReason[0] = fids[3]
+        s.boolReason[1] = fids[2]
+        s.intMinReason[0] = fids[3]
+        s.intMaxReason[0] = fids[2]
+        s.boolReason[2] = 0
 
-        // Drop learned index 2; keep 0,1,3 → remap 0→0,1→1,2→-1,3→2.
-        s.forgetLearnedClauses { idx, _ -> idx != 2 }
+        s.forgetLearnedClauses { idx, _ -> idx == 0 || idx == 3 }
 
         assertEquals(base + 2, s.boolReason[0])
-        assertEquals(-1, s.boolReason[1])
+        assertEquals(base + 1, s.boolReason[1])
         assertEquals(base + 2, s.intMinReason[0])
-        assertEquals(-1, s.intMaxReason[0])
+        assertEquals(base + 1, s.intMaxReason[0])
         assertEquals(0, s.boolReason[2])
 
         s.factorAt(s.boolReason[0])

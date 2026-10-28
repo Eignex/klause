@@ -3,6 +3,7 @@ package com.eignex.klause.solver.search
 import com.eignex.klause.solver.result.GLUE_LBD
 import com.eignex.klause.solver.result.OpenTheoryClauseStats
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.MutableIntIntMap
 import kotlin.time.TimeSource
 
 internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
@@ -10,6 +11,9 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
     private val stages = IntArrayList()
     private val learned = WatchedClauseStore()
     private val pendingAttach = ArrayDeque<Int>()
+    private val rechecks = ArrayDeque<Int>()
+    private var reasons = MutableIntIntMap()
+    val hasReasons: Boolean get() = !reasons.isEmpty()
     private var propagatedTrail = 0
     private var unitsPending = false
     private var learnedClauses = 0L
@@ -42,6 +46,8 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
     }
 
     fun onRootReset() {
+        reasons.forEach { _, index -> queueRecheck(index) }
+        reasons.clear()
         propagatedTrail = 0
         unitsPending = learned.units.size > 0
     }
@@ -105,6 +111,7 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
         val droppable = IntArrayList(learned.size)
         for (index in 0 until learned.size) {
             val retained = learned.lbdAt(index) <= learnedDb.glueLbd ||
+                stages[index] and 2 != 0 ||
                 learned.usedAt(index) ||
                 learned.literalsAt(index).size == 1
             if (!retained) droppable.add(index)
@@ -115,12 +122,20 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
             return
         }
         val dropped = selectDroppedClauses(droppable, survivors)
+        val remap = IntArray(learned.size) { -1 }
         var target = 0
         for (index in 0 until learned.size) {
             if (dropped[index]) lifecycle.note(LearnedKind.Clause, LearnedStage.Retired)
-            else stages[target++] = stages[index]
+            else {
+                remap[index] = target
+                stages[target++] = stages[index]
+            }
         }
         stages.truncateTo(target)
+        repeat(rechecks.size) { rechecks.addLast(remap[rechecks.removeFirst()]) }
+        val retainedReasons = MutableIntIntMap()
+        reasons.forEach { variable, index -> if (remap[index] >= 0) retainedReasons.put(variable, remap[index]) }
+        reasons = retainedReasons
         learned.retain { index -> !dropped[index] }
         reductions++
         droppedClauses += droppable.size - survivors
@@ -169,6 +184,12 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
             val result = learned.attach(index, host)
             if (result !is ComponentResult.Consistent) return result
         }
+        while (rechecks.isNotEmpty()) {
+            val index = rechecks.removeFirst()
+            stages[index] = stages[index] and 2.inv()
+            val result = learned.recheck(index, host)
+            if (result !is ComponentResult.Consistent) return result
+        }
         if (unitsPending) {
             unitsPending = false
             val result = learned.propagateUnits(host)
@@ -192,9 +213,27 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
         return ComponentResult.Consistent
     }
 
+    fun implied(index: Int, literal: Int) {
+        reasons.put(literal ushr 1, index)
+        consumed(index)
+    }
+
+    fun unassigned(variable: Int) {
+        val index = reasons.getOrDefault(variable, -1)
+        if (index < 0) return
+        reasons.remove(variable)
+        queueRecheck(index)
+    }
+
+    private fun queueRecheck(index: Int) {
+        if (stages[index] and 2 != 0) return
+        stages[index] = stages[index] or 2
+        rechecks.addLast(index)
+    }
+
     fun consumed(index: Int) {
-        if (stages[index] != 0) return
-        stages[index] = 1
+        if (stages[index] and 1 != 0) return
+        stages[index] = stages[index] or 1
         lifecycle.note(LearnedKind.Clause, LearnedStage.Consumed)
     }
 

@@ -218,6 +218,21 @@ class SearchLearningTest {
     }
 
     @Test
+    fun `a shared nonunit assertion should be restored over an unchanged root premise`() {
+        val session = SearchSession(emptyList())
+        session.learn(SearchExplanation(intArrayOf(1)))
+        session.propagate()
+        session.push(SearchDecision.Bool(4))
+        session.learn(SearchExplanation(intArrayOf(0, 2)))
+        session.propagate()
+        session.popTo(0)
+
+        session.propagate()
+
+        assertEquals(true, session.boolValue(1))
+    }
+
+    @Test
     fun `a pending attachment should survive suspension of the actual search run`() {
         val session = SearchSession(emptyList())
         session.initialize()

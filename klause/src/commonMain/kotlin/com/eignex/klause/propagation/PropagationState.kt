@@ -1048,9 +1048,7 @@ class PropagationState private constructor(
         try {
             return drainFixpoint(allFactors, initialFactor, initialFactors, cancellation, skipExpensiveBake)
         } finally {
-            if (runCancelled) {
-                while (propQueue.isNotEmpty()) deferLearnedAttachment(propQueue.removeFirst())
-            }
+            while (propQueue.isNotEmpty()) deferLearnedAttachment(propQueue.removeFirst())
             propagationNanos += start.elapsedNow().inWholeNanoseconds
         }
     }
