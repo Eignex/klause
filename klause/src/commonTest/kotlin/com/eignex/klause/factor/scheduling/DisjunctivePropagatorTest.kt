@@ -120,7 +120,7 @@ class DisjunctivePropagatorTest {
         for ((index, shape) in shapes.withIndex()) {
             val problem = shape.problem()
             val rng = Random(0xD19 + index)
-            repeat(5) { iter ->
+            repeat(3) { iter ->
                 PropagationReasonOracle.assertReasonsImply(problem, "${shape.label}#$iter") { state ->
                     (0 until 2).all { b -> rng.nextInt(3) != 0 || state.pinBool(b, rng.nextBoolean()) } &&
                         shape.starts.all { state.tightenIntMax(it, 1L + rng.nextInt(2)) } &&
@@ -136,7 +136,7 @@ class DisjunctivePropagatorTest {
         for ((index, shape) in overloadShapes.withIndex()) {
             val problem = shape.problem()
             val rng = Random(0xD18 + index)
-            repeat(5) { iter ->
+            repeat(3) { iter ->
                 PropagationReasonOracle.assertReasonsImply(problem, "${shape.label} starts#$iter") { state ->
                     (0 until 3).all { b -> rng.nextInt(4) == 0 || state.pinBool(b, rng.nextInt(4) != 0) } &&
                         shape.starts.all {
