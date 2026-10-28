@@ -319,6 +319,23 @@ MDD filtering and explanations; every restriction follows from unconditional sou
 factors, independently of transient domains. Repeated roles and interval tables
 decline this mechanism.
 
+Three ground Tables can also transmit a cycle through columns outside a target
+Table. Each neighbor is indexed by its target columns and the remaining shared
+columns. A target row survives exactly when the two neighbor support sets
+intersect. This streams the completed three-relation join projected back into
+the target, without materializing joined rows or adding search-time state.
+Surviving target rows retain every private column and duplicate occurrence;
+other factors, including AllDifferent over private indices, remain constraints.
+Omitted columns outside the three Tables overapproximate their wider cluster:
+a surviving row certifies support only in these three relations, never source
+satisfiability. Assumptions and transient domains supply no premises.
+
+A call attempts at most 64 cyclic projections, each with 262,144 visits and
+65,536 stored key/support cells, including one cell per set entry. Scope selection,
+indexing, support intersections and row copies share the call allowance. Incomplete
+projections publish nothing. Ordinary Table propagation, explanations and undo
+consume completed restrictions; there is no retained cluster propagator.
+
 Each attempt admits scopes up to 64, tables up to 262,144 cells and diagrams up to
 65,536 states and 131,072 records. Product states and records have the same caps;
 an attempt has 2,097,152 visits, and a call has 8,388,608 visits and 1,048,576 retained

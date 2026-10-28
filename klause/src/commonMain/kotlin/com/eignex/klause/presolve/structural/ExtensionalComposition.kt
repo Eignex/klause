@@ -21,12 +21,16 @@ internal object ExtensionalComposition {
         val states: Int = 65_536,
         val records: Int = 131_072,
         val retainedCells: Int = 1_048_576,
+        val cyclicAttempts: Int = 64,
+        val cyclicWork: Int = 262_144,
+        val cyclicCells: Int = 65_536,
     )
 
     private class Meter(val cancellation: Cancellation, val limits: Limits) {
         var remaining = limits.work
         var pairRemaining = Int.MAX_VALUE
         var retained = 0
+        var cyclicAttempts = 0
 
         fun visit(): Boolean {
             if (remaining <= 0 || pairRemaining <= 0 || cancellation()) return false
@@ -91,6 +95,11 @@ internal object ExtensionalComposition {
                 meter.retained += cells
                 current = next
             }
+            if (current is Table) {
+                val next = intersectCycles(current, candidates.keys.toList(), meter)
+                if (next === ExtensionalIntersection.Refuted) return PassDelta(infeasible = true)
+                if (next is ExtensionalIntersection.Restricted) current = next.factor
+            }
             if (current !== factor) {
                 dropped.add(id)
                 added.add(current)
@@ -98,6 +107,35 @@ internal object ExtensionalComposition {
             if (meter.remaining <= 0 || cancellation()) break
         }
         return PassDelta(dropped.toIntArray(), added)
+    }
+
+    private fun intersectCycles(target: Table, neighbors: List<Table>, meter: Meter): ExtensionalIntersection? {
+        var current = target
+        for (a in neighbors.indices) for (b in a + 1 until neighbors.size) {
+            meter.pairRemaining = Int.MAX_VALUE
+            if (meter.cyclicAttempts >= meter.limits.cyclicAttempts || !meter.visit()) {
+                return if (current === target) null else ExtensionalIntersection.Restricted(current)
+            }
+            val left = neighbors[a]
+            val right = neighbors[b]
+            repeat(left.arity * (right.arity + current.arity)) {
+                if (!meter.visit()) {
+                    return if (current === target) null else ExtensionalIntersection.Restricted(current)
+                }
+            }
+            if (left.xs.none { it in right.xs && it !in current.xs }) continue
+            meter.cyclicAttempts++
+            meter.pairRemaining = meter.limits.cyclicWork
+            val intersection = CyclicTableComposition.intersect(
+                current, left, right, meter::visit, meter.limits.cyclicCells,
+            ) ?: continue
+            if (intersection === ExtensionalIntersection.Refuted) return intersection
+            val next = (intersection as ExtensionalIntersection.Restricted).factor as Table
+            if (next.tuples.size > meter.limits.retainedCells - meter.retained) continue
+            meter.retained += next.tuples.size
+            current = next
+        }
+        return if (current === target) null else ExtensionalIntersection.Restricted(current)
     }
 
     private fun candidates(
