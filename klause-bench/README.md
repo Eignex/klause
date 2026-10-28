@@ -2709,6 +2709,8 @@ It retains original bytes, source and prepared models, runtime/build identities,
 default/aggressive preparation costs and four modulo-three controls. Each preparation
 has twelve seconds and an 825-million work allowance; reaching that allowance does
 not establish completion of every optional pass.
+`controls=3`, `controls=6` or `controls=off` selects a retained control size or
+omits the controls when continuing a source replay.
 
 `replay=true` compares strong native search, conservative source-decision-prefix
 reasons, exact definitions with those same source-only decisions/reasons, and

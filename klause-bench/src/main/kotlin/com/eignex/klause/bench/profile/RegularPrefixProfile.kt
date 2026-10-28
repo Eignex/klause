@@ -34,8 +34,15 @@ import kotlin.time.Duration.Companion.seconds
 internal object RegularPrefixProfile {
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.size in 1..2 && args.first().startsWith("request64="))
-        val replay = args.size == 2 && args.last() == "replay=true"
+        require(args.size in 1..3 && args.first().startsWith("request64="))
+        require(args.drop(1).all { it == "replay=true" || it in setOf("controls=3", "controls=6", "controls=off") })
+        val replay = "replay=true" in args
+        val sizes = when (args.firstOrNull { it.startsWith("controls=") }) {
+            "controls=3" -> listOf(3)
+            "controls=6" -> listOf(6)
+            "controls=off" -> emptyList()
+            else -> listOf(3, 6)
+        }
         val request = Base64.getDecoder().decode(args.first().substringAfter('='))
         require(request.size <= 16 * 1024)
         val sources = Reports.json.parseToJsonElement(request.decodeToString()).jsonArray
@@ -43,7 +50,7 @@ internal object RegularPrefixProfile {
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         out.resolve("request.json").writeBytes(request)
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
-        for (k in listOf(3, 6)) {
+        for (k in sizes) {
             for (allowTwo in listOf(false, true)) {
                 capture(control(k, allowTwo), out.resolve("control-$k-$allowTwo"), replay)
             }
