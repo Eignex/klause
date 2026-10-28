@@ -71,6 +71,18 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         if (!persistentState) engine.propagator.reset()
     }
 
+    // The source-root probe asserts no search restriction; live adoption checks every changed bound.
+    fun retainTrialRoot(probe: PropagationSession): Boolean {
+        val target = sharedNative ?: return false
+        if (!engine.sparseTrialActive || native !== probe || !persistentState ||
+            probe.problem !== engine.problem || target.problem !== engine.problem ||
+            probe.decisionLevel != 0 || target.decisionLevel != 0 || shared?.decisionLevel != 0 ||
+            engine.propagator.state?.depth != 0
+        ) return false
+        native = target
+        return true
+    }
+
     fun localModel() {
         persistentState = false
         currentModel = null

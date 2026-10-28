@@ -15,6 +15,7 @@ import com.eignex.klause.lp.engine.exactRhs
 import com.eignex.klause.lp.engine.forEachRationalColumn
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
@@ -49,6 +50,7 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
     var entries = 0L
     fun decline(reason: String) = SparseLpAdmission(mapOf("Decline$reason" to 1L,
         "PreparationWork" to (entries + rows + columns)))
+    if ((problem as? BakedProblem)?.factorProjections?.builtInRelaxation == false) return decline("Projection")
     if (columns + rows > MAX_DIMENSION) {
         return decline("Shape")
     }

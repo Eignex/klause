@@ -5,10 +5,14 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ProblemSettings
+import com.eignex.klause.lp.RelaxationProjection
+import com.eignex.klause.lp.RelaxationProjectionProvider
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.solver.FactorProjectionProviders
+import com.eignex.klause.solver.RelaxationCapability
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.Cancellation
@@ -18,6 +22,28 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class SparseLpAdmissionTest {
+    @Test
+    fun `unreserved custom projections decline before emission`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 2)),
+            listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1)),
+            settings = ProblemSettings(lpCeilingTableauCells = 1L))
+        var emitted = false
+        val projections = FactorProjectionProviders(relaxation = RelaxationProjectionProvider {
+            RelaxationProjection(RelaxationCapability.SOUND) { _, builder ->
+                emitted = true
+                builder.linearRow(LinearOp.LE, intArrayOf(0), longArrayOf(1), 1)
+            }
+        }).prepare(problem)
+        val sink = SolveStatsSink("custom-projection")
+
+        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1)),
+            LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")), sink,
+            projections = projections).use { }
+
+        assertFalse(emitted)
+        assertEquals(1L, sink.snapshot().lp.sparseTrial["DeclineProjection"])
+    }
+
     @Test
     fun `wide exact scalars decline numerical admission`() {
         val model = LpBuilder().apply {

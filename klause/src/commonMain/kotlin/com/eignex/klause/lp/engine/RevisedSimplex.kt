@@ -477,7 +477,15 @@ internal class RevisedSimplex(
         return buildMap {
             put("ProgressSamples", samples.size.toLong())
             samples.firstOrNull()?.let { put("FirstViolatedBasics", it.violatedBasics.toLong()) }
-            samples.lastOrNull()?.let { put("LastViolatedBasics", it.violatedBasics.toLong()) }
+            samples.lastOrNull()?.let {
+                put("LastViolatedBasics", it.violatedBasics.toLong())
+                put("ProgressPhase" + it.phase.name, 1L)
+            }
+            progressTrace?.let {
+                put("DegenerateSteps", it.degenerateSteps.values.sumOf(Int::toLong))
+                put("BoundFlips", it.boundFlips.values.sumOf(Int::toLong))
+                put("PricedColumns", it.pricedColumns)
+            }
             put("NumericalWork", work.ops)
             put("Pivots", lastPivots.toLong())
             lastTermination?.let { put("Termination" + it.name, 1L) }
