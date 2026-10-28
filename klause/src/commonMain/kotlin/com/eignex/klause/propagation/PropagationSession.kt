@@ -849,7 +849,7 @@ class PropagationSession private constructor(
      *  not the general database, so clause-database introspection routes differently. */
     val usesNativeSat: Boolean get() = state.nativeEngine != null
 
-    /** Current learned-clause count. Used by the engine to decide whether to invoke
+    /** Current learned-constraint count, including PB constraints and integer rows. Used to invoke
      *  [forgetLearnedClauses] based on `BacktrackParams.maxLearnedClauses`. */
     val learnedClauseCount: Int get() = state.nativeEngine?.count ?: state.learnedClauses.size
 

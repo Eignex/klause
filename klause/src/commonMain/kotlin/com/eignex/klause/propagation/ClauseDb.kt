@@ -320,7 +320,7 @@ internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd
     // surviving here indexes past the compacted clause array on the next drain.
     remapQueue(propQueue, remap, refBase)
     remapQueue(atoms.dirtyFactors, remap, refBase)
-    intEvents.remapLearned(remap, refBase)
+    if (learned.integerRows != null) intEvents.remapLearned(remap, refBase)
 
     // The per-variable reason fields record which factor forced each currently-implied
     // value, learned-clause ids included. Level-0 facts — e.g. a permanent blocking nogood

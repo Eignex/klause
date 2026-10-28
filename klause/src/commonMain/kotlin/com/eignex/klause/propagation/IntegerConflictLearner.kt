@@ -98,7 +98,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             if (!sourceRow.holeFree(state, marker[2])) continue
             val proposed = sourceRow.boundFor(state, variable, marker[2]) ?: continue
             val domain = state.intDomains[variable]
-            if (lower && proposed < domain.min || !lower && proposed > domain.max) continue
+            if ((lower && proposed < domain.min) || (!lower && proposed > domain.max)) continue
             latest = BoundEvent(sourceRow, variable, marker[2], key)
         }
         return latest

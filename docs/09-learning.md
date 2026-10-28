@@ -166,6 +166,8 @@ combinations, 64 native levels and 64 stored rows, with bounded duplicate lookup
 Rows share the learned store and integer bounds propagation. Eager reasons freeze
 the historical clause premises without a compactable lazy factor id. Integer bound
 event subscriptions wake rows after undo and are remapped or removed on forgetting.
+Later conflicts use these retained rows' clause explanations; row combination loads
+only original mandatory source rows.
 Only clauses are shared across arms. Row satisfaction tests the complete maximum
 activity; a satisfied endpoint literal cannot discharge the row or certify a root
 contradiction.

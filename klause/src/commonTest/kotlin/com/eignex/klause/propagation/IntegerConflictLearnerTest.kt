@@ -1,6 +1,7 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.LinearPropagator
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.Table
@@ -10,7 +11,9 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
+import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchConflictResolution
+import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchLearnedConflictResult
 import com.eignex.klause.solver.search.SearchResult
@@ -25,6 +28,56 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class IntegerConflictLearnerTest {
+    @Test
+    fun `a full row store should fall back until forgetting releases capacity`() {
+        val native = PropagationSession(Problem(0, 4,
+            arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24), IntDomain(0, 6)), arrayOf(
+                Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+                Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+            ))).apply { enableIntegerRowLearning() }
+        repeat(INTEGER_LEARNING_ROWS) { index ->
+            val row = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(3),
+                longArrayOf(1), intArrayOf(3), LinearOp.LE, 6L + index), useLo = true))
+            native.addLearnedIntegerRow(row, lbd = 3)
+        }
+        assertIs<PropagationResult.Implied>(native.pinIntAtMost(2, 7))
+        val capped = assertIs<PropagationResult.Unsat>(native.pinIntAtLeast(0, 2))
+        assertIs<ConflictAnalyzer.AnalysisResult.Learned>(capped.learnedClause)
+        native.popToLevel(0)
+        native.forgetLearnedClauses { index, _ -> index != 0 }
+        assertIs<PropagationResult.Implied>(native.pinIntAtMost(2, 7))
+
+        val retried = assertIs<PropagationResult.Unsat>(native.pinIntAtLeast(0, 2))
+
+        assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(retried.learnedClause)
+        assertEquals(INTEGER_LEARNING_ROWS - 1, native.explanationState.learned.integerRows?.size)
+    }
+
+    @Test
+    fun `an unavailable shared bound premise should decline native row admission`() {
+        val native = PropagationSession(Problem(0, 3,
+            arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)), arrayOf(
+                Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+                Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+            ))).apply { enableIntegerRowLearning() }
+        val peer = object : SearchComponent {
+            override fun initialize(context: SearchContext): ComponentResult =
+                context.publish(SearchDecision.IntAtMost(2, 7))
+        }
+        val cp = CpSearchComponent(native)
+        val shared = SearchSession(listOf(peer, cp), atoms = SearchAtomRegistry(0))
+        assertIs<ComponentResult.Consistent>(shared.initialize())
+        assertIs<ComponentResult.Conflict>(shared.push(SearchDecision.IntAtLeast(0, 2)))
+        assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(cp.lastConflict?.learnedClause)
+
+        assertFalse(cp.prefersNativeConflictAnalysis)
+
+        val fallback = assertIs<SearchConflictResolution.Backjump>(cp.resolveConflict(shared)).conflict
+        shared.popTo(fallback.decisionLevel)
+        fallback.apply(shared)
+        assertTrue(native.explanationState.learned.integerRows.isNullOrEmpty())
+    }
+
     @Test
     fun `cancellation before row analysis should publish no learned result`() {
         val state = PropagationState(Problem(0, 3,
@@ -87,13 +140,14 @@ class IntegerConflictLearnerTest {
     @Test
     fun `a stored source row should assert and tighten several sibling endpoints`() {
         for (sign in listOf(1, -1)) {
-            for (op in listOf(LinearOp.LE, LinearOp.EQ)) {
+            for ((op, orientation) in listOf(LinearOp.LE to 1, LinearOp.EQ to 1, LinearOp.EQ to -1)) {
                 val native = PropagationSession(Problem(0, 3, arrayOf(
                     IntDomain(if (sign > 0) 0L else -6L, if (sign > 0) 6L else 0L),
                     IntDomain(if (sign > 0) 0L else -12L, if (sign > 0) 12L else 0L),
                     IntDomain(if (sign > 0) 0L else -24L, if (sign > 0) 24L else 0L),
                 ), arrayOf(
-                    Linear(intArrayOf(2 * sign, sign, -sign), intArrayOf(0, 1, 2), op, 0),
+                    Linear(intArrayOf(2 * sign * orientation, sign * orientation, -sign * orientation),
+                        intArrayOf(0, 1, 2), op, 0),
                     Linear(intArrayOf(2 * sign, -sign), intArrayOf(0, 1), LinearOp.LE, 0),
                 )), pbLearning = false).apply { enableIntegerRowLearning() }
                 val cp = CpSearchComponent(native, intArrayOf(4, 7, 9))
