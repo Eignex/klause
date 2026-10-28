@@ -1097,7 +1097,8 @@ traversal after default preparation; it is a separate control. Each preparation
 has four seconds and 100 million phase units, each solve two seconds. Submit the
 profile through the lab with a two-minute containing limit.
 The capture retains source bytes/hashes, prepared objectives, domains, global
-scopes, incumbent sequences, branch states and native work/prune counters. Native
+scopes, incumbent sequences, the first 32 branch states with their active incumbent
+and a truncation flag, and native work/prune counters. Native
 source checks use reconstructed original coordinates; they supply no independent
 proof or witness validation. The input-order control also tests the explicit
 improving query `f <= 10` against existing bounded hole probing and retains the
