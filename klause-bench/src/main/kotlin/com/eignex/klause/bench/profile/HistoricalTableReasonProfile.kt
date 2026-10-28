@@ -25,6 +25,9 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.util.Cancellation
 import com.sun.management.ThreadMXBean
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.io.File
@@ -115,6 +118,10 @@ internal object HistoricalTableReasonProfile {
         val state = native.javaClass.getDeclaredField("state").apply { isAccessible = true }.get(native)
         val flag = state.javaClass.getDeclaredField("historicalTableReasons").apply { isAccessible = true }
         flag.setBoolean(state, enabled)
+        val traceField = state.javaClass.getDeclaredField("arithmeticLearningTrace").apply { isAccessible = true }
+        val trace = Class.forName("com.eignex.klause.propagation.ArithmeticLearningTrace")
+            .getConstructor().newInstance()
+        traceField.set(state, trace)
         val cp = CpSearchComponent(native)
         val shared = SearchSession(listOf(cp), cancellation = stop, atoms = SearchAtomRegistry(problem.numBoolVars))
         val outcomes = ArrayList<String>()
@@ -152,6 +159,7 @@ internal object HistoricalTableReasonProfile {
             .invoke(state) as Long
         shared.popTo(0)
         flag.setBoolean(state, false)
+        traceField.set(state, null)
         return buildJsonObject {
             put("original", codec.encodeToString(original))
             put("prepared", codec.encodeToString(problem))
@@ -166,6 +174,16 @@ internal object HistoricalTableReasonProfile {
             put("aZeroSiblingQ", siblingQ)
             put("learnedCount", learnedCount)
             put("finiteWork", work)
+            put("trace", buildJsonArray {
+                for (event in trace.javaClass.getMethod("getEvents").invoke(trace) as List<*>) {
+                    requireNotNull(event)
+                    add(buildJsonObject {
+                        put("kind", event.javaClass.getMethod("getKind").invoke(event) as String)
+                        put("data", JsonArray((event.javaClass.getMethod("getData").invoke(event) as LongArray)
+                            .map(::JsonPrimitive)))
+                    })
+                }
+            })
             put("cancelled", stop())
         }
     }

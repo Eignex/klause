@@ -11,7 +11,10 @@ internal class HistoricalTableReason(private val state: PropagationState) {
         if (marker === selected) return replacement
         if (selected == null && marker.size == LAZY_PAYLOAD + 4 && marker[1] >= 0 &&
             state.factorAt(marker[1]) is TablePropagator
-        ) selected = marker
+        ) {
+            selected = marker
+            state.arithmeticLearningTrace?.record("table.selected", marker[1].toLong(), marker[2].toLong())
+        }
         return null
     }
 
@@ -23,6 +26,8 @@ internal class HistoricalTableReason(private val state: PropagationState) {
             state, marker.copyOfRange(LAZY_PAYLOAD, marker.size), marker[2], preferred,
         )
         val alternate = replacement ?: return false
+        state.lazyReasonMemo[marker]?.let { state.arithmeticLearningTrace?.clause("table.ordinary-reason", it, state) }
+        state.arithmeticLearningTrace?.clause("table.alternate-reason", alternate, state)
         return state.lazyReasonMemo[marker]?.contentEquals(alternate) == false
     }
 }

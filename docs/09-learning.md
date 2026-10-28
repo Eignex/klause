@@ -56,7 +56,7 @@ range's postings, then checks the deduction's historical domains. Mutable live
 prefixes and explanation caches remain state-local.
 An internal opt-in conflict analysis can retry one unextended ground-table reason
 against the ordinary minimized clause's frozen literals. Reconstruction admits at
-most 256 rows, 4096 cells, 64 columns and 64 retained premises; bound deductions
+most 256 rows, 4096 cells, 64 columns and 64 distinct considered premises; bound deductions
 with more than 62 historical target holes decline. It retains target-domain scope
 premises and chooses only blockers present at the deduction's trail position.
 The retry runs both minimization passes and replaces an asserting ordinary clause

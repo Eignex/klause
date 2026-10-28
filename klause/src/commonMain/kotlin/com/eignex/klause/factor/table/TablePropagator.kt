@@ -198,6 +198,8 @@ internal class TablePropagator(
         if (kind != VALUE && snapshot.domains[col].holeCount > 62) return null
         val out = LitSet()
         if (kind != VALUE) columnLiterals(state, col, snapshot, out)
+        val examined = IntHashSet()
+        for (lit in out.toArray()) examined.add(lit)
         val pick = IntArrayList()
         for (row in 0 until numTuples) {
             state.checkFiniteWork()
@@ -212,6 +214,8 @@ internal class TablePropagator(
                 pick.clear()
                 if (cellAt(state, row, c, snapshot, pick) == Cell.LIVE) continue
                 killed = true
+                if (pick.size > 0) examined.add(pick[0])
+                if (examined.size > 64) return null
                 if (pick.size == 0 || out.has(pick[0])) {
                     chosen = Lit.NONE
                     break
