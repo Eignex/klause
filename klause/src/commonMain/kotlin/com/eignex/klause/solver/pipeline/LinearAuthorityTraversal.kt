@@ -21,6 +21,9 @@ import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
+import com.eignex.klause.solver.evidence.SourceIntegerAggregateSplit
+import com.eignex.klause.solver.evidence.SourceInequality
+import com.eignex.klause.solver.evidence.adjacentIntegerAbove
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
@@ -68,8 +71,13 @@ internal class LinearAuthorityTraversal(
     latestFeedback: Boolean = true,
     feedbackRequest: LinearAuthorityFeedbackRequest? = null,
     composeBooleanBranches: Boolean = false,
+    aggregateBranching: Boolean = false,
 ) : SearchBrancher, SearchBranchProposal, SearchNodePolicy, AutoCloseable {
     override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
+
+    private val aggregateBranches = if (aggregateBranching && !useActiveRows && !composeBooleanBranches &&
+        !useRefutationReuse &&
+        !useRefutationPropagation && !useRefutationResolution) LinearAggregateBranches(budget) else null
 
     private val ownsAuthority = borrowedAuthority == null
     private val authority = borrowedAuthority ?: LinearAuthority(budget, { shape ->
@@ -139,7 +147,10 @@ internal class LinearAuthorityTraversal(
         "numericalRetainedNodes" to retained,
         "numericalLpPreparations" to authority.preparations,
         "numericalLpReuses" to authority.reuses,
-    ) + (feedback?.let { mapOf("numericalFeedbackCollections" to it.collections,
+    ) + (aggregateBranches?.let { mapOf("numericalAggregateBranchWork" to it.work,
+        "numericalAggregateBranchAllocation" to it.allocation,
+        "numericalAggregateBranchProposals" to it.proposals) } ?: emptyMap()) +
+        (feedback?.let { mapOf("numericalFeedbackCollections" to it.collections,
         "numericalFeedbackLateCollections" to it.lateCollections,
         "numericalFeedbackUnavailable" to it.unavailable,
         "numericalFeedbackCutEvaluations" to it.evaluatedCuts,
@@ -166,7 +177,8 @@ internal class LinearAuthorityTraversal(
         retained += 2
         val condition = current.condition
         budget.funding?.charge(0L, 1024L + 256L *
-            (condition.bools.size.toLong() + condition.lower.size + condition.upper.size))
+            (condition.bools.size.toLong() + condition.lower.size + condition.upper.size +
+                condition.integerRows.sumOf { it.supportSize.toLong() + 1L }))
         peakPending = maxOf(peakPending, pending)
     }
     var ray: SourceEvidence? = null
@@ -217,6 +229,15 @@ internal class LinearAuthorityTraversal(
                 if (Lit.isPositive(decision.literal)) split.above else split.below
             }
             is SearchDecision.Theory -> {
+                val aggregate = decision.decision as? AggregateAlternative
+                if (aggregate != null) {
+                    val split = current.split as? CoverageSplit.Aggregate ?: return ComponentResult.Indeterminate
+                    if (aggregate.row != split.row) return ComponentResult.Indeterminate
+                    val selected = if (aggregate.upper) split.below else split.above
+                    selected.assertion = decision
+                    path += context.decisionLevel to selected
+                    return ComponentResult.Consistent
+                }
                 val registered = decision.decision as? RegisteredTheoryDecision
                 val atom = (registered?.payload as? SourceBoundPredicate)?.sourceBound
                 val bound = if (atom != null) {
@@ -489,6 +510,12 @@ internal class LinearAuthorityTraversal(
         }
         if (current.coveredBound != null) return SearchNodeDisposition.Prune
         result.split?.let { (coordinate, threshold) ->
+            aggregateBranches?.propose(branch, cancellation)?.let { row ->
+                current.split = CoverageSplit.Aggregate(row, current.condition)
+                splitCreated()
+                observe("numericalAggregateSplits")
+                return SearchNodeDisposition.Expand
+            }
             val candidate = if (supportBranching != null && numericalFeedback != null)
                 supportBranching.select(numericalFeedback, result.fractional, cancellation)
                 else if (useBranchHistory) branchHistory.select(result.fractional, cancellation)
@@ -524,6 +551,9 @@ internal class LinearAuthorityTraversal(
     }
 
     override fun nextBranch(context: SearchContext): List<SearchDecision>? {
+        (current.split as? CoverageSplit.Aggregate)?.let { split ->
+            return listOf(true, false).map { SearchDecision.Theory(AggregateAlternative(split.row, it)) }
+        }
         val split = current.split as? CoverageSplit.Integer ?: return null
         if (propagateRefutations) {
             return integerAtom(context, split.coordinate, split.threshold)?.alternatives()
@@ -596,8 +626,13 @@ internal class LinearAuthorityTraversal(
 
     private fun checked(claim: SourceClaim, proof: SourceDerivation): SourceEvidence? {
         val evidence = SourceEvidence(source.scope, claim, proof)
+        val verification = if (aggregateBranches == null) cancellation else Cancellation {
+            budget.funding?.charge(1L)
+            observe("numericalAggregateCoverageWork")
+            cancellation() || budget.funding?.exhausted == true
+        }
         return evidence.takeIf {
-            SourceEvidenceVerifier(proofSource).verify(it, cancellation) == SourceEvidenceCheck.Checked
+            SourceEvidenceVerifier(proofSource).verify(it, verification) == SourceEvidenceCheck.Checked
         }
     }
 }
@@ -605,6 +640,8 @@ internal class LinearAuthorityTraversal(
 private data class IntegerAlternative(
     val coordinate: SourceCoordinate, val threshold: BigFraction, val upper: Boolean,
 ) : SearchTheoryDecision
+
+private data class AggregateAlternative(val row: SourceInequality, val upper: Boolean) : SearchTheoryDecision
 
 private class CoverageNode(val condition: SourceCondition) {
     var assertion: SearchDecision? = null
@@ -634,6 +671,7 @@ private class CoverageNode(val condition: SourceCondition) {
                 is CoverageSplit.Boolean -> SourceDerivation.BooleanSplit(children.id, below.proof, above.proof)
                 is CoverageSplit.Integer -> SourceDerivation.IntegerSplit(children.coordinate,
                     children.threshold, below.proof, above.proof)
+                is CoverageSplit.Aggregate -> SourceIntegerAggregateSplit(children.row, below.proof, above.proof)
             }
             return BoundCoverage(selected, proof)
         }
@@ -662,6 +700,7 @@ private class CoverageNode(val condition: SourceCondition) {
                 is CoverageSplit.Boolean -> SourceDerivation.BooleanSplit(children.id, below, above)
                 is CoverageSplit.Integer -> SourceDerivation.IntegerSplit(children.coordinate,
                     children.threshold, below, above)
+                is CoverageSplit.Aggregate -> SourceIntegerAggregateSplit(children.row, below, above)
             }
         }
         val evidence = result?.evidence ?: return null
@@ -682,6 +721,8 @@ private sealed class CoverageSplit(below: SourceCondition, above: SourceConditio
     val above = CoverageNode(above)
     class Boolean(val id: Int, condition: SourceCondition) : CoverageSplit(
         condition.pin(id, false), condition.pin(id, true))
+    class Aggregate(val row: SourceInequality, condition: SourceCondition) :
+        CoverageSplit(condition.integerBound(row), condition.integerBound(row.adjacentIntegerAbove()))
     class Integer(val coordinate: SourceCoordinate, val threshold: BigFraction, condition: SourceCondition,
         val fractional: Pair<SourceCoordinate, BigFraction>? = null) :
         CoverageSplit(condition.bound(coordinate, threshold, true),

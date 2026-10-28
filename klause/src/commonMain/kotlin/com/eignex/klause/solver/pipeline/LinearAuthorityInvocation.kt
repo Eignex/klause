@@ -59,6 +59,7 @@ internal class LinearAuthorityInvocation(
     onNumericalFeedback: ((SourceNumericalFeedbackResult) -> Unit)? = null,
     latestFeedback: Boolean = true,
     feedbackRequest: LinearAuthorityFeedbackRequest? = null,
+    aggregateBranching: Boolean = false,
 ) : AutoCloseable {
     init {
         require(borrowedAuthority?.funding == null || borrowedAuthority.funding === funding) {
@@ -106,7 +107,7 @@ internal class LinearAuthorityInvocation(
         useRefutationResolution = params.sourceRefutationResolution, useSupportBranching = supportBranching,
         pointCuts = boundOrdered && params.sourcePointCuts, onNumericalFeedback = onNumericalFeedback,
         aggregateCuts = boundOrdered && params.sourceAggregateCuts, latestFeedback = latestFeedback,
-        feedbackRequest = feedbackRequest)
+        feedbackRequest = feedbackRequest, aggregateBranching = aggregateBranching)
     private val session = SearchComponentSet(listOf(component)).session(params.maxLeaves, stop,
         atoms = if (params.sourceRefutationPropagation || params.sourceRefutationResolution) SearchAtomRegistry(
             context.coordinates.filter {

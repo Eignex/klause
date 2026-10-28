@@ -53,6 +53,17 @@ internal fun SourceCondition.checkWitness(
             return SourceEvidenceCheck.Rejected("witness violates an invocation upper bound")
         }
     }
+    for (row in integerRows) {
+        var activity = BigFraction.ZERO
+        for ((coordinate, coefficient) in row.coefficients) {
+            arithmetic.arithmetic.step()
+            if (coordinate.kind != SourceCoordinate.Kind.Integer || !sample.declares(coordinate)) {
+                return SourceEvidenceCheck.Rejected("aggregate restriction references an undeclared integer")
+            }
+            activity += coefficient * BigFraction.of(sample.exactIntValue(coordinate.id), BIG_ONE)
+        }
+        if (activity > row.rhs) return SourceEvidenceCheck.Rejected("witness violates an integer aggregate restriction")
+    }
     return SourceEvidenceCheck.Checked
 }
 

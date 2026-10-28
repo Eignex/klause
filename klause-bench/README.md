@@ -104,6 +104,17 @@ Arm values are `solve-one` options; `param.<name>` becomes `--param <name>=<valu
 
 ## Selection and named sets
 
+`integer-aggregate-v1` fixes three self-authored SMT-LIB controls for primitive
+row-derived integer branching. The [fixture notes](smoke-corpus/integer-aggregate-v1/README.md)
+state their mathematical expectations and source provenance.
+`bench.profile.IntegerAggregateBranches` accepts `problem=NAME sha256=HEX
+aggregate=true|false cuts=true|false` for one frozen identity. It retains original
+bytes, ordinary source setup, the original IR affine context and a five-second,
+256-operation internal numerical traversal. Reports separate native original-source
+coverage from independent proof checking, and retain proposal, verification,
+LP, construction and modeled allocation costs. This instrumented mechanism probe
+supplies no whole-CLI timing or default-routing admission.
+
 `nonlinear-integer-residues-v1` and its matching
 `smtlib-nonlinear-integer-residues-v1` suite retain ten synthetic multivariate
 integer equality controls. Their [notes](smoke-corpus/nonlinear-integer-residues-v1/README.md)

@@ -807,6 +807,20 @@ a balanced gain estimate to choose a coordinate; absent, nonfinite or all-zero e
 retain source order. These estimates guide exhaustive splits only and supply no
 pruning or proof authority. Indicator splits and integral strict-limit proposals
 do not train fractional history.
+
+An internal aggregate branch policy considers paired active integer rows with
+32 or fewer terms. It rounds coefficient ratios at four scales, divides out their
+integer gcd, and uses exact shifted-coordinate bounds to admit only a primitive
+direction whose feasible activity lies strictly between adjacent integers.
+Missing shift bounds retain coordinate branching. Open coordinates use one-sided
+bounds directly. The policy has 128-row, 32-attempt, 16,384-work and 1 MiB modeled
+allocation limits per invocation, with 128-bit inputs and 512-bit intermediate
+fractions. Failed attempts debit the containing LP allowance. The two enforced
+aggregate restrictions stay in the coverage tree and original-source checker.
+It is disabled by default and declines active-row and refutation-reuse modes;
+finite enumeration and the exact theory's Hermite branch order retain their own
+owners.
+
 `NumericalLinearRequest.solve` serves MPS through the same numerical authority, and
 these adapters never confer source semantics on a rounded or tolerance model.
 

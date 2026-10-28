@@ -39,6 +39,8 @@ class SourceCondition(
     lower: Map<SourceCoordinate, BigFraction> = emptyMap(),
     upper: Map<SourceCoordinate, BigFraction> = emptyMap(),
 ) {
+    private var capturedIntegerRows: Set<SourceInequality> = emptySet()
+    internal val integerRows: Set<SourceInequality> get() = capturedIntegerRows.toSet()
     private val capturedBools = bools.toMap()
     private val capturedLower = lower.toMap()
     private val capturedUpper = upper.toMap()
@@ -57,23 +59,31 @@ class SourceCondition(
     internal fun implies(other: SourceCondition): Boolean =
         other.capturedBools.all { (id, value) -> capturedBools[id] == value } &&
             other.capturedLower.all { (id, value) -> capturedLower[id]?.let { it >= value } == true } &&
-            other.capturedUpper.all { (id, value) -> capturedUpper[id]?.let { it <= value } == true }
+            other.capturedUpper.all { (id, value) -> capturedUpper[id]?.let { it <= value } == true } &&
+            capturedIntegerRows.containsAll(other.capturedIntegerRows)
 
     internal fun pin(id: Int, value: Boolean): SourceCondition =
-        SourceCondition(capturedBools + (id to value), capturedLower, capturedUpper)
+        SourceCondition(capturedBools + (id to value), capturedLower, capturedUpper).withRows(capturedIntegerRows)
 
     internal fun bound(id: SourceCoordinate, value: BigFraction, upper: Boolean): SourceCondition =
         if (upper) SourceCondition(capturedBools, capturedLower, capturedUpper + (id to
-            (capturedUpper[id]?.let { if (it < value) it else value } ?: value)))
+            (capturedUpper[id]?.let { if (it < value) it else value } ?: value))).withRows(capturedIntegerRows)
         else SourceCondition(capturedBools, capturedLower + (id to
             (capturedLower[id]?.let { if (it > value) it else value } ?: value)), capturedUpper)
+            .withRows(capturedIntegerRows)
+
+    internal fun integerBound(row: SourceInequality): SourceCondition =
+        SourceCondition(capturedBools, capturedLower, capturedUpper).withRows(capturedIntegerRows + row)
+
+    private fun withRows(rows: Set<SourceInequality>): SourceCondition = apply { capturedIntegerRows = rows }
 
     override fun equals(other: Any?): Boolean = other is SourceCondition &&
         capturedBools == other.capturedBools && capturedLower == other.capturedLower &&
-            capturedUpper == other.capturedUpper
+            capturedUpper == other.capturedUpper && capturedIntegerRows == other.capturedIntegerRows
 
     override fun hashCode(): Int =
-        31 * (31 * capturedBools.hashCode() + capturedLower.hashCode()) + capturedUpper.hashCode()
+        31 * (31 * (31 * capturedBools.hashCode() + capturedLower.hashCode()) + capturedUpper.hashCode()) +
+            capturedIntegerRows.hashCode()
 }
 
 

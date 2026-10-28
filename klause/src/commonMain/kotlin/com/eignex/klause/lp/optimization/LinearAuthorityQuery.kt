@@ -11,6 +11,7 @@ import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceInequality
+import com.eignex.klause.solver.evidence.SourceIntegerRowAssumption
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.integerPinBounds
 import com.eignex.klause.util.Cancellation
@@ -108,6 +109,10 @@ internal class LinearAuthorityQuery private constructor(
                 cited += claim.inequality to SourceDerivation.Import(evidence)
             }
             val condition = source.scope.condition
+            for (row in condition.integerRows) {
+                if (cancellation()) return null
+                cited += row to SourceIntegerRowAssumption(row)
+            }
             for ((upper, bounds) in listOf(false to condition.lower, true to condition.upper)) {
                 val sign = if (upper) BigFraction.ONE else BigFraction.MINUS_ONE
                 for ((id, value) in bounds) cited += SourceInequality(mapOf(id to sign), value * sign) to
