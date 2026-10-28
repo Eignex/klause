@@ -40,11 +40,11 @@ internal fun Regular.emitLpRelaxation(builder: RelaxationBuilder) {
         val box = builder.rootDomain(seq[t])
         val live = builder.liveDomain(seq[t])
         reach[t].forEach { state ->
-            (1..s).forEach { symbol ->
+            for (symbol in 1..s) {
                 val sym = symbol.toLong()
-                if (sym !in box) return@forEach
+                if (sym !in box) continue
                 val nxt = delta(state, sym)
-                if (nxt == 0) return@forEach
+                if (nxt == 0) continue
                 // The arc is present while symbol sym stays in seq[t]'s live domain.
                 val col = builder.auxColumn(
                     0L,

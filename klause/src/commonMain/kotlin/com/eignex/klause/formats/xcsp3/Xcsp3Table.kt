@@ -9,6 +9,7 @@ import com.eignex.klause.lowering.trueLit
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.LongHashSet
+import com.eignex.klause.util.binarySearchLong
 
 // `<extension>` (positive/negative table) lowering for the XCSP3 front-end.
 //
@@ -92,7 +93,7 @@ internal fun Compiler.Builder.postConflictComplement(vars: IntArray, rows: Short
         var code = 0L
         var inDomain = true
         for (c in 0 until arity) {
-            val idx = doms[c].binarySearch(rows.lo[r * arity + c])
+            val idx = doms[c].binarySearchLong(rows.lo[r * arity + c])
             if (idx < 0) {
                 inDomain = false
                 break
