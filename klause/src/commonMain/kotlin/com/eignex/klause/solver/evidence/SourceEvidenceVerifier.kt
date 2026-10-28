@@ -201,7 +201,7 @@ class SourceEvidenceVerifier(
                 is SourceIntegerAggregateSplit -> {
                     val row = derivation.below
                     if (!validIntegerRow(row)) return reject(
-                        "aggregate coverage requires integral activity over declared integers and an integral threshold")
+                        "aggregate coverage requires declared integer activity and an integral threshold")
                     return both(claim(claim, derivation.whenBelow, scope.copy(condition =
                         scope.condition.integerBound(row)), depth + 1)) {
                         claim(claim, derivation.whenAbove, scope.copy(condition =

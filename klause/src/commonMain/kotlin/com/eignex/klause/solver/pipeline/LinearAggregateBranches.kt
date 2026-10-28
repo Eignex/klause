@@ -33,7 +33,10 @@ internal class LinearAggregateBranches(private val budget: SourceLpBudget) {
 
     private fun spend(units: Long, bytes: Long = 0L): Boolean {
         if (units > 16_384L - work || budget.funding?.paused == true ||
-            bytes > 1_048_576L - allocation) return false
+            bytes > 1_048_576L - allocation
+        ) {
+                return false
+            }
         work += units
         allocation += bytes
         budget.funding?.charge(units, bytes)
@@ -65,7 +68,10 @@ internal class LinearAggregateBranches(private val budget: SourceLpBudget) {
                 coefficients.keys.any { it.kind != SourceCoordinate.Kind.Integer } ||
                 (coefficients.values + row.rhs).any {
                     it.num.magnitudeBitLength() > 128 || it.den.magnitudeBitLength() > 128
-                }) continue
+                }
+            ) {
+                    continue
+                }
             val opposite = coefficients.mapValues { it.value.negated() }
             if (!spend(rows.size.toLong(), 64L * (coefficients.size + rows.sumOf { it.supportSize }))) return null
             val lower = rows.filter { !it.strict && it.coefficients == opposite }.map { it.rhs }.reduceOrNull(::minimum)
@@ -126,7 +132,11 @@ internal class LinearAggregateBranches(private val budget: SourceLpBudget) {
                 val threshold = BigFraction.of(formUpper.negated().ceilInteger().negate(), BIG_ONE)
                 if (formLower <= threshold || threshold.num.magnitudeBitLength() > 128) continue
                 val proposed = SourceInequality(form, threshold)
-                if (proposed in condition.integerRows || proposed.adjacentIntegerAbove() in condition.integerRows) continue
+                if (proposed in condition.integerRows ||
+                    proposed.adjacentIntegerAbove() in condition.integerRows
+                ) {
+                        continue
+                    }
                 proposals++
                 return proposed
             }

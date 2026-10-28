@@ -114,6 +114,8 @@ bytes, ordinary source setup, the original IR affine context and a five-second,
 coverage from independent proof checking, and retain proposal, verification,
 LP, construction and modeled allocation costs. This instrumented mechanism probe
 supplies no whole-CLI timing or default-routing admission.
+`hermite=true` instead records one actual branch from the delivered exact integer
+component, with no global verdict claim.
 
 `nonlinear-integer-residues-v1` and its matching
 `smtlib-nonlinear-integer-residues-v1` suite retain ten synthetic multivariate
@@ -8533,3 +8535,60 @@ undo the delivered opt-in capability, change pure-Boolean PB admission, or deter
 the separate guarded, Element, hole or recursive-row hypotheses. No broader source
 campaign is required by this negative. Failed lint checks and the seed-hook compile
 correction are retained with their CI logs; they executed no accepted new replay.
+
+### Primitive aggregate partitions
+
+[Preparation 9021](https://lab.eignex.com/jobs/9021), at `e497185270`, retains
+all three frozen `integer-aggregate-v1` identities, seed 1, P1, exact semantics and
+five-second budgets on Linux/amd64. Ordinary preparation leaves search in both gap
+controls: finite-box and initially open inputs take 25 and 165 native CP nodes,
+respectively, versus 16 and 375 with optional presolve disabled. Source bound
+inference selects finite CP for both; the gcd control is refuted before search
+with 117 preparation work and zero probes. These native work units are separate
+from numerical authority work. [9010](https://lab.eignex.com/jobs/9010) contains
+CLI usage errors from an MPS-only traversal option and supplies no solver outcomes.
+
+The original-IR numerical comparisons at `9f2dbec62c` use the same frozen bytes,
+zero objective, single observed processor, five-second solve deadline and
+256-operation allowance, with checked source cuts enabled in both arms:
+[open coordinate 9044](https://lab.eignex.com/jobs/9044),
+[open aggregate 9045](https://lab.eignex.com/jobs/9045),
+[finite-box coordinate 9054](https://lab.eignex.com/jobs/9054) and
+[finite-box aggregate 9055](https://lab.eignex.com/jobs/9055).
+Library, harness, runtime/options and Kotlin dependency fingerprints match.
+No arm retains a cut; complete row scans find no gcd rounding opportunity.
+
+| Source | LP operations, coordinate to aggregate | Total funded work | Total modeled allocation bytes |
+|---|---:|---:|---:|
+| Finite box | 251 to 3 | 839890 to 15459 | 307348 to 38532 |
+| Open nonnegative | 256 to 3 | 871377 to 14553 | 562580 to 38020 |
+
+Both aggregate arms consume one split, refute both LP children and pass a fresh
+original-IR root check. The finite control also has checked root coverage; the
+open control exhausts its operation allowance with 129 pending leaves. The open
+partition is `sum(x(i)) <= 4` against `sum(x(i)) >= 5`; the finite partition reverses
+those alternatives through `-sum(x(i)) <= -5`. Both original SMT IRs retain open
+integer declarations with explicit bound rows; the numerical invocation creates
+no finite CP domains. A unit control separately covers declared finite domains.
+
+The proposal itself spends 741/586 work and 10880/10368 modeled bytes on finite/open
+inputs. Final coverage adds 140/143 work. Each aggregate arm prepares three LP
+matrices with no reuse; the coordinate arms prepare one and reuse it 250/255 times.
+Total funded costs above include those construction and tree costs. Working LP
+rows rise from two to three; the aggregate LP allocation component rises from
+6804 to 24068 modeled bytes. Reports retain parsing, ordinary setup, context,
+authority construction, solving, fresh checking and disposal intervals separately.
+These JFR-instrumented observations establish bounded numerical proof and cost
+benefit, without a whole-CLI timing, physical-memory or automatic-owner claim.
+
+[Exact-theory inspection 9056](https://lab.eignex.com/jobs/9056) retains the actual
+first Hermite branch on the open source: `-x(7) <= -5` against `-x(7) >= -4`.
+It is coordinate-aligned and supplies no global proof or full-search comparison.
+The aggregate family remains internal and disabled by default. Its applicability
+is limited to admitted thin paired rows with checked shift bounds; mixed rows,
+missing sides and unsupported semantic or affine transfers decline. Tests cover
+fractional-form rejection, Boolean authority, scoped imports, guarded feasible
+alternatives, cancellation, shared allowances and backjump/restart replay.
+The root checks are native original-IR derivation checks; there is no exported or
+independently checked UNSAT certificate. Raw receipts remain outside Git under
+`klause-evidence/campaigns/integer-aggregate-3793/`.

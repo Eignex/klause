@@ -30,14 +30,14 @@ import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SourceBoundPredicate
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.util.Cancellation
-import java.io.File
-import java.lang.management.ManagementFactory
-import kotlin.time.Duration.Companion.seconds
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import java.lang.management.ManagementFactory
+import kotlin.time.Duration.Companion.seconds
 
 internal object IntegerAggregateBranches {
     @JvmStatic
@@ -60,14 +60,30 @@ internal object IntegerAggregateBranches {
         val parsingNs = System.nanoTime() - parsingStarted
         val original = parsed.source.originalSource as Problem
         val setupStarted = System.nanoTime()
-        val prepared = SourceSetup.prepare(SourceSetupRequest(parsed.source, ExecutionOperation.SATISFY,
-            FiniteEngine.BACKTRACK, cancellation = preparationStop))
+        val prepared = SourceSetup.prepare(
+            SourceSetupRequest(
+            parsed.source,
+            ExecutionOperation.SATISFY,
+            FiniteEngine.BACKTRACK,
+            cancellation = preparationStop,
+        )
+        )
         val setupNs = System.nanoTime() - setupStarted
         val contextStarted = System.nanoTime()
-        val scope = SourceScope(SourceRevision(sha256(bytes), "klause-ir-exact-v1"),
-            objective = SourceObjective("constant-zero", ObjectiveSense.MINIMIZE))
-        val context = checkNotNull(original.sourceProofContext(scope, LinearObjective(
-            LongArray(original.numBoolVars), LongArray(original.numIntVars)), preparationStop))
+        val scope = SourceScope(
+            SourceRevision(sha256(bytes), "klause-ir-exact-v1"),
+            objective = SourceObjective("constant-zero", ObjectiveSense.MINIMIZE),
+        )
+        val context = checkNotNull(
+            original.sourceProofContext(
+                scope,
+                LinearObjective(
+            LongArray(original.numBoolVars),
+            LongArray(original.numIntVars),
+        ),
+            preparationStop
+            )
+        )
         val contextNs = System.nanoTime() - contextStarted
         Reports.writeJson(out.resolve("native-system.json").path, NumericalFrontierSnapshot.system(context))
         if (options["hermite"]?.toBooleanStrict() == true) {
@@ -75,11 +91,19 @@ internal object IntegerAggregateBranches {
             return
         }
         val solveStop = Cancellation.after(5.seconds)
-        val params = TheoryParams(timeout = solveStop, randomSeed = 1L, sourceCuts = cuts,
-            sourceLpOperations = 256)
+        val params = TheoryParams(
+            timeout = solveStop,
+            randomSeed = 1L,
+            sourceCuts = cuts,
+            sourceLpOperations = 256,
+        )
         val constructionStarted = System.nanoTime()
-        val invocation = NumericalFrontierSnapshot.open(context, params, frontier = true,
-            aggregateBranching = aggregate)
+        val invocation = NumericalFrontierSnapshot.open(
+            context,
+            params,
+            frontier = true,
+            aggregateBranching = aggregate,
+        )
         val constructionNs = System.nanoTime() - constructionStarted
         val started = System.nanoTime()
         var report: JsonObject
@@ -116,74 +140,111 @@ internal object IntegerAggregateBranches {
                 put("processors", Runtime.getRuntime().availableProcessors())
                 put("ordinaryRoute", prepared.route.javaClass.simpleName)
                 put("preparedExecution", prepared.preparedPlan?.kind?.name)
-                put("originalFiniteIntegers", (0 until original.numIntVars).count { original.intDomainOrNull(it) != null })
-                put("originalOpenIntegers", (0 until original.numIntVars).count { original.intDomainOrNull(it) == null })
+                put(
+                    "originalFiniteIntegers",
+                    (0 until original.numIntVars).count { original.intDomainOrNull(it) != null },
+                )
+                put(
+                    "originalOpenIntegers",
+                    (0 until original.numIntVars).count { original.intDomainOrNull(it) == null },
+                )
                 put("operations", stats.smt.sourceLp.operations)
                 split?.let { row ->
-                    put("aggregateBelow", buildJsonObject {
+                    put(
+                        "aggregateBelow",
+                        buildJsonObject {
                         put("rhs", row.rhs.toString())
-                        put("coefficients", buildJsonObject {
+                        put(
+                            "coefficients",
+                            buildJsonObject {
                             row.coefficients.forEach { (id, value) -> put("${id.kind}/${id.id}", value.toString()) }
-                        })
-                    })
+                        }
+                        )
+                    }
+                    )
                 }
-                put("stages", buildJsonObject {
+                put(
+                    "stages",
+                    buildJsonObject {
                     stats.smt.completeSearchStages.orEmpty().toSortedMap().forEach { (key, value) -> put(key, value) }
-                })
+                }
+                )
                 put("sourceLp", stats.smt.sourceLp.toString())
                 put("javaVersion", System.getProperty("java.version"))
                 put("os", System.getProperty("os.name"))
                 put("arch", System.getProperty("os.arch"))
-                put("jvmOptions", buildJsonArray {
+                put(
+                    "jvmOptions",
+                    buildJsonArray {
                     ManagementFactory.getRuntimeMXBean().inputArguments.forEach { add(JsonPrimitive(it)) }
-                })
+                }
+                )
             }
         } finally {
             val disposalStarted = System.nanoTime()
             (invocation as AutoCloseable).close()
             disposalNs = System.nanoTime() - disposalStarted
         }
-        Reports.writeJson(out.resolve("report.json").path, buildJsonObject {
+        Reports.writeJson(
+            out.resolve("report.json").path,
+            buildJsonObject {
             report.forEach { (key, value) -> put(key, value) }
             put("disposalNs", disposalNs)
-        })
+        }
+        )
     }
 
     private fun inspectHermite(original: Problem, out: File, hash: String) {
         val stop = Cancellation.after(5.seconds)
         ExactLiraSearchComponent(original).use { component ->
             val session = SearchComponentSet(listOf(component)).session(
-                maxChecks = 256, cancellation = stop, atoms = SearchAtomRegistry(original.numBoolVars))
+                maxChecks = 256,
+                cancellation = stop,
+                atoms = SearchAtomRegistry(original.numBoolVars),
+            )
             val initialized = session.initialize()
             val checked = session.check()
             val branches = component.nextBranch(session)
-            Reports.writeJson(out.resolve("hermite.json").path, buildJsonObject {
+            Reports.writeJson(
+                out.resolve("hermite.json").path,
+                buildJsonObject {
                 put("revision", Reports.readGitSha())
                 put("originalSha256", hash)
                 put("scope", "direct-exact-theory-first-branch")
                 put("globalVerdictClaim", false)
                 put("initialization", initialized.toString())
                 put("rootCheck", checked.toString())
-                put("alternatives", buildJsonArray {
+                put(
+                    "alternatives",
+                    buildJsonArray {
                     branches.orEmpty().forEach { decision ->
-                        val payload = ((decision as? SearchDecision.Theory)?.decision as? RegisteredTheoryDecision)?.payload
-                        val atom = (payload as? SourceBoundPredicate)?.sourceBound
-                        add(buildJsonObject {
+                        val theory = (decision as? SearchDecision.Theory)?.decision as? RegisteredTheoryDecision
+                        val atom = (theory?.payload as? SourceBoundPredicate)?.sourceBound
+                        add(
+                            buildJsonObject {
                             put("kind", decision.javaClass.simpleName)
                             put("threshold", atom?.threshold?.toString())
                             put("upper", atom?.upper)
-                            put("terms", buildJsonArray {
+                            put(
+                                "terms",
+                                buildJsonArray {
                                 atom?.terms.orEmpty().forEach { term ->
-                                    add(buildJsonObject {
+                                    add(
+                                        buildJsonObject {
                                         put("source", term.source.toString())
                                         put("coefficient", term.coefficient.toString())
-                                    })
+                                    }
+                                    )
                                 }
-                            })
-                        })
+                            }
+                            )
+                        }
+                        )
                     }
-                })
-            })
+                }
+                )
+            }
+            )
             session.popTo(0)
         }
     }
