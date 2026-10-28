@@ -7094,3 +7094,18 @@ support unchanged complete-check accounting, with no partial-policy benefit or
 throughput claim. Useful captured conflicts qualify the bounded internal consumer;
 inactive-state cost and original-source applicability keep automatic activation
 disabled.
+
+### Boolean conflict locality
+
+`MixedPbLocalityProfile` runs twelve tiny retained-projection controls: four-hole
+counting with four/five pigeons, pure Boolean/unrelated finite integer/connected
+finite integer, and clause/PB learning. The connection is `b0 iff x0 <= 5` with
+`x0` in `0..10`. Direct finite construction excludes presolve, binary substitution
+and LP preparation. The profile reports stored PB constraints and later Boolean
+pins whose factor reason is a stored PB constraint, alongside decisions, backjumps,
+finite work, elapsed time and current-thread allocations. Reflection reads existing
+internal reason identities without changing propagation. Pin observations can repeat
+across commits and are not a count of distinct deductions. Feasible verdicts have
+native source checks only; these controls provide no independent proof/witness check
+or corpus speedup estimate. Run once as a bounded lab profile; broader/default
+admission needs a separately authorized matched study.
