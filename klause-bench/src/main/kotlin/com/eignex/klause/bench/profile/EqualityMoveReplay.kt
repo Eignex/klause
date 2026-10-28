@@ -63,9 +63,14 @@ internal object EqualityMoveReplay {
         val objective = requireNotNull(parsed.objective).toLinearObjective()
         val center = Sample(booleanArrayOf(), options.getValue("center").split(',').map(String::toLong).toLongArray())
         check(FiniteConflictSelection.checkSource(source, center, stop))
+        val attachment = if (parsed.definedVars.isEmpty()) {
+            SourceAttachment(parsed.problem, parsed.definitionHints)
+        } else {
+            SourceAttachment(parsed.problem, parsed.definedVars, emptyList(), parsed.definitionHints)
+        }
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(parsed.problem, parsed.definitionHints),
+            attachment,
             ExecutionOperation.OPTIMIZE,
             FiniteEngine.LOCAL_SEARCH,
             objective = objective,
