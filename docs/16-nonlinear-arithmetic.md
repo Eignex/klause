@@ -55,8 +55,14 @@ conjunctions, with shared original integer coordinates across every atom. It
 evaluates the typed expression DAG over rings modulo 2, 3, 4, 5 and 8 without
 expanding products or powers. Positive exact denominators at each circuit node
 clear rational coefficients through integer edge scales; no ring division or
-field inference is used. Exhausting a ring without a shared support refutes the
-source. Surviving residue support supplies no integer witness or proof.
+field inference is used. Before shared-tuple enumeration, each node receives a
+bounded overapproximating residue image in every selected ring. Sums and products
+combine independent operand images, conservatively losing alias correlations;
+powers map each base residue by modular squaring. A completed disjoint scaled
+equality image refutes the source. Overlapping images supply no fact and retain
+shared-tuple enumeration for cross-atom correlations. Exhausting a ring without a
+shared support also refutes the source. Surviving support supplies no integer
+witness or proof.
 Guarded, negated and order predicates supply no residue premises; an equality
 with real or auxiliary support declines the check. Unary-only systems remain
 with root admission.
@@ -134,7 +140,8 @@ Residue checks run once per cursor entry under the containing arithmetic allowan
 They use a private 65,536-step ceiling, at most 16,384 modeled storage cells, and
 4,096-bit coefficients and cleared denominators; configured polynomial coefficient
 and matrix ceilings further limit storage. Formula admission, DAG preparation,
-denominator work and shared tuple evaluation all charge the containing meter.
+denominator work, image storage and set operations, and shared tuple evaluation
+all charge the containing meter.
 Private ceilings decline without proof; containing cancellation or exhaustion stops
 the cursor. Completed checks remain inside that cursor and use no numeric window
 or Boolean pin as a residue premise, so no conditional refutation can escape to a
