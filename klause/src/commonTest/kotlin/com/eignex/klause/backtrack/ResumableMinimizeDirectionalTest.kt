@@ -24,7 +24,7 @@ import kotlin.test.assertTrue
 
 class ResumableMinimizeDirectionalTest {
     @Test
-    fun `finite search consumes both directional child gains before exhausting component rejected leaves`() {
+    fun `finite search consumes both directional gains across cooperative slices`() {
         val blocks = 4
         val variables = blocks * 3
         val factors = ArrayList<Factor>()
@@ -48,15 +48,21 @@ class ResumableMinimizeDirectionalTest {
             }) },
         )
 
-        val result = BacktrackSolver(problem).minimize(
-            LinearObjective(intCoefficients = LongArray(variables) { 1L }), params,
-        )
+        val objective = LinearObjective(intCoefficients = LongArray(variables) { 1L })
+        ResumableMinimize(BacktrackSolver(problem), objective, params).use { search ->
+            var slices = 0
+            while (slices++ < 64 && !search.isDone &&
+                (search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes?.get("CONSUMED") ?: 0L) == 0L
+            ) {
+                search.runSlice(Cancellation.Never, 1000L, 8L) {}
+            }
 
-        val observations = result.stats.lp.phases.getValue("DIRECTIONAL_BRANCH_NODE").outcomes
-        val diagnostic = "$observations; solves=${result.stats.lp.solves.sum}; prunes=${result.stats.lp.pruned.sum}"
-        assertTrue((observations["DOWN"] ?: 0L) >= 2L, diagnostic)
-        assertTrue((observations["UP"] ?: 0L) >= 2L, diagnostic)
-        assertTrue((observations["CONSUMED"] ?: 0L) > 0L, diagnostic)
+            val observations = search.stats.lp.phases.getValue("DIRECTIONAL_BRANCH_NODE").outcomes
+            val diagnostic = "$observations; solves=${search.stats.lp.solves.sum}"
+            assertTrue((observations["DOWN"] ?: 0L) >= 2L, diagnostic)
+            assertTrue((observations["UP"] ?: 0L) >= 2L, diagnostic)
+            assertTrue((observations["CONSUMED"] ?: 0L) > 0L, diagnostic)
+        }
     }
 
     @Test
