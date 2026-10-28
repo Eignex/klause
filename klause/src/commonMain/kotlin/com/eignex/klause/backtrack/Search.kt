@@ -239,7 +239,7 @@ internal class CpSatisfactionTraversal(
             components.forEach(resources::ownComponent)
             cp.useEnforcingPeers(components.filterIsInstance<FiniteFactorEnforcer>()
                 .flatMap { it.enforcingFiniteFactors(problem) }.toSet())
-            deferredRoot = deferredInitialization && components.any { it is PreparingSearchComponent }
+            deferredRoot = deferredInitialization
             val session = SearchComponentSet(components, branchers = listOf(traversal.brancher)).session(
                 cancellation = if (deferredRoot) cancelledWhen({
                     if (run == null) propagationCancellation.deadline() else params.cancellation.deadline()
@@ -314,8 +314,11 @@ internal class CpSatisfactionTraversal(
                 if (params.cancellation() && slice?.pauses() == true) return null
                 val result = if (deferredRoot) {
                     val pending = initialization ?: session.prepareInitialization { component, context ->
-                        if (component is PreparingSearchComponent) component.prepareInitialization(context)
-                        else sequenceOf(component.initialize(context)).iterator()
+                        when (component) {
+                            is CpSearchComponent -> component.prepareInitialization(context)
+                            is PreparingSearchComponent -> component.prepareInitialization(context)
+                            else -> sequenceOf(component.initialize(context)).iterator()
+                        }
                     }.also { initialization = it }
                     var initialized: ComponentResult? = null
                     while (initialized == null) {
