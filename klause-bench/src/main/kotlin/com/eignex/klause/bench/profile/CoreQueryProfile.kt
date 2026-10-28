@@ -46,6 +46,9 @@ internal object CoreQueryProfile {
     private val core = type.getDeclaredField("coreLiterals").apply { isAccessible = true }
     private val softs = type.getDeclaredField("querySofts").apply { isAccessible = true }
     private val query = type.getDeclaredField("query").apply { isAccessible = true }
+    private val deductions = BakedProblem::class.java.getDeclaredField("rootDeductions").apply {
+        isAccessible = true
+    }
 
     @JvmStatic
     fun main(args: Array<String>) {
@@ -78,7 +81,7 @@ internal object CoreQueryProfile {
                     for (repeat in 0..2) for (policy in listOf("ordinary", "stratified", "root-fixed", "refined")) {
                         val rootCostStart = System.nanoTime()
                         val rootCostBytes = bean.getThreadAllocatedBytes(thread)
-                        val root = model.rootDeductions as? PropagationResult.Implied
+                        val root = deductions.get(model) as? PropagationResult.Implied
                         val coefficients = cost.boolWeights
                         var offset = cost.constant
                         var removed = 0
