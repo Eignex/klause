@@ -1,5 +1,6 @@
 package com.eignex.klause.presolve.structural
 
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Factor
@@ -10,6 +11,7 @@ import com.eignex.klause.presolve.PresolveContext
 import com.eignex.klause.presolve.Presolver
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationState
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.mark
 import com.eignex.klause.propagation.undoTo
 import com.eignex.klause.util.Cancellation
@@ -169,5 +171,23 @@ class CyclicTableCompositionTest {
         val result = CyclicTableComposition.intersect(target, left, right, { true }, 64)
 
         assertNull(result)
+    }
+
+    @Test
+    fun `cyclic restrictions should preserve source assignment multiplicity`() {
+        val target = Table(intArrayOf(0, 1), longArrayOf(0, 0, 0, 0, 0, 1, 1, 0, 1, 1))
+        val left = Table(intArrayOf(0, 2), longArrayOf(0, 0, 1, 1))
+        val right = Table(intArrayOf(1, 2), longArrayOf(0, 0, 1, 1))
+        val source = Problem(0, 3, Array(3) { IntDomain(0, 1) }, arrayOf<Factor>(target, left, right))
+        val before = BacktrackSolver(source.bake()).enumerate().map { it.ints.toList() }.toList()
+        val result = assertIs<ExtensionalIntersection.Restricted>(
+            CyclicTableComposition.intersect(target, left, right, { true }, 64),
+        )
+        val after = source.withFactors(arrayOf(result.factor, left, right))
+
+        val assignments = BacktrackSolver(after.bake()).enumerate().map { it.ints.toList() }.toList()
+
+        assertEquals(2, assignments.size)
+        assertEquals(before.toSet(), assignments.toSet())
     }
 }

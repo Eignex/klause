@@ -1,0 +1,19 @@
+<instance format="XCSP3" type="COP">
+  <variables>
+    <array id="x" size="[4]"> 0..2 </array>
+  </variables>
+  <constraints>
+    <extension>
+      <list>x[0] x[1] x[2]</list>
+      <supports>(0,0,0)(0,1,2)(0,2,1)(1,0,2)(1,1,1)(1,2,0)(2,0,1)(2,1,0)(2,2,2)</supports>
+    </extension>
+    <extension>
+      <list>x[0] x[1] x[3]</list>
+      <supports>(0,0,0)(0,1,2)(0,2,1)(1,0,2)(1,1,1)(1,2,0)(2,0,1)(2,1,0)(2,2,2)</supports>
+    </extension>
+    <extension><list>x[2] x[3]</list><supports>(0,1)(0,2)(1,0)(1,2)(2,0)(2,1)</supports></extension>
+  </constraints>
+  <objectives>
+    <minimize type="sum"><list>x[]</list><coeffs>1 2 4 8</coeffs></minimize>
+  </objectives>
+</instance>
