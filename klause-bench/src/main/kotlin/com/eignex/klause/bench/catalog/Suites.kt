@@ -740,6 +740,10 @@ internal object Suites {
         vendored("magic-series-tiny", Category.CSP, Expected.Sat, relPath = "xcsp3/magic-series-tiny.xml")
         vendored("sum-opt-tiny", Category.OPTIMIZATION, Expected.Unknown, relPath = "xcsp3/sum-opt-tiny.xml")
         vendored("pair-cover-costs", Category.OPTIMIZATION, Expected.Unknown, relPath = "xcsp3/pair-cover-costs.xml")
+        vendored("pair-cover-alias-costs", Category.OPTIMIZATION, Expected.Unknown,
+            relPath = "xcsp3/pair-cover-alias-costs.xml")
+        vendored("pair-cover-alias-replaced", Category.OPTIMIZATION, Expected.Unknown,
+            relPath = "xcsp3/pair-cover-alias-replaced.xml")
         vendored("evidence-latin4", Category.OPTIMIZATION, Expected.Unknown,
             relPath = "finite-repair-evidence/latin4.xml")
         vendored("equality-cost-symmetry", Category.OPTIMIZATION, Expected.Opt(90L),

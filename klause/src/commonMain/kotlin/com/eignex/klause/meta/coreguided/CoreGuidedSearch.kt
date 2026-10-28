@@ -11,6 +11,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.presolve.SeparableObjectiveView
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
@@ -89,7 +90,9 @@ internal class CoreGuidedSearch(
     private val weights = LinkedHashMap<Int, BigInt>()
     private val tails = HashMap<Int, Tail>()
     private var nextBool = base.numBoolVars
-    private val objectiveTerms = objective.boolWeightValues.size + objective.intCoefficientValues.size
+    private var costs = objective
+    private var costsPrepared = false
+    private val objectiveTerms get() = costs.boolWeightValues.size + costs.intCoefficientValues.size
     private var initialIndex = 0
     private var lower = cheapest(base, objective)
     private var threshold: BigInt? = null
@@ -143,7 +146,7 @@ internal class CoreGuidedSearch(
     override val initialWork: Long = work
     override val canReseed: Boolean get() = false
     override val preparationPending: Boolean
-        get() = initialIndex < objectiveTerms || core != null ||
+        get() = !costsPrepared || initialIndex < objectiveTerms || core != null ||
             (queryModel != null && query == null)
 
     override fun runSlice(
@@ -209,6 +212,14 @@ internal class CoreGuidedSearch(
     ): MinimizeResult? {
         val deadline = requireNotNull(segment.deadline())
         while (!preparation()) {
+            if (!costsPrepared) {
+                costsPrepared = true
+                SeparableObjectiveView.create(base, objective, preparation)?.let {
+                    costs = it.objective
+                    lower = cheapest(base, costs)
+                }
+                if (preparation()) continue
+            }
             if (initialIndex < objectiveTerms) {
                 prepareObjective()
                 if (initialIndex < objectiveTerms) continue
@@ -318,15 +329,15 @@ internal class CoreGuidedSearch(
         while (initialIndex < end) {
             val id = initialIndex++
             recordPreparation(1L)
-            if (id >= objective.boolWeightValues.size) {
-                val variable = id - objective.boolWeightValues.size
-                val coefficient = objective.intCoefficientValues[variable]
+            if (id >= costs.boolWeightValues.size) {
+                val variable = id - costs.boolWeightValues.size
+                val coefficient = costs.intCoefficientValues[variable]
                 if (coefficient == 0L) continue
                 val domain = base.rootIntDomain(variable)
                 appendFrontier(variable, coefficient, if (coefficient > 0L) domain.min else domain.max)
                 continue
             }
-            val weight = objective.boolWeightValues[id]
+            val weight = costs.boolWeightValues[id]
             if (weight == 0L) continue
             val exact = bigIntOf(weight)
             val preferred = Lit.make(id, weight < 0L)

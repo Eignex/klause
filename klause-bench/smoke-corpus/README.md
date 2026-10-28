@@ -23,6 +23,12 @@ MiniZinc smoke models live under
 [klause-mzn-lib/test-models](../../klause-mzn-lib/test-models) and are referenced
 by the `mzn-smoke` suite. They are not duplicated in the smoke corpus.
 
+`xcsp3/pair-cover-alias-costs.xml` retains `o = x + y + z` over the sparse
+pair-cover domains and minimizes `o`. `pair-cover-alias-replaced.xml` retains the
+same variables and constraints but minimizes the sum directly. Both self-authored
+Apache-2.0 controls have optimum 6 at `(0,3,3,6)`. Their distinct identities compare
+cost exposure and retained output-bound propagation without changing feasibility.
+
 The width-`n` component-split matrix is `nI + 11^T` with RHS `2n`, giving exact
 solution `x = 1`. The linked MiniZinc control adds a redundant row joining blocks.
 These fixtures are explicit experiments rather than CI smoke selection.

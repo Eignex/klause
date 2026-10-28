@@ -470,6 +470,15 @@ threshold of each column is materialized, so a wide contiguous column can still 
 the worker's whole allowance one value at a time. Scalar proofs count the full integer
 cost magnitude.
 
+The directly selected worker can expand a retained finite sum-output definition
+through the bounded [separable cost view](07-presolve.md#guarantees-and-source-mappings).
+Only its private soft costs use that expression. The original output coordinate,
+defining factors and objective retain witness and publication authority; floors
+stay in the same units and exact attainment still checks the original objective.
+Curated eligibility reads the original objective, so an integer output alias does
+not enable an additional default worker. Expansion and refused attempts spend the
+worker's containing preparation allowance.
+
 Published incumbents project away auxiliary selectors and pass the source check, and
 optimality requires exact equality between the original objective and the
 accumulated bound. Auxiliary clauses never enter shared channels. On a single lane
