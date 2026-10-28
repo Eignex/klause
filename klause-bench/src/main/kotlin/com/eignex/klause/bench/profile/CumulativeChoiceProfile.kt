@@ -96,7 +96,7 @@ internal object CumulativeChoiceProfile {
                         put("rangedDemands", factor.resourceVars.count {
                             session.intDomain(it).min != session.intDomain(it).max
                         })
-                        put("channels", channels(problem, factor, session))
+                        put("channelRows", channelRows(problem, factor, session))
                     })
                 })
                 if (options.isEmpty() && preparation == null) {
@@ -111,25 +111,27 @@ internal object CumulativeChoiceProfile {
         }
     }
 
-    private fun channels(problem: Problem, factor: Cumulative, session: PropagationSession) = buildJsonArray {
-        val rows = problem.factors.filterIsInstance<ReifiedLinear>().filter {
-            it.op == LinearOp.EQ && it.vars.size == 1 && it.integerConstants?.coeffs?.get(0) == 1L
-        }
+    private fun channelRows(problem: Problem, factor: Cumulative, session: PropagationSession) = buildJsonArray {
+        val rows = problem.factors.filterIsInstance<ReifiedLinear>().filter { it.op == LinearOp.EQ }
         for (demand in factor.resourceVars.distinct()) {
-            for (channel in rows.filter { it.vars[0] == demand && it.integerConstants?.bound == 1L }) {
-                for (choice in rows.filter { it.auxBoolVar == channel.auxBoolVar && it.vars[0] != demand }) {
-                    val machine = choice.vars[0]
-                    val value = requireNotNull(choice.integerConstants).bound
-                    add(buildJsonObject {
-                        put("demand", demand)
-                        put("demandDomain", session.intDomain(demand).toString())
-                        put("machine", machine)
-                        put("value", value)
-                        put("machineDomain", session.intDomain(machine).toString())
-                        put("choiceRetained", value in session.intDomain(machine))
+            for (channel in rows.filter { demand in it.vars }) add(buildJsonObject {
+                put("demand", demand)
+                put("demandDomain", session.intDomain(demand).toString())
+                put("boolean", channel.auxBoolVar)
+                put("equalities", buildJsonArray {
+                    for (row in rows.filter { it.auxBoolVar == channel.auxBoolVar }) add(buildJsonObject {
+                        put("bound", row.constants.exactBound.toString())
+                        put("terms", buildJsonArray {
+                            for (index in row.vars.indices) add(buildJsonObject {
+                                val variable = row.vars[index]
+                                put("variable", variable)
+                                put("coefficient", row.constants.exactCoeff(index).toString())
+                                put("domain", session.intDomain(variable).toString())
+                            })
+                        })
                     })
-                }
-            }
+                })
+            })
         }
     }
 
