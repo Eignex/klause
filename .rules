@@ -96,9 +96,10 @@ Read `klause-bench/README.md` before benchmarking. In short:
 - Keep chapters tight and peers balanced: each theory, format, kernel or worker kind gets about as
   much text as its peers. Mechanism detail belongs in the owning chapter, API detail in KDoc.
 - `docs/` excludes benchmarking, measurement, scripts, fixture provenance, wrapper setup and process.
-  Benchmark workflows and short design-evidence summaries live in `klause-bench/README.md`, fixture
-  provenance and licences in READMEs beside the fixtures, MiniZinc setup in `klause-mzn-lib/README.md`.
-  Other READMEs are short entry points.
+  Benchmark usage lives in `klause-bench/README.md`, limited to running the bench and a pointer to
+  eignex-lab. Keep experiment results and design-evidence summaries out of repository documentation.
+  Fixture provenance and licences live in READMEs beside the fixtures, MiniZinc setup in
+  `klause-mzn-lib/README.md`. Other READMEs are short entry points.
 - Never commit campaign archives, raw records, payloads or one-off scripts, compressed or not. Keep
   them in `klause-evidence/campaigns/<name>/` beside the primary checkout (shared by all worktrees),
   promote reusable tools and fixtures into `klause-bench`, and delete bundles once their conclusions
