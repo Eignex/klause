@@ -38,7 +38,7 @@ internal class NonlinearIntegerResidues(
     private val capacity = minOf(MAX_CELLS, limits.maxDenseCoefficients ?: MAX_CELLS,
         (limits.maxMatrixCells ?: MAX_CELLS.toLong()).coerceAtMost(MAX_CELLS.toLong()).toInt())
     private val nodes = ArrayList<ResidueNode>()
-    private val indices = HashMap<PolynomialExpression, Int>()
+    private val indices = HashMap<ResidueExpressionKey, Int>()
     private val variables = LinkedHashMap<Int, Int>()
     private val equations = ArrayList<Pair<Int, Int>>()
     private var multivariate = false
@@ -120,7 +120,11 @@ internal class NonlinearIntegerResidues(
         while (pending.isNotEmpty()) {
             step()
             val (expression, combine) = pending.removeLast()
-            if (expression in indices) continue
+            if (expression is PolynomialExpression.Constant &&
+                maxOf(expression.numerator.magnitudeBitLength(), expression.denominator.magnitudeBitLength()) > MAX_BITS
+            ) throw ResidueDecline()
+            val key = ResidueExpressionKey(expression)
+            if (key in indices) continue
             val children = when (expression) {
                 is PolynomialExpression.Sum -> expression.operands
                 is PolynomialExpression.Product -> expression.operands
@@ -134,7 +138,7 @@ internal class NonlinearIntegerResidues(
                 continue
             }
             reserve(children.size + 6)
-            val args = children.map { indices.getValue(it) }
+            val args = children.map { indices.getValue(ResidueExpressionKey(it)) }
             val denominator = when (expression) {
                 is PolynomialExpression.Constant -> {
                     chargeBits(expression.numerator)
@@ -151,12 +155,12 @@ internal class NonlinearIntegerResidues(
                 if (expression.id.index !in integers) throw ResidueDecline()
                 variables.getOrPut(expression.id.index) { variables.size }
             } else -1
-            indices[expression] = nodes.size
+            indices[key] = nodes.size
             nodes.add(ResidueNode(expression, denominator, args, variable,
                 if (variable >= 0) variable else args.minOfOrNull { nodes[it].firstVariable } ?: Int.MAX_VALUE,
                 if (variable >= 0) variable else args.maxOfOrNull { nodes[it].lastVariable } ?: -1))
         }
-        return indices.getValue(root)
+        return indices.getValue(ResidueExpressionKey(root))
     }
 
     private fun chargeBits(value: BigInt) {
@@ -277,6 +281,13 @@ private class ResidueNode(
     val firstVariable: Int,
     val lastVariable: Int,
 )
+
+// Structural equality can walk an unadmitted source subtree outside the charged DAG traversal.
+private class ResidueExpressionKey(private val expression: PolynomialExpression) {
+    override fun hashCode(): Int = expression.hashCode()
+    override fun equals(other: Any?): Boolean = other is ResidueExpressionKey && expression === other.expression
+}
+
 private class ResidueDecline : RuntimeException()
 private val MODULI = intArrayOf(2, 3, 4, 5, 8)
 private const val MAX_WORK = 65_536L

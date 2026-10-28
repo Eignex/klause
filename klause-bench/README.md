@@ -133,6 +133,13 @@ replay here: the service requires local-only reference placement, so the initial
 automatic reference job was cancelled before execution and cloud reference
 placement was rejected. The option remains disabled by default.
 
+The existing-source comparison [8978](https://lab.eignex.com/jobs/8978), at
+`7ac88f813f`, retains all twelve frozen `nonlinear-integer-v1` identities under the
+same off/on controls. Its records distinguish source admission, native work and
+original-source witness checks. Unary, guarded and real-supported equalities are
+outside residue admission; the open product has modular support. These source
+shapes supply no expectation of a new residue refutation or a default benefit.
+
 `sets/<name>.txt` fixes membership as one `<suite>/<problem>` identity per line,
 matching `select`; `@<set>` includes another set and `#` starts a comment.
 Focused sets cover the structural themes reported by `select features=true`:
