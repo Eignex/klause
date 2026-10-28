@@ -198,6 +198,7 @@ internal fun bindSourceExecutionControls(
             reader.defaulted(ExecutionOption.niaCellReuse, defaults.reuseSourceCells),
             reader.defaulted(ExecutionOption.niaCellSteering, defaults.steerSourceCells),
             reader.defaulted(ExecutionOption.niaIntegerRoots, defaults.admitIntegerRoots),
+            reader.defaulted(ExecutionOption.niaResidues, defaults.residueRefutation),
         )
     } else {
         null

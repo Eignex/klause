@@ -31,7 +31,8 @@ internal object Suites {
             smtlibCore, xcsp3Core, mpsCore, mznSmoke, satCrafted, lpComponentSplit, productAliases,
         ) + QfNraSuites.all + QfNraCanonicalSuite.suite + QfNraPartialConflictSuite.suite +
             QfNraCoupledSuite.suite + QfNraPreparedSupportSuite.suite +
-            NonlinearIntegerSuite.suite + NonlinearIntegerCellSuite.suite + DivModSuite.suite + AbsSuite.suite +
+            NonlinearIntegerSuite.suite + NonlinearIntegerCellSuite.suite + NonlinearIntegerResidueSuite.suite +
+            DivModSuite.suite + AbsSuite.suite +
             ContinuousArithmeticSuite.suite + MpsLinearSourceSuite.suite +
             SourceOwnershipSuite.suite + ExactGlobalsSuite.suite + SourceEqualitySuite.suite
     }
@@ -656,11 +657,15 @@ internal object Suites {
     private val wcnfCore = suite("wcnf-core", "Curated DIMACS WCNF (MaxSAT)") {
         format = Format.WCNF
         license = "internal"
+        vendored("conditional-cost", Category.OPTIMIZATION, Expected.Opt(1L),
+            relPath = "conditional-symmetry/conditional-cost.wcnf")
         vendored("maxsat-tiny", Category.OPTIMIZATION, Expected.Opt(1L))
         vendored("cover-dominated", Category.OPTIMIZATION, Expected.Opt(1L))
         vendored("cover-tied", Category.OPTIMIZATION, Expected.Opt(1L))
         vendored("cover-other-reader", Category.OPTIMIZATION, Expected.Opt(1L))
         vendored("weighted-penalty-complements", Category.OPTIMIZATION, Expected.Opt(5L))
+        vendored("signed-cost-symmetry", Category.OPTIMIZATION, Expected.Opt(2L),
+            relPath = "cost-symmetry/signed-cost.wcnf", license = "Apache-2.0")
     }
 
     private val opbCore = suite("opb-core", "Curated pseudo-Boolean OPB") {
@@ -735,8 +740,15 @@ internal object Suites {
         license = "internal"
         vendored("magic-series-tiny", Category.CSP, Expected.Sat, relPath = "xcsp3/magic-series-tiny.xml")
         vendored("sum-opt-tiny", Category.OPTIMIZATION, Expected.Unknown, relPath = "xcsp3/sum-opt-tiny.xml")
+        vendored("pair-cover-costs", Category.OPTIMIZATION, Expected.Unknown, relPath = "xcsp3/pair-cover-costs.xml")
+        vendored("pair-cover-alias-costs", Category.OPTIMIZATION, Expected.Unknown,
+            relPath = "xcsp3/pair-cover-alias-costs.xml")
+        vendored("pair-cover-alias-replaced", Category.OPTIMIZATION, Expected.Unknown,
+            relPath = "xcsp3/pair-cover-alias-replaced.xml")
         vendored("evidence-latin4", Category.OPTIMIZATION, Expected.Unknown,
             relPath = "finite-repair-evidence/latin4.xml")
+        vendored("equality-cost-symmetry", Category.OPTIMIZATION, Expected.Opt(90L),
+            relPath = "cost-symmetry/equality-cost.xml", license = "Apache-2.0")
         for (name in listOf("linear-exchange", "linear-three-cycle", "linear-four-cycle", "linear-knapsack",
             "linear-transport")) {
             vendored("evidence-$name", Category.OPTIMIZATION, Expected.Unknown,

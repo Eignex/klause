@@ -199,6 +199,8 @@ predicate cumulative(array[int] of var int: starts, array[int] of int: durations
                      array[int] of int: resources, int: capacity);
 predicate disjunctive(array[int] of var int: starts, array[int] of int: durations);
 predicate disjunctive_strict(array[int] of var int: starts, array[int] of int: durations);
+predicate klause_disjunctive_opt(array[int] of var bool: presents,
+                               array[int] of var int: starts, array[int] of int: durations);
 % Var-arg cumulative / disjunctive[_strict] live in their own override files
 % (fzn_cumulative.mzn etc.) so MiniZinc shadows the std decomposing definitions.
 

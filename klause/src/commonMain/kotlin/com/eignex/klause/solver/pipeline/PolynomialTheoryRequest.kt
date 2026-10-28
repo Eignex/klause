@@ -187,6 +187,8 @@ data class PolynomialTheoryExecution(
     val integerCells: NonlinearIntegerCellReuseStats? = null,
     /** Nonlinear integer root admission observations, absent when admission is disabled. */
     val integerRoots: NonlinearIntegerRootStats? = null,
+    /** Bounded integer residue observations, absent when residue refutation is disabled. */
+    val integerResidues: NonlinearIntegerResidueStats? = null,
 )
 
 /** Finite-objective optimization with exact polynomial witnesses and separately scoped theory work. */

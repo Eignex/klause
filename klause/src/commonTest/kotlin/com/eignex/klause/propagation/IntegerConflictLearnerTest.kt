@@ -30,6 +30,100 @@ import kotlin.test.assertTrue
 
 class IntegerConflictLearnerTest {
     @Test
+    fun `an incidental hole should preserve a learned row guard`() {
+        val native = PropagationSession(Problem(1, 3,
+            arrayOf(IntDomain(0, 6), IntDomain(0, 12).excludeValue(2), IntDomain(0, 24)), arrayOf(
+                ReifiedLinear(0, intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+                Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+            ))).apply { enableIntegerRowLearning() }
+        assertIs<PropagationResult.Implied>(native.pinBool(0, true))
+        assertIs<PropagationResult.Implied>(native.pinIntAtMost(2, 7))
+
+        val conflict = assertIs<PropagationResult.Unsat>(native.pinIntAtLeast(0, 2))
+
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(conflict.learnedClause)
+        assertEquals(Lit.make(0, true), learned.row.guard)
+        assertTrue(learned.fallbackClause.literals.contains(Lit.make(0, false)))
+        native.popToLevel(learned.backjumpLevel)
+        assertIs<PropagationResult.Implied>(native.addLearnedIntegerRow(learned.row, learned.lbd))
+        assertEquals(1L, native.intDomain(0).max)
+    }
+
+    @Test
+    fun `original rows should retain a reusable consequence of the scaling conflict`() {
+        for (scale in listOf(2, 8, 32)) {
+            for (order in listOf(listOf(0, 1, 2), listOf(0, 2, 1), listOf(1, 0, 2),
+                listOf(1, 2, 0), listOf(2, 0, 1), listOf(2, 1, 0))) {
+                val factors = arrayOf(
+                    Linear(intArrayOf(scale, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+                    Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                    Linear(intArrayOf(1, -scale, -1), intArrayOf(2, 0, 3), LinearOp.LE, 0),
+                )
+                val native = PropagationSession(Problem(0, 4, arrayOf(IntDomain(0, scale.toLong()),
+                    IntDomain(0, scale.toLong()), IntDomain(0, scale.toLong() * (scale + 1)),
+                    IntDomain(0, scale.toLong() * (scale + 1))), order.map { factors[it] }.toTypedArray()),
+                    pbLearning = false).apply { enableIntegerRowLearning() }
+                assertIs<PropagationResult.Implied>(native.pinIntAtLeast(0, 1))
+
+                val conflict = assertIs<PropagationResult.Unsat>(native.pinIntAtMost(3, 0))
+
+                val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(conflict.learnedClause,
+                    "scale=$scale order=$order")
+                native.popToLevel(learned.backjumpLevel)
+                assertIs<PropagationResult.Implied>(native.addLearnedIntegerRow(learned.row, learned.lbd))
+                assertEquals(1L, native.intDomain(3).min, "scale=$scale order=$order")
+            }
+        }
+    }
+
+    @Test
+    fun `an incidental hole should retain a row across sibling endpoints without filling the domain`() {
+        for (sign in listOf(1, -1)) {
+            val native = PropagationSession(Problem(0, 3, arrayOf(
+                IntDomain(if (sign > 0) 0L else -6L, if (sign > 0) 6L else 0L),
+                IntDomain(if (sign > 0) 0L else -12L, if (sign > 0) 12L else 0L).excludeValue(2L * sign),
+                IntDomain(if (sign > 0) 0L else -24L, if (sign > 0) 24L else 0L),
+            ), arrayOf(
+                Linear(intArrayOf(2 * sign, sign, -sign), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+                Linear(intArrayOf(2 * sign, -sign), intArrayOf(0, 1), LinearOp.LE, 0),
+            )), pbLearning = false).apply { enableIntegerRowLearning() }
+            val cp = CpSearchComponent(native, intArrayOf(4, 7, 9))
+            val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(0))
+            assertIs<ComponentResult.Consistent>(shared.initialize())
+            assertIs<ComponentResult.Consistent>(shared.push(if (sign > 0)
+                SearchDecision.IntAtMost(9, 7) else SearchDecision.IntAtLeast(9, -7)))
+            assertIs<ComponentResult.Conflict>(shared.push(if (sign > 0)
+                SearchDecision.IntAtLeast(4, 2) else SearchDecision.IntAtMost(4, -2)))
+            val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(cp.lastConflict?.learnedClause)
+            assertEquals(4L * sign, learned.row.coefficient(0))
+            assertEquals(-sign.toLong(), learned.row.coefficient(2))
+            val backjump = assertIs<SearchConflictResolution.Backjump>(cp.resolveConflict(shared)).conflict
+            shared.popTo(backjump.decisionLevel)
+
+            assertIs<SearchLearnedConflictResult.Resume>(backjump.apply(shared))
+
+            assertEquals(sign.toLong(), if (sign > 0) native.intDomain(0).max else native.intDomain(0).min)
+            for (upper in listOf(11L, 15L, 23L)) {
+                shared.popTo(0)
+                assertFalse(2L * sign in native.intDomain(1))
+                assertIs<ComponentResult.Consistent>(shared.push(if (sign > 0)
+                    SearchDecision.IntAtMost(9, upper) else SearchDecision.IntAtLeast(9, -upper)))
+                assertEquals(sign * (upper / 4),
+                    if (sign > 0) native.intDomain(0).max else native.intDomain(0).min)
+                val state = native.explanationState
+                val reason = if (sign > 0) state.intMaxReason[0] else state.intMinReason[0]
+                assertIs<LearnedIntegerPropagator>(state.factorAt(reason))
+                assertNotNull(state.reasonOf(if (sign > 0) state.intMaxAntecedents[0] else state.intMinAntecedents[0]))
+            }
+            shared.popTo(0)
+            assertFalse(2L * sign in native.intDomain(1))
+            assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.IntEqual(4, 2L * sign)))
+            assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.IntEqual(7, 4L * sign)))
+            assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.IntEqual(9, 8L * sign)))
+        }
+    }
+
+    @Test
     fun `a retained row reason should keep its historical premises after factor ids move`() {
         val native = PropagationSession(Problem(1, 3,
             arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)), arrayOf(
@@ -284,20 +378,24 @@ class IntegerConflictLearnerTest {
 
     @Test
     fun `historical holes should withhold a row even after the live interval loses the hole`() {
-        val native = PropagationSession(Problem(0, 3,
-            arrayOf(IntDomain(0, 6), IntDomain(0, 12).excludeValue(4), IntDomain(0, 24)), arrayOf(
+        for (reverse in listOf(false, true)) {
+            val rows = listOf(
                 Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
                 Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
-            ))).apply { enableIntegerRowLearning() }
-        assertIs<PropagationResult.Implied>(native.pinIntAtMost(2, 7))
+            )
+            val native = PropagationSession(Problem(0, 3,
+                arrayOf(IntDomain(0, 6), IntDomain(0, 12).excludeValue(4), IntDomain(0, 24)),
+                (if (reverse) rows.reversed() else rows).toTypedArray())).apply { enableIntegerRowLearning() }
+            assertIs<PropagationResult.Implied>(native.pinIntAtMost(2, 7))
 
-        val conflict = assertIs<PropagationResult.Unsat>(native.pinIntAtLeast(0, 2))
+            val conflict = assertIs<PropagationResult.Unsat>(native.pinIntAtLeast(0, 2))
 
-        assertIs<ConflictAnalyzer.AnalysisResult.Learned>(conflict.learnedClause)
+            assertIs<ConflictAnalyzer.AnalysisResult.Learned>(conflict.learnedClause)
+        }
     }
 
     @Test
-    fun `a reified source reason should retain its Boolean condition in clause fallback`() {
+    fun `a reified source reason should retain its Boolean condition in the row and fallback`() {
         val native = PropagationSession(Problem(1, 3,
             arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)), arrayOf(
                 ReifiedLinear(0, intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
@@ -308,7 +406,8 @@ class IntegerConflictLearnerTest {
 
         val conflict = assertIs<PropagationResult.Unsat>(native.pinIntAtLeast(0, 2))
 
-        val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(conflict.learnedClause)
-        assertTrue(learned.literals.contains(Lit.make(0, false)))
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(conflict.learnedClause)
+        assertEquals(Lit.make(0, true), learned.row.guard)
+        assertTrue(learned.fallbackClause.literals.contains(Lit.make(0, false)))
     }
 }

@@ -17,7 +17,7 @@ private fun PropagationState.factorBoolVars(fid: Int): IntArray = when {
 }
 
 /** Integer vars for factor [fid]: same routing as [factorBoolVars]. */
-private fun PropagationState.factorIntVars(fid: Int): IntArray = when {
+internal fun PropagationState.factorIntVars(fid: Int): IntArray = when {
     fid < baseFactorCount -> problem.factors[fid].intVars
     incremental -> midlife.factors[fid - baseFactorCount].intVars
     nativeEngine != null -> EmptyIntArray

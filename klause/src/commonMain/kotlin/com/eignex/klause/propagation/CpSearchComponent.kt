@@ -81,6 +81,13 @@ class CpSearchComponent(
         }
 
     private fun usableIntegerRow(learned: ConflictAnalyzer.AnalysisResult.LearnedIntegerRow): Boolean {
+        val usable = checkIntegerRow(learned)
+        if (!usable) session.explanationState.arithmeticLearningTrace?.record(
+            "integer.decline.shared-assertion-or-premise")
+        return usable
+    }
+
+    private fun checkIntegerRow(learned: ConflictAnalyzer.AnalysisResult.LearnedIntegerRow): Boolean {
         try {
             val context = sharedContext as? SearchSession ?: return false
             var nativeTarget = sharedRootLevel
@@ -93,6 +100,24 @@ class CpSearchComponent(
             val state = session.explanationState
             val trail = state.integerLearningTrailAtLevel?.invoke(nativeTarget) ?: return false
             if (!learned.row.assertsAt(state, trail)) return false
+            if (learned.row.guard != Lit.NONE) {
+                val guard = learned.row.guard
+                val variable = Lit.variable(guard)
+                val premise = if (variable < session.problem.numBoolVars) {
+                    SearchAtomPremise.Asserted(SearchDecision.Bool(guard))
+                } else {
+                    val atom = state.atomIdOf(variable)
+                    if (!Lit.isPositive(guard) || state.atoms.kind[atom] != AtomKind.EQ) return false
+                    val source = sourceIntId(state.atoms.intVar[atom])
+                    val value = state.atoms.threshold[atom]
+                    if (context.intLowerBound(source) != value || context.intUpperBound(source) != value) return false
+                    SearchAtomPremise.All(listOf(context.intLowerBoundPremise(source),
+                        context.intUpperBoundPremise(source)))
+                }
+                if (context.explainAtoms(premise, maxNodes = 128) == null) {
+                    return false
+                }
+            }
             for (variable in learned.row.variables) {
                 if (context.cancelled()) return false
                 val source = sourceIntId(variable)
@@ -109,6 +134,12 @@ class CpSearchComponent(
     }
 
     private fun usableMixedPb(learned: ConflictAnalyzer.AnalysisResult.LearnedPb): Boolean {
+        val usable = checkMixedPb(learned)
+        if (!usable) session.explanationState.arithmeticLearningTrace?.record("pb.decline.shared-assertion-or-premise")
+        return usable
+    }
+
+    private fun checkMixedPb(learned: ConflictAnalyzer.AnalysisResult.LearnedPb): Boolean {
         val context = sharedContext as? SearchSession ?: return false
         var nativeTarget = sharedRootLevel
         for (level in minOf(nativeLevelBySharedLevel.size - 1, analysisSharedLevel - 1) downTo 0) {
@@ -550,6 +581,9 @@ class CpSearchComponent(
         override val decisionLevels: IntArray get() = learned.decisionLevels
 
         override fun apply(session: SearchSession): SearchLearnedConflictResult {
+            this@CpSearchComponent.session.explanationState.arithmeticLearningTrace?.record(
+                "analysis.mapped-target", learned.backjumpLevel.toLong(), decisionLevel.toLong(),
+                this@CpSearchComponent.session.decisionLevel.toLong())
             val result = when (learned) {
                 is ConflictAnalyzer.AnalysisResult.Learned -> this@CpSearchComponent.session.addLearnedClause(
                     Clause(learned.literals),

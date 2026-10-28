@@ -15,6 +15,7 @@ import com.eignex.klause.ir.values
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.baked
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntDisjointSet
@@ -52,6 +53,25 @@ internal object SymmetryBreaking {
         cancellation: Cancellation = Cancellation.Never,
     ): PassDelta {
         val extra = breakings(problem, FiniteColumns(problem), objectiveIntVars, objectiveBoolVars, cancellation)
+        return if (extra.isEmpty()) PassDelta() else PassDelta(addedFactors = extra)
+    }
+
+    fun breakObjectiveSymmetries(problem: BakedProblem, context: PresolveContext): PassDelta {
+        val objective = context.linearObjective ?: return PassDelta()
+        if (context.solutionSetSensitive || context.modelBreaksSymmetry || problem.numRealVars != 0 ||
+            problem.semantics.isApproximate || objective.realCoefficientValues.any { it != 0.0 }
+        ) return PassDelta()
+        val ints = objective.intCoefficientValues
+        val bools = objective.boolWeightValues
+        context.cancellation.charge(ints.size.toLong() + bools.size)
+        if (context.cancellation()) return PassDelta()
+        val objectiveInts = ints.indices.filter { ints[it] != 0L }.toSet()
+        val objectiveBools = bools.indices.filter { bools[it] != 0L }.toSet()
+        if (objectiveInts.isEmpty() && objectiveBools.isEmpty()) return PassDelta()
+        val extra = breakings(
+            problem, FiniteColumns(problem), objectiveInts, objectiveBools,
+            context.cancellation, objective,
+        )
         return if (extra.isEmpty()) PassDelta() else PassDelta(addedFactors = extra)
     }
 
@@ -100,6 +120,7 @@ internal object SymmetryBreaking {
         objectiveIntVars: Set<Int>,
         objectiveBoolVars: Set<Int>,
         cancellation: Cancellation,
+        objective: LinearObjective? = null,
     ): List<Factor> {
         // One-shot: once a [SymmetryHandling] factor is present the generators have been posted. The round
         // engine re-enables this pass whenever another pass changes the problem, and re-running would
@@ -118,11 +139,15 @@ internal object SymmetryBreaking {
         val active = activeColumns(problem, columns, cancellation) ?: return emptyList()
         val heldInts = active.heldInts(objectiveIntVars)
         val heldBools = active.heldBools(objectiveBoolVars)
-        val generators = findGenerators(problem, active, heldInts, heldBools, cancellation)
+        val variableHeldInts = if (objective == null) heldInts else active.heldInts(emptySet())
+        val variableHeldBools = if (objective == null) heldBools else active.heldBools(emptySet())
+        val generators = findGenerators(problem, active, variableHeldInts, variableHeldBools, cancellation, objective)
         // For an orbit whose members are *individually* interchangeable (each single transposition is
         // itself an automorphism — a scalar symmetric group, not a lockstep matrix), the full total
         // order is sound and strictly stronger than the generator lex, so post it too.
-        val scalarLex = scalarTotalOrders(problem, generators, heldInts, heldBools)
+        val scalarLex = scalarTotalOrders(
+            problem, generators, variableHeldInts, variableHeldBools, objective, cancellation,
+        )
         val valuePins = breakValueSymmetry(problem, active, heldInts, cancellation, chainPrecedence = true)
         val extra = ArrayList<Factor>()
         if (generators.isNotEmpty()) extra.add(SymmetryHandling(generators))
@@ -829,6 +854,7 @@ internal object SymmetryBreaking {
         objectiveIntVars: Set<Int>,
         objectiveBoolVars: Set<Int>,
         cancellation: Cancellation = Cancellation.Never,
+        objective: LinearObjective? = null,
     ): List<Pair<IntArray, IntArray>> {
         val nInt = problem.numIntVars
         val nBool = problem.numBoolVars
@@ -839,9 +865,11 @@ internal object SymmetryBreaking {
         val base = PresolveShared.structuralKeyMultiset(problem.factors.asList())
         val seedIntBase = Array(nInt) { v ->
             if (v in objectiveIntVars) objectiveSeed(SPACE_INT, v) else columns.seed(v)
+                .withCoefficient(objective?.intCoefficientValues?.getOrElse(v) { 0L })
         }
         val seedBoolBase = Array(nBool) { v ->
             if (v in objectiveBoolVars) objectiveSeed(SPACE_BOOL, v) else columns.boolSeed(v)
+                .withCoefficient(objective?.boolWeightValues?.getOrElse(v) { 0L })
         }
 
         val budget = intArrayOf(GENERATOR_WORK_BUDGET)
@@ -877,7 +905,9 @@ internal object SymmetryBreaking {
                 // its image's, which the factor check below does not see; the seeds are those values.
                 if ((0 until nInt).any { seedIntBase[it] != seedIntBase[perm.first[it]] }) continue
                 if ((0 until nBool).any { seedBoolBase[it] != seedBoolBase[perm.second[it]] }) continue
-                cancellation.charge(problem.factors.size.toLong())
+                cancellation.charge(problem.factors.size.toLong() + if (objective == null) 0 else nInt + nBool)
+                if (cancellation()) break
+                if (!preservesObjective(objective, perm.first, perm.second)) continue
                 if (!isAutomorphism(problem, base, perm.second, perm.first)) continue
                 gens.add(perm)
                 index.forEach { g, gi ->
@@ -983,6 +1013,8 @@ internal object SymmetryBreaking {
         generators: List<Pair<IntArray, IntArray>>,
         objectiveIntVars: Set<Int>,
         objectiveBoolVars: Set<Int>,
+        objective: LinearObjective? = null,
+        cancellation: Cancellation = Cancellation.Never,
     ): List<Factor> {
         // Skips building the (potentially expensive) structural-key multiset when there is nothing to order.
         if (generators.isEmpty()) return emptyList()
@@ -996,9 +1028,12 @@ internal object SymmetryBreaking {
         val intMapId = IntArray(problem.numIntVars) { it }
         val boolMapId = IntArray(problem.numBoolVars) { it }
         fun swapAuto(map: IntArray, a: Int, b: Int): Boolean {
+            cancellation.charge(problem.factors.size.toLong() + problem.numIntVars + problem.numBoolVars)
+            if (cancellation()) return false
             map[a] = b
             map[b] = a
-            val ok = isAutomorphism(problem, base, boolMapId, intMapId)
+            val ok = preservesObjective(objective, intMapId, boolMapId) &&
+                isAutomorphism(problem, base, boolMapId, intMapId)
             map[a] = a
             map[b] = b
             return ok
@@ -1023,6 +1058,14 @@ internal object SymmetryBreaking {
             }
         }
         return extra
+    }
+
+    private fun preservesObjective(objective: LinearObjective?, intMap: IntArray, boolMap: IntArray): Boolean {
+        if (objective == null) return true
+        val ints = objective.intCoefficientValues
+        val bools = objective.boolWeightValues
+        return intMap.indices.all { ints.getOrElse(it) { 0L } == ints.getOrElse(intMap[it]) { 0L } } &&
+            boolMap.indices.all { bools.getOrElse(it) { 0L } == bools.getOrElse(boolMap[it]) { 0L } }
     }
 
     /** Whether remapping every factor through [boolMap]/[intMap] leaves the factor multiset (by
@@ -1068,6 +1111,9 @@ internal object SymmetryBreaking {
  * canonical total order colour ids are assigned in.
  */
 internal class RefineKey(private val words: LongArray) : Comparable<RefineKey> {
+    fun withCoefficient(coefficient: Long?): RefineKey =
+        if (coefficient == null) this else RefineKey(words + coefficient)
+
     override fun equals(other: Any?): Boolean =
         this === other || (other is RefineKey && words.contentEquals(other.words))
 

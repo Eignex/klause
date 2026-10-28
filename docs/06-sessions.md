@@ -94,14 +94,26 @@ outside these entry points.
 
 ## Exact count bounds
 
-Anytime exact counting reports proven projected assignments as its lower bound and
-adds all unchecked or undecided subtree mass to its upper bound. Exhausting
-`maxChecks` partway through an expansion keeps the unchecked siblings in the upper
-bound, and an `Unknown` check keeps its whole subtree there. Subtree arithmetic is
+Anytime exact counting partitions pure Boolean clause models into independent
+components after conditioning. Fixed projected values contribute one, free projected
+columns contribute two, and components without projected columns contribute only
+existential feasibility. Every enforcing clause participates; a clause satisfied by
+a fixed literal contributes no incidence. At least two constrained components and a
+nonempty projection are required. Empty projections use one whole-model feasibility
+check. Integer, real, unsupported-factor, custom-projection and symmetry-breaking
+models retain monolithic counting, with no representative pruning.
+
+Each component traversal reports proven projected assignments as its lower bound and
+adds all unchecked or undecided subtree mass to its upper bound. Component intervals
+multiply using exact nonnegative integers and share one `maxChecks` allowance,
+including root checks. Unvisited existential components retain `[0, 1]`; a proved
+zero component makes the product exactly zero even when another is unresolved.
+Exhausting `maxChecks` partway through an expansion keeps the unchecked siblings in
+the upper bound, and an `Unknown` check keeps its whole subtree there. Subtree arithmetic is
 exact, and integer values are visited lazily, so a bounded budget never materializes
-a whole domain. `Count.upper == Long.MAX_VALUE` is an unbounded sentinel, not an
-exact count; exactness requires every projected branch decided and a representable
-count.
+a whole domain. `Count.upper == Long.MAX_VALUE` is an unbounded sentinel when the
+exact upper mass exceeds the range. Equal saturated bounds cannot prove exactness;
+the internal interval must collapse to a representable count.
 
 ## Theory invocation scopes
 

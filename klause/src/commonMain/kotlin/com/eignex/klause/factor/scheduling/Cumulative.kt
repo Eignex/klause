@@ -71,7 +71,8 @@ class Cumulative(
     /** Per-task presence literals; empty for the non-opt fast path. Absent tasks contribute
      *  zero energy and no compulsory part; propagation filters with definitely present tasks only,
      *  since an unpinned task may yet go absent. In the [unary] shape, an unpinned task whose
-     *  minimum duration would overload the present tasks is ruled absent. */
+     *  minimum duration would overload the present tasks is ruled absent, and so is a literal shared by
+     *  several tasks whose minima would overload them together. */
     override val presents: IntArray = EmptyIntArray,
     /** Per-task duration variables; empty = use [durations] as constants. When set, the
      *  factor reads the current duration from `state.assignment.intValue(durationVars(i))`

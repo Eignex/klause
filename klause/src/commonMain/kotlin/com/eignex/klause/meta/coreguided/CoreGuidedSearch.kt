@@ -5,10 +5,13 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.PROPAGATION_WORK_PER_NODE
 import com.eignex.klause.backtrack.ResumableSatisfaction
 import com.eignex.klause.factor.arithmetic.ReifiedCardinality
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.presolve.SeparableObjectiveView
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
@@ -43,6 +46,7 @@ import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.compareTo
 import com.eignex.klause.util.minus
 import com.eignex.klause.util.plus
+import com.eignex.klause.util.times
 import com.eignex.klause.util.toDouble
 import kotlin.math.nextDown
 import kotlin.time.Duration
@@ -56,6 +60,11 @@ import kotlin.time.TimeSource
  * CP 2014, https://doi.org/10.1007/978-3-319-10428-7_41): each core raises the lower bound by its minimum
  * weight and adds a reified `≥ 2` threshold over its literals as a new soft, whose successor threshold
  * enters once it is spent.
+ *
+ * A finite integer cost `c·x` is the sum of the gaps between consecutive root values that `x` crosses away
+ * from its cheapest end, so each gap is a soft threshold literal `[x ≥ v]` (or `[x ≤ v]` when `c < 0`)
+ * weighted by `|c|` times the gap. Only the first unspent threshold of each column is materialized; a
+ * latent successor implies its frontier.
  */
 internal class CoreGuidedSearch(
     private val base: BakedProblem,
@@ -65,6 +74,7 @@ internal class CoreGuidedSearch(
     private val maximumWork: Long? = null,
     private val maximumMillis: Long? = null,
     private val timeSource: TimeSource = TimeSource.Monotonic,
+    private val coreRefinement: CoreRefinementMode = CoreRefinementMode.NONE,
 ) : ResumableSearch,
     ReseedGuard {
     private val opened = timeSource.markNow()
@@ -79,16 +89,17 @@ internal class CoreGuidedSearch(
     }
     private val initialFactorCount = factors.size
     private val weights = LinkedHashMap<Int, BigInt>()
-    private val tails = HashMap<Int, ThresholdTail>()
+    private val tails = HashMap<Int, Tail>()
     private var nextBool = base.numBoolVars
+    private var costs = objective
+    private var costsPrepared = false
+    private val objectiveTerms get() = costs.boolWeightValues.size + costs.intCoefficientValues.size
     private var initialIndex = 0
-    private var lower = objective.boolWeightValues.fold(bigIntOf(objective.constant)) { value, weight ->
-        if (weight < 0L) value + bigIntOf(weight) else value
-    }
+    private var lower = cheapest(base, objective)
     private var threshold: BigInt? = null
     private var query: ResumableSolve? = null
     private var queryModel: BakedProblem? = null
-    private var preparationVisits = factors.size.toLong() + objective.boolWeightValues.size
+    private var preparationVisits = factors.size.toLong() + objectiveTerms
     private var querySofts = IntArray(0)
     private var completedStats = SolveStats.EMPTY
     private var completedWork = 0L
@@ -106,12 +117,16 @@ internal class CoreGuidedSearch(
     private var completedCores = 0L
     private var largestCore = 0
 
-    private class ThresholdTail(val literals: IntArray, val minimum: Int, val weight: BigInt)
+    private sealed interface Tail
+
+    private class ThresholdTail(val literals: IntArray, val minimum: Int, val weight: BigInt) : Tail
+
+    private class FrontierTail(val variable: Int, val coefficient: Long, val reached: Long) : Tail
 
     init {
         require(maximumWork == null || maximumWork >= 0L) { "core work limit must be nonnegative" }
         require(maximumMillis == null || maximumMillis >= 0L) { "core time limit must be nonnegative" }
-        require(eligible(base, objective)) { "core-guided search needs a finite Boolean objective" }
+        require(admits(base, objective)) { "core-guided search needs a finite Boolean or integer objective" }
         activeTime = opened.elapsedNow()
     }
 
@@ -132,7 +147,7 @@ internal class CoreGuidedSearch(
     override val initialWork: Long = work
     override val canReseed: Boolean get() = false
     override val preparationPending: Boolean
-        get() = initialIndex < objective.boolWeightValues.size || core != null ||
+        get() = !costsPrepared || initialIndex < objectiveTerms || core != null ||
             (queryModel != null && query == null)
 
     override fun runSlice(
@@ -198,9 +213,17 @@ internal class CoreGuidedSearch(
     ): MinimizeResult? {
         val deadline = requireNotNull(segment.deadline())
         while (!preparation()) {
-            if (initialIndex < objective.boolWeightValues.size) {
+            if (!costsPrepared) {
+                costsPrepared = true
+                SeparableObjectiveView.create(base, objective, preparation)?.let {
+                    costs = it.objective
+                    lower = cheapest(base, costs)
+                }
+                if (preparation()) continue
+            }
+            if (initialIndex < objectiveTerms) {
                 prepareObjective()
-                if (initialIndex < objective.boolWeightValues.size) continue
+                if (initialIndex < objectiveTerms) continue
                 threshold = if (stratify) maximumWeight() else BIG_ONE
             }
             if (core != null) {
@@ -233,6 +256,9 @@ internal class CoreGuidedSearch(
             val paused = result is SolveResult.Unknown &&
                 (result.reason == TerminationReason.Cancelled || result.reason == TerminationReason.BudgetExhausted) &&
                 segment() && !token() && !quotaExhausted
+            val refutationModel = if (result is SolveResult.Unsat &&
+                coreRefinement == CoreRefinementMode.DELETION
+            ) queryModel else null
             finishQuery(keepModel = paused)
             if (paused) {
                 return if (allowanceExhausted) finish(stopped(TerminationReason.BudgetExhausted)) else null
@@ -272,13 +298,16 @@ internal class CoreGuidedSearch(
                 is SolveResult.Unsat -> {
                     val assumptions = result.assumptionCore
                     recordPreparation(querySofts.size.toLong())
-                    val selected = if (assumptions == null) {
+                    val projected = if (assumptions == null) {
                         querySofts
                     } else {
                         querySofts.filter {
                             assumptions.boolValueOrNull(Lit.variable(it)) == !Lit.isPositive(it)
                         }.toIntArray()
                     }
+                    val selected = refutationModel?.let {
+                        CoreRefinement.refine(it, projected, params.assumptions, preparation, ::recordPreparation)
+                    } ?: projected
                     if (selected.isEmpty()) return finish(MinimizeResult.Infeasible(stats = stats))
                     recordPreparation(3L * selected.size)
                     coreWeight = selected.map { requireNotNull(weights[it]) }.reduce { a, b -> if (a < b) a else b }
@@ -303,11 +332,19 @@ internal class CoreGuidedSearch(
     }
 
     private fun prepareObjective() {
-        val end = minOf(objective.boolWeightValues.size, initialIndex + 256)
+        val end = minOf(objectiveTerms, initialIndex + 256)
         while (initialIndex < end) {
             val id = initialIndex++
             recordPreparation(1L)
-            val weight = objective.boolWeightValues[id]
+            if (id >= costs.boolWeightValues.size) {
+                val variable = id - costs.boolWeightValues.size
+                val coefficient = costs.intCoefficientValues[variable]
+                if (coefficient == 0L) continue
+                val domain = base.rootIntDomain(variable)
+                appendFrontier(variable, coefficient, if (coefficient > 0L) domain.min else domain.max)
+                continue
+            }
+            val weight = costs.boolWeightValues[id]
             if (weight == 0L) continue
             val exact = bigIntOf(weight)
             val preferred = Lit.make(id, weight < 0L)
@@ -337,7 +374,11 @@ internal class CoreGuidedSearch(
             val residual = requireNotNull(weights[id]) - coreWeight
             if (residual == BIG_ZERO) {
                 weights.remove(id)
-                tails.remove(id)?.let { appendThreshold(it.literals, it.minimum, it.weight) }
+                when (val tail = tails.remove(id)) {
+                    is ThresholdTail -> appendThreshold(tail.literals, tail.minimum, tail.weight)
+                    is FrontierTail -> appendFrontier(tail.variable, tail.coefficient, tail.reached)
+                    null -> Unit
+                }
             } else {
                 weights[id] = residual
             }
@@ -357,6 +398,20 @@ internal class CoreGuidedSearch(
         recordPreparation(1L + literals.size)
         // A latent higher threshold implies its frontier; spending the frontier exposes its successor.
         if (minimum < literals.size) tails[literal] = ThresholdTail(literals, minimum + 1, weight)
+    }
+
+    private fun appendFrontier(variable: Int, coefficient: Long, reached: Long) {
+        val domain = base.rootIntDomain(variable)
+        val ascending = coefficient > 0L
+        if (if (ascending) reached >= domain.max else reached <= domain.min) return
+        val next = if (ascending) domain.higher(reached) else domain.lower(reached)
+        val selector = nextBool++
+        val op = if (ascending) LinearOp.GE else LinearOp.LE
+        factors.add(ReifiedLinear(selector, longArrayOf(1), intArrayOf(variable), op, next))
+        val literal = Lit.make(selector, true)
+        weights[literal] = bigIntOf(coefficient).abs() * (bigIntOf(next) - bigIntOf(reached)).abs()
+        tails[literal] = FrontierTail(variable, coefficient, next)
+        recordPreparation(3L)
     }
 
     private fun maximumWeight(below: BigInt? = null): BigInt? {
@@ -389,6 +444,7 @@ internal class CoreGuidedSearch(
                     cutExchange = null,
                 ),
                 ownsWorkDebt = false,
+                projectAssumptionCore = coreRefinement == CoreRefinementMode.REASONS,
             )
         } catch (failure: SearchInitializationCancelled) {
             settleQuery(failure.stats, failure.work)
@@ -468,17 +524,53 @@ internal class CoreGuidedSearch(
     }
 
     companion object {
-        fun scalarProofs(objective: LinearObjective): Boolean {
-            val magnitude = objective.boolWeightValues.fold(bigIntOf(objective.constant).abs()) { value, weight ->
-                value + bigIntOf(weight).abs()
+        fun scalarProofs(problem: BakedProblem, objective: LinearObjective): Boolean {
+            var magnitude = objective.boolWeightValues.fold(bigIntOf(objective.constant).abs()) { total, weight ->
+                total + bigIntOf(weight).abs()
+            }
+            for (v in objective.intCoefficientValues.indices) {
+                val coefficient = objective.intCoefficientValues[v]
+                if (coefficient == 0L) continue
+                if (v >= problem.numIntVars) return false
+                val domain = problem.rootIntDomain(v)
+                val low = bigIntOf(domain.min).abs()
+                val high = bigIntOf(domain.max).abs()
+                val extreme = if (low > high) low else high
+                magnitude += bigIntOf(coefficient).abs() * extreme
             }
             return magnitude <= bigIntOf(9_007_199_254_740_992L)
         }
 
+        /** Boolean objectives, which curated pools admit. */
         fun eligible(problem: BakedProblem, objective: LinearObjective): Boolean =
+            admits(problem, objective) && objective.intCoefficientValues.all { it == 0L }
+
+        /**
+         * Boolean objectives and exact integer costs over columns whose source bounds are closed on both
+         * sides, so no frontier starts from or walks toward an endpoint the finite projection invented.
+         */
+        fun admits(problem: BakedProblem, objective: LinearObjective): Boolean =
             problem.numRealVars == 0 && objective.boolWeightValues.size <= problem.numBoolVars &&
-                objective.intCoefficientValues.all { it == 0L } &&
-                objective.realCoefficientValues.all { it == 0.0 }
+                objective.realCoefficientValues.all { it == 0.0 } &&
+                objective.intCoefficientValues.indices.all { v ->
+                    objective.intCoefficientValues[v] == 0L || exactColumn(problem, v)
+                }
+
+        private fun exactColumn(problem: BakedProblem, v: Int): Boolean = v < problem.numIntVars &&
+            !problem.semantics.isApproximate && problem.intBounds.hasLower(v) && problem.intBounds.hasUpper(v)
+
+        private fun cheapest(problem: BakedProblem, objective: LinearObjective): BigInt {
+            var value = objective.boolWeightValues.fold(bigIntOf(objective.constant)) { total, weight ->
+                if (weight < 0L) total + bigIntOf(weight) else total
+            }
+            for (v in objective.intCoefficientValues.indices) {
+                val coefficient = objective.intCoefficientValues[v]
+                if (coefficient == 0L || v >= problem.numIntVars) continue
+                val domain = problem.rootIntDomain(v)
+                value += bigIntOf(coefficient) * bigIntOf(if (coefficient > 0L) domain.min else domain.max)
+            }
+            return value
+        }
     }
 }
 

@@ -113,6 +113,7 @@ internal object Compiler {
         private val divModOperands = HashMap<FExpr, Int>()
         private val divModRelations = com.eignex.klause.lowering.DivModRelationIndex()
         override val factors = ArrayList<Factor>()
+        internal val classes = Xcsp3ConstraintClasses(factors)
         internal var nextBool = 0
         internal var objective: LinearObjectiveSpec? = null
         internal var objectiveMaximize = false
@@ -325,6 +326,10 @@ internal object Compiler {
 
         fun constraint(e: XmlElement) {
             requireHardConstraint(e)
+            classes.within(e.attr("class")) { dispatch(e) }
+        }
+
+        private fun dispatch(e: XmlElement) {
             when (e.tag) {
                 "allDifferent" -> allDifferent(e)
                 "sum" -> sum(e)
@@ -971,16 +976,22 @@ internal object Compiler {
         }
 
         internal fun divModTerm(args: List<FExpr>, mod: Boolean): IntComb {
-            val a = divModOperands.getOrPut(args[0]) { materializeVar(linear(args[0])) }
+            val a = divModOperand(args[0]) { linear(args[0]) }
             val bLin = linear(args[1])
-            if (!bLin.isConstant()) return divModVar(a,
-                divModOperands.getOrPut(args[1]) { materializeVar(bLin) }, mod)
+            if (!bLin.isConstant()) return divModVar(a, divModOperand(args[1]) { bLin }, mod)
             val k = when (bLin) {
                 is IntComb.Narrow -> bLin.lin.constant
                 is IntComb.Wide -> throw UnsupportedXcsp3Exception("div/mod by an over-64-bit constant divisor")
             }
             if (k == 0L) throw UnsupportedXcsp3Exception("div/mod by zero divisor")
             return retainedDivMod(a, constVar(k), mod)
+        }
+
+        private fun divModOperand(operand: FExpr, lin: () -> IntComb): Int {
+            val start = factors.size
+            val v = divModOperands.getOrPut(operand) { materializeVar(lin()) }
+            classes.define(v, start)
+            return v
         }
 
         internal fun divModVar(a: Int, b: Int, mod: Boolean): IntComb {
@@ -996,7 +1007,9 @@ internal object Compiler {
             val relation = divModRelations.retain(a, b, domains[a], domains[b],
                 quotient = null, remainder = null,
                 freshInt = { domain -> newAuxVar(domain.min, domain.max) })
+            val start = factors.size
             factors.addAll(relation.factors)
+            classes.define(relation.quotient, start)
             return IntComb.Narrow(LinComb(mapOf((if (mod) relation.remainder else relation.quotient) to 1L), 0L))
         }
 
@@ -1261,17 +1274,29 @@ internal object Compiler {
             while (true) {
                 val tag = reader.nextChildTag() ?: return
                 when (tag) {
-                    "group" -> streamGroup(reader)
-                    "block" -> if (reader.enterPeeked(::requireHardAttribute)) streamConstraints(reader)
+                    "group" -> {
+                        val group = requireNotNull(enterStreamed(reader)) { "group without a template constraint" }
+                        classes.within(group) { streamGroup(reader) }
+                    }
+                    "block" -> enterStreamed(reader)?.let { classes.within(it) { streamConstraints(reader) } }
                     else -> constraint(reader.materializeChild())
                 }
             }
         }
 
-        /** Stream a `<group>`: materialize the (first, bounded) template, then instantiate one `<args>` row
-         *  at a time, so a group over millions of rows never holds them all at once. */
+        /** Open the peeked container's start tag; its `class` attribute, or null when it has no body. */
+        private fun enterStreamed(reader: XmlReader): String? {
+            var containerClasses = ""
+            val entered = reader.enterPeeked { name, value ->
+                requireHardAttribute(name, value)
+                if (name == "class") containerClasses = value
+            }
+            return if (entered) containerClasses else null
+        }
+
+        /** Stream an entered `<group>`: materialize the (first, bounded) template, then instantiate one
+         *  `<args>` row at a time, so a group over millions of rows never holds them all at once. */
         private fun streamGroup(reader: XmlReader) {
-            require(reader.enterPeeked(::requireHardAttribute)) { "group without a template constraint" }
             val firstTag = reader.nextChildTag()
                 ?: throw UnsupportedXcsp3Exception("group without a template constraint")
             require(firstTag != "args") { "group template must precede its <args> rows" }
@@ -1317,7 +1342,7 @@ internal object Compiler {
             tokens: List<String>,
         ) {
             if (intensionTemplate != null) {
-                intension(FExpr.substitute(intensionTemplate, tokens))
+                classes.within(template.attr("class")) { intension(FExpr.substitute(intensionTemplate, tokens)) }
             } else {
                 constraint(template.substituteParams(tokens, used))
             }
@@ -1346,6 +1371,13 @@ internal object Compiler {
                 if (spec.intCoefficientValues.size >= domains.size) spec
                 else spec.copy(intCoefficients = spec.intCoefficientValues.copyOf(domains.size))
             }
+            val implied = classes.mask(factors.size)?.also { mask ->
+                // The forced-true literal is a constant every constraint shares, so no class owns its unit clause.
+                for (i in mask.indices) {
+                    val unit = factors[i]
+                    if (unit is Clause && unit.literals.size == 1 && unit.literals[0] == trueLitCache) mask[i] = false
+                }
+            }?.takeIf { mask -> mask.any { it } }
             return Xcsp3Problem(
                 Problem(
                     settings = settings,
@@ -1354,6 +1386,8 @@ internal object Compiler {
                     numIntVars = domains.size,
                     intDomains = domains.toTypedArray(),
                     factors = factors.toTypedArray(),
+                    impliedFactorMask = implied,
+                    hasSymmetryBreaking = classes.hasSymmetryBreaking,
                     // A raw problem: the base bake is deferred to presolve step 0 (`Problem.bake`); construction
                     // is pure parse. The pipeline folds it (and can LP-tighten a wide domain first).
                 ),

@@ -98,6 +98,16 @@ overflow scans and pivot cost selection. A rejected definition leaves other pivo
 of that equality and translations through other definitions available.
 Wider affine expressions, approximate semantics, open-theory
 preparation and protection-only objectives retain objective-column protection.
+`SeparableObjectiveView` can expand a single integer output through retained
+mandatory integral equalities and unit pivots without rewriting the model or its
+objective. It combines coefficients and offsets in the same normalized objective
+units, declining checked overflow,
+open columns, approximate semantics and cyclic expansion. One attempt permits at
+most 4096 integer slots, 256 surviving terms, depth 16 and 32768 charged visits.
+Breadth-first selection assigns each defining row one pivot before expansion, so
+shared partners cannot reverse a row selected for another output.
+Conditional rows supply no definition authority. A failed or interrupted attempt
+leaves the original costs available; its work remains charged.
 Default single-core mixed placement optimization can prepare a second finite view
 with objective columns protected when affine substitution removed an objective
 coordinate. This elective preparation spends the remaining preparation allowance;
@@ -427,6 +437,18 @@ domains, and value pins and precedence chains use only columns with live factor
 readers. Value orbits intersecting an active objective column's domain stay fixed.
 Active-column scans charge and poll the pass token; an interrupted scan
 posts no break. Both passes stay off for solution-set-sensitive queries.
+
+The opt-in finite `objective-symmetry` pass runs before `symmetry` and admits
+variable permutations under the exact current replacement objective. Candidate
+colors combine root domains or Boolean fixings with signed objective coefficients;
+verification checks those declarations, every coefficient and the complete factor
+multiset. Constant offsets are invariant. Scalar orders additionally require each
+adjacent single transposition to pass verification, so a lockstep matrix orbit
+receives only the existing generator lex and stabilizer propagation. Value symmetry
+still protects objective domains. Protection-only contexts, real coordinates,
+source symmetry annotations and solution-sensitive operations decline this pass;
+pure local-search plans disable it. Default admission retains objective-column
+protection. Discovery and verification share the preparation allowance.
 
 Boolean probing retains failed-literal units and bounds implied by both polarities;
 integer and open-range probing extend this to bounds and holes. Compilation, incidence,

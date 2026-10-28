@@ -91,35 +91,8 @@ class DisjunctivePropagatorTest {
 
     @Test
     fun `overload deductions over duration ranges and optional tasks should be implied by their reasons`() {
-        val shapes = listOf(
-            OverloadShape("distinct"),
-            OverloadShape("shared start", starts = intArrayOf(0, 0, 1)),
-            OverloadShape("shared duration", durationVars = intArrayOf(3, 3, 4)),
-            OverloadShape("repeated presence", presents = IntArray(3) { Lit.make(it / 2, true) }),
-            OverloadShape("opposite presence", presents = IntArray(3) { Lit.make(minOf(it, 1), it < 2) }),
-            OverloadShape("zero minima", minDuration = 0),
-        )
-        for ((index, shape) in shapes.withIndex()) {
-            val used = (shape.starts + shape.durationVars).toSet()
-            val problem = Problem(
-                numBoolVars = 3,
-                numIntVars = 6,
-                intDomains = Array(6) {
-                    when {
-                        it !in used -> IntDomain(0, 0)
-                        it < 3 -> IntDomain(0, 3)
-                        else -> IntDomain(shape.minDuration, 2)
-                    }
-                },
-                factors = arrayOf<Factor>(
-                    Cumulative.unary(
-                        starts = shape.starts,
-                        durations = LongArray(3) { 2L },
-                        presents = shape.presents,
-                        durationVars = shape.durationVars,
-                    ),
-                ),
-            )
+        for ((index, shape) in overloadShapes.withIndex()) {
+            val problem = shape.problem()
             val rng = Random(0xD17 + index)
             repeat(5) { iter ->
                 PropagationReasonOracle.assertReasonsImply(problem, "${shape.label}#$iter") { state ->
@@ -132,12 +105,177 @@ class DisjunctivePropagatorTest {
         }
     }
 
+    @Test
+    fun `guard exclusions should be implied by their reasons`() {
+        val guards = IntArray(3) { Lit.make(it / 2, true) }
+        val shapes = listOf(
+            OverloadShape("shared guard", presents = guards),
+            OverloadShape("shared guard and start", starts = intArrayOf(0, 0, 1), presents = guards),
+            OverloadShape("shared guard and duration", durationVars = intArrayOf(3, 3, 4), presents = guards),
+            OverloadShape("shared guard zero minima", presents = guards, minDuration = 0),
+            OverloadShape("one guard", presents = IntArray(3) { Lit.make(0, false) }),
+        )
+        for ((index, shape) in shapes.withIndex()) {
+            val problem = shape.problem()
+            val rng = Random(0xD19 + index)
+            repeat(5) { iter ->
+                PropagationReasonOracle.assertReasonsImply(problem, "${shape.label}#$iter") { state ->
+                    (0 until 2).all { b -> rng.nextInt(3) != 0 || state.pinBool(b, rng.nextBoolean()) } &&
+                        shape.starts.all { state.tightenIntMax(it, 1L + rng.nextInt(2)) } &&
+                        shape.durationVars.all { rng.nextBoolean() || state.tightenIntMin(it, 2) } &&
+                        (rng.nextBoolean() || state.excludeIntValue(shape.starts[0], 1))
+                }
+            }
+        }
+    }
+
     private class OverloadShape(
         val label: String,
         val starts: IntArray = intArrayOf(0, 1, 2),
         val durationVars: IntArray = intArrayOf(3, 4, 5),
         val presents: IntArray = IntArray(3) { Lit.make(it, true) },
         val minDuration: Long = 1,
+    ) {
+        fun problem(): Problem {
+            val used = (starts + durationVars).toSet()
+            return Problem(
+                numBoolVars = 3,
+                numIntVars = 6,
+                intDomains = Array(6) {
+                    when {
+                        it !in used -> IntDomain(0, 0)
+                        it < 3 -> IntDomain(0, 3)
+                        else -> IntDomain(minDuration, 2)
+                    }
+                },
+                factors = arrayOf<Factor>(
+                    Cumulative.unary(
+                        starts = starts,
+                        durations = LongArray(3) { 2L },
+                        presents = presents,
+                        durationVars = durationVars,
+                    ),
+                ),
+            )
+        }
+    }
+
+    private val overloadShapes = listOf(
+        OverloadShape("distinct"),
+        OverloadShape("shared start", starts = intArrayOf(0, 0, 1)),
+        OverloadShape("shared duration", durationVars = intArrayOf(3, 3, 4)),
+        OverloadShape("repeated presence", presents = IntArray(3) { Lit.make(it / 2, true) }),
+        OverloadShape("opposite presence", presents = IntArray(3) { Lit.make(minOf(it, 1), it < 2) }),
+        OverloadShape("zero minima", minDuration = 0),
+    )
+
+    @Test
+    fun `tasks sharing an unknown presence that cannot fit together should rule it out`() {
+        for (positive in listOf(true, false)) {
+            val problem = Problem(
+                numBoolVars = 1,
+                numIntVars = 2,
+                intDomains = Array(2) { IntDomain(0, 1) },
+                factors = arrayOf<Factor>(guardedPair(positive)),
+            )
+
+            val result = problem.propagate(Assumptions.None)
+
+            assertTrue(result is PropagationResult.Implied, "$result")
+            assertEquals(!positive, result.boolValueOrNull(0))
+        }
+    }
+
+    @Test
+    fun `a ruled-out shared presence should reach a clause over it`() {
+        val problem = Problem(
+            numBoolVars = 2,
+            numIntVars = 2,
+            intDomains = Array(2) { IntDomain(0, 1) },
+            factors = arrayOf(guardedPair(true), Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
+        )
+
+        val result = problem.propagate(Assumptions.None)
+
+        assertTrue(result is PropagationResult.Implied, "$result")
+        assertEquals(true, result.boolValueOrNull(1))
+    }
+
+    @Test
+    fun `a guard exclusion reason should cite the windows as they stood and not the shared presence`() {
+        val problem = Problem(
+            numBoolVars = 1,
+            numIntVars = 2,
+            intDomains = Array(2) { IntDomain(0, 9) },
+            factors = arrayOf<Factor>(guardedPair(true)),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        state.currentLevel = 1
+        check(state.tightenIntMax(0, 1) && state.tightenIntMax(1, 1))
+        state.currentFactor = 0
+        check(state.factorAt(0).propagate(state, 0) && state.boolValues[0] == false)
+        val recorded = state.boolAntecedents[0]
+        state.currentFactor = -1
+        state.currentLevel = 2
+        check(state.tightenIntMax(0, 0))
+
+        val reason = requireNotNull(state.reasonOf(recorded))
+
+        val cited = reason.map { lit ->
+            val v = Lit.variable(lit)
+            if (v < problem.numBoolVars) {
+                "b$v=${Lit.isPositive(lit)}"
+            } else {
+                val atom = v - problem.numBoolVars
+                "x${state.atoms.intVar[atom]} ${state.atoms.kind[atom]} ${state.atoms.threshold[atom]}"
+            }
+        }.toSet()
+        assertEquals(setOf("x0 LE 1", "x1 LE 1"), cited)
+    }
+
+    @Test
+    fun `a guard exclusion should retract with its premises`() {
+        val problem = Problem(
+            numBoolVars = 1,
+            numIntVars = 2,
+            intDomains = Array(2) { IntDomain(0, 9) },
+            factors = arrayOf<Factor>(guardedPair(true)),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        val mark = state.mark()
+        state.currentLevel = 1
+        check(state.tightenIntMax(0, 1) && state.tightenIntMax(1, 1))
+        state.currentFactor = 0
+        check(state.factorAt(0).propagate(state, 0) && state.boolValues[0] == false)
+
+        state.undoTo(mark)
+
+        assertNull(state.boolValues[0])
+    }
+
+    @Test
+    fun `an unrepresentable completion time should decline the guard check`() {
+        val top = Long.MAX_VALUE - 1
+        val problem = Problem(
+            numBoolVars = 1,
+            numIntVars = 2,
+            intDomains = Array(2) { IntDomain(top, top) },
+            factors = arrayOf<Factor>(guardedPair(true)),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.currentFactor = 0
+
+        check(state.factorAt(0).propagate(state, 0))
+
+        assertNull(state.boolValues[0])
+    }
+
+    private fun guardedPair(positive: Boolean) = Cumulative.unary(
+        starts = intArrayOf(0, 1),
+        durations = longArrayOf(2, 2),
+        presents = IntArray(2) { Lit.make(0, positive) },
     )
 
     @Test

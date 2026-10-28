@@ -32,7 +32,7 @@ eignexPublish {
 val fullTargets = providers.gradleProperty("targets.full").isPresent
 
 // Compact model JSON needs Skema's unreleased fixed-field nodes, root path decoding and integral tokens.
-val skemaPin = "0.3.1-20261027.115734-17"
+val skemaPin = "0.3.1-20261028.100806-19"
 
 kotlin {
     compilerOptions {
@@ -56,7 +56,7 @@ kotlin {
                 version { strictly("0.1.1-20261023.051622-264") }
             }
             implementation("com.eignex:kumulant:0.3.4-20261013.194059-67")
-            implementation("com.eignex:kpermute:1.2.0")
+            implementation("com.eignex:kpermute:1.3.0")
         }
         // BigInt is java.math.BigInteger on the JVM; native has no platform big integer to map onto.
         nativeMain.dependencies {

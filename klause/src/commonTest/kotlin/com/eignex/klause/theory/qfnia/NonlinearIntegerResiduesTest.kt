@@ -1,0 +1,186 @@
+package com.eignex.klause.theory.qfnia
+
+import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
+import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
+import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
+import com.eignex.klause.formats.smtlib.SmtLibPolynomial
+import com.eignex.klause.ir.NonlinearIntegerProblem
+import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.theory.qfnra.PolynomialCondition
+import com.eignex.klause.theory.qfnra.QfNraParams
+import com.eignex.klause.theory.qfnra.QfNraResult
+import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertIs
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+class NonlinearIntegerResiduesTest {
+    @Test
+    fun `mandatory multivariate systems should refute with shared integer residues`() {
+        val assertions = listOf(
+            "(assert (= (+ (* x x) (* y y)) 3))",
+            "(assert (= (+ (* x x) (* y y)) (+ (* 4 z) 3)))",
+            "(assert (= (* x y) 2)) (assert (= (+ x y) 4))",
+            "(assert (= (+ (* (/ 1 2) x x) (* (/ 1 2) y y)) (/ 3 2)))",
+            "(assert (= (+ (* (- x) (- x)) (* y y)) (- 1)))",
+            "(assert (= (+ (* x x) (* y y)) 100000000000000000000000000000000000003))",
+            "(define-fun square ((n Int)) Int (* n n)) " +
+                "(assert (let ((a x) (b y)) (= (+ (square a) (square b)) 3)))",
+        )
+        for (assertion in assertions) {
+            val source = source(assertion)
+
+            val execution = solveNonlinearIntegers(source, NonlinearIntegerParams(residueRefutation = true))
+
+            assertIs<QfNraResult.Unsatisfiable>(execution.result, assertion)
+            assertEquals(1L, execution.stats.residues.refuted, assertion)
+            assertEquals(0L, execution.stats.checks, assertion)
+            assertTrue(execution.stats.residues.tuples > 0, assertion)
+        }
+    }
+
+    @Test
+    fun `surviving modular support should supply no integer verdict`() {
+        for (assertion in listOf(
+            "(assert (= (+ (* x x) (* y y)) 2))",
+            "(assert (= (+ (* x x) (* y y)) 21))",
+            "(assert (= (* (/ 1 2) x y) 1))",
+            "(assert (= (+ (^ x 2147483647) y) 0))",
+        )) {
+            val residues = NonlinearIntegerResidues(source(assertion), PolynomialArithmetic(), PolynomialLimits())
+
+            val refuted = residues.refutes()
+
+            assertFalse(refuted, assertion)
+        }
+    }
+
+    @Test
+    fun `composite zero divisors should preserve a real integer witness`() {
+        val residues = NonlinearIntegerResidues(source(
+            "(assert (= (* x y) 4)) (assert (= x 2)) (assert (= y 2))",
+        ), PolynomialArithmetic(), PolynomialLimits())
+
+        assertFalse(residues.refutes())
+        assertEquals(5L, residues.stats.rings)
+    }
+
+    @Test
+    fun `guarded real auxiliary and non equality support should decline`() {
+        for (assertion in listOf(
+            "(assert (or (= (+ (* x x) (* y y)) 3) (= x y)))",
+            "(assert (not (= (+ (* x x) (* y y)) 3)))",
+            "(assert (< (+ (* x x) (* y y)) 3))",
+            "(assert (= (+ (* x x) (* r r)) 3))",
+            "(assert (= (+ (* x x) (ite b (* y y) 0)) 3))",
+            "(assert (= (* x x) 2)) (assert (= (* y y) 3))",
+        )) {
+            val residues = NonlinearIntegerResidues(source(assertion), PolynomialArithmetic(), PolynomialLimits())
+
+            assertFalse(residues.refutes(), assertion)
+            assertEquals(0L, residues.stats.refuted, assertion)
+        }
+    }
+
+    @Test
+    fun `containing storage limits should decline before a refutation`() {
+        for (limits in listOf(PolynomialLimits(maxMatrixCells = 0), PolynomialLimits(maxDenseCoefficients = 1))) {
+            val residues = NonlinearIntegerResidues(source("(assert (= (+ (* x x) (* y y)) 3))"),
+                PolynomialArithmetic(), limits)
+
+            assertFalse(residues.refutes())
+            assertEquals(1L, residues.stats.declined)
+        }
+    }
+
+    @Test
+    fun `denominator growth and incomplete enumeration should decline without proof`() {
+        for (assertion in listOf(
+            "(assert (= (+ (* (^ (/ 1 2) 10000) x x) (* y y)) 3))",
+            "(assert (= (+ (^ x 2147483646) (^ y 2147483646) " +
+                "(^ z 2147483646) (^ w 2147483646)) 7))",
+        )) {
+            val residues = NonlinearIntegerResidues(source(assertion), PolynomialArithmetic(), PolynomialLimits())
+
+            assertFalse(residues.refutes(), assertion)
+            assertEquals(0L, residues.stats.refuted)
+            assertEquals(1L, residues.stats.declined)
+        }
+    }
+
+    @Test
+    fun `containing cancellation should interrupt charged residue work`() {
+        var charged = 0L
+        val token = object : Cancellation {
+            override fun isCancelled(): Boolean = charged >= 40
+            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+        }
+        val residues = NonlinearIntegerResidues(source("(assert (= (+ (* x x) (* y y)) 3))"),
+            PolynomialArithmetic(token), PolynomialLimits())
+
+        assertFailsWith<PolynomialInterrupted> { residues.refutes() }
+        assertEquals(40L, charged)
+        assertEquals(0L, residues.stats.refuted)
+    }
+
+    @Test
+    fun `private residue work should share the containing allowance and preserve a stopped verdict`() {
+        val execution = solveNonlinearIntegers(source("(assert (= (+ (* x x) (* y y)) 3))"),
+            NonlinearIntegerParams(arithmetic = QfNraParams(maximumWork = 40), residueRefutation = true))
+
+        assertIs<QfNraResult.Unknown>(execution.result)
+        assertEquals(0L, execution.stats.residues.refuted)
+        assertEquals(40L, execution.stats.polynomial.workSpent)
+    }
+
+    @Test
+    fun `paused entry should preserve the same residue result and charge on resume`() {
+        val source = source("(assert (= (+ (* x x) (* y y)) 3))")
+        val params = NonlinearIntegerParams(residueRefutation = true)
+        val whole = solveNonlinearIntegers(source, params)
+        NonlinearIntegerCursor(source, params, PolynomialCondition()).use { cursor ->
+            assertNull(cursor.runSlice(Cancellation { true }))
+            assertEquals(0L, cursor.stats.polynomial.workSpent)
+
+            val resumed = requireNotNull(cursor.runSlice(maximumCandidates = 1))
+
+            assertIs<QfNraResult.Unsatisfiable>(resumed.result)
+            assertEquals(whole.stats, resumed.stats)
+        }
+    }
+
+    @Test
+    fun `a changed window should retain supported source residues without caching a scoped refutation`() {
+        val parsed = SmtLibPolynomial.parse(
+            "(declare-const x Int) (declare-const y Int) (assert (= (+ (* x x) (* y y)) 2))",
+            allowIntegers = true,
+        )
+        val source = NonlinearIntegerProblem(parsed.formula, parsed.realCount, parsed.boolCount,
+            parsed.intVarNames, parsed.realVarNames, parsed.boolVarNames)
+        val params = NonlinearIntegerParams(residueRefutation = true)
+        val zero = mapOf(0 to BigFraction.ZERO, 1 to BigFraction.ZERO)
+        val one = mapOf(0 to BigFraction.ONE, 1 to BigFraction.ONE)
+        val narrow = solveNonlinearIntegers(source, params, PolynomialCondition(lower = zero, upper = zero))
+
+        val changed = solveNonlinearIntegers(source, params, PolynomialCondition(lower = one, upper = one))
+
+        assertIs<QfNraResult.Unsatisfiable>(narrow.result)
+        assertIs<QfNraResult.Satisfiable>(changed.result)
+        assertEquals(0L, narrow.stats.residues.refuted)
+        assertEquals(0L, changed.stats.residues.refuted)
+    }
+
+    private fun source(assertions: String): NonlinearIntegerProblem {
+        val parsed = SmtLibPolynomial.parse(
+            "(declare-const x Int) (declare-const y Int) (declare-const z Int) (declare-const w Int) " +
+                "(declare-const r Real) (declare-const b Bool) $assertions", allowIntegers = true,
+        )
+        return NonlinearIntegerProblem(parsed.formula, parsed.realCount, parsed.boolCount,
+            parsed.intVarNames, parsed.realVarNames, parsed.boolVarNames)
+    }
+}

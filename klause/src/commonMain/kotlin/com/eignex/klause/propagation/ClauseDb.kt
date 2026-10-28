@@ -116,6 +116,7 @@ internal fun PropagationState.addLearnedPb(
     learned.origins.add(OWN_ORIGIN)
     refPayloadStore.add(null)
     val watched = prop.selectWatched(this)
+    arithmeticLearningTrace?.stored(newFid, "pb")
     for (lit in watched) installLitWatch(lit, newFid, NO_BLOCKER)
     refPayload[newFid] = watched
     return newFid
@@ -128,6 +129,7 @@ internal fun PropagationState.addLearnedIntegerRow(row: IntegerConflictRow, lbd:
     learned.store.add(propagator)
     val rows = learned.integerRows ?: ArrayList<LearnedIntegerPropagator>().also { learned.integerRows = it }
     rows.add(propagator)
+    arithmeticLearningTrace?.stored(factor, "integer")
     learned.lbds.add(lbd)
     learned.permanent.add(0)
     learned.tier.add(ClauseTier.UNSET.ordinal)
@@ -135,6 +137,7 @@ internal fun PropagationState.addLearnedIntegerRow(row: IntegerConflictRow, lbd:
     learned.origins.add(OWN_ORIGIN)
     refPayloadStore.add(null)
     for (watch in propagator.initialIntEventWatches) intEvents.subscribeMidlife(watch, factor)
+    if (row.guard != Lit.NONE) installLitWatch(row.guard xor 1, factor)
     return factor
 }
 
@@ -232,6 +235,7 @@ internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd
         remap[i] = if (keep(i, learned.lbds[i])) newCount++ else -1
     }
     if (newCount == n) return // nothing dropped
+    arithmeticLearningTrace?.remap(baseFactorCount, remap)
 
     learned.integerRows?.clear()
     var w = 0

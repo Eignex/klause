@@ -153,6 +153,7 @@ internal fun PropagationState.pinBoolImpl(v: Int, value: Boolean, antecedents: I
     // Dating it before that mark lets an asserting backjump erase several supposedly surviving literals.
     boolLevel[v] = maxOf(currentLevel, levelToDecisionVar.size)
     boolReason[v] = currentFactor
+    arithmeticLearningTrace?.pin(currentFactor, v, if (value) 1 else 0, "bool", boolLevel[v])
     noteLearnedUse(currentFactor) // a learned clause that forces a unit counts as reused
     boolAntecedents[v] = antecedents
     boolPinOrder.add(v)
@@ -296,6 +297,8 @@ private inline fun PropagationState.tightenBoundImpl(
         antecedents
     }
     intDomains[v] = newDomain
+    arithmeticLearningTrace?.pin(currentFactor, v, if (isMin) newDomain.min else newDomain.max,
+        if (isMin) "lower" else "upper", currentLevel)
     intLevel[v] = maxOf(intLevel[v], currentLevel)
     if (isMin) {
         intMinLevel[v] = currentLevel

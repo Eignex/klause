@@ -187,6 +187,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
     fun analyze(conflictFactorId: Int): AnalysisResult = boundedAnalysis {
         beginAnalysis()
         val factor = state.factorAt(conflictFactorId)
+        state.arithmeticLearningTrace?.seedEndpoints(state.factorIntVars(conflictFactorId), state)
         val seedReason = factor.conflictReason(state, conflictFactorId)
             ?: return@boundedAnalysis AnalysisResult.NotApplicable
         return@boundedAnalysis analyzeFromSeed(seedReason, conflictLevelOf(seedReason), seedFactorId = conflictFactorId)
@@ -214,6 +215,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         if (state.runCancelled) AnalysisResult.NotApplicable else result
     } catch (_: FinitePropagationInterrupted) {
         state.runCancelled = true
+        state.arithmeticLearningTrace?.record("analysis.cancelled")
         AnalysisResult.NotApplicable
     }
 
@@ -223,6 +225,8 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
      * sit below the literal's level on this one.
      */
     private fun beginAnalysis() {
+        state.arithmeticLearningTrace?.record("analysis.begin", state.currentFactor.toLong(),
+            state.currentLevel.toLong(), state.undo.size.toLong())
         state.lazyReasonMemo.clear()
         val atomCount = state.atoms.intVar.size
         if (atomLevelStamp.size < atomCount) {
@@ -241,6 +245,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         var max = 0
         for (lit in reason) {
             val l = levelOf(Lit.variable(lit))
+            state.arithmeticLearningTrace?.record("analysis.seed-level", lit.toLong(), l.toLong())
             if (l > max) max = l
         }
         return max
@@ -286,15 +291,31 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
      * externally-supplied clause seed.
      */
     private fun analyzeFromSeed(seedReason: IntArray, currentLevel: Int, seedFactorId: Int = -1): AnalysisResult {
-        if (currentLevel <= 0) return AnalysisResult.NotApplicable
+        state.arithmeticLearningTrace?.record("analysis.seed", seedFactorId.toLong(), currentLevel.toLong())
+        state.arithmeticLearningTrace?.clause("analysis.seed-clause", seedReason, state)
+        if (currentLevel <= 0) {
+            state.arithmeticLearningTrace?.record("analysis.decline.root")
+            return AnalysisResult.NotApplicable
+        }
         universe = state.problem.numBoolVars + state.atoms.intVar.size
+        if (state.integerRowLearning && seedFactorId < 0) {
+            state.arithmeticLearningTrace?.record("integer.decline.non-factor-seed")
+        }
 
         if (state.integerRowLearning && seedFactorId >= 0) {
             val fallback = runResolution(clauseResolvent, seedReason, currentLevel)
+            (fallback as? AnalysisResult.Learned)?.let {
+                state.arithmeticLearningTrace?.clause("integer.fallback", it.literals, state)
+            }
             val row = (fallback as? AnalysisResult.Learned)?.let {
                 IntegerConflictLearner(state).learn(seedFactorId, currentLevel, it)
             }
+            if (fallback !is AnalysisResult.Learned) {
+                state.arithmeticLearningTrace?.record("integer.decline.no-clausal-fallback")
+            }
             if (row != null) {
+                state.arithmeticLearningTrace?.row("integer.derived", row.row, state)
+                state.arithmeticLearningTrace?.record("integer.native-target", row.backjumpLevel.toLong())
                 lastResolvent = clauseResolvent
                 return row
             }
@@ -308,8 +329,17 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
             pb.seedFactorId = seedFactorId
             val r = runResolution(pb, seedReason, currentLevel)
             if (!pb.failed) {
+                state.arithmeticLearningTrace?.record(if (r is AnalysisResult.LearnedPb) "pb.derived" else "pb.clause")
+                if (r is AnalysisResult.LearnedPb) {
+                    state.arithmeticLearningTrace?.clause("pb.literals", r.literals, state)
+                    if (r.weights.size <= 64) state.arithmeticLearningTrace?.record("pb.weights", *r.weights)
+                    state.arithmeticLearningTrace?.record("pb.target", r.degree, r.backjumpLevel.toLong())
+                } else if (r is AnalysisResult.Learned) {
+                    state.arithmeticLearningTrace?.clause("pb.clause-result", r.literals, state)
+                }
                 val result = if (r is AnalysisResult.LearnedPb && state.problem.numIntVars > 0) {
                     val fallback = runResolution(clauseResolvent, seedReason, currentLevel) as? AnalysisResult.Learned
+                    fallback?.let { state.arithmeticLearningTrace?.clause("pb.fallback", it.literals, state) }
                     r.copy(fallbackClause = fallback)
                 } else {
                     r
@@ -319,7 +349,11 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
             }
         }
         lastResolvent = clauseResolvent
-        return runResolution(clauseResolvent, seedReason, currentLevel)
+        val result = runResolution(clauseResolvent, seedReason, currentLevel)
+        (result as? AnalysisResult.Learned)?.let {
+            state.arithmeticLearningTrace?.clause("analysis.clause-result", it.literals, state)
+        }
+        return result
     }
 
     /**

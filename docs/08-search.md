@@ -450,6 +450,13 @@ the exclusion. Its reason cites the overloaded set's start bounds, minimum
 durations and member presences, never the excluded presence. Zero minima add no
 load, and unrepresentable completion times decline the check.
 
+Tasks sharing one exact signed presence literal run together or not at all. When
+an unknown literal's tasks would together overload the present tasks, the literal
+is ruled out, citing the same windows, minimum durations and present members, never
+the shared literal. Only identical literals are grouped: complementary and distinct
+literals are checked separately. Groups are fixed when the propagator is built, so
+a factor without a repeated literal does no extra work.
+
 Diffn's constant-size sweep filters positive-area compulsory parts. Strict boxes
 with a zero dimension also receive the pairwise separation check, so the sweep's
 empty-area shortcut cannot admit an invalid complete assignment. Non-strict boxes

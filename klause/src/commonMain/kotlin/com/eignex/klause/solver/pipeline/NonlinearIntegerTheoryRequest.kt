@@ -20,6 +20,7 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.theory.qfnia.NonlinearIntegerCellStats
 import com.eignex.klause.theory.qfnia.NonlinearIntegerCursor
 import com.eignex.klause.theory.qfnia.NonlinearIntegerParams
+import com.eignex.klause.theory.qfnia.NonlinearIntegerResidueCounts
 import com.eignex.klause.theory.qfnia.NonlinearIntegerRootCounts
 import com.eignex.klause.theory.qfnia.NonlinearIntegerRootStore
 import com.eignex.klause.theory.qfnia.NonlinearIntegerStrategy
@@ -69,6 +70,8 @@ data class NonlinearIntegerTheoryParams(
     val steerSourceCells: Boolean = false,
     /** Admit complete integer root sets of mandatory unary polynomial equalities on original integers. */
     val admitIntegerRoots: Boolean = false,
+    /** Enable bounded residue refutations of mandatory equalities on original integers. */
+    val residueRefutation: Boolean = false,
 ) {
     init {
         require(maximumCandidates >= 0 && maximumMoves >= 0)
@@ -136,6 +139,10 @@ internal class NonlinearIntegerInvocation(
     private var completedRoots = NonlinearIntegerRootCounts()
     private var retainedRoots = NonlinearIntegerRootCounts()
     internal val rootCounts: NonlinearIntegerRootCounts get() = completedRoots + retainedRoots
+    private var completedResidues = NonlinearIntegerResidueCounts()
+    private var retainedResidues = NonlinearIntegerResidueCounts()
+    internal val residueCounts: NonlinearIntegerResidueCounts
+        get() = completedResidues + retainedResidues
     private val external = polynomial.timeout or polynomial.cancellation
     private val stop = external or Cancellation {
         polynomial.maximumWork?.let { native.workSpent >= it } == true || resource != null ||
@@ -233,6 +240,7 @@ internal class NonlinearIntegerInvocation(
             resource,
             integerCells = cellReuseStats(params, listOf(this)),
             integerRoots = integerRootStats(params, listOf(this)),
+            integerResidues = integerResidueStats(params, listOf(this)),
         )
     }
 
@@ -295,6 +303,7 @@ internal class NonlinearIntegerInvocation(
                 reuseSourceCells = params.reuseSourceCells,
                 steerSourceCells = params.steerSourceCells,
                 admitIntegerRoots = params.admitIntegerRoots,
+                residueRefutation = params.residueRefutation,
             ),
             pins,
             roots,
@@ -318,6 +327,7 @@ internal class NonlinearIntegerInvocation(
             native = cursor.stats.polynomial
             retainedCells = cursor.stats.cells
             retainedRoots = cursor.stats.roots
+            retainedResidues = cursor.stats.residues
             retainedChecks = cursor.stats.checks
             searchStats = searchStats.copy(search = SearchStats(nodes = SumResult(cursor.stats.candidates.toDouble())))
             var charged = cursor.stats.candidates - before
@@ -418,6 +428,7 @@ internal class NonlinearIntegerInvocation(
                 reuseSourceCells = params.reuseSourceCells,
                 steerSourceCells = params.steerSourceCells,
                 admitIntegerRoots = params.admitIntegerRoots,
+                residueRefutation = params.residueRefutation,
             ),
             condition,
             roots,
@@ -425,6 +436,7 @@ internal class NonlinearIntegerInvocation(
         val observed = execution.stats.polynomial
         completedCells += execution.stats.cells
         completedRoots += execution.stats.roots
+        completedResidues += execution.stats.residues
         completedChecks += execution.stats.checks
         native = QfNraStats(
             sum(native.projectedPolynomials, observed.projectedPolynomials),

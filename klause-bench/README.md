@@ -58,6 +58,36 @@ controls and establish no solver throughput or verdict claim.
 
 ## Klause-lab
 
+`bench.profile.CoreQueryProfile` compares retained and ordinarily prepared Boolean
+core controls with unrelated cheap objective pins. Two source shapes, five OLL
+policies and three repeats give 60 two-second core cases, alongside 24 matched
+native-SAT BnB controls with LP off/forced bounding. Allow 300 seconds for the full
+profile. `confirm=true` selects one equal-weight source, both preparation policies
+and one repeat: ten core cases, four BnB cases and four helper calls, each capped at
+two seconds.
+It retains source/objective hashes, actual query/core
+sequences, source point checks, preparation and complete-handle time/allocation,
+work and thresholds. Policies include removing root-satisfied cost pins, bounded
+propagation deletion (`refined`) and seed reason projection (`projected`). The
+opt-in propagation-deletion control shares the worker's
+allowance. Separate helper calls retain the existing opt-in deletion minimizer's
+actual seed-path behavior. These native controls establish no independently checked
+proof or whole-CLI throughput claim.
+
+`bench.profile.CoreQueryLearningProfile` captures six bounded completed OLL query
+sequences over the incidental-`q` control, with retained/default preparation and
+three repeats. It replays the identical queries with and without a source-checked
+unit from an earlier completed query. Only source-coordinate `q` is eligible;
+remapped prepared coordinates decline. Every source check receives at most 512
+decisions and 500 ms under one 120-second capture deadline. It records actual pins,
+candidate checks, query construction/search time and allocation, source-point
+checks and visits to `q=false`. A conditioned `q or a` negative rejects exporting
+`q` from `a=false`. This is a bounded replay experiment, not a mutable query owner
+or ordinary slice-retention measurement.
+`confirm=true` selects one repeat of each preparation policy, including checked
+source outcomes and actual `q=false` assertion attempts. It is an observation
+confirmation rather than a timing repeat.
+
 [Klause-lab](https://github.com/Eignex/klause-lab) owns everything that runs more than
 one case: experiments and A/B comparisons, regression schedules, reference solving and
 reference results, witness checking and profiling. It builds the Klause revisions an
@@ -112,6 +142,49 @@ resources. The legacy experiment path remains available for reference arms and
 paired A/B comparisons; a bench request names one source revision.
 
 ## Selection and named sets
+
+`nonlinear-integer-residues-v1` and its matching
+`smtlib-nonlinear-integer-residues-v1` suite retain ten synthetic multivariate
+integer equality controls. Their [notes](smoke-corpus/nonlinear-integer-residues-v1/README.md)
+give independent mathematical expectations and pinned source hashes. Compare
+`nia-residues=false` and `true` with identical work and candidate controls;
+`niaResidueRings`, `niaResidueTuples`, `niaResidueWork`,
+`niaResidueRefutedScopes` and `niaResidueDeclines` expose completed and incomplete
+native work. Residue work is included in the containing polynomial allowance.
+The option defaults off; synthetic refutation capability establishes no corpus
+benefit or default activation case.
+
+The bounded cloud comparison [8976](https://lab.eignex.com/jobs/8976), at
+`6b0ffe9cf1`, uses all ten sources with identical off/on arms, eight candidates,
+100,000 native work units and a two-second case budget on Linux amd64. All sources
+enter the nonlinear integer route. The five residue discriminators change from
+UNKNOWN to native UNSAT, consuming one completed residue refutation each with
+10–68 tuples and 239–1,737 residue work units. The two reported SAT controls remain
+SAT in both arms; Dolmen accepts all four original-source models. The guarded SAT
+alternative, real-supported SAT input and selected-ring inconclusive UNSAT input
+remain UNKNOWN in both arms. The real-supported equality records a decline; the
+guard supplies no residue premise. Build/runtime fingerprints, original hashes and
+checker resource receipts are retained with the job.
+
+These are synthetic capability and cost observations, not a process-throughput
+comparison. Native UNSAT has no exported certificate or independent reference
+replay here: the service requires local-only reference placement, so the initial
+automatic reference job was cancelled before execution and cloud reference
+placement was rejected. The option remains disabled by default.
+
+The existing-source comparison [8978](https://lab.eignex.com/jobs/8978), at
+`7ac88f813f`, retains all twelve frozen `nonlinear-integer-v1` identities under the
+same off/on controls. Its records distinguish source admission, native work and
+original-source witness checks. Unary, guarded and real-supported equalities are
+outside residue admission; the open product has modular support. These source
+shapes supply no expectation of a new residue refutation or a default benefit.
+Five identities reject the NIA-specific CLI controls on finite or polynomial-real
+routes in both arms; these are command rejections, not UNKNOWN solver outcomes.
+The seven executed pairs match, with no residue refutation. The admitted open
+product retains support in all five rings and adds 370 native work units. Dolmen
+accepts the four wide-square/overflow SAT models; its two Boolean-assumption model
+checks remain unknown with `unbound-id`. This bounded check establishes no
+existing-source benefit and makes no claim about the ten rejected executions.
 
 `sets/<name>.txt` fixes membership as one `<suite>/<problem>` identity per line,
 matching `select`; `@<set>` includes another set and `#` starts a comment.
@@ -360,6 +433,178 @@ This decoding belongs to selection preparation; ordinary cases use the prepared
 plain inputs. Hashes use decompressed bytes.
 Compression writes beside the original, verifies SHA-256, then replaces it;
 interrupted migration can resume.
+
+## Objective-preserving symmetry admission
+
+`bench.profile.SymmetryAdmissionProfile` captures ordinary protected preparation
+and opt-in `default,+objective-symmetry` preparation for one to eight hash-pinned
+XCSP3 optimization sources or `wcnf-core` sources. Submit it as a lab profile with
+`request64=` containing a base64 JSON array of `{suite, problem, sha256}` entries. Each preparation has an
+eight-second containing token and 550 million phase units. The capture retains
+original sources, replacement objectives, source symmetry markers, moved generator
+coordinates and their coefficients, retained integral rows, root integer domains,
+pass outcomes, elapsed time and charged work. Tagged row references use the IR's
+`Term` encoding; diagnostic rows retain exact coefficients, bounds and activators.
+It executes no search and makes no source-verdict or runtime-gain claim. Stopped
+preparations remain incomplete observations. Use ordinary source-checked lab solves
+for consumed pruning, quality, proof and total-cost qualification.
+
+Objective-preserving admission control [8865](https://lab.eignex.com/jobs/8865),
+at `c8e09efafc`, uses the self-authored Latin4 source, normal preparation,
+`conflictDriven`, P1, seed 3 and five seconds per case on Linux/amd64, JDK
+25.0.4.1+1-LTS, with a hard one-vCPU/4608-MiB cgroup. Protected admission and
+symmetry disabled both visit 977 nodes and perform 5,094 propagations; opt-in
+admission visits 245 nodes and performs 1,361 propagations through the existing
+generator consumer. All three attain native optimum 24, with independently
+accepted original-source witnesses. Witness checking does not certify the proofs.
+The admitted transpose moves twelve cost coordinates and adds one propagator-only
+factor, with no scalar orders. Preparation costs rise from 139 to 203 ms and
+50,802 to 62,042 phase units. Whole-CLI wall/user-CPU/peak-RSS observations are
+2.20 s / 1.98 s / 109,448 KiB protected, 1.90 s / 1.63 s / 108,296 KiB admitted,
+and 2.31 s / 2.09 s / 119,364 KiB disabled. One ordered repeat establishes consumed
+pruning on this fixture, not a runtime speedup or ordinary-source gain.
+
+Preparation screen [8866](https://lab.eignex.com/jobs/8866), at `8e4dd749a1`,
+completes all ten captures without a stop. Latin4 retains its transpose after normal
+preparation. Warehouse-40-80-00, GBACP-UD04, TestScheduling-t020m10r03-1 and
+BinPacking2-n1c1w1a retain no generator in either mode. These four ordinary sources
+cover explicit costs, nonlinear cost auxiliaries, a maximum-output objective and
+source symmetry rows. Their extra objective-symmetry analyses spend respectively
+898,844, 49,699,697, 7,151,610 and 246,015 phase units without a reduction. Affine
+and binary replacement remain enabled; the prepared objectives and complete source
+hashes are retained in the capture. BinPacking2's source symmetry rows are present
+although the existing XCSP3 source marker reports false, so no marker-based skip
+is inferred. The ordered JFR preparations are applicability and cost observations,
+not search or timing comparisons.
+
+This gate retains an opt-in consumed capability and rejects broader/default
+admission on the screened evidence. No ordinary-source benefit or mixed-local-search
+qualification follows. Generator handling has no local-search invariant; scalar
+orders still change the mixed portfolio's grading landscape, retaining the earlier
+trapping and cost losses as admission constraints. The four empty screens provide
+no reason to expand a mixed comparison. Raw records, original sources, hashes and
+resource receipts remain outside Git in
+`klause-evidence/campaigns/objective-preserving-symmetry-2026-10-28/`.
+
+## Conditional symmetry admission
+
+`bench.profile.ConditionalSymmetryProfile` takes no arguments and captures the
+hash-pinned `wcnf-core/conditional-cost` source. Four preparations compare default
+and opt-in objective symmetry, with and without fresh opening `s=t=true` pins.
+Each preparation has eight seconds and 550 million phase units. The two unpinned
+views retain internal pins and undo in one propagation session, then run ordinary,
+explicit LP-bound, LP-off, PB-cutoff and prefix-first optimization controls, each
+with five seconds and seed 3. The prefix-first control disables LP and chooses
+`s,t` before objective-guided remaining choices. Search captures include their
+instrumentation and retain at most 32 branch states per run; these are applicability
+observations, not timing comparisons. Normal LP admission skips clause-only models,
+so the explicit bound control is distinct from ordinary configuration.
+
+Snapshots retain immutable factors and Boolean values. They omit learned constraints
+and do not certify the complete enforcing residual, authorize pruning, or supply an
+independent source check. Fresh opening preparation is distinct from decisions in a
+retained search. The profile installs no conditional symmetry consumer. Ordinary
+lab solve cases retain original WCNF bytes and witnesses; the lab has no independent
+WCNF checking adapter, so these cases receive only native checking credit.
+
+[Lab 8891](https://lab.eignex.com/jobs/8891), at `357d4e4885`, completes all four
+preparations and ten searches on Linux/amd64, JDK 25.0.4.1+1-LTS, with a hard
+one-vCPU/4608-MiB cgroup. Preparation retains all three original clauses and exact
+coefficients `[1,1,-1,-2]` with constant 3. Both admission modes have zero generators;
+fresh opening pins retain all five clauses and also expose no generator. The
+retained session reaches `???? -> ??1? -> ??11` and undo restores `????`, in source
+order `a,b,s,t`. Thus the connected source residual exists without a root generator
+or a preparation reduction.
+
+All ten searches return native optimum 1. Both preparation views give the same
+counts: ordinary, LP-off and PB-cutoff use nine nodes/four failures; prefix-first
+uses eight/four; explicit LP uses four/one with root bound 1 and 978 LP work units.
+Ordinary branch traces never leave both `a,b` free at `s=t=true`. Prefix-first does,
+finds `0111`, and revisits that prefix after root model blocking. That blocker is an
+enforcing relation, so the original three clauses alone cannot certify the later
+residual swap. Even without LP, the incumbent's cheap linear bound closes the
+`a=true` sibling. The source inequality `a+b >= s+t-1` gives the stronger root bound
+`C >= 2-t >= 1`, attained by either exchanged point. These controls reject adding a
+dynamic consumer at this gate; they do not reject conditional symmetries generally.
+No broader screen or mixed-local-search/default admission follows.
+
+[Lab 8884](https://lab.eignex.com/jobs/8884), at `38d6ff2e8f`, completes two whole-CLI
+controls on the same source hash, P1 and seed 3. Ordinary and LP-off both report
+native optimum 1, witness `1011`, seven nodes and two propagations. Both spend 4,670
+preparation units; preparation is 136/116 ms, CLI wall time 1.40/1.37 s, user CPU
+1.17/1.17 s and peak RSS 115,456/115,296 KiB. They run concurrently under a hard
+two-vCPU/8704-MiB cgroup. These single-repeat costs and ordered JFR captures are not
+speedup evidence. Neither witnesses nor proofs receive independent checker credit.
+Raw states, timings, source/build/runtime hashes and resource receipts remain in
+`klause-evidence/campaigns/conditional-symmetry-3760/` outside Git. Queued profile
+8883 was cancelled before execution when the explicit LP control was added.
+
+## Equality and complemented Boolean controls
+
+[Preparation 8880](https://lab.eignex.com/jobs/8880), at `49289e403e`, completes
+four captures of the independent [cost symmetry sources](smoke-corpus/cost-symmetry/README.md).
+The transportation source retains all nine 0..2 domains and its original objective.
+Dependent-row removal drops the column-0 equation, leaving three row equations and
+two column equations. The exact source cost certificate still uses retained rows,
+with zero right side, but transpose fails full factor-multiset verification on this
+prepared representation. Neither protected nor coefficient-colored preparation
+finds a generator. The latter adds 328 phase units without a reduction.
+
+[Transportation 8878](https://lab.eignex.com/jobs/8878) proves 90 in all three
+ordinary controls, each with 63 nodes and 230 propagations. All three original-source
+witnesses pass the independent XCSP3 checker. Disabling LP harvest leaves the tree
+unchanged; these directly selected `conflictDriven` workers report no LP work, so
+this comparison does not establish that a tight LP bound was consumed.
+
+[Boolean 8879](https://lab.eignex.com/jobs/8879) proves 2 in all four controls.
+Preparation preserves the signed weights `[1,-1,1,-1]` and offset 2. Existing
+objective admission finds the two unsigned swaps and scalar orders, reducing
+10 nodes to 7 while adding 3,707 preparation units. Direct core-guided search
+uses two cores, an exact lower bound of 2 and two nodes. Its existing preferred-literal
+orientation retains positive penalty weights and the source constant. The four
+optimal source assignments already form one orbit under the unsigned swaps;
+the complemented reversal's additional source orbit relates nonoptimal points.
+WCNF has no independent lab checker here: its witnesses and native proof labels
+retain the `reported-result-v1` limit.
+
+[Strong LP 8906](https://lab.eignex.com/jobs/8906) selects the `lp-aggressive`
+worker on both sources. Transportation attains 90 and closes the root with its
+certified bound of 90, zero search nodes and one bound prune. Root LP work is
+1,518 units; the node LP spends 1,235 units. Its original-source witness also
+passes the independent XCSP3 checker; none of these witness checks certifies a
+native optimality proof. The Boolean control reports no LP work and retains
+10 nodes, so it supplies no LP-consumption claim. Core-guided search remains
+the stronger existing Boolean control.
+
+All nine solves use normal preparation, P1, seed 3 and five-second budgets on
+Linux/amd64 with JDK 25.0.4.1+1-LTS, a hard one-vCPU/4608-MiB cgroup and
+`-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=1`. Physical whole-CLI
+measurements include construction and search; they are one ordered repeat,
+not a throughput comparison. The JFR preparation captures are separate diagnostics.
+
+| Source and control | Nodes / propagations | Preparation ms / work | CLI wall / user CPU s | Peak RSS KiB |
+| --- | ---: | ---: | ---: | ---: |
+| Transportation protected | 63 / 230 | 249 / 164219 | 1.52 / 1.32 | 102664 |
+| Transportation coefficient-colored | 63 / 230 | 264 / 164547 | 1.55 / 1.31 | 102816 |
+| Transportation without LP harvest | 63 / 230 | 196 / 164219 | 1.51 / 1.22 | 103308 |
+| Boolean protected | 10 / 6 | 178 / 2773 | 1.52 / 1.18 | 95864 |
+| Boolean unsigned admission | 7 / 7 | 138 / 6480 | 1.36 / 1.12 | 100360 |
+| Boolean symmetry disabled | 10 / 6 | 155 / 2563 | 1.34 / 1.04 | 96356 |
+| Boolean core-guided | 2 / 3 | 163 / 2773 | 1.23 / 0.97 | 96740 |
+| Transportation LP worker | 0 / 0 | 260 / 164219 | 1.52 / 1.40 | 107580 |
+| Boolean LP worker | 10 / 6 | 166 / 2773 | 1.53 / 1.15 | 95856 |
+
+The equality gate stops at the prepared-factor check and consumed LP closure.
+The complemented-image gate stops at existing optimum-orbit coverage and consumed
+core bounds. These independent negative results admit neither a row-certificate
+API nor a signed-image consumer. No ordinary-source gain, default promotion or
+mixed-local-search qualification follows; the earlier landscape losses remain
+admission constraints. Source coordinates, objectives and conservative query,
+scope and unread-column protections retain their existing contracts.
+Raw sources, records, preparation captures, hashes and resource receipts remain
+outside Git in `klause-evidence/campaigns/cost-symmetry-gates-2026-10-28/`.
+Superseded jobs 8874/8875/8876 and the ceiling-only 8904 were cancelled with zero
+executed commands. No local compilation, tests or numerical workloads were run.
 
 ## Fixture provenance
 
@@ -662,6 +907,36 @@ factor batches are separate controls.
 
 ## Profiling
 
+`bench.profile.ProjectedCountProfile` compares component and monolithic exact
+projected counting over retained DIMACS sources with disjoint Boolean XOR pairs
+and a connected holdout. Options are `pairs=2,4,8 repeats=3 maxChecks=10000`.
+Both paths use the same ordinary feasibility preset and 100 decisions per check;
+full and x-only projections are separate. Reflection selects the retained internal
+monolithic path and fails if its entry point changes. Each measured traversal
+includes source parsing/baking, partitioning, component construction, feasibility
+search and interval consumption; construction and count time are also separate.
+The profile retains original bytes/hashes, exact intervals, current-thread allocated
+bytes and installed-build/runtime identity. Alternating repeats follow one warmup
+per path and shape. Run it through one bounded lab profile job; instrumented times
+and allocations establish no ordinary-source throughput or physical RSS claim.
+
+[Capture 8902](https://lab.eignex.com/jobs/8902), at `e387b8f450`, compares seven
+source/projection cases with three alternating repeats on Linux/amd64, JDK
+25.0.4.1 and a one-CPU cgroup. All 42 measured traversals return matching native
+exact counts: 4, 16 and 256 for the disjoint pairs, and 129 for the connected
+holdout. These counts have no independent counting certificate. Original DIMACS
+bytes/hashes, installed-build identity, runtime and resource receipts are retained.
+
+For eight pairs, full-projection median total time is 4.08 ms versus 260.63 ms
+monolithic, with 3.76 MB versus 120.09 MB of current-thread allocation. X-only
+medians are 2.03 ms versus 84.79 ms and 1.71 MB versus 42.30 MB. Negatives remain:
+one two-pair full repeat takes 69.93 ms versus 7.88 ms, and one four-pair x-only
+repeat takes 66.41 ms versus 10.41 ms. The connected fallback adds 6–38 kB of
+allocation per paired repeat. JFR and recorded cgroup throttling make these
+diagnostic timings, not a throughput claim. The bounded result supports Boolean
+clause products; it supplies no wider factor admission. The lab retried one lost
+upload automatically; these observations use its committed second attempt.
+
 `ExactLinearScoringProfile` compares identical dyadic mixed-row candidate sequences
 at widths 8/64/512/4096, including committed choices and a fresh final score.
 Three warmup batches precede five measured batches of 4096 primitive candidates
@@ -740,6 +1015,24 @@ job: the lab builds the named commit and runs the class once under JFR, keeping 
 it writes to `$OUT` (see the lab's
 [profile jobs guide](https://github.com/Eignex/klause-lab/blob/main/deploy/SETUP.md#profile-jobs)).
 The lab runs no shell scripts, so a new measurement is a class in that package.
+
+`TaskOrderProfile` captures native unary and single-pair reified-order controls
+before selecting a task-order consumer. The free-pair and equal-start controls
+compare minimum, midpoint, impact probing, VSIDS and LP with default/aggressive preparation;
+the order overlay adds two existing reified rows and their covering clause.
+Each solve has 256 decisions and five seconds for construction and search.
+Prefix records retain both order polarities and undo; bounded selector traces,
+learning, preparation and thread allocation records include ordinary solver cleanup.
+Thread allocations are cumulative JVM allocations, not peak memory; these serial
+instrumented controls supply no throughput comparison or independent proof check.
+Optional `suite`, `problem`, `modelSha256` and `dataSha256` arguments add one
+MiniZinc source. Its compiler identity, original bytes, FlatZinc and output mapping
+are retained. The annotated control preserves the source selectors; separate free
+controls inspect default preparation and a first-pair overlay. These satisfaction
+projections supply no original MiniZinc objective or proof claim. Optional tasks,
+variable/zero durations and shared starts decline the overlay.
+`mode=source` runs only the four MiniZinc controls, allowing compiler-capable
+placement without repeating retained authored captures.
 
 `SourceStageProfile` accepts `request64=<base64 JSON array>` for stage attribution.
 A source request has `suite`, `problem`, decoded-source `sha256`, `engine`
@@ -2369,22 +2662,83 @@ independent cycles). Each hash-checked source goes through finite preparation wi
 CLI's presolve allowance, then `satOptimized` minimization. A wrapping variable selector
 samples every branch point for 4,096 picks, then every sixteenth, until the trace
 allowance is spent; sampling time is excluded from the search deadline. A sample joins
-the free coordinates of every live factor: a clause with a true literal is discharged,
-and every other factor, including clauses with atom literals, connects all its free
+the free coordinates of every live factor: a clause with a true literal is discharged
+whatever its literal order (`dischargedAfterFreeLiteral` counts those whose true literal
+follows a free one), and every other factor, including clauses with atom literals, connects all its free
 coordinates. The objective is treated as additive, so splits are an upper bound for a
 decomposition that must also respect an incumbent cutoff. A component's key hashes each
 live factor's residual in factor order; a key seen again after an intervening retraction,
-conflict or restart counts as a re-encountered child obligation. Every eighth sample re-joins with
-learned clauses, with and without permanent incumbent-scoped entries. Up to `probes` split
+conflict or restart counts as a re-encountered child obligation. Every eighth sample
+reports source-only and all-enforcing incidence, including full learned PB support,
+weights, degree and established values. Discharged restrictions add no incidence.
+The observation admits at most one million terms and polls the containing trace deadline;
+unsupported learned kinds, unnameable atoms or interruption withhold completeness.
+Permanent marks retention only; logical scope and cutoff provenance are unavailable
+from that mark. Entry counters count observations, including repeat observations of
+the same constraint, and store positions apply only to that observation.
+Up to `probes` split
 nodes keep their residual clauses; after the search each component and the joint residual
-are solved as fresh `satOptimized` models, and the joint residual once more with
-`LpConfig(LpEmphasis.DEFAULT)` as the ordinary-bounds control. The children share one allowance equal to the
+are solved as fresh `satOptimized` models, and the joint residual twice more, with
+`LpConfig(LpEmphasis.DEFAULT)` as the ordinary-bounds control and with `objectiveGuidedValues`
+as the ordering control. The children share one allowance equal to the
 joint solve's, carry no incumbent cutoff or learned clause, and an unfinished child leaves
 the composition open. The composed witness is reconstructed and checked against the
 original clauses, and later sightings of each probed key are reported. Records retain
 source hashes, preparation outcome, the solve result, and native original-clause checks
 of the reconstructed witness; non-clause factors are counted as unchecked. A trace
 establishes residual structure only, not reuse savings or portfolio throughput.
+
+Boolean-clause split probes retain `<sample>.residual.json` beneath the source's
+snapshot directory. `snapshotBytes` bounds total serialized retention per source
+(8 MiB by default); `probes` bounds count, up to 16. Capture and incumbent observation
+charge the trace clock. Serialization has a conservative size preflight and a final
+byte check; interruption, unsupported models/restrictions and exhausted retention
+decline explicitly. Snapshot storage time is reported separately.
+The record uses `ProblemJson` for the prepared model and supported learned clauses/PBs,
+with exact coordinate maps, signed objective, constant, established values, fixed and
+source-isolated contributions, source/preparation identities, opening assumptions,
+an incumbent witness and its exact strict cutoff, and source/enforcing membership.
+All retained learned restrictions stay conditioned on the captured state; permanence
+does not grant broader authority. Preparation reconstruction is unavailable offline,
+so snapshots explicitly withhold original-source replay.
+
+`bench.profile.ConditionalComponentReplay` takes `snapshot64=BASE64` or
+`snapshotFile=PATH`, plus `sha256=HEX`. `snapshotJob=ID` resolves a file beneath a
+retained local lab job; a missing artifact fails rather than retracing the source.
+Loading performs deterministic structural verification without solving. It recomputes
+residuals, objective contributions, maps, condition identities and membership; hashes
+identify bytes and establish no proof. `replay=true` separately invokes the same child,
+joint, objective-ordered and ordinary LP controls, with `probeMillis` (2,000) per arm
+and `seed` (3). Children share one arm allowance including model construction.
+Source-relaxation and all-enforcing replay retain distinct scopes; the latter keeps
+every supported learned restriction and the captured strict cutoff. Native residual
+witness checks provide no original-source verdict or independent optimality certificate.
+Raw snapshots belong in `klause-evidence/campaigns/`, outside Git. An opt-in
+`ConditionalComponentTrace.run` consumer receives `ResidualProbeContext`, retaining
+the in-process reconstruction route for separately bounded policy experiments.
+
+`bench.profile.ScopedComponentProfile` runs bounded lab-only cutoff and one-variable
+separator controls (`millis=2000 seed=3`). Child satisfaction queries enforce an exact
+strict integral PB budget. A refutation raises a scoped lower bound; a feasible point
+supplies only an upper bound until a matching lower bound is checked. Child budgets
+subtract fixed/isolated costs and sibling lower bounds. Both separator polarities
+share one deadline, decision ledger, visit cap and cumulative modeled storage cap.
+Records separate construction, checking, search and structural costs. These controls
+do not admit production traversal, caching or source-family policies.
+
+`bench.profile.ScopedResidualConsumer` forwards trace arguments and uses `probeMillis=0`
+to disable legacy cold probes. It compares at most one checked control and one catalog
+context. Retained-node composition keeps the captured restrictions and cutoff. The
+separate root study uses the same prepared root and a checked retained incumbent,
+reapplies ordinary strict-budget propagation, and captures through `ResidualSnapshots`.
+Post-split observations alone do not settle earlier root choices. Every arm funds
+input verification, construction, native original-Problem checks and search under one
+two-second allowance, a shared million-decision ledger, four million inspection visits
+and 16 MiB of cumulative modeled storage. Default search, LP, aggressive LP with PB
+cutoffs and objective ordering, and same-variable ordering remain separate controls;
+both separator alternatives share one arm allowance. Root snapshots and full checked
+witnesses go under `$OUT`. Checks are native original-Problem clauses and exact costs,
+without an independent source-format proof certificate or a production default change.
 
 ### Table profiling
 
@@ -2435,36 +2789,232 @@ the recorded witnesses against the original MiniZinc source.
 
 ## Design evidence
 
+### Unary edge-finding over minimum durations
+
+Unary edge-finding over minimum durations while durations are unfixed (rejected
+[#3776](https://github.com/Eignex/klause/pull/3776) at `c3c0294b56`) was compared
+against merge-base `a8808b5665`. The comparison covered the only corpus sources with
+a variable-duration unary resource, stripboard 2022/2025. Every record compiled with
+MiniZinc 2.10.1 on cloud Linux/amd64. The lab had no independent MiniZinc assignment
+checker, so only Klause's model-level witness checks ran. In
+[job 8970](https://lab.eignex.com/jobs/8970) (10 instances, seeds 3/17, P1/20s), seven
+instances find no solution in any arm. Aggressive presolve and LP match the base
+arm. [Job 8990](https://lab.eignex.com/jobs/8990) added seeds 5/11/23/29 on the three
+instances that differ.
+
+Across both jobs the bound wins 4 and loses 6 paired outcomes under default
+settings, and wins 3 and loses 4 on CP alone. The wins include a proof of 90 on
+stripboard_w20_h15_l4_c4_n24 that the base misses at seed 3; the losses include 247
+against 90 on the same instance at seed 23. Median node throughput is 11% lower
+under default settings and 6.5% lower on CP. The bound is sound and changes the
+search, but it does not pay for its cost, so time-tabling, detectable precedences
+and edge-finding keep waiting for fixed durations. Raw records are under
+`klause-evidence/campaigns/unary-bounds-3748-3749/`.
+
+### Objective core projection and completed-query replay
+
+[8917](https://lab.eignex.com/jobs/8917) runs 48 core and 24 ordinary BnB controls
+at `4f90f3e94b`, over two self-authored CNF/linear-objective pairs, retained/default
+preparation and three repeats. Every result is native optimal 100 with an accepted
+source point. Stratification handles the unequal-weight control in one two-input
+core; ordinary OLL takes two cores, first with three inputs. For eight unrelated
+equal-weight terms, preparation retains the ten-input core, stratification does
+not shrink it, and no cost pin is root-satisfied. Bounded propagation deletion
+reduces the core to two inputs and search nodes from nine to one, but allocates
+about 39 KiB extra and supplies no stable total-time gain. The existing helper's
+`minimizeCore=true` retains all ten seed-prefix pins. The configured default LP
+control executes no LP passes, so it is an applicability decline.
+
+[8926](https://lab.eignex.com/jobs/8926) confirms in-place seed-proof projection
+at `2ac7fe5453` on that equal-weight source, with both preparation policies and
+one repeat. Actual query traces retain the unrelated cheap pins while OLL consumes
+the two-input core and reaches checked objective 100 in one node. The prepared
+projected handle allocates 223,568 bytes, versus 233,304 for ordinary OLL and
+271,496 for deletion. Timing includes a 57 ms projected outlier; this single
+confirmation establishes no speedup. Explicitly forced LP bounding also certifies
+100 and closes at zero nodes. Seed projection remains an internal, default-disabled
+bounded capability; these controls justify no automatic admission change.
+
+[8918](https://lab.eignex.com/jobs/8918) captures six two-query sequences at
+`4f90f3e94b`. An incidental source-valid `q` learned before the first completed
+refutation survives a fresh source check and is replayed after the OLL transition.
+Later search nodes fall from six to five, with checked source objective 1. In the
+two non-warmup retained repeats, verification alone costs 1.54–2.03 ms, against
+0.92–0.95 ms for rebuilding/search without replay; replay adds construction and
+allocation. [8927](https://lab.eignex.com/jobs/8927) confirms the completed-query
+sequence at `2ac7fe5453`: the later `q=false` assertion count falls from one to zero,
+with unchanged checked source outcomes. A conditioned `q or a` negative rejects
+the unit obtained under `a=false`. Prepared-coordinate identity deliberately
+declines, so its zero assertion counters in the older captures are unavailable,
+not evidence that preparation discharged `q`. No production replay cache or mutable
+query owner is admitted: total replay cost exceeds the avoided obligation.
+
+These are instrumented native controls on one Linux/amd64 vCPU, a 4,608 MiB cgroup
+and JDK 25.0.4.1. Installed harness/runtime hashes, resource receipts and source
+bytes are retained with the jobs. In 8917/8926, the historical `sourceSha256` field
+hashes the CNF concatenated with its coefficient CSV; source and objective byte
+hashes are distinct fields in the maintained profile. Native refutations are not
+independently proof-checked. No default-route or whole-CLI throughput gain is claimed.
+
 ### Conditional component composition
 
 [Conditional component traces](#conditional-component-traces) cover the eleven
 WCNF sources of status sweep [8846](https://lab.eignex.com/jobs/8846) at `364582ebf`,
-all feasible and unproven at ten seconds, plus the two-five-cycle controls. Jobs
+all feasible and unproven at ten seconds, plus the two-five-cycle controls. Every
+prepared factor is a clause, so no enforcing source relation is outside the trace. Jobs
 [8852](https://lab.eignex.com/jobs/8852), [8856](https://lab.eignex.com/jobs/8856) and
-[8858](https://lab.eignex.com/jobs/8858) ran at `f6dc3eca`, `7a315f07` and `891e11ae` on
-one Linux/amd64 vCPU with 4.6 GiB and JDK 25. Every prepared factor is a clause, so no
-enforcing relation is outside the trace.
+[8858](https://lab.eignex.com/jobs/8858) ran at `f6dc3eca`, `7a315f07` and `891e11ae`
+with a trace that joined a clause's free literals before reading a later true literal,
+so their split statistics undercount independence; their compositions, witnesses and
+refutations are unaffected. Job [8862](https://lab.eignex.com/jobs/8862) at `2b1b6867`
+repeats 8856 with order-independent membership. At `846b8184`, jobs
+[8868](https://lab.eignex.com/jobs/8868) and [8892](https://lab.eignex.com/jobs/8892) add
+the objective-guided joint control on the five sources with closed compositions, with a
+20-second trace allowance. [8867](https://lab.eignex.com/jobs/8867) ran on a host three
+times slower and spent its 6-second allowance before the p06 split region, and
+[8872](https://lab.eignex.com/jobs/8872) timed out fetching the corpus before any source. All ran on one Linux/amd64 vCPU with 4.6 GiB and JDK 25.
 
 The conditioned control splits at its root into the two cycles. Children of 3 and 3 plus
 the fixed separator compose to 7 in 20 nodes, against 82 for the joint residual. Across
-the sources, all ten closed node compositions equal the joint optimum, every composed witness
-passes the original clauses, and child and joint refutations agree in four probes.
+the sources, every closed node composition that a joint residual also closes equals its
+optimum, every composed witness passes the original clauses, and child and joint
+refutations agree in every refuted probe: four in 8856, five in 8862.
 
-Independence is narrow. One source never splits. On six others a giant component holds
-the residual: split-off children carry at most 6% of free variables, the giant stops
-without a verdict, or no probe-eligible split appears. Wall-time gains appear only at shallow balanced splits under the
-trivial objective bound: an auctions node solves 161 and 9 clauses in 31,810 nodes and
-59 ms against 137,777 nodes and 235 ms joint, and a preference-planning node closes its
-children where the joint residual stops at two seconds. Elsewhere, per-child model cost
-exceeds the saved nodes. `LpConfig(LpEmphasis.DEFAULT)` left every joint node count
-unchanged. Re-encountered child keys are mostly at most nine clauses solved in at most
-22 nodes, while a full residual scan costs about eight search nodes on auctions and
-milliseconds per sample on the largest sources. Incumbent-scoped learned entries merge
-many splits; non-permanent learned clauses merged splits only on tcp.
+The correction changes one source. Preference-planning p06 splits from decision level
+10,600: its largest component holds 44–62% of live clauses instead of 99.8%. Two probed
+nodes split into 575 and 576 components whose children all close at zero residual cost
+in at most 2,209 nodes, while the joint and LP-bounded joint residuals stop at two
+seconds. The composed witnesses, 1,312 and 1,322, pass the original clauses and lie below
+the traced incumbent of 2,969–3,234. With `objectiveGuidedValues` the joint residual
+closes the same nodes in 2,139 and 1,985 nodes (81 and 39 ms), and it refutes the third
+probed node in 144 nodes against 1,264 for its children. The surviving work is a
+value-ordering cost that existing ordering removes, not independence.
 
-The retained scope shows no consumed reuse under containing allowances, so no traversal
-or cache integration follows. Raw records are under
+The other sources keep their pattern. Protein never splits. On privilege, tcp, CSG,
+haplotyping and packup a giant component holds the residual: split-off children carry at
+most 12.4% of free variables, or the giant stops without a verdict. A p03 node closes its
+children where the joint stops only on the faster 8856 host. There its 26,707-clause giant
+child, beside a six-clause one, finishes within the allowance; on later hosts every child
+solve and joint control stops. On metro, rna and p03 the ordered joint residual closes
+every node the children close in less time than the children's total. The one gain that survives
+every joint control is a shallow auctions node, where 161 clauses beside a nine-clause child
+solve in 31,810 nodes and 124 ms against 96,302 nodes and 170 ms ordered. A full residual
+scan costs 4–220 search nodes per sample. Learned-clause merges count clauses only, not
+learned pseudo-Boolean entries such as the objective cutoff, so they bound no
+cutoff-inclusive connectivity. Probed keys are re-encountered after retractions, but a
+re-encountered key is not consumed reuse.
+
+On the corrected trace, no nontrivial independent obligation survives preparation, LP
+bounds, learning and ordering under containing allowances on the retained scope, so
+neither traversal nor cache integration follows from it. Raw records are under
 `klause-evidence/campaigns/conditional-components-3724/`.
+
+### Integer cost cores
+
+Lazy integer cost frontiers for a directly selected `core-guided` worker were compared
+in job [8869](https://lab.eignex.com/jobs/8869) at `e180dc3d4b` against mixed defaults
+and `lp=aggressive`: P1/20s, seeds 3/17, Linux/amd64, debug enabled, independent XCSP3
+witness checks. On `xcsp3-core/pair-cover-costs` every arm proves 6; the core arm
+returns two two-literal cores with floors 3 and 6 in 2 nodes, against 20 nodes for
+the others. A Boolean threshold view of the same source reaches those floors with a
+five-literal second core, because its seed prefix includes the eager suffix selectors.
+
+On Wordpress-04-10-500_c24, whose reference optimum is 1442, defaults and aggressive LP
+reach 1442 unproven with root bound 0. The core arm raises an exact floor to 343 and
+394 after 199 and 250 cores, but finds no witness. On FAPP-aux-01-0200_c25 two cores
+reach 8,930,251 against a best known 99,955,504, and no arm finds a witness. Both
+MiniZinc candidates failed to load in every arm. These floors survive ordinary
+preparation but close neither gap and cost the incumbent, so curated pools keep
+Boolean-only admission. Raw records are under
+`klause-evidence/campaigns/finite-cost-core-avenue/lazy-3738/`.
+
+### Residual scope capture and replay
+
+[Capture 8903](https://lab.eignex.com/jobs/8903), at `09b97f920b` on Mac/aarch64,
+retains the conditioned two-cycle root in 2,256 bytes. The case times out before an
+auctions record, so it supplies no ordinary-source applicability result.
+[Replay 8923](https://lab.eignex.com/jobs/8923), at `d1a6e116c0` on cloud Linux/amd64,
+loads those exact bytes without fetching a corpus or retracing search. Both use
+JDK 25.0.4.1. Re-encoding and reloading preserve every byte and the residual meaning.
+The two source components close at 3 each, plus the fixed separator cost 1; joint,
+objective-ordered and ordinary LP controls agree at 7. The retained incumbent has
+strict cutoff 7, which joins both cycles into one enforcing component. Every enforcing
+control refutes that cutoff-conditioned workload, while the source relaxation remains
+feasible. Native prepared witnesses are checked; original-source reconstruction and
+independent optimality certificates are unavailable offline. This establishes replay
+and scope fidelity, with no portfolio or reuse-speed claim. Runtime/resource receipts,
+hashes, snapshots and the timed-out source attempt remain under
+`klause-evidence/campaigns/residual-snapshots-3740-3741/`.
+
+### Scoped component cutoff and separator gates
+
+[Control 8916](https://lab.eignex.com/jobs/8916), at `70d9e18945`, checks exact
+child floors 3+3 against strict cutoffs 6 and 7. Threshold refutation closes 6
+without claiming source infeasibility; cutoff 7 permits the checked optimum 6.
+The bridge control keeps both separator alternatives. Its two-decision ordering
+gain does not cover structural analysis, and supplies no performance admission.
+Thirty-four CI controls cover immutable scopes, signed costs, partial siblings,
+cutoff changes, undo, budget-implied PB rows and containing allowances.
+
+[Source gate 8953](https://lab.eignex.com/jobs/8953), at `870a202eee`, completes
+one frozen auctions source, seed 3, and two seconds per containing arm on Linux/amd64,
+JDK 25.0.4.1, one vCPU and 4608 MiB. The first retained split has no incumbent
+and declines. Sample 270's cutoff joins all 16 live variables in the captured
+enforcing graph. Keeping that cutoff as the exact composition target exposes
+four children of 6,4,4,2 variables under every remaining restriction, fixed cost
+68,480 and checked strict cutoff 69,645. Floors 865+300 close that cutoff
+in three queries and one charged decision. Ordinary learning and both LP controls
+close it with zero charged decisions. Total input-through-check cost is 91 ms for
+composition versus 87 ms for ordinary search; cumulative modeled storage is
+555 KB versus 453 KB. Neither reusable progress nor useful additional closure
+survives these controls, so component traversal is not admitted.
+
+The separate fresh prepared root reapplies ordinary cutoff propagation under the
+same checked incumbent. It remains one 186-variable component. The bounded
+separator selects variable 0, which ordinary search already selects first; its
+first branch leaves children of 184 and 1 variables. Analysis costs 471 ms,
+and the shared allowance expires without closure or a composed source witness;
+the other branch remains unresolved. At the retained node, both separator branches
+close, but total cost is 210 ms versus natural composition's 91 ms. These results
+reject this bounded separator pilot independently of the cutoff contract. No
+child results are reused, and no source-family or production default is admitted.
+
+Incumbents retain complete prepared and reconstructed witnesses checked against
+native original-Problem clauses and exact costs. Expired root candidate checks
+supply no source-witness claim; there is no independent source-format proof
+certificate. Raw snapshots, witnesses, JFR, runtime receipts and the first failed
+artifact-upload attempt remain outside Git in
+`klause-evidence/campaigns/scoped-components-3742-3743/`. No local executable
+validation ran. Job 8896 failed remote compilation before any solver case.
+
+### Retained objective alias costs
+
+[8895](https://lab.eignex.com/jobs/8895) compares `d4e3c9b659` with the matched
+expansion-disabled `6d8a789c68` on the pair-cover alias and replacement-objective
+controls: P1/5s, seeds 3/17, one case per seed and arm. Ordinary mixed and aggressive
+LP/probing controls retain their existing preparation. All sixteen cases attain
+native optimum 6, and every original-source witness passes the independent XCSP3
+checker. The native proofs are not independently certified. Runtime, non-solver
+dependencies and source hashes match on Linux/amd64, JDK 25.0.4.1+1-LTS, with a
+3 GiB Serial-GC heap and one active processor per CLI. Four concurrent cases share
+a hard four-vCPU/16,896-MiB cgroup.
+
+Normal preparation retains the protected sum output. Its private separable view
+consumes two two-term cores instead of six singleton output cores, reaching floor 6
+with propagation work 898/752 instead of 2,205/2,221. The already exposed objective
+retains two cores and 544/547 propagation work in both builds. Retaining the alias
+also preserves ordinary-search structure: ordinary nodes are 7/2 with the alias and
+17/17 after objective replacement; aggressive LP/probing uses 5/11 and 19/18.
+These are consumed capability and representation controls, without a verdict gain.
+
+Whole-CLI external wall seconds for the alias core change from 1.50/1.42 to
+1.67/1.29; peak RSS KiB changes from 124,608/125,060 to 124,012/122,448. The opposite
+timing directions, cold startup, concurrent execution and single observation per
+seed establish no speedup. Allocations were not collected. The bounded directly
+selected capability retains original objective authority and ordinary admission;
+no broader-source or default-route benefit is established. Sources, hashes, runtime
+identities, checker results and resource receipts remain outside Git in
+`klause-evidence/campaigns/objective-alias-costs-3745/`.
 
 ### Bounded retained integer probing
 
@@ -3725,6 +4275,187 @@ seconds. The [matched stage capture](https://lab.eignex.com/jobs/8854) also exit
 establish deadline handling without independent witness or proof validation.
 Instrumented profiles establish no throughput result; charged scheduling visits
 also change the units included in propagation-work totals.
+
+### Cumulative demand-window admission
+
+`bench.profile.CumulativeChoiceProfile` captures ordinary propagation and
+off/default/aggressive finite preparation, with a 500-million-work allowance and
+20-second cancellation per stage. No arguments select the self-authored FlatZinc
+choice control; `suite=ID problem=NAME` compiles an original MiniZinc identity and
+preserves its model, data and FlatZinc bytes. The original objective participates
+in preparation. Reports retain complete native equality rows, demand domains,
+compiler/runtime/build identities, work-budget exhaustion and current-thread
+allocation. The compiler must be on the worker's `PATH`; these instrumented
+captures establish no throughput result or independently checked source verdict.
+
+On matching control bytes, [baseline 8881](https://lab.eignex.com/jobs/8881)
+retains `q=0..1` and `machine=1..3`, while
+[candidate 8889](https://lab.eignex.com/jobs/8889), at `b9854a4548`, fixes `q=0`
+and removes interior `machine=2`. A baseline failed-choice probe also refutes
+that value, and default/aggressive preparation fixes the demand in both arms.
+The corrected [control 8922](https://lab.eignex.com/jobs/8922) retains both native
+equality rows, including the machine constant column. The control establishes
+consumed inference before preparation, without a prepared-source benefit.
+
+Original TestScheduling-20 captures [8931](https://lab.eignex.com/jobs/8931) and
+[8908](https://lab.eignex.com/jobs/8908), at `a0f1daf9d7` and `1354c5aca0`, retain
+ten constant-duration, 20-task machine cumulatives and their channels. Their
+captured demand/channel domains match across all four stages. Both aggressive
+stages reach the 500-million-work allowance. Source model/data hashes match;
+FlatZinc differs only in generated path comments, with comment-free payload hash
+`7a5f6ba081138be4702d0d79fa4a7255ce9cd64524197f4a03d5bfb1ded5d9ef`.
+
+[Pilot 8936](https://lab.eignex.com/jobs/8936) compares main `56a06e3194` with
+candidate `6214c20e57` on that original identity, P1/seed 3, serial ten-second CP
+cases. Each pins one `lp-default` or `lp-aggressive` arm with matching preparation
+and LP ceilings. Linux/amd64 JDK 25.0.4.1 has a hard one-CPU, 4,608 MiB cgroup.
+Each pair below is baseline → candidate; all reported objectives remain unproven.
+
+| Controls | Reported objective | Nodes | CP propagation work | Peak CLI RSS (KiB) |
+|---|---:|---:|---:|---:|
+| Default | 1295 → 6581 | 524 → 292 | 18,952,922 → 56,358,713 | 239,680 → 221,008 |
+| Aggressive | 6581 → 6581 | 104 → 103 | 79,799 → 890,484 | 256,244 → 271,796 |
+
+Whole-CLI wall time is 10.40–10.48 seconds; LP runs in all four cases. The lab
+records legacy `lab-minizinc-gecode-v1` checks as valid after completing the model
+with reported output variables fixed. These receipts do not establish an
+assignment-only checker or an optimality proof. The single-identity/seed pilot
+supports rejecting this candidate's default admission, without a universal
+performance claim. The runtime subwindow prototype is withdrawn; ordinary
+cumulative propagation remains the control, and no heldout campaign follows.
+Earlier [8882](https://lab.eignex.com/jobs/8882)/[8888](https://lab.eignex.com/jobs/8888)
+compiler declines and [8932](https://lab.eignex.com/jobs/8932)'s invalid fixed-engine
+LP configuration establish no search or cost result.
+
+### Source task-order applicability
+
+[Task-order capture 8898](https://lab.eignex.com/jobs/8898), at `f41e018c2a`,
+retains 18 authored controls on Linux/amd64 under a one-CPU, 4,608 MiB cgroup.
+Each construction/search has five seconds and 256 decisions, with source checking
+recorded separately. The process exits 1 after those controls because that worker
+lacks MiniZinc; it establishes no original-source coverage. All nine authored
+witnesses pass the native factor checker. Refutations have no independent exported
+proof check, and the serial JFR timings establish no throughput comparison.
+
+For two mandatory duration-2 tasks, unary non-overlap requires one order, and both
+orders would imply `2 + 2 <= 0`. The existing two reified rows and covering clause
+enforce this source-relative partition. Both prefixes propagate bounds across the
+whole start range and undo restores the root. The free pair remains a two-node,
+zero-conflict solve; prepared reified orders raise propagation work from 22 to
+206 and add two Booleans and three factors before preparation. The prepared free
+pair also installs the existing difference-system propagator.
+
+On equal starts, raw reified orders produce two conflicts and one learned clause,
+versus 31 conflicts for minimum-value search. Impact probing also refutes before
+committed decisions. Ordinary preparation maps the native tasks to a shared start,
+outside the proposed initial guard; preparing the reified rows refutes at root.
+This contradiction therefore supplies no eligible prepared source for a new order
+consumer. The capture retains construction, search, check and cumulative thread
+allocation costs; allocation is not peak storage or RSS.
+
+[Original-source capture 8935](https://lab.eignex.com/jobs/8935), at `0fa5390dca`,
+compiles the hash-pinned `2023/test-scheduling/t20m10r10-17` source with MiniZinc
+2.10.1 on cloud Linux/amd64 and exits 0. It retains the compiler executable,
+standard-library, solver-library and configuration hashes, original bytes,
+FlatZinc and output mapping. Its four controls use the same decision/time caps
+and one-CPU, 4,608 MiB budget. All ten prepared native unary factors retain
+mandatory fixed positive tasks with distinct starts, and the existing difference
+system survives. This source is eligible; compiler availability and prepared
+shape do not supply a rejection.
+
+The first order commits and raises a start lower bound from 0 to 49. Both
+input-order controls, with and without that pair, return native-checked witnesses
+in 74 nodes with no conflicts or learned clauses. The overlay raises propagation
+work from 333,115 to 358,556 and prepared factors from 413 to 416. The annotated
+control preserves the source selectors and reaches the 256-decision cap with
+557 conflicts; default VSIDS reaches it with 44. Both return unknown. These
+selector contrasts establish no order-specific gain. Traces stop at 128 records;
+the complete solve statistics and native witness checks remain recorded.
+
+Stop the bounded first-pair proposal: it enforces the partition and propagates,
+but supplies no useful search reduction or reusable conflict beyond the retained
+controls. Together with the authored prepared shared-start barrier, this does
+not qualify a dynamic consumer. This is a bounded applicability disposition,
+not a claim about every scheduling source or pair policy. The source runs are
+satisfaction projections, with no original-objective, independent MiniZinc
+witness/proof or throughput claim. Explicit annotations remain authoritative;
+the pair-first arm is only a separate diagnostic control.
+
+### Optional unary source admission
+
+`bench.profile.OptionalUnaryProfile` captures the authored three-task optional
+control and the pinned 2026 workforce allocation model with a separately identified
+three-task/two-team data instantiation. The pinned upstream directory supplies no
+data. `mode=control` selects only the authored control; `mode=semantics` selects ten
+small absent-value, shared-guard and fallback controls instead. Run it through the
+lab at a pushed revision with an explicit outer profile budget, including source
+preparation and artifact transfer.
+
+Each source compiles against the installed solver library and a copied library
+with the two optional-disjunctive overrides removed. Both arms retain compiler,
+library, source/data and runtime identities, FlatZinc, output mappings, factor
+payloads and root domains. Preparation uses seed 3, 1.65 billion weighted work
+units and a five-second containing deadline; each satisfaction solve has 128
+decisions under that deadline. Semantic controls use preparation off. The original
+workforce objective is not optimized. Upstream MiniZinc renders each reconstructed
+point through its original output mapping, separately from the existing compiled
+factor checker. Neither operation supplies independent MiniZinc source-witness or
+proof checking. Internal output-renderer declines remain recorded separately.
+
+`capture.zip` retains the complete capture except the separately emitted JFR;
+one archive bounds per-file transfer overhead. Keep raw evidence outside Git under
+`klause-evidence/campaigns/3780-optional-unary/` beside the primary checkout.
+Serial JFR timings and native factor counts establish no throughput or default
+benefit. Source-channel deductions and original output semantics determine admission.
+
+[Compiler/preparation capture 8969](https://lab.eignex.com/jobs/8969), at
+`0e4980bad2`, uses MiniZinc 2.10.1 on Linux/amd64 with JDK 25.0.4.1 under a hard
+one-CPU, 4,608 MiB cgroup. All four original model/data compilations succeed,
+and all twelve reconstructed satisfaction points pass their complete compiled
+factor check without exhausting the containing deadlines. The model and data
+bytes match across library arms. The workforce source is the unchanged upstream
+model; its small data is authored here, not a published corpus instance.
+
+With default preparation, the decomposition leaves the control's original `p`
+open, while the actual bridge fixes `p=false` at the root. Preparation work falls
+from 355,349 to 115,497 units and finite work from 713 to 108; conflicts fall
+from two to zero, while nodes rise from one to two. On workforce, pinning the
+first allocation to team A leaves the third allocation at A/B in the decomposition
+and fixes it to B with retention. The source requires the first two tasks to share
+their team. Default preparation work is 21,202,000 versus 10,147,371 units;
+finite work is 16,649 versus 5,487, with five/four nodes and three/zero conflicts.
+Aggressive preparation reaches the allocation deduction in both arms, so it
+supplies no additional native deduction there. These are bounded consumed-choice
+and charged-work observations, not a corpus, throughput or default-policy claim.
+
+[Semantic capture 8967](https://lab.eignex.com/jobs/8967), at `33b85ef407`, compiles
+all twenty library/source combinations. Sixteen SAT points pass the compiled
+factor checker; the four UNSAT outcomes have no independent proof check.
+Zero-duration, variable-duration, reified and negated controls retain byte-identical
+FlatZinc bodies after generated comments are removed, including strict zero-task
+separation. Default absent-zero and explicit noncanonical controls keep their
+distinct feasibility. Shared complemented guards, repeated starts and statically
+absent inputs compile through the positive fragment.
+
+The capture harness appended a second solution terminator after the writer's
+existing terminator. [Output replay 8975](https://lab.eignex.com/jobs/8975) reuses
+the frozen points and output models with that empty block removed; it runs no
+solver. Both original sources render successfully in both libraries, including
+`p=false; task=<>` with the native control's independent `c=2` value and workforce's
+allocation, starts and optional totals. Some authored output models also contain
+an undefined absent `deopt` or an undeclared `int_ne`; both libraries retain these
+compiler-output declines.
+They supply no complete-source output validation. The original control and
+workforce output checks are separate from these limits and from the native factor
+checks. The lab has no independent MiniZinc assignment/proof checker.
+
+Initial capture 8950 retains its incorrect mandatory-only include and output-harness
+failure. Capture 8951 records the corrected source with a smaller, solution-set-
+sensitive preparation budget and a redundant native overlay; it is not the actual
+bridge comparison. Jobs 8958, 8959 and 8964 expire during remote preparation or
+artifact upload and supply no accepted source/solver result. Those failures and
+all raw receipts remain in the external campaign. No local compilation, test,
+solver, benchmark or profiler workload ran.
 
 ### Portfolio slice policy
 
@@ -7295,3 +8026,228 @@ both routes. Job 8861 was cancelled during preparation after that finding and
 executed no cases. Raw records, source points, hashes, JFR, resource receipts,
 CI reports and the cancelled attempt are retained outside Git under
 `klause-evidence/campaigns/finite-conflict-learning-3727-3728/` beside the primary checkout.
+
+The sparse [8905 gate](https://lab.eignex.com/jobs/8905), at
+`bab7a828da2a89911c7647f3ba131f3270094402`, repeats the four endpoints with
+clauses and rows on contiguous domains, `y!=2` and `y!=4`: six sessions, 24
+endpoint records and six disposal records. With the incidental hole at 2, one
+retained row owns `x<=1` and sibling bounds `2`, `3`, `5`; clauses retain bounds
+`5`, `6`, `6`. Sparse membership survives undo. The hole at 4 is clipped by
+`y<=3` in this source order and retains clause fallback. Reversed-row CI also
+covers the requested lower bound 4 snapping to 5. Historical target holes, later
+carves, signed endpoints and the 64-position sparse-tail allowance have separate
+controls. No domain is replaced by its hull.
+
+All 24 source points pass fresh native checks; no independent witness or exported
+proof check is supplied. At the last incidental-hole endpoint, cumulative native
+finite work is 361 for rows and 233 for clauses, plus 48 point-check work units in
+each arm. Stores contain 12 and 8 native constraints before disposal, including
+channeling clauses; every native store is empty after disposal and shared stores
+stay empty. Elapsed/current-thread allocation checkpoints include construction,
+checks, earlier records and disposal. Ordered class loading and overlapping
+checkpoints support no timing or allocation advantage. The Linux amd64 execution
+uses Temurin `25.0.4.1+1-LTS`, one hard cgroup vCPU and 4608 MiB.
+
+Job 8885 retains a failed historical-hole admission prediction and partial records;
+8905 also retains its infrastructure retry before execution. These limits leave
+integer-row learning opt-in, without a preparation/LP or default-performance claim.
+Raw records, source/build hashes, JFR, receipts and CI reports live under
+`klause-evidence/campaigns/integer-provenance-3753-3754/` beside the primary checkout.
+
+### Retained integer reason gate
+
+`IntegerReasonReroutingProfile [m]`, with `m=2..32` and default 8, compares all
+six source orders of `m*x+y<=z`, `x-y<=0`, `z-m*x<=w`. Clauses, original-row
+learning, an actually acquired eager row `(m+1)*x<=z`, and a numeric surrogate
+visit the conflict `x>=1,w<=0`, then siblings `w<=1` and `min(3,m)`. The surrogate
+supplies the redundant row as an original source and omits its acquisition costs.
+Optional arithmetic tracing adds bounded pre-undo seed owners, markers, derived
+rows and consumers; absent tracing is explicit, with no substituted owner claims.
+
+[Gate 8921](https://lab.eignex.com/jobs/8921), at
+`169180d956d16e52f4eede31176efab2846e3b76`, completes 24 sessions and 48 stage
+records at `m=8`, with no truncated traces. Original rows retain `z<=9*w` in three
+orders and `y<=w` in the other three, then own deductions that give `x<=1` and
+`x<=3` at both siblings. Clauses alone stop at `x<=8`. In source order A/B/C,
+the failed A row resolves B then C; the numeric surrogate resolves C from the
+retained-row shape and produces the same `z<=9*w`, rather than `x<=w`.
+
+Cumulative native work is 826–901 for original rows, 1249–1701 for the acquired
+eager row and 802–975 for the surrogate. The surrogate saves at most 41 units in
+three orders while omitting 173–182 extra units of actual acquisition; it costs
+more in the other three orders before acquisition. Point checks add 38 units per
+original/eager session and 48 per surrogate. Native stores contain 28–29, 48–69
+and 25–30 learned constraints respectively before disposal; the surrogate also
+carries one extra base row. Every native/shared store is empty afterwards.
+Ordinary original-row rerouting discharges this scaling lead,
+so recursive numeric reason storage is not adopted from it.
+
+All 48 source points pass fresh native checks, without an independent witness or
+exported-proof checker. Host-auto placement selected Mac arm64, Temurin
+`25.0.4.1+1-LTS`, with advisory one-vCPU/4608-MiB budgets. Ordered elapsed and
+current-thread allocation include construction, tracing, checks, earlier record writing
+and disposal, and supply no throughput claim. Job 8901 retains an incorrect
+uniform-sibling-bound prediction; 8919 failed trace-hook compilation before cases.
+Hashes, complete captures, JFR and receipts remain beside the primary checkout in
+`klause-evidence/campaigns/integer-provenance-3753-3754/`. This bounded rejection
+does not establish that every retained-row family lacks useful numeric reasons.
+
+### Guarded integer conflict rows
+
+`GuardedIntegerRowProfile` keeps the finite reified source `r iff 2*x+y<=z`
+(and its negative-indicator equivalent), with mandatory `2*x-y<=0` and domains
+`x=0..6`, `y=0..12`, `z=0..24`. Clause and opt-in row arms acquire a conflict at
+`guard,z<=7,x>=2`, then retract the guard and reuse at `z<=11` and `15`.
+The row must own the sibling bound reason; false guards retain a feasible region.
+One warmup per configuration precedes one measured lifecycle. Native point rechecks
+are separate from independent source-witness or proof verification.
+
+Each lifecycle records construction, acquisition, cumulative native work, constraints,
+current-thread allocation, total elapsed time and explicit store disposal. Cumulative
+checkpoints overlap and must not be summed. Conditioned-root controls capture ordinary
+solution-set-preserving preparation and the existing exact-certified LP relaxation
+with objective `-x`, a ten-second containing deadline and 200,000 floating work units.
+They retain prepared factor/domain shapes and establish only conditional authority.
+These instrumented controls do not qualify defaults or establish whole-CLI throughput.
+
+`producer=element` selects the independent variable-array control
+`r=Element([a,b],i)`, `2*x+a<=z`, `2*x-r<=0`, with `i=0..1` and the same numeric
+boxes. Only a selected equality's bound conflict seeds arithmetic learning; support
+reasons retain clause fallback. The profile requires an index-guarded row to own
+sibling deductions and keeps the feasible `i=1,x=2,a=0,b=r=4,z=4` alternative.
+Ordinary controls include default and aggressive solution-set-preserving preparation
+with separate one-million-work allowances, and the existing Element LP hull under
+root conditioning. Neither root preparation nor its hull creates an unconditional
+selected equality in the retained search session.
+
+[Element gate 8914](https://lab.eignex.com/jobs/8914) completes fourteen records at
+`13db8c402932298b73d19c8bcce5fa976ca952a8`: four lifecycles including warmups and
+two ordinary conditioned roots. One retained row owns both measured sibling bounds,
+`2` and `3`, versus clause bounds `5` and `6`. Twelve fully fixed source points,
+including the other-index alternative, pass fresh native checks. These are finite
+API controls without independent source-witness or exported-proof checking.
+
+At the second measured sibling, native work is 295 for clauses and 466 for rows;
+stores contain 8 and 11 constraints, including channeling clauses, with one retained
+integer row and no shared clauses. Complete measured lifecycle allocation is
+323,328 versus 338,688 bytes, and elapsed time is 9.82 versus 9.74 ms, including
+construction, acquisition, point checks, record writing and disposal. Disposal leaves
+both stores empty and costs about 0.11–0.12 ms. One ordered sample under JFR supplies
+no timing advantage claim. Default conditioned preparation leaves `x` in
+`{0,1,2,4}`; aggressive preparation reaches `x<=2`, and the existing Element hull
+certifies objective bound `-11/4` for `-x`, hence the same integer bound. Preparation
+spends 163,598 and 403,657 work units. This establishes guarded retained consumption,
+not superiority over ordinary preparation or LP, and keeps defaults unchanged.
+
+[Reified gate 8909](https://lab.eignex.com/jobs/8909) independently completes
+twenty-eight records at the same revision: eight lifecycles including warmups and
+four ordinary conditioned roots. Both signed guards retain one row that owns the
+sibling bounds `2` and `3`, versus clause bounds `5` and `6`. All twenty-four fully
+fixed source points pass native checks, including assignments violating the
+unguarded row when its guard is false. At the second measured sibling, native work
+is 294 for clauses and 395 for rows; native stores contain 7 and 9 constraints and
+shared stores remain empty. Complete lifecycle allocation is about 283 KB versus
+294 KB. Ordered elapsed observations are 6.51–6.71 ms versus 6.04–6.33 ms; disposal
+leaves no stored constraints and costs 0.065–0.090 ms. These observations supply no
+statistical speedup or default-admission claim.
+
+Default conditioned preparation retains `x` in `{0,1,2,4}`; aggressive preparation
+and the exact LP both reach `x<=2`. Preparation spends 148,868–148,888 and
+186,779–186,783 work units. The reified and Element executions both use Linux amd64,
+Temurin `25.0.4.1+1-LTS`, and hard cgroup budgets of one vCPU and 4608 MiB. Source
+bytes, revision/build identities, complete records, JFR and runtime/preparation
+resource receipts remain outside Git in
+`klause-evidence/campaigns/guarded-integer-rows-3752-3755/` beside the primary checkout.
+Job 8899 failed profile compilation before any case ran; no local builds, tests or
+numerical work ran. Neither gate supplies independent source-witness or proof checking.
+
+### Prepared arithmetic learning replay
+
+`PreparedArithmeticLearningProfile` freezes the two source shapes from the direct
+PB and integer-row controls as OPB and FlatZinc bytes. It compares the learners
+independently, with the other learner disabled. Twelve cells distinguish retained
+finite conflict replay, normal finite preparation followed by the identical replay,
+and production finite solving with normal preparation and automatic LP. The LP
+route answers whether the strong ordinary owner already discharges the source;
+its changed search trajectory is separate from same-conflict deduction comparisons.
+
+The fixed conflict script runs only when lossless canonical and prepared model
+identities match. Rewrites without a qualified coordinate mapping are an explicit
+replay decline, never a guessed source-variable remap or evidence of universal
+inapplicability. Records retain original bytes/hashes, canonical and prepared JSON,
+preparation statistics, conflict/fallback/native/shared levels, historical endpoint
+markers and holes, arithmetic store identities, actual later pins, and truncation.
+Normal preparation may use its ordinary probing/LP passes; capture adds no solve.
+Both learners retain their existing default admission policy.
+
+Each cell has two warmups and two measured invocations, with the second pass in
+reverse order: 48 invocations, at most two seconds each, in one lab profile capped
+with `profile.runTimeoutSec=180`. This is a bounded diagnostic, not a corpus gate. Complete disjoint
+intervals include parsing, preparation, session construction, analysis, search or
+script replay, original-point checking, release and capture serialization. Record
+file writes are outside the interval. Traces remain optional; warmed JFR timing and
+current-thread allocation include their overhead and establish no uninstrumented
+throughput or physical memory advantage. Releasing references does not time future
+GC. Warmups, failed attempts, skips and preparation changes remain in the records.
+
+Script points are explicit feasible original-source controls, separate from search
+witnesses. Production points are reconstructed to original coordinates before a
+fresh native point check. Neither route has an independent witness or exported
+proof checker. Do not add cumulative checkpoints or infer consumption from storage
+alone. Review PB and integer costs independently; no prepared consumer or losing
+total work/storage rejects practical admission for that selected source, without
+claiming a broad negative or enabling a default. Raw records belong under
+`klause-evidence/campaigns/prepared-arithmetic-3757/` beside the primary checkout.
+
+The internal trace defaults to 128 events, 8192 scalar words and at most 64 tracked
+arithmetic constraints. A row endpoint records variable, coefficient, historical
+minimum/maximum, historical hole count and live lower/upper reason factor ids;
+following hole events name the excluded values. Each row names its signed guard,
+with a separate Boolean/order-atom tuple; `Lit.NONE` records unconditional rows.
+Raw endpoint markers retain their
+original trail boundary and payload. Clause tuples record literal, cached level,
+integer coordinate, atom-kind ordinal and threshold (Boolean tuples use the reason
+factor id in the last slot). `analysis.seed-level` carries the effective level
+already computed by analysis. Derived rows/PBs and clause fallback stay distinct.
+`analysis.mapped-target` gives requested native target, shared target and actual
+native level at application. Store events assign a trace-local stable id; consumer
+events carry that id, current factor, coordinate, bound/value and native level.
+Remap events retire or move the same id. Truncation stops all subsequent capture;
+missing events after it cannot be interpreted as a decline or lack of reuse.
+
+[Prepared replay 8900](https://lab.eignex.com/jobs/8900) completes all 48
+invocations at `8f0f7b8d330bf6e8d3c545937c855ed8e9e1cb3b`. The returned OPB
+`cc9d2968347e` and FlatZinc `30eaca5a4886` hashes match the statically selected
+bytes. All 48 original-point checks pass, including sixteen reconstructed production
+witnesses; there is no independent witness or exported-proof check. No invocation
+is cancelled and no retained script trace is truncated. Automatic placement chose
+Mac/aarch64, JDK `25.0.4.1+1-LTS`; the one-core/4608 MiB resource receipt is advisory,
+not a hard cgroup limit. Original bytes, complete hashes, runtime/distribution
+fingerprints, commands, JFR and receipts remain outside Git in the campaign above.
+The client request supplied a 180-second base timeout; the execution receipt has a
+300-second outer profile limit and 1.533-second command elapsed. An explicit outer
+profile cap uses `profile.runTimeoutSec` rather than the base solve timeout.
+
+| Source | Retained conflict replay | Normal prepared source |
+|---|---|---|
+| Boolean PB | One PB owns the asserting pin; native work rises from 44 to 78. | Structural normalization, dual fixing and symmetry add `b0=false`, `b1=true`, `b4=true`. The trigger is removed. Ordinary LP-enabled solving takes two decisions, 45 finite work and three LP solves in both arms, with no learned constraint. |
+| Integer rows | One row owns assertion and the later `z<=11` deduction `x<=2`, versus clause control `x<=5`; native work rises from 207 to 261. Both stores have four entries, of different kinds. | Singleton-column, dual-fix and strengthening preparation removes both rows and fixes `x=0`. Both ordinary arms finish with zero decisions, six finite work and no LP solve or learned constraint. |
+
+The two warmed retained PB clause intervals are 0.793–0.817 ms and 133504
+current-thread allocated bytes; PB intervals are 0.890–1.126 ms and 151704–215392
+bytes. Integer clauses take 1.348–1.654 ms and 164184–166336 bytes, versus
+1.405–1.732 ms and 196160 bytes for rows. These disjoint complete in-process
+intervals include capture and source-point checking. Two instrumented observations
+per arm supply no uninstrumented throughput or physical-memory conclusion; JVM
+startup and future GC are outside the intervals. The normal changed trajectories
+are separate controls, not same-conflict timing pairs.
+Preparation has no separate deterministic work meter here; its time and allocation
+are included in the invocation totals.
+
+This gate rejects practical/default promotion on these two SAT source controls:
+normal preparation removes the retained opportunities, and the direct controls
+supply no total-cost advantage. It does not reject arithmetic learning universally,
+undo the delivered opt-in capability, change pure-Boolean PB admission, or determine
+the separate guarded, Element, hole or recursive-row hypotheses. No broader source
+campaign is required by this negative. Failed lint checks and the seed-hook compile
+correction are retained with their CI logs; they executed no accepted new replay.

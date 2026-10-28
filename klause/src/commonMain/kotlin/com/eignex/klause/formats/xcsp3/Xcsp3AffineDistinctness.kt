@@ -145,9 +145,11 @@ internal fun Compiler.Builder.recoverAffineDistinctness(index: Xcsp3AffineDistin
         }
         if (cancellation()) break
         factors.add(Distinct(operands))
+        classes.inherit(factors.size - 1, group.sourceRows)
         group.sourceRows.forEach { removed.add(it) }
     }
     if (removed.isEmpty()) return
+    classes.compact(removed)
     var factorIndex = 0
     factors.removeAll { factorIndex++ in removed }
 }

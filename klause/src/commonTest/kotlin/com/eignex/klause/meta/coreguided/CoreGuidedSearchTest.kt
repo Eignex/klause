@@ -4,6 +4,8 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.InputOrder
+import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.dimacs.Dimacs
@@ -11,8 +13,15 @@ import com.eignex.klause.formats.dimacs.toProblem
 import com.eignex.klause.formats.opb.Opb
 import com.eignex.klause.formats.opb.toProblem
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SemanticRational
+import com.eignex.klause.ir.SourceFormat
+import com.eignex.klause.ir.SourceSemantics
+import com.eignex.klause.ir.SourceTolerance
+import com.eignex.klause.ir.intdomain.intDomainFromSurvivors
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BuiltInPropagationProjectionProvider
 import com.eignex.klause.propagation.PropagationProjection
@@ -625,6 +634,119 @@ class CoreGuidedSearchTest {
     }
 
     @Test
+    fun `integer costs should charge overlapping pair cores once to the attained floor`() {
+        val floors = mutableListOf<Double>()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
+        val search = CoreGuidedSearch(
+            pairCover().bake(),
+            objective,
+            BacktrackParams(objectiveLowerBoundSink = { floors += it }),
+        )
+
+        val result = assertIs<MinimizeResult.Optimal>(search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {})
+
+        assertEquals(listOf(3.0, 6.0), floors)
+        assertEquals(6L, objective.evaluateLong(result.sample))
+        assertEquals(objective.evaluateExact(result.sample), search.lowerBound)
+        assertEquals(2L, result.stats.coreGuided.cores)
+        assertEquals(2, result.stats.coreGuided.largestCore)
+    }
+
+    @Test
+    fun `an eager threshold view of the pair cover should reach the same floor with a wider core`() {
+        val channels = longArrayOf(3, 3, 3, 8, 10, 11).mapIndexed { selector, value ->
+            ReifiedLinear(selector, longArrayOf(1), intArrayOf(selector % 3), LinearOp.GE, value)
+        }
+        val problem = pairCover(6, channels).bake()
+        val floors = mutableListOf<Double>()
+        val objective = LinearObjective(longArrayOf(3, 3, 3, 5, 7, 8))
+        val search = CoreGuidedSearch(problem, objective, BacktrackParams(objectiveLowerBoundSink = { floors += it }))
+
+        val result = assertIs<MinimizeResult.Optimal>(search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {})
+
+        assertEquals(listOf(3.0, 6.0), floors)
+        assertEquals(6L, (0 until 3).sumOf { result.sample.intValue(it) })
+        assertEquals(5, result.stats.coreGuided.largestCore)
+    }
+
+    @Test
+    fun `negative integer costs should charge signed value gaps from the root maximum`() {
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(intDomainFromSurvivors(longArrayOf(0, 3, 8)), IntDomain(0, 1)),
+            listOf(Linear(longArrayOf(1, 6), intArrayOf(0, 1), LinearOp.LE, 9)),
+        ).bake()
+        val floors = mutableListOf<Double>()
+        val objective = LinearObjective(intCoefficients = longArrayOf(-2, -7), constant = 4)
+        val search = CoreGuidedSearch(problem, objective, BacktrackParams(objectiveLowerBoundSink = { floors += it }))
+
+        val result = assertIs<MinimizeResult.Optimal>(search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {})
+
+        assertEquals(listOf(-12.0), floors)
+        assertEquals(8L, result.sample.intValue(0))
+        assertEquals(-12L, objective.evaluateLong(result.sample))
+        assertEquals(objective.evaluateExact(result.sample), search.lowerBound)
+    }
+
+    @Test
+    fun `caller integer pins should scope the integer cost optimum`() {
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
+        val params = BacktrackParams(assumptions = Assumptions(ints = mapOf(0 to 8L)))
+        val search = CoreGuidedSearch(pairCover().bake(), objective, params)
+
+        val result = assertIs<MinimizeResult.Optimal>(search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {})
+
+        assertEquals(8L, result.sample.intValue(0))
+        assertEquals(11L, objective.evaluateLong(result.sample))
+        assertEquals(objective.evaluateExact(result.sample), search.lowerBound)
+    }
+
+    @Test
+    fun `infeasibility found by search should not end as an integer cost bound`() {
+        val problem = Problem(
+            0,
+            3,
+            Array(3) { intDomainFromSurvivors(longArrayOf(0, 3)) },
+            listOf(
+                Linear(longArrayOf(1, -1), intArrayOf(0, 1), LinearOp.NE, 0),
+                Linear(longArrayOf(1, -1), intArrayOf(0, 2), LinearOp.NE, 0),
+                Linear(longArrayOf(1, -1), intArrayOf(1, 2), LinearOp.NE, 0),
+            ),
+        ).bake()
+
+        val result = CoreGuidedSolver(problem).minimize(
+            LinearObjective(intCoefficients = longArrayOf(1, 1, 1)),
+            BacktrackParams(),
+        )
+
+        assertIs<MinimizeResult.Infeasible>(result)
+    }
+
+    @Test
+    fun `integer costs should be admitted only on exact models and stay out of curated eligibility`() {
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
+        val approximate = pairCover().withSourceSemantics(
+            SourceSemantics(
+                SourceFormat.IR,
+                feasibilityTolerance = SourceTolerance(absolute = SemanticRational.ofLong(1)),
+            ).resolve(),
+        )
+
+        assertTrue(CoreGuidedSearch.admits(pairCover().bake(), objective))
+        assertFalse(CoreGuidedSearch.eligible(pairCover().bake(), objective))
+        assertFalse(CoreGuidedSearch.admits(approximate.bake(), objective))
+    }
+
+    @Test
+    fun `scalar proofs should count integer cost magnitude`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(-3, 2)), emptyList()).bake()
+
+        assertTrue(CoreGuidedSearch.scalarProofs(problem, LinearObjective(intCoefficients = longArrayOf(1L shl 51))))
+        assertFalse(CoreGuidedSearch.scalarProofs(problem, LinearObjective(intCoefficients = longArrayOf(1L shl 52))))
+    }
+
+    @Test
     fun `closed pending search should reject another slice`() {
         val problem = Problem(1, 0, emptyArray(), emptyArray()).bake()
         val search = CoreGuidedSearch(problem, LinearObjective(longArrayOf(1)), BacktrackParams())
@@ -633,6 +755,21 @@ class CoreGuidedSearchTest {
 
         assertFailsWith<IllegalStateException> { search.runSlice(Cancellation.Never, 1, 1) {} }
     }
+
+    private fun pairCover(numBoolVars: Int = 0, channels: List<Factor> = emptyList()) = Problem(
+        numBoolVars,
+        3,
+        arrayOf(
+            intDomainFromSurvivors(longArrayOf(0, 3, 8)),
+            intDomainFromSurvivors(longArrayOf(0, 3, 10)),
+            intDomainFromSurvivors(longArrayOf(0, 3, 11)),
+        ),
+        listOf(
+            Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 3),
+            Linear(longArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 3),
+            Linear(longArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 3),
+        ) + channels,
+    )
 
     private class ClockJumpOnDecision(private val clock: TestTimeSource) : SearchComponent {
         var interrupted = false

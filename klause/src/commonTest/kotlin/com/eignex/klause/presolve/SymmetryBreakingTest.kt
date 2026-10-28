@@ -1,5 +1,6 @@
 package com.eignex.klause.presolve
 
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
@@ -22,12 +23,15 @@ import com.eignex.klause.presolve.PresolveShared.withSourcePassDelta
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.conditionedRoot
 import com.eignex.klause.propagation.propagate
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
@@ -152,6 +156,158 @@ class SymmetryBreakingTest {
         val delta = Presolve.breakSymmetries(problem, objectiveIntVars = setOf(1), objectiveBoolVars = setOf(1))
 
         assertTrue(delta.isEmpty)
+    }
+
+    @Test
+    fun `objective symmetry should prune complete search while retaining each attainable cost`() {
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 3) }, listOf(AllDifferent(intArrayOf(0, 1, 2)))).bake()
+        for (weight in listOf(-2L, 2L)) {
+            val objective = LinearObjective(intCoefficients = LongArray(3) { weight }, constant = 7)
+            val context = PresolveContext.of(objective, transformObjective = true)
+            val delta = PresolvePass.BREAK_OBJECTIVE_SYMMETRIES.applyFinite(problem, context)
+            val reduced = problem.withPassDelta(delta, BakeConfig.NONE)
+
+            val original = BacktrackSolver(problem).enumerate().toList()
+            val representatives = BacktrackSolver(reduced).enumerate().toList()
+
+            assertEquals(24, original.size)
+            assertEquals(4, representatives.size)
+            assertEquals(
+                original.map(objective::evaluateLong).toSet(), representatives.map(objective::evaluateLong).toSet(),
+            )
+            assertTrue(delta.addedFactors.none { it is ValuePrecede })
+        }
+    }
+
+    @Test
+    fun `objective symmetry should admit the Latin transpose without scalar pair orders`() {
+        val factors = (0 until 4).flatMap { i -> listOf(
+            AllDifferent(IntArray(4) { j -> 4 * i + j }),
+            AllDifferent(IntArray(4) { j -> 4 * j + i }),
+        ) }
+        val problem = Problem(0, 16, Array(16) { IntDomain(0, 3) }, factors).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(8, 1, 1, 1, 1, 4, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1))
+        val context = PresolveContext.of(objective, transformObjective = true)
+
+        val delta = PresolvePass.BREAK_OBJECTIVE_SYMMETRIES.applyFinite(problem, context)
+
+        val symmetry = delta.addedFactors.filterIsInstance<SymmetryHandling>().single()
+        val transpose = IntArray(16) { i -> 4 * (i % 4) + i / 4 }
+        assertTrue(symmetry.generators.any { it.first.contentEquals(transpose) })
+        assertEquals(1, delta.addedFactors.size)
+        val point = longArrayOf(0, 1, 2, 3, 2, 3, 0, 1, 1, 2, 3, 0, 3, 0, 1, 2)
+        val image = LongArray(16) { point[transpose[it]] }
+        val singlePair = point.copyOf().apply { this[1] = point[4]; this[4] = point[1] }
+        assertFalse(isFeasible(problem, BooleanArray(0), singlePair))
+        assertTrue(isFeasible(problem, BooleanArray(0), image))
+        val reduced = problem.withPassDelta(delta, BakeConfig.NONE)
+        assertTrue(isFeasible(reduced, BooleanArray(0), point))
+        assertFalse(isFeasible(reduced, BooleanArray(0), image))
+    }
+
+    @Test
+    fun `objective symmetry should retain signed Boolean weights and offset`() {
+        val problem = Problem(3, 0, emptyArray(), listOf(Clause(intArrayOf(pos(0), pos(1), pos(2))))).bake()
+        for (weight in listOf(-3L, 3L)) {
+            val objective = LinearObjective(boolWeights = LongArray(3) { weight }, constant = -5)
+            val delta = PresolvePass.BREAK_OBJECTIVE_SYMMETRIES.applyFinite(
+                problem, PresolveContext.of(objective, transformObjective = true),
+            )
+            val original = BacktrackSolver(problem).enumerate().toList()
+            val representatives = BacktrackSolver(problem.withPassDelta(delta, BakeConfig.NONE)).enumerate().toList()
+
+            assertEquals(7, original.size)
+            assertEquals(3, representatives.size)
+            assertEquals(
+                original.map(objective::evaluateLong).toSet(), representatives.map(objective::evaluateLong).toSet(),
+            )
+        }
+    }
+
+    @Test
+    fun `objective symmetry should distinguish signed coefficients`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 3) }, listOf(AllDifferent(intArrayOf(0, 1)))).bake()
+        for (coefficients in listOf(longArrayOf(-1, 1), longArrayOf(1, 2), longArrayOf(0, 1))) {
+            val context = PresolveContext.of(LinearObjective(intCoefficients = coefficients), transformObjective = true)
+
+            assertTrue(PresolvePass.BREAK_OBJECTIVE_SYMMETRIES.applyFinite(problem, context).isEmpty)
+        }
+    }
+
+    @Test
+    fun `objective symmetry should require exact nonsensitive unannotated admission`() {
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 3) }, listOf(AllDifferent(intArrayOf(0, 1, 2)))).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
+        val exact = PresolveContext.of(objective, transformObjective = true)
+        val pass = PresolvePass.BREAK_OBJECTIVE_SYMMETRIES
+
+        for (context in listOf(
+            PresolveContext.of(objective),
+            exact.copy(solutionSetSensitive = true),
+            exact.copy(modelBreaksSymmetry = true),
+        )) assertTrue(pass.applyFinite(problem, context).isEmpty)
+        assertFalse(PresolveConfig.DEFAULT.resolved(pass, exact))
+        assertFalse(PresolveConfig.parse("default,+objective-symmetry").forLocalSearch().resolved(pass, exact))
+        assertFalse(PresolveConfig.parse("off,+objective-symmetry").resolved(
+            pass, exact.copy(solutionSetSensitive = true),
+        ))
+    }
+
+    @Test
+    fun `objective symmetry should preserve root holes and opening pins`() {
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1))
+        val context = PresolveContext.of(objective, transformObjective = true)
+        val factors = listOf(AllDifferent(intArrayOf(0, 1)))
+        val pinned = Problem(0, 2, Array(2) { IntDomain(0, 3) }, factors).bake()
+            .conditionedRoot(Assumptions.None.withInt(0, 3), Cancellation.Never)
+        val holes = Problem(0, 2, arrayOf(IntDomain(0, 3).excludeValue(1), IntDomain(0, 3)), factors).bake()
+
+        for (problem in listOf(pinned, holes)) {
+            assertTrue(PresolvePass.BREAK_OBJECTIVE_SYMMETRIES.applyFinite(problem, context).isEmpty)
+        }
+    }
+
+    @Test
+    fun `value protection should follow the exact objective rather than stale support metadata`() {
+        val problem = Problem(
+            0, 3, arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(5, 7)),
+            listOf(AllDifferent(intArrayOf(0, 1)), Table(intArrayOf(2), longArrayOf(5, 6, 7))),
+        ).bake()
+        val context = PresolveContext(
+            objectiveIntCoeffs = mapOf(0 to 1L),
+            linearObjective = LinearObjective(intCoefficients = longArrayOf(0, 0, -1)),
+        )
+
+        val delta = PresolvePass.BREAK_OBJECTIVE_SYMMETRIES.applyFinite(problem, context)
+        val reduced = problem.withPassDelta(delta, BakeConfig.NONE)
+
+        assertTrue(isFeasible(reduced, BooleanArray(0), longArrayOf(0, 1, 7)))
+    }
+
+    @Test
+    fun `objective symmetry should keep unread objective columns fixed`() {
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 3) }, listOf(AllDifferent(intArrayOf(0, 2)))).bake()
+        val context = PresolveContext.of(
+            LinearObjective(intCoefficients = longArrayOf(1, 1, 1)), transformObjective = true,
+        )
+
+        val delta = PresolvePass.BREAK_OBJECTIVE_SYMMETRIES.applyFinite(problem, context)
+
+        assertTrue(delta.addedFactors.any { it is SymmetryHandling })
+        assertTrue(delta.addedFactors.all { 1 !in it.intVars })
+    }
+
+    @Test
+    fun `an interrupted objective symmetry scan should post no break`() {
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 3) }, listOf(AllDifferent(intArrayOf(0, 1, 2)))).bake()
+        val budget = PresolveBudget(1)
+        val context = PresolveContext.of(
+            LinearObjective(intCoefficients = longArrayOf(1, 1, 1)), transformObjective = true,
+        )
+            .withCancellation(budget.orSpent(Cancellation.Never))
+
+        assertTrue(PresolvePass.BREAK_OBJECTIVE_SYMMETRIES.applyFinite(problem, context).isEmpty)
+        assertTrue(budget.spent() > 0)
     }
 
     @Test

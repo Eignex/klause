@@ -8,10 +8,37 @@ import com.eignex.klause.util.CheckedLongOverflowException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class IntegerConflictRowTest {
+    @Test
+    fun `an assertion whose raw target is a historical hole should decline`() {
+        val row = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
+            longArrayOf(1), intArrayOf(0), LinearOp.LE, 3), useLo = true))
+        val state = PropagationState(Problem(0, 1, arrayOf(IntDomain(0, 6).excludeValue(3)), emptyArray()),
+            Assumptions.None)
+        state.undoLogging = true
+        assertTrue(state.tightenIntMax(0, 2))
+
+        assertFalse(row.assertsAt(state, 0))
+    }
+
+    @Test
+    fun `a later interior carve should not remove an earlier raw assertion target`() {
+        val row = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
+            longArrayOf(1), intArrayOf(0), LinearOp.LE, 3), useLo = true))
+        val state = PropagationState(Problem(0, 1, arrayOf(IntDomain(0, 6)), emptyArray()), Assumptions.None)
+        state.undoLogging = true
+        assertTrue(state.tightenIntMin(0, 1))
+        val trail = state.undo.size
+        assertTrue(state.excludeIntValue(0, 3))
+
+        assertTrue(row.assertsAt(state, trail))
+        assertFalse(row.assertsAt(state, state.undo.size))
+    }
+
     @Test
     fun `an overflowing nonnegative combination should decline`() {
         val left = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0, 1),

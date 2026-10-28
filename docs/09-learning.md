@@ -30,6 +30,15 @@ Assumption cores keep the applied seed prefix when propagation refutes it, or th
 assumption set when the tree is exhausted. Cores are jointly refuted with the hard
 model and need not be minimal; an interrupted seeding cannot certify the full seed.
 
+An internal opt-in seed projection starts from the historical forcing clause of a
+Boolean pin contradicted by the next named assumption. It resolves eager Boolean
+antecedents until every remaining literal is negated by an applied named pin, keeping
+transitive premises rather than using their decision levels as proof. Root units
+must belong to the captured baked model. Integer atoms, lazy or unavailable reasons,
+cycles, cancellation and local limits retain the certified prefix. The projection
+admits at most 128 literals, 128 resolution steps and 8,192 visits, charged to the
+same propagation work and containing token. An empty projection supplies no verdict.
+
 ### Table explanations
 
 Table filtering keeps STR2 explanations, built from build-local caches of historical
@@ -146,31 +155,81 @@ rounds the reason up after division by its pivot coefficient, then adds it to ca
 the pivot. Weakening and saturation keep coefficients bounded and canonical. These
 nonnegative combinations with Chvátal-Gomory rounding preserve implication. A step
 that declines, including signed-word overflow, falls back to clause resolution.
-Learned pseudo-Boolean constraints share clause retention.
+Learned pseudo-Boolean constraints share clause retention. A permanent-retention
+mark prevents forgetting; it does not establish logical scope. Source-valid atom
+channeling clauses and incumbent restrictions can both have that mark. Observers
+of enforcing incidence read complete PB terms and established values, because the
+weighted covering watch set is only a propagation wakeup index. Unknown constraint
+kinds or unnameable atoms withhold a complete-incidence claim.
 
 ## Integer row learning
 
 `integerRowLearning` is opt-in and independent of pseudo-Boolean learning. Mandatory
 finite `Linear` inequalities and the explaining half of equalities provide integer
-rows. Each resolved endpoint must name an unextended historical linear reason from
-the same source row; historical holes, reification, disequalities, wide constants
+rows. Reified integer rows preserve the signed indicator selecting the inequality
+or equality side, including the strict integer complement of an inequality. Each
+resolved endpoint must name an unextended historical linear reason from the same
+source row, with its exact guard false-literal and historical guard truth.
+
+The raw requested bound, reconstructed at the deduction's trail position, must
+support the eliminated live endpoint; a hole-snapped stronger endpoint retains
+clause fallback. Interior holes in the remaining terms stay in the actual domains
+and do not prevent a source-implied combination. Historical exclusions clipped by
+a pivot move remain conservative: a sparse tail walk admits at most 64 positions,
+using historical membership to exclude later carves. Disequalities, wide constants
 and unsupported projections retain clause fallback.
+
+A selected variable-array `Element` can seed a conflict from either side of its
+selected equality. Its positive index-equality atom retains the source index,
+offset and selected cell identity, including when the atom is created after selection.
+Only a bound conflict of that equality is arithmetic; Element support explanations
+remain clause reasons. Support filtering keeps its hole-aware semantics. Repeated
+cells retain their selected index guard, and a result alias supplies no arithmetic row.
 
 Opposite-sign nonnegative combinations use checked signed arithmetic and integer
 gcd normalization. Each combination must remain conflicting. A retained row must
 propagate against the session's historical domains at its native backjump and the
-mapped shared target; literal counts do not establish assertion. Foreign unavailable
-bound premises retain clause analysis. The producer admits at most 16 terms, 16
-combinations, 64 native levels and 64 stored rows, with bounded duplicate lookup.
+mapped shared target. The raw assertion target must have been a member of its
+historical domain; a later carve cannot remove that earlier membership, and a
+historical hole cannot supply a raw bound assertion. Literal counts do not establish
+assertion. Foreign unavailable bound premises retain clause analysis. The producer
+admits at most 16 terms, 16 combinations, 64 native levels and 64 stored rows, with
+bounded duplicate lookup.
+
+Rows retain at most one distinct signed guard; combinations requiring different
+guards retain clause fallback. A guarded row asserts only where its guard already
+holds at both the native and mapped shared target. An inactive guard withholds
+arithmetic propagation, and its activation wakes the row through a literal watch.
+Guard negations remain premises of every retained-row deduction and conflict.
 
 Rows share the learned store and integer bounds propagation. Eager reasons freeze
 the historical clause premises without a compactable lazy factor id. Integer bound
 event subscriptions wake rows after undo and are remapped or removed on forgetting.
-Later conflicts use these retained rows' clause explanations; row combination loads
-only original mandatory source rows.
+Later conflicts use these retained rows' clause explanations. Arithmetic combination
+loads original mandatory or guarded linear rows; a selected Element equality can
+seed the conflict but cannot supply a numerical endpoint reason.
 Only clauses are shared across arms. Row satisfaction tests the complete maximum
 activity; a satisfied endpoint literal cannot discharge the row or certify a root
 contradiction.
+
+## Arithmetic diagnostics
+
+An optional native-session `ArithmeticLearningTrace` records bounded arithmetic
+analysis events before conflict retraction. It retains seed and fallback literals,
+integer endpoint markers and historical row domains, signed row guards with native
+Boolean or order-atom metadata, native/shared targets, decline
+categories and stored arithmetic consumers. Literal metadata distinguishes cached
+atom levels from the analyzer's effective conflict level. Historical domain holes
+exclude later journalled carves; endpoint factor ids describe the live reason owner.
+Storage identities survive factor compaction and retire when their constraint is
+forgotten. Only actual changed bounds or Boolean pins count as consumer events.
+
+The trace is absent by default. Its fixed event and scalar-word allowances and
+per-payload limits stop capture with explicit truncation. Event lookups withhold a
+full recorder before later payloads are constructed. The trace reads existing state,
+does not reconstruct new reasons or run propagation, and supplies no proof or source
+mapping authority. Source and preparation identities belong to the containing
+diagnostic invocation; an incomplete trace cannot establish exhaustive applicability.
 
 ## Learned-clause retention
 

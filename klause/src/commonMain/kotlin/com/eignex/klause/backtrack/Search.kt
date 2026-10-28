@@ -24,6 +24,7 @@ import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.baked
+import com.eignex.klause.propagation.projectSeedCore
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.IncumbentSubscription
 import com.eignex.klause.solver.incumbent.Verification
@@ -167,6 +168,7 @@ internal class CpSatisfactionTraversal(
     projection: PropagationProblem = PropagationProblem(problem),
     private val deferredInitialization: Boolean = false,
     singleModel: Boolean = false,
+    projectAssumptionCore: Boolean = false,
 ) : AutoCloseable {
     private val resources = SearchInvocationResources()
     private val lpResources = ArrayList<LpSearchResource>()
@@ -242,7 +244,10 @@ internal class CpSatisfactionTraversal(
                 } else params.cancellation,
                 learnedDb = params.sharedLearnedDb(),
             )
-            val seeded = cp.session.seed(params.assumptions)
+            val seed = cp.session.seed(params.assumptions)
+            val seeded = if (projectAssumptionCore && seed is PropagationResult.Unsat) {
+                cp.session.projectSeedCore(params.assumptions, seed, propagationCancellation)
+            } else seed
             cp.rebase()
             rootOutcome = if (seeded is PropagationResult.Unsat || cp.session.isUnsatAtRoot) {
                 val core = (problem.baked as? PropagationResult.Unsat)?.let(::coreOf)

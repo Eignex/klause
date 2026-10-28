@@ -2,6 +2,8 @@ package com.eignex.klause.presolve
 
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.factor.symmetry.SymmetryHandling
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
@@ -34,6 +36,27 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class AffineObjectiveTest {
+    @Test
+    fun `objective symmetry should consume translated costs and exclude the reconstructed alias`() {
+        val model = Problem(
+            0, 4, arrayOf(IntDomain(1, 4), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
+            listOf(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1),
+                AllDifferent(intArrayOf(1, 2, 3)),
+            ),
+        )
+        val cost = LinearObjective(intCoefficients = longArrayOf(1, 0, 1, 1), constant = -1)
+
+        val outcome = PresolvePipeline.run(model, cost, PresolveConfig.parse("off,+affine,+objective-symmetry"), false)
+        val transformed = assertNotNull(outcome.objective)
+        val assignments = BacktrackSolver(outcome.problem.bake()).enumerate().toList()
+
+        assertTrue(outcome.problem.factors.filterIsInstance<SymmetryHandling>().isNotEmpty())
+        assertTrue(outcome.problem.factors.all { 0 !in it.intVars })
+        assertEquals(4, assignments.map { outcome.reconstruct(it).ints.toList() }.toSet().size)
+        for (sample in assignments) outcome.mapping.requireObjectivePreserved(cost, transformed, sample)
+    }
+
     private val source = Problem(
         0,
         3,

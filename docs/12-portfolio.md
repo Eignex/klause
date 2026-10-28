@@ -461,6 +461,40 @@ and relaxes the core with a reified cardinality, replacing its violation count `
 `1 + sum(k = 2..n, s >= k)`; only the first unspent threshold of each count is
 materialized. Weights and the bound use arbitrary-precision integers.
 
+Internal core refinement is default-disabled. Seed-proof projection uses the
+[historical reasons](09-learning.md#explanation-lifetime) of the existing query,
+without another propagation session or solve; unsupported seed conflicts and tree
+exhaustion keep their certified cores. Caller conditions remain attached to every
+augmented query.
+
+A separate deletion control tries deleting each member of a
+completed core with a fresh propagation refutation of the augmented hard model and
+the retained caller pins. It admits at most 32 members, 4,096 columns, 4,096 factors
+and 32,768 structural entries and propagation visits, over built-in projections
+of clauses and reified cardinalities. It never removes the final member and retains
+the original certified core on a stop.
+Its construction, trials and disposal share the core worker's work and active-time
+allowances. It performs no additional search and does not promise a minimal core;
+tree refutations unavailable to propagation keep their original members.
+
+Selecting `core-guided` directly also accepts exact integer costs over columns whose
+source bounds are closed on both sides; curated pools still admit it only for Boolean
+objectives. A cost `c·x` starts at its cheapest root value and becomes the gaps between
+consecutive root values crossed away from it: each gap is a threshold `[x ≥ v]`, or
+`[x ≤ v]` when `c < 0`, weighted by `|c|` times the gap. Only the first unspent
+threshold of each column is materialized, so a wide contiguous column can still spend
+the worker's whole allowance one value at a time. Scalar proofs count the full integer
+cost magnitude.
+
+The directly selected worker can expand a retained finite sum-output definition
+through the bounded [separable cost view](07-presolve.md#guarantees-and-source-mappings).
+Only its private soft costs use that expression. The original output coordinate,
+defining factors and objective retain witness and publication authority; floors
+stay in the same units and exact attainment still checks the original objective.
+Curated eligibility reads the original objective, so an integer output alias does
+not enable an additional default worker. Expansion and refused attempts spend the
+worker's containing preparation allowance.
+
 Published incumbents project away auxiliary selectors and pass the source check, and
 optimality requires exact equality between the original objective and the
 accumulated bound. Auxiliary clauses never enter shared channels. On a single lane

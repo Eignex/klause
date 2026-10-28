@@ -223,6 +223,8 @@ internal fun FlatZincCompiler.evalBoolVarArray(e: FznExpr): IntArray = when (e) 
     is FznExpr.ArrayLit -> IntArray(e.elements.size) { resolveBoolLit(e.elements[it]) }
 
     is FznExpr.Ident -> when (val arr = arrays[e.name]) {
+        is FlatZincArray.BoolParam -> IntArray(arr.values.size) { resolveBoolLit(FznExpr.BoolLit(arr.values[it])) }
+
         is FlatZincArray.Vars -> {
             require(arr.elementKind == FlatZincArray.Vars.ElementKind.Bool) {
                 "`${e.name}` is not a bool var array"
