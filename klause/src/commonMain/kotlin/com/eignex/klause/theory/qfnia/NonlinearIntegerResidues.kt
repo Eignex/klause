@@ -227,7 +227,9 @@ internal class NonlinearIntegerResidues(
                         step()
                         value * values[child] % modulus
                     }
-                    is PolynomialExpression.Power -> modularPower(values[node.args.single()], expression.exponent, modulus)
+                    is PolynomialExpression.Power -> modularPower(
+                        values[node.args.single()], expression.exponent, modulus,
+                    )
                 }
             }
             val supported = equations.indices.all { index ->

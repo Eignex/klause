@@ -115,6 +115,24 @@ native work. Residue work is included in the containing polynomial allowance.
 The option defaults off; synthetic refutation capability establishes no corpus
 benefit or default activation case.
 
+The bounded cloud comparison [8976](https://lab.eignex.com/jobs/8976), at
+`6b0ffe9cf1`, uses all ten sources with identical off/on arms, eight candidates,
+100,000 native work units and a two-second case budget on Linux amd64. All sources
+enter the nonlinear integer route. The five residue discriminators change from
+UNKNOWN to native UNSAT, consuming one completed residue refutation each with
+10–68 tuples and 239–1,737 residue work units. The two reported SAT controls remain
+SAT in both arms; Dolmen accepts all four original-source models. The guarded SAT
+alternative, real-supported SAT input and selected-ring inconclusive UNSAT input
+remain UNKNOWN in both arms. The real-supported equality records a decline; the
+guard supplies no residue premise. Build/runtime fingerprints, original hashes and
+checker resource receipts are retained with the job.
+
+These are synthetic capability and cost observations, not a process-throughput
+comparison. Native UNSAT has no exported certificate or independent reference
+replay here: the service requires local-only reference placement, so the initial
+automatic reference job was cancelled before execution and cloud reference
+placement was rejected. The option remains disabled by default.
+
 `sets/<name>.txt` fixes membership as one `<suite>/<problem>` identity per line,
 matching `select`; `@<set>` includes another set and `#` starts a comment.
 Focused sets cover the structural themes reported by `select features=true`:
