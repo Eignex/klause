@@ -7660,6 +7660,44 @@ integer-row learning opt-in, without a preparation/LP or default-performance cla
 Raw records, source/build hashes, JFR, receipts and CI reports live under
 `klause-evidence/campaigns/integer-provenance-3753-3754/` beside the primary checkout.
 
+### Retained integer reason gate
+
+`IntegerReasonReroutingProfile [m]`, with `m=2..32` and default 8, compares all
+six source orders of `m*x+y<=z`, `x-y<=0`, `z-m*x<=w`. Clauses, original-row
+learning, an actually acquired eager row `(m+1)*x<=z`, and a numeric surrogate
+visit the conflict `x>=1,w<=0`, then siblings `w<=1` and `min(3,m)`. The surrogate
+supplies the redundant row as an original source and omits its acquisition costs.
+Optional arithmetic tracing adds bounded pre-undo seed owners, markers, derived
+rows and consumers; absent tracing is explicit, with no substituted owner claims.
+
+[Gate 8921](https://lab.eignex.com/jobs/8921), at
+`169180d956d16e52f4eede31176efab2846e3b76`, completes 24 sessions and 48 stage
+records at `m=8`, with no truncated traces. Original rows retain `z<=9*w` in three
+orders and `y<=w` in the other three, then own deductions that give `x<=1` and
+`x<=3` at both siblings. Clauses alone stop at `x<=8`. In source order A/B/C,
+the failed A row resolves B then C; the numeric surrogate resolves C from the
+retained-row shape and produces the same `z<=9*w`, rather than `x<=w`.
+
+Cumulative native work is 826–901 for original rows, 1249–1701 for the acquired
+eager row and 802–975 for the surrogate. The surrogate saves at most 41 units in
+three orders while omitting 173–182 extra units of actual acquisition; it costs
+more in the other three orders before acquisition. Point checks add 38 units per
+original/eager session and 48 per surrogate. Native stores contain 28–29, 48–69
+and 25–30 learned constraints respectively before disposal; the surrogate also
+carries one extra base row. Every native/shared store is empty afterwards.
+Ordinary original-row rerouting discharges this scaling lead,
+so recursive numeric reason storage is not adopted from it.
+
+All 48 source points pass fresh native checks, without an independent witness or
+exported-proof checker. Host-auto placement selected Mac arm64, Temurin
+`25.0.4.1+1-LTS`, with advisory one-vCPU/4608-MiB budgets. Ordered elapsed and
+current-thread allocation include construction, tracing, checks, earlier record writing
+and disposal, and supply no throughput claim. Job 8901 retains an incorrect
+uniform-sibling-bound prediction; 8919 failed trace-hook compilation before cases.
+Hashes, complete captures, JFR and receipts remain beside the primary checkout in
+`klause-evidence/campaigns/integer-provenance-3753-3754/`. This bounded rejection
+does not establish that every retained-row family lacks useful numeric reasons.
+
 ### Guarded integer conflict rows
 
 `GuardedIntegerRowProfile` keeps the finite reified source `r iff 2*x+y<=z`

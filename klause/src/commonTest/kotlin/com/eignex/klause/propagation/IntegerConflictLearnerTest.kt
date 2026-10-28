@@ -30,6 +30,26 @@ import kotlin.test.assertTrue
 
 class IntegerConflictLearnerTest {
     @Test
+    fun `an incidental hole should preserve a learned row guard`() {
+        val native = PropagationSession(Problem(1, 3,
+            arrayOf(IntDomain(0, 6), IntDomain(0, 12).excludeValue(2), IntDomain(0, 24)), arrayOf(
+                ReifiedLinear(0, intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+                Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+            ))).apply { enableIntegerRowLearning() }
+        assertIs<PropagationResult.Implied>(native.pinBool(0, true))
+        assertIs<PropagationResult.Implied>(native.pinIntAtMost(2, 7))
+
+        val conflict = assertIs<PropagationResult.Unsat>(native.pinIntAtLeast(0, 2))
+
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(conflict.learnedClause)
+        assertEquals(Lit.make(0, true), learned.row.guard)
+        assertTrue(learned.fallbackClause.literals.contains(Lit.make(0, false)))
+        native.popToLevel(learned.backjumpLevel)
+        assertIs<PropagationResult.Implied>(native.addLearnedIntegerRow(learned.row, learned.lbd))
+        assertEquals(1L, native.intDomain(0).max)
+    }
+
+    @Test
     fun `original rows should retain a reusable consequence of the scaling conflict`() {
         for (scale in listOf(2, 8, 32)) {
             for (order in listOf(listOf(0, 1, 2), listOf(0, 2, 1), listOf(1, 0, 2),
