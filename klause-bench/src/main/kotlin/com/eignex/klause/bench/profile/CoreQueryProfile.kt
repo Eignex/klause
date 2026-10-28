@@ -105,9 +105,10 @@ internal object CoreQueryProfile {
                             cancellation = stop, nativeSat = false)
                         val started = System.nanoTime()
                         val before = bean.getThreadAllocatedBytes(thread)
-                        search = constructor.newInstance(model, cost, params, policy == "stratified", null,
+                        val handle = constructor.newInstance(model, cost, params, policy == "stratified", null,
                             2_000L, TimeSource.Monotonic, policy == "refined") as ResumableSearch
-                        val result = search.use { it.runSlice(stop, 2_000L, -1L) {} }
+                        search = handle
+                        val result = handle.use { it.runSlice(stop, 2_000L, -1L) {} }
                         observe()
                         val elapsed = System.nanoTime() - started
                         val bytes = bean.getThreadAllocatedBytes(thread) - before
@@ -131,12 +132,12 @@ internal object CoreQueryProfile {
                             put("nativeResult", result?.javaClass?.simpleName)
                             put("sourceAccepted", sourceAccepted)
                             put("sourceObjective", point?.let { objective.evaluateLong(it) })
-                            put("cores", search.stats.coreGuided.cores)
-                            put("largestCore", search.stats.coreGuided.largestCore)
-                            put("floor", search.stats.coreGuided.lowerBound.toString())
-                            put("work", search.work)
-                            put("nodes", search.stats.search.nodes.sum)
-                            put("propagation", search.stats.search.propagationWork.sum)
+                            put("cores", handle.stats.coreGuided.cores)
+                            put("largestCore", handle.stats.coreGuided.largestCore)
+                            put("floor", handle.stats.coreGuided.lowerBound.toString())
+                            put("work", handle.work)
+                            put("nodes", handle.stats.search.nodes.sum)
+                            put("propagation", handle.stats.search.propagationWork.sum)
                             put("history", JsonArray(history))
                             put("independentProofCheck", false)
                         }
