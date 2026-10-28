@@ -205,7 +205,7 @@ internal object RegularPrefixProfile {
             out.resolve("$mode-report.json").writeText(report.toString())
             println("${out.name}/$mode: $report")
             if (replay && mode == "default" && snapshot != null && model.factors.any { it is Regular } &&
-                prepared.presolve?.infeasible != true && !stop()
+                prepared.presolve?.infeasible != true && root !is PropagationResult.Unsat && !stop()
             ) {
                 RegularPrefixReplay.capture(
                     model,

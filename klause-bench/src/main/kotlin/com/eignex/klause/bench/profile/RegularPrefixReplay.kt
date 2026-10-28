@@ -48,6 +48,7 @@ internal data class RegularPrefixDefinitions(val problem: Problem, val states: I
 internal fun regularPrefixDefinitions(source: Problem): RegularPrefixDefinitions {
     require(source.numRealVars == 0)
     require(source.numIntVars <= 4096 && source.numBoolVars <= 4096 && source.factors.size <= 8192)
+    require((0 until source.numIntVars).all { source.intBounds.hasLower(it) && source.intBounds.hasUpper(it) })
     val selected = source.factors.filterIsInstance<Regular>().let {
         if (source.numIntVars <= 8) it else it.take(1)
     }
