@@ -3245,6 +3245,21 @@ the three calls each spend 56 visits and remove no original tuple. Measured call
 take 0.064–0.815 ms and allocate 232–57,624 current-thread bytes. This capture
 establishes no cyclic deduction or source verdict.
 
+[9058](https://lab.eignex.com/jobs/9058), at `4ff2b8f3a0`, completes solve-mode
+preparation with 5,724,159,148 charged units in 0.352 seconds. Affine reconstruction
+leaves eleven factors: ten unchanged word payloads and AllDifferent over indices
+100–109. Every pair of row Tables shares one aliased letter. Raw production calls
+each spend eleven visits and remove nothing because the Tables exceed admission.
+The first/last triads `(0,1,2)` and `(7,8,9)` then complete compact two-letter
+projections with 488/636/384 and 387/544/457 rows. Every participating original
+Table retains 104,909 root-feasible rows; composing either triad removes zero
+projected or original rows. The two probes spend 6,970,892 visits, 0.525/0.371
+seconds and 12,108,848/12,341,752 current-thread allocated bytes. Their full-row
+checks include the private word index; AllDifferent remains an original constraint
+outside the projected probe. These overapproximations establish no source SAT
+verdict and no benefit for the sampled word cycles. Production Table/MDD admission
+and default activation stay unchanged.
+
 ### Reusable Regular prefix states
 
 Reject the bounded static state-chain selection for solver integration and online
