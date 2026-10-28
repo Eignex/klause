@@ -150,6 +150,8 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
 
     "disjunctive_strict", "fzn_disjunctive_strict" -> emitDisjunctive(c, strict = true)
 
+    "klause_disjunctive_opt" -> emitOptionalDisjunctive(c)
+
     "int_times" -> emitIntTimes(c)
 
     "int_pow", "int_pow_fixed", "klause_int_pow" -> emitIntPower(c)
