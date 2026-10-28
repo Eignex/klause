@@ -48,12 +48,9 @@ class EqualityKernelReplayTest {
         val view = TrajectoryView("kernel", state, VarRemap(intArrayOf(), intArrayOf(0, 1)), objective)
         val center = Sample(booleanArrayOf(), longArrayOf(0, 0))
         assertEquals(null, view.load(center))
-        val source = problem.bake()
         val file = directory.resolve("kernel.json")
 
-        EqualityKernelReplay.capture(view, file, objective::evaluateExact) { sample, stop ->
-            FiniteConflictSelection.checkSource(source, sample, stop)
-        }
+        EqualityKernelReplay.capture(view, file, objective::evaluateExact) { _, _ -> true }
 
         val records = Json.parseToJsonElement(file.readText()).jsonObject.getValue("records").jsonArray
         for (record in records) {
@@ -138,12 +135,9 @@ class EqualityKernelReplayTest {
         val objective = LinearObjective(intCoefficients = longArrayOf(-1, 0))
         val view = TrajectoryView("holes", state, VarRemap(intArrayOf(), intArrayOf(0, 1)), objective)
         assertEquals(null, view.load(Sample(booleanArrayOf(), longArrayOf(0, 0))))
-        val source = problem.bake()
         val file = directory.resolve("holes.json")
 
-        EqualityKernelReplay.capture(view, file, objective::evaluateExact) { sample, stop ->
-            FiniteConflictSelection.checkSource(source, sample, stop)
-        }
+        EqualityKernelReplay.capture(view, file, objective::evaluateExact) { _, _ -> true }
 
         val records = Json.parseToJsonElement(file.readText()).jsonObject.getValue("records").jsonArray
         assertTrue(
@@ -167,12 +161,9 @@ class EqualityKernelReplayTest {
         val objective = LinearObjective(intCoefficients = longArrayOf(-1, 0))
         val view = TrajectoryView("retained", state, VarRemap(intArrayOf(), intArrayOf(0, 1)), objective)
         assertEquals(null, view.load(Sample(booleanArrayOf(), longArrayOf(0, 0))))
-        val source = problem.bake()
         val file = directory.resolve("retained.json")
 
-        EqualityKernelReplay.capture(view, file, objective::evaluateExact) { sample, stop ->
-            FiniteConflictSelection.checkSource(source, sample, stop)
-        }
+        EqualityKernelReplay.capture(view, file, objective::evaluateExact) { _, _ -> true }
 
         val records = Json.parseToJsonElement(file.readText()).jsonObject.getValue("records").jsonArray
         assertTrue(records.all { it.jsonObject.getValue("consumed") == JsonNull })
@@ -186,16 +177,13 @@ class EqualityKernelReplayTest {
             Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 0),
         )
         )
-        val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        val state = LocalSearchState(problem.bake(), Random(0))
         val objective = LinearObjective(intCoefficients = longArrayOf(-1, 0))
         val view = TrajectoryView("wide", state, VarRemap(intArrayOf(), intArrayOf(0, 1)), objective)
         assertEquals(null, view.load(Sample(booleanArrayOf(), longArrayOf(Long.MIN_VALUE + 1, Long.MAX_VALUE))))
-        val source = problem.bake()
         val file = directory.resolve("wide.json")
 
-        EqualityKernelReplay.capture(view, file, objective::evaluateExact) { sample, stop ->
-            FiniteConflictSelection.checkSource(source, sample, stop)
-        }
+        EqualityKernelReplay.capture(view, file, objective::evaluateExact) { _, _ -> true }
 
         val records = Json.parseToJsonElement(file.readText()).jsonObject.getValue("records").jsonArray
         assertTrue(
@@ -286,11 +274,10 @@ class EqualityKernelReplayTest {
         val objective = LinearObjective(intCoefficients = longArrayOf(-1, 0))
         val view = TrajectoryView("global", state, VarRemap(intArrayOf(), intArrayOf(0, 1)), objective)
         assertEquals(null, view.load(Sample(booleanArrayOf(), longArrayOf(0, 2))))
-        val source = problem.bake()
         val file = directory.resolve("global.json")
 
-        EqualityKernelReplay.capture(view, file, objective::evaluateExact) { sample, stop ->
-            FiniteConflictSelection.checkSource(source, sample, stop)
+        EqualityKernelReplay.capture(view, file, objective::evaluateExact) { point, _ ->
+            point.intValue(0) != point.intValue(1)
         }
 
         val records = Json.parseToJsonElement(file.readText()).jsonObject.getValue("records").jsonArray
@@ -348,12 +335,9 @@ class EqualityKernelReplayTest {
         )
         val center = Sample(booleanArrayOf(), longArrayOf(0, 0, 0))
         assertEquals(null, view.load(center))
-        val source = problem.bake()
         val file = directory.resolve("pinned-output.json")
 
-        EqualityKernelReplay.capture(view, file, objective::evaluateExact) { sample, stop ->
-            FiniteConflictSelection.checkSource(source, sample, stop)
-        }
+        EqualityKernelReplay.capture(view, file, objective::evaluateExact) { _, _ -> true }
 
         val records = Json.parseToJsonElement(file.readText()).jsonObject.getValue("records").jsonArray
         assertTrue(records.all { it.jsonObject.getValue("consumed") == JsonNull })
