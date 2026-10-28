@@ -2576,6 +2576,35 @@ source hashes, preparation outcome, the solve result, and native original-clause
 of the reconstructed witness; non-clause factors are counted as unchecked. A trace
 establishes residual structure only, not reuse savings or portfolio throughput.
 
+Boolean-clause split probes retain `<sample>.residual.json` beneath the source's
+snapshot directory. `snapshotBytes` bounds total serialized retention per source
+(8 MiB by default); `probes` bounds count, up to 16. Capture and incumbent observation
+charge the trace clock. Serialization has a conservative size preflight and a final
+byte check; interruption, unsupported models/restrictions and exhausted retention
+decline explicitly. Snapshot storage time is reported separately.
+The record uses `ProblemJson` for the prepared model and supported learned clauses/PBs,
+with exact coordinate maps, signed objective, constant, established values, fixed and
+source-isolated contributions, source/preparation identities, opening assumptions,
+an incumbent witness and its exact strict cutoff, and source/enforcing membership.
+All retained learned restrictions stay conditioned on the captured state; permanence
+does not grant broader authority. Preparation reconstruction is unavailable offline,
+so snapshots explicitly withhold original-source replay.
+
+`bench.profile.ConditionalComponentReplay` takes `snapshot64=BASE64` or
+`snapshotFile=PATH`, plus `sha256=HEX`. `snapshotJob=ID` resolves a file beneath a
+retained local lab job; a missing artifact fails rather than retracing the source.
+Loading performs deterministic structural verification without solving. It recomputes
+residuals, objective contributions, maps, condition identities and membership; hashes
+identify bytes and establish no proof. `replay=true` separately invokes the same child,
+joint, objective-ordered and ordinary LP controls, with `probeMillis` (2,000) per arm
+and `seed` (3). Children share one arm allowance including model construction.
+Source-relaxation and all-enforcing replay retain distinct scopes; the latter keeps
+every supported learned restriction and the captured strict cutoff. Native residual
+witness checks provide no original-source verdict or independent optimality certificate.
+Raw snapshots belong in `klause-evidence/campaigns/`, outside Git. An opt-in
+`ConditionalComponentTrace.run` consumer receives `ResidualProbeContext`, retaining
+the in-process reconstruction route for separately bounded policy experiments.
+
 ### Table profiling
 
 `bench.profile.ExtensionalCompositionProfile` accepts `suite=ID problem=NAME

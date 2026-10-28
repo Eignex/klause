@@ -13,7 +13,6 @@ import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.dimacs.Dimacs
 import com.eignex.klause.formats.dimacs.toProblem
-import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpConfig
@@ -22,7 +21,6 @@ import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
@@ -94,7 +92,9 @@ object ConditionalComponentTrace {
 
     /** Run the trace [args] describe, writing into `$OUT` (`build/profile-out` when unset). */
     @JvmStatic
-    fun main(args: Array<String>) {
+    fun main(args: Array<String>) = run(args)
+
+    internal fun run(args: Array<String>, consumer: ((ResidualProbeContext) -> JsonObject)? = null) {
         val out = System.getenv("OUT")?.let(::File) ?: File("build/profile-out")
         out.mkdirs()
         val sources = args.filter { it.startsWith("source=") }.map { it.removePrefix("source=") }
@@ -102,7 +102,8 @@ object ConditionalComponentTrace {
             require('=' in arg) { "expected key=value, got '$arg'" }
             arg.substringBefore('=') to arg.substringAfter('=')
         }
-        val known = setOf("searchMillis", "traceMillis", "prepareMillis", "seed", "probes", "probeMillis")
+        val known = setOf("searchMillis", "traceMillis", "prepareMillis", "seed", "probes", "probeMillis",
+            "snapshotBytes")
         val unknown = options.keys - known
         require(unknown.isEmpty()) { "unknown argument(s) $unknown" }
         val settings = Settings(
@@ -112,6 +113,7 @@ object ConditionalComponentTrace {
             seed = options["seed"]?.toLong() ?: 3L,
             probes = options["probes"]?.toInt() ?: 3,
             probeMillis = options["probeMillis"]?.toLong() ?: 2_000L,
+            snapshotBytes = options["snapshotBytes"]?.toInt() ?: ResidualSnapshots.MAX_BYTES,
         )
         out.resolve("request.json").writeText(buildJsonObject {
             put("sources", sources.joinToString(","))
@@ -121,6 +123,7 @@ object ConditionalComponentTrace {
             put("seed", settings.seed)
             put("probes", settings.probes)
             put("probeMillis", settings.probeMillis)
+            put("snapshotBytes", settings.snapshotBytes)
             put("javaVersion", System.getProperty("java.version"))
             put("osArch", System.getProperty("os.arch"))
             put("processors", Runtime.getRuntime().availableProcessors())
@@ -130,7 +133,8 @@ object ConditionalComponentTrace {
         val inputs = listOf<() -> Input>({ control(conditioned = false) }, { control(conditioned = true) }) +
             sources.map { spec -> { catalogSource(spec) } }
         inputs.forEachIndexed { index, load ->
-            val record = runCatching { trace(load(), settings) }.getOrElse {
+            val snapshots = out.resolve("${index.toString().padStart(2, '0')}-snapshots")
+            val record = runCatching { trace(load(), settings, snapshots, consumer) }.getOrElse {
                 buildJsonObject { put("failure", it.toString()) }
             }
             val label = record["label"]?.toString()?.trim('"') ?: "input"
@@ -197,9 +201,19 @@ object ConditionalComponentTrace {
         val seed: Long,
         val probes: Int,
         val probeMillis: Long,
-    )
+        val snapshotBytes: Int,
+    ) {
+        init {
+            require(probes in 0..16 && snapshotBytes in 0..ResidualSnapshots.MAX_BYTES)
+        }
+    }
 
-    private fun trace(input: Input, settings: Settings): JsonObject {
+    private fun trace(
+        input: Input,
+        settings: Settings,
+        snapshots: File,
+        consumer: ((ResidualProbeContext) -> JsonObject)?,
+    ): JsonObject {
         val prepareStart = System.nanoTime()
         val stop = Cancellation.after(settings.prepareMillis.milliseconds)
         val prepared = FinitePipeline.prepare(FinitePipelineRequest(
@@ -227,14 +241,22 @@ object ConditionalComponentTrace {
         if (baked == null || objective == null || stop() || prepared.presolve?.infeasible == true) {
             return JsonObject(header + ("decline" to JsonPrimitive("preparation-terminal")))
         }
-        val recorder = Recorder(baked, settings.traceMillis * 1_000_000, settings.probes)
+        val context = ResidualCaptureContext(objective, input.identity, buildJsonObject {
+            put("preparation", header.getValue("preparation"))
+            put("revision", Reports.readGitSha())
+            put("seed", settings.seed)
+            put("presolveAllowance", PRESOLVE_ALLOWANCE)
+            put("provenance", runCatching { InstalledBuild.current.fingerprint }.getOrElse { "unavailable: $it" })
+        }, ResidualSnapshotBudget(settings.probes, settings.snapshotBytes))
+        val recorder = Recorder(baked, settings.traceMillis * 1_000_000, settings.probes, context)
         val start = System.nanoTime()
         val deadline = settings.searchMillis * 1_000_000
         val base = BacktrackPresets.satOptimized(
             randomSeed = settings.seed,
             cancellation = Cancellation { System.nanoTime() - start - recorder.traceNanos > deadline },
         )
-        val params = base.copy(variableSelector = TracingSelector(base.variableSelector, recorder))
+        val params = base.copy(variableSelector = TracingSelector(base.variableSelector, recorder),
+            improvedSolutionSink = { sample, _ -> recorder.onIncumbent(sample) })
         val result = BacktrackSolver(baked).minimize(objective, params)
         val wallNanos = System.nanoTime() - start
         val sourceSample = result.assignment?.let(prepared.reconstruct)
@@ -260,7 +282,10 @@ object ConditionalComponentTrace {
             }
             put("trace", recorder.summary())
             put("probes", JsonArray(recorder.probes.map { probe ->
-                val composition = runCatching { compose(probe, objective, prepared.reconstruct, input, settings) }
+                val composition = runCatching {
+                    if (probe.declined) buildJsonObject { put("decline", "unsupported-source-factor") } else
+                        compose(probe, objective, prepared.reconstruct, input, settings)
+                }
                     .getOrElse { buildJsonObject { put("failure", it.toString()) } }
                 val later = recorder.laterSightings(probe)
                 JsonObject(composition + buildJsonObject {
@@ -268,6 +293,26 @@ object ConditionalComponentTrace {
                     put("laterSightings", later.sumOf { it.first })
                     put("laterReencounters", later.sumOf { it.second })
                     put("componentsReencounteredLater", later.count { it.second > 0 })
+                    put("snapshotDecline", probe.snapshot.decline)
+                    probe.snapshot.bytes?.let { bytes ->
+                        val stored = System.nanoTime()
+                        snapshots.mkdirs()
+                        val file = snapshots.resolve("${probe.sample}.residual.json")
+                        file.writeBytes(bytes)
+                        put("snapshotFile", "${snapshots.name}/${file.name}")
+                        put("snapshotBytes", bytes.size)
+                        put("snapshotSha256", hex(MessageDigest.getInstance("SHA-256").digest(bytes)))
+                        put("snapshotStorageNs", System.nanoTime() - stored)
+                        if (consumer != null) {
+                            val consuming = System.nanoTime()
+                            val consumed = runCatching {
+                                consumer(ResidualProbeContext(ResidualSnapshots.load(bytes.decodeToString()),
+                                    prepared.reconstruct, input.problem, input.objective))
+                            }.getOrElse { buildJsonObject { put("failure", it.toString()) } }
+                            put("consumer", consumed)
+                            put("consumerNs", System.nanoTime() - consuming)
+                        }
+                    }
                 })
             }))
         })
@@ -278,7 +323,8 @@ object ConditionalComponentTrace {
      *
      * The children share one containing allowance equal to the joint solve's, so the composition never renews
      * work. A child that stops without a verdict leaves the composition open; fresh models carry no incumbent
-     * cutoff or learned clause from the traced search, so a child result is unconditional on the node.
+     * cutoff or learned restriction from the traced search. Their source relaxation remains conditional
+     * on the captured assignments, whose deduction scope can include an incumbent cutoff.
      */
     private fun compose(
         probe: Probe,
@@ -380,23 +426,7 @@ object ConditionalComponentTrace {
         stop: Cancellation,
         seed: Long,
         control: (BacktrackParams) -> BacktrackParams = { it },
-    ): Residual {
-        if (stop()) return Residual(vars, null, 0L, 0L)
-        val built = System.nanoTime()
-        val local = HashMap<Int, Int>(vars.size * 2)
-        vars.forEachIndexed { i, v -> local[v] = i }
-        val factors: List<Factor> = clauses.map { c ->
-            Clause(IntArray(c.size) { Lit.make(local.getValue(Lit.variable(c[it])), Lit.isPositive(c[it])) })
-        }
-        val baked = Problem(vars.size, 0, emptyArray(), factors.toTypedArray()).bake()
-        val objective = LinearObjective(LongArray(vars.size) { weights.getOrElse(vars[it]) { 0L } })
-        val solving = System.nanoTime()
-        val result = BacktrackSolver(baked).minimize(
-            objective,
-            control(BacktrackPresets.satOptimized(randomSeed = seed, cancellation = stop)),
-        )
-        return Residual(vars, result, solving - built, System.nanoTime() - solving)
-    }
+    ): ResidualRun = ResidualReplayControls.solve(vars, clauses.map(::Clause), weights, stop, seed, control)
 
     private fun sourceObjective(objective: LinearObjective, sample: Sample): Long {
         var total = objective.constant
@@ -464,9 +494,8 @@ object ConditionalComponentTrace {
         val seenAtCapture: List<Pair<Int, Int>>,
         val declined: Boolean,
         val captureNanos: Long,
+        val snapshot: ResidualCapture = ResidualCapture(null, "capture-not-enabled"),
     )
-
-    private class Residual(val vars: IntArray, val result: MinimizeResult?, val buildNanos: Long, val solveNanos: Long)
 
     private class Component(var live: Int = 0, var free: Int = 0, var h1: Long = 0L, var h2: Long = 0L)
 
@@ -475,6 +504,7 @@ object ConditionalComponentTrace {
         private val prepared: Problem,
         private val traceCapNanos: Long,
         private val maxProbes: Int,
+        private val captureContext: ResidualCaptureContext? = null,
     ) {
         var traceNanos = 0L
         var epoch = 0L
@@ -527,6 +557,28 @@ object ConditionalComponentTrace {
         private var unknownLearnedEntries = 0L
         private var lastEnforcing: JsonObject? = null
         private var observationDeadline = Long.MAX_VALUE
+        private var incumbent: ResidualCutoff? = null
+        private var incumbentUnavailable = false
+
+        fun onIncumbent(sample: Sample) {
+            val context = captureContext ?: return
+            incumbentUnavailable = true
+            if (traceNanos >= traceCapNanos || prepared.numBoolVars > 100_000) return
+            val started = System.nanoTime()
+            try {
+                val weights = context.objective.boolWeights
+                if (prepared.numIntVars != 0 || prepared.numRealVars != 0 || weights.size > prepared.numBoolVars) return
+                val values = List(prepared.numBoolVars) { sample.boolValue(it) }
+                val padded = List(prepared.numBoolVars) { weights.getOrElse(it) { 0L } }
+                if (System.nanoTime() - started >= traceCapNanos - traceNanos) return
+                incumbent = ResidualCutoff(
+                    ResidualSnapshots.objective(padded, context.objective.constant, values).toString(), values,
+                )
+                incumbentUnavailable = false
+            } finally {
+                traceNanos += System.nanoTime() - started
+            }
+        }
 
         fun observe(session: PropagationSession) {
             picks++
@@ -745,6 +797,15 @@ object ConditionalComponentTrace {
                 clauses[index.getValue(find(liveRep[k]))].add(residual)
             }
             val keys = roots.map { r -> components.getValue(r).let { it.h1 to it.h2 } }
+            val snapshot = captureContext?.let { context ->
+                val stop = Cancellation { System.nanoTime() >= observationDeadline }
+                context.budget.retain { remaining ->
+                    if (incumbentUnavailable) ResidualCapture(null, "cutoff-observation-incomplete") else
+                        ResidualSnapshots.capture(problem, context.objective,
+                        List(numBool) { session.boolValue(it) }, LearnedResidualRestrictions.inspect(session, stop),
+                        context.sourceIdentity, context.preparationIdentity, incumbent, stop, remaining)
+                }
+            } ?: ResidualCapture(null, "capture-not-enabled")
             return Probe(
                 sample = samples,
                 level = level,
@@ -755,6 +816,7 @@ object ConditionalComponentTrace {
                 seenAtCapture = keys.map { k -> seen[k]?.let { it.sightings to it.reencounters } ?: (0 to 0) },
                 declined = declined,
                 captureNanos = System.nanoTime() - started,
+                snapshot = snapshot,
             )
         }
 
@@ -841,6 +903,10 @@ object ConditionalComponentTrace {
             put("learnedPbEntryObservations", learnedPbEntries)
             put("dischargedLearnedEntryObservations", dischargedLearnedEntries)
             put("unknownLearnedEntryObservations", unknownLearnedEntries)
+            captureContext?.let { context ->
+                put("retainedSnapshots", context.budget.count)
+                put("retainedSnapshotBytes", context.budget.bytes)
+            }
             lastEnforcing?.let { put("lastEnforcingIncidence", it) }
         }
 
