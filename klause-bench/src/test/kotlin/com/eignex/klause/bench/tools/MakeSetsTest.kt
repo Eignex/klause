@@ -26,11 +26,16 @@ class MakeSetsTest {
 
     @Test
     fun `references read as csv DictReader reads them`() {
-        val rows = MakeSets.csvRows("collection,problem,feasible,proven,elapsed_ms\r\nc,\"a,\"\"b\"\"\",1,1,5\r\n\r\nc,p,,0,7\n")
-        assertEquals(listOf(
+        val input = "collection,problem,feasible,proven,elapsed_ms\r\n" +
+            "c,\"a,\"\"b\"\"\",1,1,5\r\n\r\nc,p,,0,7\n"
+        val rows = MakeSets.csvRows(input)
+        assertEquals(
+            listOf(
             mapOf("collection" to "c", "problem" to "a,\"b\"", "feasible" to "1", "proven" to "1", "elapsed_ms" to "5"),
             mapOf("collection" to "c", "problem" to "p", "feasible" to "", "proven" to "0", "elapsed_ms" to "7"),
-        ), rows)
+        ),
+            rows
+        )
     }
 
     @Test
@@ -38,33 +43,41 @@ class MakeSetsTest {
         val dir = Files.createTempDirectory("sets")
         val features = Files.createDirectories(dir.resolve("features"))
         val problems = (0 until 40).map { "f${it % 4}/p$it" }
-        features.resolve("suite.jsonl").writeText("not a problem\n" + problems.joinToString("\n") { p ->
-            """{"collection":"c","problem":"$p","suite":"suite","family":"${p.substringBefore('/')}","format":"MZN","themes":["sat","pb"]}"""
-        } + "\n")
+        features.resolve("suite.jsonl").writeText(
+            "not a problem\n" + problems.joinToString("\n") { p ->
+            """{"collection":"c","problem":"$p","suite":"suite","family":"${p.substringBefore('/')}",""" +
+                """"format":"MZN","themes":["sat","pb"]}"""
+        } + "\n"
+        )
         // Ten easy, twenty medium, five hard and five unproven.
         val references = dir.resolve("references.csv")
-        references.writeText("collection,problem,feasible,proven,elapsed_ms\n" + problems.mapIndexed { i, p ->
+        references.writeText(
+            "collection,problem,feasible,proven,elapsed_ms\n" + problems.mapIndexed { i, p ->
             when {
                 i < 10 -> "c,$p,1,1,${i * 10}"
                 i < 30 -> "c,$p,1,1,${1000 + i}"
                 i < 35 -> "c,$p,0,1,${20_000 + i}"
                 else -> "c,$p,,0,5"
             }
-        }.joinToString("\n") + "\n")
+        }.joinToString("\n") + "\n"
+        )
         val sets = dir.resolve("sets")
 
         MakeSets.draw(features, references, sets, setOf("sat", "pb"), LocalDate.of(2026, 1, 2))
 
         val sat = sets.resolve("sat.txt").readLines()
-        assertEquals("# sat: problems with the sat theme, drawn 2026-01-02 by klause-bench/scripts/draw-sets.sh", sat[0])
-        assertEquals(listOf("# easy: 8", "# medium: 11", "# hard: 1"), sat.filter { it.startsWith("# ") && ": " in it && "theme" !in it && "tiers" !in it })
+        val heading = "# sat: problems with the sat theme, drawn 2026-01-02 by klause-bench/scripts/draw-sets.sh"
+        assertEquals(heading, sat[0])
+        val tiers = sat.filter { it.startsWith("# ") && ": " in it && "theme" !in it && "tiers" !in it }
+        assertEquals(listOf("# easy: 8", "# medium: 11", "# hard: 1"), tiers)
         val pb = sets.resolve("pb.txt").readLines().filter { !it.startsWith("#") }
         val drawn = sat.filter { !it.startsWith("#") }
         // The rest: one hard of four, the nine medium, and the two easy that take the medium shortfall.
         assertEquals(12, pb.size)
         assertTrue(drawn.intersect(pb.toSet()).isEmpty())
         assertTrue((drawn + pb).none { it.substringAfter("suite/").substringAfter("/p").toInt() >= 35 })
-        assertEquals("# linear: open-int, linear-real\n@open-int\n@linear-real\n", sets.resolve("linear.txt").readText())
+        val linear = "# linear: open-int, linear-real\n@open-int\n@linear-real\n"
+        assertEquals(linear, sets.resolve("linear.txt").readText())
         assertTrue(Files.notExists(sets.resolve("mip.txt")))
         dir.toFile().deleteRecursively()
     }

@@ -24,7 +24,7 @@ jq '
       | ($base.backend == "reference") as $reference
       | .repository = "Eignex/klause"
       | .bench = {manifest:"klause-bench/lab/bench.json", sourceValidation:($reference | not),
-          request:{parameters:({selections:($selections | map(del(.reference)) | tojson)} + ($base | parameters))}}
+          request:{parameters:({selections:($selections | map(del(.reference)) | tojson), measurement:(.measurement // "none")} + ($base | parameters))}}
       | if (.seeds // [] | length) > 0 then .bench.request.parameters["solver-seeds"] = (.seeds | map(tostring) | join(",")) else . end
       | .bench.referenceFilters = ($selections | map(select(.suite != null) | {key:.suite,value:(.reference // if $reference then "any" else "decided" end)}) | from_entries)
       | .base = ($base | with_entries(select(.key | IN("ref", "label") or ($reference and IN("backend", "solver", "timeout", "processors", "fixed")))))

@@ -58,12 +58,15 @@ internal object KlauseLabSuite : BenchSuite {
 
     override fun plan(request: BenchRequest): List<BenchCase> {
         val settings = LabSettings(request.parameters)
-        return settings.selections.flatMap { KlauseCli.selectProblems(it) }.distinctBy { it.suite to it.ref.name }.flatMap { selected ->
+        val selectedProblems = settings.selections.flatMap { KlauseCli.selectProblems(it) }
+            .distinctBy { it.suite to it.ref.name }
+        return selectedProblems.flatMap { selected ->
             val ref = selected.ref
             require(ref.source !is ProblemSource.InCode) { "Lab subprocess solves require file-backed inputs" }
             val inputs = LabInputs.resolve(ref)
             val trees = LabInputs.treeHashes(inputs)
             settings.engines.flatMap { engine ->
+                val variant = if (settings.engines.size > 1) "$engine/" else ""
                 settings.seeds.flatMap { seed ->
                     (0 until settings.repeats).map { repeat ->
                         BenchCase(
@@ -73,7 +76,7 @@ internal object KlauseLabSuite : BenchSuite {
                             inputs = inputs,
                             attributes = trees + mapOf(
                                 "suite" to selected.suite,
-                                "comparisonKey" to "${selected.suite}/${ref.name}/${if (settings.engines.size > 1) "$engine/" else ""}$seed/$repeat",
+                                "comparisonKey" to "${selected.suite}/${ref.name}/$variant$seed/$repeat",
                                 "seed" to seed.toString(),
                                 "budgetMs" to settings.timeout.toString(),
                                 "problem" to ref.name,

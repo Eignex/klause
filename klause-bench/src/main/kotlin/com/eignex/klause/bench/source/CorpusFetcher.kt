@@ -3,6 +3,7 @@ package com.eignex.klause.bench.source
 import com.eignex.klause.bench.catalog.ExternalCollection
 import com.eignex.klause.bench.catalog.FetchMethod
 import com.eignex.klause.bench.catalog.ProblemSource
+import org.tukaani.xz.LZMAInputStream
 import java.io.File
 import java.lang.Boolean.getBoolean
 import java.net.URI
@@ -10,7 +11,6 @@ import java.nio.file.Files
 import java.util.zip.CRC32
 import java.util.zip.CheckedInputStream
 import java.util.zip.ZipFile
-import org.tukaani.xz.LZMAInputStream
 
 /**
  * Resolves a [ProblemSource] to a concrete [File] on disk.
@@ -56,7 +56,10 @@ internal object CorpusFetcher {
 
     private val downloads = CorpusDownload()
     private val mirror: CorpusMirror?
-        get() = System.getenv("KLAUSE_BENCH_CORPUS_MIRROR")?.takeIf { it.isNotBlank() }?.let { CorpusMirror(URI(it)) }
+        get() {
+            val address = System.getenv("LAB_CORPUS_MIRROR") ?: System.getenv("KLAUSE_BENCH_CORPUS_MIRROR")
+            return address?.takeIf { it.isNotBlank() }?.let { CorpusMirror(URI(it)) }
+        }
 
     /** `$XDG_CACHE_HOME` when set, else `~/.cache` (the XDG base-dir default). */
     private fun xdgCacheHome(): File = System.getenv("XDG_CACHE_HOME")?.takeIf { it.isNotBlank() }?.let { File(it) }
@@ -65,6 +68,7 @@ internal object CorpusFetcher {
     /** Resolve [source] to a file, fetching an external collection if needed. */
     fun resolve(source: ProblemSource): File = when (source) {
         is ProblemSource.Prepared -> source.file.also { require(it.isFile) }
+
         is ProblemSource.Vendored -> File(workspaceRoot(), source.workspaceRelPath).also {
             require(it.isFile) { "vendored file missing: ${source.workspaceRelPath}" }
         }
@@ -142,7 +146,10 @@ internal object CorpusFetcher {
                 is FetchMethod.GbdFiles -> gbdFiles(collection, method, dir)
             }
             collection.extensionless?.let { (marker, ext) -> nameBare(dir, marker, ext) }
-            if (remote != null && System.getenv("KLAUSE_BENCH_CORPUS_MIRROR_WRITE") == "true") {
+            val mirrorWrite = System.getenv(
+                "LAB_CORPUS_MIRROR_WRITE",
+            ) ?: System.getenv("KLAUSE_BENCH_CORPUS_MIRROR_WRITE")
+            if (remote != null && mirrorWrite == "true") {
                 runCatching { remote.publish(collection.id, dir) }.onFailure {
                     System.err.println("corpus mirror publication deferred: ${it.javaClass.simpleName}")
                 }

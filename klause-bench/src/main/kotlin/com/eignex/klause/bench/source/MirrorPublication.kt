@@ -1,11 +1,11 @@
 package com.eignex.klause.bench.source
 
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URI
 import java.util.HexFormat
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 
 @Serializable
 internal data class MirrorPublication(val url: String, val headers: Map<String, String> = emptyMap())
@@ -13,12 +13,8 @@ internal data class MirrorPublication(val url: String, val headers: Map<String, 
 @Serializable
 private data class MirrorSignature(val method: String, val key: String, val sha256: String)
 
-internal fun corpusMirrorPublication(
-    id: String,
-    sha: ByteArray,
-    fallback: URI,
-): MirrorPublication = corpusTransport {
-    val signer = System.getenv("KLAUSE_BENCH_CORPUS_SIGNER")
+internal fun corpusMirrorPublication(id: String, sha: ByteArray, fallback: URI): MirrorPublication = corpusTransport {
+    val signer = System.getenv("LAB_INPUT_SIGNER") ?: System.getenv("KLAUSE_BENCH_CORPUS_SIGNER")
         ?: return@corpusTransport MirrorPublication(fallback.toString())
     val uri = URI(signer)
     require(uri.scheme == "http" && uri.host in setOf("127.0.0.1", "localhost", "::1") && uri.userInfo == null)

@@ -1,12 +1,12 @@
 package com.eignex.klause.bench.lab
 
 import com.eignex.lab.bench.BenchProtocol
-import java.nio.file.Files
-import java.nio.file.Path
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import java.nio.file.Files
+import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

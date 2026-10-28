@@ -22,7 +22,8 @@ internal data class LabSettings(val parameters: Map<String, String>) {
     val wallTimeout = (timeout * 2 + 20_999) / 1000 + 2 * compileTimeout + 120
 
     init {
-        require(selections.isNotEmpty() && selections.all { it.isNotEmpty() && it.keys.all { key -> key in SELECTORS } })
+        require(selections.isNotEmpty())
+        require(selections.all { it.isNotEmpty() && it.keys.all { key -> key in SELECTORS } })
         val unknown = parameters.keys.filterNot { it in SELECTORS || it in OPTIONS || it.startsWith("param.") }
         require(unknown.isEmpty()) { "Unknown Klause bench parameters: $unknown" }
         require(engines.all { it in ENGINES }) { "Unknown engine; supported: $ENGINES" }

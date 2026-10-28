@@ -1,5 +1,9 @@
 package com.eignex.klause.bench.tools
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.LocalDate
@@ -8,10 +12,7 @@ import kotlin.io.path.name
 import kotlin.io.path.readLines
 import kotlin.io.path.readText
 import kotlin.io.path.writeText
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
+import kotlin.system.exitProcess
 
 /**
  * Draw klause-bench's named problem sets from classified problems and the lab's reference results:
@@ -24,27 +25,36 @@ import kotlinx.serialization.json.JsonPrimitive
  * difficulties by how fast the reference proved them, spread over suites and families; a problem the reference did not
  * prove is left out. A problem goes in the first set that takes it, so `sweep`, which includes them all, holds each
  * once. Naming sets draws only those and leaves the other set files as they are: a new theme joins `sweep` without
- * redrawing the rest. The draws are those the Python script this replaces made: its seeded Mersenne Twister and shuffle.
+ * redrawing the rest. The draws retain the original seeded Mersenne Twister and shuffle.
  */
 internal object MakeSets {
     /** Focused sets in the order they draw, each the theme it covers. */
-    val SETS = listOf("open-int", "linear-real", "nonlinear-real", "mip", "scheduling", "routing", "packing", "globals", "sat",
-        "maxsat", "pb")
+    val SETS = listOf(
+        "open-int", "linear-real", "nonlinear-real", "mip", "scheduling", "routing", "packing", "globals",
+        "sat", "maxsat", "pb",
+    )
+
     /**
      * Formats a set leaves out: MPS models with continuous columns are covered by `mip`, so `linear-real` is SMT and
      * MiniZinc, where they would otherwise outnumber the SMT-LIB logics it is for.
      */
     private val EXCLUDED_FORMATS = mapOf("linear-real" to setOf("MPS"))
+
     /** Each set's size: CSP/COP and SMT weigh more than MPS, SAT and PB. 275 in all. */
-    val SIZES = mapOf("globals" to 30, "scheduling" to 25, "routing" to 20, "packing" to 20, "open-int" to 35, "linear-real" to 35,
-        "nonlinear-real" to 25, "mip" to 25, "sat" to 20, "pb" to 20, "maxsat" to 20)
+    val SIZES = mapOf(
+        "globals" to 30, "scheduling" to 25, "routing" to 20, "packing" to 20, "open-int" to 35,
+        "linear-real" to 35, "nonlinear-real" to 25, "mip" to 25, "sat" to 20, "pb" to 20, "maxsat" to 20,
+    )
+
     /**
      * The most of a set's picks in a tier one suite may take: hakank's many small models would otherwise fill the
      * MiniZinc share of every set it has a theme in.
      */
     private val SUITE_SHARE = mapOf("hakank" to 0.15)
+
     /** Sets made of others: `linear` is open-domain integers with linear reals as well. */
     private val UNIONS = mapOf("linear" to listOf("open-int", "linear-real"), "sweep" to SETS)
+
     /**
      * Difficulty tiers by the reference's time to prove. A set takes [EASY_SHARE] easy, [HARD] hard and medium for the
      * rest: over the 250, about 100 easy, 140 medium and 10 hard.
@@ -61,14 +71,23 @@ internal object MakeSets {
 
     fun main(args: List<String>): Int {
         if (args.size !in 3..4) {
-            System.err.println("usage: klause-bench/scripts/draw-sets.sh <features-dir> <references.csv> <sets-dir> [set,…]")
+            System.err.println(
+                "usage: klause-bench/scripts/draw-sets.sh <features-dir> <references.csv> <sets-dir> [set,...]",
+            )
             return 2
         }
-        draw(Path.of(args[0]), Path.of(args[1]), Path.of(args[2]), args.getOrNull(3)?.split(",")?.toSet() ?: SETS.toSet())
+        val selected = args.getOrNull(3)?.split(",")?.toSet() ?: SETS.toSet()
+        draw(Path.of(args[0]), Path.of(args[1]), Path.of(args[2]), selected)
         return 0
     }
 
-    fun draw(featuresDir: Path, referencesCsv: Path, setsDir: Path, only: Set<String>, today: LocalDate = LocalDate.now()) {
+    fun draw(
+        featuresDir: Path,
+        referencesCsv: Path,
+        setsDir: Path,
+        only: Set<String>,
+        today: LocalDate = LocalDate.now(),
+    ) {
         // Each problem's tier by how fast the reference proved it, over every reference solver.
         val fastest = HashMap<Pair<String, String>, Long>()
         for (row in csvRows(referencesCsv.readText())) {
@@ -90,8 +109,10 @@ internal object MakeSets {
                 val tier = fastest[text("collection") to text("problem")]?.let(::tierOf) ?: continue
                 for (theme in (p["themes"] as? JsonArray).orEmpty()) {
                     val name = (theme as JsonPrimitive).content
-                    if (text("format") !in EXCLUDED_FORMATS[name].orEmpty())
-                        pools.getOrPut(name to tier) { mutableListOf() } += Candidate(text("suite"), text("family"), text("problem"))
+                    if (text("format") !in EXCLUDED_FORMATS[name].orEmpty()) {
+                        pools.getOrPut(name to tier) { mutableListOf() } +=
+                            Candidate(text("suite"), text("family"), text("problem"))
+                    }
                 }
             }
         }
@@ -127,14 +148,17 @@ internal object MakeSets {
                 lines += chosen.map { "${it.suite}/${it.problem}" }
             }
             setsDir.resolve("$name.txt").writeText(lines.joinToString("\n") + "\n")
-            System.err.println("$name " + TIERS.joinToString(", ", "{", "}") { "'${it.name}': ${picked[it.name].orEmpty().size}" })
+            val counts = TIERS.joinToString(", ", "{", "}") { "'${it.name}': ${picked[it.name].orEmpty().size}" }
+            System.err.println("$name $counts")
         }
         for ((name, parts) in UNIONS) {
-            setsDir.resolve("$name.txt").writeText("# $name: " + parts.joinToString(", ") + "\n" + parts.joinToString("") { "@$it\n" })
+            val content = "# $name: " + parts.joinToString(", ") + "\n" + parts.joinToString("") { "@$it\n" }
+            setsDir.resolve("$name.txt").writeText(content)
         }
     }
 
-    private fun tierOf(elapsedMs: Long): String? = TIERS.firstOrNull { elapsedMs >= it.low && elapsedMs < it.high }?.name
+    private fun tierOf(elapsedMs: Long): String? =
+        TIERS.firstOrNull { elapsedMs >= it.low && elapsedMs < it.high }?.name
 
     /**
      * [n] of [candidates], one per (suite, family) per round, suites and families taken in a seeded order, no suite
@@ -156,7 +180,8 @@ internal object MakeSets {
         while (suites.any { bySuite.getValue(it).isNotEmpty() }) {
             for (s in suites) bySuite.getValue(s).let { if (it.isNotEmpty()) order += it.removeLast() }
         }
-        fun open(k: Pair<String, String>) = families.getValue(k).isNotEmpty() && (taken[k.first] ?: 0) < (caps[k.first] ?: n)
+        fun open(k: Pair<String, String>) =
+            families.getValue(k).isNotEmpty() && (taken[k.first] ?: 0) < (caps[k.first] ?: n)
         val chosen = mutableListOf<Candidate>()
         while (chosen.size < n && order.any(::open)) {
             for (k in order) {
@@ -172,7 +197,7 @@ internal object MakeSets {
     /** The rows of [text], a CSV with a header line, as Python's `csv.DictReader` reads them: blank lines skipped. */
     fun csvRows(text: String): List<Map<String, String>> {
         val records = mutableListOf<List<String>>()
-        var fields = mutableListOf<String>()
+        val fields = mutableListOf<String>()
         val field = StringBuilder()
         var quoted = false
         var started = false
@@ -180,23 +205,36 @@ internal object MakeSets {
         fun endRecord() {
             if (started || fields.isNotEmpty()) {
                 fields += field.toString()
-                records += fields
+                records += fields.toList()
             }
-            fields = mutableListOf()
+            fields.clear()
             field.clear()
             started = false
         }
         while (i < text.length) {
             val c = text[i]
             when {
-                quoted && c == '"' && text.getOrNull(i + 1) == '"' -> { field.append('"'); i++ }
+                quoted && c == '"' && text.getOrNull(i + 1) == '"' -> {
+                    field.append('"');
+                    i++
+                }
                 quoted && c == '"' -> quoted = false
                 quoted -> field.append(c)
-                c == '"' -> { quoted = true; started = true }
-                c == ',' -> { fields += field.toString(); field.clear(); started = true }
+                c == '"' -> {
+                    quoted = true;
+                    started = true
+                }
+                c == ',' -> {
+                    fields += field.toString();
+                    field.clear();
+                    started = true
+                }
                 c == '\r' && text.getOrNull(i + 1) == '\n' -> {}
                 c == '\n' || c == '\r' -> endRecord()
-                else -> { field.append(c); started = true }
+                else -> {
+                    field.append(c);
+                    started = true
+                }
             }
             i++
         }
@@ -206,7 +244,8 @@ internal object MakeSets {
     }
 
     private val CANDIDATE_ORDER = Comparator<Candidate> { a, b ->
-        compareCodePoints(a.suite, b.suite).takeIf { it != 0 } ?: compareCodePoints(a.family, b.family).takeIf { it != 0 }
+        compareCodePoints(a.suite, b.suite).takeIf { it != 0 }
+            ?: compareCodePoints(a.family, b.family).takeIf { it != 0 }
             ?: compareCodePoints(a.problem, b.problem)
     }
 
@@ -228,8 +267,12 @@ internal class PythonRandom(seed: Long) {
 
     init {
         require(seed >= 0)
-        val key = if (seed == 0L) intArrayOf(0) else
-            generateSequence(seed) { (it ushr 32).takeIf { rest -> rest != 0L } }.map { it.toInt() }.toList().toIntArray()
+        val key = if (seed == 0L) {
+            intArrayOf(0)
+        } else {
+            generateSequence(seed) { (it ushr 32).takeIf { rest -> rest != 0L } }
+                .map { it.toInt() }.toList().toIntArray()
+        }
         mt[0] = 19650218
         for (i in 1 until N) mt[i] = 1812433253 * (mt[i - 1] xor (mt[i - 1] ushr 30)) + i
         var i = 1
@@ -238,13 +281,19 @@ internal class PythonRandom(seed: Long) {
             mt[i] = (mt[i] xor ((mt[i - 1] xor (mt[i - 1] ushr 30)) * 1664525)) + key[j] + j
             i++
             j++
-            if (i >= N) { mt[0] = mt[N - 1]; i = 1 }
+            if (i >= N) {
+                mt[0] = mt[N - 1];
+                i = 1
+            }
             if (j >= key.size) j = 0
         }
         repeat(N - 1) {
             mt[i] = (mt[i] xor ((mt[i - 1] xor (mt[i - 1] ushr 30)) * 1566083941)) - i
             i++
-            if (i >= N) { mt[0] = mt[N - 1]; i = 1 }
+            if (i >= N) {
+                mt[0] = mt[N - 1];
+                i = 1
+            }
         }
         mt[0] = Int.MIN_VALUE
     }
@@ -292,4 +341,7 @@ internal class PythonRandom(seed: Long) {
     }
 }
 
-fun main(args: Array<String>) { kotlin.system.exitProcess(MakeSets.main(args.toList())) }
+/** Draw the repository's named sets from classified inputs and exported lab reference results. */
+fun main(args: Array<String>) {
+    exitProcess(MakeSets.main(args.toList()))
+}
