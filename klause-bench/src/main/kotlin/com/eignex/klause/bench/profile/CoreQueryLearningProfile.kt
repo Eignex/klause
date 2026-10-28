@@ -74,9 +74,14 @@ internal object CoreQueryLearningProfile {
                 val model = ordinary?.problem as? BakedProblem ?: sourceBaked
                 val cost = ordinary?.objective ?: objective
                 val queries = ArrayList<Query>()
+                val openedPins = ArrayList<String>()
                 var owner: ResumableSearch? = null
                 val stop = lifetime or Cancellation.after(2.seconds) or Cancellation {
                     val live = owner
+                    if (live != null && field(live, "queryModel") != null) {
+                        val pins = (field(live, "querySofts") as IntArray).joinToString(",")
+                        if (openedPins.lastOrNull() != pins) openedPins += pins
+                    }
                     val handle = live?.let { field(it, "query") }
                     if (handle != null && queries.none { it.handle === handle }) {
                         check(queries.size < 8)
@@ -149,6 +154,7 @@ internal object CoreQueryLearningProfile {
                             put("preparedFactors", model.numFactors)
                             put("query", index)
                             put("queryCount", queries.size)
+                            put("openedQueryPins", JsonArray(openedPins.map(::JsonPrimitive)))
                             put("pins", captured.params.assumptions.toString())
                             put("replay", replay)
                             put("availableUnits", JsonArray(available.map { JsonPrimitive(it.single()) }))
@@ -190,6 +196,7 @@ internal object CoreQueryLearningProfile {
                     put("repeat", repeat)
                     put("captureResult", captureResult?.javaClass?.simpleName)
                     put("queryCount", 0)
+                    put("openedQueryPins", JsonArray(openedPins.map(::JsonPrimitive)))
                 }.toString())
                 output.flush()
             }

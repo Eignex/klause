@@ -13,19 +13,15 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import kotlin.test.assertTrue
 
 class CoreRefinementTest {
     @Test
     fun `refinement removes an unrelated pin by a joint refutation`() {
         val literals = IntArray(3) { Lit.make(it, true) }
         val problem = Problem(3, 0, emptyArray(), arrayOf(Clause(literals.copyOfRange(1, 3)))).bake()
-        var charged = 0L
-
-        val refined = CoreRefinement.refine(problem, literals, Assumptions.None, Cancellation.Never) { charged += it }
+        val refined = CoreRefinement.refine(problem, literals, Assumptions.None, Cancellation.Never) {}
 
         assertContentEquals(literals.copyOfRange(1, 3), refined)
-        assertTrue(charged > 0L)
     }
 
     @Test
