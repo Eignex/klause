@@ -2,9 +2,12 @@ package com.eignex.klause.bench.metric
 
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.source.CorpusFiles
+import com.github.luben.zstd.ZstdOutputStreamNoFinalizer
 
+import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.nio.file.Files
 import kotlin.test.Test
@@ -16,12 +19,21 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SolverInvocationTest {
+    companion object {
+        @BeforeAll
+        @JvmStatic
+        fun initializeCodec() {
+            ZstdOutputStreamNoFinalizer(ByteArrayOutputStream(), 1).use { it.write(ByteArray(0)) }
+        }
+    }
+
     @Test
     fun `compressed input reaches the solver as original bytes and is retired afterwards`() {
         val root = Files.createTempDirectory("solver-source").toFile()
         try {
             val body = "p cnf 2 1\n1 -2 0\n"
-            val packed = CorpusFiles.compress(File(root, "input.cnf").apply { writeText(body) })
+            val packed = File(root, "input.cnf.zst")
+            ZstdOutputStreamNoFinalizer(packed.outputStream(), 1).use { it.write(body.toByteArray()) }
             var staged: File? = null
 
             val result = SolverInvocation.withSourceInput(packed, Budget(10_000)) { plain, remaining ->
@@ -46,7 +58,8 @@ class SolverInvocationTest {
     fun `exhausted input preparation supplies no solver verdict`() {
         val root = Files.createTempDirectory("solver-source").toFile()
         try {
-            val packed = CorpusFiles.compress(File(root, "input.cnf").apply { writeText("p cnf 0 0\n") })
+            val packed = File(root, "input.cnf.zst")
+            ZstdOutputStreamNoFinalizer(packed.outputStream(), 1).use { it.write("p cnf 0 0\n".toByteArray()) }
             val result = SolverInvocation.withSourceInput(packed, Budget(0)) { _, _ -> error("budget exhausted") }
 
             assertNull(result.feasible)
