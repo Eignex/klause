@@ -620,3 +620,42 @@ F1's work-driven mode remains available for finite integer/Boolean controls and
 rejects numerical companions; mixed numerical elapsed schedules are not reproducible
 work traces. S1's directional LP gains remain a separate opt-in branch control.
 Native completion flags do not independently validate proofs.
+
+[The admission contract](https://github.com/Eignex/klause/pull/3859) is exercised by
+[9267](https://lab.eignex.com/jobs/9267) and
+[9271](https://lab.eignex.com/jobs/9271) at `40f5f3353e`, whose tree matches its
+rebase merge `8b7b791202`. Both retain matched original source hashes, identical
+installed CLI/library and JDK artifact hashes, and Linux/amd64 resource receipts.
+The 24 reported witness records pass MIPLIB solchecker
+`1.0.4+eignex-lab-longnum-1`; its binary, patch, source and witness identities remain
+in the receipts. These checks validate points and original objective values under the recorded
+tolerance policy, not independently checked optimality or bounds.
+
+The ten-second run uses four MIPLIB 3 sources and five controls: automatic default,
+binary gate, general-integer trial, direct numerical frontier and broad companions.
+The trial admits `bell3a`, `bell5` and `flugpl`; `dcmulti` remains a binary admission
+control. Both companions receive real slices. The trial loses the `bell5` witness
+and worsens `bell3a` against the binary control. Grouped execution permits the last
+case to consume about 22 CPU-seconds in ten seconds of wall time, so these outcomes
+alone cannot establish a precise policy comparison.
+
+The follow-up runs `bell3a` and `bell5` at thirty seconds, seeds 1 and 3, with one
+core and serial execution. The trial and binary control each find four checked
+witnesses. Trial objectives improve once and worsen three times; peak RSS increases
+in three comparisons. User CPU time stays near thirty seconds per case. The longer
+budget recovers feasibility without a consistent quality or total-cost advantage.
+The numerical companion produces 101–134 native certified node bounds and records
+26–101 child-bound gains before retiring after 4.01–4.18 seconds of active work.
+It supplies no terminal completion or credited incumbent, and neither companion
+observes an imported incumbent. Construction, deferred queries, private retirement
+and source checking remain charged to the containing run.
+
+Keep the binary-only automatic gate and the opt-in general-integer control under
+these quotas. This decision concerns the tested admission policy; internal bounds
+and changed finite schedules do not establish consumed whole-source benefit.
+[9223](https://lab.eignex.com/jobs/9223) exhausts its allowance selecting the full
+MIPLIB 2017 archive; [9253](https://lab.eignex.com/jobs/9253) exhausts preparation
+after lease losses. Neither produces source outcomes. The successful runs retain
+about 397 seconds of cold preparation and nine seconds with reused artifacts,
+plus about 2.57 seconds of independent checking; failed preparation stays part of
+the investigation cost rather than becoming a solver regression.
