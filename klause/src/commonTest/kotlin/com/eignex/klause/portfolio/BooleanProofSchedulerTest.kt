@@ -2,12 +2,14 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.factor.Factor
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceObjective
 import com.eignex.klause.solver.evidence.SourceRevision
@@ -101,7 +103,7 @@ class BooleanProofSchedulerTest {
 
     @Test
     fun `idle workers should leave the allowance for an unfinished sibling`() {
-        val factors = arrayOf(
+        val factors = arrayOf<Factor>(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
         ) + Array(8) { mask ->
@@ -111,7 +113,7 @@ class BooleanProofSchedulerTest {
         BooleanProofScheduler(problem, context, listOf(0), List(2) { BacktrackParams() }).use { scheduler ->
             val result = scheduler.run(Cancellation.Never, 100L, 1L, 1L)
 
-            assertTrue(result is com.eignex.klause.solver.SolveResult.Unsat)
+            assertTrue(result is SolveResult.Unsat)
             assertTrue(scheduler.nativeCoverageComplete)
         }
     }
