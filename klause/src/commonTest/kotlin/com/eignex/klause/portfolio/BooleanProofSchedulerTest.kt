@@ -25,10 +25,9 @@ import kotlin.test.assertTrue
 
 class BooleanProofSchedulerTest {
     private val context = BooleanProofContext(SourceScope(SourceRevision("fixture", "exact-cnf")), "identity:0")
-    private val contradiction = Problem(4, 0, emptyArray(), arrayOf(
-        Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))), Clause(intArrayOf(Lit.make(2, true), Lit.make(3, false))),
-        Clause(intArrayOf(Lit.make(2, false), Lit.make(3, true))), Clause(intArrayOf(Lit.make(2, false), Lit.make(3, false))),
-    )).bake()
+    private val contradiction = Problem(5, 0, emptyArray(), Array(8) { mask ->
+        Clause(IntArray(3) { bit -> Lit.make(bit + 2, mask and (1 shl bit) != 0) })
+    }).bake()
 
     @Test
     fun `retained workers should refute every disjoint task without independent proof authority`() {
