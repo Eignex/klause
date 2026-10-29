@@ -2,10 +2,11 @@ package com.eignex.klause.backtrack
 
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.result.SearchStatsSink
+import com.eignex.klause.util.Cancellation
 
 /**
  * One scheduled in-search simplification pass over the live constraint database. Passes run
- * per arm at the restart boundary, after the DFS trail is popped, with the session at the post-seed
+ * per arm at a safe root boundary, with the session at the post-seed
  * root; each call works a bounded slice so a single restart never stalls on a full database sweep.
  *
  * Every pass must declare whether it preserves the variable set. The portfolio shares learned
@@ -17,6 +18,7 @@ import com.eignex.klause.solver.result.SearchStatsSink
 internal interface InprocessingPass {
     /** True when the pass never adds, removes, or renames variables — the portfolio-safe category. */
     val preservesVariables: Boolean
+    val spending: InprocessingSpending? get() = null
 
     /** Run one bounded slice with [session] at the post-seed root, leaving it there, and count the work it
      *  does into [stats] so a work-sliced search is charged for it. */
@@ -26,42 +28,9 @@ internal interface InprocessingPass {
     fun reset()
 }
 
-/** Clause vivification behind the inprocessing seam: a round-robin cursor over the learned
- *  database, one [BacktrackParams.vivifyBatch]-sized slice per scheduled run. */
-internal class VivificationPass : InprocessingPass {
-    override val preservesVariables: Boolean get() = true
-    private var cursor = 0
-
-    override fun run(session: PropagationSession, params: BacktrackParams, stats: SearchStatsSink?) {
-        cursor = vivify(session, params, cursor, stats)
-    }
-
-    override fun reset() {
-        cursor = 0
-    }
-}
-
-/** Clause subsumption + self-subsuming resolution behind the inprocessing seam: a
- *  round-robin cursor over the learned database, one [BacktrackParams.subsumeBatch]-sized slice per
- *  scheduled run. */
-internal class SubsumptionPass : InprocessingPass {
-    override val preservesVariables: Boolean get() = true
-    private var cursor = 0
-
-    override fun run(session: PropagationSession, params: BacktrackParams, stats: SearchStatsSink?) {
-        cursor = subsume(session, params, cursor, stats)
-    }
-
-    override fun reset() {
-        cursor = 0
-    }
-}
-
 /**
- * The scheduled per-arm inprocessing loop: runs its passes in order at every
- * [BacktrackParams.inprocessingCadence]-th restart. The cadence exists because the passes' probing
- * cost competes with conflict throughput — restart-heavy configurations pay it often — so it is the
- * portfolio's per-arm tuning lever for how much simplification an arm buys.
+ * Per-arm safe-root scheduling under one containing work ceiling. Restart cadence, optional work
+ * and growth triggers share a cooldown that excludes the work the passes themselves spend.
  */
 internal class Inprocessing(
     private val passes: List<InprocessingPass>,
@@ -77,19 +46,77 @@ internal class Inprocessing(
     }
 
     private var restartsUntilRun = cadence
+    private var nextPass = 0
+    private var spent = 0L
+    private var debt = 0L
+    private var lastWork = 0L
+    private var lastCount = 0
+    private var pendingRoot: InprocessingPass? = null
 
-    fun onRestart(session: PropagationSession, params: BacktrackParams): Boolean {
-        if (--restartsUntilRun > 0) return false
-        restartsUntilRun = cadence
-        for (pass in passes) {
-            if (session.cancelRequested || session.fixpointCancelled || session.isUnsatAtRoot) break
-            pass.run(session, params, stats)
+    fun onRestart(session: PropagationSession, params: BacktrackParams): Boolean = atRoot(session, params, true)
+
+    fun onRoot(session: PropagationSession, params: BacktrackParams): Boolean = atRoot(session, params, false)
+
+    private fun atRoot(session: PropagationSession, params: BacktrackParams, restart: Boolean): Boolean {
+        val beforeResume = session.work
+        if (pendingRoot != null) {
+            val limit = params.inprocessingWork - minOf(debt, params.inprocessingWork)
+            debt = (debt - params.inprocessingWork).coerceAtLeast(0L)
+            val token = Cancellation { params.cancellation() || session.work - beforeResume >= limit }
+            session.withCancellation(token) {
+                pendingRoot?.spending?.run(session, params, stats, resumingRoot = true) { session.resumeInprocessingRoot() }
+            }
+            val used = (session.work - beforeResume).coerceAtLeast(0L)
+            spent = saturatedWork(spent, used)
+            debt = saturatedWork(debt, (used - limit).coerceAtLeast(0L))
+            stats?.noteInprocessing("inprocessContinuationWork", used)
+            if (!session.fixpointCancelled) pendingRoot = null
+            return true
         }
-        return params.rootSimplification || params.rootProbeBatch > 0
+        if (!session.canSimplifyRoot || passes.isEmpty()) return false
+        val restartDue = restart && --restartsUntilRun <= 0
+        if (restartDue) restartsUntilRun = cadence
+        val work = (session.work - spent).coerceAtLeast(0L)
+        val elapsed = (work - lastWork).coerceAtLeast(0L)
+        val intervalDue = params.inprocessingInterval > 0L && elapsed >= params.inprocessingInterval
+        val growthDue = params.inprocessingGrowth > 0 &&
+            session.learnedClauseCount.toLong() - lastCount >= params.inprocessingGrowth
+        if ((!restartDue && !intervalDue && !growthDue) || elapsed < params.inprocessingCooldown) return false
+        lastWork = work
+        lastCount = session.learnedClauseCount
+        val repaid = minOf(debt, params.inprocessingWork)
+        debt -= repaid
+        val offered = params.inprocessingWork - repaid
+        if (offered == 0L || params.cancellation() || session.cancelRequested) return false
+        stats?.noteInprocessing(if (restartDue) "inprocessRestartTriggers" else "inprocessWorkTriggers", 1L)
+        val start = session.work
+        val token = Cancellation { params.cancellation() || session.work - start >= offered }
+        try {
+            session.withCancellation(token) {
+                repeat(passes.size) {
+                    if (session.cancelRequested || session.fixpointCancelled || session.isUnsatAtRoot) return@withCancellation
+                    val pass = passes[nextPass]
+                    nextPass = (nextPass + 1) % passes.size
+                    pass.run(session, params, stats)
+                    if (session.fixpointCancelled) pendingRoot = pass
+                }
+            }
+        } finally {
+            val used = (session.work - start).coerceAtLeast(0L)
+            spent = saturatedWork(spent, used)
+            debt = saturatedWork(debt, (used - offered).coerceAtLeast(0L))
+        }
+        return true
     }
 
     fun reset() {
         restartsUntilRun = cadence
+        nextPass = 0
+        spent = 0L
+        debt = 0L
+        lastWork = 0L
+        lastCount = 0
+        pendingRoot = null
         for (pass in passes) pass.reset()
     }
 

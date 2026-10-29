@@ -146,12 +146,35 @@ class PropagationSession private constructor(
     private var seededRestrictions: DeducedRestrictions = DeducedRestrictions.None
     private var scopedLearnedAssertion = false
     private var simplifiedRootSources: MutableSet<Int>? = null
+    private var inprocessingRootPending = false
+
+    internal fun resumeInprocessingRoot(): Boolean {
+        if (!inprocessingRootPending) return false
+        check(decisionLevel == 0 && seededRestrictions.isEmpty && !scopedLearnedAssertion)
+        if (cancelRequested) return true
+        state.runCancelled = false
+        val conflict = state.inprocessingFixpoint(-1, cancellation)
+        if (conflict != null) bakedUnsat = PropagationResult.Unsat(conflictLevels = conflict)
+        inprocessingRootPending = state.runCancelled
+        if (!inprocessingRootPending) levelStates[levelTop - 1] = state.mark()
+        return true
+    }
 
     internal val canSimplifyRoot: Boolean
         get() = decisionLevel == 0 && seededRestrictions.isEmpty && !scopedLearnedAssertion &&
             !fixpointCancelled && !isUnsatAtRoot
 
     internal val rootClauseCount: Int get() = problem.numFactors + learnedClauseCount
+
+    internal var learnedClauseRevision: Long = 0L
+        private set
+
+    internal fun learnedClauseLiteralCount(index: Int): Int = state.nativeEngine?.literalCountOf(index)
+        ?: (state.learned.store[index] as? ClausePropagator)?.literals?.size ?: 0
+
+    internal fun chargeInprocessingWork(count: Long) {
+        state.work += count
+    }
 
     internal fun rootClauseLiterals(factor: Int, limit: Int): IntArray? {
         if (simplifiedRootSources?.contains(factor) == true) return null
@@ -162,7 +185,7 @@ class PropagationSession private constructor(
         }
         val index = factor - problem.numFactors
         if (!isLearnedClause(index) || learnedClausePermanent(index)) return null
-        if (state.nativeEngine?.literalCountOf(index)?.let { it > limit } == true) return null
+        if (learnedClauseLiteralCount(index) > limit) return null
         return learnedClauseLiterals(index).takeIf {
             it.size <= limit && it.all { lit -> Lit.variable(lit) < problem.numBoolVars }
         }
@@ -175,11 +198,19 @@ class PropagationSession private constructor(
         sourceReplacement: Boolean,
     ): PropagationResult {
         check(canSimplifyRoot)
-        val result = registerAndPropagate(base = state.undoTop) {
-            state.addLearnedClause(clause, lbd, permanent = sourceReplacement, origin = origin)
+        val base = state.undoTop
+        val fid = state.addLearnedClause(clause, lbd, permanent = sourceReplacement, origin = origin)
+        state.factorAttribution?.let {
+            if (state.nativeEngine == null) it.admit(state.factorAt(fid))
+            else if (it.admissionFamilies != 0) it.note(it.admissionFamilies, FactorAttribution.Metric.Learned)
         }
-        if (result is PropagationResult.Unsat) bakedUnsat = result
-        return result
+        val conflict = state.inprocessingFixpoint(fid, cancellation)
+        inprocessingRootPending = state.runCancelled
+        if (conflict != null) {
+            return revertAndUnsat(conflict).also { bakedUnsat = it }
+        }
+        if (!inprocessingRootPending) levelStates[levelTop - 1] = state.mark()
+        return if (inprocessingRootPending) PropagationResult.Implied.EMPTY else impliedSince(base)
     }
 
     internal fun retireRootSource(factor: Int, literals: IntArray) {
@@ -962,7 +993,9 @@ class PropagationSession private constructor(
     /** Forward to [PropagationState.forgetLearnedClauses]. Called by the engine's
      *  restart hook to bound the learned-clause database. */
     fun forgetLearnedClauses(keep: (learnedIndex: Int, lbd: Int) -> Boolean) {
+        val before = learnedClauseCount
         state.forgetLearnedClauses(keep)
+        if (learnedClauseCount != before) learnedClauseRevision++
     }
 
     /** Unified truth of a bool or atom literal — null when undetermined. */

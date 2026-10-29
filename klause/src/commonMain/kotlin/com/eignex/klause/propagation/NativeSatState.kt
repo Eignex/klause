@@ -361,18 +361,22 @@ internal class NativeSatState(private val state: PropagationState) {
         // old learned index -> new learned index, or -1 if dropped.
         val referenced = state.referencedLearned(learnedCount)
         val remap = IntArray(learnedCount)
+        state.work += learnedCount
         var survivors = 0
         for (i in 0 until learnedCount) {
+            state.work++
             remap[i] = if (learnedPermanent[i] == 1 || referenced[i] || keep(i, learnedLbd[i])) survivors++ else -1
         }
         if (survivors == learnedCount) return
 
         for (i in 0 until learnedCount) if (remap[i] < 0) {
+            state.work++
             state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Retired)
         }
         state.remapReasons(state.boolReason, remap, baseCount)
         var queued = 0
         for (i in recheckHead until rechecks.size) {
+            state.work++
             val next = remap[rechecks[i] - baseCount]
             if (next >= 0) rechecks[queued++] = baseCount + next
         }
@@ -380,9 +384,11 @@ internal class NativeSatState(private val state: PropagationState) {
         recheckHead = 0
 
         for (lit in watchEntries.indices) {
+            state.work++
             val entries = watchEntries[lit]
             var w = 0
             for (r in 0 until watchSizes[lit]) {
+                state.work++
                 val entry = entries[r]
                 val h = entry.toInt()
                 val newH = if (h < baseCount) h else remap[h - baseCount].let { if (it < 0) -1 else baseCount + it }
@@ -396,12 +402,16 @@ internal class NativeSatState(private val state: PropagationState) {
         // unread clause. Keep the original starts and buffer size live until every source is read.
         var literalWrite = 0
         for (i in 0 until learnedCount) {
+            state.work++
             val target = remap[i]
             if (target < 0) continue
             val start = learnedStarts[i]
             val end = learnedEnd(i)
             learnedStarts[target] = literalWrite
-            for (k in start until end) learnedLits[literalWrite++] = learnedLits[k]
+            for (k in start until end) {
+                state.work++
+                learnedLits[literalWrite++] = learnedLits[k]
+            }
             lifecycleStages[target] = lifecycleStages[i]
             learnedLbd[target] = learnedLbd[i]
             learnedPermanent[target] = learnedPermanent[i]
@@ -424,7 +434,10 @@ internal class NativeSatState(private val state: PropagationState) {
         learnedWatchPos.truncateTo(2 * survivors)
         learnedCount = survivors
         learnedUnits.clear()
-        for (i in 0 until learnedCount) if (clauseLen(baseCount + i) == 1) learnedUnits.add(baseCount + i)
+        for (i in 0 until learnedCount) {
+            state.work++
+            if (clauseLen(baseCount + i) == 1) learnedUnits.add(baseCount + i)
+        }
     }
 
     private fun pinUnit(h: Int, unitIdx: Int): Boolean {

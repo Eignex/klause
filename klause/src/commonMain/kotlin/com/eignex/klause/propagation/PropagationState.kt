@@ -1069,6 +1069,22 @@ class PropagationState private constructor(
         }
     }
 
+    internal fun inprocessingFixpoint(initialFactor: Int, cancellation: Cancellation): IntArray? {
+        val start = TimeSource.Monotonic.markNow()
+        val previousFloor = cancelFloor
+        cancelFloor = 0
+        finiteWork.cancellation = cancellation
+        try {
+            if (initialFactor >= 0 || nativeEngine != null) {
+                return drainFixpoint(false, initialFactor, EmptyIntArray, cancellation, false)
+            }
+            return fireQueue(cancellation !== Cancellation.Never, 0, cancellation, false)
+        } finally {
+            cancelFloor = previousFloor
+            propagationNanos += start.elapsedNow().inWholeNanoseconds
+        }
+    }
+
     private var rootPreparationStarted = false
 
     internal fun beginRootFixpoint(): Iterator<Unit> = sequence {

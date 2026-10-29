@@ -40,6 +40,36 @@ class RootInprocessingSearchTest {
     )
 
     @Test
+    fun `ordinary search should consume root probes without a restart schedule`() {
+        for (native in listOf(false, true)) {
+            val configured = params(native).copy(lubyRestartBase = null, inprocessingInterval = 1L,
+                inprocessingWork = 4096L, inprocessingRootWork = 512L, inprocessingProbeWork = 512L)
+
+            val result = BacktrackSolver(problem().bake()).solve(configured)
+
+            assertIs<SolveResult.Sat>(result)
+            assertEquals(0.0, result.stats.search.restarts.sum)
+            assertTrue(result.stats.search.learning.getValue("inprocessWorkTriggers") > 0L)
+            assertTrue(result.stats.search.learning.getValue("inprocessProbeUnits") > 0L)
+        }
+    }
+
+    @Test
+    fun `resumed search should retain root work without a restart schedule`() {
+        for (native in listOf(false, true)) {
+            val configured = params(native).copy(lubyRestartBase = null, inprocessingInterval = 1L,
+                inprocessingWork = 4096L, inprocessingRootWork = 512L, inprocessingProbeWork = 512L)
+            val search = BacktrackSolver(problem().bake()).resumableSolve(configured)
+
+            val result = search.use { finish(it) }
+
+            assertIs<SolveResult.Sat>(result)
+            assertEquals(0.0, result.stats.search.restarts.sum)
+            assertTrue(result.stats.search.learning.getValue("inprocessProbeUnits") > 0L)
+        }
+    }
+
+    @Test
     fun `real restarts should consume probing units and refreshed imported binaries`() {
         for (native in listOf(false, true)) {
             var retained: PropagationSession? = null

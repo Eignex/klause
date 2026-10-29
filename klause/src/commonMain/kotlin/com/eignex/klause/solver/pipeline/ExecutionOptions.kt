@@ -293,6 +293,23 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** Maximum propagation work per root probe. */
         val rootProbeWork: ExecutionOption<Long> = ExecutionOption("root-probe-work", ValueKind.POSITIVE_LONG)
 
+        /** Containing work ceiling for one scheduled simplification slice. */
+        val inprocessingWork: ExecutionOption<Long> = ExecutionOption("inprocessing-work", ValueKind.LONG)
+        /** Cheap root scan work ceiling. */
+        val inprocessingRootWork: ExecutionOption<Long> = ExecutionOption("inprocessing-root-work", ValueKind.LONG)
+        /** Failed-literal probe work ceiling. */
+        val inprocessingProbeWork: ExecutionOption<Long> = ExecutionOption("inprocessing-probe-work", ValueKind.LONG)
+        /** Subsumption preparation and matching work ceiling. */
+        val inprocessingSubsumeWork: ExecutionOption<Long> = ExecutionOption("inprocessing-subsume-work", ValueKind.LONG)
+        /** Vivification work ceiling. */
+        val inprocessingVivifyWork: ExecutionOption<Long> = ExecutionOption("inprocessing-vivify-work", ValueKind.LONG)
+        /** Non-inprocessing work between safe-root opportunities; zero disables the trigger. */
+        val inprocessingInterval: ExecutionOption<Long> = ExecutionOption("inprocessing-interval", ValueKind.LONG)
+        /** Learned-clause growth between safe-root opportunities; zero disables the trigger. */
+        val inprocessingGrowth: ExecutionOption<Int> = ExecutionOption("inprocessing-growth", ValueKind.INT)
+        /** Non-inprocessing work required after a simplification attempt. */
+        val inprocessingCooldown: ExecutionOption<Long> = ExecutionOption("inprocessing-cooldown", ValueKind.LONG)
+
         /** The `lp-objective-cone` execution setting. */
         val lpObjectiveCone: ExecutionOption<Boolean> = ExecutionOption("lp-objective-cone", ValueKind.BOOLEAN)
 
@@ -492,7 +509,9 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 phaseSaving, targetPhasing, solutionPhasing, rephaseInterval, maxLearned,
                 lbdGlue, tieredDb, midLbd, vivification, vivifyBatch,
                 subsumption, subsumeBatch, inprocessingCadence, rootSimplification, rootSimplifyBatch,
-                rootProbeBatch, rootProbeWork, lpObjectiveCone, lpAutoOffReprobe,
+                rootProbeBatch, rootProbeWork, inprocessingWork, inprocessingRootWork, inprocessingProbeWork,
+                inprocessingSubsumeWork, inprocessingVivifyWork, inprocessingInterval, inprocessingGrowth,
+                inprocessingCooldown, lpObjectiveCone, lpAutoOffReprobe,
                 lpKnapsackLagrangian, lpComponentSplit, lpComponentOwnership, lpBoundMaxPivots, lpAdaptiveWork,
                 lpBranching, lpDirectionalGains,
                 lpVariableShaving, lpPruneHulls, lpRootCuts, pbLearning, integerRowLearning,

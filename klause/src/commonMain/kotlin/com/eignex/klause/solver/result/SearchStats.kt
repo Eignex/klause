@@ -308,9 +308,15 @@ internal class SearchStatsSink {
         inprocessVisits += visits
     }
 
+    private val inprocessing = LinkedHashMap<String, Long>()
+
+    internal fun noteInprocessing(metric: String, count: Long) {
+        inprocessing[metric] = (inprocessing[metric] ?: 0L) + count
+    }
+
     fun snapshot(): SearchStats = SearchStats(
         valueOrdering = valueOrdering(),
-        learning = learning(),
+        learning = learning() + inprocessing,
         nodes = nodes.read(),
         fails = fails.read(),
         restarts = restarts.read(),

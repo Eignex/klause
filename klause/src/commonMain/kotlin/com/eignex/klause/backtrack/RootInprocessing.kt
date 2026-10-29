@@ -7,50 +7,105 @@ import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.result.SearchStatsSink
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 
 internal class RootSimplificationPass : InprocessingPass {
     override val preservesVariables: Boolean get() = true
     private var cursor = 0
+    override val spending = InprocessingSpending(InprocessingKind.Root)
+    private var dropped = IntHashSet()
+    private var revision = -1L
+    private var pendingSource: Pair<Int, IntArray>? = null
 
     override fun reset() {
         cursor = 0
+        dropped = IntHashSet()
+        revision = -1L
+        pendingSource = null
+        spending.reset()
     }
 
     override fun run(session: PropagationSession, params: BacktrackParams, stats: SearchStatsSink?) {
         if (!session.canSimplifyRoot) return
+        spending.run(session, params, stats) { budget -> simplify(session, params, budget) }
+    }
+
+    private fun simplify(session: PropagationSession, params: BacktrackParams, budget: InprocessingBudget) {
         val count = session.rootClauseCount
         if (count == 0) return
-        val dropped = IntHashSet()
-        var visits = 0L
+        if (revision != session.learnedClauseRevision) dropped = IntHashSet()
+        revision = session.learnedClauseRevision
+        pendingSource?.let { (factor, literals) ->
+            if (!budget.visit(literals.size + 1)) return
+            session.retireRootSource(factor, literals)
+            budget.note("RetirementWork", literals.size + 1L)
+            pendingSource = null
+        }
+        if (!dropped.isEmpty()) {
+            if (budget.stopped()) return
+            val before = session.work
+            session.forgetLearnedClauses { index, _ -> index !in dropped }
+            budget.note("RetirementWork", session.work - before)
+            dropped = IntHashSet()
+            revision = session.learnedClauseRevision
+            cursor = 0
+            return
+        }
         if (cursor !in 0 until count) cursor = 0
         var examined = 0
+        var literalsVisited = 0
         while (examined++ < minOf(params.rootSimplifyBatch, count)) {
-            if (session.cancelRequested || !session.canSimplifyRoot || visits >= ROOT_LITERAL_LIMIT) break
-            visits++
+            if (!session.canSimplifyRoot || literalsVisited >= ROOT_LITERAL_LIMIT || !budget.visit()) break
             val factor = cursor
             cursor = (cursor + 1) % count
-            val literals = session.rootClauseLiterals(factor, ROOT_LITERAL_LIMIT - visits.toInt()) ?: continue
-            visits += literals.size
+            budget.note("Candidates")
+            val literals = session.rootClauseLiterals(factor, ROOT_LITERAL_LIMIT - literalsVisited) ?: continue
+            budget.charge(literals.size)
+            literalsVisited += literals.size
             if (literals.size < 2) continue
-            val satisfied = literals.any { session.litTruth(it) == true }
-            val residual = if (satisfied) null else literals.filter { session.litTruth(it) != false }.toIntArray()
-            if (!satisfied && (residual == null || residual.isEmpty() || residual.size == literals.size)) continue
+            budget.note("Eligible")
+            val residual = IntArrayList(literals.size)
+            var satisfied = false
+            for (literal in literals) {
+                if (!budget.visit()) return
+                when (session.litTruth(literal)) {
+                    true -> { satisfied = true; break }
+                    false -> Unit
+                    null -> residual.add(literal)
+                }
+            }
+            if (!satisfied && (residual.isEmpty() || residual.size == literals.size)) continue
             val source = factor < session.problem.numFactors
-            if (residual != null) {
+            if (!satisfied) {
                 val index = factor - session.problem.numFactors
                 val origin = if (source) OWN_ORIGIN else session.learnedClauseOrigin(index)
                 val lbd = if (source) residual.size else minOf(session.learnedClauseLbd(index), residual.size)
-                session.addRootDerivedClause(Clause(residual), lbd, origin, source)
-                if (!session.canSimplifyRoot) continue
+                if (!budget.visit(residual.size * 2 + 1)) break
+                val before = session.work
+                session.addRootDerivedClause(Clause(residual.toIntArray()), lbd, origin, source)
+                if (source) pendingSource = factor to literals
+                else dropped.add(index)
+                budget.note("AttachmentWork", session.work - before + residual.size * 2 + 1L)
+                budget.note("Shortened")
+                if (!session.canSimplifyRoot) break
             }
-            if (source) session.retireRootSource(factor, literals)
-            else dropped.add(factor - session.problem.numFactors)
+            if (budget.stopped()) break
+            if (source) {
+                budget.visit(literals.size + 1)
+                session.retireRootSource(factor, literals)
+                pendingSource = null
+                budget.note("RetirementWork", literals.size + 1L)
+            } else dropped.add(factor - session.problem.numFactors)
         }
-        stats?.observeInprocessing(probes = 0L, visits = visits)
         val beforeCompaction = session.learnedClauseCount
-        if (!dropped.isEmpty()) session.forgetLearnedClauses { index, _ -> index !in dropped }
-        // Protected reasons can survive retirement requests without renumbering the snapshot.
+        if (!dropped.isEmpty() && !budget.stopped()) {
+            val before = session.work
+            session.forgetLearnedClauses { index, _ -> index !in dropped }
+            budget.note("RetirementWork", session.work - before)
+            dropped = IntHashSet()
+            revision = session.learnedClauseRevision
+        }
         if (session.learnedClauseCount < beforeCompaction) cursor = 0
     }
 }
@@ -58,44 +113,50 @@ internal class RootSimplificationPass : InprocessingPass {
 internal class RootProbingPass : InprocessingPass {
     override val preservesVariables: Boolean get() = true
     private var cursor = 0
+    override val spending = InprocessingSpending(InprocessingKind.Probe)
 
     override fun reset() {
         cursor = 0
+        spending.reset()
     }
 
     override fun run(session: PropagationSession, params: BacktrackParams, stats: SearchStatsSink?) {
         if (!session.canSimplifyRoot || params.rootProbeWork <= 0L) return
+        spending.run(session, params, stats) { budget -> probe(session, params, budget) }
+    }
+
+    private fun probe(session: PropagationSession, params: BacktrackParams, budget: InprocessingBudget) {
         val variables = session.problem.numBoolVars
         if (variables == 0) return
         var attempted = 0
         var examined = 0
         val priorCancelled = session.probeCancelled
-        while (attempted < params.rootProbeBatch && examined < minOf(2 * variables, ROOT_LITERAL_LIMIT)) {
-            if (session.cancelRequested || !session.canSimplifyRoot) break
+        while (attempted < params.rootProbeBatch && examined < minOf(2L * variables, ROOT_LITERAL_LIMIT.toLong())) {
+            if (!session.canSimplifyRoot || !budget.visit()) break
             val literal = cursor % (2 * variables)
             val variable = Lit.variable(literal)
             cursor = (literal + 1) % (2 * variables)
             examined++
+            budget.note("Candidates")
             if (session.boolValue(variable) != null) continue
             attempted++
-            stats?.observeInprocessing(probes = 1L, visits = 0L)
+            budget.note("Eligible")
+            budget.probe()
             val start = session.work
             val token = Cancellation { session.work - start >= params.rootProbeWork }
-            val result = session.withCancellation(token) { session.probeBool(variable, Lit.isPositive(literal)) }
-            when (result) {
-                null -> {
-                    // A local probe limit retracts its entire partial fixpoint; it is not a search cancellation.
-                    if (!session.cancelRequested) session.probeCancelled = priorCancelled
-                }
+            when (val result = session.withCancellation(token) { session.probeBool(variable, Lit.isPositive(literal)) }) {
+                null -> if (!params.cancellation()) session.probeCancelled = priorCancelled
                 is PropagationResult.Unsat -> {
-                    // At an unconditional root the failed decision is the complete premise.
+                    if (!budget.visit(3)) break
+                    val before = session.work
                     session.addRootDerivedClause(Clause(intArrayOf(Lit.negate(literal))), 1, OWN_ORIGIN, false)
+                    budget.note("AttachmentWork", session.work - before + 3L)
+                    budget.note("Units")
                 }
                 else -> session.popLast()
             }
         }
-        stats?.observeInprocessing(probes = 0L, visits = examined.toLong())
     }
 }
 
-private const val ROOT_LITERAL_LIMIT = 8192
+internal const val ROOT_LITERAL_LIMIT = 8192

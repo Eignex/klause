@@ -233,6 +233,22 @@ data class BacktrackParams(
     val rootProbeBatch: Int = 0,
     /** Propagation work ceiling per root probe, in addition to the containing invocation token. */
     val rootProbeWork: Long = 8192L,
+    /** Work ceiling for a complete scheduled inprocessing slice; zero withholds every pass. */
+    val inprocessingWork: Long = Long.MAX_VALUE,
+    /** Cheap root scan allowance within [inprocessingWork]. */
+    val inprocessingRootWork: Long = Long.MAX_VALUE,
+    /** Failed-literal probing allowance within [inprocessingWork]. */
+    val inprocessingProbeWork: Long = Long.MAX_VALUE,
+    /** Subsumption preparation, matching and mutation allowance within [inprocessingWork]. */
+    val inprocessingSubsumeWork: Long = Long.MAX_VALUE,
+    /** Vivification scanning, propagation and mutation allowance within [inprocessingWork]. */
+    val inprocessingVivifyWork: Long = Long.MAX_VALUE,
+    /** Non-inprocessing propagation work between safe-root opportunities; zero disables this trigger. */
+    val inprocessingInterval: Long = 0L,
+    /** Learned-clause growth triggering work at a safe root; zero disables this trigger. */
+    val inprocessingGrowth: Int = 0,
+    /** Non-inprocessing propagation work required after any scheduled attempt. */
+    val inprocessingCooldown: Long = 0L,
     /**
      * Externally-supplied objective upper bound for branch-and-bound minimisation. When
      * non-null, the [com.eignex.klause.solver.Optimizer.improvements] / `minimize`
@@ -426,6 +442,10 @@ data class BacktrackParams(
         require(rootSimplifyBatch > 0) { "root simplification batch must be positive" }
         require(rootProbeBatch >= 0) { "root probe batch must be nonnegative" }
         require(rootProbeWork > 0L) { "root probe work must be positive" }
+        require(listOf(inprocessingWork, inprocessingRootWork, inprocessingProbeWork,
+            inprocessingSubsumeWork, inprocessingVivifyWork, inprocessingInterval,
+            inprocessingCooldown).all { it >= 0L }) { "inprocessing work limits must be nonnegative" }
+        require(inprocessingGrowth >= 0) { "inprocessing growth must be nonnegative" }
         require(lubyRestartBase == null || lubyRestartBase > 0L) {
             "lubyRestartBase must be positive or null (off)"
         }
