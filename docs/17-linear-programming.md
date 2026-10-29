@@ -48,6 +48,30 @@ indicator records both bound premises and retires when the pin retracts. Bounds
 retract with the search scope while definitions stay available to siblings. These
 definitions supply no witness authority: publication checks the original rows.
 
+Compatible discrete preparation views retain immutable source-row templates and exact
+integer endpoint metadata through their selected projections. Compact integer rows
+reuse their source-coordinate and coefficient buffers in presolve harvest and later
+LP assembly; guarded rows read the current pin on every emission. Each build maps
+those definitions into its own columns, bounds, premises and numerical owner.
+Templates retain neither a basis nor a checked claim.
+
+Factor identity preserves a row definition; row rewrites replace it. Component
+snapshots retain their row definitions, exact endpoints, stated bound sides and
+objective coefficients. Bound or objective changes replace affected snapshots;
+joining rows replace merged components and retain unrelated ones. Explicit namespace
+remaps, changed dimensions or semantics and source-to-finite transitions reject the
+prior binding. A foreign source cannot use a prepared template index. Continuous,
+custom and unsupported projections retain their ordinary emission paths.
+
+Template construction polls and charges the containing token, including failed
+attempts, and caps visits and retained storage at 262,144 modeled units each.
+An incomplete attempt publishes no snapshot. Each selection retains one complete
+snapshot, with immutable publication across parallel consumers. Preparation and
+actual row/bound emission have separate observations in the existing LP phase ledger;
+they do not establish numerical result reuse or certified deduction consumption.
+Sparse-trial assembly uses the same source templates and keeps its own admission,
+factorization and certification allowances.
+
 Element hulls share an index-value selector across properties of the same integer
 index. Constant properties use one joint distribution, preserving their choice
 correlations; variable entries keep their bounded big-M links. Admission enumerates

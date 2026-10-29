@@ -151,9 +151,11 @@ class SparseLpAdmissionTest {
         )
         val session = PropagationSession(problem)
         val sink = SolveStatsSink("sparse-trial")
+        val projections = FactorProjectionProviders.Default.prepare(problem)
 
         LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, 1, 1)),
-            LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")), sink).use { engine ->
+            LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")), sink,
+            projections = projections).use { engine ->
             assertTrue(engine.sparseTrialActive)
             assertEquals(0, engine.params.lpPlan.boundMaxDepth)
             engine.rootLpRelaxationBound(requireNotNull(engine.lpRelaxer), emptyList())
@@ -164,6 +166,8 @@ class SparseLpAdmissionTest {
         assertEquals(1L, sink.snapshot().lp.sparseTrial["Admitted"])
         assertTrue(sink.snapshot().lp.pruned.sum > 0.0)
         assertTrue(sink.snapshot().lp.workOps.sum > 0.0)
+        assertTrue(sink.snapshot().lp.phases.filterKeys { it.startsWith("TEMPLATE_ASSEMBLY_") }.values
+            .sumOf { it.outcomes["ROWS"] ?: 0L } > 0L)
     }
 
     @Test

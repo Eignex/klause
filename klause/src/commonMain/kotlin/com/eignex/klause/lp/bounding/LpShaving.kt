@@ -10,6 +10,7 @@ import com.eignex.klause.lp.engine.certifiedTightObjectiveLowerBound
 import com.eignex.klause.lp.engine.integerFarkasRay
 import com.eignex.klause.lp.engine.newTableauCutSolver
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
+import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.RootDomains
 import com.eignex.klause.lp.rootDomainOf
 import com.eignex.klause.propagation.PropagationResult
@@ -188,8 +189,12 @@ private fun LpEngine.safeMin(prob: Problem, coeffs: LongArray, token: Cancellati
     val session = PropagationSession(if (selected == null) PropagationProblem(prob)
         else PropagationProblem(prob, selected))
     if (session.isUnsatAtRoot) return null
-    val relaxation = CpToLpRelaxation(prob, LinearObjective(intCoefficients = coeffs), projections = selected)
-        .build(session)
+    val relaxation = try {
+        CpToLpRelaxation(prob, LinearObjective(intCoefficients = coeffs), projections = selected,
+            templateStats = sink.lp).build(session, cancellation = token)
+    } catch (_: LpAssemblyCancelled) {
+        return null
+    }
     if (relaxation.model.n == 0) return null
     val simplex = dualSimplex(relaxation.model, token)
     val result = try {
@@ -222,9 +227,11 @@ private fun LpEngine.safeMax(prob: Problem, coeffs: LongArray, token: Cancellati
  *  [PropagationSession] bake — the no-bake analog of [safeMin], for pre-bake OBBT on wide domains. */
 private fun LpEngine.safeMinNoBake(coeffs: LongArray, token: Cancellation): Double? {
     val relaxation = try {
-        CpToLpRelaxation(problem, LinearObjective(intCoefficients = coeffs), projections = projections)
-            .build(RootDomains(problem))
+        CpToLpRelaxation(problem, LinearObjective(intCoefficients = coeffs), projections = projections,
+            templateStats = sink.lp).build(RootDomains(problem), cancellation = token)
     } catch (_: CheckedLongOverflowException) {
+        return null
+    } catch (_: LpAssemblyCancelled) {
         return null
     }
     if (relaxation.model.n == 0) return null
@@ -320,9 +327,11 @@ internal fun LpEngine.rootLpInfeasibleNoBake(token: Cancellation): Boolean {
     val relaxer = lpRelaxer ?: return false
     if (token()) return false
     val model = try {
-        relaxer.build(RootDomains(problem)).model
+        relaxer.build(RootDomains(problem), cancellation = token).model
     } catch (_: CheckedLongOverflowException) {
         return false // a relaxation the row arithmetic cannot express yields no verdict, never a crash
+    } catch (_: LpAssemblyCancelled) {
+        return false
     }
     if (model.n == 0) return false
     val simplex = newTableauCutSolver(
@@ -363,8 +372,10 @@ internal fun LpEngine.rootRelaxationSize(): RootRelaxationSize? {
     val session = PropagationSession(problem)
     if (session.isUnsatAtRoot) return null
     val model = try {
-        relaxer.build(session).model
+        relaxer.build(session, cancellation = params.cancellation).model
     } catch (_: CheckedLongOverflowException) {
+        return null
+    } catch (_: LpAssemblyCancelled) {
         return null
     }
     return RootRelaxationSize(model.n, model.m, model.csc.colPtr[model.n])

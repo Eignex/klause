@@ -495,6 +495,18 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     var sparseTrial: Map<String, Long> = emptyMap()
     private val phases = LinkedHashMap<String, LpPhaseStats>()
 
+    fun observeTemplatePreparation(nanos: Long, work: Long, outcomes: Map<String, Long>) {
+        val key = "TEMPLATE_PREPARATION_${probeRoute.name}"
+        val delta = LpPhaseStats(calls = 1L, nanos = nanos, work = work, outcomes = outcomes)
+        phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(delta)
+    }
+
+    fun observeTemplateUse(rows: Int = 0, bounds: Int = 0) {
+        val key = "TEMPLATE_ASSEMBLY_${probeRoute.name}"
+        val delta = LpPhaseStats(outcomes = mapOf("ROWS" to rows.toLong(), "BOUNDS" to bounds.toLong()))
+        phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(delta)
+    }
+
     fun observeDirectionalBranch(outcome: String) {
         val key = "DIRECTIONAL_BRANCH_NODE"
         val delta = LpPhaseStats(calls = 1L, outcomes = mapOf(outcome to 1L))

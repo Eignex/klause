@@ -50,6 +50,16 @@ propagator-only symmetry does not change that eligibility. Explicit `+lp-harvest
 nonclausal sources and optimization keep harvest eligibility.
 [Wide-integer pre-bake bounds](#pre-bake-lp-bounds) use a separate safety gate.
 
+LP harvest carries compatible immutable source-row and exact-bound templates across
+finite rebuilds through the selected projections. Unchanged definitions retain their
+buffers; changed bounds, rows, objectives and component joins replace the affected
+component snapshots. Namespace remaps and semantic-scope changes require fresh
+bindings. The later model-facing LP consumers instantiate their own mutable owners
+from these definitions; see [LP preparation](17-linear-programming.md#exact-source-row-projections).
+Template construction spends the same containing allowance, and unfinished preparation
+publishes no reusable state. Template reuse changes assembly work, not pass admission,
+probe selection, reconstruction guarantees or source authority.
+
 The round-boundary diminishing-return check counts live factors plus integer-domain
 endpoint spans. Incremental and rebuilt hosts use the same nonnegative measure,
 saturating spans and totals at `Long.MAX_VALUE`; saturation can hide reductions.

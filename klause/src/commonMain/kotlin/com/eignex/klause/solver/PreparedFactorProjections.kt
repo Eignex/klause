@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalAtomicApi::class)
+
 package com.eignex.klause.solver
 
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
@@ -19,6 +21,7 @@ import com.eignex.klause.lp.BuiltInRelaxationProjectionProvider
 import com.eignex.klause.lp.LinearLpProjection
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.lp.RelaxationProjection
+import com.eignex.klause.lp.relaxation.LpPreparationTemplates
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.FactorProjectionPreparation
 import com.eignex.klause.propagation.PropagationProjection
@@ -29,6 +32,9 @@ import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.solver.objective.LinearObjective
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 /**
  * Immutable source-associated mechanism selection. Factories are retained, never mutable workspaces;
@@ -50,6 +56,24 @@ class PreparedFactorProjections internal constructor(
         Array(problem.numFactors) { providers.encoder.select(problem.factors[it], target) }
     },
 ) {
+    private var lpTemplateNamespace: Any = Any()
+    private val lpTemplateCache = AtomicReference<LpPreparationTemplates?>(null)
+
+    internal fun prepareLpTemplates(
+        objective: LinearObjective?, token: Cancellation, onWork: (Long) -> Unit = {},
+    ): LpPreparationTemplates? {
+        val previous = lpTemplateCache.load()
+        val next = LpPreparationTemplates.prepare(this, lpTemplateNamespace, objective, previous, token, onWork)
+            ?: return null
+        lpTemplateCache.compareAndSet(previous, next)
+        return next
+    }
+
+    private fun inheritLpTemplates(source: PreparedFactorProjections): PreparedFactorProjections = apply {
+        lpTemplateNamespace = source.lpTemplateNamespace
+        lpTemplateCache.store(source.lpTemplateCache.load())
+    }
+
     /** Immutable whole-relation selection in this canonical source's factor namespace. */
     fun encoder(factorId: Int, target: EncodingTarget): Encoder = encoders.getValue(target)[factorId]
 
@@ -108,7 +132,7 @@ class PreparedFactorProjections internal constructor(
         view.numBoolVars == problem.numBoolVars && view.numIntVars == problem.numIntVars &&
         view.numRealVars == problem.numRealVars && view.numFactors == problem.numFactors &&
         view.factors.indices.all { view.factors[it] === problem.factors[it] }
-    ) projected(view, IntArray(view.numFactors) { it }) else forProblem(view)
+    ) projected(view, IntArray(view.numFactors) { it }) else forProblem(view).inheritLpTemplates(this)
 
     internal fun projected(view: Problem, factorIndices: IntArray, remap: VarRemap? = null): PreparedFactorProjections {
         require(factorIndices.size == view.numFactors && factorIndices.all { it in problem.factors.indices }) {
@@ -121,7 +145,7 @@ class PreparedFactorProjections internal constructor(
             encoders.mapValues { (_, selected) -> Array(factorIndices.size) {
                 val encoder = selected[factorIndices[it]]
                 if (remap == null) encoder else encoder.remapped(remap)
-            } })
+            } }).also { if (remap == null) it.inheritLpTemplates(this) }
     }
 
     internal fun retained(mapping: RetainedFactors): PreparedFactorProjections {
