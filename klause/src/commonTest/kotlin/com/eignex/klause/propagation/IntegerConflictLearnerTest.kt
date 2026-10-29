@@ -1,14 +1,24 @@
 package com.eignex.klause.propagation
 
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.backtrack.selector.IndomainMax
+import com.eignex.klause.backtrack.selector.InputOrder
+import com.eignex.klause.backtrack.selector.VariableSelector
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearPropagator
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.Table
+import com.eignex.klause.formats.flatzinc.parseFlatZinc
+import com.eignex.klause.formats.json.ProblemJson
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.solver.pipeline.FiniteEngine
+import com.eignex.klause.solver.pipeline.FinitePipeline
+import com.eignex.klause.solver.pipeline.FinitePipelineRequest
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchComponent
@@ -18,7 +28,9 @@ import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchLearnedConflictResult
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchSession
+import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.Cancellation
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -29,6 +41,61 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class IntegerConflictLearnerTest {
+    @Test
+    fun `a prepared enumeration should reuse and retire its guarded arithmetic consequence`() {
+        val program = parseFlatZinc("""
+            var bool: active;
+            var 0..24: z;
+            var 0..6: x;
+            var 0..12: y;
+            constraint int_lin_le_reif([2,1,-1],[x,y,z],0,active);
+            constraint int_lin_le([2,-1],[x,y],0);
+            solve satisfy;
+        """.trimIndent())
+        val prepared = FinitePipeline.prepare(FinitePipelineRequest(
+            program.problem, FiniteEngine.BACKTRACK, solutionSetSensitive = true, randomSeed = 3L,
+        ))
+        var native: PropagationSession? = null
+        val selector = object : VariableSelector by InputOrder {
+            override fun fresh(): VariableSelector = this
+            override fun pick(session: PropagationSession, rng: Random): VarRef? {
+                native = session
+                return InputOrder.pick(session, rng)
+            }
+        }
+        val uses = mutableMapOf<Pair<LearnedIntegerPropagator, Int>, MutableSet<Long>>()
+        val params = BacktrackParams(variableSelector = selector, valueSelector = IndomainMax,
+            integerRowLearning = true, pbLearning = false, randomSeed = 3L, maxDecisions = 10_000)
+        BacktrackSolver(assertIs<BakedProblem>(prepared.problem)).openEnumerate(params).use { stream ->
+            repeat(250) {
+                assertTrue(stream.hasNext())
+                val point = prepared.reconstruct(stream.next())
+                val x = point.intValue(program.intVarsByName.getValue("x"))
+                val y = point.intValue(program.intVarsByName.getValue("y"))
+                val z = point.intValue(program.intVarsByName.getValue("z"))
+                assertEquals(2 * x + y <= z, point.boolValue(program.boolVarsByName.getValue("active")))
+                assertTrue(2 * x <= y)
+                val state = assertNotNull(native).explanationState
+                for (variable in state.intMaxReason.indices) {
+                    val reason = state.intMaxReason[variable]
+                    if (reason < state.baseFactorCount) continue
+                    val row = state.factorAt(reason) as? LearnedIntegerPropagator ?: continue
+                    uses.getOrPut(row to variable) { mutableSetOf() }.add(state.intDomains[variable].max)
+                }
+            }
+        }
+
+        val retained = uses.entries.firstOrNull { it.value.size >= 2 }?.key?.first
+        assertNotNull(retained, "prepared=" + ProblemJson().encodeToString(prepared.problem) + "; uses=" + uses.values)
+        assertTrue(retained.row.guard != Lit.NONE)
+        val session = assertNotNull(native)
+        session.popToLevel(0)
+        assertIs<PropagationResult.Implied>(session.pinBool(Lit.variable(retained.row.guard),
+            !Lit.isPositive(retained.row.guard)))
+        session.forgetLearnedClauses { _, _ -> false }
+        assertFalse(session.explanationState.learned.integerRows?.contains(retained) == true)
+        assertTrue((session.learnedLifecycle()["learningIntegerRetired"] ?: 0L) > 0L)
+    }
     @Test
     fun `a consumed guarded row should retire after its historical reason retracts`() {
         val native = PropagationSession(Problem(2, 3,

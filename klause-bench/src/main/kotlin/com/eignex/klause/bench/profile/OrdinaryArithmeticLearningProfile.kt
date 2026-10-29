@@ -23,6 +23,7 @@ import com.eignex.klause.util.Cancellation
 import java.io.File
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -40,7 +41,23 @@ internal object OrdinaryArithmeticLearningProfile {
         val lp = options["lp"] ?: "auto"
         require(lp in setOf("auto", "off"))
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
-        Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
+        var stdoutBytes = 0L
+        fun publish(record: String) {
+            val bytes = record.encodeToByteArray().size + 1L
+            require(bytes <= 3_145_728L - stdoutBytes) { "live record allowance exhausted" }
+            stdoutBytes += bytes
+            println(record)
+        }
+        val provenance = InstalledBuild.reference
+        val fingerprint = provenance.fingerprint
+        Reports.writeJson(out.resolve("provenance.json").path, provenance)
+        publish(buildJsonObject {
+            put("event", "provenance")
+            put("fingerprint", fingerprint)
+            put("build", Reports.json.encodeToString(provenance))
+            put("javaRuntimeVersion", System.getProperty("java.runtime.version"))
+            put("javaVmName", System.getProperty("java.vm.name"))
+        }.toString())
         val ref = Catalog.uncapped(suite).problems.single { it.name == name }
         val bytes = CorpusFetcher.resolve(ref.source).readBytes()
         require(bytes.size <= 1_048_576)
@@ -61,7 +78,8 @@ internal object OrdinaryArithmeticLearningProfile {
                 val label = if (learning) "integer" else "clause"
                 val originalJson = codec.encodeToString(original)
                 val preparedJson = codec.encodeToString(prepared.problem)
-                require(originalJson.length <= 2_097_152 && preparedJson.length <= 2_097_152)
+                require(originalJson.encodeToByteArray().size <= 131_072 &&
+                    preparedJson.encodeToByteArray().size <= 131_072)
                 out.resolve("$label-original.json").writeText(originalJson)
                 out.resolve("$label-prepared.json").writeText(preparedJson)
                 var native: PropagationSession? = null
@@ -127,6 +145,7 @@ internal object OrdinaryArithmeticLearningProfile {
                 capture?.record("traversal.retirement-checked")
                 val record = buildJsonObject {
                     put("revision", Reports.readGitSha())
+                    put("provenanceFingerprint", fingerprint)
                     put("original", originalJson)
                     put("prepared", preparedJson)
                     put("suite", suite)
@@ -155,12 +174,13 @@ internal object OrdinaryArithmeticLearningProfile {
                 }.toString()
                 output.appendLine(record)
                 output.flush()
-                println(record)
+                publish(record)
                 capture?.release()
             }
         }
         System.out.flush()
         // The lab publishes live log tails asynchronously before process teardown.
-        Thread.sleep(5_000L)
+        val chunks = (stdoutBytes + 65_535L) / 65_536L
+        Thread.sleep(5_000L + chunks * 1_100L)
     }
 }

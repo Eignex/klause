@@ -781,12 +781,16 @@ retirement. The selector wrapper delegates all decisions and notifications.
 Original source bytes, canonical original/prepared models and installed provenance
 remain in the capture. Bounded records also go to stdout, including both canonical
 models, so retained live output can expose a capture awaiting file publication.
-A five-second terminal drain lets asynchronous live-log publication retain the last
-records; it is inside the profile allowance and outside the arm timer. Each arm's deadline contains loading, preparation, solving,
+The live stream includes build/runtime provenance and references its fingerprint
+from each arm. Canonical models admit 128 KiB each and live output admits 3 MiB.
+A terminal drain allows five seconds plus 1.1 seconds per 64 KiB log chunk for
+asynchronous publication; it is inside the profile allowance and outside the arm
+timer. Each arm's deadline contains loading, preparation, solving,
 reconstruction, native point checking and retirement. Native propagation work is a
 subset of invocation cost; the arm timer excludes record serialization and output.
 Set the profile execution limit separately from `profile.runTimeoutSec`, which
-contains remote preparation, cache work, retries, capture and retirement. The instrumented capture supplies neither independent
+contains remote preparation, cache work, retries, capture and retirement. The
+instrumented capture supplies neither independent
 source checking nor a throughput claim. Use an ordinary lab adapter comparison
 with source validation for whole-source outcomes; a missing consumer requires
 further source or integration diagnosis. Defaults and export scope remain separate.
