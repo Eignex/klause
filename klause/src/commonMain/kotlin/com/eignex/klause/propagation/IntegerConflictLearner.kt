@@ -54,7 +54,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             state.arithmeticLearningTrace?.row("integer.pivot-row", event.row, state, event.trail)
             row = row.resolve(event.row, event.variable) ?: return decline("combination-shape-or-guard")
             if (row.minimum(state) <= row.bound) return decline("combination-lost-conflict")
-            if (state.learned.integerRows?.any { it.row.sameAs(row) } == true) return decline("duplicate")
+            if (state.learned.integerRows?.any { it.row.subsumes(row) } == true) return decline("duplicate")
             for (level in 0 until currentLevel) {
                 val trail = state.integerLearningTrailAtLevel?.invoke(level)
                 if (trail == null) {
