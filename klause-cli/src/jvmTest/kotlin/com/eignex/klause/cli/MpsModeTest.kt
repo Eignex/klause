@@ -35,6 +35,30 @@ import kotlin.test.assertTrue
 
 class MpsModeTest {
     @Test
+    fun `prepared MPS search should consume templates retained from LP harvest`() {
+        val relative = "klause-bench/smoke-corpus/lp-component-split/cover-2x3.mps"
+        val source = listOf(File(relative), File("../$relative")).first { it.isFile }
+
+        val text = capture {
+            assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", "-s", "--exact",
+                "--presolve", "off,+lp-harvest", "--lp", "aggressive,-cuts",
+                "--param", "lp-component-ownership=true", "--param", "bt-arm=lp-aggressive",
+                "--param", "arms=1", "-r", "3", "--param", "max-decisions=1000", source.absolutePath)))
+        }
+
+        assertTrue("s OPTIMUM FOUND" in text.lines(), text)
+        assertTrue("o 4" in text.lines(), text)
+        val reused = Regex("lpPhase_TEMPLATE_PREPARATION_[A-Z]+_FACTORS_REUSED=(\\d+)").findAll(text)
+            .sumOf { it.groupValues[1].toLong() }
+        val exactBounds = Regex("lpPhase_TEMPLATE_ASSEMBLY_[A-Z]+_EXACT_BOUND_OBJECTS=(\\d+)").findAll(text)
+            .sumOf { it.groupValues[1].toLong() }
+        val pruned = Regex("lpBoundPruned=(\\d+)").findAll(text).sumOf { it.groupValues[1].toLong() }
+        assertTrue(reused > 0L, text)
+        assertTrue(exactBounds > 0L, text)
+        assertTrue(pruned > 0L, text)
+    }
+
+    @Test
     fun `prepared separable MPS search should consume compatible child results`() {
         val relative = "klause-bench/smoke-corpus/lp-component-split/cover-2x3.mps"
         val source = listOf(File(relative), File("../$relative")).first { it.isFile }

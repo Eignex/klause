@@ -194,29 +194,45 @@ internal class LpPreparationTemplates private constructor(
                         storage += 24L
                     }
                 }
-                val parents = IntArray(factors.size) { it }
-                fun root(index: Int): Int {
-                    var current = index
-                    while (parents[current] != current) {
-                        parents[current] = parents[parents[current]]
-                        current = parents[current]
+                val unchangedIncidence = old != null && old.factors.size == factors.size && factors.indices.all {
+                    if (!visit()) return null
+                    old.factors[it] === factors[it]
+                }
+                val groups = if (unchangedIncidence) {
+                    requireNotNull(old).components.map { it.factors }
+                } else {
+                    val parents = IntArray(factors.size) { it }
+                    val ranks = IntArray(factors.size)
+                    fun root(index: Int): Int {
+                        var current = index
+                        while (parents[current] != current) {
+                            parents[current] = parents[parents[current]]
+                            current = parents[current]
+                        }
+                        return current
                     }
-                    return current
-                }
-                val owners = HashMap<Int, Int>()
-                for (index in factors.indices) for (reference in factors[index].support) {
-                    if (!visit()) return null
-                    val owner = owners.put(reference, index) ?: continue
-                    parents[root(index)] = root(owner)
-                }
-                val groups = LinkedHashMap<Int, MutableList<LpFactorTemplate>>()
-                for (index in factors.indices) {
-                    if (!visit()) return null
-                    groups.getOrPut(root(index)) { ArrayList() }.add(factors[index])
+                    val owners = HashMap<Int, Int>()
+                    for (index in factors.indices) for (reference in factors[index].support) {
+                        if (!visit()) return null
+                        val owner = owners.put(reference, index) ?: continue
+                        val first = root(index)
+                        val second = root(owner)
+                        if (first == second) continue
+                        if (ranks[first] < ranks[second]) parents[first] = second else {
+                            parents[second] = first
+                            if (ranks[first] == ranks[second]) ranks[first]++
+                        }
+                    }
+                    val collected = LinkedHashMap<Int, MutableList<LpFactorTemplate>>()
+                    for (index in factors.indices) {
+                        if (!visit()) return null
+                        collected.getOrPut(root(index)) { ArrayList() }.add(factors[index])
+                    }
+                    collected.values.toList()
                 }
                 val previousComponents = old?.components.orEmpty().associateBy { it.factors.firstOrNull() }
                 var reusedComponents = 0
-                val components = groups.values.map { group ->
+                val components = groups.map { group ->
                     val componentBounds = LinkedHashMap<Int, LpIntegerBoundTemplate>()
                     val costs = ArrayList<Long>()
                     val seen = HashSet<Int>()
