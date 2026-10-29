@@ -63,6 +63,66 @@ class RootInprocessingTest {
     }
 
     @Test
+    fun `an unchanged complete root scan should not spend another scan allowance`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(problem(intArrayOf(0, 2, 4)).bake(), nativeSat = native)
+            val pass = RootSimplificationPass()
+            pass.run(session, BacktrackParams(), null)
+            val work = session.work
+
+            repeat(3) { pass.run(session, BacktrackParams(), null) }
+
+            assertEquals(work, session.work)
+        }
+    }
+
+    @Test
+    fun `new learned clauses should be scanned without replaying unchanged source clauses`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(problem(intArrayOf(0, 2, 4)).bake(), nativeSat = native)
+            val pass = RootSimplificationPass()
+            val stats = SearchStatsSink()
+            pass.run(session, BacktrackParams(), stats)
+            session.addLearnedClause(Clause(intArrayOf(2, 4, 6)), 3)
+
+            pass.run(session, BacktrackParams(), stats)
+
+            assertEquals(2L, stats.snapshot().learning.getValue("inprocessRootCandidates"))
+        }
+    }
+
+    @Test
+    fun `new unconditional root facts should revisit earlier source clauses`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(problem(intArrayOf(0, 2, 4)).bake(), nativeSat = native)
+            val pass = RootSimplificationPass()
+            pass.run(session, BacktrackParams(), null)
+            session.addRootDerivedClause(Clause(intArrayOf(1)), 1, 0, false)
+
+            pass.run(session, BacktrackParams(), null)
+            session.pinBool(1, false)
+
+            assertEquals(true, session.boolValue(2))
+            assertEquals(setOf(2, 4), assertNotNull(session.boolReasonClause(2)).toSet())
+        }
+    }
+
+    @Test
+    fun `a completed tiny root scan should wait for changed input`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(problem(intArrayOf(0, 2, 4)).bake(), nativeSat = native)
+            val pass = RootSimplificationPass()
+            val params = BacktrackParams(inprocessingRootWork = 1L)
+            repeat(12) { pass.run(session, params, null) }
+            val work = session.work
+
+            repeat(12) { pass.run(session, params, null) }
+
+            assertEquals(work, session.work)
+        }
+    }
+
+    @Test
     fun `root refresh should preserve imported origin through compaction`() {
         for (native in listOf(false, true)) {
             val session = PropagationSession(problem(intArrayOf(1)).bake(), nativeSat = native)

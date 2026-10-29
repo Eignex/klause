@@ -494,6 +494,10 @@ facts or making a decision. Root publication retains its bounded scan across sli
 It retains the CP publisher so a consequence reaches peers without creating another
 private decision level in its producer.
 
+A completed root scan waits for changed input. Appended learned clauses extend its
+remaining range without replaying unchanged sources; new permanent root facts or
+learned compaction invalidate the completed range. Partial candidates retain their
+position until admission or rejection.
 Root scan positions and residual candidates, probe cursors, vivification replacement
 batches and subsumption preparation survive suspension. The subsumption occurrence
 window retains at most 1,024 clauses

@@ -14,6 +14,8 @@ import com.eignex.klause.util.SharingMemoryObservation
 internal class RootSimplificationPass : InprocessingPass {
     override val preservesVariables: Boolean get() = true
     private var cursor = 0
+    private var scanEnd = 0
+    private var scanRoot = -1
     override val spending = InprocessingSpending(InprocessingKind.Root)
     private var dropped = IntHashSet()
     private var revision = -1L
@@ -39,6 +41,8 @@ internal class RootSimplificationPass : InprocessingPass {
 
     override fun reset() {
         cursor = 0
+        scanEnd = 0
+        scanRoot = -1
         dropped = IntHashSet()
         revision = -1L
         pendingSource = null
@@ -58,6 +62,9 @@ internal class RootSimplificationPass : InprocessingPass {
         if (revision != session.learnedClauseRevision) {
             dropped = IntHashSet()
             pending = null
+            cursor = 0
+            scanEnd = count
+            scanRoot = session.explanationState.undoTop
         }
         revision = session.learnedClauseRevision
         if (count == 0) return
@@ -75,19 +82,27 @@ internal class RootSimplificationPass : InprocessingPass {
             budget.note("RetirementWork", session.work - before)
             dropped = IntHashSet()
             revision = session.learnedClauseRevision
-            if (session.learnedClauseCount < beforeCount) cursor = 0
+            if (session.learnedClauseCount < beforeCount) {
+                cursor = 0
+                scanEnd = session.rootClauseCount
+            }
             return
         }
-        if (cursor !in 0 until count) cursor = 0
+        if (cursor >= scanEnd && pending == null) {
+            if (scanRoot != session.explanationState.undoTop) {
+                cursor = 0
+                scanRoot = session.explanationState.undoTop
+            }
+            scanEnd = count
+        }
         var examined = 0
         var literalsVisited = 0
-        while (examined++ < minOf(params.rootSimplifyBatch, count)) {
+        while ((pending != null || cursor < scanEnd) && examined++ < params.rootSimplifyBatch) {
             if (!session.canSimplifyRoot || literalsVisited >= ROOT_LITERAL_LIMIT || budget.stopped()) break
             var candidate = pending
             if (candidate == null) {
                 if (!budget.visit()) break
-                val factor = cursor
-                cursor = (cursor + 1) % count
+                val factor = cursor++
                 budget.note("Candidates")
                 val literals = session.rootClauseLiterals(factor, ROOT_LITERAL_LIMIT - literalsVisited) ?: continue
                 budget.charge(literals.size)
@@ -145,7 +160,10 @@ internal class RootSimplificationPass : InprocessingPass {
             dropped = IntHashSet()
             revision = session.learnedClauseRevision
         }
-        if (session.learnedClauseCount < beforeCompaction) cursor = 0
+        if (session.learnedClauseCount < beforeCompaction) {
+            cursor = 0
+            scanEnd = session.rootClauseCount
+        }
     }
 }
 
