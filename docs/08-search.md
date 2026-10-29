@@ -38,6 +38,11 @@ Five owners divide the work:
   retains ordered alternatives and replays their shared decision prefixes through
   the session. Pauses retain the selected alternative and its replay position.
 
+Incremental initialization advances each component's iterator with that component
+as the active publisher. Synchronous initializers run inside the iterator too.
+Root refresh retains the same ownership: facts already established by CP reach
+peers without returning to CP as extra private decisions.
+
 Numerical frontier traversal orders alternatives by inherited checked objective
 bounds, visiting unbounded alternatives first. It keeps both children of every
 split, including unresolved leaves. Improved checked incumbents reawaken those

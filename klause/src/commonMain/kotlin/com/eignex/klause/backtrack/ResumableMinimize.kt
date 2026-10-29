@@ -489,7 +489,7 @@ internal class ResumableMinimize(
                 } else if (deferredInstallation && component is PreparingSearchComponent) {
                     component.prepareInitialization(context)
                 } else {
-                    sequenceOf(component.initialize(context)).iterator()
+                    sequence { yield(component.initialize(context)) }.iterator()
                 }
             }
             while (initialized == null) {

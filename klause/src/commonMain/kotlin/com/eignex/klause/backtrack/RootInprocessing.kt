@@ -68,7 +68,11 @@ internal class RootSimplificationPass : InprocessingPass {
             val residual = IntArrayList(literals.size)
             var satisfied = false
             for (literal in literals) {
-                if (!budget.visit()) return
+                if (!budget.visit()) {
+                    // Protected predecessors must not consume every retry's scan allowance.
+                    cursor = factor
+                    return
+                }
                 when (session.litTruth(literal)) {
                     true -> { satisfied = true; break }
                     false -> Unit
@@ -81,7 +85,10 @@ internal class RootSimplificationPass : InprocessingPass {
                 val index = factor - session.problem.numFactors
                 val origin = if (source) OWN_ORIGIN else session.learnedClauseOrigin(index)
                 val lbd = if (source) residual.size else minOf(session.learnedClauseLbd(index), residual.size)
-                if (!budget.visit(residual.size * 2 + 1)) break
+                if (!budget.visit(residual.size * 2 + 1)) {
+                    cursor = factor
+                    break
+                }
                 val before = session.work
                 session.addRootDerivedClause(Clause(residual.toIntArray()), lbd, origin, source)
                 if (source) pendingSource = factor to literals
