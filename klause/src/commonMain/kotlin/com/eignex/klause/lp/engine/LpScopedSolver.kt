@@ -510,21 +510,7 @@ internal class LpScopedSolver(
         val components = solver as? ComponentLpSolver
         if (append && compaction == null && components != null) {
             preparationAttempts++
-            val adopted = try {
-                components.appendLocalRows(next.state, token, workLimit) { part, childToken, childWork ->
-                    newPersistentLpSolver(part, childToken, refactorUpdateLimit, iterationLimit,
-                        childWork, trackDegeneracy, context.engineFactory, pricing)
-                }
-            } catch (primary: Throwable) {
-                solver = null
-                closeOwner(components, primary)
-                throw primary
-            } finally {
-                preparationWork = saturated(preparationWork, components.lastMetrics.workOps)
-                reservedConstructionWork = saturated(reservedConstructionWork, components.lastReservedConstructionWork)
-                constructionWork = saturated(constructionWork, components.lastMetrics.preparationOps)
-                preparationRefactorizations += components.lastRefactorizations
-            }
+            val adopted = appendComponentRows(next.state, components, token)
             if (adopted) {
                 preparationSuccesses++
                 publish(next)
@@ -589,6 +575,26 @@ internal class LpScopedSolver(
 
     private fun saturatingAdd(left: Long, right: Long): Long =
         if (left > Long.MAX_VALUE - right) Long.MAX_VALUE else left + right
+
+    private fun appendComponentRows(
+        next: LpExactState,
+        components: ComponentLpSolver,
+        token: Cancellation,
+    ): Boolean = try {
+        components.appendLocalRows(next, token, workLimit) { part, childToken, childWork ->
+            newPersistentLpSolver(part, childToken, refactorUpdateLimit, iterationLimit,
+                childWork, trackDegeneracy, context.engineFactory, componentPricing(part, next.model.n))
+        }
+    } catch (primary: Throwable) {
+        solver = null
+        closeOwner(components, primary)
+        throw primary
+    } finally {
+        preparationWork = saturated(preparationWork, components.lastMetrics.workOps)
+        reservedConstructionWork = saturated(reservedConstructionWork, components.lastReservedConstructionWork)
+        constructionWork = saturated(constructionWork, components.lastMetrics.preparationOps)
+        preparationRefactorizations += components.lastRefactorizations
+    }
 
     private fun recordAppendWork(work: Long?, complete: Boolean = work != null) {
         var aggregateComplete = true
@@ -722,7 +728,7 @@ internal class LpScopedSolver(
                     working, token,
                     { part, childToken ->
                         newPersistentLpSolver(part, childToken, refactorUpdateLimit, iterationLimit,
-                            remainingWork, trackDegeneracy, context.engineFactory, pricing)
+                            remainingWork, trackDegeneracy, context.engineFactory, componentPricing(part, working.n))
                     },
                     ::ComponentLpSolver,
                 )
@@ -800,6 +806,14 @@ internal class LpScopedSolver(
         } finally {
             closedOwners++
         }
+    }
+
+    private fun componentPricing(part: LpModel, columns: Int): LpPricingOptions {
+        val limit = pricing.basisEntryLimit
+        if (limit == Long.MAX_VALUE) return pricing
+        // Column ownership stays fixed when local cut rows are appended, so unaffected children keep their shares.
+        val share = limit / columns * part.n + (limit % columns) * part.n / columns
+        return pricing.copy(basisEntryLimit = share)
     }
 
     override fun close() {

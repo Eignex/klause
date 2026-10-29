@@ -172,6 +172,8 @@ floating results and successful bounds under the same certification policy.
 Global trail revision numbers alone do not invalidate an unchanged child.
 Explicit query work and pivot allowances cover the collection, including failed
 children. Reused results add no numerical work or factorization charges.
+Finite basis entry limits are divided among the immutable column blocks; local
+cut replacements retain those shares.
 
 Child bounds remain exact rationals until their sum, isolated-column contributions
 and the original objective constant, scale and sense are combined. Rounding applies
