@@ -63,9 +63,24 @@ class RootInprocessingTest {
     }
 
     @Test
-    fun `an unchanged complete root scan should not spend another scan allowance`() {
+    fun `a root without Boolean facts should not spend the simplification allowance`() {
         for (native in listOf(false, true)) {
             val session = PropagationSession(problem(intArrayOf(0, 2, 4)).bake(), nativeSat = native)
+            val work = session.work
+
+            RootSimplificationPass().run(session, BacktrackParams(), null)
+
+            assertEquals(work, session.work)
+            assertEquals(0, session.learnedClauseCount)
+        }
+    }
+
+    @Test
+    fun `an unchanged complete root scan should not spend another scan allowance`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(
+                problem(intArrayOf(0, 2, 4), intArrayOf(6)).bake(), nativeSat = native,
+            )
             val pass = RootSimplificationPass()
             pass.run(session, BacktrackParams(), null)
             val work = session.work
@@ -79,15 +94,17 @@ class RootInprocessingTest {
     @Test
     fun `new learned clauses should be scanned without replaying unchanged source clauses`() {
         for (native in listOf(false, true)) {
-            val session = PropagationSession(problem(intArrayOf(0, 2, 4)).bake(), nativeSat = native)
+            val session = PropagationSession(
+                problem(intArrayOf(0, 2, 4), intArrayOf(6)).bake(), nativeSat = native,
+            )
             val pass = RootSimplificationPass()
             val stats = SearchStatsSink()
             pass.run(session, BacktrackParams(), stats)
-            session.addLearnedClause(Clause(intArrayOf(2, 4, 6)), 3)
+            session.addLearnedClause(Clause(intArrayOf(0, 3, 4)), 3)
 
             pass.run(session, BacktrackParams(), stats)
 
-            assertEquals(2L, stats.snapshot().learning.getValue("inprocessRootCandidates"))
+            assertEquals(3L, stats.snapshot().learning.getValue("inprocessRootCandidates"))
         }
     }
 
@@ -110,7 +127,9 @@ class RootInprocessingTest {
     @Test
     fun `a completed tiny root scan should wait for changed input`() {
         for (native in listOf(false, true)) {
-            val session = PropagationSession(problem(intArrayOf(0, 2, 4)).bake(), nativeSat = native)
+            val session = PropagationSession(
+                problem(intArrayOf(0, 2, 4), intArrayOf(6)).bake(), nativeSat = native,
+            )
             val pass = RootSimplificationPass()
             val params = BacktrackParams(inprocessingRootWork = 1L)
             repeat(12) { pass.run(session, params, null) }
@@ -125,8 +144,9 @@ class RootInprocessingTest {
     @Test
     fun `a clause beyond the remaining literal space should wait for the next slice`() {
         for (native in listOf(false, true)) {
-            val source = Problem(5000, 0, emptyArray(), arrayOf<Factor>(
+            val source = Problem(5001, 0, emptyArray(), arrayOf<Factor>(
                 Clause(IntArray(5000) { it * 2 }), Clause(IntArray(5000) { it * 2 + 1 }),
+                Clause(intArrayOf(10000)),
             ))
             val session = PropagationSession(source.bake(), nativeSat = native)
             val pass = RootSimplificationPass()
@@ -313,7 +333,9 @@ class RootInprocessingTest {
     @Test
     fun `reset should release a root candidate retained across a tiny slice`() {
         for (native in listOf(false, true)) {
-            val session = PropagationSession(problem(intArrayOf(0, 2, 4)).bake(), nativeSat = native)
+            val session = PropagationSession(
+                problem(intArrayOf(0, 2, 4), intArrayOf(6)).bake(), nativeSat = native,
+            )
             val pass = RootSimplificationPass()
             pass.run(session, BacktrackParams(inprocessingRootWork = 1L), null)
             val before = SharingMemoryObservation(1024L, 128, { false }, {})
@@ -331,10 +353,10 @@ class RootInprocessingTest {
 
     @Test
     fun `an empty general learned generation should release an obsolete root candidate`() {
-        val session = PropagationSession(problem())
+        val session = PropagationSession(problem(intArrayOf(6)))
         session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
         val pass = RootSimplificationPass()
-        pass.run(session, BacktrackParams(inprocessingRootWork = 1L), null)
+        repeat(8) { pass.run(session, BacktrackParams(inprocessingRootWork = 1L), null) }
         val before = SharingMemoryObservation(1024L, 128, { false }, {})
         val retained = before.snapshot { pass.retainedMemory(before, false) }
         assertTrue(assertNotNull(retained.completeValues).getValue("ownedPrimitiveBytes") > 0L)
