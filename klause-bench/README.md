@@ -261,7 +261,11 @@ receive consecutive explicit seeds, one core, the same containing decision/work 
 and normal 5000/150000 work slices. Each balanced control pays source construction,
 bake, private setup, source witness checking and retirement; process CPU, thread
 allocation, root/total propagation and native coverage remain separate observations.
-One warmup precedes measured repeats. Use the explicit build/classpath and JVM
+One warmup precedes measured repeats. Optional `recipe=LABEL native=true|false`
+selects a fresh catalog recipe and preserves the same propagation backend in both
+controls; defaults are `input-order` and `false`. Qualify against the applicable
+strong catalog recipes before drawing any production-admission conclusion.
+Use the explicit build/classpath and JVM
 controls of `BooleanProofCoverageProfile`. The scheduler is internal and pure Boolean
 satisfaction only; the profile supplies neither independent UNSAT checking nor a
 production activation decision. Sampled heap is not a peak-memory bound.
