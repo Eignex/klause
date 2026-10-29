@@ -272,7 +272,7 @@ internal fun LpEngine.lpBoundAndFix(
     cutsAllowed: Boolean = false,
 ): LpNodeOutcome = try {
     sink.lp.cutLifecycle.recipe = LpRoute.NODE
-    sink.lp.cutLifecycle.families = emptySet()
+    sink.lp.cutLifecycle.families = cutPool.cuts().mapTo(HashSet()) { it.family }
     sink.lp.observeNodePass()
     sink.lp.clockStart()
     sparseSafePrune(
@@ -598,7 +598,10 @@ internal fun LpEngine.sparseSafePrune(
             // credit each family it does run with whether it produced a violated cut this round.
             val fresh = ArrayList<Cut>()
             for (i in lpSeparators.indices) {
-                if (!lpSeparatorGate.shouldRun(i)) continue
+                if (!lpSeparatorGate.shouldRun(i)) {
+                    sink.lp.cutLifecycle.event(lpSeparators[i].family, "APPLICABILITY", "GATED")
+                    continue
+                }
                 val produced = constructCuts(lpSeparators[i], ctx)
                 lpSeparatorGate.record(i, produced.isNotEmpty())
                 fresh.addAll(produced)
@@ -1492,11 +1495,17 @@ internal fun LpEngine.harvestRootCuts(
     if (session.isUnsatAtRoot) return emptyList()
     if (separators.isEmpty() && !gomory && !mir) return emptyList()
     sink.lp.cutLifecycle.recipe = LpRoute.ROOT
+    sink.lp.cutLifecycle.families = separators.mapTo(HashSet()) { it.family }.also {
+        if (gomory) it.add(CutFamily.GOMORY)
+        if (mir) it.add(CutFamily.MIR)
+    }
     fun pool(limit: Int = CutPool.DEFAULT_MAX_CUTS) = CutPool(maxCuts = limit,
         observe = { family, stage, outcome -> sink.lp.cutLifecycle.event(family, stage, outcome) })
     var pool = pool()
     try {
-        var relaxation = relaxer.build(session, cancellation = cancellation)
+        var relaxation = sink.lp.cutLifecycle.measureShared("ASSEMBLY") {
+            relaxer.build(session, cancellation = cancellation)
+        }
         if (relaxation.model.n == 0) return emptyList()
         if (!cutSeparationSupported(relaxation, cancellation, root = true)) return emptyList()
         if (ordinaryCutSeparation) {

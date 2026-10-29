@@ -13,6 +13,29 @@ import kotlin.test.assertTrue
 
 class RevisedSimplexWorkTest {
     @Test
+    fun `a refused factor build should retain backend work without installed entries`() {
+        RevisedSimplex(cover(), pricing = LpPricingOptions(basisEntryLimit = 1L)).use { solver ->
+            val result = solver.solve()
+
+            assertNull(result)
+            assertTrue(solver.lastMetrics.basisBuildDeclines > 0L)
+            assertTrue(solver.lastMetrics.basisBuildWork > 0L)
+            assertEquals(0L, solver.lastMetrics.factorEntriesBuilt)
+        }
+    }
+
+    @Test
+    fun `a successful numerical solve should report installed backend entries`() {
+        RevisedSimplex(cover()).use { solver ->
+            assertNotNull(solver.solve())
+
+            assertTrue(solver.lastMetrics.factorEntriesBuilt > 0L)
+            assertTrue(solver.lastMetrics.basisBuildWork > 0L)
+            assertEquals(0L, solver.lastMetrics.basisBuildUnmeasured)
+        }
+    }
+
+    @Test
     fun `repair should use the retained invocation allowance and charge its completed overrun`() {
         var factorCalls = 0
         var repairAllowance: Long? = null

@@ -53,5 +53,5 @@ internal fun LpEngine.observeCutRayUse(relaxation: LpRelaxation, ray: LongArray)
 
 internal fun LpEngine.observeCutFill(fill: Double, rows: Int) {
     sink.lp.cutLifecycle.shared("FILL", LpPhaseStats(calls = 1L,
-        outcomes = mapOf("FACTOR_ENTRIES" to fill.toLong(), "ROWS" to rows.toLong())))
+        outcomes = mapOf("SOLVE_MAX_RATIO_MICROS_SUM" to (fill * 1_000_000.0).toLong(), "ROWS" to rows.toLong())))
 }

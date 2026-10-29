@@ -630,60 +630,75 @@ internal class RevisedSimplex(
         // is the backend's fill, which [nnzB] deliberately does not follow.
         work.add(nnzB)
         val solver = solver()
-        basisLifecycle.factorized = try {
-            solver.refactorize(basicVar)
-        } catch (_: BasisArithmeticException) {
-            false
-        } catch (_: ArithmeticException) {
-            false
-        }
-        if (!basisLifecycle.factorized) {
-            observations.singularRefactorizations++
-            val remaining = effectiveWorkLimit.takeIf { it > 0 }?.let { maxOf(0, it - work.ops) }
-            val control = BasisRepairControl(cancellation, remaining)
-            val recovery = try {
-                basisRepairer.recover(
-                    solver,
-                    basicVar,
-                    n,
-                    model.basisBoundStates(),
-                    status,
-                    model,
-                    cancellation,
-                    control,
-                )
-            } finally {
-                work.add(control.spentWork)
-                repairStop = control.stop
-                repairCallbackFailure = control.callbackFailure
-                if (repairStop != null) observations.termination = repairTermination()
+        val buildBefore = operationWork(solver)
+        try {
+            basisLifecycle.factorized = try {
+                solver.refactorize(basicVar)
+            } catch (_: BasisArithmeticException) {
+                false
+            } catch (_: ArithmeticException) {
+                false
             }
-            return@profiled when (recovery) {
-                is BasisRecoveryResult.Failed -> {
-                    numericalFailure = true
-                    if (recovery.decline == BasisRepairDecline.CANCELLED) {
-                        repairStop = BasisRepairStop.CANCELLED
-                        observations.termination = LpFloatTermination.CANCELLED
+            if (!basisLifecycle.factorized) {
+                observations.singularRefactorizations++
+                val remaining = effectiveWorkLimit.takeIf { it > 0 }?.let { maxOf(0, it - work.ops) }
+                val control = BasisRepairControl(cancellation, remaining)
+                val recovery = try {
+                    basisRepairer.recover(
+                        solver,
+                        basicVar,
+                        n,
+                        model.basisBoundStates(),
+                        status,
+                        model,
+                        cancellation,
+                        control,
+                    )
+                } finally {
+                    work.add(control.spentWork)
+                    repairStop = control.stop
+                    repairCallbackFailure = control.callbackFailure
+                    if (repairStop != null) observations.termination = repairTermination()
+                }
+                return@profiled when (recovery) {
+                    is BasisRecoveryResult.Failed -> {
+                        numericalFailure = true
+                        if (recovery.decline == BasisRepairDecline.CANCELLED) {
+                            repairStop = BasisRepairStop.CANCELLED
+                            observations.termination = LpFloatTermination.CANCELLED
+                        }
+                        invalidateBasisDependentState()
+                        RefactorResult.FAILED
                     }
-                    invalidateBasisDependentState()
-                    RefactorResult.FAILED
-                }
 
-                is BasisRecoveryResult.Recovered -> {
-                    installRecoveredBasis(recovery.state)
-                    recordFactorization(solver, basisChanged = true)
-                    RefactorResult.BASIS_CHANGED
+                    is BasisRecoveryResult.Recovered -> {
+                        installRecoveredBasis(recovery.state)
+                        recordFactorization(solver, basisChanged = true)
+                        RefactorResult.BASIS_CHANGED
+                    }
                 }
             }
+            basisLifecycle.columns = basicVar.copyOf()
+            basisLifecycle.unitRows = IntArray(m) { -1 }
+            recordFactorization(solver, basisChanged = false)
+            return@profiled RefactorResult.UNCHANGED
+        } finally {
+            val buildAfter = operationWork(solver)
+            val measured = if (buildBefore == null || buildAfter == null ||
+                buildAfter.refactorization.attempts <= buildBefore.refactorization.attempts
+            ) null else operationDelta(buildBefore, buildAfter) { it.refactorization.mergedWith(it.repair) }
+            if (measured == null) observations.basisBuildUnmeasured++ else observations.basisBuildWork += measured
+            if (buildBefore != null && buildAfter != null) {
+                observations.basisBuildDeclines += maxOf(0L,
+                    buildAfter.refactorization.declines - buildBefore.refactorization.declines) + maxOf(0L,
+                    buildAfter.repair.declines - buildBefore.repair.declines)
+            }
         }
-        basisLifecycle.columns = basicVar.copyOf()
-        basisLifecycle.unitRows = IntArray(m) { -1 }
-        recordFactorization(solver, basisChanged = false)
-        return@profiled RefactorResult.UNCHANGED
     }
 
     private fun recordFactorization(solver: BasisSolver, basisChanged: Boolean) {
         numericalFailure = false
+        observations.factorEntriesBuilt += solver.nnz.toLong()
         // Fill of the factors the solver now holds: how much they grow the basis, and how dense they
         // become. Read off the solver, so unlike the work meter this measures the backend in play — a
         // density approaching 1 on real bases says the sparse factors are dense after all.

@@ -531,8 +531,11 @@ alongside the ordinary LP totals. Family tags distinguish construction, mapping,
 admission, selection, aging, retraction, checked support and actual deduction use.
 `*_SOLVE`, `*_OWNER_EDIT` and certificate phases are shared containing costs;
 families participating in one query overlap and must not be summed. `*_FILL`
-reports factor entries for completed numerical results, without treating a failed
-result as zero fill. Retain ordinary numerical failure and work counters too.
+reports the sum of completed-query maximum fill ratios in millionths, divided
+by its call count for an average. `*_BASIS_BUILD` reports actual backend build
+work, declined builds, missing reports and successfully installed factor entries,
+including work from failed solves. These units overlap the numerical cost model;
+retain ordinary numerical failure and work counters too.
 
 For finite controls compare `param.lp-root-cuts=false|true` under the same pinned
 LP arm. For numerical source traversal retain a no-cut arm

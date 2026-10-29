@@ -34,6 +34,7 @@ import com.eignex.klause.lp.cut.KnapsackCoverSeparator
 import com.eignex.klause.lp.cut.SharedCut
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.Cut
+import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpCertifierCost
@@ -304,6 +305,11 @@ internal class LpEngine(
     }
 
     private fun recordCutSupport(supported: Boolean): Boolean {
+        val families = lpSeparators.mapTo(HashSet()) { it.family }
+        if (params.lpPlan.gomoryEnabled) families.add(CutFamily.GOMORY)
+        if (params.lpPlan.mirEnabled) families.add(CutFamily.MIR)
+        for (family in families) sink.lp.cutLifecycle.event(family, "APPLICABILITY",
+            if (supported) "SUPPORTED" else "UNSUPPORTED")
         lpLadder.setCutsSupported(supported)
         return supported
     }

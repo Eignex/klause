@@ -24,7 +24,10 @@ import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.util.Cancellation
 
-internal class LinearAuthoritySession(private val budget: SourceLpBudget) : AutoCloseable {
+internal class LinearAuthoritySession(
+    private val budget: SourceLpBudget,
+    private val onLifecycle: (String, Long) -> Unit = { _, _ -> },
+) : AutoCloseable {
     private data class Query(val scope: SourceScope, val columns: List<ExactLpColumn>, val inactive: Set<Int>)
     private var rows: List<ExactRationalInequality> = emptyList()
     private var owner: LpScopedSolver? = null
@@ -75,8 +78,10 @@ internal class LinearAuthoritySession(private val budget: SourceLpBudget) : Auto
             objective = costs
             effort = profile
             preparations++
+            onLifecycle("OwnerPrepared", 1L)
         } else {
             reuses++
+            onLifecycle("OwnerReused", 1L)
             if (changedObjective) {
                 if (!current.replaceObjective(costs, token)) return null
                 objective = costs
@@ -167,6 +172,7 @@ internal class LinearAuthoritySession(private val budget: SourceLpBudget) : Auto
                 val usable = it.primal != null || it.bound != null || it.conflict != null
                 if (completedPolicy?.certificate == policy.certificate &&
                     (usable || completedPolicy?.floating == profile)) {
+                    onLifecycle("QueryReused", 1L)
                     return@resumeSparse consume(it, prepared, token)
                 }
                 completed = null
@@ -191,6 +197,7 @@ internal class LinearAuthoritySession(private val budget: SourceLpBudget) : Auto
                     }
                 consume(guidance, prepared, token)
             } finally {
+                observer?.observeSolve(current.lastMetrics, component = false)
                 budget.observe(preparation = current.metrics.preparationWork - preparation,
                     floatWork = current.lastMetrics.workOps)
             }
@@ -200,6 +207,7 @@ internal class LinearAuthoritySession(private val budget: SourceLpBudget) : Auto
     }
 
     fun invalidateGuidance() {
+        onLifecycle("GuidanceInvalidated", 1L)
         if (owner?.floatPaused == true) {
             close()
         } else {
@@ -233,6 +241,7 @@ internal class LinearAuthoritySession(private val budget: SourceLpBudget) : Auto
         completed = null
         completedPolicy = null
         lifetime = null
+        if (current != null) onLifecycle("OwnerClosed", 1L)
         budget.closeOwner(current)
     }
 }
