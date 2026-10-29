@@ -15,6 +15,9 @@ import com.eignex.klause.solver.evidence.SourceObjective
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.search.BooleanProofContext
+import com.eignex.klause.solver.search.SearchBranchAttemptObserver
+import com.eignex.klause.solver.search.SearchContext
+import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -144,6 +147,28 @@ class BooleanProofSchedulerTest {
                 assertEquals(charged, scheduler.chargedWork)
                 assertFalse(scheduler.nativeCoverageComplete)
             }
+    }
+
+    @Test
+    fun `failed worker attempts should consume the containing work allowance`() {
+        var attempts = 0
+        val observer = object : SearchBranchAttemptObserver {
+            override fun onAttempt(decision: SearchDecision, context: SearchContext) {
+                attempts++
+                error("interrupted branch observation")
+            }
+        }
+        val params = BacktrackParams(nativeSat = false, branchObserver = observer)
+        BooleanProofScheduler(contradiction, context, listOf(0), listOf(params)).use { scheduler ->
+            assertFailsWith<IllegalStateException> { scheduler.run(Cancellation.Never, 5000L) }
+            assertTrue(scheduler.chargedWork > 0L)
+            val previous = attempts
+
+            scheduler.run(Cancellation.Never, scheduler.chargedWork)
+
+            assertEquals(previous, attempts)
+            assertFalse(scheduler.nativeCoverageComplete)
+        }
     }
 
     @Test

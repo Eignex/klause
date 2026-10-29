@@ -7,8 +7,8 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.RepairSearch
-import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
@@ -156,10 +156,13 @@ internal class BooleanProofScheduler(
             if (stopped[worker] || (workers[worker].lease == null && pending == 0)) continue
             val offered = minOf(allowance, workLimit - chargedWork)
             val before = work
-            val step = runSlice(worker, cancellation, Long.MAX_VALUE, offered)
-            val spent = (work - before).coerceAtLeast(0L)
-            val debit = if (spent == 0L) offered else spent
-            chargedWork = if (debit > Long.MAX_VALUE - chargedWork) Long.MAX_VALUE else chargedWork + debit
+            val step = try {
+                runSlice(worker, cancellation, Long.MAX_VALUE, offered)
+            } finally {
+                val spent = (work - before).coerceAtLeast(0L)
+                val debit = if (spent == 0L) offered else spent
+                chargedWork = if (debit > Long.MAX_VALUE - chargedWork) Long.MAX_VALUE else chargedWork + debit
+            }
             if (step.sample != null) return SolveResult.Sat(step.sample, stats = stats)
             if (step.reason != null && step.reason != TerminationReason.SearchExhausted) stopped[worker] = true
             allowance = (allowance.toDouble() * 1.5).toLong().coerceIn(baseSliceWork, maxSliceWork)
