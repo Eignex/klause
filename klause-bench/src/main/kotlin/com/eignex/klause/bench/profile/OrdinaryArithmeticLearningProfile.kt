@@ -59,8 +59,11 @@ internal object OrdinaryArithmeticLearningProfile {
                     cancellation = stop, solveCancellation = stop, randomSeed = 3L,
                 ))
                 val label = if (learning) "integer" else "clause"
-                out.resolve("$label-original.json").writeText(codec.encodeToString(original))
-                out.resolve("$label-prepared.json").writeText(codec.encodeToString(prepared.problem))
+                val originalJson = codec.encodeToString(original)
+                val preparedJson = codec.encodeToString(prepared.problem)
+                require(originalJson.length <= 2_097_152 && preparedJson.length <= 2_097_152)
+                out.resolve("$label-original.json").writeText(originalJson)
+                out.resolve("$label-prepared.json").writeText(preparedJson)
                 var native: PropagationSession? = null
                 var capture: PreparedArithmeticLearningProfile.Capture? = null
                 val base = entry.searchParams ?: BacktrackPresets.conflictDriven(randomSeed = 3L)
@@ -121,9 +124,11 @@ internal object OrdinaryArithmeticLearningProfile {
                 capture?.record("traversal.finished")
                 native?.popToLevel(0)
                 native?.forgetLearnedClauses { _, _ -> false }
-                capture?.record("traversal.retired")
-                output.appendLine(buildJsonObject {
+                capture?.record("traversal.retirement-checked")
+                val record = buildJsonObject {
                     put("revision", Reports.readGitSha())
+                    put("original", originalJson)
+                    put("prepared", preparedJson)
                     put("suite", suite)
                     put("problem", name)
                     put("sourceSha256", hash)
@@ -144,11 +149,13 @@ internal object OrdinaryArithmeticLearningProfile {
                     put("storedBeforeRetirement", beforeRetirement)
                     put("storedAfterRetirement", native?.learnedClauseCount)
                     put("finiteWorkIncludingRetirement", capture?.work())
-                    put("invocationElapsedNs", System.nanoTime() - opened)
+                    put("armElapsedBeforeSerializationNs", System.nanoTime() - opened)
                     put("cancelled", stop())
                     put("trace", capture?.export() ?: JsonNull)
-                }.toString())
+                }.toString()
+                output.appendLine(record)
                 output.flush()
+                println(record)
                 capture?.release()
             }
         }
