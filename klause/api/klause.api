@@ -9600,6 +9600,7 @@ public abstract interface class com/eignex/klause/portfolio/WitnessCheck {
 
 public final class com/eignex/klause/presolve/AffinePivotOrder : java/lang/Enum {
 	public static final field MARKOWITZ Lcom/eignex/klause/presolve/AffinePivotOrder;
+	public static final field REWRITE_COST Lcom/eignex/klause/presolve/AffinePivotOrder;
 	public static final field STABLE_ID Lcom/eignex/klause/presolve/AffinePivotOrder;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/presolve/AffinePivotOrder;

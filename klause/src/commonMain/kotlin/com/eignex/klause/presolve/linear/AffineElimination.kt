@@ -528,11 +528,14 @@ internal object AffineSingletons {
         // Whether the definition admits this pivot; null admits every column.
         pivotable: ((Linear, Int) -> Boolean)?,
         cancellation: Cancellation = Cancellation.Never,
+        minimizeRewrite: Boolean = false,
     ): AffineCandidate? {
         val f = ws.factorAt(di)?.equivalentLinear() ?: return null
         if (f.op != LinearOp.EQ || f.vars.size < 2) return null
         val row = f.integerConstants ?: return null
         cancellation.charge(AFFINE_WORK_WEIGHT * f.vars.size)
+        var best: AffineCandidate? = null
+        var bestWeight = Long.MAX_VALUE
         for (xi in f.vars.indices) {
             // A single wide row can carry thousands of pivot candidates each running an O(occurrences)
             // overflow check, so poll the deadline between them (and inside the check below).
@@ -594,10 +597,18 @@ internal object AffineSingletons {
                 termCoeffs[0] in INT_RANGE && constTerm in INT_RANGE &&
                 ws.otherOccurrencesAffineSubstitutable(di, x, termCoeffs[0].toInt(), constTerm.toInt(), termVars[0])
             if (isAlias || ws.otherOccurrencesAllLinear(di, x) || singlePartnerSubstitutable) {
-                return AffineCandidate(di, x, constTerm, termVars, termCoeffs, isAlias)
+                val candidate = AffineCandidate(di, x, constTerm, termVars, termCoeffs, isAlias)
+                if (!minimizeRewrite || f.vars.size != 2) return candidate
+                val weight = ws.rewriteWeight(di, x, cancellation)
+                if (cancellation()) return null
+                if (weight < bestWeight) {
+                    best = candidate
+                    bestWeight = weight
+                }
+                if (weight == 0L) return candidate
             }
         }
-        return null
+        return best
     }
 
     /** Whether any variable in [touchedVars] heads a unit-pivot or residue candidate, testing only the
@@ -671,6 +682,18 @@ internal object AffineSingletons {
         val size: Int
         fun factorAt(id: Int): Factor?
         fun degreeOf(x: Int): Int
+        fun occurrenceAt(x: Int, k: Int): Int
+
+        fun rewriteWeight(defIdx: Int, x: Int, cancellation: Cancellation): Long {
+            var weight = 0L
+            for (k in 0 until degreeOf(x)) {
+                cancellation.charge(AFFINE_WORK_WEIGHT)
+                if (cancellation()) return Long.MAX_VALUE
+                val id = occurrenceAt(x, k)
+                if (id != defIdx) weight += factorAt(id)?.structuralKeyWeight?.coerceAtLeast(1)?.toLong() ?: 0L
+            }
+            return weight
+        }
         fun isContained(defIdx: Int, x: Int): Boolean
         fun otherOccurrencesAllLinear(defIdx: Int, x: Int): Boolean
         fun otherOccurrencesAffineSubstitutable(defIdx: Int, x: Int, scale: Int, offset: Int, replacement: Int): Boolean
@@ -773,7 +796,7 @@ internal object AffineSingletons {
 
         /** The stable id of the [k]-th factor mentioning [x] (`0 until degreeOf(x)`) — lets the
          *  touched-variable re-scan visit only the factors a changed variable appears in. */
-        fun occurrenceAt(x: Int, k: Int): Int = occ.flat[occ.offsets[x] + k]
+        override fun occurrenceAt(x: Int, k: Int): Int = occ.flat[occ.offsets[x] + k]
 
         override fun isContained(defIdx: Int, x: Int): Boolean {
             for (k in occ.offsets[x] until occ.offsets[x + 1]) if (occ.flat[k] != defIdx) return false
@@ -974,6 +997,8 @@ internal object AffineSingletons {
 
         /** Number of live factors mentioning [x] — the fan-out a fold on [x] would rewrite. */
         override fun degreeOf(x: Int): Int = intOcc[x].size
+
+        override fun occurrenceAt(x: Int, k: Int): Int = intOcc[x][k]
 
         /** Whether [x] occurs in no factor other than [defIdx]. */
         override fun isContained(defIdx: Int, x: Int): Boolean {
