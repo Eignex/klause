@@ -60,6 +60,7 @@ class ResumableSatisfactionTest {
             val exchange = object : ClauseExchange {
                 override fun onSearchStart(session: PropagationSession) {
                     if (injected) return
+                    assertEquals(native, session.usesNativeSat)
                     injected = true
                     repeat(16) { session.addLearnedClause(Clause(intArrayOf(0, 1)), 9) }
                 }

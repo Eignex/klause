@@ -100,7 +100,8 @@ class IntegerConflictLearnerTest {
             session.popToLevel(0)
             assertIs<PropagationResult.Implied>(session.pinBool(Lit.variable(retained.row.guard),
                 !Lit.isPositive(retained.row.guard)))
-            session.forgetLearnedClauses { _, _ -> false }
+            assertTrue(session.explanationState.forgetLearnedClauses(maxWork = 16_000_000L,
+                maxScratchBytes = 16_000_000L, cancelled = { session.cancelRequested }) { _, _ -> false })
             assertFalse(session.explanationState.learned.integerRows?.contains(retained) == true)
             assertTrue((session.learnedLifecycle()["learningIntegerRetired"] ?: 0L) > 0L)
         }
