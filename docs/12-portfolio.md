@@ -174,9 +174,12 @@ including for direct engine publications. The low-level portfolio API also
 supports caller-trusted unbound workers with an explicit witness checker. Learned
 clauses are exchanged only when at least two backtrack workers exist.
 
-Detailed memory sampling is enabled by the single-lane charged-work diagnostic
-schedule (portfolio-work); ordinary schedules retain inexpensive traffic/work/use
-counters. Clause accounting is reported per worker in `ArmSchedule.sharing.clauses` and as
+Detailed memory sampling requires `sharing-memory=true`, independently of the
+single-lane charged-work schedule (`portfolio-work`). It defaults to false;
+traffic/work/use counters remain inexpensive. Each sample has separate
+`sharing-memory-work` and `sharing-memory-scratch` limits (32,768 visits and
+4,096 deduplication entries by default; zero is permitted).
+Clause accounting is reported per worker in `ArmSchedule.sharing.clauses` and as
 `clause*` fields in the CLI arm record. Pool payload and key/origin capacities
 belong to one shared pool; repeated worker observations must not be summed.
 Worker `seenKeys` and `seenCapacityBytes` describe the session-spanning duplicate
@@ -184,15 +187,18 @@ filter, including exported and evicted keys. Its lifetime is the native session,
 not the pool generation. Compaction invalidates the drain cursor but preserves
 that filter. Reseeding a retained repair session keeps the filter with its
 learned database. A fresh session releases its backing arrays and reimports the current
-pool; resuming the same session retains both cursor and filter. Retirement drains
-uses, exports remaining glue and releases the filter.
+pool; resuming the same session retains both cursor and filter. Retirement releases
+the filter without sampling. An uncancelled retirement also drains uses and exports
+remaining glue; a cancelled retirement skips those scans.
 
 `inspected` counts entries examined, including duplicates, and
 `translatedLiterals` counts imported literals. `importWork` includes drain visits,
 translation scalar visits and immediate native attachment; subsequent fixpoint
 work remains ordinary propagation work. Channel time includes export, compaction,
-accounting and use draining. Memory sampling charges deterministic store/reference
-visits separately as accountingWork to the containing propagation allowance. `uses` drains the existing origin-use counter once,
+accounting and use draining. Memory sampling polls cancellation and charges each
+store/reference visit and deduplication comparison before performing it. The native
+and shared observers use one allowance and one scratch-entry cap; `accountingWork`
+reports that work in the containing propagation allowance. `uses` drains the existing origin-use counter once,
 sharing that observation with contribution rewards: it counts consumption once per
 reduction window, rather than exports or checks. The retained peer-import and
 consumed-peer-import counts describe distinct live objects, so repeated window
@@ -211,15 +217,32 @@ counts describe live entries unless explicitly named capacity. Object headers,
 collection spare reference capacity and allocator overhead are platform-dependent
 and excluded; physical resident memory requires an external process measurement.
 
-Memory fields are boundary samples with individual `peak*` maxima, not an atomic
-process peak or a sum of concurrent high-water marks. `drain*` fields describe
+`PropagationSession.sharingMemory` returns a `SharingMemorySnapshot` with
+`COMPLETE`, `PARTIAL` or `STALE` status. Only `completeValues` permits a consumer
+to use the observed fields as a complete sample; it is null for partial or stale
+data. Complete describes traversal coverage of these modeled fields, not a
+deduplicated total across owners or physical bytes. Cancellation, exhausted work
+or exhausted scratch returns partial data without changing solver state. Only
+finished categories are present. Scratch retains at most the configured number
+of fixed-size linked entries, and each deduplication comparison is charged.
+Sparse primitive maps visit every capacity slot under the same allowance; lazy
+reason memos retain insertion order so iteration does not scan spare capacity.
+
+Telemetry exports mutually exclusive `memorySampleComplete`,
+`memorySamplePartial` and `memorySampleStale` flags, plus `memorySampleWork` and
+`memorySampleScratchEntries`. Each observation replaces current sample fields;
+partial samples cannot inherit absent fields from an earlier complete sample.
+Close removes current fields and marks the sample stale without a diagnostic
+scan. Retained `peak*` values remain historical per-field maxima and must never
+be used as a complete byte total or added into concurrent high-water marks.
+`drain*` fields describe
 transient batch storage. ALNS repair pools remain worker-private, skip search-conditioned permanent clauses
 and decline direct global nogoods; their worker meter reports that separate owner.
 The finite adapter observes its shared-search learned store and copied reasons
 through a read-only callback in the native session; its lifecycle owner clears
-that callback after the final exchange snapshot. These `shared*` fields belong to
-the coordinator, separately from native storage. Work-scheduled open-theory
-learning statistics expose the same owner observations. A pool cap bounds its entries, not cumulative
+that callback on close. These `shared*` fields belong to the coordinator,
+separately from native storage. Open-theory lifecycle statistics do not trigger
+memory scans from a scheduling token. A pool cap bounds its entries, not cumulative
 worker seen keys, learned stores or pinned reasons. Retention and delivery policy
 remain separate from these observations.
 

@@ -460,6 +460,15 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** Opt-in single-lane portfolio diagnostic work allowance. */
         val portfolioWork: ExecutionOption<Long> = ExecutionOption("portfolio-work", ValueKind.LONG)
 
+        /** Enable bounded sharing-memory observations independently of scheduling. */
+        val sharingMemory: ExecutionOption<Boolean> = ExecutionOption("sharing-memory", ValueKind.BOOLEAN)
+
+        /** Maximum charged visits per sharing-memory observation. */
+        val sharingMemoryWork: ExecutionOption<Long> = ExecutionOption("sharing-memory-work", ValueKind.LONG)
+
+        /** Maximum deduplication entries per sharing-memory observation. */
+        val sharingMemoryScratch: ExecutionOption<Int> = ExecutionOption("sharing-memory-scratch", ValueKind.INT)
+
         /** Allow the curated bounded core worker before the first incumbent. Default false. */
         val coreEarly: ExecutionOption<Boolean> = ExecutionOption("core-early", ValueKind.BOOLEAN)
 
@@ -524,6 +533,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 scoring, acceptance, restart, strategy, localSearchArm, objectiveGuidance,
                 lambda, arms, localSearchArms, backtrackArms, clauseShareLbd,
                 clauseShareLen, sliceWork, sliceMaxWork, sliceGrowth, portfolioWork, coreEarly, companionIntegers,
+                sharingMemory, sharingMemoryWork, sharingMemoryScratch,
                 coreRefinement, companionAfterIncumbent, companionActiveMillis, portfolioProgress,
                 phaseRetention, reseedStaleThreshold, lsResiduals, lsPhaseTimes, backtrackArmsByLabel,
             ).associateBy { it.id }

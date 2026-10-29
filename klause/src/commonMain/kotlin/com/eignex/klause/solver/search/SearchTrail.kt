@@ -3,6 +3,7 @@ package com.eignex.klause.solver.search
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableIntIntMap
 import com.eignex.klause.util.MutableIntObjectMap
+import com.eignex.klause.util.SharingMemoryObservation
 
 internal class SearchTrail {
     private val decisions = ArrayList<SearchDecision>()
@@ -31,15 +32,20 @@ internal class SearchTrail {
         else -> null
     }
     fun levelOf(literal: Int): Int = boolLevels.getOrDefault(literal ushr 1, 0)
-    internal fun reasonMemory(): Map<String, Long> {
-        val arrays = HashSet<IntArray>()
-        boolReasons.forEach { _, reason -> arrays.add(reason.literals) }
-        return mapOf(
-            "sharedReasonMemorySampleWork" to boolReasons.referenceCapacity.toLong() + arrays.size,
-            "sharedReasonPayloadBytes" to arrays.sumOf { it.size.toLong() * Int.SIZE_BYTES },
+    internal fun reasonMemory(sample: SharingMemoryObservation) {
+        val arrays = sample.seen<IntArray>()
+        var payload = 0L
+        for (value in boolReasons.valuesInternal) {
+            sample.step()
+            if (value == null) continue
+            val literals = (value as SearchExplanation).literals
+            if (sample.retain(arrays, literals)) payload += literals.size.toLong() * Int.SIZE_BYTES
+        }
+        sample.record(mapOf(
+            "sharedReasonPayloadBytes" to payload,
             "sharedReasonIndexCapacityBytes" to boolReasons.primitiveCapacityBytes,
             "sharedReasonReferenceSlots" to boolReasons.referenceCapacity.toLong(),
-        )
+        ))
     }
 
     fun reasonFor(variable: Int): SearchExplanation? = boolReasons[variable]

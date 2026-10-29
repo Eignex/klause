@@ -146,6 +146,12 @@ data class PortfolioScenario(
     val sliceGrowth: Double = 1.5,
     /** Opt-in single-lane diagnostic allowance in charged node-equivalents; null uses elapsed policy. */
     val diagnosticWorkLimit: Long? = null,
+    /** Opt-in retained sharing-memory observation, independent of work scheduling. */
+    val sharingMemory: Boolean = false,
+    /** Maximum charged visits per sharing-memory observation. */
+    val sharingMemoryWork: Long = 32_768L,
+    /** Maximum deduplication entries across one sharing-memory observation. */
+    val sharingMemoryScratch: Int = 4_096,
     /** Allow the curated core worker before the first incumbent after ordinary complete workers receive coverage. */
     val earlyCoreAdmission: Boolean = false,
     /** Bounded private objective-core refinement; disabled by default. */
@@ -164,6 +170,7 @@ data class PortfolioScenario(
     val explicitArms: Boolean = false,
 ) {
     init {
+        require(sharingMemoryWork >= 0L && sharingMemoryScratch >= 0) { "sharing memory limits must be nonnegative" }
         require(cores >= 1) { "cores must be ≥ 1" }
         require(!earlyCoreAdmission ||
             (cores == 1 && kind == Kind.COP && engine == EngineMix.MIXED && btPool == null)) {

@@ -22,6 +22,13 @@ internal class SharingMeter {
     }
     private val clauseCounts = HashMap<String, Long>()
     private val clauseMemory = HashMap<String, Long>()
+    private var sampleFields: Set<String> = emptySet()
+
+    internal fun clauseMemorySample(values: Map<String, Long>) {
+        for (name in sampleFields) clauseMemory.remove(name)
+        sampleFields = values.keys.toSet()
+        clauseMemory(values)
+    }
 
     internal fun clauseCount(name: String, count: Long) {
         clauseCounts[name] = (clauseCounts[name] ?: 0L) + count

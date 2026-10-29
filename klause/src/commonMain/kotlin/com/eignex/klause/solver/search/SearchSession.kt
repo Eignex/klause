@@ -2,7 +2,7 @@ package com.eignex.klause.solver.search
 
 import com.eignex.klause.solver.result.OpenTheoryClauseStats
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.workScheduled
+import com.eignex.klause.util.SharingMemoryObservation
 
 /**
  * Shared trailed coordination for finite-domain and theory components.
@@ -59,7 +59,6 @@ class SearchSession(
     }
 
     private val singleComponent = components.singleOrNull()
-    private val measureLearnedMemory = cancellation.workScheduled()
     private val trail = SearchTrail()
     private val learning = SearchLearning(learnedDb)
     private var selfPublicationsPending = false
@@ -829,17 +828,11 @@ class SearchSession(
     internal fun learnedLifecycle(): Map<String, Long> = learning.lifecycle.snapshot()
 
     /** Snapshot learned-clause telemetry for a completed open-theory solve. */
-    fun learnedClauseStats(): OpenTheoryClauseStats = learning.snapshot(measureLearnedMemory).let {
-        if (measureLearnedMemory) it.copy(learning = it.learning + trail.reasonMemory()) else it
-    }
+    fun learnedClauseStats(): OpenTheoryClauseStats = learning.snapshot()
 
-    internal fun retainedLearningMemory(): Map<String, Long> {
-        val store = learning.retainedMemory()
-        val reasons = trail.reasonMemory()
-        return store + reasons + mapOf(
-            "sharedMemorySampleWork" to store.getValue("sharedMemorySampleWork") +
-                reasons.getValue("sharedReasonMemorySampleWork"),
-        )
+    internal fun retainedLearningMemory(sample: SharingMemoryObservation) {
+        learning.retainedMemory(sample)
+        trail.reasonMemory(sample)
     }
 
     /** Retain a sound clause-form explanation for subsequent propagation. */

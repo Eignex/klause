@@ -681,6 +681,10 @@ internal fun buildPortfolioScenario(
     val maxSliceWork = p[ExecutionOption.sliceMaxWork]
     val sliceGrowth = p[ExecutionOption.sliceGrowth]
     val diagnosticWorkLimit = p[ExecutionOption.portfolioWork]
+    val sharingMemory = p[ExecutionOption.sharingMemory] ?: false
+    val sharingMemoryWork = p[ExecutionOption.sharingMemoryWork] ?: 32_768L
+    val sharingMemoryScratch = p[ExecutionOption.sharingMemoryScratch] ?: 4_096
+    if (sharingMemoryWork < 0L || sharingMemoryScratch < 0) pipelineConfigError("sharing memory limits must be nonnegative")
     val earlyCoreAdmission = p[ExecutionOption.coreEarly] ?: false
     val companionIntegers = p[ExecutionOption.companionIntegers] ?: false
     val companionAfterIncumbent = p[ExecutionOption.companionAfterIncumbent] ?: false
@@ -705,7 +709,7 @@ internal fun buildPortfolioScenario(
     if (sliceGrowth != null && (!sliceGrowth.isFinite() || sliceGrowth < 1.0)) {
         pipelineConfigError("slice-growth must be finite and >= 1")
     }
-    p.finish("portfolio", "arms, ls, bt, seed, lambda, clause-share-lbd, clause-share-len, slice-work, slice-max-work, slice-growth, portfolio-work, portfolio-progress, core-early, companion-integers, companion-after-incumbent, companion-active-ms, core-refinement, phase-retention, reseed-stale-threshold, ls-residuals, ls-phase-times")
+    p.finish("portfolio", "arms, ls, bt, seed, lambda, clause-share-lbd, clause-share-len, slice-work, slice-max-work, slice-growth, portfolio-work, sharing-memory, sharing-memory-work, sharing-memory-scratch, portfolio-progress, core-early, companion-integers, companion-after-incumbent, companion-active-ms, core-refinement, phase-retention, reseed-stale-threshold, ls-residuals, ls-phase-times")
     if (armsParam != null && (ls != null || bt != null)) {
         pipelineConfigError("portfolio: set either `arms=N` or `ls=/bt=`, not both")
     }
@@ -746,6 +750,9 @@ internal fun buildPortfolioScenario(
         maxSliceWork = effectiveMaxSliceWork,
         sliceGrowth = sliceGrowth ?: 1.5,
         diagnosticWorkLimit = diagnosticWorkLimit,
+        sharingMemory = sharingMemory,
+        sharingMemoryWork = sharingMemoryWork,
+        sharingMemoryScratch = sharingMemoryScratch,
         earlyCoreAdmission = earlyCoreAdmission,
         coreRefinement = coreRefinement,
         companionIntegers = companionIntegers,

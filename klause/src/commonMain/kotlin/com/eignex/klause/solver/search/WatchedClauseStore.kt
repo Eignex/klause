@@ -2,6 +2,7 @@ package com.eignex.klause.solver.search
 
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableIntObjectMap
+import com.eignex.klause.util.SharingMemoryObservation
 
 /**
  * Assignment view and consequence sink a [WatchedClauseStore] propagates through.
@@ -45,22 +46,28 @@ internal class WatchedClauseStore {
     private val signatures = MutableIntObjectMap<IntArrayList>()
     private val unitClauses = IntArrayList()
 
-    internal fun memory(): Map<String, Long> {
+    internal fun memory(sample: SharingMemoryObservation) {
         var watchBytes = 0L
         var signatureBytes = 0L
-        watchers.forEach { _, entries -> watchBytes += entries.backingData.size.toLong() * Int.SIZE_BYTES }
-        signatures.forEach { _, entries -> signatureBytes += entries.backingData.size.toLong() * Int.SIZE_BYTES }
-        return mapOf(
+        for (value in watchers.valuesInternal) {
+            sample.step()
+            if (value != null) watchBytes += (value as IntArrayList).backingData.size.toLong() * Int.SIZE_BYTES
+        }
+        for (value in signatures.valuesInternal) {
+            sample.step()
+            if (value != null) signatureBytes += (value as IntArrayList).backingData.size.toLong() * Int.SIZE_BYTES
+        }
+        var payload = 0L
+        for (clause in clauses) { sample.step(); payload += clause.size.toLong() * Int.SIZE_BYTES }
+        sample.record(mapOf(
             "sharedLearnedObjects" to clauses.size.toLong(),
-            "sharedMemorySampleWork" to clauses.size.toLong() + watchers.referenceCapacity +
-                signatures.referenceCapacity,
-            "sharedLearnedPayloadBytes" to clauses.sumOf { it.size.toLong() * Int.SIZE_BYTES },
+            "sharedLearnedPayloadBytes" to payload,
             "sharedLearnedIndexCapacityBytes" to watchBytes + signatureBytes + watchers.primitiveCapacityBytes +
                 signatures.primitiveCapacityBytes + lbds.backingData.size.toLong() * Int.SIZE_BYTES +
                 unitClauses.backingData.size.toLong() * Int.SIZE_BYTES,
             "sharedLearnedReferenceSlots" to clauses.size.toLong() * 2L + watchers.referenceCapacity +
                 signatures.referenceCapacity,
-        )
+        ))
     }
 
     /** Number of retained clauses. */

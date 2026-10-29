@@ -54,6 +54,9 @@ internal class AlnsWorkerConfig private constructor(
     private val numericalCompletion: Boolean,
     private val toleranceCheck: ((Sample) -> Boolean)?,
     private val workScheduled: Boolean = false,
+    private val sharingMemory: Boolean = false,
+    private val sharingMemoryWork: Long = 32_768L,
+    private val sharingMemoryScratch: Int = 4_096,
 ) :
     WorkerConfig {
     constructor(
@@ -63,16 +66,31 @@ internal class AlnsWorkerConfig private constructor(
     ) : this(profile, nodeBudget, numericalCompletion, null)
 
     fun withToleranceCheck(check: (Sample) -> Boolean): AlnsWorkerConfig =
-        AlnsWorkerConfig(profile, nodeBudget, numericalCompletion, check, workScheduled)
+        AlnsWorkerConfig(
+            profile, nodeBudget, numericalCompletion, check,
+            workScheduled, sharingMemory, sharingMemoryWork, sharingMemoryScratch,
+        )
 
     override fun withNodeBudget(budget: NodeBudget): WorkerConfig =
-        AlnsWorkerConfig(profile, budget, numericalCompletion, toleranceCheck, workScheduled)
+        AlnsWorkerConfig(
+            profile, budget, numericalCompletion, toleranceCheck,
+            workScheduled, sharingMemory, sharingMemoryWork, sharingMemoryScratch,
+        )
 
     fun withNumericalCompletion(): AlnsWorkerConfig =
-        AlnsWorkerConfig(profile, nodeBudget, true, toleranceCheck, workScheduled)
+        AlnsWorkerConfig(
+            profile, nodeBudget, true, toleranceCheck,
+            workScheduled, sharingMemory, sharingMemoryWork, sharingMemoryScratch,
+        )
 
     fun withWorkScheduling(): AlnsWorkerConfig =
-        AlnsWorkerConfig(profile, nodeBudget, numericalCompletion, toleranceCheck, true)
+        AlnsWorkerConfig(
+            profile, nodeBudget, numericalCompletion, toleranceCheck,
+            true, sharingMemory, sharingMemoryWork, sharingMemoryScratch,
+        )
+
+    fun withSharingMemory(enabled: Boolean, work: Long, scratch: Int): AlnsWorkerConfig =
+        AlnsWorkerConfig(profile, nodeBudget, numericalCompletion, toleranceCheck, workScheduled, enabled, work, scratch)
 
     override val label: String get() = "alns-${profile.label}"
 
@@ -97,7 +115,8 @@ internal class AlnsWorkerConfig private constructor(
         // One pool carries globally-valid learned clauses across repair fragments. A repair learns under
         // pins and an incumbent, so its permanent (objective-bound, blocking) clauses and LP Farkas nogoods
         // hold only under those pins and are not shared.
-        val repairClauses = SharedClausePool(measureMemory = workScheduled)
+        val repairClauses = SharedClausePool(measureMemory = sharingMemory,
+            memorySampleWork = sharingMemoryWork, memorySampleScratchEntries = sharingMemoryScratch)
         val meter = SharingMeter()
         val alns = Alns(
             inner = LocalSearchSolver(
