@@ -42,15 +42,15 @@ import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.util.Cancellation
-import kotlin.io.encoding.Base64
-import kotlin.time.Duration.Companion.seconds
-import kotlin.time.TimeSource.Monotonic
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlin.io.encoding.Base64
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource.Monotonic
 
 internal expect fun profileAllocatedBytes(): Long?
 
@@ -114,20 +114,28 @@ fun main(args: Array<String>) {
             for (arbitrary in arms) {
                 for (claim in LpClaim.entries) {
                     if (profileExpired(stop)) return
-                    lifecycle(initial, column, side, round, true, true, stop, claim, true, arbitrary,
-                        preserveOverflowCheckpoint = false)
+                    lifecycle(
+                        initial, column, side, round, true, true, stop, claim, true, arbitrary,
+                        preserveOverflowCheckpoint = false,
+                    )
                 }
             }
             continue
         }
         if (checkpoint) {
             val arms = if (round % 2 == 0) listOf(false, true) else listOf(true, false)
-            val requested = if (mode == "checkpoint-feasibility") listOf(LpClaim.FEASIBLE_COMPLETION) else LpClaim.entries
+            val requested = if (mode == "checkpoint-feasibility") {
+                listOf(LpClaim.FEASIBLE_COMPLETION)
+            } else {
+                LpClaim.entries
+            }
             for (preserve in arms) {
                 for (claim in requested) {
                     if (profileExpired(stop)) return
-                    lifecycle(initial, column, side, round, true, true, stop, claim, true,
-                        preserveOverflowCheckpoint = preserve)
+                    lifecycle(
+                        initial, column, side, round, true, true, stop, claim, true,
+                        preserveOverflowCheckpoint = preserve,
+                    )
                 }
             }
             continue
@@ -149,14 +157,18 @@ fun main(args: Array<String>) {
     if (checkpoint) {
         for (preserve in listOf(false, true)) {
             if (profileExpired(stop)) return
-            sourceWorker(compiled.model, requireNotNull(objective), stop, timeoutSeconds = 5,
-                preserveOverflowCheckpoint = preserve)
+            sourceWorker(
+                compiled.model, requireNotNull(objective), stop, timeoutSeconds = 5,
+                preserveOverflowCheckpoint = preserve,
+            )
         }
     } else if (mode == "precision" || mode == "consumers") {
         for (arbitrary in listOf(false, true)) {
             if (profileExpired(stop)) return
-            sourceWorker(compiled.model, requireNotNull(objective), stop, arbitrary, 5,
-                preserveOverflowCheckpoint = false)
+            sourceWorker(
+                compiled.model, requireNotNull(objective), stop, arbitrary, 5,
+                preserveOverflowCheckpoint = false,
+            )
         }
     } else if (!profileExpired(stop)) sourceWorker(compiled.model, requireNotNull(objective), stop)
 }
