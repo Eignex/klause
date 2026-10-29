@@ -60,7 +60,8 @@ integrality and both bound sides.
 
 Factor identity preserves a row definition; row rewrites replace it. Component
 snapshots retain their row definitions, exact endpoints, stated bound sides and
-objective coefficients. Bound or objective changes replace affected snapshots;
+objective coefficients. Unchanged row incidence retains the component partition.
+Bound or objective changes replace affected snapshots;
 joining rows replace merged components and retain unrelated ones. Explicit namespace
 remaps, changed dimensions or semantics and source-to-finite transitions reject the
 prior binding. A foreign source cannot use a prepared template index. Continuous,
