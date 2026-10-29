@@ -633,6 +633,19 @@ modeled retained units and negative results. One warmup precedes up to five meas
 rounds; mode order rotates. Equal native results across modes check consistency,
 without establishing independent source or optimality validation.
 
+The unchanged-index controls [9363](https://lab.eignex.com/jobs/9363) and
+[9369](https://lab.eignex.com/jobs/9369), at `69cc7b2250`, compare all three modes
+through actual consuming LPs on the two frozen P3 MPS fixtures. Including cold
+setup, median preparation-plus-assembly falls from 4.73 to 4.10 ms over 32
+consumers and from 5.79 to 5.27 ms over 64; allocation falls by 202/353 KB.
+Charged template work falls from 5741/7454 to 1742/2036. Ordered coordinates add
+9/6 modeled retained units; the publication/storage cap stays unchanged.
+Alternating bounds, objectives and rows rejects complete-index reuse and retains
+selective rebuilding, including failed-validation cost. Objective churn increases
+assembly time by 7.1/2.7 percent in these controls. Disabled templates remain
+cheaper on these tiny sources, and whole-LP timings support no speedup claim.
+Native LP results agree across modes; their optimality is not independently checked.
+
 `scripts/lp-lifecycle-profile.sh mps-afiro|mps-adlittle [repeats] [both|jvm|native]` runs one
 hash-pinned source from the existing basis corpus on JVM and Linux Native through
 the production source projection and scoped LP owner. Submit it as a lab profile
