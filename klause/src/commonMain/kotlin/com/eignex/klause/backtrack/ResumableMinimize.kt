@@ -405,6 +405,7 @@ internal class ResumableMinimize(
             branching = CpBranching.None,
         ).also {
             it.conflictStats = sink.ca
+            resources.own(AutoCloseable { params.clauseExchange?.onSearchClose(it.session) })
             sink.search.propagationWork = { it.session.work }
             sink.search.learning = { it.session.learnedLifecycle() }
             sink.search.valueOrdering = { it.session.valueOrdering.snapshot() }
@@ -555,6 +556,7 @@ internal class ResumableMinimize(
                     is StepEvent.Terminal -> return e.result
 
                     StepEvent.Paused -> {
+                        params.clauseExchange?.onSearchEnd(session)
                         slice.noteOverspend()
                         // Restarts sample root fixings too, but an arm that restarts rarely would show none of its own.
                         sink.search.observeRootFixed(session.rootFixedVariableCount())
@@ -600,11 +602,7 @@ internal class ResumableMinimize(
         closed = true
         installation = null
         lpHints?.resetHistory()
-        try {
-            if (::cp.isInitialized) params.clauseExchange?.onSearchClose(session)
-        } finally {
-            resources.close()
-        }
+        resources.close()
     }
 
     // A lazy sequence can be abandoned while suspended, so it must not carry native factors across a yield.
@@ -1503,7 +1501,6 @@ internal class ResumableMinimize(
         }
 
         override fun onCancellation(context: SearchContext): SearchRunDisposition {
-            params.clauseExchange?.onSearchEnd(session)
             return if (pausable) SearchRunDisposition.Pause else SearchRunDisposition.Indeterminate
         }
     }

@@ -97,7 +97,8 @@ internal class AlnsWorkerConfig private constructor(
         // One pool carries globally-valid learned clauses across repair fragments. A repair learns under
         // pins and an incumbent, so its permanent (objective-bound, blocking) clauses and LP Farkas nogoods
         // hold only under those pins and are not shared.
-        val repairClauses = SharedClausePool()
+        val repairClauses = SharedClausePool(measureMemory = workScheduled)
+        val meter = SharingMeter()
         val alns = Alns(
             inner = LocalSearchSolver(
                 problem,
@@ -113,7 +114,8 @@ internal class AlnsWorkerConfig private constructor(
             backtrack = BacktrackSolver(problem),
             backtrackParams = BacktrackParams(
                 randomSeed = seed + index,
-                clauseExchange = PoolClauseExchange(repairClauses, skipPermanent = true, shareGlobalNogoods = false),
+                clauseExchange = PoolClauseExchange(repairClauses, skipPermanent = true,
+                    shareGlobalNogoods = false, meter = meter),
                 nodeBudget = nodeBudget,
                 toleranceCheck = toleranceCheck,
             ),
@@ -141,7 +143,10 @@ internal class AlnsWorkerConfig private constructor(
             withInstructionBudget = { p, limit ->
                 p.copy(maxInstructions = minOf(p.maxInstructions ?: Long.MAX_VALUE, limit))
             },
-        ).bindEvidence(evidenceModel).also { it.family = ArmFamily.Lns }
+        ).bindEvidence(evidenceModel).also {
+            it.family = ArmFamily.Lns
+            it.sharingMeter = meter
+        }
     }
 
     /**

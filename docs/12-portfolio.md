@@ -182,7 +182,8 @@ belong to one shared pool; repeated worker observations must not be summed.
 Worker `seenKeys` and `seenCapacityBytes` describe the session-spanning duplicate
 filter, including exported and evicted keys. Its lifetime is the native session,
 not the pool generation. Compaction invalidates the drain cursor but preserves
-that filter. A fresh session releases its backing arrays and reimports the current
+that filter. Reseeding a retained repair session keeps the filter with its
+learned database. A fresh session releases its backing arrays and reimports the current
 pool; resuming the same session retains both cursor and filter. Retirement drains
 uses, exports remaining glue and releases the filter.
 
@@ -209,7 +210,9 @@ and excluded; physical resident memory requires an external process measurement.
 
 Memory fields are boundary samples with individual `peak*` maxima, not an atomic
 process peak or a sum of concurrent high-water marks. `drain*` fields describe
-transient batch storage. Shared-search learned stores and copied reasons report
+transient batch storage. ALNS repair pools remain worker-private, skip search-conditioned permanent clauses
+and decline direct global nogoods; their worker meter reports that separate owner.
+Shared-search learned stores and copied reasons report
 separately in their learning statistics. A pool cap bounds its entries, not cumulative
 worker seen keys, learned stores or pinned reasons. Retention and delivery policy
 remain separate from these observations.
