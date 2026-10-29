@@ -281,7 +281,15 @@ legacy start-index placement rejected by the independent checker; use
 `suite=rewrite-structure-canonical-v1 problem=element-cone` for its separately
 identified standard-list-index control.
 
-## Corpus and build identity
+`T`h`e` `L`P` `l`i`f`e`c`y`c`l`e` `s`c`r`i`p`t` `a`c`c`e`p`t`s` `m`o`d`e`=`p`r`e`c`i`s`i`o`n` `a`s` `i`t`s` `f`o`u`r`t`h` `a`r`g`u`m`e`n`t`
+`(`p`r`e`c`i`s`i`o`n` `a`t` `t`h`e` `s`h`e`l`l` `e`n`t`r`y` `p`o`i`n`t`)`.` `I`t` `p`a`i`r`s` `f`i`x`e`d`-`w`i`d`t`h`-`f`i`r`s`t` `a`n`d` `e`a`r`l`y`
+`a`r`b`i`t`r`a`r`y`-`p`r`e`c`i`s`i`o`n` `c`o`n`t`i`n`u`a`t`i`o`n` `r`e`q`u`e`s`t`s` `t`h`r`o`u`g`h` `t`h`e` `e`x`i`s`t`i`n`g` `f`o`u`r` `c`l`a`i`m`s` `a`n`d`
+`c`h`a`n`g`e`d`/`u`n`c`h`a`n`g`e`d` `a`u`t`h`o`r`i`t`y` `c`o`n`t`r`o`l`s`,` `a`l`t`e`r`n`a`t`i`n`g` `a`r`m` `o`r`d`e`r` `b`e`t`w`e`e`n` `w`a`r`m`u`p` `a`n`d`
+`m`e`a`s`u`r`e`d` `r`o`u`n`d`s`.` `B`o`t`h` `a`r`m`s` `k`e`e`p` `t`h`e` `s`a`m`e` `c`u`m`u`l`a`t`i`v`e` `i`m`p`o`r`t`,` `w`o`r`k`,` `a`l`l`o`c`a`t`i`o`n` `a`n`d`
+`v`e`r`i`f`i`c`a`t`i`o`n` `l`i`m`i`t`s`.` `U`s`e` `t`o`t`a`l` `q`u`e`r`y`/`c`e`r`t`i`f`i`c`a`t`i`o`n` `c`o`s`t` `a`n`d` `a`c`t`u`a`l` `a`l`l`o`c`a`t`i`o`n`/`R`S`S`
+`a`l`o`n`g`s`i`d`e` `i`m`p`o`r`t` `p`r`o`g`r`e`s`s`;` `t`h`e` `r`e`a`l` `s`o`u`r`c`e`-`w`o`r`k`e`r` `c`o`n`t`r`o`l` `r`e`t`a`i`n`s` `p`r`o`d`u`c`t`i`o`n` `p`o`l`i`c`y`.`
+`
+`#`#` `C`o`r`p`u`s` `a`n`d` `b`u`i`l`d` `i`d`e`n`t`i`t`y`
 
 Compressed file inputs are staged with the existing corpus decoder before CLI
 launch. `sourceDecodeMs` is deducted from the CLI deadline, and

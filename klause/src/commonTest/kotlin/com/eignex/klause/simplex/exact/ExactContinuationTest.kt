@@ -10,6 +10,46 @@ import kotlin.test.assertTrue
 
 class ExactContinuationTest {
     @Test
+    fun `early arbitrary precision should avoid abandoned imports under the same ceiling`() {
+        val huge = BigFraction.of(BIG_ONE shl 100, BIG_ONE)
+        val input = ExactContinuationInput(
+            listOf(
+                listOf(0 to BigFraction.ONE),
+                listOf(1 to huge, 2 to BigFraction.ONE),
+                listOf(1 to BigFraction.ONE, 2 to huge),
+            ),
+            List(3) { BigFraction.ONE },
+            List(6) { BigFraction.ZERO },
+            List(3) { null } + List(3) { BigFraction.ZERO },
+            listOf(0, 1, 2),
+            List(3) { ContinuationStatus.BASIC } + List(3) { ContinuationStatus.FIXED },
+        )
+        val limits = ExactContinuationLimits(maxImportPivots = 3)
+        val fixed = ExactContinuation(input)
+        val early = ExactContinuation(input)
+
+        val replayed = fixed.resume(limits)
+        val direct = early.resume(limits.copy(startArbitraryPrecision = true))
+        val repeated = fixed.resume(limits.copy(startArbitraryPrecision = true))
+
+        assertEquals(ContinuationDecline.IMPORT_LIMIT, replayed.metrics.decline)
+        assertEquals(1, replayed.metrics.restarts)
+        assertEquals(3, replayed.metrics.imports)
+        assertNull(replayed.values)
+        val point = assertNotNull(direct.values)
+        assertEquals(BigFraction.ONE, point[0])
+        assertEquals(BigFraction.ONE, huge * point[1] + point[2])
+        assertEquals(BigFraction.ONE, point[1] + huge * point[2])
+        assertEquals(3, direct.metrics.imports)
+        assertEquals(0, direct.metrics.restarts)
+        assertEquals(ContinuationDecline.IMPORT_LIMIT, repeated.metrics.decline)
+        assertEquals(0, repeated.metrics.imports)
+        assertEquals(3, fixed.usedImportPivots)
+        assertEquals(replayed.metrics.work + repeated.metrics.work, fixed.usedWork)
+        assertEquals(replayed.metrics.allocation + repeated.metrics.allocation, fixed.usedAllocation)
+    }
+
+    @Test
     fun `a rebound wide endpoint should restart from current exact bounds`() {
         val initial = ExactContinuationInput(
             listOf(emptyList()), emptyList(), listOf(BigFraction.ZERO), listOf(null),
