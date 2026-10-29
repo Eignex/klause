@@ -44,6 +44,22 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class OpenTheorySolverTest {
+    @Test
+    fun `incremental ordinary linear traversal should publish a strict guard consequence`() {
+        val model = Problem(2, 0, emptyArray(), arrayOf(
+            ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                doubleArrayOf(2.0, -3.0), LinearOp.LE, 0.0, strict = true),
+        ), numRealVars = 2, realLower = DoubleArray(2), realUpper = DoubleArray(2))
+        val engine = OpenTheoryPipeline.engineFor(OpenTheoryRequest(model).withPresolve(PresolveConfig.NONE))
+
+        val result = assertIs<OpenTheoryResult.Sat>(engine.solve(TheoryParams(openLinearIncremental = true)))
+
+        val witness = result.assignment
+        assertEquals(false, witness.boolValue(0))
+        assertEquals(BigFraction.ZERO, TheoryCompletion.parseRational(witness.realValue(0)))
+        assertEquals(BigFraction.ZERO, TheoryCompletion.parseRational(witness.realValue(1)))
+        assertTrue((result.stats.smt.completeSearchStages?.get("PARTIAL_LINEAR_DEDUCTION") ?: 0L) > 0L)
+    }
 
     @Test
     fun `separate integer linear openings should report their own primary LP work`() {

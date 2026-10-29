@@ -98,6 +98,14 @@ the pending rows are asserted. Interrupted preparation or assertion leaves pendi
 work available for a later operation and publishes no assertion marker for an
 uncommitted bound batch.
 
+Ordinary complete traversal selects this combined route with
+`open-linear-incremental=true`. Positive-depth committed assertion markers follow
+a source-index trail in scope order; retraction removes only the suffix belonging
+to popped scopes. Root markers stay outside that trail. Interrupted batches append
+only their committed markers, so retry and backtrack keep the same assertion
+authority. Source-row visits, invalidations, interval visits, compatible declines
+and deductions are included in the traversal's stage counters.
+
 This route combines scoped assertion reuse with the exact-input decline cache and
 the explained interval producer before the numerical query. A compatible decline
 retains no reason or numerical authority. A successful implication rebuilds its

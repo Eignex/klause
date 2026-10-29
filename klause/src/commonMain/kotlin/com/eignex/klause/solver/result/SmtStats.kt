@@ -219,9 +219,9 @@ internal class SmtStatsSink {
         outcomes[key] = (outcomes[key] ?: 0L) + 1L
     }
 
-    fun observeCompleteSearchStage(key: String) {
+    fun observeCompleteSearchStage(key: String, count: Long = 1L) {
         val stages = checkNotNull(completeSearchStages)
-        stages[key] = (stages[key] ?: 0L) + 1L
+        stages[key] = (stages[key] ?: 0L) + count
     }
 
     fun observeCompleteSearchLinearPoint() {

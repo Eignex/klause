@@ -72,6 +72,8 @@ data class TheoryParams(
      * The theory decides the arithmetic residual at a leaf.
      */
     val openBranching: OpenBranching = OpenBranching.Automatic,
+    /** Schedule touched linear rows and deliver explained interval consequences before numerical checks. */
+    val openLinearIncremental: Boolean = false,
     /**
      * Splits that must consult the hint before its allowance is spent drawing one.
      *

@@ -50,6 +50,31 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverTest {
     @Test
+    fun `incremental nested siblings should preserve the surviving source scope`() {
+        val source = Problem(3, intBounds = openBounds(), factors = arrayOf(
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+            ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, -2),
+            ReifiedLinear(2, intArrayOf(1), intArrayOf(0), LinearOp.LE, -4),
+        ))
+        ExactLiraSearchComponent(source).use { component ->
+            component.useIncrementalLinearPropagation()
+            val session = SearchSession(listOf(component))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+            session.popTo(1)
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+
+            val result = assertIs<SearchResult.Satisfied>(session.solve(1))
+            val witness = assertNotNull(result.model.valueOf(component.assignmentKey))
+            assertTrue(witness.intValue(0) <= BIG_ZERO)
+            assertTrue(witness.intValue(0) >= bigIntOf(-1))
+            assertContentEquals(booleanArrayOf(true, false, false), witness.bools)
+        }
+    }
+
+    @Test
     fun `incremental prepared rows should consume a strict consequence before Boolean completion`() {
         val source = Problem(5, 0, emptyArray(), arrayOf(
             ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
