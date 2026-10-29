@@ -125,12 +125,17 @@ class RootInprocessingTest {
     @Test
     fun `a clause beyond the remaining literal space should wait for the next slice`() {
         for (native in listOf(false, true)) {
-            val session = PropagationSession(problem(IntArray(5000) { it % 2 * 2 },
-                IntArray(5000) { it % 2 * 2 }).bake(), nativeSat = native)
+            val source = Problem(5000, 0, emptyArray(), arrayOf<Factor>(
+                Clause(IntArray(5000) { it * 2 }), Clause(IntArray(5000) { it * 2 + 1 }),
+            ))
+            val session = PropagationSession(source.bake(), nativeSat = native)
             val pass = RootSimplificationPass()
             val stats = SearchStatsSink()
 
-            repeat(2) { pass.run(session, BacktrackParams(), stats) }
+            pass.run(session, BacktrackParams(), stats)
+            assertEquals(1L, stats.snapshot().learning.getValue("inprocessRootEligible"))
+
+            pass.run(session, BacktrackParams(), stats)
 
             assertEquals(2L, stats.snapshot().learning.getValue("inprocessRootEligible"))
         }
