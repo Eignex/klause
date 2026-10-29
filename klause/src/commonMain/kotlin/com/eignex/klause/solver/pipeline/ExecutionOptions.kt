@@ -307,7 +307,8 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         val lpComponentSplit: ExecutionOption<Boolean> = ExecutionOption("lp-component-split", ValueKind.BOOLEAN)
 
         /** The `lp-component-ownership` execution setting. */
-        val lpComponentOwnership: ExecutionOption<Boolean> = ExecutionOption("lp-component-ownership", ValueKind.BOOLEAN)
+        val lpComponentOwnership: ExecutionOption<Boolean> =
+            ExecutionOption("lp-component-ownership", ValueKind.BOOLEAN)
 
         /** The `lp-bound-max-pivots` execution setting. */
         val lpBoundMaxPivots: ExecutionOption<Int> = ExecutionOption("lp-bound-max-pivots", ValueKind.INT)

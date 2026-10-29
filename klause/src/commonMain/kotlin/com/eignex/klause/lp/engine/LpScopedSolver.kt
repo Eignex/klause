@@ -273,8 +273,11 @@ internal class LpScopedSolver(
             try {
                 if (!current.adopt(state, token)) return null
                 solveStarted = true
+                val queryAllowance = allowance ?: if (current is ComponentLpSolver) {
+                    LpFloatAllowance(workLimit, iterationLimit)
+                } else null
                 (if (warm == null) current.resolveBounds(
-                    allowance ?: if (current is ComponentLpSolver) LpFloatAllowance(workLimit, iterationLimit) else null,
+                    queryAllowance,
                 ) else current.solve(warm)).also {
                     lastFloatTermination = current.lastTermination
                 }

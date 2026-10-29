@@ -18,6 +18,29 @@ import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
     @Test
+    fun `a component conflict should retain its guarded row and active bound premise`() {
+        val builder = LpBuilder()
+        val x = builder.addVar(0L, 5L)
+        val y = builder.addVar(0L, 5L)
+        builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L)
+        builder.addRow(intArrayOf(y), longArrayOf(1L), Relation.GE, 3L, global = false,
+            premises = LpRowPremises(intArrayOf(), booleanArrayOf(), longArrayOf(), intArrayOf(7)))
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        LpScopedSolver(LpExactState(source), componentSplit = true).use { owner ->
+            assertTrue(owner.assertBound(y, true, ExactLpSide(ExactLpNumber.of(2L)), 8L))
+
+            val result = assertNotNull(owner.solve())
+
+            assertEquals(LpVerdict.INFEASIBLE, result.verdict)
+            val support = assertNotNull(result.conflictSupport)
+            assertSame(owner.state, support.state)
+            val premises = assertNotNull(support.rows.single { it.first == 1 }.second.premises)
+            assertEquals(listOf(7), premises.literalEntries())
+            assertEquals(8L, support.sides.single { it.column == y && it.upper }.witness)
+        }
+    }
+
+    @Test
     fun `component ownership should retain exact node bounds across a sibling edit`() {
         val builder = LpBuilder()
         repeat(2) {

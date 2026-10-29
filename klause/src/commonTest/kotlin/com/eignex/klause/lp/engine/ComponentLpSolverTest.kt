@@ -145,6 +145,25 @@ class ComponentLpSolverTest {
     }
 
     @Test
+    fun `checked component bounds should not bypass a different acceptance policy`() {
+        val builder = LpBuilder()
+        repeat(2) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(1L), Relation.GE, 1L)
+        }
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val owner = assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel())))
+        owner.use {
+            assertNotNull(it.solve())
+            assertNotNull(it.exactBound())
+
+            val rejected = it.exactBound(policy = LpCertificationPolicy { _, _ -> false })
+
+            assertNull(rejected)
+        }
+    }
+
+    @Test
     fun `a rounded component optimum should preserve its exact fractional contradiction`() {
         val builder = LpBuilder()
         val x = builder.addRealVar(0.0, 1.0)

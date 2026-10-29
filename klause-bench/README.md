@@ -488,6 +488,8 @@ cuts to their owning blocks. It leaves automatic component admission unchanged;
 record prepared block counts and actual bound edits before interpreting a zero
 reuse or zero-cut result. Component count alone establishes no saved work or
 whole-source improvement.
+`lpPhase_COMPONENT_LIFECYCLE_*` records child `SOLVED` and `REUSED` counts through
+the existing route ledger; numerical work, pivots and factors count actual solves.
 
 The opt-in basis tool uses the [basis corpus](../klause/src/jvmTest/resources/basis-corpus/README.md):
 
