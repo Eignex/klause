@@ -81,7 +81,8 @@ the containing per-owner LP work/allocation ceilings, active-time limit and segm
 limits; construction uses those same ceilings. Candidate checks and typed terminal
 verification remain the authority boundary.
 
-`SearchEvent.WorkerAdmission` reports these requirements and explicit decline causes.
+`SearchEvent.WorkerAdmission` reports these requirements and explicit decline causes,
+distinguishing eligible catalog candidates from composition-selected workers.
 Curated backtrack filtering reports unmet model needs; selected finite recipes report
 their actual worker authority. Explicit named recipes bypass automatic filtering.
 An explicit arm count, including the default-sized count, prevents automatic numerical

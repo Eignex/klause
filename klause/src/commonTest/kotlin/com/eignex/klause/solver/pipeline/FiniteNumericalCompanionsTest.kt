@@ -92,7 +92,9 @@ class FiniteNumericalCompanionsTest {
         val frontier = events.single { it.recipe == "numerical/finite-companion" }
         val repair = events.single { it.recipe == "ls/finite-joint-companion" }
         assertEquals(true, frontier.admitted)
+        assertEquals(true, frontier.selected)
         assertEquals(true, repair.admitted)
+        assertEquals(true, repair.selected)
         assertTrue(frontier.requirements.contains("authority=CHECKED_TERMINALS"))
         assertTrue(repair.requirements.contains("authority=WITNESS_ONLY"))
         assertTrue(events.any { it.recipe == "satOptimized" && it.admitted })

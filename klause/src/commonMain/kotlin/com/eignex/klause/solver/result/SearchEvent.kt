@@ -27,6 +27,8 @@ sealed interface SearchEvent {
         val requirements: String,
         /** Stable reasons for declining the automatic admission. */
         val declines: List<String>,
+        /** Whether composition selected this eligible recipe for materialization. */
+        val selected: Boolean = false,
     ) : SearchEvent
 
     /** A logical event from opt-in single-lane portfolio diagnostics. */

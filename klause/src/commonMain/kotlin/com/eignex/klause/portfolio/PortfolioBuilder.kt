@@ -184,7 +184,7 @@ object PortfolioBuilder {
                         sourceMapping = if (privateCoordinates) WorkerSourceMapping.CHECKED_RECONSTRUCTION
                         else WorkerSourceMapping.WORKING_COORDINATES)
                     observe("portfolio", SearchEvent.WorkerAdmission(config.label, true,
-                        requirements.toString(), emptyList()))
+                        requirements.toString(), emptyList(), selected = true))
                 }
                 worker
             }
