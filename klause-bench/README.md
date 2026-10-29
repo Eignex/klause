@@ -948,6 +948,16 @@ read alone establishes neither consumption nor a performance benefit.
 `*CompletionOriginalChecked` records the reconstructed original-source and adjusted
 objective check before import on ordinary linear-source execution.
 
+[9366](https://lab.eignex.com/jobs/9366) exercises ordinary finite producers on
+`bell3a` and `bell5`, with completion off/on at `89d5153cd9`, seed 1, one core and
+thirty seconds. Each treatment records two numerical imports/uses and one repair
+import/use; both final treatment points pass the independent rational MPS checker.
+The `bell3a` control fails that checker's zero-tolerance row E3 check, and the checked
+`bell5` treatment objective is worse than its control. Preparation costs 546.5 CPU
+seconds separately from solving. These controls establish consumed completion,
+without qualifying activation or speed. Reconstructed-source qualification and
+current-head CI are retained with [the implementation](https://github.com/Eignex/klause/pull/3897).
+
 `param.companion-integers=true` trials bounded general-integer/continuous numerical
 companions on the ordinary finite route. `false` retains the binary-only gate.
 Both settings capture `admission` lines with fragment, objective, proof authority,

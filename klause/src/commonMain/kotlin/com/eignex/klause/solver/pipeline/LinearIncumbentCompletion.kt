@@ -51,7 +51,7 @@ internal class LinearIncumbentCompletion(
         val token = metered(cancellation, checking = false)
         val previous = attempts.firstOrNull {
             budget.observe(preparation = seed.numBoolVars.toLong() + seed.numIntVars + seed.numRealVars)
-            !token() && sameSource(it.source, source) && it.seed == seed &&
+            !token() && sameSource(it.source, source, token) && it.seed == seed &&
                 it.seed.semantics == seed.semantics && it.seed.coordinateFrame === seed.coordinateFrame
         }
         if (previous?.finished == true) {
@@ -180,11 +180,19 @@ internal class LinearIncumbentCompletion(
         override fun workMeter(): WorkMeter = meter
     }
 
-    private fun sameSource(left: SourceProofContext, right: SourceProofContext): Boolean = left === right ||
-        (left.scope == right.scope && left.coordinates == right.coordinates && left.premises == right.premises &&
+    private fun sameSource(left: SourceProofContext, right: SourceProofContext, token: Cancellation): Boolean {
+        if (left === right) return true
+        budget.observe(preparation = 2L * left.coordinateCount + 2L * right.coordinateCount +
+            left.premiseCount + right.premiseCount +
+            listOf(left.scope.condition, right.scope.condition).sumOf {
+                it.bools.size.toLong() + it.lower.size + it.upper.size + it.integerRows.size
+            })
+        return !token() && left.scope == right.scope && left.coordinates == right.coordinates &&
+            left.premises == right.premises &&
             left.affineObjectiveAvailable == right.affineObjectiveAvailable && left.objective == right.objective &&
             left.objectiveConstant == right.objectiveConstant && left.semantics == right.semantics &&
-            left.semanticsChecker === right.semanticsChecker)
+            left.semanticsChecker === right.semanticsChecker
+    }
 
     private fun finish(attempt: Attempt, point: Sample?): Sample? {
         attempt.checked = point
