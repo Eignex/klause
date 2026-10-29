@@ -369,6 +369,35 @@ one lane and seed 17 under a 600-second containing allowance with source validat
 Its receipts distinguish preparation, solve, witness checks and native proof flags.
 These controls establish no throughput improvement or independent proof validation.
 
+### Numerical lifecycle profiles
+
+`scripts/lp-lifecycle-profile.sh mps-afiro|mps-adlittle [repeats]` runs one
+hash-pinned source from the existing basis corpus on JVM and Linux Native through
+the production source projection and scoped LP owner. Submit it as a lab profile
+script with build tasks `:klause:stageLpProfileJvm` and
+`:klause:linkLpProfileReleaseExecutableLinuxX64`, a 180-second profile limit and
+compatible Linux x86_64 placement. These bench-owned custom compilations have
+internal access to the engine and add no Maven artifacts. Ordinary CI compiles
+them and runs the shared deterministic regressions; it runs no profiling workload.
+
+Each owner runs cold, asserted-bound, bound-pop, appended-row and row-pop queries.
+Fresh owners at the same exact states control retained owners. One warmup precedes
+up to five alternating rounds, with phase observations enabled and disabled.
+Preparation, edits, query, certificate phases and retirement remain in the record.
+JVM thread allocation and whole-process RSS are separate measurements; native
+allocation is unavailable. Inclusive numerical and certificate phase timings must
+not be summed. Feasibility timing covers violation scans; transform, pricing and
+update costs during repair remain in their respective numerical phases. Query
+time less floating time includes certificate work and query scaffolding.
+Serialization follows each query and enters the containing lifecycle time.
+
+Original bytes, corpus manifest, revision, executable hashes, runtime, JFR and
+resource receipts accompany the records. These controlled LP edits establish no
+original-source result. Pair them with source-matched ordinary lab solver runs
+using independent source validation, deterministic work scheduling where applicable,
+and the same semantics and preparation controls. Kernel timings, pivot counts and
+modeled work alone establish no numerical policy improvement.
+
 ### Bounded sparse admission trials
 
 `lp=default,+sparse-trial` selects the ordinary model-facing LP route's bounded

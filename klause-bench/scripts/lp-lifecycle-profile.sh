@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+set -euo pipefail
+: "${LAB_WORKTREE:?lab source root is required}"
+: "${OUT:?lab output directory is required}"
+trace="${1:?usage: lp-lifecycle-profile.sh mps-afiro|mps-adlittle [repeats]}"
+repeats="${2:-3}"
+[[ "$trace" == mps-afiro || "$trace" == mps-adlittle ]] || exit 2
+[[ "$repeats" =~ ^[1-5]$ ]] || exit 2
+[[ "$(uname -s)/$(uname -m)" == Linux/x86_64 ]] || exit 2
+manifest="$LAB_WORKTREE/klause/src/jvmTest/resources/basis-corpus/manifest.json"
+source_identity="$(jq -er --arg id "$trace" '.fixtures[] | select(.id == $id) | .source' "$manifest")"
+expected="$(jq -er --arg id "$trace" '.fixtures[] | select(.id == $id) | .sourceSha256' "$manifest")"
+source_path="${source_identity%@*}"
+source_revision="${source_identity##*@}"
+mkdir -p "$OUT"
+cp "$manifest" "$OUT/basis-manifest.json"
+curl -fsSL --max-time 30 "https://raw.githubusercontent.com/ERGO-Code/HiGHS/$source_revision/${source_path#HiGHS/}" -o "$OUT/source.mps"
+printf '%s  %s\n' "$expected" "$OUT/source.mps" | sha256sum --check
+source64="$(base64 < "$OUT/source.mps" | tr -d '\n')"
+args=("source64=$source64" "source=$source_identity" "sha256=$expected" "repeats=$repeats")
+git -C "$LAB_WORKTREE" rev-parse HEAD > "$OUT/revision.txt"
+uname -a > "$OUT/platform.txt"
+"${JAVA_HOME:+$JAVA_HOME/bin/}java" -version > "$OUT/java-version.txt" 2>&1
+native="$LAB_WORKTREE/klause/build/bin/linuxX64/lpProfileReleaseExecutable/klause-lp-profile.kexe"
+sha256sum "$native" > "$OUT/native-sha256.txt"
+find "$LAB_WORKTREE/klause/build/lp-profile/jvm" -type f -print0 | sort -z | xargs -0 sha256sum > "$OUT/jvm-sha256.txt"
+/usr/bin/time -v -o "$OUT/jvm-resources.txt" \
+  "${JAVA_HOME:+$JAVA_HOME/bin/}java" -Xmx1536m -XX:ActiveProcessorCount=1 -XX:+UseSerialGC \
+  --enable-native-access=ALL-UNNAMED --add-modules=jdk.incubator.vector \
+  "-XX:StartFlightRecording=filename=$OUT/lifecycle.jfr,settings=profile,dumponexit=true" \
+  -cp "$LAB_WORKTREE/klause/build/lp-profile/jvm/classes:$LAB_WORKTREE/klause/build/lp-profile/jvm/lib/*" \
+  com.eignex.klause.bench.profile.LpLifecycleProfileKt "${args[@]}" > "$OUT/jvm.ndjson"
+/usr/bin/time -v -o "$OUT/native-resources.txt" "$native" "${args[@]}" > "$OUT/native.ndjson"
