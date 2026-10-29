@@ -33,7 +33,9 @@ retires private state and returns unresolved coverage while retaining work and
 statistics. Caller-condition replacement retires every worker and invalidates
 closures. Changed source or mapping identities require a fresh scheduler. The
 executor admits identity-mapped pure Boolean clause satisfaction only; objectives,
-numeric restrictions, symmetry reductions and additional components decline.
+numeric restrictions, symmetry reductions, cross-worker exchanges and additional
+components decline. A checked witness remains terminal until the caller condition
+changes; it cannot become a later sample-free refutation.
 It runs through an explicit internal entry point; ordinary portfolio selection
 retains its existing policy.
 
