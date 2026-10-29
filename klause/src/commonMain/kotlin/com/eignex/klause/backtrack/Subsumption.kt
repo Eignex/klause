@@ -68,6 +68,10 @@ private class SubsumptionSlice(session: PropagationSession, start: Int, batch: I
     private val origins = IntArrayList()
     private var attached = 0
 
+    init {
+        session.chargeInprocessingWork(3L * size)
+    }
+
     fun advance(session: PropagationSession, budget: InprocessingBudget): Boolean {
         while (built < size) {
             if (!budget.visit()) return false

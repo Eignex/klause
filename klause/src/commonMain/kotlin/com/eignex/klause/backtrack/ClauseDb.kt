@@ -186,8 +186,8 @@ private fun vivifyClause(
     val priorCancelled = session.probeCancelled
     try {
         for (literal in literals) {
-            if (!budget.visit()) return null
-            when (session.litTruth(literal)) {
+            if (budget.stopped()) return null
+            when (budget.truth(literal)) {
                 true -> {
                     kept.add(literal)
                     result = kept.toIntArray()

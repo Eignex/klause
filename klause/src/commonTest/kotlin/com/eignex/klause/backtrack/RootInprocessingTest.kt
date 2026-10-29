@@ -81,7 +81,8 @@ class RootInprocessingTest {
 
     @Test
     fun `a retained active reason should not starve later root candidates`() {
-        for ((native, work) in listOf(false to Long.MAX_VALUE, true to Long.MAX_VALUE, false to 10L, true to 10L)) {
+        for ((native, work) in listOf(false to Long.MAX_VALUE, true to Long.MAX_VALUE,
+            false to 10L, true to 10L, false to 1L, true to 1L)) {
             val session = PropagationSession(problem(intArrayOf(1)).bake(), nativeSat = native)
             session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
             session.addLearnedClause(Clause(intArrayOf(0, 4, 6)), 3)

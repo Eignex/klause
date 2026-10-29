@@ -72,9 +72,9 @@ class InprocessingBudgetTest {
             session.addLearnedClause(Clause(intArrayOf(1, 3, 4)), 3)
             val pass = VivificationPass()
             val stats = SearchStatsSink()
-            val before = session.work
+            val cancellation = Cancellation { session.decisionLevel > 0 && session.boolValue(1) == true }
 
-            pass.run(session, BacktrackParams(cancellation = Cancellation { session.work - before >= 8L }), stats)
+            pass.run(session, BacktrackParams(cancellation = cancellation), stats)
 
             assertEquals(0, session.decisionLevel)
             assertFalse(session.fixpointCancelled)

@@ -17,12 +17,14 @@ internal class RootSimplificationPass : InprocessingPass {
     private var dropped = IntHashSet()
     private var revision = -1L
     private var pendingSource: Pair<Int, IntArray>? = null
+    private var pending: RootCandidate? = null
 
     override fun reset() {
         cursor = 0
         dropped = IntHashSet()
         revision = -1L
         pendingSource = null
+        pending = null
     }
 
     override fun run(session: PropagationSession, params: BacktrackParams, stats: SearchStatsSink?) {
@@ -33,7 +35,10 @@ internal class RootSimplificationPass : InprocessingPass {
     private fun simplify(session: PropagationSession, params: BacktrackParams, budget: InprocessingBudget) {
         val count = session.rootClauseCount
         if (count == 0) return
-        if (revision != session.learnedClauseRevision) dropped = IntHashSet()
+        if (revision != session.learnedClauseRevision) {
+            dropped = IntHashSet()
+            pending = null
+        }
         revision = session.learnedClauseRevision
         pendingSource?.let { (factor, literals) ->
             if (!budget.visit(literals.size + 1)) return
@@ -56,41 +61,46 @@ internal class RootSimplificationPass : InprocessingPass {
         var examined = 0
         var literalsVisited = 0
         while (examined++ < minOf(params.rootSimplifyBatch, count)) {
-            if (!session.canSimplifyRoot || literalsVisited >= ROOT_LITERAL_LIMIT || !budget.visit()) break
-            val factor = cursor
-            cursor = (cursor + 1) % count
-            budget.note("Candidates")
-            val literals = session.rootClauseLiterals(factor, ROOT_LITERAL_LIMIT - literalsVisited) ?: continue
-            budget.charge(literals.size)
-            literalsVisited += literals.size
-            if (literals.size < 2) continue
-            budget.note("Eligible")
-            val residual = IntArrayList(literals.size)
-            var satisfied = false
-            for (literal in literals) {
-                if (!budget.visit()) {
-                    // Protected predecessors must not consume every retry's scan allowance.
-                    cursor = factor
-                    return
-                }
-                when (session.litTruth(literal)) {
-                    true -> { satisfied = true; break }
+            if (!session.canSimplifyRoot || literalsVisited >= ROOT_LITERAL_LIMIT || budget.stopped()) break
+            var candidate = pending
+            if (candidate == null) {
+                if (!budget.visit()) break
+                val factor = cursor
+                cursor = (cursor + 1) % count
+                budget.note("Candidates")
+                val literals = session.rootClauseLiterals(factor, ROOT_LITERAL_LIMIT - literalsVisited) ?: continue
+                budget.charge(literals.size)
+                literalsVisited += literals.size
+                if (literals.size < 2) continue
+                budget.note("Eligible")
+                candidate = RootCandidate(factor, literals)
+                pending = candidate
+            }
+            val factor = candidate.factor
+            val literals = candidate.literals
+            val residual = candidate.residual
+            while (candidate.next < literals.size && !candidate.satisfied) {
+                if (budget.stopped()) return
+                when (budget.truth(literals[candidate.next++])) {
+                    true -> candidate.satisfied = true
                     false -> Unit
-                    null -> residual.add(literal)
+                    null -> residual.add(literals[candidate.next - 1])
                 }
             }
-            if (!satisfied && (residual.isEmpty() || residual.size == literals.size)) continue
+            val satisfied = candidate.satisfied
+            if (!satisfied && (residual.isEmpty() || residual.size == literals.size)) {
+                pending = null
+                continue
+            }
             val source = factor < session.problem.numFactors
             if (!satisfied) {
                 val index = factor - session.problem.numFactors
                 val origin = if (source) OWN_ORIGIN else session.learnedClauseOrigin(index)
                 val lbd = if (source) residual.size else minOf(session.learnedClauseLbd(index), residual.size)
-                if (!budget.visit(residual.size * 2 + 1)) {
-                    cursor = factor
-                    break
-                }
+                if (!budget.visit(residual.size * 2 + 1)) break
                 val before = session.work
                 session.addRootDerivedClause(Clause(residual.toIntArray()), lbd, origin, source)
+                pending = null
                 if (source) pendingSource = factor to literals
                 else dropped.add(index)
                 budget.note("AttachmentWork", session.work - before + residual.size * 2 + 1L)
@@ -99,11 +109,12 @@ internal class RootSimplificationPass : InprocessingPass {
             }
             if (budget.stopped()) break
             if (source) {
-                budget.visit(literals.size + 1)
+                if (!budget.visit(literals.size + 1)) break
                 session.retireRootSource(factor, literals)
                 pendingSource = null
                 budget.note("RetirementWork", literals.size + 1L)
             } else dropped.add(factor - session.problem.numFactors)
+            pending = null
         }
         val beforeCompaction = session.learnedClauseCount
         if (!dropped.isEmpty() && !budget.stopped()) {
@@ -115,6 +126,12 @@ internal class RootSimplificationPass : InprocessingPass {
         }
         if (session.learnedClauseCount < beforeCompaction) cursor = 0
     }
+}
+
+private class RootCandidate(val factor: Int, val literals: IntArray) {
+    val residual = IntArrayList(literals.size)
+    var next = 0
+    var satisfied = false
 }
 
 internal class RootProbingPass : InprocessingPass {

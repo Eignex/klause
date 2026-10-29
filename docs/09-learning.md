@@ -427,8 +427,9 @@ facts or making a decision. Root publication retains its bounded scan across sli
 It retains the CP publisher so a consequence reaches peers without creating another
 private decision level in its producer.
 
-Root and probe cursors, vivification replacement batches and subsumption preparation
-survive suspension. The subsumption occurrence window retains at most 1,024 clauses
+Root scan positions and residual candidates, probe cursors, vivification replacement
+batches and subsumption preparation survive suspension. The subsumption occurrence
+window retains at most 1,024 clauses
 and 8,192 literals, advances round-robin, and declines a clause exceeding its remaining
 literal space. Compaction invalidates snapshots by a session-local revision, without
 changing source variable IDs. Replacement attachment precedes retirement; active and

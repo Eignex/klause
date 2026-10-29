@@ -182,18 +182,19 @@ class PropagationSession private constructor(
             val literals = if (usesNativeSat) (problem.factors[factor] as? Clause)?.literals
                 else (projection.propagators[factor] as? ClausePropagator)?.literals
             if (literals == null || literals.size > limit) return null
+            state.work += literals.size
             if (!literals.all { lit -> Lit.variable(lit) < problem.numBoolVars }) {
-                state.work += literals.size
                 return null
             }
             return literals
         }
         val index = factor - problem.numFactors
         if (!isLearnedClause(index) || learnedClausePermanent(index)) return null
-        if (learnedClauseLiteralCount(index) > limit) return null
+        val size = learnedClauseLiteralCount(index)
+        if (size > limit) return null
+        state.work += size.toLong() * (if (usesNativeSat) 2L else 1L)
         val literals = learnedClauseLiterals(index)
         if (!literals.all { lit -> Lit.variable(lit) < problem.numBoolVars }) {
-            state.work += literals.size
             return null
         }
         return literals

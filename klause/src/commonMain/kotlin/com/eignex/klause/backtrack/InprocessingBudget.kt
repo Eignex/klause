@@ -66,6 +66,11 @@ internal class InprocessingBudget(
         stats?.observeInprocessing(probes = 0L, visits = count.toLong())
     }
 
+    fun truth(literal: Int): Boolean? {
+        stats?.observeInprocessing(probes = 0L, visits = 1L)
+        return session.litTruth(literal)
+    }
+
     fun probe() {
         stats?.observeInprocessing(probes = 1L, visits = 0L)
         note("Probes")
