@@ -349,7 +349,8 @@ is no separate stale binary graph or whole-graph rebuild.
 Opt-in failed-literal probing tries a bounded rotating set of Boolean literals at
 scheduled restarts. Each attempt has a propagation-work ceiling within the invocation
 token. A completed root conflict proves the complementary unit, which is attached and
-propagated through ordinary search. Successful and interrupted probes retract to the
+propagated through ordinary search. Completed root facts are published to shared
+components before traversal resumes. Successful and interrupted probes retract to the
 complete root; interruption supplies no deduction. Clause scans and probes enter the
 existing inprocessing and propagation work counters. Cursors survive suspension and
 reset on reseeding; learned indices never survive a pass snapshot.

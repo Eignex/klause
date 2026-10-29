@@ -11,6 +11,10 @@ import com.eignex.klause.propagation.SharedClause
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchComponent
+import com.eignex.klause.solver.search.SearchContext
+import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -38,7 +42,7 @@ class RootInprocessingSearchTest {
             var retained: PropagationSession? = null
             val exchange = object : ClauseExchange {
                 override fun onRestart(session: PropagationSession) {
-                    if (retained == null) session.importClause(SharedClause(intArrayOf(0, 2, 8), longArrayOf(), 3), 6)
+                    if (retained == null) session.importClause(SharedClause(intArrayOf(0, 3, 8), longArrayOf(), 3), 6)
                     retained = session
                 }
             }
@@ -51,6 +55,9 @@ class RootInprocessingSearchTest {
             assertTrue(session.learnedLifecycle().getValue("learningClauseConsumed") > 0L)
             assertTrue(result.stats.search.inprocessProbes.sum > 0.0)
             assertTrue(result.stats.search.inprocessVisits.sum > 0.0)
+            var importedUses = 0L
+            session.drainImportUses { origin, uses -> if (origin == 6) importedUses += uses }
+            assertTrue(importedUses > 0L)
         }
     }
 
@@ -72,6 +79,28 @@ class RootInprocessingSearchTest {
             assertEquals(true, session.boolValue(2))
             assertTrue(session.learnedLifecycle().getValue("learningClauseConsumed") > 0L)
             assertTrue(result.stats.search.inprocessProbes.sum > 0.0)
+        }
+    }
+
+    @Test
+    fun `a probing unit should reach peer components at the shared root`() {
+        for (native in listOf(false, true)) {
+            var consumed = false
+            val peer = object : SearchComponent {
+                override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
+                    if (decision == SearchDecision.Bool(4) && context.decisionLevel == 0) consumed = true
+                    return ComponentResult.Consistent
+                }
+            }
+            val exchange = object : ClauseExchange {
+                override fun onRestart(session: PropagationSession) {}
+            }
+            val params = params(native, exchange).copy(componentFactory = { listOf(peer) })
+
+            val result = BacktrackSolver(problem().bake()).solve(params)
+
+            assertIs<SolveResult.Sat>(result)
+            assertTrue(consumed)
         }
     }
 
