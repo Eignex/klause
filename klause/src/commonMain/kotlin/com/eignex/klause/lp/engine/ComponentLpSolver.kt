@@ -37,7 +37,10 @@ internal class ComponentLpSolver(
     private var solveStarted = false
     var queryAllowance: LpFloatAllowance? = null
     private val certificationKey = if (model.exactState == null) exactLpStateKey(model) else null
-    private var blockResults: List<FloatLpResult>? = null
+    private var blockResults: List<FloatLpResult?>? = null
+    private val solveOrder = parts.indices.sortedWith(
+        compareBy<Int> { parts[it].model.m.toLong() + parts[it].model.n }.thenBy { it },
+    )
     private var metrics = LpSolveMetrics()
     override var lastDegenerateColumns: Int = 0
         private set
@@ -418,7 +421,8 @@ internal class ComponentLpSolver(
         var maxFill = 0.0
         var maxDensity = 0.0
         var maxDim = 0
-        val results = ArrayList<FloatLpResult>(parts.size)
+        val results = MutableList<FloatLpResult?>(parts.size) { null }
+        blockResults = results
         for (j in isolated) {
             val c = model.costD(j)
             val shifted = if (model.exactState == null) {
@@ -448,7 +452,7 @@ internal class ComponentLpSolver(
             primal[j] = shifted + model.loShiftD(j)
             objective += c * shifted
         }
-        for (k in parts.indices) {
+        for (k in solveOrder) {
             val part = parts[k]
             val reused = reusable[k]?.takeIf { it.optimal && it.exactState === part.model.exactState &&
                 solvers[k].solvedExactState === part.model.exactState }
@@ -491,7 +495,7 @@ internal class ComponentLpSolver(
                 lastColumns += solvers[k].lastColumns
             }
             if (!r.optimal && lastTermination == null) lastTermination = solvers[k].lastTermination
-            results.add(r)
+            results[k] = r
             if (part.model.exactState != null && r.optimal) reusable[k] = r
             objective += r.objective - part.model.objConstantD
             val sub = part.model
@@ -521,7 +525,7 @@ internal class ComponentLpSolver(
             return null
         }
         blockResults = results
-        if (results.all { it.optimal }) lastTermination = LpFloatTermination.OPTIMAL_CANDIDATE
+        if (results.all { it?.optimal == true }) lastTermination = LpFloatTermination.OPTIMAL_CANDIDATE
         return FloatLpResult(
             basis = basis,
             objective = model.objectiveD(objective),
@@ -532,7 +536,7 @@ internal class ComponentLpSolver(
             luMaxDensity = maxDensity,
             luMaxDim = maxDim,
             blocks = parts.size,
-            optimal = results.all { it.optimal },
+            optimal = results.all { it?.optimal == true },
             warmStarted = metrics.warmHits > 0,
             refactorizations = lastRefactorizations,
             exactState = model.exactState,
@@ -542,15 +546,23 @@ internal class ComponentLpSolver(
     override fun exactBound(observer: LpCertificationObserver?, policy: LpCertificationPolicy): CertifiedLpBound? {
         if (!currentAuthority()) return null
         val results = blockResults ?: return null
+        if (results.any { it == null } && (model.exactState == null || results.all { it == null } ||
+                (lastTermination != LpFloatTermination.WORK && lastTermination != LpFloatTermination.PIVOTS))
+        ) return null
         var value = model.exactConstant()
         val citedRows = HashSet<Int>()
         val citedSides = ArrayList<LpExactCitedSide>()
         for (index in parts.indices) {
             val part = parts[index]
-            val bound = checkedBounds[index]?.takeIf { it.policy === policy }?.bound
-                ?: certifyLpBound(part.model, results[index].duals, observer, policy)?.also {
-                    if (part.model.exactState != null) checkedBounds[index] = CheckedBound(policy, it)
-                } ?: return null
+            val result = results[index]
+            val bound = if (result == null) {
+                certifyLpBound(part.model, DoubleArray(part.model.m), observer, policy)
+            } else {
+                checkedBounds[index]?.takeIf { it.policy === policy }?.bound
+                    ?: certifyLpBound(part.model, result.duals, observer, policy)?.also {
+                        if (part.model.exactState != null) checkedBounds[index] = CheckedBound(policy, it)
+                    }
+            } ?: return null
             value += bound.value - part.model.exactConstant()
             model.exactState?.let { state ->
                 val support = bound.support ?: return null
@@ -592,24 +604,26 @@ internal class ComponentLpSolver(
     ): ExactLpWitness? {
         if (!currentAuthority() || cancellation()) return null
         val results = blockResults ?: return null
+        if (results.any { it == null }) return null
         val point = MutableList(model.n) { model.exactShift(it) }
         for (index in parts.indices) {
             val part = parts[index]
             if (cancellation()) return null
+            val result = results[index] ?: return null
             val exact = verifyExactBasis(
                 part.model,
-                results[index].basis,
+                result.basis,
                 cache = solvers[index].exactBasisCache ?: ExactBasisCache(),
                 cancellation = cancellation,
                 observer = observer,
             )
-            if (exact.singularRank != null) solvers[index].rejectSingularBasis(part.model, results[index].basis)
+            if (exact.singularRank != null) solvers[index].rejectSingularBasis(part.model, result.basis)
             val witness = policy.acceptNullable(
                 LpCertifier.EXACT_BASIS,
                 exact.witness,
             ) ?: policy.acceptNullable(
                 LpCertifier.EXACT_POINT,
-                exactPointWitness(part.model, results[index].primal, observer),
+                exactPointWitness(part.model, result.primal, observer),
             ) ?: return null
             for (column in part.cols.indices) point[part.cols[column]] = witness.primal[column]
         }
@@ -619,7 +633,7 @@ internal class ComponentLpSolver(
         return checkedLpWitness(model, point)
     }
 
-    private fun currentAuthority(): Boolean = !closed && if (model.exactState != null) {
+    private fun currentAuthority(): Boolean = !closed && activeSolve == null && if (model.exactState != null) {
         solvedExactState === model.exactState
     } else {
         certificationKey?.let { exactLpStateKey(model)?.contentEquals(it) } == true
@@ -630,7 +644,7 @@ internal class ComponentLpSolver(
     override fun mirCuts(maxCuts: Int): List<Cut> = localCuts(maxCuts) { owner, count -> owner.mirCuts(count) }
 
     private fun localCuts(maxCuts: Int, separate: (TableauCutSolver, Int) -> List<Cut>): List<Cut> {
-        if (!currentAuthority() || blockResults?.all { it.optimal } != true || maxCuts <= 0) return emptyList()
+        if (!currentAuthority() || blockResults?.all { it?.optimal == true } != true || maxCuts <= 0) return emptyList()
         val cuts = ArrayList<Cut>()
         for (index in parts.indices) {
             val owner = solvers[index] as? TableauCutSolver ?: continue

@@ -9,6 +9,7 @@ import com.eignex.klause.lp.cut.SourceCut
 import com.eignex.klause.lp.cut.orNull
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.CertifiedLpResult
+import com.eignex.klause.lp.engine.ComponentLpSolverCapability
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.lp.engine.ExactLpNumber
@@ -16,6 +17,7 @@ import com.eignex.klause.lp.engine.FarkasRoute
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertifier
+import com.eignex.klause.lp.engine.LpCertifierCost
 import com.eignex.klause.lp.engine.LpClaim
 import com.eignex.klause.lp.engine.LpDeductionCertificate
 import com.eignex.klause.lp.engine.LpModel
@@ -511,6 +513,9 @@ internal fun LpEngine.sparseSafePrune(
     }
     if (floatResult == null) observeNodeWorkStop(simplex)
     val result = floatResult ?: run {
+        if (pruneWithComponentBound(relaxation, simplex, bound, sink, cancellation)) {
+            return LpNodeOutcome(true, null)
+        }
         if (lpCounterResults.read(model, solveContext.certificationPolicy)?.witness != null) {
             return LpNodeOutcome(false, null)
         }
@@ -779,6 +784,33 @@ internal fun LpEngine.sparseSafePrune(
         return LpNodeOutcome(true, null)
     }
     return LpNodeOutcome(false, optimalBasis)
+}
+
+private fun LpEngine.pruneWithComponentBound(
+    relaxation: LpRelaxation,
+    solver: LpSolver,
+    cutoff: Double,
+    sink: SolveStatsSink,
+    cancellation: Cancellation,
+): Boolean {
+    val component = solver as? ComponentLpSolverCapability ?: return false
+    if (!cutoff.isFinite() || cancellation()) return false
+    noteNodeOverhead(relaxation.model.extent() * LpNodeOverhead.EXACT)
+    val observer = sink.lp.certificationObserver(LpRoute.NODE)
+    val charged = object : LpCertificationObserver by observer {
+        override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
+            observer.observe(certifier, success, cost)
+            if (cost is LpCertifierCost.Metered) noteNodeOverhead(cost.work)
+        }
+    }
+    val checked = component.exactBound(charged, solveContext.certificationPolicy) ?: return false
+    if (cancellation()) return false
+    val full = checked.value + BigFraction.ofLong(relaxation.objectiveConstant)
+    val threshold = sourceObjectiveCutoff(relaxation, cutoff, sourceObjectiveRange(relaxation)) ?: return false
+    if (full < threshold) return false
+    sink.lp.observePrune()
+    LpClaim.BOUND.consumed(charged)
+    return true
 }
 
 @Suppress("LongParameterList")

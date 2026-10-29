@@ -33,6 +33,27 @@ import kotlin.test.assertTrue
 
 class LpEngineTest {
     @Test
+    fun `ordinary node pruning consumes a checked partial component bound`() {
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 5) }, listOf(
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
+            Linear(intArrayOf(2), intArrayOf(1), LinearOp.GE, 1),
+            Linear(intArrayOf(2), intArrayOf(2), LinearOp.GE, 1),
+        ))
+        val sink = SolveStatsSink("partial-component-prune")
+
+        val pruned = LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, 1, 1), constant = 7L),
+            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true, boundMaxPivots = 2,
+                probe = false, rootCutHarvest = false)), sink).use { engine ->
+            engine.pruneNode(PropagationSession(problem), 8.0, -1, true)
+        }
+
+        assertTrue(pruned)
+        assertEquals(1.0, sink.snapshot().lp.pruned.sum)
+        assertEquals(2L, sink.snapshot().lp.phases["COMPONENT_LIFECYCLE_NODE"]?.outcomes?.get("SOLVED"))
+    }
+
+    @Test
     fun `root pruning retains complete useful element property groups`() {
         val problem = Problem(
             0, 4, arrayOf(IntDomain(0, 2), IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 9)),
