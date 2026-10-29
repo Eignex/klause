@@ -78,7 +78,6 @@ class LinearAuthorityCutsTest {
 
         LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
             val baseline = authority.advance(source, Cancellation.Never)
-            val baselineObservations = authority.cutObservations()
             val result = authority.advance(source, Cancellation.Never, cuts = true)
 
             assertEquals(SourceValue.Rational(BigFraction.ofLong(3) * BigFraction.ofLong(2).reciprocal()),
@@ -257,6 +256,7 @@ class LinearAuthorityCutsTest {
 
         LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
             val baseline = authority.advance(source, Cancellation.Never)
+            val baselineObservations = authority.cutObservations()
             val result = authority.advance(source, Cancellation.Never, cuts = true)
 
             assertEquals(SourceValue.Rational(BigFraction.ofLong(3) * BigFraction.ofLong(2).reciprocal()),
