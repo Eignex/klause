@@ -18,6 +18,8 @@ import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceSemanticsChecker
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.shl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -65,6 +67,39 @@ class LinearIncumbentCompletionTest {
         LinearIncumbentCompletion(budget) { _, _ -> }.use {
             assertSame(point, it.complete(source, point, Cancellation.Never))
         }
+    }
+
+    @Test
+    fun `oversized advisory integers should be refused before retaining their payload`() {
+        val wide = bigIntOf(1) shl 4096
+        val offered = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.0), exactInts = listOf(wide))
+        var attempts = 0L
+        var declines = 0L
+
+        LinearIncumbentCompletion(SourceLpBudget()) { stage, count ->
+            if (stage == "Attempts") attempts += count
+            if (stage == "SeedScalarLimit") declines += count
+        }.use { completion ->
+            repeat(2) { assertNull(completion.complete(source, offered, Cancellation.Never)) }
+        }
+
+        assertEquals(0L, attempts)
+        assertEquals(2L, declines)
+    }
+
+    @Test
+    fun `an unfunded seed snapshot should not consume retained attempt capacity`() {
+        val funding = SourceLpFunding(2_000_000L, 100L).also { it.grant(2_000_000L) }
+        var attempts = 0L
+
+        LinearIncumbentCompletion(SourceLpBudget(funding = funding)) { stage, count ->
+            if (stage == "Attempts") attempts += count
+        }.use { completion ->
+            repeat(2) { assertNull(completion.complete(source, seed, Cancellation.Never)) }
+        }
+
+        assertEquals(0L, attempts)
+        assertEquals(0L, funding.allocated)
     }
 
     @Test

@@ -106,6 +106,9 @@ remain declined; paused recovery keeps its progress under the same cumulative
 allowance. Preparation, residual solving, checking and retained allocation spend the
 companion's existing LP funding, and closure releases its residual owners. The
 control defaults to false and changes neither worker admission nor lifetimes.
+Advisory keys retain value snapshots without producer certificates. Unsupported
+symbolic payloads, integers outside the recovery scalar limit and keys beyond the
+remaining modeled allocation are refused before retention.
 
 `companion-integers=true` trials the same bounded companion pair on finite general
 integer/continuous sources. It changes only the binary-fragment restriction; size,
