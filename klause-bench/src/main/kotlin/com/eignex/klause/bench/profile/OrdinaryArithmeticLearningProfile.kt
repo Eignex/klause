@@ -159,5 +159,8 @@ internal object OrdinaryArithmeticLearningProfile {
                 capture?.release()
             }
         }
+        System.out.flush()
+        // The lab publishes live log tails asynchronously before process teardown.
+        Thread.sleep(5_000L)
     }
 }
