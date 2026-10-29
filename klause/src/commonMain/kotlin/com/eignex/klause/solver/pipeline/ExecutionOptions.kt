@@ -300,7 +300,9 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** Failed-literal probe work ceiling. */
         val inprocessingProbeWork: ExecutionOption<Long> = ExecutionOption("inprocessing-probe-work", ValueKind.LONG)
         /** Subsumption preparation and matching work ceiling. */
-        val inprocessingSubsumeWork: ExecutionOption<Long> = ExecutionOption("inprocessing-subsume-work", ValueKind.LONG)
+        val inprocessingSubsumeWork: ExecutionOption<Long> = ExecutionOption(
+            "inprocessing-subsume-work", ValueKind.LONG,
+        )
         /** Vivification work ceiling. */
         val inprocessingVivifyWork: ExecutionOption<Long> = ExecutionOption("inprocessing-vivify-work", ValueKind.LONG)
         /** Non-inprocessing work between safe-root opportunities; zero disables the trigger. */

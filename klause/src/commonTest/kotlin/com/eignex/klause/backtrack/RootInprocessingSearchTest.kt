@@ -89,9 +89,15 @@ class RootInprocessingSearchTest {
     }
 
     @Test
-    fun `optimization should consume work triggered probing before an incumbent cutoff`() {
+    fun `optimization should consume growth triggered probing after source clause import`() {
         for ((native, resumed) in listOf(false to false, false to true, true to false, true to true)) {
-            val configured = params(native).copy(lubyRestartBase = null, inprocessingInterval = 1L,
+            val exchange = object : ClauseExchange {
+                override fun onSearchStart(session: PropagationSession) {
+                    session.importClause(SharedClause(intArrayOf(0, 2, 8), longArrayOf(), 3), 6)
+                }
+                override fun onRestart(session: PropagationSession) = Unit
+            }
+            val configured = params(native, exchange).copy(lubyRestartBase = null, inprocessingGrowth = 1,
                 inprocessingWork = 4096L, inprocessingRootWork = 512L, inprocessingProbeWork = 512L,
                 lpConfig = LpConfig.OFF)
             val solver = BacktrackSolver(problem().bake())

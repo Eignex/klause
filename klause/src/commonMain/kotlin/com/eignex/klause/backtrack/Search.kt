@@ -516,7 +516,11 @@ private class CpSatisfactionTraversalPolicy(
         }
         if (result is ComponentResult.Conflict) return SearchRunDisposition.Exhausted
         if (result == ComponentResult.Indeterminate) {
-            return if (slice?.pauses?.invoke() == true) SearchRunDisposition.Pause else SearchRunDisposition.Indeterminate
+            return if (slice?.pauses?.invoke() == true) {
+                SearchRunDisposition.Pause
+            } else {
+                SearchRunDisposition.Indeterminate
+            }
         }
         return SearchRunDisposition.Continue
     }

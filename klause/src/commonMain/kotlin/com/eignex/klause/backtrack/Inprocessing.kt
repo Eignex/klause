@@ -1,8 +1,8 @@
 package com.eignex.klause.backtrack
 
-import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PROPAGATION_PREPARATION_BATCH_SIZE
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.result.SearchStatsSink
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchContext
