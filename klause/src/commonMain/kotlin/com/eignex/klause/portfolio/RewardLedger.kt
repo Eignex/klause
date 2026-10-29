@@ -187,6 +187,7 @@ internal class ProgressCredit(arms: Int) {
 
 /** What the scheduler did with each arm over a run, reported as [SolveStats.portfolio]. */
 internal class ScheduleLog(private val workers: List<PortfolioWorker>) {
+    val progress = PortfolioProgressLog(workers)
     private val segments = LongArray(workers.size)
     private val work = LongArray(workers.size)
     private val millis = LongArray(workers.size)
@@ -265,6 +266,8 @@ internal class ScheduleLog(private val workers: List<PortfolioWorker>) {
                     faults = faults[arm],
                     credit = (if (workers[arm].auxiliaryProof) proofLedger else ledger).creditOf(arm),
                     sharing = workers[arm].sharingMeter?.snapshot() ?: SharingStats(),
+                    phases = progress.phases(arm),
+                    lifecycle = progress.lifecycle(arm),
                 )
             },
         )

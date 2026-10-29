@@ -50,6 +50,10 @@ internal class PortfolioProgressLog(workers: List<PortfolioWorker>) {
         lifecycle[arm] = lifecycle[arm].copy(retirementNanos = lifecycle[arm].retirementNanos + nanos)
     }
 
+    fun active(arm: Int, nanos: Long) {
+        lifecycle[arm] = lifecycle[arm].copy(activeNanos = lifecycle[arm].activeNanos + nanos)
+    }
+
     fun phases(arm: Int): List<PortfolioPhaseStats> = phases[arm].filter { it.segments > 0 || it.credit.isNotEmpty() }
     fun lifecycle(arm: Int): PortfolioLifecycleStats = lifecycle[arm]
 }

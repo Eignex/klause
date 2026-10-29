@@ -231,7 +231,8 @@ class Portfolio(
             val openingFailure = opened.exceptionOrNull()
             if (opening && (handle != null || openingFailure != null)) {
                 claim.initializationNanos = setup.elapsedNow().inWholeNanoseconds
-                claim.initializationWork = handle?.initialWork ?: (openingFailure as? SearchInitializationCancelled)?.work ?: 0L
+                claim.initializationWork = handle?.initialWork
+                    ?: (openingFailure as? SearchInitializationCancelled)?.work ?: 0L
                 run.log.initialized(
                     arm,
                     setup.elapsedNow().inWholeMilliseconds,
@@ -481,7 +482,8 @@ class Portfolio(
             val openingFailure = opened.exceptionOrNull()
             if (opening && (handle != null || openingFailure != null)) {
                 claim.initializationNanos = setup.elapsedNow().inWholeNanoseconds
-                claim.initializationWork = handle?.initialWork ?: (openingFailure as? SearchInitializationCancelled)?.work ?: 0L
+                claim.initializationWork = handle?.initialWork
+                    ?: (openingFailure as? SearchInitializationCancelled)?.work ?: 0L
                 run.log.initialized(
                     arm,
                     setup.elapsedNow().inWholeMilliseconds,
@@ -779,7 +781,7 @@ class Portfolio(
         private val proofProgress = proofLedger?.let { ProgressCredit(workers.size) }
         private val progress = ProgressCredit(workers.size)
         val log = ScheduleLog(workers)
-        private val progressLog = PortfolioProgressLog(workers)
+        private val progressLog = log.progress
         private val queried = BooleanArray(workers.size)
         private val recorded = BooleanArray(workers.size)
         private val readVersions = LongArray(workers.size) { -1L }
@@ -917,9 +919,15 @@ class Portfolio(
                 }
                 parallelRun(List(lanes) { index -> { lane(index, segment) } })
                 laneFailure?.let { throw it }
+            } catch (failure: Throwable) {
+                if (laneFailure == null) laneFailure = failure
+                throw failure
             } finally {
                 try {
                     closeAll(laneFailure)
+                } catch (failure: Throwable) {
+                    if (laneFailure == null) laneFailure = failure
+                    throw failure
                 } finally {
                     for (worker in workers) {
                         worker.sharingMeter?.onImport = null
@@ -956,6 +964,7 @@ class Portfolio(
                             busy[claim.arm] = false
                             activeSince[claim.arm] = null
                             armNanos[claim.arm] += spent
+                            progressLog.active(claim.arm, spent)
                             totalNanos += spent
                         }
                     }
@@ -1029,7 +1038,8 @@ class Portfolio(
                 preparationRevisit = revisiting,
                 segment = segmentIndex++,
             ).also { claim ->
-                claim.selectedPhase = if (feasibilityComplete) PortfolioPhase.IMPROVEMENT else PortfolioPhase.FEASIBILITY
+                claim.selectedPhase = if (feasibilityComplete) PortfolioPhase.IMPROVEMENT
+                    else PortfolioPhase.FEASIBILITY
                 diagnostics?.onEvent?.invoke(PortfolioEvent.Selected(claim.segment, arm, workers[arm].label,
                     claim.sliceWork))
             }
@@ -1254,7 +1264,8 @@ class Portfolio(
                 val idleCredit = idleAccount.pendingCreditOf(other)
                 val idleProgress = PortfolioProgress(other,
                     if (feasibilityComplete) PortfolioPhase.IMPROVEMENT else PortfolioPhase.FEASIBILITY,
-                    0, 0, 0, false, false, idleCredit, idleAccount.settleIdle(other, claim.sliceWork), idleCredit = true)
+                    0, 0, 0, false, false, idleCredit, idleAccount.settleIdle(other, claim.sliceWork),
+                    idleCredit = true)
                 progressLog.record(idleProgress, 0)
                 onProgress?.invoke(PortfolioEvent.Progressed(idleProgress))
                 val idleReward = rewardFor(idleProgress)
@@ -1307,13 +1318,11 @@ class Portfolio(
                 .fold(SolveStats.EMPTY) { acc, snapshot -> acc.mergedWith(snapshot) }
             return stats.copy(
                 run = stats.run.copy(wallMs = started.elapsedNow().inWholeMilliseconds),
-                portfolio = log.stats(ledger, proofLedger ?: ledger).let { snapshot -> snapshot.copy(
-                    arms = snapshot.arms.mapIndexed { arm, value -> value.copy(
-                        phases = progressLog.phases(arm), lifecycle = progressLog.lifecycle(arm)) },
+                portfolio = log.stats(ledger, proofLedger ?: ledger).copy(
                     profile = profile, reseedStaleThreshold = reseedStaleThreshold,
                     baseSliceWork = baseSliceWork, maxSliceWork = maxSliceWork, sliceGrowth = sliceGrowth,
                     invocationNanos = epoch.elapsedNow().inWholeNanoseconds,
-                ) },
+                ),
             )
         }
 

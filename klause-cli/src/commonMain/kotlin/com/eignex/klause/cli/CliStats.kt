@@ -412,7 +412,7 @@ internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> {
             "firstQueryNs=${life.firstQueryNanos} availableNs=${life.incumbentAvailableNanos} " +
             "readNs=${life.incumbentReadNanos} importedNs=${life.incumbentImportedNanos} " +
             "consumedNs=${life.incumbentConsumedNanos} retiredNs=${life.retiredNanos} " +
-            "retirementNs=${life.retirementNanos} reads=${life.incumbentReads} " +
+            "retirementNs=${life.retirementNanos} activeNs=${life.activeNanos} reads=${life.incumbentReads} " +
             "imports=${life.incumbentImports} uses=${life.incumbentUses}"
     }
     val alns = stats.alns

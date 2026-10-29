@@ -461,8 +461,10 @@ Idle downstream-use credit reaches the same callback with zero new work or time.
 Each arm retains at most three phase summaries and one lifecycle summary. They
 separate factory construction, handle initialization, pending preparation, verification
 requests (including refuted or indeterminate checks), accepted incumbents and handle
-retirement. Initialization and checking are included in segment time; retirement
-follows settlement. Invocation time includes all these scopes and coordinator costs.
+retirement. Phase times run through reward settlement; initialization and checking
+are included. Arm active time also includes settlement/observer overhead and in-lane
+retirement. Retirement during final cleanup is outside arm active time. Invocation
+time includes all these scopes and coordinator costs.
 Source preparation precedes this scope and retains its own invocation accounting;
 source reconstruction, independent checking and process retirement belong to the
 containing source run. Nested times must not be added to invocation time.

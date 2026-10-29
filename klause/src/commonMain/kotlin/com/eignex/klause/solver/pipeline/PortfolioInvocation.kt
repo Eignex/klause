@@ -69,6 +69,7 @@ internal class PortfolioInvocation(
 ) : PortfolioExecutor {
     init { require(factories.isNotEmpty()) { "portfolio invocation requires admitted arm factories" } }
     private val factories = factories.toList()
+    private val started = TimeSource.Monotonic.markNow()
     val resources = PortfolioInvocationResources(
         maxOf(factories.size, controls.parallelism), controls.parallelism,
         controls.workerSeed, controls.cancellation, controls.nodeBudget,
@@ -77,7 +78,6 @@ internal class PortfolioInvocation(
         }.toSet(),
     )
     private val workers = ArrayList<PortfolioWorker>()
-    private val started = TimeSource.Monotonic.markNow()
     private val portfolio: Portfolio = try {
         for (slot in resources.slots) {
             val construction = TimeSource.Monotonic.markNow()

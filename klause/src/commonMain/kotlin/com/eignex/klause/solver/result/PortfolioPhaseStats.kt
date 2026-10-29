@@ -10,7 +10,7 @@ data class PortfolioPhaseStats(
     val segments: Long = 0,
     /** Native work, including handle initialization. */
     val work: Long = 0,
-    /** Inclusive segment nanoseconds. */
+    /** Segment nanoseconds through reward settlement, including coordinator checking. */
     val nanos: Long = 0,
     /** Coordinator verification requests, including failed and indeterminate checks. */
     val checks: Long = 0,
@@ -56,4 +56,6 @@ data class PortfolioLifecycleStats(
     val incumbentImports: Long = 0,
     /** Actual private bound/center consumer calls following an import. */
     val incumbentUses: Long = 0,
+    /** Inclusive lane time, including reward/observer overhead and in-lane handle retirement. */
+    val activeNanos: Long = 0,
 )
