@@ -30,6 +30,8 @@ internal class PreparingMinimize(
         solver.problem, propagationToken, params.propagationCancelFloor,
         params.pbLearning ?: (solver.problem.numIntVars == 0),
         cumulativeUnarySubsets = solver.problem.numRealVars == 0 && params.useCumulativeUnarySubsets,
+        attribution = params.propagationAttribution,
+        historicalTables = params.historicalTableReasons,
     )
     private var search: ResumableMinimize? = null
     private var installing: ResumableMinimize? = null
@@ -41,6 +43,7 @@ internal class PreparingMinimize(
     private val propagationNanos: Long get() = preparation?.propagationNanos ?: retainedPropagationNanos
     private val sink = SolveStatsSink(backend = "backtrack").also {
         it.start()
+        it.search.learning = { preparation?.learning() ?: emptyMap() }
         it.search.propagationWork = { propagationWork }
         it.search.rootPropagationWork = { propagationWork }
         it.search.propagationNanos = { propagationNanos }
@@ -136,6 +139,7 @@ internal class PreparingMinimize(
         val completedRootWork = sink.search.rootPropagationWork()
         val completedNanos = sink.search.propagationNanos()
         val completedRootNanos = sink.search.rootPropagationNanos()
+        val completedLearning = sink.search.learning()
         try {
             (search ?: installing)?.close()
         } finally {
@@ -145,6 +149,7 @@ internal class PreparingMinimize(
             preparation = null
             installing = null
             if (pending) {
+                sink.search.learning = { completedLearning }
                 sink.search.propagationWork = { completedWork }
                 sink.search.rootPropagationWork = { completedRootWork }
                 sink.search.propagationNanos = { completedNanos }

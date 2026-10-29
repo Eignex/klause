@@ -11,6 +11,8 @@ internal class PropagationPreparation(
     private val propagationCancelFloor: Int,
     private val pbLearning: Boolean,
     private val cumulativeUnarySubsets: Boolean = false,
+    private val attribution: Boolean = false,
+    private val historicalTables: Boolean = false,
 ) {
     private val projections = PropagationProblem.preparation(problem)
     private var projection: PropagationProblem? = null
@@ -27,6 +29,7 @@ internal class PropagationPreparation(
 
     val work: Long get() = state?.work ?: 0L
     val propagationNanos: Long get() = state?.propagationNanos ?: 0L
+    fun learning(): Map<String, Long> = state?.factorAttribution?.snapshot() ?: emptyMap()
 
     fun advance(): PropagationSession? {
         result?.let { return it }
@@ -40,6 +43,8 @@ internal class PropagationPreparation(
             state = builder.next()?.also {
                 it.cancelFloor = propagationCancelFloor
                 it.cumulativeUnarySubsets = cumulativeUnarySubsets
+                if (attribution) it.factorAttribution = FactorAttribution()
+                it.historicalTableReasons = historicalTables
                 states = null
             }
             return null
