@@ -79,6 +79,21 @@ class ArithmeticLearningTraceTest {
     }
 
     @Test
+    fun `an oversized clause capture should preserve later consumers`() {
+        val state = PropagationState(Problem(0, 0, emptyArray(), emptyArray()), Assumptions.None)
+        val trace = ArithmeticLearningTrace()
+        trace.stored(4, "integer")
+        trace.clause("analysis.seed-clause", IntArray(65), state)
+
+        trace.pin(4, 0, 2, "upper", 1)
+
+        assertContentEquals(longArrayOf(65), trace.events.single { it.kind.endsWith(".omitted") }.data)
+        assertTrue(trace.events.any { it.kind == "consumer.upper" })
+        assertEquals(1, trace.omittedPayloads)
+        assertFalse(trace.truncated)
+    }
+
+    @Test
     fun `capture should own payloads and stop at its word allowance`() {
         val trace = ArithmeticLearningTrace(maxEvents = 4, maxWords = 3)
         val payload = longArrayOf(1, 2)

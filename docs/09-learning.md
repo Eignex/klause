@@ -295,8 +295,8 @@ Guard negations remain premises of every retained-row deduction and conflict.
 
 Rows belong to the prepared session's coordinates and source factors. Assignment
 reconstruction does not authorize replaying a row in another preparation, assumption
-container or objective context. Only the owning store attaches the typed object. Opt-in integer learning gives the
-finite backtrack traversal a session-local shared atom registry, reserving the
+container or objective context. Only the owning store attaches the typed object.
+Opt-in integer learning gives the finite backtrack traversal a session-local shared atom registry, reserving the
 prepared Boolean coordinates before naming integer decisions and their complements.
 The registry admits at most 4,096 atoms; an exhausted registry stops the traversal
 as indeterminate. Without names, a non-root integer decision cannot supply a
