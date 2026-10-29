@@ -1374,18 +1374,33 @@ private fun LpEngine.sparseRootLpRelaxationBound(
         return standaloneRootLpRelaxationBound(relaxer, emptyList(), cancellation)
     }
     if (relaxation.model.n == 0) return Double.NaN
-    val attempt = solveNode(relaxation.model, null, cancellation) ?: return Double.NaN
-    return try {
-        val lower = attempt.second?.let {
-            certifiedTightObjectiveLowerBound(relaxation.model, it.duals,
-                rootCertificationObserver(), solveContext.certificationPolicy)
+    try {
+        while (sparseTrialRemainingWork() > 0L && !cancellation()) {
+            val attempt = solveNode(relaxation.model, null, cancellation)
+            if (attempt == null) {
+                val metrics = propagator.lastMetrics.copy(preparationOps = 0L)
+                observeRootWork(metrics, finished = !propagator.floatPaused)
+                if (!propagator.floatPaused || metrics.workOps == 0L) return Double.NaN
+                sink.lp.sparseTrial = sink.lp.sparseTrial +
+                    ("RootPauses" to ((sink.lp.sparseTrial["RootPauses"] ?: 0L) + 1L))
+                observeNodePause()
+                continue
+            }
+            return try {
+                val lower = attempt.second?.let {
+                    certifiedTightObjectiveLowerBound(relaxation.model, it.duals,
+                        rootCertificationObserver(), solveContext.certificationPolicy)
+                }
+                if (cancellation()) Double.NaN else projectCertifiedLowerBound(relaxation, lower)
+            } finally {
+                // Scoped preparation has already charged its scaling-construction reservation.
+                val metrics = if (nodeUsesTrail) propagator.lastMetrics.copy(preparationOps = 0L)
+                    else attempt.first.lastMetrics
+                observeRootSolve(attempt.first, metrics)
+            }
         }
-        if (cancellation()) Double.NaN else projectCertifiedLowerBound(relaxation, lower)
+        return Double.NaN
     } finally {
-        // Scoped preparation has already charged its scaling-construction reservation.
-        val metrics = if (nodeUsesTrail) propagator.lastMetrics.copy(preparationOps = 0L)
-            else attempt.first.lastMetrics
-        observeRootSolve(attempt.first, metrics)
         val retained = cpAdapter.retainTrialRoot(root)
         sink.lp.sparseTrial = sink.lp.sparseTrial + ("RootOwnerRetained" to if (retained) 1L else 0L)
     }

@@ -26,6 +26,49 @@ import kotlin.test.assertTrue
 
 class SparseLpAdmissionTest {
     @Test
+    fun `sparse root consultations retain progress until a checked bound completes`() {
+        val problem = Problem(0, 96, Array(96) { IntDomain(0, 1) },
+            List(95) { Linear(intArrayOf(1, 1), intArrayOf(it, it + 1), LinearOp.GE, 1) },
+            settings = ProblemSettings(lpCeilingTableauCells = 1L))
+        val sink = SolveStatsSink("continued-sparse-root")
+
+        val (lower, work) = LpEngine(problem, LinearObjective(intCoefficients = LongArray(96) { 1L }),
+            LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")), sink).use { engine ->
+            repeat(3) { engine.observeNodeWork(false, 96, 96, 1L) }
+            val bound = engine.rootLpRelaxationBound(requireNotNull(engine.lpRelaxer), emptyList())
+            bound to engine.totalSolveWork()
+        }
+
+        assertEquals(48.0, lower)
+        assertTrue((sink.snapshot().lp.sparseTrial["RootPauses"] ?: 0L) > 0L)
+        assertEquals(1.0, sink.snapshot().lp.rootPasses.sum)
+        assertTrue(sink.snapshot().lp.rootWorkOps.sum > 0.0)
+        assertTrue(work <= SPARSE_LP_MAX_WORK)
+    }
+
+    @Test
+    fun `cancelled sparse root continuation publishes no partial bound`() {
+        val problem = Problem(0, 96, Array(96) { IntDomain(0, 1) },
+            List(95) { Linear(intArrayOf(1, 1), intArrayOf(it, it + 1), LinearOp.GE, 1) },
+            settings = ProblemSettings(lpCeilingTableauCells = 1L))
+        val sink = SolveStatsSink("cancelled-sparse-root")
+        val stop = Cancellation { (sink.lp.sparseTrial["RootPauses"] ?: 0L) > 0L }
+
+        val (lower, work) = LpEngine(problem, LinearObjective(intCoefficients = LongArray(96) { 1L }),
+            LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")), sink).use { engine ->
+            repeat(3) { engine.observeNodeWork(false, 96, 96, 1L) }
+            val bound = engine.rootLpRelaxationBound(requireNotNull(engine.lpRelaxer), emptyList(), stop)
+            bound to engine.totalSolveWork()
+        }
+
+        assertTrue(lower.isNaN())
+        assertEquals(1L, sink.snapshot().lp.sparseTrial["RootPauses"])
+        assertEquals(0.0, sink.snapshot().lp.rootPasses.sum)
+        assertTrue(sink.snapshot().lp.rootWorkOps.sum > 0.0)
+        assertTrue(work <= SPARSE_LP_MAX_WORK)
+    }
+
+    @Test
     fun `strict source completion stays outside bounded root trial admission`() {
         val problem = Problem(
             0, 0, emptyArray(),

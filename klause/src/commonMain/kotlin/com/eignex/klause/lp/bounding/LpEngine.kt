@@ -250,10 +250,17 @@ internal class LpEngine(
         solver: LpSolver,
         metrics: com.eignex.klause.lp.engine.LpSolveMetrics = solver.lastMetrics,
     ) {
+        observeRootWork(metrics)
+        observeSparseTrial(solver)
+    }
+
+    internal fun observeRootWork(
+        metrics: com.eignex.klause.lp.engine.LpSolveMetrics,
+        finished: Boolean = true,
+    ) {
         val charged = if (sparseTrialActive) metrics.copy(workOps =
             saturatingAdd(metrics.workOps, metrics.preparationOps)) else metrics
-        sink.lp.observeEngineCost(LpRoute.ROOT, charged)
-        observeSparseTrial(solver)
+        sink.lp.observeEngineCost(LpRoute.ROOT, charged, finished)
         chargeWork(charged.workOps)
     }
 
@@ -535,7 +542,8 @@ internal class LpEngine(
     }
 
     internal fun nodeQueryWorkBudget(): Long? {
-        if (sparseTrialActive) return sparseTrialRemainingWork().coerceAtLeast(1L)
+        if (sparseTrialActive) return minOf(sparseTrialRemainingWork().coerceAtLeast(1L),
+            if (adaptiveWork) lpWorkBudget.ops() else SPARSE_LP_MAX_WORK)
         val offered = nodeWorkAllowance()?.coerceAtLeast(1L) ?: return null
         val containing = nodeWorkBudget()
         return if (containing == 0L) offered else minOf(containing, offered)
@@ -627,7 +635,7 @@ internal class LpEngine(
     }
 
     internal fun observeNodePause() {
-        if (rootQueryPolicy == LpRootQueryPolicy.CHECKPOINTED_WORK && adaptiveWork &&
+        if ((sparseTrialActive || rootQueryPolicy == LpRootQueryPolicy.CHECKPOINTED_WORK) && adaptiveWork &&
             propagator.floatPaused && propagator.lastMetrics.pivots > 0
         ) lpWorkBudget.observeWorkStop()
     }
@@ -723,7 +731,8 @@ internal class LpEngine(
             noteSolveOps(metrics.workOps)
         } else null,
         continuationAllowance = {
-            lpEffortGovernor.remainingWork()?.takeIf { rootQueryPolicy == LpRootQueryPolicy.CHECKPOINTED_WORK }
+            if (sparseTrialActive) sparseTrialRemainingWork() else
+                lpEffortGovernor.remainingWork()?.takeIf { rootQueryPolicy == LpRootQueryPolicy.CHECKPOINTED_WORK }
         },
     )
 
