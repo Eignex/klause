@@ -375,6 +375,12 @@ retains no trace buffer. Finite source invocations forward these events through
 `SearchEvent.PortfolioDiagnostic`; CLI verbose output renders them without a clock.
 The ordinary scheduler remains the default.
 
+Boolean region attribution uses the [task coverage protocol](08-search.md#boolean-task-coverage)
+with the same source, full assumptions, objective cutoff and mapping identity. Schedule
+events and read/import/use counts do not establish duplicate region coverage. The task
+board is separate from worker selection: it changes neither these scheduling rules nor
+terminal admission and owns no retained solver state.
+
 ### Slice accounting and coverage
 
 The counted schedule starts at 5000 node equivalents, grows by 1.5 after an ordinary
