@@ -6,10 +6,10 @@ trace="${1:?usage: lp-lifecycle-profile.sh mps-afiro|mps-adlittle [repeats] [bot
 repeats="${2:-3}"
 runtime="${3:-both}"
 mode="${4:-lifecycle}"
-[[ "$trace" == mps-afiro || "$trace" == mps-adlittle ]] || exit 2
+[[ "$trace" =~ ^mps-[a-z0-9_-]+$ ]] || exit 2
 [[ "$repeats" =~ ^[1-5]$ ]] || exit 2
 [[ "$runtime" == both || "$runtime" == jvm || "$runtime" == native ]] || exit 2
-[[ "$mode" == lifecycle || "$mode" == claims || "$mode" == precision || "$mode" == consumers ]] || exit 2
+[[ "$mode" == lifecycle || "$mode" == claims || "$mode" == precision || "$mode" == checkpoint || "$mode" == consumers ]] || exit 2
 [[ "$(uname -s)/$(uname -m)" == Linux/x86_64 ]] || exit 2
 manifest="$LAB_WORKTREE/klause/src/jvmTest/resources/basis-corpus/manifest.json"
 fixture="$(sed -n "/\"id\": \"$trace\"/,/^    }/p" "$manifest")"
@@ -17,6 +17,12 @@ source_identity="$(printf '%s\n' "$fixture" | sed -n 's/^ *"source": "\([^"]*\)"
 expected="$(printf '%s\n' "$fixture" | sed -n 's/^ *"sourceSha256": "\([^"]*\)".*/\1/p')"
 source_path="${source_identity%@*}"
 source_revision="${source_identity##*@}"
+if [[ -n "${5:-}" || -n "${6:-}" ]]; then
+  expected="${5:?held-out source SHA-256 is required}"
+  source_revision="${6:?held-out source revision is required}"
+  source_path="HiGHS/check/instances/${trace#mps-}.mps"
+  source_identity="$source_path@$source_revision"
+fi
 [[ "$source_path" == "HiGHS/check/instances/${trace#mps-}.mps" ]] || exit 2
 [[ "$source_revision" =~ ^[a-f0-9]{40}$ && "$expected" =~ ^[a-f0-9]{64}$ ]] || exit 2
 mkdir -p "$OUT"
