@@ -36,7 +36,7 @@ internal object Suites {
             NonlinearIntegerBooleanResidueSuite.suite +
             DivModSuite.suite + AbsSuite.suite +
             ContinuousArithmeticSuite.suite + MpsLinearSourceSuite.suite +
-            SourceOwnershipSuite.suite + ExactGlobalsSuite.suite + SourceEqualitySuite.suite +
+            SourceOwnershipSuite.suite + RewriteStructureSuite.suite + ExactGlobalsSuite.suite + SourceEqualitySuite.suite +
             IntegerAggregateSuite.suite
     }
 

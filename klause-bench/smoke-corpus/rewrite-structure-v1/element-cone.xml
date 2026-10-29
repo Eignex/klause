@@ -1,0 +1,14 @@
+<instance format="XCSP3" type="COP">
+  <variables>
+    <var id="x">1..3</var>
+    <var id="y">0..2</var>
+    <var id="w">0..2</var>
+    <var id="result">2..6</var>
+  </variables>
+  <constraints>
+    <sum><list>x y</list><coeffs>1 -1</coeffs><condition>(eq,1)</condition></sum>
+    <extension><list>y w</list><supports>(0,0)(1,1)(2,2)</supports></extension>
+    <element startIndex="1"><list>2 4 6</list><index>x</index><value>result</value></element>
+  </constraints>
+  <objectives><minimize>result</minimize></objectives>
+</instance>
