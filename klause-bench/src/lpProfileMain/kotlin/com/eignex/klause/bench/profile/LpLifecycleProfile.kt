@@ -36,8 +36,8 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.util.Cancellation
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -56,6 +56,7 @@ internal fun main(args: Array<String>) {
     val repeats = options.getValue("repeats").toInt().also { require(it in 1..5) }
     val stop = Cancellation.after(120.seconds)
     val start = Monotonic.markNow()
+    val preparationAllocated = profileAllocatedBytes()
     val compiled = Mps.parse(bytes.decodeToString()).toProblem()
     val objective = compiled.objective?.toLinearObjective()?.let { if (compiled.maximize) it.negated() else it }
     val projection = CpToLpRelaxation(compiled.model, objective)
@@ -77,6 +78,9 @@ internal fun main(args: Array<String>) {
         put("source", options.getValue("source"))
         put("sha256", options.getValue("sha256"))
         put("elapsedNs", start.elapsedNow().inWholeNanoseconds)
+        put("allocatedBytes", preparationAllocated?.let { allocated ->
+            profileAllocatedBytes()?.minus(allocated)?.let(::JsonPrimitive)
+        } ?: JsonNull)
         put("rows", initial.model.m)
         put("columns", initial.model.n)
         put("editColumn", column)
@@ -194,6 +198,8 @@ private fun lifecycle(
                 put("activeRows", current.metrics.activeRows)
                 put("certificateWork", observer.work)
                 put("certificateAttempts", numbers(observer.attempts))
+                put("exactInputAttempts", observer.exactInputAttempts)
+                put("exactInputAccepted", observer.exactInputAccepted)
                 put("certificatePhases", numbers(observer.phases))
                 put("reconstructionDecline", result?.reconstruction?.decline?.name)
                 put("basisDecline", result?.basisVerification?.decline?.name)
@@ -206,6 +212,7 @@ private fun lifecycle(
                     numbers(triggers)
                 } ?: JsonNull)
                 put("qualitySamples", numerical?.lastRefactorPolicyMetrics?.qualitySamples?.let(::JsonPrimitive) ?: JsonNull)
+                put("pivotSpread", numerical?.lastRefactorPolicyMetrics?.pivotSpread?.let(::profileNumber) ?: JsonNull)
                 put("trace", numerical?.progressTrace?.let(::traceJson) ?: JsonNull)
             })
             if (!retained) {
@@ -240,6 +247,9 @@ private fun numbers(values: Map<*, Long>): JsonElement = buildJsonObject {
     values.forEach { (key, value) -> put(key.toString(), value) }
 }
 
+private fun profileNumber(value: Double): JsonElement =
+    if (value.isFinite()) JsonPrimitive(value) else JsonPrimitive(value.toString())
+
 private fun traceJson(trace: SimplexProgressTrace): JsonElement = buildJsonObject {
     put("inclusivePhaseNs", numbers(trace.phaseNanos))
     put("phaseCalls", numbers(trace.phaseCalls))
@@ -247,22 +257,36 @@ private fun traceJson(trace: SimplexProgressTrace): JsonElement = buildJsonObjec
     put("degenerateSteps", trace.degenerateSteps.values.sum())
     put("basisWork", numbers(trace.basisWork))
     put("progressSamples", trace.samples.size)
+    put("samples", JsonArray(trace.samples.map { sample -> buildJsonObject {
+        put("phase", sample.phase.name)
+        put("pivots", sample.pivots)
+        put("work", sample.work)
+        put("scaledObjective", profileNumber(sample.scaledObjective))
+        put("scaledInfeasibility", profileNumber(sample.scaledInfeasibility))
+        put("scaledMaxViolation", profileNumber(sample.scaledMaxViolation))
+        put("violatedBasics", sample.violatedBasics)
+    } }))
     put("primalFeasibilityIterations", trace.iterations[SimplexPhase.PRIMAL_FEASIBILITY] ?: 0)
-    put("sourcePrimalResidual", trace.sourcePrimalResidual?.let(::JsonPrimitive) ?: JsonNull)
-    put("sourceBoundViolation", trace.sourceBoundViolation?.let(::JsonPrimitive) ?: JsonNull)
-    put("sourceBasicDualResidual", trace.sourceBasicDualResidual?.let(::JsonPrimitive) ?: JsonNull)
+    put("sourcePrimalResidual", trace.sourcePrimalResidual?.let(::profileNumber) ?: JsonNull)
+    put("sourceBoundViolation", trace.sourceBoundViolation?.let(::profileNumber) ?: JsonNull)
+    put("sourceBasicDualResidual", trace.sourceBasicDualResidual?.let(::profileNumber) ?: JsonNull)
 }
 
 private class LifecycleCertificates : LpCertificationObserver {
     var work = 0L
     val phases = mutableMapOf<LpSolvePhase, Long>()
     val attempts = mutableMapOf<String, Long>()
+    var exactInputAttempts = 0
+    var exactInputAccepted = 0
     override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
         val key = "$certifier:$success"
         attempts[key] = attempts.getOrElse(key) { 0L } + 1L
         if (cost is LpCertifierCost.Metered) work += cost.work
     }
-    override fun observeExactInput(accepted: Boolean) = Unit
+    override fun observeExactInput(accepted: Boolean) {
+        exactInputAttempts++
+        if (accepted) exactInputAccepted++
+    }
     override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
     override fun observeBasisVerification(metrics: ExactBasisMetrics) { work += metrics.work }
     override fun observeContinuation(metrics: ExactContinuationMetrics) { work += metrics.work }

@@ -375,8 +375,10 @@ These controls establish no throughput improvement or independent proof validati
 hash-pinned source from the existing basis corpus on JVM and Linux Native through
 the production source projection and scoped LP owner. Submit it as a lab profile
 script with build tasks `:klause:stageLpProfileJvm` and
-`:klause:linkLpProfileReleaseExecutableLinuxX64`, a 180-second profile limit and
-compatible Linux x86_64 placement. These bench-owned custom compilations have
+`:klause:linkLpProfileReleaseExecutableLinuxX64`, `base.timeout="180000"` and
+compatible Linux x86_64 placement. Fund remote build, source preparation, retries
+and cleanup separately through a finite `profile.runTimeoutSec` containing
+allowance. These bench-owned custom compilations have
 internal access to the engine and add no Maven artifacts. Ordinary CI compiles
 them and runs the shared deterministic regressions; it runs no profiling workload.
 
@@ -396,7 +398,10 @@ traces reset at the next solve. Scoped owner counters are cumulative gauges and
 must not be summed across queries.
 
 Original bytes, corpus manifest, revision, executable hashes, runtime, JFR and
-resource receipts accompany the records. These controlled LP edits establish no
+resource receipts accompany the records, including the official JFR allocation
+sample export. Numerical invocations retain the bounded progress samples and
+certificate work retains exact-input eligibility and declined reconstruction
+outcomes. These controlled LP edits establish no
 original-source result. Pair them with source-matched ordinary lab solver runs
 using independent source validation, deterministic work scheduling where applicable,
 and the same semantics and preparation controls. Kernel timings, pivot counts and
