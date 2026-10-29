@@ -173,7 +173,8 @@ Global trail revision numbers alone do not invalidate an unchanged child.
 Prepared root cuts belong to the initial immutable layout even when its row
 revision is nonzero.
 Explicit query work and pivot allowances cover the collection, including failed
-children. Reused results add no numerical work or factorization charges.
+children, for retained node queries and fresh root tableau queries. Reused results
+add no numerical work or factorization charges.
 Finite basis entry limits are divided among the immutable column blocks; local
 cut replacements retain those shares.
 
