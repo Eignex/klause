@@ -1,9 +1,7 @@
 package com.eignex.klause.propagation
 
-import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.toBacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.backtrack.selector.IndomainMax
-import com.eignex.klause.backtrack.selector.InputOrder
 import com.eignex.klause.backtrack.selector.VariableSelector
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearPropagator
@@ -11,6 +9,7 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
+import com.eignex.klause.formats.flatzinc.toSearchHints
 import com.eignex.klause.formats.json.ProblemJson
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -45,29 +44,43 @@ class IntegerConflictLearnerTest {
     fun `a prepared enumeration should reuse and retire its guarded arithmetic consequence`() {
         val program = parseFlatZinc("""
             var bool: active;
-            var 0..24: z;
-            var 0..6: x;
-            var 0..12: y;
+            var 0..8: z;
+            var 0..2: x;
+            var 0..4: y;
             constraint int_lin_le_reif([2,1,-1],[x,y,z],0,active);
             constraint int_lin_le([2,-1],[x,y],0);
-            solve satisfy;
+            solve :: seq_search([
+                bool_search([active],input_order,indomain_max,complete),
+                int_search([z,x,y],input_order,indomain_min,complete)
+            ]) satisfy;
         """.trimIndent())
         val prepared = FinitePipeline.prepare(FinitePipelineRequest(
             program.problem, FiniteEngine.BACKTRACK, solutionSetSensitive = true, randomSeed = 3L,
         ))
         var native: PropagationSession? = null
-        val selector = object : VariableSelector by InputOrder {
-            override fun fresh(): VariableSelector = this
+        val trace = ArithmeticLearningTrace(1024, 65536)
+        val uses = mutableMapOf<Pair<LearnedIntegerPropagator, Int>, MutableSet<Long>>()
+        val base = assertNotNull(program.searchHints).toSearchHints().toBacktrackParams(
+            prepared.problem.numBoolVars, prepared.problem.numIntVars)
+        fun observing(delegate: VariableSelector): VariableSelector = object : VariableSelector by delegate {
+            override fun fresh(): VariableSelector = observing(delegate.fresh())
             override fun pick(session: PropagationSession, rng: Random): VarRef? {
+                if (native == null) session.explanationState.arithmeticLearningTrace = trace
                 native = session
-                return InputOrder.pick(session, rng)
+                val state = session.explanationState
+                for (variable in state.intMaxReason.indices) {
+                    val reason = state.intMaxReason[variable]
+                    if (reason < state.baseFactorCount) continue
+                    val row = state.factorAt(reason) as? LearnedIntegerPropagator ?: continue
+                    uses.getOrPut(row to variable) { mutableSetOf() }.add(state.intDomains[variable].max)
+                }
+                return delegate.pick(session, rng)
             }
         }
-        val uses = mutableMapOf<Pair<LearnedIntegerPropagator, Int>, MutableSet<Long>>()
-        val params = BacktrackParams(variableSelector = selector, valueSelector = IndomainMax,
-            integerRowLearning = true, pbLearning = false, randomSeed = 3L, maxDecisions = 10_000)
+        val params = base.copy(variableSelector = observing(base.variableSelector),
+            integerRowLearning = true, pbLearning = false, randomSeed = 3L, maxDecisions = 1_000)
         BacktrackSolver(assertIs<BakedProblem>(prepared.problem)).openEnumerate(params).use { stream ->
-            repeat(250) {
+            repeat(20) {
                 assertTrue(stream.hasNext())
                 val point = prepared.reconstruct(stream.next())
                 val x = point.intValue(program.intVarsByName.getValue("x"))
@@ -75,20 +88,15 @@ class IntegerConflictLearnerTest {
                 val z = point.intValue(program.intVarsByName.getValue("z"))
                 assertEquals(2 * x + y <= z, point.boolValue(program.boolVarsByName.getValue("active")))
                 assertTrue(2 * x <= y)
-                val state = assertNotNull(native).explanationState
-                for (variable in state.intMaxReason.indices) {
-                    val reason = state.intMaxReason[variable]
-                    if (reason < state.baseFactorCount) continue
-                    val row = state.factorAt(reason) as? LearnedIntegerPropagator ?: continue
-                    uses.getOrPut(row to variable) { mutableSetOf() }.add(state.intDomains[variable].max)
-                }
             }
         }
 
-        val retained = uses.entries.firstOrNull { it.value.size >= 2 }?.key?.first
-        assertNotNull(retained, "prepared=" + ProblemJson().encodeToString(prepared.problem) + "; uses=" + uses.values)
-        assertTrue(retained.row.guard != Lit.NONE)
         val session = assertNotNull(native)
+        val retained = uses.entries.firstOrNull { it.value.size >= 2 }?.key?.first
+        assertNotNull(retained, "prepared=" + ProblemJson().encodeToString(prepared.problem) +
+            "; learning=" + session.learnedLifecycle() + "; uses=" + uses.values +
+            "; tail=" + trace.events.takeLast(20).map { it.kind })
+        assertTrue(retained.row.guard != Lit.NONE)
         session.popToLevel(0)
         assertIs<PropagationResult.Implied>(session.pinBool(Lit.variable(retained.row.guard),
             !Lit.isPositive(retained.row.guard)))
@@ -96,6 +104,7 @@ class IntegerConflictLearnerTest {
         assertFalse(session.explanationState.learned.integerRows?.contains(retained) == true)
         assertTrue((session.learnedLifecycle()["learningIntegerRetired"] ?: 0L) > 0L)
     }
+
     @Test
     fun `a consumed guarded row should retire after its historical reason retracts`() {
         val native = PropagationSession(Problem(2, 3,
