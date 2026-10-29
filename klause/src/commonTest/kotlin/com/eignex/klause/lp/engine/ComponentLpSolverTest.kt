@@ -15,6 +15,24 @@ import kotlin.test.assertTrue
 
 class ComponentLpSolverTest {
     @Test
+    fun `an isolated improving direction withholds complete component points and tableaux`() {
+        val builder = LpBuilder()
+        repeat(2) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        builder.addRealVar(0.0, null, cost = -1.0)
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val owner = assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel())))
+        owner.use {
+            assertNull(it.solve())
+
+            assertNull(it.exactWitness())
+            assertTrue(it.gomoryCuts(2).isEmpty())
+        }
+    }
+
+    @Test
     fun `unfinished components require every minimizing bound side`() {
         val builder = LpBuilder()
         builder.addRealVar(0.0, null, cost = -1.0)
