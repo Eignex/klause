@@ -254,6 +254,7 @@ class ExactLiraSearchComponent private constructor(
     private var partialLinearProducerNs = 0L
     private var partialLinearAssertionNs = 0L
     private var partialLinearNumericalNs = 0L
+    private var linearOperationStops = 0L
     private var sourceInstalled = false
     private var graphFirst = false
     private var solveContext = LpSolveContext.Production
@@ -462,7 +463,7 @@ class ExactLiraSearchComponent private constructor(
             partialLinearProducerNs, partialLinearAssertionNs, partialLinearNumericalNs,
             system.assertionCost.definitionAppends, system.assertionCost.definitionNs,
             system.assertionCost.boundCalls, system.assertionCost.boundSides, system.assertionCost.boundNs,
-            sourceRowVisits, sourceRowTouches, sourceRowInvalidations)
+            sourceRowVisits, sourceRowTouches, sourceRowInvalidations, linearOperationStops)
 
     internal fun observePartialLinearCost() {
         check(context == null || context?.decisionLevel == 0)
@@ -1357,6 +1358,7 @@ class ExactLiraSearchComponent private constructor(
         lpStop.end()
         if (operationStop() && !context.cancelled()) {
             operationBudgetExhausted = true
+            linearOperationStops++
             context.executionControls.reportStop(SearchStopCause.OperationAllowance)
         }
         operationStop = parentStop

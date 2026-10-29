@@ -39,7 +39,7 @@ internal object LinearPrefixInspection {
         integrated: Boolean = false, cached: Boolean = false, reuse: Boolean = false, batching: Boolean = false,
         incremental: Boolean = false, incrementalControl: Boolean = false,
     ) {
-        val emergencySeconds = if (incremental) 30 else 10
+        val emergencySeconds = if (incremental) 40 else 10
         val captures = (0..1).map { replay ->
             val incrementalRows = incremental && !incrementalControl && replay == 1
             val stop = Cancellation.after(emergencySeconds.seconds)

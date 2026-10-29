@@ -335,10 +335,10 @@ by CI at the later source revision.
 SMT source. It compares the existing cached partial interval producer with the
 same producer plus literal-to-row assertion scheduling. Both arms use seed 1,
 one processor, a containing 100,000,000-unit open-work allowance and the same
-thirty-second emergency deadline. Fresh ordinary source preparation precedes each
+forty-second emergency deadline. Fresh ordinary source preparation precedes each
 arm; exact prefix and continuation snapshots must agree. The profile reports row
 visits, literal touches, retracted assertions, compatible decline reuse, consumed
-guard implications and producer/assertion/numerical time separately. These are
+guard implications, operation stops and producer/assertion/numerical time separately. These are
 direct library diagnostics; they supply neither a default CLI throughput claim nor
 independent whole-source proof validation. Run the main through the committed lab
 profile wrapper with CLI and bench installation tasks; retain pinned source bytes, preparation,
@@ -370,7 +370,13 @@ Incremental mode consumes 16 deduction events with 5 numerical deferrals and
 119,049 source-row visits, versus 396,676 control visits. After continuation,
 shared pins, reasons and source assertion levels still agree, but LP witness IDs
 and five point coordinates differ; the profile rejects that continuation replay.
-Use the same-policy control to isolate this difference before admission changes.
+[9268](https://lab.eignex.com/jobs/9268) repeats the cached producer in both arms;
+its prefix and continuation snapshots agree. Both continuation snapshots are also
+byte-identical to the incremental continuation in 9262, with 37 cumulative
+deduction events and 18 checks. The first paired control's differing intermediate
+work is retained as an unqualified comparison; it establishes no scheduling or
+throughput attribution. At the matching first boundary, only 1,871 of 11,671
+Booleans are assigned, establishing consumption before source completion.
 These observations establish no default throughput or terminal claim. Admission
 stays opt-in while [#3844](https://github.com/Eignex/klause/issues/3844) retains
 its completion audit.
