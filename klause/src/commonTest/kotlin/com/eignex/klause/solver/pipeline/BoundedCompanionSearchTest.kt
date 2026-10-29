@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.solver.ResumableSearch
+import com.eignex.klause.solver.ReseedGuard
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
@@ -22,7 +23,9 @@ class BoundedCompanionSearchTest {
         for (ceiling in listOf(250L, 1_000L)) {
             val clock = TestTimeSource()
             var calls = 0
-            val native = object : ResumableSearch {
+            val native = object : ResumableSearch, ReseedGuard {
+                override val canReseed: Boolean get() = false
+                override val incumbentTrialPending: Boolean get() = true
                 override val isDone: Boolean get() = false
                 override val stats: SolveStats get() = SolveStats.EMPTY
                 override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
@@ -43,6 +46,7 @@ class BoundedCompanionSearchTest {
             assertEquals(TerminationReason.BudgetExhausted, assertIs<MinimizeResult.Unknown>(result).reason)
             assertEquals(1, calls)
             assertTrue(search.isDone)
+            assertFalse(search.incumbentTrialPending)
             assertEquals(1L, search.stats.smt.completeSearchStages?.get("trialRetired"))
             assertEquals(5_000L, search.stats.smt.completeSearchStages?.get("trialActiveMs"))
         }

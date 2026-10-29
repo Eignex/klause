@@ -30,6 +30,34 @@ import kotlin.test.assertTrue
 
 class JointLinearRepairTest {
     @Test
+    fun `a checked center trial should retain its condition after a publication pause`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(2), null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.GE, 0.0),
+            ), numRealVars = 1, realLower = doubleArrayOf(0.75), realUpper = doubleArrayOf(2.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val seed = Sample(booleanArrayOf(), longArrayOf(2), doubleArrayOf(0.75),
+            exactReals = listOf(BigFraction.ofLong(3) / BigFraction.ofLong(4)))
+        var paused = false
+
+        JointLinearRepair(model, source, objective, TheoryParams(sourceIncumbentCompletion = true, maxFlips = 1),
+            external = { seed }, onIncumbentUse = { paused = true }).use { repair ->
+            repair.search(adaptive = false).use { search ->
+                search.advance(Cancellation { paused }, 5_000)
+                assertTrue(repair.incumbentTrialPending)
+                paused = false
+                var done = false
+                repeat(32) { if (!done) done = search.advance(Cancellation.Never, 5_000) }
+
+                assertEquals(1L, assertIs<MinimizeResult.WithSample>(
+                    search.minimizeResult(TerminationReason.BudgetExhausted)).sample.intValue(0))
+                assertFalse(repair.incumbentTrialPending)
+            }
+        }
+    }
+
+    @Test
     fun `checked handoff should improve its first connected integer neighborhood`() {
         val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(2), null, null),
             factors = arrayOf(

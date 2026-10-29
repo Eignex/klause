@@ -964,6 +964,9 @@ an LP operation, but that alone establishes no source-level benefit.
 proposal from a checked pooled center, skipping its all-pinned bootstrap. The first
 proposal frees at most two connected integers under the same repair allowance;
 record completed checked improvements separately from proposal/import counts.
+The first pending checked-center proposal receives continuation behind complete-worker
+coverage within the unchanged companion cap. Retain unsuccessful and paused proposal
+costs; continuation alone establishes no checked progress.
 
 [9366](https://lab.eignex.com/jobs/9366) exercises ordinary finite producers on
 `bell3a` and `bell5`, with completion off/on at `89d5153cd9`, seed 1, one core and
