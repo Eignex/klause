@@ -326,6 +326,7 @@ internal fun benchmarkJson(trace: BasisTrace, artifactSha: String, reports: List
     return json(*fields.toTypedArray())
 }
 
+@OptIn(com.eignex.koblas.KoblasEngineApi::class)
 private fun commonFields(
     command: String,
     trace: BasisTrace,
