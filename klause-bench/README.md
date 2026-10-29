@@ -221,6 +221,20 @@ receipts are absent, native verdicts remain unverified, and no default activatio
 throughput improvement follows.
 
 This repository owns catalog selection, runtime configuration and build/launch recipes.
+
+`bench.profile.BooleanProofCoverageProfile` accepts `suite=ID problem=NAME sha256=HEX
+work=N seed=N splits=N` for one DIMACS source with at most 4,096 Boolean variables,
+one MiB of input and four partition variables. It records an ordinary F1 control,
+two attributed repeats, two independent replicas and bounded task qualification through
+actual finite solves. Source bytes, build/runtime identities, logical schedule and
+branch traces, preparation time, per-query native work, inprocessing counters, thread
+allocation and sampled heap are retained under `$OUT`. Lost, cancelled, stale and
+duplicate task completions exercise the same board that accepts scoped native results.
+Witnesses and stops leave coverage open; native refutations remain independently
+unverified. This diagnostic includes inline trace cost, uses no production task
+scheduler and establishes no equal-resource speed or heap benefit. Sampled heap and
+literal payload bytes are separate observations, not complete worker memory bounds.
+
 `lab/recipes/` contains the migrated lab recipes. `scripts/convert-lab-recipe.sh`
 translates legacy experiments or schedules from stdin without submitting them;
 exact legacy confirmation lists require a newly pinned SDK plan and are refused.

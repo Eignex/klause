@@ -573,6 +573,7 @@ internal class BacktrackBrancher(
     private val phase = PhaseSaving(session.problem.numBoolVars, session.problem.numIntVars, params)
     private val rng = Random(params.randomSeed ?: Random.Default.nextLong())
     private val onEvent = params.onEvent
+    private val branchObserver = params.branchObserver
     private var restartCount = 0L
     private var preferImportedSolution = false
 
@@ -624,6 +625,10 @@ internal class BacktrackBrancher(
     private fun isOpen(variable: VarRef): Boolean = when (variable) {
         is VarRef.Bool -> session.needsBoolDecision(variable.varId)
         is VarRef.IntVar -> session.needsIntDecision(variable.varId)
+    }
+
+    override fun onAttempt(decision: SearchDecision, context: SearchContext) {
+        branchObserver?.onAttempt(decision, context)
     }
 
     override fun onCommit(decision: SearchDecision, decisionLevel: Int) {

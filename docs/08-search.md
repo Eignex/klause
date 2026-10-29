@@ -7,6 +7,36 @@ arithmetic components enforce their owned relations. Exhaustion proves a result
 only when every required check completed. [Learning](09-learning.md) reuses the
 reasons those mechanisms supply.
 
+## Boolean task coverage
+
+`BooleanProofTasks` owns a bounded partition over at most twelve distinct Boolean
+variables. Every assignment selects exactly one cube; the complete caller condition
+stays in `BooleanProofContext` with the original source revision, semantics, objective
+direction, exact strict cutoff and prepared mapping identity. Cube coordinates require
+the caller's validated mapping. This protocol runs no workers and supplies no solver
+verdict. Its serialized caller owns execution, scoped result checking and loss detection.
+
+Only one attempt owns a region. Loss, release and cancellation return unclosed regions;
+duplicate, foreign and stale completions cannot close coverage. Checking runs before
+closure and rechecks ownership afterward. Witnesses, stops and unavailable checks leave
+the region pending. Native refutations and independently checked refutations remain
+distinct. Complete native coverage alone supplies no independent UNSAT or optimality
+verification. Replacing any context invalidates every lease and closure, including after
+an incumbent tightens the cutoff. Accepted closures survive ordinary cancellation.
+
+`BooleanCoverageAttribution` retains bounded exact region keys and their first workers.
+It separates repeated entries by one worker, duplicate entries across workers and
+duplicate native refutations. Exact equality gives a lower bound on overlap; entries
+alone prove no completed coverage or saved work. `SearchRunObserver.onAttempt` observes
+a tightening alternative before assertion, including immediate conflicts. Finite
+backtrack exposes it through `BacktrackParams.branchObserver`. Its Boolean adapter
+captures all established Boolean values and the attempted literal; callers restrict it
+to pure Boolean models with the complete mapped variable count and a matching context.
+Hidden finite or arithmetic branches require another vocabulary. Capture limits mark
+partial observations, and retirement releases retained keys. Literal payload bytes
+exclude collection capacity, headers and all solver state. Observers run inline and
+must not mutate the context.
+
 ## Shared component search
 
 [solver.search](../klause/src/commonMain/kotlin/com/eignex/klause/solver/search)

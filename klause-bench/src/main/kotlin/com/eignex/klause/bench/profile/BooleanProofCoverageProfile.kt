@@ -1,0 +1,201 @@
+package com.eignex.klause.bench.profile
+
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.backtrack.selector.IndomainMin
+import com.eignex.klause.backtrack.selector.InputOrder
+import com.eignex.klause.bench.catalog.Catalog
+import com.eignex.klause.bench.metric.InstalledBuild
+import com.eignex.klause.bench.metric.sha256
+import com.eignex.klause.bench.report.Reports
+import com.eignex.klause.bench.source.CorpusFetcher
+import com.eignex.klause.bench.source.CorpusFiles
+import com.eignex.klause.formats.dimacs.Dimacs
+import com.eignex.klause.formats.dimacs.toProblem
+import com.eignex.klause.ir.Lit
+import com.eignex.klause.portfolio.Portfolio
+import com.eignex.klause.portfolio.PortfolioDiagnostics
+import com.eignex.klause.portfolio.PortfolioWorker
+import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.evidence.SourceRevision
+import com.eignex.klause.solver.evidence.SourceScope
+import com.eignex.klause.solver.search.BooleanCoverageAttribution
+import com.eignex.klause.solver.search.BooleanCube
+import com.eignex.klause.solver.search.BooleanProofContext
+import com.eignex.klause.solver.search.BooleanProofTasks
+import com.eignex.klause.solver.search.BooleanTaskCheck
+import com.eignex.klause.util.Cancellation
+import com.sun.management.ThreadMXBean
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import java.io.File
+import java.lang.management.ManagementFactory
+import kotlin.time.Duration.Companion.seconds
+
+/** Bounded Boolean attribution and scoped task protocol qualification through finite solver paths. */
+object BooleanProofCoverageProfile {
+    /** Capture one pinned DIMACS source under `$OUT`; this is a protocol control, not a production scheduler. */
+    @JvmStatic
+    fun main(args: Array<String>) {
+        val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
+        require(options.keys == setOf("suite", "problem", "sha256", "work", "seed", "splits"))
+        val work = options.getValue("work").toLong().also { require(it in 1..100000) }
+        val seed = options.getValue("seed").toLong()
+        val splits = options.getValue("splits").toInt().also { require(it in 0..4) }
+        val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
+        val stop = Cancellation.after(120.seconds)
+        val reference = Catalog.uncapped(options.getValue("suite")).problems
+            .single { it.name == options.getValue("problem") }
+        val bytes = CorpusFiles.open(CorpusFetcher.resolve(reference.source)).use { it.readNBytes(1048577) }
+        require(bytes.size <= 1048576 && sha256(bytes) == options.getValue("sha256"))
+        out.resolve("source.cnf").writeBytes(bytes)
+        out.resolve("request.txt").writeText(args.joinToString("\n"))
+        Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
+        val started = System.nanoTime()
+        val document = Dimacs.parse(bytes.decodeToString())
+        require(!document.triviallyUnsat && document.numBoolVars in splits..4096)
+        val source = document.toProblem()
+        val problem = source.bake(cancellation = stop)
+        check(!stop())
+        val preparationNs = System.nanoTime() - started
+        val context = BooleanProofContext(
+            SourceScope(SourceRevision(sha256(bytes), "dimacs-cnf:" + source.semantics)), "source-identity:0",
+        )
+        val bean = ManagementFactory.getThreadMXBean() as ThreadMXBean
+        bean.isThreadAllocatedMemoryEnabled = true
+        val report = out.resolve("records.jsonl")
+        for ((index, observed) in listOf(false, true, true).withIndex()) {
+            val branches = out.resolve("branches-$index.txt")
+            val capture = BooleanCoverageAttribution(context, onEntry = { worker, cube ->
+                branches.appendText("$worker:${cube.literals.joinToString(",")}\n")
+            })
+            val allocated = bean.getThreadAllocatedBytes(Thread.currentThread().threadId())
+            val begin = System.nanoTime()
+            val trace = out.resolve("trace-$index.txt")
+            val workers = List(2) { worker ->
+                PortfolioWorker.of("bt/input-order", worker, BacktrackSolver(problem).session(),
+                    params(seed, stop).copy(branchObserver = if (observed) {
+                        capture.observer(worker, problem.numBoolVars)
+                    } else null))
+            }
+            val result = Portfolio.thompson(workers, baseSliceWork = 8, maxSliceWork = 64,
+                sliceGrowth = 1.5, reseedStaleThreshold = 0,
+                diagnostics = PortfolioDiagnostics(work, seed) { trace.appendText("$it\n") }).use { it.solve(stop) }
+            val record = resultRecord(result, begin, allocated, bean).toMutableMap()
+            record["mode"] = JsonPrimitive(if (observed) "f1-attribution" else "f1-baseline")
+            record["entries"] = JsonPrimitive(capture.entries)
+            record["duplicateEntries"] = JsonPrimitive(capture.duplicateEntries)
+            record["repeatedEntries"] = JsonPrimitive(capture.repeatedEntries)
+            record["declinedEntries"] = JsonPrimitive(capture.declinedEntries)
+            record["retainedRegions"] = JsonPrimitive(capture.regions)
+            record["retainedLiteralPayloadBytes"] = JsonPrimitive(capture.literalBytes)
+            record["preparationNs"] = JsonPrimitive(preparationNs)
+            report.appendText("${JsonObject(record)}\n")
+            capture.clear()
+        }
+        independentReplicas(problem, context, seed, work, stop, bean, report)
+        qualifyTasks(problem, context, splits, seed, work, stop, bean, report)
+        out.resolve("completed.json").writeText(buildJsonObject {
+            put("sourceSha256", sha256(bytes))
+            put("revision", Reports.readGitSha())
+            put("javaVersion", System.getProperty("java.version"))
+            put("osArch", System.getProperty("os.arch"))
+            put("processors", Runtime.getRuntime().availableProcessors())
+            put("maxHeapBytes", Runtime.getRuntime().maxMemory())
+            put("elapsedNs", System.nanoTime() - started)
+            put("emergencyStopped", stop())
+            put("independentlyVerifiedUnsatOrOptimality", false)
+            put("runtimeScheduler", false)
+        }.toString())
+    }
+
+    private fun independentReplicas(
+        problem: BakedProblem, context: BooleanProofContext, seed: Long, work: Long,
+        stop: Cancellation, bean: ThreadMXBean, report: File,
+    ) {
+        val capture = BooleanCoverageAttribution(context)
+        for (worker in 0..1) {
+            if (stop()) break
+            val allocated = bean.getThreadAllocatedBytes(Thread.currentThread().threadId())
+            val begin = System.nanoTime()
+            val result = BacktrackSolver(problem).solve(params(seed, stop).copy(
+                nodeBudget = NodeBudget(maxOf(1L, work / 2)),
+                branchObserver = capture.observer(worker, problem.numBoolVars),
+            ))
+            if (result is SolveResult.Unsat) capture.recordRefutation(context, worker, BooleanCube(emptyList()))
+            val record = resultRecord(result, begin, allocated, bean).toMutableMap()
+            record["mode"] = JsonPrimitive("independent-replicas")
+            record["worker"] = JsonPrimitive(worker)
+            record["duplicateEntries"] = JsonPrimitive(capture.duplicateEntries)
+            record["duplicateNativeRefutations"] = JsonPrimitive(capture.duplicateRefutations)
+            record["refutedRegions"] = JsonPrimitive(capture.refutedRegions)
+            report.appendText("${JsonObject(record)}\n")
+        }
+        capture.clear()
+    }
+
+    private fun qualifyTasks(
+        problem: BakedProblem, context: BooleanProofContext, splits: Int, seed: Long, work: Long,
+        stop: Cancellation, bean: ThreadMXBean, report: File,
+    ) {
+        val tasks = BooleanProofTasks(context, (0 until splits).toList())
+        val retired = checkNotNull(tasks.acquire(0))
+        tasks.loseWorker(0)
+        val cancelled = checkNotNull(tasks.acquire(1))
+        tasks.cancel()
+        check(!tasks.complete(retired) { error("lost completion reached checker") })
+        check(!tasks.complete(cancelled) { error("cancelled completion reached checker") })
+        val stale = checkNotNull(tasks.acquire(2))
+        tasks.replaceContext(context.copy(mapping = "source-identity:1"))
+        check(!tasks.complete(stale) { error("stale completion reached checker") })
+        val leases = List(tasks.size) { worker -> checkNotNull(tasks.acquire(worker)) }
+        for (lease in leases) {
+            if (stop()) break
+            val pins = Assumptions(bools = lease.cube.literals.associate { Lit.variable(it) to Lit.isPositive(it) })
+            val allocated = bean.getThreadAllocatedBytes(Thread.currentThread().threadId())
+            val begin = System.nanoTime()
+            val result = BacktrackSolver(problem).solve(params(seed, stop).copy(
+                assumptions = pins, nodeBudget = NodeBudget(maxOf(1L, work / tasks.size)),
+            ))
+            val accepted = tasks.complete(lease) { current ->
+                check(current.context == tasks.context && current.cube == lease.cube)
+                if (result is SolveResult.Unsat) BooleanTaskCheck.NativeRefutation else BooleanTaskCheck.Unresolved
+            }
+            check(!tasks.complete(lease) { error("duplicate completion reached checker") })
+            val record = resultRecord(result, begin, allocated, bean).toMutableMap()
+            record["mode"] = JsonPrimitive("protocol-qualification")
+            record["task"] = JsonPrimitive(lease.task)
+            record["cube"] = JsonArray(lease.cube.literals.map(::JsonPrimitive))
+            record["nativeClosureAccepted"] = JsonPrimitive(accepted)
+            record["closedTasks"] = JsonPrimitive(tasks.closed)
+            record["nativeCoverageComplete"] = JsonPrimitive(tasks.nativeCoverageComplete)
+            record["independentlyCheckedCoverageComplete"] = JsonPrimitive(tasks.independentlyCheckedCoverageComplete)
+            report.appendText("${JsonObject(record)}\n")
+        }
+        tasks.cancel()
+    }
+
+    private fun params(seed: Long, stop: Cancellation): BacktrackParams = BacktrackParams(
+        randomSeed = seed, cancellation = stop, nativeSat = false,
+        variableSelector = InputOrder, valueSelector = IndomainMin,
+    )
+
+    private fun resultRecord(result: SolveResult, started: Long, allocated: Long, bean: ThreadMXBean): JsonObject =
+        buildJsonObject {
+            put("result", result::class.simpleName)
+            put("elapsedNsIncludingCheckAndRetirement", System.nanoTime() - started)
+            put("threadAllocatedBytes", bean.getThreadAllocatedBytes(Thread.currentThread().threadId()) - allocated)
+            put("heapUsedBytes", ManagementFactory.getMemoryMXBean().heapMemoryUsage.used)
+            put("decisions", result.stats.search.nodes.sum)
+            put("propagationWork", result.stats.search.propagationWork.sum)
+            put("learningAndInprocessing", JsonObject(result.stats.search.learning.mapValues { JsonPrimitive(it.value) }))
+            put("independentlyVerifiedUnsatOrOptimality", false)
+        }
+}

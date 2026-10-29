@@ -309,6 +309,7 @@ class SearchRun internal constructor(
             val decision = frame.decisions[frame.next++]
             if (!decision.tightens(session)) continue
             if (!session.executionControls.canCommitDecision()) return Advance.Budget
+            observer.onAttempt(decision, session)
             when (val result = session.push(decision)) {
                 ComponentResult.Consistent -> {
                     if (!session.lastPushCreatedLevel()) continue
@@ -604,6 +605,9 @@ fun interface SearchDecisionBudget {
 
 /** Observes shared traversal lifecycle events without owning its trail. */
 interface SearchRunObserver {
+    /** A tightening alternative is entering its assertion, including alternatives that conflict immediately. */
+    fun onAttempt(decision: SearchDecision, context: SearchContext) {}
+
     /** A shared decision was accepted at [decisionLevel]. */
     fun onCommit(decision: SearchDecision, decisionLevel: Int) {}
 
