@@ -141,12 +141,6 @@ internal const val LP_WORK_PER_NODE = 600L
 // Converts propagation visits to approximate CP-node cost without changing slice sizes.
 internal const val PROPAGATION_WORK_PER_NODE = 4_000L
 
-/** The search work a slice is charged, in nodes: every node, plus inprocessing at its measured rates. */
+/** Decision work; inprocessing scans and probes enter the propagation-work ledger. */
 internal val SearchStatsSink.searchWork: Long
-    get() = nodeCount + inprocessProbes / INPROCESS_PROBES_PER_NODE + inprocessVisits / INPROCESS_VISITS_PER_NODE
-
-// Converts vivification probes and subsumption literal visits to approximate CP-node cost.
-// A probe propagates and undoes one literal; a search node also analyzes conflicts and learns.
-internal const val INPROCESS_PROBES_PER_NODE = 12L
-
-internal const val INPROCESS_VISITS_PER_NODE = 18_000L
+    get() = nodeCount

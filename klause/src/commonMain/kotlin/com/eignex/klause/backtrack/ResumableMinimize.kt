@@ -1272,6 +1272,12 @@ internal class ResumableMinimize(
         override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
             slice.charge()
             if (pausable && slice.workExpired()) return SearchNodeDisposition.Pause
+            when (simplify(context, false)) {
+                SearchRunDisposition.Exhausted -> return SearchNodeDisposition.Prune
+                SearchRunDisposition.Pause -> return SearchNodeDisposition.Pause
+                SearchRunDisposition.Indeterminate -> return SearchNodeDisposition.Indeterminate
+                SearchRunDisposition.Continue -> Unit
+            }
             val externalBound = externalCutoff()
             val effectiveBound = if (externalBound < bestObj) externalBound else bestObj
             if (rebindable && discreteObjective) {
@@ -1487,6 +1493,8 @@ internal class ResumableMinimize(
         override val lifecycle: SearchRunLifecycle get() = this
 
         override fun onResume(context: SearchContext): SearchRunDisposition {
+            val simplified = simplify(context, false)
+            if (simplified != SearchRunDisposition.Continue) return simplified
             if (pendingRealLeaf != null || pendingRealResult != null) return SearchRunDisposition.Continue
             boundExchange.applySharedFloor()
             val local = incumbents.current()
@@ -1510,14 +1518,8 @@ internal class ResumableMinimize(
             boundExchange.publishFloor()
             boundExchange.importGlobalVarBounds()
             forgetIfOverCap(session, params)
-            val refreshRoot = inprocessing?.onRestart(session, params) == true
-            if (session.isUnsatAtRoot) return SearchRunDisposition.Exhausted
-            if (refreshRoot) {
-                val initialized = cp.initialize(context)
-                val result = if (initialized == ComponentResult.Consistent) searchSession.propagate() else initialized
-                if (result is ComponentResult.Conflict) return SearchRunDisposition.Exhausted
-                if (result == ComponentResult.Indeterminate) return SearchRunDisposition.Indeterminate
-            }
+            val simplified = simplify(context, true)
+            if (simplified != SearchRunDisposition.Continue) return simplified
             pooledIncumbents?.poll()?.let { brancher.importPooledSolution(it.assignment) }
             return SearchRunDisposition.Continue
         }
@@ -1525,6 +1527,20 @@ internal class ResumableMinimize(
         override fun onCancellation(context: SearchContext): SearchRunDisposition {
             return if (pausable) SearchRunDisposition.Pause else SearchRunDisposition.Indeterminate
         }
+    }
+
+    private fun simplify(context: SearchContext, restart: Boolean): SearchRunDisposition {
+        if (context.decisionLevel != 0) return SearchRunDisposition.Continue
+        val refresh = if (restart) inprocessing?.onRestart(session, params) else inprocessing?.onRoot(session, params)
+        if (session.isUnsatAtRoot) return SearchRunDisposition.Exhausted
+        if (refresh != true) return SearchRunDisposition.Continue
+        val initialized = cp.initialize(context)
+        val result = if (initialized == ComponentResult.Consistent) searchSession.propagate() else initialized
+        if (result is ComponentResult.Conflict) return SearchRunDisposition.Exhausted
+        if (result == ComponentResult.Indeterminate) {
+            return if (pausable) SearchRunDisposition.Pause else SearchRunDisposition.Indeterminate
+        }
+        return SearchRunDisposition.Continue
     }
 
     private fun applyObjectiveBound(): SearchRunDisposition {

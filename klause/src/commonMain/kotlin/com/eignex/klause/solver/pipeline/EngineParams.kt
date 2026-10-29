@@ -162,6 +162,8 @@ val BACKTRACK_OVERRIDE_KEYS = listOf(
     "target-phasing", "solution-phasing", "rephase-interval", "max-learned", "lbd-glue", "tiered-db",
     "mid-lbd", "vivification", "vivify-batch", "subsumption", "subsume-batch", "inprocessing-cadence",
     "root-simplification", "root-simplify-batch", "root-probe-batch", "root-probe-work",
+    "inprocessing-work", "inprocessing-root-work", "inprocessing-probe-work", "inprocessing-subsume-work",
+    "inprocessing-vivify-work", "inprocessing-interval", "inprocessing-growth", "inprocessing-cooldown",
     "lp-objective-cone", "lp-auto-off-reprobe",
     "lp-knapsack-lagrangian", "lp-component-split", "lp-component-ownership", "lp-bound-max-pivots", "lp-adaptive-work",
     "lp-branching", "lp-directional-gains", "lp-variable-shaving", "lp-prune-hulls", "lp-root-cuts",
@@ -207,6 +209,14 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
     val rootSimplifyBatch = p[ExecutionOption.rootSimplifyBatch]
     val rootProbeBatch = p[ExecutionOption.rootProbeBatch]
     val rootProbeWork = p[ExecutionOption.rootProbeWork]
+    val inprocessingWork = p[ExecutionOption.inprocessingWork]
+    val inprocessingRootWork = p[ExecutionOption.inprocessingRootWork]
+    val inprocessingProbeWork = p[ExecutionOption.inprocessingProbeWork]
+    val inprocessingSubsumeWork = p[ExecutionOption.inprocessingSubsumeWork]
+    val inprocessingVivifyWork = p[ExecutionOption.inprocessingVivifyWork]
+    val inprocessingInterval = p[ExecutionOption.inprocessingInterval]
+    val inprocessingGrowth = p[ExecutionOption.inprocessingGrowth]
+    val inprocessingCooldown = p[ExecutionOption.inprocessingCooldown]
     val lpCone = p[ExecutionOption.lpObjectiveCone]
     val lpAutoOff = p[ExecutionOption.lpAutoOffReprobe]
     val lpKnapsack = p[ExecutionOption.lpKnapsackLagrangian]
@@ -231,6 +241,8 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
         maxDecisions, luby, adaptiveRestart, emaRestart, modeSwitchingRestart, phaseSaving, targetPhasing,
         solutionPhasing, rephaseInterval, maxLearned, lbdGlue, tieredDb, midLbd, vivification, vivifyBatch,
         subsumption, subsumeBatch, inprocessingCadence, rootSimplification, rootSimplifyBatch, rootProbeBatch, rootProbeWork,
+        inprocessingWork, inprocessingRootWork, inprocessingProbeWork, inprocessingSubsumeWork,
+        inprocessingVivifyWork, inprocessingInterval, inprocessingGrowth, inprocessingCooldown,
         lpCone, lpAutoOff, lpKnapsack, lpComponentSplit, lpComponentOwnership, lpBoundMaxPivots, lpAdaptiveWork,
         lpBranching, lpVariableShaving, lpPruneHulls, lpRootCuts, pbLearning,
         pbObjectiveCutoff, integerRowLearning, propagationAttribution, historicalTableReasons,
@@ -261,6 +273,14 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
         rootSimplifyBatch?.let { out = out.copy(rootSimplifyBatch = it) }
         rootProbeBatch?.let { out = out.copy(rootProbeBatch = it) }
         rootProbeWork?.let { out = out.copy(rootProbeWork = it) }
+        inprocessingWork?.let { out = out.copy(inprocessingWork = it) }
+        inprocessingRootWork?.let { out = out.copy(inprocessingRootWork = it) }
+        inprocessingProbeWork?.let { out = out.copy(inprocessingProbeWork = it) }
+        inprocessingSubsumeWork?.let { out = out.copy(inprocessingSubsumeWork = it) }
+        inprocessingVivifyWork?.let { out = out.copy(inprocessingVivifyWork = it) }
+        inprocessingInterval?.let { out = out.copy(inprocessingInterval = it) }
+        inprocessingGrowth?.let { out = out.copy(inprocessingGrowth = it) }
+        inprocessingCooldown?.let { out = out.copy(inprocessingCooldown = it) }
         lpCone?.let { out = out.copy(lpPlan = out.lpPlan.copy(objectiveCone = it)) }
         lpAutoOff?.let { out = out.copy(lpPlan = out.lpPlan.copy(autoOffReprobe = it)) }
         lpKnapsack?.let { out = out.copy(lpPlan = out.lpPlan.copy(knapsackLagrangian = it)) }

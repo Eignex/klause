@@ -57,6 +57,20 @@ class EngineParamsTest {
     }
 
     @Test
+    fun `inprocessing spending and trigger controls should reach backtrack workers`() {
+        val configured = applyBacktrackParams(com.eignex.klause.backtrack.BacktrackParams(), EngineParams(listOf(
+            "inprocessing-work=100", "inprocessing-root-work=11", "inprocessing-probe-work=12",
+            "inprocessing-subsume-work=13", "inprocessing-vivify-work=14", "inprocessing-interval=15",
+            "inprocessing-growth=16", "inprocessing-cooldown=17",
+        )))
+
+        assertEquals(listOf(100L, 11L, 12L, 13L, 14L, 15L, 17L), listOf(configured.inprocessingWork,
+            configured.inprocessingRootWork, configured.inprocessingProbeWork, configured.inprocessingSubsumeWork,
+            configured.inprocessingVivifyWork, configured.inprocessingInterval, configured.inprocessingCooldown))
+        assertEquals(16, configured.inprocessingGrowth)
+    }
+
+    @Test
     fun `propagation attribution and historical table refinement remain separate opt in controls`() {
         val base = com.eignex.klause.backtrack.BacktrackParams()
         val attributed = applyBacktrackParams(base, EngineParams(listOf("propagation-attribution=true")))

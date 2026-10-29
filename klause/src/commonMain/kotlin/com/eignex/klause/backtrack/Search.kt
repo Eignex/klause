@@ -486,31 +486,44 @@ private class CpSatisfactionTraversalPolicy(
     override val modelContinuation = SearchModelContinuation.BlockAtRoot
     override val modelPolicy: SearchModelPolicy = SearchModelPolicy.SurfaceAll
     override val pauseBeforeDecision: () -> Boolean = slice?.beforeBranch ?: { false }
-    override val nodePolicy: SearchNodePolicy = slice?.let { s ->
-        object : SearchNodePolicy {
-            override fun beforeBranch(context: SearchContext): SearchNodeDisposition =
-                if (s.beforeBranch()) SearchNodeDisposition.Pause else SearchNodeDisposition.Expand
+    override val nodePolicy: SearchNodePolicy = object : SearchNodePolicy {
+        override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
+            if (slice?.beforeBranch?.invoke() == true) return SearchNodeDisposition.Pause
+            return when (simplify(context, false)) {
+                SearchRunDisposition.Continue -> SearchNodeDisposition.Expand
+                SearchRunDisposition.Exhausted -> SearchNodeDisposition.Prune
+                SearchRunDisposition.Pause -> SearchNodeDisposition.Pause
+                SearchRunDisposition.Indeterminate -> SearchNodeDisposition.Indeterminate
+            }
         }
-    } ?: SearchNodePolicy.ExpandAll
+    }
     override val lifecycle: SearchRunLifecycle get() = this
 
     private val inprocessing = Inprocessing.from(params, sink?.search)
 
     private val pooledIncumbents = params.pooledIncumbents?.let { IncumbentSubscription(it) }
 
+    override fun onResume(context: SearchContext): SearchRunDisposition = simplify(context, false)
+
+    private fun simplify(context: SearchContext, restart: Boolean): SearchRunDisposition {
+        if (context.decisionLevel != 0) return SearchRunDisposition.Continue
+        val refresh = if (restart) inprocessing?.onRestart(session, params) else inprocessing?.onRoot(session, params)
+        if (session.isUnsatAtRoot) return SearchRunDisposition.Exhausted
+        if (refresh != true) return SearchRunDisposition.Continue
+        val initialized = cp.initialize(context)
+        val result = if (initialized == ComponentResult.Consistent) (context as SearchSession).propagate() else initialized
+        if (result is ComponentResult.Conflict) return SearchRunDisposition.Exhausted
+        if (result == ComponentResult.Indeterminate) {
+            return if (slice?.pauses?.invoke() == true) SearchRunDisposition.Pause else SearchRunDisposition.Indeterminate
+        }
+        return SearchRunDisposition.Continue
+    }
+
     override fun onRestart(context: SearchContext): SearchRunDisposition {
         params.clauseExchange?.onRestart(session)
         forgetIfOverCap(session, params)
-        val refreshRoot = inprocessing?.onRestart(session, params) == true
-        if (session.isUnsatAtRoot) return SearchRunDisposition.Exhausted
-        if (refreshRoot) {
-            val initialized = cp.initialize(context)
-            val result = if (initialized == ComponentResult.Consistent) {
-                (context as SearchSession).propagate()
-            } else initialized
-            if (result is ComponentResult.Conflict) return SearchRunDisposition.Exhausted
-            if (result == ComponentResult.Indeterminate) return SearchRunDisposition.Indeterminate
-        }
+        val simplified = simplify(context, true)
+        if (simplified != SearchRunDisposition.Continue) return simplified
         pooledIncumbents?.poll()?.let { brancher.importPooledSolution(it.assignment) }
         return SearchRunDisposition.Continue
     }

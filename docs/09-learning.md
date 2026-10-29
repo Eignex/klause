@@ -377,7 +377,7 @@ target, saved, all-true, all-false and random polarities every 1000 conflicts by
 default. A
 mode-switching schedule pins the polarity source to its stage instead.
 
-Inprocessing runs at restart boundaries in bounded round-robin slices over the
+Inprocessing runs at safe complete roots in bounded round-robin slices over the
 learned database. Vivification strengthens a clause by asserting the negations of its
 literals under propagation; subsumption drops subsumed learned clauses and applies
 self-subsuming resolution. Every pass must preserve the variable set, because portfolio workers share learned
@@ -410,6 +410,37 @@ without turning a conditional fact into an unconditional clause. The structural
 source replacements themselves introduce no additional scope. Probing and root
 simplification are disabled by default; their batch and per-probe limits are explicit
 execution settings.
+
+The containing invocation and worker work allowance includes scans, occurrence-index
+preparation, probing, attachment propagation and protected retirement. Scans enter
+the propagation-work ledger; diagnostic probe and visit counts add no second charge.
+Each of the four classes has a separate work ceiling inside the scheduled slice's
+total ceiling. Zero withholds that class. Completed atomic copying, sorting and
+compaction can overspend; the class and scheduled loop repay their respective debt
+before admitting more work. Time and work cancellation retain no partial probe.
+An interrupted root attachment keeps its queued fixpoint and completes under the
+next invocation before publishing root facts or making a decision.
+
+Root and probe cursors, vivification replacement batches and subsumption preparation
+survive suspension. The subsumption occurrence window retains at most 1,024 clauses
+and 8,192 literals, advances round-robin, and declines a clause exceeding its remaining
+literal space. Compaction invalidates snapshots by a session-local revision, without
+changing source variable IDs. Replacement attachment precedes retirement; active and
+historical reasons retain their ordinary protection.
+
+Restart cadence remains a trigger. Optional propagation-work intervals and learned
+clause growth also request work at natural roots, without forcing a restart. The
+cooldown requires non-inprocessing work after an attempted slice and applies to
+restart requests too; a pass cannot earn its own next opportunity. Class rotation
+prevents a cheap pass from always taking the entire offered slice. Work and growth
+triggers and cooldown are disabled by default; the additional work ceilings are
+unlimited unless configured. Existing general off and SAT preset controls remain.
+Per-class attempted, eligible, shortened, unit, stopped and work counters diagnose
+applicability. Attachment, retirement and continuation work are subsets of class
+work, which itself overlaps containing propagation work. Learned lifecycle and S4
+family attribution retain their own authority and completeness limits; missing
+attribution does not establish zero usefulness. These observations select no
+adaptive score or default threshold.
 
 ## Theory completion
 

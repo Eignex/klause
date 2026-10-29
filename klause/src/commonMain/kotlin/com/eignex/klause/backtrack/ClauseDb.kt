@@ -84,72 +84,138 @@ private fun forgetTiered(session: PropagationSession, params: BacktrackParams, c
     for (index in 0 until session.learnedClauseCount) session.clearLearnedClauseUsed(index)
 }
 
-/** Strengthen a bounded round-robin slice of learned Boolean clauses at a root restart. */
+// Retaining the batch prevents repeated attachments when retirement must wait for another slice.
+internal class VivificationPass(startCursor: Int = 0) : InprocessingPass {
+    override val preservesVariables: Boolean get() = true
+    override val spending = InprocessingSpending(InprocessingKind.Vivification)
+    var cursor = startCursor
+        private set
+    private var revision = -1L
+    private val rows = ArrayList<IntArray>()
+    private val lbds = IntArrayList()
+    private val origins = IntArrayList()
+    private var dropped = IntHashSet()
+    private var attached = 0
+    private var preparing = true
+
+    override fun reset() {
+        cursor = 0
+        clear()
+        spending.reset()
+    }
+
+    private fun clear() {
+        rows.clear()
+        lbds.clear()
+        origins.clear()
+        dropped = IntHashSet()
+        attached = 0
+        preparing = true
+        revision = -1L
+    }
+
+    override fun run(session: PropagationSession, params: BacktrackParams, stats: SearchStatsSink?) {
+        if (!session.canSimplifyRoot) return
+        if (revision != session.learnedClauseRevision) clear()
+        revision = session.learnedClauseRevision
+        spending.run(session, params, stats) { advance(session, params, it) }
+    }
+
+    private fun advance(session: PropagationSession, params: BacktrackParams, budget: InprocessingBudget) {
+        val count = session.learnedClauseCount
+        if (count == 0) return
+        if (cursor !in 0 until count) cursor = 0
+        if (preparing) {
+            var examined = 0
+            var literalsVisited = 0
+            while (examined++ < minOf(params.vivifyBatch.coerceAtLeast(1), count)) {
+                if (literalsVisited >= ROOT_LITERAL_LIMIT || !budget.visit()) break
+                val index = cursor
+                cursor = (cursor + 1) % count
+                budget.note("Candidates")
+                val literals = session.rootClauseLiterals(session.problem.numFactors + index,
+                    ROOT_LITERAL_LIMIT - literalsVisited) ?: continue
+                budget.charge(literals.size)
+                literalsVisited += literals.size
+                if (literals.size < 3) continue
+                budget.note("Eligible")
+                val strengthened = vivifyClause(session, literals, params, budget) ?: continue
+                if (strengthened.size !in 2 until literals.size) continue
+                rows.add(strengthened)
+                lbds.add(minOf(session.learnedClauseLbd(index), strengthened.size))
+                origins.add(session.learnedClauseOrigin(index))
+                dropped.add(index)
+            }
+            preparing = false
+        }
+        while (attached < rows.size) {
+            val row = rows[attached]
+            if (!budget.visit(row.size * 2 + 1)) return
+            val before = session.work
+            session.addRootDerivedClause(Clause(row), lbds[attached], origins[attached], false)
+            budget.note("AttachmentWork", session.work - before + row.size * 2 + 1L)
+            budget.note("Shortened")
+            attached++
+        }
+        if (!dropped.isEmpty()) {
+            if (budget.stopped()) return
+            val before = session.work
+            session.forgetLearnedClauses { index, _ -> index !in dropped }
+            budget.note("RetirementWork", session.work - before)
+            cursor = 0
+        }
+        clear()
+    }
+}
+
 internal fun vivify(
     session: PropagationSession,
     params: BacktrackParams,
     startCursor: Int,
     stats: SearchStatsSink? = null,
-): Int {
-    val count = session.learnedClauseCount
-    if (count == 0) return 0
-    val native = session.usesNativeSat
-    val numBool = session.problem.numBoolVars
-    val replacements = ArrayList<IntArray>()
-    val replacementLbds = IntArrayList()
-    val replacementOrigins = IntArrayList()
-    val dropped = IntHashSet()
-    var cursor = if (startCursor in 0 until count) startCursor else 0
-    repeat(minOf(params.vivifyBatch.coerceAtLeast(1), count)) {
-        val index = cursor
-        cursor = (cursor + 1) % count
-        if (session.learnedClausePermanent(index) || !session.isLearnedClause(index)) return@repeat
-        if (!native && !session.learnedClauseAt(index).allLiteralsBool(numBool)) return@repeat
-        val literals = session.learnedClauseLiterals(index)
-        if (literals.size < 3) return@repeat
-        val strengthened = vivifyClause(session, literals, stats) ?: return@repeat
-        if (strengthened.size in 2 until literals.size) {
-            dropped.add(index)
-            replacements += strengthened
-            replacementLbds.add(minOf(session.learnedClauseLbd(index), strengthened.size))
-            replacementOrigins.add(session.learnedClauseOrigin(index))
-        }
-    }
-    if (replacements.isEmpty()) return cursor
-    session.forgetLearnedClauses { index, _ -> index !in dropped }
-    for (index in replacements.indices) {
-        session.addLearnedClause(Clause(replacements[index]), replacementLbds[index], replacementOrigins[index])
-    }
-    return 0
-}
+): Int = VivificationPass(startCursor).also { it.run(session, params, stats) }.cursor
 
-private fun vivifyClause(session: PropagationSession, literals: IntArray, stats: SearchStatsSink?): IntArray? {
+private fun vivifyClause(
+    session: PropagationSession,
+    literals: IntArray,
+    params: BacktrackParams,
+    budget: InprocessingBudget,
+): IntArray? {
     val kept = IntArrayList(literals.size)
     var pushes = 0
     var result: IntArray? = null
-    for (literal in literals) {
-        when (session.litTruth(literal)) {
-            true -> {
-                kept.add(literal)
-                result = kept.toIntArray()
-                break
-            }
-
-            false -> Unit
-
-            null -> {
-                kept.add(literal)
-                stats?.observeInprocessing(probes = 1L, visits = 0L)
-                if (session.pinBool(Lit.variable(literal), !Lit.isPositive(literal)) is PropagationResult.Unsat) {
+    val priorCancelled = session.probeCancelled
+    try {
+        for (literal in literals) {
+            if (!budget.visit()) return null
+            when (session.litTruth(literal)) {
+                true -> {
+                    kept.add(literal)
                     result = kept.toIntArray()
                     break
                 }
-                pushes++
+
+                false -> Unit
+
+                null -> {
+                    kept.add(literal)
+                    budget.probe()
+                    when (session.probeBool(Lit.variable(literal), !Lit.isPositive(literal))) {
+                        null -> return null
+                        is PropagationResult.Unsat -> {
+                            result = kept.toIntArray()
+                            break
+                        }
+                        else -> pushes++
+                    }
+                }
             }
         }
+        return result ?: kept.toIntArray().takeIf { it.size < literals.size }
+    } finally {
+        repeat(pushes) { session.popLast() }
+        if (!params.cancellation()) session.probeCancelled = priorCancelled
     }
-    repeat(pushes) { session.popLast() }
-    return result ?: kept.toIntArray().takeIf { it.size < literals.size }
 }
 
 internal fun snapshotAssignment(session: PropagationSession): Sample = Sample(

@@ -16,12 +16,13 @@ import kotlin.test.assertNull
 
 class InprocessingTest {
 
-    private class CountingPass(override val preservesVariables: Boolean = true) : InprocessingPass {
+    private class CountingPass(override val preservesVariables: Boolean = true, private val work: Long = 0L) : InprocessingPass {
         var runs = 0
         var resets = 0
 
         override fun run(session: PropagationSession, params: BacktrackParams, stats: SearchStatsSink?) {
             runs++
+            session.chargeInprocessingWork(work)
         }
 
         override fun reset() {
@@ -79,5 +80,64 @@ class InprocessingTest {
                 BacktrackParams(vivification = true, assumptions = Assumptions(bools = mapOf(0 to true))),
             ),
         )
+    }
+
+    @Test
+    fun `work triggers should run at safe roots without a restart`() {
+        val pass = CountingPass(work = 7L)
+        val loop = Inprocessing(listOf(pass), cadence = 100)
+        val session = session()
+        val params = BacktrackParams(inprocessingInterval = 1L, inprocessingCooldown = 10L)
+
+        session.chargeInprocessingWork(10L)
+        loop.onRoot(session, params)
+        repeat(20) { loop.onRoot(session, params) }
+        assertEquals(1, pass.runs)
+        session.chargeInprocessingWork(10L)
+        loop.onRoot(session, params)
+
+        assertEquals(2, pass.runs)
+    }
+
+    @Test
+    fun `clause growth should trigger independently of restart cadence`() {
+        val pass = CountingPass()
+        val loop = Inprocessing(listOf(pass), cadence = 100)
+        val session = session()
+        val params = BacktrackParams(inprocessingGrowth = 1)
+
+        loop.onRoot(session, params)
+        assertEquals(0, pass.runs)
+        session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
+        loop.onRoot(session, params)
+        loop.onRoot(session, params)
+
+        assertEquals(1, pass.runs)
+    }
+
+    @Test
+    fun `atomic overspend should repay debt before rotating to the next class`() {
+        val passes = List(3) { CountingPass(work = 10L) }
+        val loop = Inprocessing(passes, cadence = 1)
+        val session = session()
+        val params = BacktrackParams(inprocessingWork = 5L)
+
+        repeat(3) { loop.onRestart(session, params) }
+
+        assertEquals(listOf(1, 1, 0), passes.map { it.runs })
+    }
+
+    @Test
+    fun `cooldown should withhold restart attempts until search earns work`() {
+        val pass = CountingPass(work = 100L)
+        val loop = Inprocessing(listOf(pass), cadence = 1)
+        val session = session()
+        val params = BacktrackParams(inprocessingCooldown = 10L)
+
+        session.chargeInprocessingWork(10L)
+        loop.onRestart(session, params)
+        repeat(10) { loop.onRestart(session, params) }
+
+        assertEquals(1, pass.runs)
     }
 }

@@ -96,29 +96,25 @@ class SliceBudgetTest {
     }
 
     @Test
-    fun `vivification probes should spend the slice at their own rate`() {
+    fun `probe diagnostics should not duplicate propagation work charges`() {
         val search = SearchStatsSink()
         val slice = SliceBudget({ search.searchWork }, { 0L })
         slice.begin(sliceMillis = Long.MAX_VALUE, sliceNodes = 10L)
 
-        search.observeInprocessing(probes = 9L * INPROCESS_PROBES_PER_NODE, visits = 0L)
-        assertFalse(slice.expired())
-        search.observeInprocessing(probes = INPROCESS_PROBES_PER_NODE, visits = 0L)
+        search.observeInprocessing(probes = 1000L, visits = 0L)
 
-        assertTrue(slice.expired())
+        assertFalse(slice.expired())
     }
 
     @Test
-    fun `subsumption visits should spend the slice at their own rate`() {
+    fun `scan diagnostics should not duplicate propagation work charges`() {
         val search = SearchStatsSink()
         val slice = SliceBudget({ search.searchWork }, { 0L })
         slice.begin(sliceMillis = Long.MAX_VALUE, sliceNodes = 10L)
 
-        search.observeInprocessing(probes = 0L, visits = 9L * INPROCESS_VISITS_PER_NODE)
-        assertFalse(slice.expired())
-        search.observeInprocessing(probes = 0L, visits = INPROCESS_VISITS_PER_NODE)
+        search.observeInprocessing(probes = 0L, visits = 1_000_000L)
 
-        assertTrue(slice.expired())
+        assertFalse(slice.expired())
     }
 
     @Test

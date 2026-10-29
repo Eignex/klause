@@ -246,13 +246,16 @@ internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd
     if (n == 0) return
     val referenced = referencedLearned(n)
     val remap = IntArray(n) // remap[i] = new learned index, or -1 if dropped
+    work += n
     var newCount = 0
     for (i in 0 until n) {
+        work++
         remap[i] = if (learned.permanent[i] == 1 || referenced[i] || keep(i, learned.lbds[i])) newCount++ else -1
     }
     if (newCount == n) return // nothing dropped
     arithmeticLearningTrace?.remap(baseFactorCount, remap)
     for (i in 0 until n) if (remap[i] < 0) {
+        work++
         learned.lifecycle.note(learnedKind(i), LearnedStage.Retired)
         factorAttribution?.retire(learned.store[i])
     }
@@ -261,6 +264,7 @@ internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd
     learned.integerRows?.clear()
     var w = 0
     for (i in 0 until n) {
+        work++
         if (remap[i] >= 0) {
             val propagator = learned.store[i]
             if (propagator is LearnedIntegerPropagator) learned.integerRows?.add(propagator)
@@ -287,6 +291,7 @@ internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd
     val refBase = problem.numFactors
     var rw = refBase
     for (i in 0 until n) {
+        work++
         if (remap[i] >= 0) {
             refPayloadStore[rw] = refPayloadStore[refBase + i]
             rw++
@@ -295,10 +300,12 @@ internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd
     while (refPayloadStore.size > rw) refPayloadStore.removeAt(refPayloadStore.size - 1)
 
     for (lit in watches.byLit.indices) {
+        work++
         val list = watches.byLit[lit]
         val blockers = watches.blockersByLit[lit] // compacted in lockstep so indices stay aligned
         var wi = 0
         for (r in 0 until list.size) {
+            work++
             val fid = list[r]
             val blocker = blockers[r]
             if (fid < refBase) {
@@ -319,9 +326,11 @@ internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd
     // Atom-literal watcher lists carry learned fids too — a learned clause watching a
     // bound atom registers here, not in the bool-var lists.
     for (list in atoms.watchersByLit) {
+        work++
         if (list == null) continue
         var wi = 0
         for (r in 0 until list.size) {
+            work++
             val fid = list[r]
             if (fid < refBase) {
                 list[wi++] = fid
@@ -338,8 +347,12 @@ internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd
     // relative to the rest of forget, which is itself infrequent (≈ once per restart).
     watches.pos.clear()
     for (lit in watches.byLit.indices) {
+        work++
         val list = watches.byLit[lit]
-        for (i in 0 until list.size) watches.pos.put(packWatch(list[i], lit), i)
+        for (i in 0 until list.size) {
+            work++
+            watches.pos.put(packWatch(list[i], lit), i)
+        }
     }
 
     // A conflict return leaves the propagation queues holding in-flight fids, and the
@@ -349,6 +362,7 @@ internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd
     remapQueue(propQueue, remap, refBase)
     var pending = 0
     for (i in 0 until learned.pendingAttach.size) {
+        work++
         val old = learned.pendingAttach[i] - refBase
         if (remap[old] >= 0) learned.pendingAttach[pending++] = refBase + remap[old]
     }
@@ -367,6 +381,7 @@ internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd
     remapReasons(intMinReason, remap, refBase)
     remapReasons(intMaxReason, remap, refBase)
     for (i in 0 until undo.size) if (undo.tag[i] == 1) {
+        work++
         undo.minReason[i] = remappedReason(undo.minReason[i], remap, refBase)
         undo.maxReason[i] = remappedReason(undo.maxReason[i], remap, refBase)
     }
@@ -376,6 +391,7 @@ internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd
  *  (static fids `< refBase` pass through; dropped clauses' reasons clear to -1). */
 internal fun PropagationState.remapReasons(reasons: IntArray, remap: IntArray, refBase: Int) {
     for (i in reasons.indices) {
+        work++
         val fid = reasons[i]
         if (fid >= refBase) {
             val idx = fid - refBase
@@ -389,6 +405,7 @@ internal fun PropagationState.remapReasons(reasons: IntArray, remap: IntArray, r
 internal fun PropagationState.remapQueue(queue: IntArrayDeque, remap: IntArray, refBase: Int) {
     if (queue.isEmpty()) return
     val drained = IntArrayList(queue.size)
+    work += queue.size * 2L
     while (queue.isNotEmpty()) drained.add(queue.removeFirst())
     for (i in 0 until drained.size) {
         val fid = drained[i]
@@ -439,8 +456,10 @@ private fun PropagationState.noteLearnedStage(index: Int, stage: LearnedStage, b
 }
 
 internal fun PropagationState.referencedLearned(count: Int): BooleanArray {
+    work += count
     val retained = BooleanArray(count)
     fun protect(fid: Int) {
+        work++
         val index = fid - baseFactorCount
         if (index in retained.indices) retained[index] = true
     }
@@ -448,6 +467,7 @@ internal fun PropagationState.referencedLearned(count: Int): BooleanArray {
     intMinReason.forEach(::protect)
     intMaxReason.forEach(::protect)
     for (i in 0 until undo.size) if (undo.tag[i] == 1) {
+        work++
         protect(undo.minReason[i])
         protect(undo.maxReason[i])
     }

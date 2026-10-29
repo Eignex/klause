@@ -7,130 +7,164 @@ import com.eignex.klause.solver.result.SearchStatsSink
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 
-/**
- * Clause subsumption and self-subsuming resolution over the live learned database. Walks a
- * bounded round-robin slice ([BacktrackParams.subsumeBatch]) of the learned clauses: a clause with a
- * subset among the other learned clauses is dropped, and a clause whose subset match holds with
- * exactly one literal negated is strengthened by resolving that literal away. Runs on both clause
- * stores — the general database and the native-SAT arena's learned buffer — over pure-Boolean,
- * non-permanent clauses. Self-subsuming resolution follows Eén and Biere, "Effective Preprocessing
- * in SAT Through Variable and Clause Elimination", SAT 2005 (https://doi.org/10.1007/11499107_5).
- *
- * Soundness is direction-free: every participating clause is learned, hence implied by the base
- * formula, so dropping one never loses models and a self-subsuming resolvent (implied by the two
- * clauses it resolves) is itself implied. Order among same-batch drops therefore never matters; the
- * pass only trades database bytes for propagation strength.
- *
- * The occurrence index registers each clause under a single literal: a subsuming subset must contain
- * that literal (possibly negated, for the resolution case), so probing both polarities of the
- * candidate's literals finds every match while keeping the probe cost proportional to the occurrence
- * lists actually touched. The index is rebuilt per run from a snapshot; like [vivify], any mutation
- * renumbers the database, so the cursor restarts after a mutating pass.
- */
+// Retained preparation avoids buying the same occurrence index on each short slice.
+internal class SubsumptionPass : InprocessingPass {
+    override val preservesVariables: Boolean get() = true
+    override val spending = InprocessingSpending(InprocessingKind.Subsumption)
+    private var cursor = 0
+    private var pending: SubsumptionSlice? = null
+
+    override fun reset() {
+        cursor = 0
+        pending = null
+        spending.reset()
+    }
+
+    override fun run(session: PropagationSession, params: BacktrackParams, stats: SearchStatsSink?) {
+        if (!session.canSimplifyRoot || session.learnedClauseCount < 2) return
+        spending.run(session, params, stats) { budget ->
+            val slice = pending?.takeIf { it.revision == session.learnedClauseRevision }
+                ?: SubsumptionSlice(session, cursor, params.subsumeBatch).also { pending = it }
+            if (slice.advance(session, budget)) {
+                cursor = if (slice.revision == session.learnedClauseRevision) slice.nextCursor else 0
+                pending = null
+            }
+        }
+    }
+}
+
 internal fun subsume(
     session: PropagationSession,
     params: BacktrackParams,
     startCursor: Int,
     stats: SearchStatsSink? = null,
 ): Int {
-    val count = session.learnedClauseCount
-    if (count < 2) return 0
-    val native = session.usesNativeSat
-    val numBool = session.problem.numBoolVars
-    // Snapshot: sorted literal arrays + 64-bit literal signatures for the participating clauses.
-    var visits = 0L
-    val lits = arrayOfNulls<IntArray>(count)
-    val sigs = LongArray(count)
-    for (i in 0 until count) {
-        if (session.learnedClausePermanent(i)) continue
-        if (!session.isLearnedClause(i)) continue // pseudo-Boolean nogoods don't participate
-        if (!native && !session.learnedClauseAt(i).allLiteralsBool(numBool)) continue
-        val l = session.learnedClauseLiterals(i).copyOf()
-        if (l.size < 2) continue
-        l.sort()
-        visits += l.size
-        lits[i] = l
-        sigs[i] = signatureOf(l)
-    }
-    // One-literal registration: clause i is discoverable through occ of its smallest literal.
-    val occ = HashMap<Int, IntArrayList>()
-    for (i in 0 until count) {
-        val l = lits[i] ?: continue
-        occ.getOrPut(l[0]) { IntArrayList() }.add(i)
-    }
-    val dropIdx = IntHashSet()
-    val replacements = ArrayList<IntArray>()
-    val replacementLbds = IntArrayList()
-    val replacementOrigins = IntArrayList()
-    val batch = params.subsumeBatch.coerceAtLeast(1)
-    var cursor = if (startCursor in 0 until count) startCursor else 0
-    var examined = 0
-    while (examined < batch && examined < count) {
-        val idx = cursor
-        cursor = (cursor + 1) % count
-        examined++
-        val c = lits[idx] ?: continue
-        if (idx in dropIdx) continue
-        var strengthened: IntArray? = null
-        probe@ for (lit in c) {
-            for (polarity in 0..1) {
-                val key = if (polarity == 0) lit else Lit.negate(lit)
-                val list = occ[key] ?: continue
-                for (k in 0 until list.size) {
-                    val j = list[k]
-                    visits++
-                    if (j == idx || j in dropIdx) continue
-                    val d = lits[j] ?: continue
-                    if (d.size > c.size || (sigs[j] and sigs[idx].inv()) != 0L) continue
-                    visits += d.size
-                    val flipped = subsetWithOneFlip(d, c) ?: continue
-                    if (flipped == NO_FLIP) {
-                        dropIdx.add(idx)
-                        break@probe
-                    }
-                    if (strengthened == null && c.size > 2) {
-                        strengthened = removeLiteral(c, flipped)
-                    }
-                }
-            }
-        }
-        if (idx !in dropIdx && strengthened != null) {
-            dropIdx.add(idx)
-            replacements.add(strengthened)
-            // The resolvent is at least as strong as the clause it replaces: inherit the parent's LBD
-            // (capped by the new size) so the derived clause keeps its tier and glue-export standing.
-            replacementLbds.add(minOf(session.learnedClauseLbd(idx), strengthened.size))
-            // A resolvent of a peer's clause stays that peer's, so its uses keep crediting the arm that found it.
-            replacementOrigins.add(session.learnedClauseOrigin(idx))
-        }
-    }
-    stats?.observeInprocessing(probes = 0L, visits = visits)
-    if (dropIdx.isEmpty()) return cursor
-    session.forgetLearnedClauses { i, _ -> i !in dropIdx }
-    for (r in replacements.indices) {
-        session.addLearnedClause(Clause(replacements[r]), replacementLbds[r], replacementOrigins[r])
-    }
-    // The forget renumbered the database, so resume the round-robin from the start.
-    return 0
+    if (!session.canSimplifyRoot || session.learnedClauseCount < 2) return startCursor
+    val slice = SubsumptionSlice(session, startCursor, params.subsumeBatch)
+    InprocessingSpending(InprocessingKind.Subsumption).run(session, params, stats) { slice.advance(session, it) }
+    return if (slice.revision == session.learnedClauseRevision) slice.nextCursor else 0
 }
 
-/** Sentinel for [subsetWithOneFlip]: a clean subset, no literal flipped. */
+private class SubsumptionSlice(session: PropagationSession, start: Int, batch: Int) {
+    val revision = session.learnedClauseRevision
+    private val count = session.learnedClauseCount
+    private val size = minOf(count, batch.coerceAtLeast(1), INDEX_CLAUSES)
+    var nextCursor = start.takeIf { it in 0 until count } ?: 0
+        private set
+    private val ids = IntArray(size)
+    private val literals = arrayOfNulls<IntArray>(size)
+    private val signatures = LongArray(size)
+    private val occurrences = HashMap<Int, IntArrayList>()
+    private var built = 0
+    private var indexed = 0
+    private var literalCount = 0
+    private var target = 0
+    private var literal = 0
+    private var polarity = 0
+    private var occurrence = 0
+    private var strengthened: IntArray? = null
+    private val dropped = IntHashSet()
+    private val replacements = ArrayList<IntArray>()
+    private val lbds = IntArrayList()
+    private val origins = IntArrayList()
+    private var attached = 0
+
+    fun advance(session: PropagationSession, budget: InprocessingBudget): Boolean {
+        while (built < size) {
+            if (!budget.visit()) return false
+            val id = nextCursor
+            nextCursor = (nextCursor + 1) % count
+            ids[built] = id
+            budget.note("Candidates")
+            val length = session.learnedClauseLiteralCount(id)
+            if (length > ROOT_LITERAL_LIMIT - literalCount) budget.note("Oversized")
+            val row = session.rootClauseLiterals(session.problem.numFactors + id,
+                ROOT_LITERAL_LIMIT - literalCount)?.takeIf { it.size >= 2 }
+            if (row != null) {
+                // Copying and sorting are bounded by the retained literal ceiling.
+                budget.charge(row.size * (2 + ceilLog2(row.size)))
+                literals[built] = row.copyOf().also { it.sort() }
+                signatures[built] = signatureOf(row)
+                literalCount += row.size
+                budget.note("Eligible")
+            }
+            built++
+        }
+        while (indexed < size) {
+            if (!budget.visit()) return false
+            literals[indexed]?.let { occurrences.getOrPut(it[0]) { IntArrayList() }.add(indexed) }
+            indexed++
+        }
+        while (target < size) {
+            if (budget.stopped()) return false
+            val c = literals[target]
+            if (c == null || ids[target] in dropped || literal >= c.size) {
+                finishTarget(session)
+                continue
+            }
+            val key = if (polarity == 0) c[literal] else Lit.negate(c[literal])
+            val list = occurrences[key]
+            if (list == null || occurrence >= list.size) {
+                if (polarity++ == 1) { literal++; polarity = 0 }
+                occurrence = 0
+                continue
+            }
+            if (!budget.visit()) return false
+            val other = list[occurrence++]
+            if (other == target || ids[other] in dropped) continue
+            val d = literals[other] ?: continue
+            if (d.size > c.size || (signatures[other] and signatures[target].inv()) != 0L) continue
+            if (!budget.visit(d.size * (1 + ceilLog2(c.size)))) { occurrence--; return false }
+            val flipped = subsetWithOneFlip(d, c) ?: continue
+            if (flipped == NO_FLIP) {
+                dropped.add(ids[target])
+            } else if (strengthened == null && c.size > 2) {
+                budget.charge(c.size)
+                strengthened = c.filter { it != flipped }.toIntArray()
+            }
+        }
+        while (attached < replacements.size) {
+            val row = replacements[attached]
+            if (!budget.visit(row.size * 2 + 1)) return false
+            val before = session.work
+            session.addRootDerivedClause(Clause(row), lbds[attached], origins[attached], false)
+            budget.note("AttachmentWork", session.work - before + row.size * 2 + 1L)
+            budget.note("Shortened")
+            attached++
+        }
+        if (!dropped.isEmpty()) {
+            if (budget.stopped()) return false
+            val before = session.work
+            session.forgetLearnedClauses { index, _ -> index !in dropped }
+            budget.note("RetirementWork", session.work - before)
+        }
+        return true
+    }
+
+    private fun finishTarget(session: PropagationSession) {
+        strengthened?.takeUnless { ids[target] in dropped }?.let {
+            dropped.add(ids[target])
+            replacements.add(it)
+            lbds.add(minOf(session.learnedClauseLbd(ids[target]), it.size))
+            origins.add(session.learnedClauseOrigin(ids[target]))
+        }
+        target++
+        literal = 0
+        polarity = 0
+        occurrence = 0
+        strengthened = null
+    }
+}
+
+private const val INDEX_CLAUSES = 1024
 private const val NO_FLIP = -1
 
-/**
- * When every literal of sorted [d] occurs in sorted [c] directly, returns [NO_FLIP]; when exactly one
- * occurs negated instead (the self-subsuming resolution case), returns that negated literal as it
- * appears in [c]; otherwise null.
- */
 private fun subsetWithOneFlip(d: IntArray, c: IntArray): Int? {
     var flipped = NO_FLIP
     for (lit in d) {
         if (binaryContains(c, lit)) continue
         val neg = Lit.negate(lit)
-        if (flipped == NO_FLIP && binaryContains(c, neg)) {
-            flipped = neg
-            continue
-        }
+        if (flipped == NO_FLIP && binaryContains(c, neg)) { flipped = neg; continue }
         return null
     }
     return flipped
@@ -141,31 +175,21 @@ private fun binaryContains(sorted: IntArray, value: Int): Boolean {
     var hi = sorted.size - 1
     while (lo <= hi) {
         val mid = (lo + hi) ushr 1
-        val v = sorted[mid]
         when {
-            v < value -> lo = mid + 1
-            v > value -> hi = mid - 1
+            sorted[mid] < value -> lo = mid + 1
+            sorted[mid] > value -> hi = mid - 1
             else -> return true
         }
     }
     return false
 }
 
-private fun removeLiteral(c: IntArray, lit: Int): IntArray {
-    val out = IntArray(c.size - 1)
-    var j = 0
-    for (l in c) if (l != lit) out[j++] = l
-    return out
-}
-
-/** 64-bit variable signature: a set bit per variable bucket, so `sig(d) and sig(c).inv() != 0`
- *  refutes both the clean subset and the one-flip case (a flip changes polarity, not the variable)
- *  without touching the arrays. */
-private fun signatureOf(sorted: IntArray): Long {
+private fun signatureOf(literals: IntArray): Long {
     var sig = 0L
-    for (lit in sorted) sig = sig or (1L shl (Lit.variable(lit) * SIG_MIX ushr SIG_SHIFT))
+    for (lit in literals) sig = sig or (1L shl (Lit.variable(lit) * SIG_MIX ushr SIG_SHIFT))
     return sig
 }
 
+private fun ceilLog2(value: Int): Int = Int.SIZE_BITS - (value - 1).countLeadingZeroBits()
 private const val SIG_MIX = 0x9E3779B1.toInt()
 private const val SIG_SHIFT = 26
