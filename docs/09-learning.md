@@ -348,6 +348,9 @@ coordinates before naming integer decisions and their complements.
 The registry admits at most 4,096 atoms; an exhausted registry stops the traversal
 as indeterminate. Without names, a non-root integer decision cannot supply a
 shared premise and mapped admission must decline.
+Every native conflict cascade repeats the mapped-target assertion and complete
+premise checks before admitting a typed result. An unavailable mapping retains its
+clausal fallback, including cascades reached through an LP consequence.
 
 Rows share the learned store and integer bounds propagation. A successful ordinary
 row assertion also retains its first-UIP clause in that native store. The two

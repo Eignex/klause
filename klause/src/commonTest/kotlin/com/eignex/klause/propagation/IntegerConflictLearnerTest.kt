@@ -43,6 +43,37 @@ import kotlin.test.assertTrue
 
 class IntegerConflictLearnerTest {
     @Test
+    fun `a cascaded row with an unavailable shared premise should retain clause fallback`() {
+        val native = PropagationSession(Problem(0, 6,
+            arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24),
+                IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)), arrayOf(
+                Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+                Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                Linear(intArrayOf(2, 1, -1), intArrayOf(3, 4, 5), LinearOp.LE, 0),
+                Linear(intArrayOf(2, -1), intArrayOf(3, 4), LinearOp.LE, 0),
+                Linear(intArrayOf(1, 1), intArrayOf(0, 3), LinearOp.GE, 3),
+            )), pbLearning = false).apply { enableIntegerRowLearning() }
+        val peer = object : SearchComponent {
+            override fun initialize(context: SearchContext): ComponentResult =
+                context.publish(SearchDecision.IntAtMost(5, 7))
+        }
+        val cp = CpSearchComponent(native)
+        val shared = SearchSession(listOf(peer, cp), atoms = SearchAtomRegistry(0))
+        assertIs<ComponentResult.Consistent>(shared.initialize())
+        assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.IntAtMost(2, 7)))
+        assertIs<ComponentResult.Conflict>(shared.push(SearchDecision.IntAtLeast(0, 2)))
+        val first = assertIs<SearchConflictResolution.Backjump>(cp.resolveConflict(shared)).conflict
+        shared.popTo(first.decisionLevel)
+
+        val cascade = assertIs<SearchLearnedConflictResult.Backjump>(first.apply(shared)).conflict
+        shared.popTo(cascade.decisionLevel)
+        assertIs<SearchLearnedConflictResult.Resume>(cascade.apply(shared))
+
+        assertEquals(1, native.explanationState.learned.integerRows?.size)
+        assertEquals(8L, shared.intLowerBound(2))
+    }
+
+    @Test
     fun `a paired arithmetic assertion should publish both row and clause deductions`() {
         val native = PropagationSession(Problem(2, 3,
             arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)), arrayOf(
