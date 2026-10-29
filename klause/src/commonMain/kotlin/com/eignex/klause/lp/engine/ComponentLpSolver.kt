@@ -270,7 +270,9 @@ internal class ComponentLpSolver(
                     activeChild = null
                     metrics += child.lastMetrics
                 }
-                if (basis == null || !basis.validFor(nextParts[index].model) || stop()) return false
+                if (basis == null || !basis.validFor(checkNotNull(nextParts[index].model.exactState).model) ||
+                    stop()
+                ) return false
             }
             if (token()) return false
             val retired = parts.indices.filter { changed[it] }.map { solvers[it] }
