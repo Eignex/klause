@@ -142,7 +142,8 @@ Resource recordings require GNU time (`gtime` from Homebrew's `gnu-time` package
 Lab source builds disable JVM incremental-compilation indexes because each build
 starts from a fresh source tree and the lab reuses complete verified distributions.
 Developer and CI builds retain their incremental-compilation settings.
-The status sweep and `klause-reference*` schedules use `tags: ["local"]` to stay on the Mac.
+The canonical status sweep uses the Linux x86 manifest and explicit Linux x86
+placement tags. Historical `klause-reference*` recipes retain their placement policy.
 Compiler tree identity is shared within one plan; each case execution verifies its pinned tree again.
 Include trees are scanned when each workload is planned.
 
@@ -1097,7 +1098,8 @@ timeouts retain their costs and provenance in the external campaign ledger.
 
 ## Comparable sweep controls
 
-The status-sweep recipe pins solver/compiler seed 1, one processor, a 10s CLI
+The status-sweep recipe uses [lab/bench-linux.json](lab/bench-linux.json) and pins
+solver/compiler seed 1, one processor, a 10s CLI
 budget, 60s compiler ceiling, 4096 MiB case memory, 2560 MiB heap, default GC,
 debug statistics, uninstrumented measurement and default tolerance. The
 `sdk-linux-v1` comparison series requires Linux x86 and retains complete assignments
@@ -1106,6 +1108,10 @@ historical Mac and legacy-harness sweeps. Preserve their records and fingerprint
 a seed, compiler, harness, platform or deadline migration needs a bounded bridge
 with identical source and matched seed/repeat blocks before attributing a revision
 regression. A changed seed is not recovered performance.
+
+Use both `platform:linux` and `arch:x86_64` tags to constrain preparation as well
+as solves. The canonical manifest declares the same required runtime tags; the
+platform-wide `lab/bench.json` remains available for retained historical recipes.
 
 `compiler-seed=1` makes the fixed MiniZinc lowering seed explicit; other values
 are rejected. `comparison-series=NAME` labels a controlled series. Records retain

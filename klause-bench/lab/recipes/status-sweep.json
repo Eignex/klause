@@ -9,7 +9,7 @@
   "priority": 100,
   "repository": "Eignex/klause",
   "bench": {
-    "manifest": "klause-bench/lab/bench.json",
+    "manifest": "klause-bench/lab/bench-linux.json",
     "sourceValidation": true,
     "request": {
       "parameters": {
