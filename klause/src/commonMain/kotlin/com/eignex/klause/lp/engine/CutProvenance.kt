@@ -107,7 +107,7 @@ internal class CutProvenance(
     private val auxiliarySnapshot = auxiliaryDefinitions.toMap()
     val storageUnits: Long = factSnapshot.sumOf { it.premise.storageUnits() + 1L } +
         assumptionSnapshot.sumOf { it.length.toLong() } + ruleSnapshot.sumOf { it.storageUnits } +
-        auxiliarySnapshot.values.sumOf { it.storageUnits + 2L } + (conclusion?.storageUnits() ?: 0L) + 3L
+        auxiliarySnapshot.values.sumOf { it.storageUnits + 2L } + (conclusion?.storageUnits() ?: 0L) + 4L
     val facts: List<CutProofFact> get() = factSnapshot.toList()
     val assumptions: Set<String> get() = assumptionSnapshot.toSet()
     val rules: List<CutRoundingRule> get() = ruleSnapshot.toList()

@@ -271,7 +271,7 @@ internal fun LpEngine.lpBoundAndFix(
     warm: Basis? = null,
     cutsAllowed: Boolean = false,
 ): LpNodeOutcome = try {
-    sink.lp.cutLifecycle.recipe = LpRoute.NODE
+    beginCutAttribution(LpRoute.NODE)
     sink.lp.cutLifecycle.families = cutPool.cuts().mapTo(HashSet()) { it.family }
     sink.lp.observeNodePass()
     sink.lp.clockStart()
@@ -1496,7 +1496,7 @@ internal fun LpEngine.harvestRootCuts(
 ): List<Cut> {
     if (session.isUnsatAtRoot) return emptyList()
     if (separators.isEmpty() && !gomory && !mir) return emptyList()
-    sink.lp.cutLifecycle.recipe = LpRoute.ROOT
+    beginCutAttribution(LpRoute.ROOT)
     sink.lp.cutLifecycle.families = separators.mapTo(HashSet()) { it.family }.also {
         if (gomory) it.add(CutFamily.GOMORY)
         if (mir) it.add(CutFamily.MIR)
@@ -1561,7 +1561,7 @@ internal fun LpEngine.harvestRootCuts(
                 activateCutAttribution(relaxation)
                 val replacement = dualSimplex(relaxation.model, cancellation)
                 ownedSimplex = replacement
-                simplex.close()
+                sink.lp.cutLifecycle.measureShared("RETIREMENT") { simplex.close() }
                 simplex = replacement
                 val next = try {
                     simplex.solve()
@@ -1584,10 +1584,10 @@ internal fun LpEngine.harvestRootCuts(
             val owned = ownedSimplex
             ownedSimplex = null
             if (primaryFailure == null) {
-                owned?.close()
+                sink.lp.cutLifecycle.measureShared("RETIREMENT") { owned?.close() }
             } else {
                 try {
-                    owned?.close()
+                    sink.lp.cutLifecycle.measureShared("RETIREMENT") { owned?.close() }
                 } catch (closeFailure: Throwable) {
                     primaryFailure.addSuppressed(closeFailure)
                 }

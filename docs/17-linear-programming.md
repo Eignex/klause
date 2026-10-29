@@ -253,7 +253,8 @@ allowances. The [portfolio](12-portfolio.md#lp-arm-admission) decides when
 an aggressive LP companion runs.
 
 Cut family identity follows portable proofs and retained rows without contributing
-to proof authority or deduplication. Finite root and node phases distinguish
+to proof authority or deduplication. Finite root and node phases name the ordinary,
+structural or retained-component admission recipe and distinguish
 construction, mapping refusal, admission, efficacy selection, tightness observations,
 capacity or inactivity retirement, and premise or scope retraction. A tight or
 selected row establishes no deduction. Nonzero exact certificate support is reported

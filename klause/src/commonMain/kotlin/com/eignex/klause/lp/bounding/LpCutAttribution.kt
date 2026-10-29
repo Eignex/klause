@@ -8,7 +8,18 @@ import com.eignex.klause.lp.engine.LpDeductionCertificate
 import com.eignex.klause.lp.engine.hasIntegralObjective
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.result.LpCutRecipe
 import com.eignex.klause.solver.result.LpPhaseStats
+import com.eignex.klause.solver.result.LpRoute
+
+internal fun LpEngine.beginCutAttribution(route: LpRoute) {
+    sink.lp.cutLifecycle.recipe = route
+    sink.lp.cutLifecycle.kind = when {
+        params.lpPlan.componentOwnership -> LpCutRecipe.COMPONENT
+        ordinaryCutSeparation -> LpCutRecipe.ORDINARY
+        else -> LpCutRecipe.STRUCTURAL
+    }
+}
 
 internal fun LpEngine.constructCuts(separator: CutSeparator, context: CutContext): List<Cut> =
     sink.lp.cutLifecycle.measure(separator.family, "CONSTRUCTION") {

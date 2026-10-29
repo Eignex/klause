@@ -6,6 +6,7 @@ import com.eignex.klause.lp.engine.CutFamily
 internal class LinearCutLifecycle(private val budget: SourceLpBudget) {
     private val counts = LinkedHashMap<String, Long>()
     var families: Set<CutFamily> = emptySet()
+    private var recipe: String = "NO_CUT"
     fun snapshot(): Map<String, Long> = counts.toMap()
 
     fun observe(family: CutFamily, stage: String, count: Long = 1L) {
@@ -13,7 +14,14 @@ internal class LinearCutLifecycle(private val budget: SourceLpBudget) {
         counts[key] = (counts[key] ?: 0L) + count
     }
 
+    fun shared(stage: String, count: Long) {
+        val key = "numericalCutLifecycleRECIPE_${recipe}_$stage"
+        counts[key] = (counts[key] ?: 0L) + count
+        for (family in families) observe(family, stage, count)
+    }
+
     fun <T> containing(recipe: String, block: () -> T): T {
+        this.recipe = recipe
         fun costs() = listOf(budget.measuredPreparationWork, budget.measuredFloatWork,
             budget.measuredContinuationWork, budget.measuredRefinementWork, budget.measuredBoundCertificationWork,
             budget.measuredConflictCertificationWork, budget.reservedAllocation, budget.activeNanos)
