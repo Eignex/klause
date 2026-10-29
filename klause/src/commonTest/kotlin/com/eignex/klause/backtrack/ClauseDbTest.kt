@@ -6,8 +6,14 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.result.SearchStatsSink
+import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.SharingMemoryObservation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class ClauseDbTest {
 
@@ -72,5 +78,38 @@ class ClauseDbTest {
         vivify(session, BacktrackParams(vivification = true, vivifyBatch = 8), 0)
         assertEquals(2, session.learnedClauseLiterals(0).size)
         assertEquals(1, session.learnedClauseLbd(0))
+    }
+
+    @Test
+    fun `reset should release grown vivification metadata and unattached rows`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(chainProblem().bake(), nativeSat = native)
+            repeat(9) { session.addLearnedClause(Clause(intArrayOf(1, 3, 4)), 3) }
+            val pass = VivificationPass()
+            val empty = SharingMemoryObservation(1024L, 128, { false }, {})
+            val baseline = empty.snapshot { pass.retainedMemory(empty, false) }
+            val stats = SearchStatsSink()
+            var prepared = false
+            val cancellation = Cancellation {
+                prepared = prepared || (stats.inprocessProbes >= 9L && session.decisionLevel > 0)
+                prepared && session.decisionLevel == 0
+            }
+            pass.run(session, BacktrackParams(vivifyBatch = 9, cancellation = cancellation), stats)
+            val before = SharingMemoryObservation(1024L, 128, { false }, {})
+            val retained = before.snapshot { pass.retainedMemory(before, false) }
+
+            pass.reset()
+            val after = SharingMemoryObservation(1024L, 128, { false }, {})
+            val released = after.snapshot { pass.retainedMemory(after, false) }
+
+            val retainedBytes = assertNotNull(retained.completeValues).getValue("ownedPrimitiveBytes")
+            val releasedBytes = assertNotNull(released.completeValues).getValue("ownedPrimitiveBytes")
+            assertTrue(retainedBytes > releasedBytes)
+            assertEquals(assertNotNull(baseline.completeValues).getValue("ownedPrimitiveBytes"), releasedBytes)
+            assertEquals(0L, released.completeValues?.getValue("ownedReferenceSlots"))
+            assertEquals(9, session.learnedClauseCount)
+            assertEquals(0, session.decisionLevel)
+            assertFalse(session.fixpointCancelled)
+        }
     }
 }

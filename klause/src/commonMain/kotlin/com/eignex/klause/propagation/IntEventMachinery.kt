@@ -101,6 +101,7 @@ internal class IntEventMachinery private constructor(
                 if (next != null) list[write++] = next
             }
             list.truncateTo(write)
+            list.trim()
         }
     }
 

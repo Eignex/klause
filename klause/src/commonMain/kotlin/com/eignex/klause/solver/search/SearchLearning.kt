@@ -9,10 +9,10 @@ import kotlin.time.TimeSource
 
 internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
     val lifecycle = LearnedLifecycle()
-    private val stages = IntArrayList()
-    private val learned = WatchedClauseStore()
-    private val pendingAttach = ArrayDeque<Int>()
-    private val rechecks = ArrayDeque<Int>()
+    private var stages = IntArrayList()
+    private var learned = WatchedClauseStore()
+    private var pendingAttach = IndexQueue()
+    private var rechecks = IndexQueue()
     private var reasons = MutableIntIntMap()
     val hasReasons: Boolean get() = !reasons.isEmpty()
     private var propagatedTrail = 0
@@ -28,6 +28,7 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
     private var assertingConflicts = 0L
     private var nonAssertingConflicts = 0L
     private var reductionNanos = 0L
+    private var releasedWatchVisits = 0L
     val size: Int get() = learned.size
 
     fun explanationOf(index: Int): SearchExplanation = learned.explanationOf(index)
@@ -36,8 +37,8 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
         if (asserting) assertingConflicts++ else nonAssertingConflicts++
     }
 
-    fun onRestart() {
-        reduceLearnedDb()
+    fun onRestart(cancelled: () -> Boolean = { false }, charge: () -> Unit = {}) {
+        reduceLearnedDb(cancelled, charge)
         restarts++
     }
 
@@ -61,20 +62,165 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
         droppedClauses,
         learned.size.toLong(),
         peakLearnedClauses,
-        learned.watchVisits,
+        releasedWatchVisits + learned.watchVisits,
         assertingConflicts,
         nonAssertingConflicts,
         reductionNanos,
         lifecycle.snapshot(),
     )
 
+    internal fun release() {
+        releasedWatchVisits += learned.watchVisits
+        learned = WatchedClauseStore()
+        stages = IntArrayList()
+        reasons = MutableIntIntMap()
+        pendingAttach = IndexQueue()
+        rechecks = IndexQueue()
+        propagatedTrail = 0
+        unitsPending = false
+    }
+
     internal fun retainedMemory(sample: SharingMemoryObservation) {
-        learned.memory(sample)
+        learned.memory(sample) { index ->
+            var protected = learned.literalsAt(index).size == 1 || learned.lbdAt(index) <= learnedDb.glueLbd
+            for (slot in reasons.usedInternal.indices) {
+                sample.step()
+                if (reasons.usedInternal[slot] && reasons.valuesInternal[slot] == index) protected = true
+            }
+            for (pending in pendingAttach) { sample.step(); if (pending == index) protected = true }
+            protected
+        }
         sample.record(mapOf(
             "sharedLearnedStageCapacityBytes" to stages.backingData.size.toLong() * Int.SIZE_BYTES,
             "sharedLearnedReasonIndexBytes" to reasons.primitiveCapacityBytes,
             "sharedLearnedPendingEntries" to (pendingAttach.size + rechecks.size).toLong(),
         ))
+        sample.owned(stages.backingData, stages.backingData.size.toLong() * Int.SIZE_BYTES)
+        sample.owned(reasons, reasons.primitiveCapacityBytes, protected = true)
+        sample.owned(pendingAttach, pendingAttach.capacityBytes, protected = true)
+        sample.owned(rechecks, rechecks.capacityBytes)
+    }
+
+    internal fun reclaimMemory(
+        softLimitBytes: Long,
+        workAllowance: Long,
+        scratchAllowanceBytes: Long,
+        protectedReasonBytes: Long = 0L,
+        cancelled: () -> Boolean = { false },
+        charge: () -> Unit = {},
+    ): SharedLearningReclamation {
+        require(softLimitBytes >= 0L && workAllowance >= 0L && scratchAllowanceBytes >= 0L)
+        val workBound = learned.replacementWorkBound + reasons.usedInternal.size * 4L +
+            (pendingAttach.size.toLong() + rechecks.size) * 4L + size * 16L
+        val scratchBound = learned.replacementScratchBound + reasons.size * 64L +
+            (pendingAttach.size.toLong() + rechecks.size) * 32L + size * 16L
+        if (cancelled()) return SharedLearningReclamation(SharedLearningReclamationStatus.Cancelled)
+        if (workBound > workAllowance || scratchBound > scratchAllowanceBytes) {
+            return SharedLearningReclamation(SharedLearningReclamationStatus.Deferred)
+        }
+        var work = 0L
+        fun step() {
+            if (cancelled()) throw ReclamationStopped(true)
+            if (work >= workAllowance) throw ReclamationStopped(false)
+            charge()
+            work++
+        }
+        return try {
+            val before = ownedBytes(::step) + protectedReasonBytes
+            if (before <= softLimitBytes) {
+                SharedLearningReclamation(SharedLearningReclamationStatus.WithinLimit, before, before, work = work)
+            } else {
+                val keep = BooleanArray(size)
+                for (index in keep.indices) {
+                    step()
+                    keep[index] = learned.literalsAt(index).size == 1 || learned.lbdAt(index) <= learnedDb.glueLbd
+                }
+                reasons.forEach { _, index -> step(); keep[index] = true }
+                for (index in pendingAttach) { step(); keep[index] = true }
+                val replacement = learned.prepareRetained(keep, ::step)
+                val remap = IntArray(size) { -1 }
+                val replacementStages = IntArrayList(replacement.size)
+                var target = 0
+                for (index in keep.indices) {
+                    step()
+                    if (keep[index]) { remap[index] = target++; replacementStages.add(stages[index]) }
+                }
+                val replacementReasons = MutableIntIntMap(reasons.size)
+                reasons.forEach { variable, index -> step(); replacementReasons.put(variable, remap[index]) }
+                val replacementPending = IndexQueue(pendingAttach.size)
+                for (index in pendingAttach) { step(); replacementPending.addLast(remap[index]) }
+                val replacementRechecks = IndexQueue(minOf(rechecks.size, replacement.size))
+                for (index in rechecks) {
+                    step()
+                    if (remap[index] >= 0) replacementRechecks.addLast(remap[index])
+                }
+                val after = replacement.ownedBytes(::step) + replacementStages.backingData.size.toLong() * Int.SIZE_BYTES +
+                    replacementReasons.primitiveCapacityBytes +
+                    replacementPending.capacityBytes + replacementRechecks.capacityBytes +
+                    protectedReasonBytes
+                step()
+                if (cancelled()) throw ReclamationStopped(true)
+                // No callback or cancellation point can observe a partially published index generation.
+                val retired = size - replacement.size
+                learned = replacement
+                stages = replacementStages
+                reasons = replacementReasons
+                pendingAttach = replacementPending
+                rechecks = replacementRechecks
+                unitsPending = learned.units.size > 0
+                if (retired > 0) {
+                    repeat(retired) { lifecycle.note(LearnedKind.Clause, LearnedStage.Retired) }
+                    reductions++
+                    droppedClauses += retired
+                }
+                SharedLearningReclamation(
+                    if (after > softLimitBytes) SharedLearningReclamationStatus.ProtectedFloor
+                    else SharedLearningReclamationStatus.Reclaimed,
+                    before, after, after, work, scratchBound,
+                )
+            }
+        } catch (stopped: ReclamationStopped) {
+            SharedLearningReclamation(
+                if (stopped.cancelled) SharedLearningReclamationStatus.Cancelled else SharedLearningReclamationStatus.Deferred,
+                work = work, scratchBytes = scratchBound,
+            )
+        }
+    }
+
+    private fun ownedBytes(step: () -> Unit): Long = learned.ownedBytes(step) +
+        stages.backingData.size.toLong() * Int.SIZE_BYTES + reasons.primitiveCapacityBytes +
+        pendingAttach.capacityBytes + rechecks.capacityBytes
+
+    private class ReclamationStopped(val cancelled: Boolean) : RuntimeException()
+
+    private class IndexQueue(capacity: Int = 8) : Iterable<Int> {
+        private var data = IntArray(capacity.coerceAtLeast(1))
+        private var head = 0
+        var size = 0
+            private set
+        val capacityBytes: Long get() = data.size.toLong() * Int.SIZE_BYTES
+        fun isNotEmpty(): Boolean = size > 0
+        fun addLast(value: Int) {
+            if (size == data.size) {
+                val replacement = IntArray(data.size * 2)
+                for (index in 0 until size) replacement[index] = data[(head + index) % data.size]
+                data = replacement
+                head = 0
+            }
+            data[(head + size++) % data.size] = value
+        }
+        fun removeFirst(): Int {
+            check(size > 0)
+            val value = data[head]
+            head = (head + 1) % data.size
+            size--
+            return value
+        }
+        override fun iterator(): Iterator<Int> = object : Iterator<Int> {
+            private var position = 0
+            override fun hasNext(): Boolean = position < size
+            override fun next(): Int = data[(head + position++) % data.size]
+        }
     }
 
     fun learn(literals: IntArray, host: ClauseWatchHost) {
@@ -104,24 +250,41 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
     // Glue clauses, clauses that propagated since the last reduction, and units are retained; the rest are
     // dropped highest-LBD first (Audemard and Simon, "Predicting Learnt Clauses Quality in Modern SAT
     // Solvers", IJCAI 2009, https://www.ijcai.org/Proceedings/09/Papers/074.pdf).
-    private fun reduceLearnedDb() {
+    private fun reduceLearnedDb(cancelled: () -> Boolean, charge: () -> Unit) {
         val cap = learnedDb.maxClauses ?: return
         // Reduction renumbers clauses, so it waits until no clause is queued for its first
         // examination. The next propagation drains that queue, so the following restart reduces.
         if (learned.size <= cap || pendingAttach.isNotEmpty()) return
+        val workBound = learned.replacementWorkBound + reasons.usedInternal.size * 4L + size * 32L +
+            rechecks.size * 4L
+        val scratchBound = learned.replacementScratchBound + reasons.size * 64L + size * 32L + rechecks.size * 32L
+        if (workBound > learnedDb.reclamationWork || scratchBound > learnedDb.reclamationScratchBytes) return
+        var work = 0L
+        fun step() {
+            if (cancelled()) throw ReclamationStopped(true)
+            if (work >= learnedDb.reclamationWork) throw ReclamationStopped(false)
+            charge()
+            work++
+        }
         val started = TimeSource.Monotonic.markNow()
         try {
-            reduceOverCap(cap)
+            reduceOverCap(cap, ::step)
+        } catch (_: ReclamationStopped) {
+            return
         } finally {
             reductionNanos += started.elapsedNow().inWholeNanoseconds
         }
     }
 
-    private fun reduceOverCap(cap: Int) {
+    private fun reduceOverCap(cap: Int, step: () -> Unit) {
         val droppable = IntArrayList(learned.size)
+        val protected = BooleanArray(learned.size)
+        reasons.forEach { _, index -> step(); protected[index] = true }
         for (index in 0 until learned.size) {
+            step()
             val retained = learned.lbdAt(index) <= learnedDb.glueLbd ||
                 learned.usedAt(index) ||
+                protected[index] ||
                 learned.literalsAt(index).size == 1
             if (!retained) droppable.add(index)
         }
@@ -131,24 +294,34 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
             return
         }
         val dropped = selectDroppedClauses(droppable, survivors)
+        val replacement = learned.prepareRetained(BooleanArray(learned.size) { !dropped[it] }, step)
         val remap = IntArray(learned.size) { -1 }
+        val replacementStages = IntArrayList(replacement.size)
         var target = 0
         for (index in 0 until learned.size) {
-            if (dropped[index]) lifecycle.note(LearnedKind.Clause, LearnedStage.Retired)
-            else {
+            step()
+            if (!dropped[index]) {
                 remap[index] = target
-                stages[target++] = stages[index]
+                replacementStages.add(stages[index])
+                target++
             }
         }
-        stages.truncateTo(target)
-        repeat(rechecks.size) {
-            val next = remap[rechecks.removeFirst()]
-            if (next >= 0) rechecks.addLast(next)
+        val replacementRechecks = IndexQueue(minOf(rechecks.size, replacement.size))
+        for (index in rechecks) {
+            step()
+            val next = remap[index]
+            if (next >= 0) replacementRechecks.addLast(next)
         }
-        val retainedReasons = MutableIntIntMap()
-        reasons.forEach { variable, index -> if (remap[index] >= 0) retainedReasons.put(variable, remap[index]) }
+        val retainedReasons = MutableIntIntMap(reasons.size)
+        reasons.forEach { variable, index -> step(); retainedReasons.put(variable, remap[index]) }
+        replacement.clearUsed()
+        step()
+        if (cancelled()) throw ReclamationStopped(true)
+        stages = replacementStages
+        rechecks = replacementRechecks
         reasons = retainedReasons
-        learned.retain { index -> !dropped[index] }
+        learned = replacement
+        repeat(droppable.size - survivors) { lifecycle.note(LearnedKind.Clause, LearnedStage.Retired) }
         reductions++
         droppedClauses += droppable.size - survivors
         learned.clearUsed()
@@ -254,3 +427,14 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
         const val BUCKET_RANGE_FACTOR = 4
     }
 }
+
+internal enum class SharedLearningReclamationStatus { WithinLimit, Reclaimed, ProtectedFloor, Deferred, Cancelled }
+
+internal data class SharedLearningReclamation(
+    val status: SharedLearningReclamationStatus,
+    val beforeBytes: Long? = null,
+    val afterBytes: Long? = null,
+    val protectedBytes: Long? = null,
+    val work: Long = 0L,
+    val scratchBytes: Long = 0L,
+)

@@ -37,7 +37,8 @@ class PortfolioPlanTest {
 
     @Test
     fun `sharing memory controls work without diagnostic scheduling`() {
-        val params = EngineParams(listOf("sharing-memory=true", "sharing-memory-work=7", "sharing-memory-scratch=1"))
+        val params = EngineParams(listOf("sharing-memory=true", "sharing-memory-work=7", "sharing-memory-scratch=1",
+            "sharing-memory-bytes=500"))
 
         val scenario = buildPortfolioScenario(params, 17L, 1, Kind.COP, EngineMix.MIXED, 6)
 
@@ -45,6 +46,7 @@ class PortfolioPlanTest {
         assertEquals(null, scenario.diagnosticWorkLimit)
         assertEquals(7L, scenario.sharingMemoryWork)
         assertEquals(1, scenario.sharingMemoryScratch)
+        assertEquals(500L, scenario.sharingMemoryBytes)
     }
 
     @Test
@@ -163,6 +165,7 @@ class PortfolioPlanTest {
             listOf("portfolio-work=-1"),
             listOf("sharing-memory-work=-1"),
             listOf("sharing-memory-scratch=-1"),
+            listOf("sharing-memory-bytes=-1"),
         )) {
             assertFailsWith<PipelineConfigException> {
                 buildPortfolioScenario(EngineParams(params), 1L, 1, Kind.COP, EngineMix.MIXED, 6)

@@ -9,6 +9,7 @@ import com.eignex.klause.solver.result.SearchStatsSink
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.SharingMemoryObservation
 
 internal class RootSimplificationPass : InprocessingPass {
     override val preservesVariables: Boolean get() = true
@@ -18,6 +19,23 @@ internal class RootSimplificationPass : InprocessingPass {
     private var revision = -1L
     private var pendingSource: Pair<Int, IntArray>? = null
     private var pending: RootCandidate? = null
+
+    override fun retainedMemory(sample: SharingMemoryObservation, protected: Boolean) {
+        sample.owned(dropped, dropped.allocatedBytes, protected)
+        pendingSource?.let { source ->
+            sample.step()
+            sample.ownedReferences(source, 1L, protected)
+            val literals = source.second
+            sample.owned(literals, literals.size.toLong() * Int.SIZE_BYTES, protected)
+        }
+        pending?.let { candidate ->
+            sample.step()
+            sample.ownedReferences(candidate, 2L, protected)
+            sample.owned(candidate.literals, candidate.literals.size.toLong() * Int.SIZE_BYTES, protected)
+            val residual = candidate.residual.backingData
+            sample.owned(residual, residual.size.toLong() * Int.SIZE_BYTES, protected)
+        }
+    }
 
     override fun reset() {
         cursor = 0

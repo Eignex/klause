@@ -9,12 +9,12 @@ internal class SearchTrail {
     private val decisions = ArrayList<SearchDecision>()
     private val boolValues = MutableIntIntMap()
     private val boolLevels = MutableIntIntMap()
-    private val boolReasons = MutableIntObjectMap<SearchExplanation>()
+    private var boolReasons = MutableIntObjectMap<SearchExplanation>()
     private val boolPublishers = MutableIntObjectMap<SearchComponent>()
     private val valuesAtLevel = ArrayList<IntArrayList>().apply { add(IntArrayList()) }
     private val intFacts = MutableIntObjectMap<IntFact>()
     private val priorIntFactsAtLevel = ArrayList<MutableIntObjectMap<IntFact?>>().apply { add(MutableIntObjectMap()) }
-    val pendingAssertions = ArrayDeque<PendingSearchAssertion>()
+    val pendingAssertions = SearchAssertionQueue()
     val boolTrail = IntArrayList()
     private val trailStartAtLevel = IntArrayList().apply { add(0) }
     val decisionLevel: Int get() = decisions.size
@@ -40,15 +40,27 @@ internal class SearchTrail {
             if (value == null) continue
             val literals = (value as SearchExplanation).literals
             if (sample.retain(arrays, literals)) payload += literals.size.toLong() * Int.SIZE_BYTES
+            sample.owned(literals, literals.size.toLong() * Int.SIZE_BYTES, protected = true)
         }
         sample.record(mapOf(
             "sharedReasonPayloadBytes" to payload,
             "sharedReasonIndexCapacityBytes" to boolReasons.primitiveCapacityBytes,
             "sharedReasonReferenceSlots" to boolReasons.referenceCapacity.toLong(),
         ))
+        sample.owned(boolReasons, boolReasons.primitiveCapacityBytes, protected = true)
+        sample.ownedReferences(boolReasons.valuesInternal, boolReasons.referenceCapacity.toLong(), protected = true)
+        sample.ownedReferences(pendingAssertions, pendingAssertions.capacity.toLong(), protected = true)
+        for (assertion in pendingAssertions) {
+            sample.step()
+            sample.ownedReferences(assertion, 2L, protected = true)
+        }
     }
 
     fun reasonFor(variable: Int): SearchExplanation? = boolReasons[variable]
+    internal fun releaseLearning() {
+        boolReasons = MutableIntObjectMap()
+        pendingAssertions.clear()
+    }
     fun publisherOf(variable: Int): SearchComponent? = boolPublishers[variable]
     fun retainReason(variable: Int, reason: SearchExplanation) {
         boolReasons.put(variable, reason)
@@ -103,12 +115,13 @@ internal class SearchTrail {
         boolTrail.truncateTo(trailStartAtLevel[level + 1])
         trailStartAtLevel.truncateTo(level + 1)
         pendingAssertions.clear()
+        if (boolReasons.isEmpty()) boolReasons = MutableIntObjectMap()
     }
 
     fun resetRoot() {
         boolValues.clear()
         boolLevels.clear()
-        boolReasons.clear()
+        boolReasons = MutableIntObjectMap()
         boolPublishers.clear()
         valuesAtLevel.clear()
         valuesAtLevel.add(IntArrayList())
@@ -193,3 +206,40 @@ internal class SearchTrail {
 }
 
 internal data class PendingSearchAssertion(val decision: SearchDecision, val source: SearchComponent?)
+
+internal class SearchAssertionQueue : Iterable<PendingSearchAssertion> {
+    private var data: Array<PendingSearchAssertion?> = arrayOfNulls(8)
+    private var head = 0
+    var size: Int = 0
+        private set
+    val capacity: Int get() = data.size
+    fun isEmpty(): Boolean = size == 0
+    fun isNotEmpty(): Boolean = size > 0
+    fun addLast(assertion: PendingSearchAssertion) {
+        if (size == data.size) {
+            val replacement = arrayOfNulls<PendingSearchAssertion>(data.size * 2)
+            for (index in 0 until size) replacement[index] = data[(head + index) % data.size]
+            data = replacement
+            head = 0
+        }
+        data[(head + size++) % data.size] = assertion
+    }
+    fun removeFirst(): PendingSearchAssertion {
+        check(size > 0)
+        val assertion = checkNotNull(data[head])
+        data[head] = null
+        head = (head + 1) % data.size
+        size--
+        return assertion
+    }
+    fun clear() {
+        data = arrayOfNulls(8)
+        size = 0
+        head = 0
+    }
+    override fun iterator(): Iterator<PendingSearchAssertion> = object : Iterator<PendingSearchAssertion> {
+        private var position = 0
+        override fun hasNext(): Boolean = position < size
+        override fun next(): PendingSearchAssertion = checkNotNull(data[(head + position++) % data.size])
+    }
+}

@@ -440,10 +440,18 @@ data class SearchLearnedDbParams(
     val maxClauses: Int? = null,
     /** Clauses whose literal block distance is at most this are retained regardless of the cap. */
     val glueLbd: Int = 2,
+    /** Optional modeled retained-byte soft limit, independent of restart cadence. */
+    val softLimitBytes: Long? = null,
+    /** Maximum charged preparation and publication work for one reclamation attempt. */
+    val reclamationWork: Long = 65_536L,
+    /** Maximum modeled scratch bytes retained by one reclamation attempt. */
+    val reclamationScratchBytes: Long = 1_048_576L,
 ) {
     init {
         require(maxClauses == null || maxClauses >= 0) { "learned clause cap must not be negative" }
         require(glueLbd >= 0) { "glue threshold must not be negative" }
+        require(softLimitBytes == null || softLimitBytes >= 0L)
+        require(reclamationWork >= 0L && reclamationScratchBytes >= 0L)
     }
 }
 

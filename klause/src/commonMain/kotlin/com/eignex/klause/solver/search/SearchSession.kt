@@ -61,6 +61,9 @@ class SearchSession(
     private val singleComponent = components.singleOrNull()
     private val trail = SearchTrail()
     private val learning = SearchLearning(learnedDb)
+    private val learnedDbParams = learnedDb
+    internal var learningReclamation: SharedLearningReclamation? = null
+        private set
     private var selfPublicationsPending = false
     private var activeComponent: SearchComponent? = null
     private var conflictResolver: SearchConflictResolver? = null
@@ -618,7 +621,7 @@ class SearchSession(
 
     internal fun restartAt(decisionLevel: Int): ComponentResult {
         popTo(decisionLevel)
-        learning.onRestart()
+        learning.onRestart(::cancelled) { executionControls.cancellation.charge(1L) }
         singleComponent?.onRestart(this) ?: components.forEach { it.onRestart(this) }
         return propagate()
     }
@@ -835,6 +838,12 @@ class SearchSession(
         trail.reasonMemory(sample)
     }
 
+    internal fun releaseLearning() {
+        learning.release()
+        trail.releaseLearning()
+        learningReclamation = null
+    }
+
     /** Retain a sound clause-form explanation for subsequent propagation. */
     fun learn(explanation: SearchExplanation?) {
         val literals = namedExplanation(explanation)?.literals ?: return
@@ -886,7 +895,39 @@ class SearchSession(
      */
     private fun propagateLearnedClauses(): ComponentResult {
         conflictOwner = null
+        reclaimLearningMemory()
+        if (cancelled()) return ComponentResult.Indeterminate
         return learning.propagate(this, trail.boolTrail)
+    }
+
+    internal fun reclaimLearningMemory(): SharedLearningReclamation? {
+        val limit = learnedDbParams.softLimitBytes ?: return null
+        val sample = SharingMemoryObservation(
+            learnedDbParams.reclamationWork,
+            (learnedDbParams.reclamationScratchBytes / 64L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+            ::cancelled,
+            { executionControls.cancellation.charge(1L) },
+        )
+        val reasons = sample.snapshot { trail.reasonMemory(sample) }
+        val values = reasons.completeValues
+        val result = if (values == null) {
+            SharedLearningReclamation(
+                if (cancelled()) SharedLearningReclamationStatus.Cancelled else SharedLearningReclamationStatus.Deferred,
+                work = reasons.work,
+            )
+        } else {
+            val scratch = reasons.scratchEntries * 64L
+            learning.reclaimMemory(
+                limit,
+                (learnedDbParams.reclamationWork - reasons.work).coerceAtLeast(0L),
+                (learnedDbParams.reclamationScratchBytes - scratch).coerceAtLeast(0L),
+                values.getValue("ownedPrimitiveBytes") + values.getValue("ownedReferenceSlots") * 8L,
+                ::cancelled,
+                { executionControls.cancellation.charge(1L) },
+            ).let { it.copy(work = it.work + reasons.work, scratchBytes = it.scratchBytes + scratch) }
+        }
+        learningReclamation = result
+        return result
     }
 
     override fun truth(literal: Int): Boolean? = literalTruth(literal)

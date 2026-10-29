@@ -5,11 +5,12 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.SharedClause
 import com.eignex.klause.solver.result.SharingChannel
 import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongHashSet
 import com.eignex.klause.util.SharingMemoryObservation
 import com.eignex.klause.util.SharingMemorySnapshot
 import com.eignex.klause.util.SharingMemoryStatus
+import com.eignex.klause.util.mixLongKey
+import com.eignex.klause.util.openAddressingCapacity
 import com.eignex.kumulant.core.Concurrency
 import com.eignex.kumulant.stream.Mutex
 import com.eignex.kumulant.stream.lock
@@ -50,98 +51,317 @@ internal class SharedClausePool(
     /** Default length bound for the arms' glue export, the length half of the shared filter
      *  (`--param clause-share-len`). */
     val shareMaxLen: Int = PoolClauseExchange.DEFAULT_MAX_LEN,
+    internal val softLimitBytes: Long? = null,
 ) {
-    private val clauses = ArrayList<SharedClause>()
-    private val global = ArrayList<Boolean>()
-
-    // The arm that published each clause, parallel to [clauses]; [NO_ORIGIN] when the publisher named none.
-    private val origins = IntArrayList()
-    private val keys = LongHashSet()
+    private var store = Store(0)
     private var generation = 0
-    private var payloadBytes = 0L
     private var compactions = 0L
+    private var declined = 0L
+    private var deferred = 0L
+
+    init {
+        require(cap > 0)
+        require(softLimitBytes == null || softLimitBytes >= 0L)
+    }
 
     internal fun memory(): Map<String, Long> = lock.withLock {
         mapOf(
-            "poolClauses" to clauses.size.toLong(),
-            "poolPayloadBytes" to payloadBytes,
-            "poolKeyCapacityBytes" to keys.allocatedBytes,
-            "poolOriginCapacityBytes" to origins.backingData.size.toLong() * Int.SIZE_BYTES,
-            "poolReferenceSlots" to clauses.size.toLong() * 2L,
+            "poolClauses" to store.size.toLong(),
+            "poolPayloadBytes" to store.payloadBytes,
+            "poolKeyCapacityBytes" to store.keyCapacityBytes,
+            "poolOriginCapacityBytes" to store.capacity.toLong() * Int.SIZE_BYTES,
+            "poolReferenceSlots" to store.capacity.toLong(),
+            "poolPrivateIndexBytes" to store.indexBytes,
+            "poolOwnedBytes" to store.ownedBytes,
+            "poolProtectedBytes" to 0L,
             "poolGeneration" to generation.toLong(),
             "poolCompactions" to compactions,
+            "poolDeclined" to declined,
+            "poolReclamationDeferred" to deferred,
         )
     }
 
     /** Append the unseen clauses of [batch] (by key) as published by arm [origin], compacting on overflow.
      *  [isGlobal] marks a globally-published nogood for retention priority over filtered glue. A clause
      *  already pooled keeps the arm that published it first. */
-    fun publish(batch: List<SharedClause>, origin: Int = NO_ORIGIN, isGlobal: Boolean = false) {
-        if (batch.isEmpty()) return
-        lock.withLock {
+    fun publish(
+        batch: List<SharedClause>,
+        origin: Int = NO_ORIGIN,
+        isGlobal: Boolean = false,
+        maxWork: Long = DEFAULT_RECLAMATION_WORK,
+        maxScratchEntries: Int = DEFAULT_RECLAMATION_SCRATCH,
+        cancelled: () -> Boolean = { false },
+        charge: () -> Unit = {},
+    ): Int = lock.withLock {
+        val budget = Budget(maxWork, maxScratchEntries, cancelled, charge)
+        var published = 0
+        try {
             for (c in batch) {
-                if (c.key in keys) continue
-                if (clauses.size >= cap) compact()
-                if (clauses.size >= cap) break
-                if (keys.add(c.key)) {
-                    clauses.add(c)
-                    payloadBytes += c.payloadBytes
-                    global.add(isGlobal)
-                    origins.add(origin)
+                budget.step()
+                if (store.contains(c.key, budget)) continue
+                if (store.size >= cap || exceedsLimit(c, budget)) compact(budget)
+                if (store.size >= cap || exceedsLimit(c, budget)) {
+                    declined++
+                    continue
                 }
+                if (store.size == store.capacity) grow(budget)
+                if (store.append(c, isGlobal, origin, budget, softLimitBytes ?: Long.MAX_VALUE)) published++
+                else declined++
             }
+        } catch (_: Stopped) {
+            deferred++
         }
+        published
+    }
+
+    internal fun reclaim(
+        maxWork: Long = DEFAULT_RECLAMATION_WORK,
+        maxScratchEntries: Int = DEFAULT_RECLAMATION_SCRATCH,
+        cancelled: () -> Boolean = { false },
+        charge: () -> Unit = {},
+    ): Reclamation = lock.withLock {
+        val before = store.ownedBytes
+        val budget = Budget(maxWork, maxScratchEntries, cancelled, charge)
+        val status = try {
+            if (store.size == 0) ReclamationStatus.UNCHANGED else {
+                compact(budget)
+                ReclamationStatus.RECLAIMED
+            }
+        } catch (_: Stopped) {
+            deferred++
+            if (cancelled()) ReclamationStatus.CANCELLED else ReclamationStatus.DEFERRED
+        }
+        Reclamation(status, before, store.ownedBytes, budget.work, budget.scratchEntries)
     }
 
     /** The clauses appended at index ≥ [cursor] of the cursor's generation, paired with the advanced
      *  cursor. A cursor from an older generation restarts at index 0 (see the class doc). */
     fun drainSince(cursor: Long): Drained = lock.withLock {
         val from = if (generationOf(cursor) == generation) indexOf(cursor) else 0
-        val size = clauses.size
+        val size = store.size
         val advanced = cursorOf(generation, size)
         if (from >= size) {
             Drained(emptyList(), EmptyIntArray, advanced)
         } else {
-            Drained(ArrayList(clauses.subList(from, size)), IntArray(size - from) { origins[from + it] }, advanced)
+            Drained(List(size - from) { store.clause(from + it) },
+                IntArray(size - from) { store.origins[from + it] }, advanced)
         }
     }
 
-    /** Keep the best half — globals first, then by (LBD, length), stable within ties — and start a
-     *  new generation. Callers hold [lock]. */
-    private fun compact() {
-        val target = cap / 2
-        val order = clauses.indices.sortedWith(
-            compareByDescending<Int> { global[it] }.thenBy { clauses[it].lbd }.thenBy { lengthOf(clauses[it]) },
-        )
-        val keep = BooleanArray(clauses.size)
-        for (k in 0 until minOf(target, order.size)) keep[order[k]] = true
-        val keptClauses = ArrayList<SharedClause>(target)
-        val keptGlobal = ArrayList<Boolean>(target)
-        val keptOrigins = IntArrayList(target)
-        keys.clear()
-        for (i in clauses.indices) {
-            if (!keep[i]) continue
-            keptClauses.add(clauses[i])
-            keptGlobal.add(global[i])
-            keptOrigins.add(origins[i])
-            keys.add(clauses[i].key)
+    private fun exceedsLimit(clause: SharedClause, budget: Budget): Boolean {
+        val limit = softLimitBytes ?: return false
+        val capacity = if (store.size == store.capacity) nextCapacity() else store.capacity
+        return Store.indexBytes(capacity) + store.payloadBytes + store.additionalPayload(clause, budget) > limit
+    }
+
+    private fun nextCapacity(): Int {
+        val desired = minOf(cap, maxOf(1, store.capacity * 2))
+        val limit = softLimitBytes ?: return desired
+        return if (Store.indexBytes(desired) + store.payloadBytes <= limit) desired else store.size + 1
+    }
+
+    private fun grow(budget: Budget) {
+        val replacement = preparedStore(nextCapacity(), budget)
+        for (i in 0 until store.size) {
+            budget.step()
+            replacement.append(store.clause(i), store.global[i], store.origins[i], budget)
         }
-        clauses.clear()
-        clauses.addAll(keptClauses)
-        global.clear()
-        global.addAll(keptGlobal)
-        origins.clear()
-        for (i in 0 until keptOrigins.size) origins.add(keptOrigins[i])
-        payloadBytes = clauses.sumOf { it.payloadBytes }
+        budget.step()
+        store = replacement
+    }
+
+    private fun compact(budget: Budget) {
+        budget.reserve(store.size * 2L)
+        val order = IntArray(store.size) { budget.step(); it }
+        sort(order, budget)
+        val limit = softLimitBytes?.div(2L) ?: Long.MAX_VALUE
+        var target = minOf(cap / 2, store.size / 2)
+        while (Store.indexBytes(target) > limit) {
+            budget.step()
+            target /= 2
+        }
+        val replacement = preparedStore(target, budget)
+        val keep = BooleanArray(store.size)
+        for (i in order) {
+            budget.step()
+            if (replacement.size >= target) break
+            if (replacement.append(store.clause(i), store.global[i], store.origins[i], budget, limit)) keep[i] = true
+        }
+        // Restore insertion order without retaining another set of payload or index arrays.
+        var next = 0
+        for (i in keep.indices) {
+            budget.step()
+            if (!keep[i]) continue
+            replacement.clauses[next] = store.clause(i)
+            replacement.global[next] = store.global[i]
+            replacement.origins[next++] = store.origins[i]
+        }
+        budget.step()
+        store = replacement
         generation++
         compactions++
     }
+
+    private fun preparedStore(capacity: Int, budget: Budget): Store {
+        budget.reserve(Store.scratchEntries(capacity))
+        return Store(capacity)
+    }
+
+    private fun sort(order: IntArray, budget: Budget) {
+        fun compare(left: Int, right: Int): Int {
+            budget.step()
+            val a = store.clause(left)
+            val b = store.clause(right)
+            return when {
+                store.global[left] != store.global[right] -> if (store.global[left]) -1 else 1
+                a.lbd != b.lbd -> a.lbd.compareTo(b.lbd)
+                lengthOf(a) != lengthOf(b) -> lengthOf(a).compareTo(lengthOf(b))
+                else -> left.compareTo(right)
+            }
+        }
+        fun sift(start: Int, end: Int) {
+            var root = start
+            while (root * 2 + 1 < end) {
+                budget.step()
+                var child = root * 2 + 1
+                if (child + 1 < end && compare(order[child], order[child + 1]) < 0) child++
+                if (compare(order[root], order[child]) >= 0) break
+                val value = order[root]
+                order[root] = order[child]
+                order[child] = value
+                root = child
+            }
+        }
+        for (i in order.size / 2 - 1 downTo 0) sift(i, order.size)
+        for (end in order.lastIndex downTo 1) {
+            budget.step()
+            val value = order[0]
+            order[0] = order[end]
+            order[end] = value
+            sift(0, end)
+        }
+    }
+
+    private class Store(val capacity: Int) {
+        val clauses = arrayOfNulls<SharedClause>(capacity)
+        val global = BooleanArray(capacity)
+        val origins = IntArray(capacity)
+        private val keyCapacity = if (capacity == 0) 0 else openAddressingCapacity(capacity)
+        private val ownerCapacity = if (capacity == 0) 0 else openAddressingCapacity(capacity * 2)
+        private val keys = LongArray(keyCapacity)
+        private val used = BooleanArray(keyCapacity)
+        private val owners = arrayOfNulls<Any>(ownerCapacity)
+        var size = 0
+        var payloadBytes = 0L
+        val keyCapacityBytes: Long get() = keyCapacity.toLong() * 9L
+        val indexBytes: Long get() = indexBytes(capacity)
+        val ownedBytes: Long get() = indexBytes + payloadBytes
+
+        fun clause(index: Int): SharedClause = checkNotNull(clauses[index])
+
+        fun contains(key: Long, budget: Budget): Boolean = size > 0 && used[keySlot(key, budget)]
+
+        private fun keySlot(key: Long, budget: Budget): Int {
+            var index = mixLongKey(key) and (keyCapacity - 1)
+            while (true) {
+                budget.step()
+                if (!used[index] || keys[index] == key) return index
+                index = (index + 1) and (keyCapacity - 1)
+            }
+        }
+
+        private fun ownerSlot(owner: Any, budget: Budget, reserved: Int = -1): Int {
+            var index = owner.hashCode() and (ownerCapacity - 1)
+            while (true) {
+                budget.step()
+                if (index != reserved && (owners[index] == null || owners[index] === owner)) return index
+                index = (index + 1) and (ownerCapacity - 1)
+            }
+        }
+
+        fun additionalPayload(clause: SharedClause, budget: Budget): Long {
+            if (size == 0) return clause.payloadBytes
+            var bytes = 0L
+            if (owners[ownerSlot(clause.boolLits, budget)] == null) bytes += clause.boolLits.size.toLong() * Int.SIZE_BYTES
+            if (owners[ownerSlot(clause.atomQuads, budget)] == null) bytes += clause.atomQuads.size.toLong() * Long.SIZE_BYTES
+            return bytes
+        }
+
+        fun append(clause: SharedClause, isGlobal: Boolean, origin: Int, budget: Budget, limit: Long = Long.MAX_VALUE): Boolean {
+            val key = keySlot(clause.key, budget)
+            val boolOwner = ownerSlot(clause.boolLits, budget)
+            val atomOwner = ownerSlot(clause.atomQuads, budget, if (owners[boolOwner] == null) boolOwner else -1)
+            val boolBytes = if (owners[boolOwner] == null) clause.boolLits.size.toLong() * Int.SIZE_BYTES else 0L
+            val atomBytes = if (owners[atomOwner] == null) clause.atomQuads.size.toLong() * Long.SIZE_BYTES else 0L
+            if (ownedBytes + boolBytes + atomBytes > limit) return false
+            budget.step()
+            keys[key] = clause.key
+            used[key] = true
+            owners[boolOwner] = clause.boolLits
+            owners[atomOwner] = clause.atomQuads
+            payloadBytes += boolBytes + atomBytes
+            clauses[size] = clause
+            global[size] = isGlobal
+            origins[size++] = origin
+            return true
+        }
+
+        companion object {
+            fun indexBytes(capacity: Int): Long = if (capacity == 0) 0L else
+                capacity.toLong() * 13L + openAddressingCapacity(capacity).toLong() * 9L +
+                    openAddressingCapacity(capacity * 2).toLong() * 8L
+
+            fun scratchEntries(capacity: Int): Long = if (capacity == 0) 0L else
+                capacity.toLong() * 3L + openAddressingCapacity(capacity).toLong() * 2L +
+                    openAddressingCapacity(capacity * 2).toLong()
+        }
+    }
+
+    private class Budget(
+        private val maxWork: Long,
+        private val maxScratchEntries: Int,
+        private val cancelled: () -> Boolean,
+        private val charge: () -> Unit,
+    ) {
+        var work = 0L
+        var scratchEntries = 0
+
+        init { require(maxWork >= 0L && maxScratchEntries >= 0) }
+
+        fun step() {
+            if (work >= maxWork || cancelled()) throw Stopped()
+            charge()
+            work++
+        }
+
+        fun reserve(entries: Long) {
+            step()
+            if (entries > maxScratchEntries - scratchEntries) throw Stopped()
+            var remaining = entries
+            while (remaining-- > 0L) step()
+            scratchEntries += entries.toInt()
+        }
+    }
+
+    private class Stopped : RuntimeException()
+
+    internal enum class ReclamationStatus { RECLAIMED, UNCHANGED, DEFERRED, CANCELLED }
+
+    internal data class Reclamation(
+        val status: ReclamationStatus,
+        val beforeBytes: Long,
+        val afterBytes: Long,
+        val work: Long,
+        val scratchEntries: Int,
+    )
 
     /** A drained batch, the arm that published each of its clauses, and the advanced cursor. */
     internal class Drained(val clauses: List<SharedClause>, val origins: IntArray, val cursor: Long)
 
     internal companion object {
         const val DEFAULT_CAP = 50_000
+        private const val DEFAULT_RECLAMATION_WORK = 4_000_000L
+        private const val DEFAULT_RECLAMATION_SCRATCH = 2_000_000
 
         /** The origin of a clause whose publisher named no arm. */
         const val NO_ORIGIN = -1
@@ -282,8 +502,8 @@ internal class PoolClauseExchange(
         if (!shareGlobalNogoods) return
         metered {
             if (seen.add(clause.key)) {
-                pool.publish(listOf(clause), origin, isGlobal = true)
-                meter?.exported(SharingChannel.Clauses, 1)
+                val published = pool.publish(listOf(clause), origin, isGlobal = true)
+                meter?.exported(SharingChannel.Clauses, published)
             }
         }
     }
@@ -292,8 +512,13 @@ internal class PoolClauseExchange(
      *  trail). The `seen` set guards against re-export within a session; the pool de-dups globally. */
     private fun export(session: PropagationSession) {
         val fresh = session.exportGlueClauses(maxLbd, maxLen, skipPermanent).filter { seen.add(it.key) }
-        if (fresh.isNotEmpty()) pool.publish(fresh, origin)
-        meter?.exported(SharingChannel.Clauses, fresh.size)
+        val published = if (fresh.isEmpty()) 0 else pool.publish(
+            fresh,
+            origin,
+            cancelled = { session.cancelRequested },
+            charge = { session.chargeSharingWork(1L) },
+        )
+        meter?.exported(SharingChannel.Clauses, published)
     }
 
     private inline fun metered(crossinline block: () -> Unit) {

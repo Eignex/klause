@@ -195,6 +195,7 @@ meter and releases it before native execution; see
 | `BacktrackParams.maxDecisions` / `maxInstructions` | Decision attempts and native traversal operations | Incomplete result, never exhaustion |
 | `SliceBudget` | Search nodes plus policy-priced LP, propagation and inprocessing | Pause |
 | Inprocessing ceilings | Propagation-work units per scheduled slice and class, inside the worker allowance | Retained cursors, batches and unpaid atomic debt |
+| Learned-memory preparation | Charged observation/preparation work and modeled scratch bytes per attempt | Safe defer, protected floor or completed reclamation |
 | Portfolio base, maximum, growth | Shared schedule in node equivalents | Work or time pause |
 | LS `maxFlips` / `maxInstructions` | Native instructions per operation or handle | Exhaustion without proof |
 | ALNS instruction allowance | Outer repair allowance per handle | Anytime result |

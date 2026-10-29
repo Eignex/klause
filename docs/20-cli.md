@@ -80,6 +80,13 @@ Solver-control flags are common to every mode; `--help` lists every parameter.
 produce a configuration error before worker execution, including when an adaptive
 restart schedule takes precedence.
 
+`--param learned-memory-bytes=N` enables the optional learned-store modeled-byte
+soft limit. `learned-memory-work` (65,536 visits) and `learned-memory-scratch-bytes`
+(1 MiB) bound each attempt. All accept nonnegative values; zero work or scratch
+defers reclamation. Protected state can exceed the soft limit. The policy uses
+identity-deduplicated primitive ownership plus eight bytes per modeled live reference;
+this is separate from heap measurements and diagnostic payload-category sums.
+
 - `-a` / `--all-solutions`, `-n <count>`: enumeration (satisfy). `-i` is accepted as a
   no-op, since optimization always streams improvements.
 - `-t <ms>` time limit, `-r <seed>`, `-s` statistics, `-v` verbose.
@@ -156,6 +163,11 @@ visits per sample (default 32,768); `sharing-memory-scratch` caps deduplication
 entries (default 4,096). Both accept zero. Samples report complete, partial or
 stale status; only complete current samples can support byte accounting. See
 [portfolios](12-portfolio.md#shared-channels) for ownership and aliasing.
+
+`sharing-memory-bytes` optionally limits each shared learned-clause pool's modeled
+payload and index bytes, including private ALNS repair pools. It accepts zero,
+operates independently of sampling and declines shares when bounded reclamation
+cannot make room. It has no default byte threshold.
 
 The finite backtrack controls `propagation-attribution=true` and
 `historical-table-reasons=true` independently enable bounded family diagnostics
