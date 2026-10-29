@@ -178,7 +178,7 @@ internal class PrivateRebuildSatisfaction(
         // cannot attach to it without a supported translation, so its cursor stays with canonical.
         val privateParams = sharedParams.copy(
             privateRebuildWork = 0L, clauseExchange = null, cutExchange = null, pooledIncumbents = null,
-            cancellation = params.cancellation or Cancellation { trialSpent() >= params.privateRebuildWork },
+            cancellation = containing or Cancellation { trialSpent() >= params.privateRebuildWork },
             onEvent = null, branchObserver = null, maxDecisions = params.maxDecisions.coerceAtMost(
                 (params.privateRebuildWork - trialSpent()).coerceAtLeast(0L) / PROPAGATION_WORK_PER_NODE,
             ),

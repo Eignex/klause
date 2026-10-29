@@ -38,12 +38,12 @@ Whole-job active time must additionally include failed preparation, checking and
 artifact/retirement work from the lab job record.
 
 Qualification compares the same hashed source, seed, runtime, physical allocation
-and containing allowances with stable-ID work alone. A runtime rebuild requires
+and containing allowances with stable-ID work alone. Production activation requires
 the [private generation contract](../docs/07-presolve.md#private-worker-qualification),
 bounded ownership/reclamation, compatible consuming workers and a benefit after
-all lifecycle costs. A lack of new candidates on a complete propositional control
-supports only a bounded no-go for that control. Unsupported/partial views need an
-applicability or grant diagnosis and cannot support a general no-go.
+all lifecycle costs. A lack of new candidates describes only that complete
+propositional control. Unsupported/partial views need an applicability or grant
+diagnosis; these observations do not retire the rebuilding objective.
 
 ## Build and run
 
