@@ -110,9 +110,9 @@ internal object LpTemplatePreparationProfile {
                             assemblyNs += System.nanoTime() - opening
                             retainedUnits = maxOf(retainedUnits, consumer.preparationTemplates?.storageUnits ?: 0L)
                             val solving = System.nanoTime()
-                            val exact = requireNotNull(relaxation.authoritativeWithTemplates(token)) {
+                            val exact = requireNotNull(relaxation.authoritativeWithTemplates(token) {
                                 consumer.observeBoundTemplates(it)
-                            }
+                            })
                             val result = solveAndCertify(exact, cancellation = token)
                             solveNs += System.nanoTime() - solving
                             results.add("${result.verdict}:${result.lowerBound}:${result.witness?.objective}")
