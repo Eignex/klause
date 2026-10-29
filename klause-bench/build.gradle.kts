@@ -35,8 +35,8 @@ repositories {
         forRepository {
             ivy {
                 name = "miniZincReleases"
-                url = uri("https://github.com/MiniZinc/MiniZincIDE/releases/download")
-                patternLayout { artifact("[revision]/MiniZincIDE-[revision]-[classifier].[ext]") }
+                url = uri("https://github.com/MiniZinc/libminizinc/releases/download")
+                patternLayout { artifact("[revision]/minizinc-compiler-only-[classifier].[ext]") }
                 metadataSources { artifact() }
             }
         }
@@ -50,18 +50,18 @@ val labMiniZinc = configurations.create("labMiniZinc") {
 }
 val labMiniZincTarget = when {
     System.getProperty("os.name").startsWith("Mac") -> when (System.getProperty("os.arch")) {
-        "aarch64", "arm64" -> Triple("aarch64-apple-darwin", "dmg", "6ab899c06a06bd7542f4df2b39e5afaa1658d6af30a65548a249048d1b3468bc")
-        "amd64", "x86_64" -> Triple("x86_64-apple-darwin", "dmg", "c5b50d62ab493a354ae2caa5d7fb80ea51ae53a82942b3f358461e1a4a46a2c1")
+        "aarch64", "arm64" -> "aarch64-apple-darwin" to "aeb1a25471ad753e67c2a73034b0725dff7c4d011d23cc8c8c91499efdb26f29"
+        "amd64", "x86_64" -> "x86_64-apple-darwin" to "02b7ce514714d57c50865e4c2458169eb76fb18bb789af26b45026a362460d06"
         else -> null
     }
     System.getProperty("os.name") == "Linux" && System.getProperty("os.arch") in setOf("amd64", "x86_64") ->
-        Triple("x86_64-linux-gnu", "tgz", "b63dd88491d47b05d0eb0ff4aa1112d1e6f77292c023800b20b98851458ce01c")
+        "x86_64-linux-gnu" to "aebc4b1422fd1073ca105275dce1eea302656b2889dda80ed338904c8e6c88e6"
     else -> null
 }
 
 dependencies {
-    labMiniZincTarget?.let { (target, extension, _) ->
-        add(labMiniZinc.name, "org.minizinc:minizinc:2.10.1:$target@$extension")
+    labMiniZincTarget?.let { (target, _) ->
+        add(labMiniZinc.name, "org.minizinc:minizinc:2.10.1:$target@tar.gz")
     }
     implementation("com.eignex:lab-bench:$labBenchVersion")
     implementation(project(":klause"))
@@ -136,12 +136,12 @@ val prepareLabRuntime = tasks.register("prepareLabRuntime") {
     notCompatibleWithConfigurationCache("Uses Gradle archive operations to stage the compiler")
     val destination = layout.buildDirectory.dir("lab-runtime/minizinc")
     val archive = labMiniZinc
-    val checksum = labMiniZincTarget?.third.orEmpty()
+    val checksum = labMiniZincTarget?.second.orEmpty()
     inputs.files(archive)
     inputs.property("checksum", checksum)
     outputs.dir(destination)
     doLast {
-        val target = requireNotNull(labMiniZincTarget) { "Lab MiniZinc runtime supports macOS ARM64/x86_64 and Linux x86_64" }
+        requireNotNull(labMiniZincTarget) { "Lab MiniZinc runtime supports macOS ARM64/x86_64 and Linux x86_64" }
         val file = archive.singleFile
         val digest = MessageDigest.getInstance("SHA-256")
         file.inputStream().use { stream ->
@@ -153,31 +153,11 @@ val prepareLabRuntime = tasks.register("prepareLabRuntime") {
             }
         }
         check(HexFormat.of().formatHex(digest.digest()) == checksum) { "MiniZinc release checksum mismatch" }
-        if (target.second == "dmg") {
-            val mount = temporaryDir.resolve("minizinc-mount").apply { mkdirs() }
-            fun diskImage(vararg args: String) {
-                check(ProcessBuilder(listOf("hdiutil") + args).inheritIO().start().waitFor() == 0) { "MiniZinc disk image operation failed" }
-            }
-            diskImage("attach", "-quiet", "-nobrowse", "-readonly", "-mountpoint", mount.absolutePath, file.absolutePath)
-            try {
-                project.sync {
-                    from(mount.resolve("MiniZincIDE.app/Contents/Resources"))
-                    include("minizinc", "share/minizinc/std/**")
-                    eachFile { if (path == "minizinc") relativePath = RelativePath(true, "bin", "minizinc") }
-                    includeEmptyDirs = false
-                    into(destination)
-                }
-            } finally {
-                diskImage("detach", "-quiet", mount.absolutePath)
-            }
-        } else {
-            project.sync {
-                from(tarTree(resources.gzip(file)))
-                include("*/bin/minizinc", "*/share/minizinc/std/**")
-                eachFile { relativePath = RelativePath(!isDirectory, *relativePath.segments.drop(1).toTypedArray()) }
-                includeEmptyDirs = false
-                into(destination)
-            }
+        project.sync {
+            from(tarTree(resources.gzip(file)))
+            include("bin/minizinc", "share/minizinc/std/**")
+            includeEmptyDirs = false
+            into(destination)
         }
         val root = destination.get().asFile
         check(root.resolve("bin/minizinc").setExecutable(true))
