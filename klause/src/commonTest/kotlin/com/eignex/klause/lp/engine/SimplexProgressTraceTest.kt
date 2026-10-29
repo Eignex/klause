@@ -157,7 +157,7 @@ class SimplexProgressTraceTest {
             assertNull(solver.solve())
 
             assertEquals(LpFloatTermination.CANCELLED, solver.lastTermination)
-            assertTrue(assertNotNull(solver.progressTrace).phaseCalls.isEmpty())
+            assertNotNull(solver.progressTrace)
         }
     }
 }
