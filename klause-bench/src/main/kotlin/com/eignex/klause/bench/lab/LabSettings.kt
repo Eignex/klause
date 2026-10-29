@@ -15,6 +15,8 @@ internal data class LabSettings(val parameters: Map<String, String>) {
     val repeats = (parameters["repeats"] ?: "1").toInt().also { require(it in 1..10000) }
     val seeds = (parameters["solver-seeds"] ?: "1").split(',').map { it.trim().toLong() }.distinct()
     val engines = (parameters["engines"] ?: "default").split(',').map { it.trim().lowercase() }.distinct()
+    val propagationControls = parameters["propagation-controls"]?.toBooleanStrict() ?: false
+    val controls = if (propagationControls) listOf("ordinary", "attributed", "historical-table") else listOf("")
     val inputOnly = parameters["input-only"]?.toBooleanStrict() ?: false
     val debug = parameters["debug"]?.toBooleanStrict() ?: true
     val measurement = parameters["measurement"] ?: "none"
@@ -24,6 +26,14 @@ internal data class LabSettings(val parameters: Map<String, String>) {
 
     init {
         require(selections.isNotEmpty())
+        if (propagationControls) {
+            require(!inputOnly && engines.all {
+                it in setOf("cp", "bt", "backtrack", "fixed", "mixed", "portfolio", "pf")
+            })
+            require("param.propagation-attribution" !in parameters && "param.historical-table-reasons" !in parameters) {
+                "propagation-controls owns attribution and historical Table switches"
+            }
+        }
         require(selections.all { it.isNotEmpty() && it.keys.all { key -> key in SELECTORS } })
         val unknown = parameters.keys.filterNot { it in SELECTORS || it in OPTIONS || it.startsWith("param.") }
         require(unknown.isEmpty()) { "Unknown Klause bench parameters: $unknown" }
@@ -56,7 +66,7 @@ internal data class LabSettings(val parameters: Map<String, String>) {
         requiredTags = if (inputOnly) emptySet() else setOf("platform:linux", "arch:x86_64"),
     )
 
-    fun caseParameters(engine: String, seed: Long): Map<String, String> =
+    fun caseParameters(engine: String, seed: Long, control: String = ""): Map<String, String> =
         parameters.filterKeys { it.startsWith("param.") || it in setOf("lp", "presolve", "exact") } + mapOf(
             "input-only" to inputOnly.toString(),
             "engine" to engine,
@@ -68,13 +78,17 @@ internal data class LabSettings(val parameters: Map<String, String>) {
             "heap-mib" to heap.toString(),
             "gc" to gc,
             "complete-assignment" to (parameters["complete-assignment"] ?: "false"),
+        ) + if (control.isEmpty()) emptyMap() else mapOf(
+            "param.propagation-attribution" to (control != "ordinary").toString(),
+            "param.historical-table-reasons" to (control == "historical-table").toString(),
         )
 
     companion object {
         val SELECTORS = setOf("suite", "set", "name", "category", "tag", "kind", "per-family", "seed", "max", "balance")
         private val OPTIONS = setOf(
             "input-only", "selections", "engines", "solver-seeds", "repeats", "cpus", "memory-mib", "timeout-ms", "lp",
-            "presolve", "exact", "debug", "measurement", "heap-mib", "gc", "compile-timeout-sec", "complete-assignment",
+            "presolve", "exact", "debug", "measurement", "heap-mib", "gc", "compile-timeout-sec",
+            "complete-assignment", "propagation-controls",
         )
         private val ENGINES = setOf(
             "default", "fixed", "backtrack", "bt", "cp", "localsearch", "ls", "local-search",

@@ -72,30 +72,35 @@ internal object KlauseLabSuite : BenchSuite {
             settings.engines.flatMap { engine ->
                 val variant = if (settings.engines.size > 1) "$engine/" else ""
                 settings.seeds.flatMap { seed ->
-                    (0 until settings.repeats).map { repeat ->
-                        BenchCase(
-                            "${selected.suite}/${ref.name}/$engine/$seed/$repeat",
-                            settings.caseParameters(engine, seed),
-                            settings.resources(),
-                            inputs = inputs,
-                            attributes = trees + mapOf(
-                                "suite" to selected.suite,
-                                "comparisonKey" to "${selected.suite}/${ref.name}/$variant$seed/$repeat",
-                                "seed" to seed.toString(),
-                                "budgetMs" to settings.timeout.toString(),
-                                "problem" to ref.name,
-                                "collection" to collectionOf(ref),
-                                "family" to (ref.family ?: ref.name.substringBefore('/')),
-                                "format" to ref.format.name,
-                                "category" to ref.category.name,
-                                "license" to ref.license,
-                                "expected" to ref.expected.toString(),
-                                "tags" to ref.tags.sorted().joinToString(","),
-                                "recordSchema" to "solver-v1",
-                                "repeat" to repeat.toString(),
-                                "validationPolicy" to "reported-result-v1",
-                            ),
-                        )
+                    (0 until settings.repeats).flatMap { repeat ->
+                        settings.controls.map { control ->
+                            val suffix = if (control.isEmpty()) "" else "/$control"
+                            BenchCase(
+                                "${selected.suite}/${ref.name}/$engine/$seed/$repeat$suffix",
+                                settings.caseParameters(engine, seed, control),
+                                settings.resources(),
+                                inputs = inputs,
+                                attributes = trees + mapOf(
+                                    "suite" to selected.suite,
+                                    "comparisonKey" to "${selected.suite}/${ref.name}/$variant$seed/$repeat$suffix",
+                                    "pairKey" to "${selected.suite}/${ref.name}/$variant$seed/$repeat",
+                                    "propagationControl" to control,
+                                    "seed" to seed.toString(),
+                                    "budgetMs" to settings.timeout.toString(),
+                                    "problem" to ref.name,
+                                    "collection" to collectionOf(ref),
+                                    "family" to (ref.family ?: ref.name.substringBefore('/')),
+                                    "format" to ref.format.name,
+                                    "category" to ref.category.name,
+                                    "license" to ref.license,
+                                    "expected" to ref.expected.toString(),
+                                    "tags" to ref.tags.sorted().joinToString(","),
+                                    "recordSchema" to "solver-v1",
+                                    "repeat" to repeat.toString(),
+                                    "validationPolicy" to "reported-result-v1",
+                                ),
+                            )
+                        }
                     }
                 }
             }

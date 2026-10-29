@@ -332,7 +332,13 @@ by CI at the later source revision.
 ## Propagation and explanation value
 
 `set=propagation-value-v1` retains scheduling, Table and mixed finite arithmetic
-sources plus a native SAT control. Use `param.propagation-attribution=true` with
+sources plus a native SAT control. The lab request parameter
+`propagation-controls=true` with `engines=cp` expands each source/seed/repeat into
+ordinary, attributed and historical-Table cases in one repository-owned plan. Case
+IDs retain the control suffix, and `pairKey` retains their common source identity.
+Explicit attribution/refinement overrides conflict with this paired control.
+
+Use `param.propagation-attribution=true` with
 ordinary `engine=cp` or fixed-work single-lane portfolio runs. Compare
 `param.historical-table-reasons=false|true` at the same source/revision, preparation,
 seed, worker recipe and containing allowance. This exposes the existing historical

@@ -1301,7 +1301,8 @@ class PropagationState private constructor(
                     it.note(family, FactorAttribution.Metric.Fires)
                     it.note(family, FactorAttribution.Metric.Work, work - before)
                     it.note(family, FactorAttribution.Metric.Deductions, propagations - pins)
-                    it.note(family, FactorAttribution.Metric.Nanos, requireNotNull(start).elapsedNow().inWholeNanoseconds)
+                    it.note(family, FactorAttribution.Metric.Nanos,
+                        requireNotNull(start).elapsedNow().inWholeNanoseconds)
                 }
             }
             if (runCancelled) {

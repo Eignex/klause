@@ -17,6 +17,20 @@ import kotlin.test.assertTrue
 
 class PropagationPreparationTest {
     @Test
+    fun `prepared root attribution survives publication without adding propagation work`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)),
+            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 3)))
+        val preparation = PropagationPreparation(problem, Cancellation.Never, 0, false, attribution = true)
+        var session: PropagationSession? = null
+        while (session == null) session = preparation.advance()
+
+        assertEquals(PropagationSession(problem).work, preparation.work)
+        assertEquals(preparation.learning(), session.learnedLifecycle())
+        assertTrue(session.learnedLifecycle().getValue("factorLinearFires") > 0)
+        assertEquals(IntDomain(0, 3), session.intDomain(0))
+    }
+
+    @Test
     fun `a prepared seed conflict should retain its certified named prefix`() {
         val problem = Problem(3, 0, emptyArray(), arrayOf(
             Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
