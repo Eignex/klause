@@ -146,7 +146,10 @@ internal object LabInputs {
         }
     }
 
-    fun treeHashes(inputs: List<BenchInput>): Map<String, String> = buildMap {
+    fun treeHashes(
+        inputs: List<BenchInput>,
+        compilerTrees: MutableMap<Path, String> = mutableMapOf(),
+    ): Map<String, String> = buildMap {
         inputs.forEachIndexed { index, input ->
             val root = if (input.root == BenchInputRoot.SOURCE) {
                 CorpusFetcher.workspaceRoot().toPath()
@@ -154,7 +157,14 @@ internal object LabInputs {
                 CorpusFetcher.cacheRoot.toPath()
             }
             val path = root.resolve(input.path)
-            if (Files.isDirectory(path)) put("inputTree.$index", treeHash(path))
+            if (Files.isDirectory(path)) {
+                val hash = if (input.root == BenchInputRoot.SOURCE && input.role == "compiler") {
+                    compilerTrees.getOrPut(path.toRealPath()) { treeHash(path) }
+                } else {
+                    treeHash(path)
+                }
+                put("inputTree.$index", hash)
+            }
         }
     }
 

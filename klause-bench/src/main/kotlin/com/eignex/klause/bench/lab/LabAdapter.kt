@@ -64,11 +64,12 @@ internal object KlauseLabSuite : BenchSuite {
         val settings = LabSettings(request.parameters)
         val selectedProblems = settings.selections.flatMap { KlauseCli.selectProblems(it) }
             .distinctBy { it.suite to it.ref.name }
+        val compilerTrees = mutableMapOf<Path, String>()
         return selectedProblems.flatMap { selected ->
             val ref = selected.ref
             require(ref.source !is ProblemSource.InCode) { "Lab subprocess solves require file-backed inputs" }
             val inputs = LabInputs.resolve(ref, settings.inputOnly)
-            val trees = LabInputs.treeHashes(inputs)
+            val trees = LabInputs.treeHashes(inputs, compilerTrees)
             settings.engines.flatMap { engine ->
                 val variant = if (settings.engines.size > 1) "$engine/" else ""
                 settings.seeds.flatMap { seed ->
