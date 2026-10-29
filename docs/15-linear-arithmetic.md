@@ -89,6 +89,24 @@ An optional decline cache reuses only a failed numerical comparison with the sam
 right-hand side and exact bound values and strictness. It retains no consequence
 or premise; changed bounds and every successful proof require fresh evaluation.
 
+The incremental opt-in indexes prepared rows by their Boolean activators and
+coefficient inputs. A literal change schedules only those source rows; retraction
+also schedules every assertion whose LP scope was popped. Root substitution still
+visits all rows. Disjunction and disequality rows remain eligible on arithmetic
+changes, which need not assign a source Boolean. Source order is preserved when
+the pending rows are asserted. Interrupted preparation or assertion leaves pending
+work available for a later operation and publishes no assertion marker for an
+uncommitted bound batch.
+
+This route combines scoped assertion reuse with the exact-input decline cache and
+the explained interval producer before the numerical query. A compatible decline
+retains no reason or numerical authority. A successful implication rebuilds its
+premises from the current trail, publishes through shared search and yields before
+the LP solve. Dependency preparation, row selection and sorting charge the current
+operation; the component owns the index and pending set for its lifetime. Row
+visits, literal touches and retracted assertions distinguish avoided scanning from
+consumed consequences.
+
 #### Disjunctions and disequalities
 
 A source disjunction is registered with search as one atom per disjunct; a disjunct

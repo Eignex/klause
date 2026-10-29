@@ -331,6 +331,19 @@ by CI at the later source revision.
 
 ## LP capture and replay
 
+`LinearRootOpeningProfile` accepts `inspect=partial-row-activation` for a pinned
+SMT source. It compares the existing cached partial interval producer with the
+same producer plus literal-to-row assertion scheduling. Both arms use seed 1,
+one processor, a containing 100,000,000-unit open-work allowance and the same
+ten-second emergency deadline. Fresh ordinary source preparation precedes each
+arm; exact prefix and continuation snapshots must agree. The profile reports row
+visits, literal touches, retracted assertions, compatible decline reuse, consumed
+guard implications and producer/assertion/numerical time separately. These are
+direct library diagnostics; they supply neither a default CLI throughput claim nor
+independent whole-source proof validation. Run the main through lab with its
+explicit bench install task and classpath; retain pinned source bytes, preparation,
+build/runtime provenance and unsuccessful receipts beside the results.
+
 The opt-in basis tool uses the [basis corpus](../klause/src/jvmTest/resources/basis-corpus/README.md):
 
 ```sh

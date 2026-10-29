@@ -37,6 +37,7 @@ internal object LinearPrefixInspection {
     fun inspect(
         compiled: SmtLibProblem, out: File, sourceSha256: String, probe: Boolean = false,
         integrated: Boolean = false, cached: Boolean = false, reuse: Boolean = false, batching: Boolean = false,
+        incremental: Boolean = false,
     ) {
         val captures = (0..1).map { replay ->
             val stop = Cancellation.after(10.seconds)
@@ -50,7 +51,8 @@ internal object LinearPrefixInspection {
                 it.name.startsWith("engineFor") && it.parameterCount == 1
             }
             val engine = requireNotNull(factory.invoke(OpenTheoryPipeline, request))
-            val params = TheoryParams(timeout = stop, randomSeed = 1L)
+            val params = TheoryParams(timeout = stop, randomSeed = 1L,
+                openWorkLimit = if (incremental) 100_000_000L else Long.MAX_VALUE)
             val stateType = Class.forName("com.eignex.klause.solver.pipeline.OpenTheorySolveState")
             val state = stateType.getDeclaredConstructor(TheoryParams::class.java).newInstance(params)
             val boundary = PrefixBoundary()
@@ -60,8 +62,8 @@ internal object LinearPrefixInspection {
             val opening = requireNotNull(begin.invoke(engine, params, state, boundary))
             val run = member(opening, "getRun")
             try {
-                val automatic = integrated && (replay == 1 || cached || batching)
-                val cachedProducer = automatic && (((cached || reuse) && replay == 1) || batching)
+                val automatic = integrated && (replay == 1 || cached || batching || incremental)
+                val cachedProducer = automatic && (((cached || reuse) && replay == 1) || batching || incremental)
                 if (run != null) {
                     val planned = field(run, "planned") as PlannedSearch
                     call(requireNotNull(planned.theory), "observePartialLinearCost")
@@ -72,6 +74,9 @@ internal object LinearPrefixInspection {
                     call(requireNotNull(planned.theory), "usePartialLinearPropagation")
                     if (cachedProducer) {
                         call(requireNotNull(planned.theory), "reusePartialLinearDeclines")
+                    }
+                    if (incremental && replay == 1) {
+                        call(requireNotNull(planned.theory), "useIncrementalLinearPropagation")
                     }
                 }
                 val result = run?.let { call(it, "advance") } ?: member(opening, "getResult")
@@ -86,6 +91,8 @@ internal object LinearPrefixInspection {
                     put("sourceVerdictClaim", false)
                     put("integrated", automatic)
                     put("cached", cachedProducer)
+                    put("incrementalRows", incremental && replay == 1)
+                    put("openWorkLimit", params.openWorkLimit)
                     put("sourceBoundBatching", !batching || replay == 1)
                     put("cliEquivalence", "unverified-direct-library-diagnostic")
                     put("ready", ready)
@@ -106,7 +113,7 @@ internal object LinearPrefixInspection {
                 val bytes = capture.toString().toByteArray()
                 require(bytes.size <= MAX_BYTES) { "prefix snapshot exceeds byte allowance" }
                 out.resolve("prefix-$replay.json").writeBytes(bytes)
-                if ((probe || integrated || batching) && !stop()) {
+                if ((probe || integrated || batching || incremental) && !stop()) {
                     val probeStarted = System.nanoTime()
                     val work = member(state, "getWork") as OpenTheoryWorkSink
                     val before = work.snapshot()
@@ -125,6 +132,8 @@ internal object LinearPrefixInspection {
                         put("treated", replay == 1)
                         put("integrated", automatic)
                         put("cached", cachedProducer)
+                        put("incrementalRows", incremental && replay == 1)
+                        put("openWorkLimit", params.openWorkLimit)
                         put("sourceBoundBatching", !batching || replay == 1)
                         put("probeNs", probeElapsed)
                         put("continuationNs", continuationElapsed)
@@ -154,7 +163,7 @@ internal object LinearPrefixInspection {
                             planned, run, compiled, out.resolve("after-$replay.exact"),
                         )
                         out.resolve("after-$replay.json").writeText("$afterCapture\n")
-                        if ((cached || batching) && replay == 1) {
+                        if ((cached || batching || incremental) && replay == 1) {
                             check(out.resolve("after-0.json").readText() == "$afterCapture\n") {
                                 "intervention changed the continued source state"
                             }
@@ -173,19 +182,20 @@ internal object LinearPrefixInspection {
             put("snapshotSha256", sha256(captures[0]))
             put("replaySha256", sha256(captures[1]))
             put("experiment", when {
+                incremental -> "cached-producer-versus-incremental-source-rows"
                 batching -> "individual-versus-batched-source-bounds"
                 cached -> "integrated-versus-cached"
                 reuse -> "plain-versus-integrated-cache"
                 integrated -> "plain-versus-integrated"
                 else -> "exact-prefix-replay"
             })
-            put("exactReplay", if (integrated && !cached && !batching) JsonNull
+            put("exactReplay", if (integrated && !cached && !batching && !incremental) JsonNull
                 else JsonPrimitive(captures[0].contentEquals(captures[1])))
             put("sourceVerdictClaim", false)
         }
         out.resolve("replay.json").writeText("$report\n")
         println(report)
-        if (!integrated || cached || batching) {
+        if (!integrated || cached || batching || incremental) {
             check(captures[0].contentEquals(captures[1])) { "fresh prefix replay differs" }
         }
     }

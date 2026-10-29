@@ -50,6 +50,58 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverTest {
     @Test
+    fun `incremental prepared rows should consume a strict consequence before Boolean completion`() {
+        val source = Problem(4, 0, emptyArray(), arrayOf(
+            ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                LinearOp.LE, 1.0),
+            ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                LinearOp.LE, 1.0, strict = true),
+            ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(2.0),
+                LinearOp.LE, 2.0, strict = true),
+        ), numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+        val prepared = assertNotNull(prepareExactLiraSource(source, Cancellation.Never))
+        prepared.open().use { component ->
+            component.useIncrementalLinearPropagation()
+            val session = SearchSession(listOf(component))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertNull(session.boolValue(2))
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+            assertEquals(true, session.boolValue(2))
+            assertNull(session.boolValue(3))
+            assertEquals(setOf(Lit.make(1, false), Lit.make(2, true)),
+                assertNotNull(session.reasonFor(2)).literals.toSet())
+        }
+    }
+
+    @Test
+    fun `incremental prepared rows should reassert an opposite guard after backtracking`() {
+        val source = Problem(3, intBounds = openBounds(), factors = arrayOf(
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+            ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+        ))
+        val prepared = assertNotNull(prepareExactLiraSource(source, Cancellation.Never))
+        prepared.open().use { component ->
+            component.useIncrementalLinearPropagation()
+            val session = SearchSession(listOf(component))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertEquals(true, session.boolValue(1))
+            session.popTo(0)
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+
+            assertEquals(false, session.boolValue(1))
+            assertEquals(setOf(Lit.make(0, true), Lit.make(1, false)),
+                assertNotNull(session.reasonFor(1)).literals.toSet())
+            assertTrue(component.partialLinearPropagationStats.sourceRowInvalidations > 0)
+        }
+    }
+
+    @Test
     fun `a strict bound should enable a guard after a closed endpoint declined`() {
         val model = Problem(4, 0, emptyArray(), arrayOf(
             ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
@@ -257,10 +309,15 @@ class QfLiraSolverTest {
             intBounds = openBounds(),
             factors = arrayOf(factor, Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0)),
         )
-        val session = SearchSession(listOf(ExactLiraSearchComponent(model)))
-        session.initialize()
+        for (incremental in listOf(false, true)) {
+            ExactLiraSearchComponent(model).use { component ->
+                if (incremental) component.useIncrementalLinearPropagation()
+                val session = SearchSession(listOf(component))
+                session.initialize()
 
-        assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+                assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            }
+        }
     }
 
     @Test

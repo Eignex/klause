@@ -215,6 +215,14 @@ class ExactLiraSearchComponent private constructor(
     private val exactForms = preparedSource.exactForms
     private val preparedRows = preparedSource.preparedRows
     private val sourceAssertionLevels = IntArray(preparedRows.size) { -1 }
+    private var incrementalSourceRows = false
+    private var sourceRowsByBoolean: Map<Int, List<Int>>? = null
+    private val changedSourceBooleans = LinkedHashSet<Int>()
+    private val pendingSourceRows = LinkedHashSet<Int>()
+    private val recurringSourceRows = ArrayList<Int>()
+    private var sourceRowVisits = 0L
+    private var sourceRowTouches = 0L
+    private var sourceRowInvalidations = 0L
     private val realDifference by lazy { RealDifferenceSystem.prepare(model, exactForms, operationStop) }
     private var impliedDisjunct = false
     private val reduction = ExactLiraReductionCache(model, exactForms, disjunctionAtoms, { solveContext }) {
@@ -441,13 +449,20 @@ class ExactLiraSearchComponent private constructor(
         partialLinearPropagation = true
     }
 
+    internal fun useIncrementalLinearPropagation() {
+        usePartialLinearPropagation()
+        reusePartialLinearDeclines()
+        incrementalSourceRows = true
+    }
+
     internal val partialLinearPropagationStats: PartialLinearPropagationStats
         get() = PartialLinearPropagationStats(partialLinearCandidates?.size ?: 0,
             partialLinearInvocations, partialLinearVisited, partialLinearEligible,
             partialLinearDeductions, partialLinearDeferrals, partialLinearEvaluations, partialLinearUnchanged,
             partialLinearProducerNs, partialLinearAssertionNs, partialLinearNumericalNs,
             system.assertionCost.definitionAppends, system.assertionCost.definitionNs,
-            system.assertionCost.boundCalls, system.assertionCost.boundSides, system.assertionCost.boundNs)
+            system.assertionCost.boundCalls, system.assertionCost.boundSides, system.assertionCost.boundNs,
+            sourceRowVisits, sourceRowTouches, sourceRowInvalidations)
 
     internal fun observePartialLinearCost() {
         check(context == null || context?.decisionLevel == 0)
@@ -1089,6 +1104,7 @@ class ExactLiraSearchComponent private constructor(
         when (decision) {
             is SearchDecision.Bool -> {
                 val variable = decision.literal ushr 1
+                if (incrementalSourceRows) changedSourceBooleans += variable
                 if (completeTraversalObserved && bools[variable] == UNASSIGNED) {
                     unassignedBooleans--
                     smtStats?.observeCompleteSearchBooleans(bools.size, unassignedBooleans)
@@ -1181,11 +1197,15 @@ class ExactLiraSearchComponent private constructor(
 
     private fun assertSource(context: SearchContext): Boolean {
         if (!installSource() || !lp.atLevel(context.decisionLevel, operationStop)) return false
+        val selected = sourceRowsToAssert(context.decisionLevel) ?: return false
         val disequalities = ArrayList<Triple<RowAddress, ExactComparison, SearchAtomPremise>>()
         val comparisons = ArrayList<PremisedSmtComparison>()
         val indices = ArrayList<Int>()
-        for ((index, prepared) in preparedRows.withIndex()) {
+        for (index in selected) {
+            if (incrementalSourceRows) operationStop.charge(1)
             if (operationStop()) return false
+            sourceRowVisits++
+            val prepared = preparedRows[index]
             // Resolved source inputs stay fixed until the LP scope containing their assertion is popped.
             // Root checks still permit substitution through newly published root-fixed columns.
             if (context.decisionLevel > 0 && sourceAssertionLevels[index] >= 0) continue
@@ -1221,8 +1241,46 @@ class ExactLiraSearchComponent private constructor(
             is LpBoundBatchResult.Applied -> Unit
         }
         if (!assertDisequalities(disequalities)) return false
+        if (incrementalSourceRows) pendingSourceRows.removeAll(selected.toSet())
         nodesByLevel.put(context.decisionLevel, node)
         return true
+    }
+
+    private fun sourceRowsToAssert(level: Int): Iterable<Int>? {
+        if (!incrementalSourceRows) return preparedRows.indices
+        if (sourceRowsByBoolean == null) {
+            val dependencies = LinkedHashMap<Int, MutableList<Int>>()
+            val recurring = ArrayList<Int>()
+            for ((index, prepared) in preparedRows.withIndex()) {
+                operationStop.charge(2L + prepared.booleans.size)
+                if (operationStop()) return null
+                for (variable in prepared.booleans) dependencies.getOrPut(variable) { ArrayList() } += index
+                if (prepared.disjunction || prepared.row.relation == LinearOp.EQ ||
+                    prepared.row.relation == LinearOp.NE) recurring += index
+            }
+            operationStop.charge(preparedRows.size.toLong() + dependencies.size + recurring.size + 1L)
+            if (operationStop()) return null
+            sourceRowsByBoolean = dependencies
+            recurringSourceRows += recurring
+            pendingSourceRows += preparedRows.indices
+        }
+        val dependencies = requireNotNull(sourceRowsByBoolean)
+        for (variable in changedSourceBooleans) {
+            val rows = dependencies[variable].orEmpty()
+            operationStop.charge(rows.size.toLong() + 1L)
+            if (operationStop()) return null
+            sourceRowTouches += rows.size
+            pendingSourceRows += rows
+        }
+        changedSourceBooleans.clear()
+        // Disjunction choices and disequality sides can change without assigning a source Boolean.
+        operationStop.charge(recurringSourceRows.size.toLong() + 1L)
+        if (operationStop()) return null
+        pendingSourceRows += recurringSourceRows
+        val count = if (level == 0) preparedRows.size else pendingSourceRows.size
+        operationStop.charge(count.toLong() * (1L + Int.SIZE_BITS - count.countLeadingZeroBits()))
+        if (operationStop()) return null
+        return if (level == 0) preparedRows.indices.toList() else pendingSourceRows.sorted()
     }
 
     private fun assertDisequalities(
@@ -1700,10 +1758,17 @@ class ExactLiraSearchComponent private constructor(
 
     private fun retractSource(decisionLevel: Int) {
         for (index in sourceAssertionLevels.indices) {
-            if (sourceAssertionLevels[index] > decisionLevel) sourceAssertionLevels[index] = -1
+            if (sourceAssertionLevels[index] > decisionLevel) {
+                sourceAssertionLevels[index] = -1
+                if (incrementalSourceRows) {
+                    pendingSourceRows += index
+                    sourceRowInvalidations++
+                }
+            }
         }
         for (variable in bools.indices) {
             if (boolLevels[variable] > decisionLevel) {
+                if (incrementalSourceRows) changedSourceBooleans += variable
                 if (completeTraversalObserved) unassignedBooleans++
                 bools[variable] = UNASSIGNED
                 boolLevels[variable] = -1
