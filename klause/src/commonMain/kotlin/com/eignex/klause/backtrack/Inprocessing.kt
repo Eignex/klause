@@ -78,13 +78,14 @@ internal class Inprocessing(
 
     private var restartsUntilRun = cadence
 
-    fun onRestart(session: PropagationSession, params: BacktrackParams) {
-        if (--restartsUntilRun > 0) return
+    fun onRestart(session: PropagationSession, params: BacktrackParams): Boolean {
+        if (--restartsUntilRun > 0) return false
         restartsUntilRun = cadence
         for (pass in passes) {
             if (session.cancelRequested || session.fixpointCancelled || session.isUnsatAtRoot) break
             pass.run(session, params, stats)
         }
+        return params.rootSimplification || params.rootProbeBatch > 0
     }
 
     fun reset() {

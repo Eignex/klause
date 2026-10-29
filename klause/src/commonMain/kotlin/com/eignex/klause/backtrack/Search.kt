@@ -479,8 +479,16 @@ private class CpSatisfactionTraversalPolicy(
     override fun onRestart(context: SearchContext): SearchRunDisposition {
         params.clauseExchange?.onRestart(session)
         forgetIfOverCap(session, params)
-        inprocessing?.onRestart(session, params)
+        val refreshRoot = inprocessing?.onRestart(session, params) == true
         if (session.isUnsatAtRoot) return SearchRunDisposition.Exhausted
+        if (refreshRoot) {
+            val initialized = cp.initialize(context)
+            val result = if (initialized == ComponentResult.Consistent) {
+                (context as SearchSession).propagate()
+            } else initialized
+            if (result is ComponentResult.Conflict) return SearchRunDisposition.Exhausted
+            if (result == ComponentResult.Indeterminate) return SearchRunDisposition.Indeterminate
+        }
         pooledIncumbents?.poll()?.let { brancher.importPooledSolution(it.assignment) }
         return SearchRunDisposition.Continue
     }

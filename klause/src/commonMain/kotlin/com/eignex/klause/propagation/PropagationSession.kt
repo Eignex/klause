@@ -162,7 +162,12 @@ class PropagationSession private constructor(
         }
     }
 
-    internal fun addRootDerivedClause(clause: Clause, lbd: Int, origin: Int, sourceReplacement: Boolean): PropagationResult {
+    internal fun addRootDerivedClause(
+        clause: Clause,
+        lbd: Int,
+        origin: Int,
+        sourceReplacement: Boolean,
+    ): PropagationResult {
         check(canSimplifyRoot)
         val result = registerAndPropagate(base = state.undoTop) {
             state.addLearnedClause(clause, lbd, permanent = sourceReplacement, origin = origin)
@@ -183,6 +188,7 @@ class PropagationSession private constructor(
             }
         }
     }
+
     private val impliedIntUndo: IntArray = preparedBuffers?.impliedIntUndo ?: (IntArray(problem.numIntVars) { -1 })
     private fun encBool(v: Int): Int = v
     private fun encInt(v: Int): Int = problem.numBoolVars + v
@@ -816,7 +822,9 @@ class PropagationSession private constructor(
         permanent: Boolean = false,
     ): PropagationResult {
         if (permanent) scopedLearnedAssertion = true
-        return registerAndPropagate(base = state.undoTop) { state.addLearnedPb(weights, literals, degree, lbd, permanent) }
+        return registerAndPropagate(base = state.undoTop) {
+            state.addLearnedPb(weights, literals, degree, lbd, permanent)
+        }
     }
 
     /** Enable bounded mandatory integer-row learning for subsequent finite conflicts. */

@@ -80,17 +80,20 @@ class RootInprocessingTest {
 
     @Test
     fun `failed literal probing should assert a consumed unconditional unit`() {
-        for (native in listOf(false, true)) {
-            val session = PropagationSession(problem(intArrayOf(0, 2), intArrayOf(0, 3)).bake(), nativeSat = native)
+        for ((native, positive) in listOf(false to false, false to true, true to false, true to true)) {
+            val literal = Lit.make(0, positive)
+            val session = PropagationSession(
+                problem(intArrayOf(literal, 2), intArrayOf(literal, 3)).bake(), nativeSat = native,
+            )
             val stats = SearchStatsSink()
 
             RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 2), stats)
 
-            assertEquals(true, session.boolValue(0))
+            assertEquals(positive, session.boolValue(0))
             assertEquals(0, session.decisionLevel)
             assertTrue(session.learnedLifecycle().getValue("learningClauseConsumed") > 0L)
             assertEquals(2L, stats.inprocessProbes)
-            assertIs<PropagationResult.Unsat>(session.pinBool(0, false))
+            assertIs<PropagationResult.Unsat>(session.pinBool(0, !positive))
         }
     }
 
@@ -132,7 +135,8 @@ class RootInprocessingTest {
     @Test
     fun `cancelled probing should leave no deduction or standing decision`() {
         val session = PropagationSession(problem(intArrayOf(0, 2), intArrayOf(0, 3)).bake())
-        session.withCancellation(Cancellation { true }) {
+        var polls = 0
+        session.withCancellation(Cancellation { ++polls >= 2 }) {
             RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 2), null)
         }
         assertEquals(0, session.learnedClauseCount)
