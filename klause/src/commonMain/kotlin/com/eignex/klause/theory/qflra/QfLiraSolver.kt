@@ -96,6 +96,7 @@ import com.eignex.klause.util.BIG_TWO
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableIntIntMap
 import com.eignex.klause.util.MutableIntObjectMap
 import com.eignex.klause.util.abs
@@ -215,7 +216,7 @@ class ExactLiraSearchComponent private constructor(
     private val exactForms = preparedSource.exactForms
     private val preparedRows = preparedSource.preparedRows
     private val sourceAssertionLevels = IntArray(preparedRows.size) { -1 }
-    private val scopedSourceAssertions = ArrayList<Int>()
+    private val scopedSourceAssertions = IntArrayList()
     private var incrementalSourceRows = false
     private var sourceRowsByBoolean: Map<Int, List<Int>>? = null
     private val changedSourceBooleans = LinkedHashSet<Int>()
@@ -1204,17 +1205,26 @@ class ExactLiraSearchComponent private constructor(
     }
 
     private fun assertSource(context: SearchContext): Boolean {
+        val previousVisits = sourceRowVisits
+        return try {
+            assertSourceWithin(context)
+        } finally {
+            if (completeTraversalObserved && incrementalSourceRows) {
+                smtStats?.observeCompleteSearchStage("INCREMENTAL_SOURCE_ROW", sourceRowVisits - previousVisits)
+            }
+        }
+    }
+
+    private fun assertSourceWithin(context: SearchContext): Boolean {
         if (!installSource() || !lp.atLevel(context.decisionLevel, operationStop)) return false
         val selected = sourceRowsToAssert(context.decisionLevel) ?: return false
         val disequalities = ArrayList<Triple<RowAddress, ExactComparison, SearchAtomPremise>>()
         val comparisons = ArrayList<PremisedSmtComparison>()
         val indices = ArrayList<Int>()
-        var visited = 0L
         for (index in selected) {
             if (incrementalSourceRows) operationStop.charge(1)
             if (operationStop()) return false
             sourceRowVisits++
-            visited++
             val prepared = preparedRows[index]
             // Resolved source inputs stay fixed until the LP scope containing their assertion is popped.
             // Root checks still permit substitution through newly published root-fixed columns.
@@ -1238,13 +1248,10 @@ class ExactLiraSearchComponent private constructor(
         }
         if (!system.assertComparisons(comparisons, operationStop) { index ->
                 val source = indices[index]
-                if (sourceAssertionLevels[source] < 0 && context.decisionLevel > 0) scopedSourceAssertions += source
+                if (sourceAssertionLevels[source] < 0 && context.decisionLevel > 0) scopedSourceAssertions.add(source)
                 sourceAssertionLevels[source] = context.decisionLevel
             }
         ) return false
-        if (completeTraversalObserved && incrementalSourceRows) {
-            smtStats?.observeCompleteSearchStage("INCREMENTAL_SOURCE_ROW", visited)
-        }
         if (lp.state?.conflict != null) return true
         for (atom in node.sourceBranches) {
             val premise = SearchAtomPremise.Asserted(branchNames[atom] ?: return false)
@@ -1774,10 +1781,10 @@ class ExactLiraSearchComponent private constructor(
 
     private fun retractSource(decisionLevel: Int) {
         var invalidated = 0L
-        while (scopedSourceAssertions.isNotEmpty()) {
+        while (!scopedSourceAssertions.isEmpty()) {
             val index = scopedSourceAssertions.last()
             if (sourceAssertionLevels[index] <= decisionLevel) break
-            scopedSourceAssertions.removeAt(scopedSourceAssertions.lastIndex)
+            scopedSourceAssertions.truncateTo(scopedSourceAssertions.size - 1)
             sourceAssertionLevels[index] = -1
             if (incrementalSourceRows) {
                 pendingSourceRows += index
