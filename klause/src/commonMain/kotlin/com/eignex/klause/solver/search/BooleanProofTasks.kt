@@ -38,7 +38,7 @@ class BooleanProofTasks(
     splitVariables: List<Int>,
 ) {
     private val identity = Any()
-    private val variables = splitVariables.toList()
+    private val variables = splitVariables.also { require(it.size <= 12) }.toList()
     private var epoch = 0L
     private var nextAttempt = 0L
     private val owners: Array<BooleanTaskLease?>

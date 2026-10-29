@@ -27,7 +27,7 @@ an incumbent tightens the cutoff. Accepted closures survive ordinary cancellatio
 `BooleanCoverageAttribution` retains bounded exact region keys and their first workers.
 It separates repeated entries by one worker, duplicate entries across workers and
 duplicate native refutations. Exact equality gives a lower bound on overlap; entries
-alone prove no completed coverage or saved work. `SearchRunObserver.onAttempt` observes
+alone prove no completed coverage or saved work. `SearchBranchAttemptObserver` observes
 a tightening alternative before assertion, including immediate conflicts. Finite
 backtrack exposes it through `BacktrackParams.branchObserver`. Its Boolean adapter
 captures all established Boolean values and the attempted literal; callers restrict it

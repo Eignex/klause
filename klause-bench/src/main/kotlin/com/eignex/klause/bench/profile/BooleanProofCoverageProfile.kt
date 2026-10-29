@@ -28,9 +28,11 @@ import com.eignex.klause.solver.search.BooleanCube
 import com.eignex.klause.solver.search.BooleanProofContext
 import com.eignex.klause.solver.search.BooleanProofTasks
 import com.eignex.klause.solver.search.BooleanTaskCheck
+import com.eignex.klause.solver.search.BooleanTaskLease
 import com.eignex.klause.util.Cancellation
 import com.sun.management.ThreadMXBean
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -68,6 +70,16 @@ object BooleanProofCoverageProfile {
         val context = BooleanProofContext(
             SourceScope(SourceRevision(sha256(bytes), "dimacs-cnf:" + source.semantics)), "source-identity:0",
         )
+        out.resolve("context.json").writeText(buildJsonObject {
+            put("sourceSha256", context.scope.revision.identity)
+            put("semantics", context.scope.revision.semantics)
+            put("mapping", context.mapping)
+            put("callerBooleanAssumptions", JsonObject(emptyMap()))
+            put("objective", JsonNull)
+            put("cutoff", JsonNull)
+            put("presolve", "off")
+            put("nativeSat", false)
+        }.toString())
         val bean = ManagementFactory.getThreadMXBean() as ThreadMXBean
         bean.isThreadAllocatedMemoryEnabled = true
         val report = out.resolve("records.jsonl")
@@ -147,23 +159,23 @@ object BooleanProofCoverageProfile {
     ) {
         val tasks = BooleanProofTasks(context, (0 until splits).toList())
         val retired = checkNotNull(tasks.acquire(0))
+        faultQuery(problem, retired, seed, work, tasks.size, stop, bean, report, "lost")
         tasks.loseWorker(0)
         val cancelled = checkNotNull(tasks.acquire(1))
+        faultQuery(problem, cancelled, seed, work, tasks.size, stop or Cancellation { true }, bean, report, "cancelled")
         tasks.cancel()
         check(!tasks.complete(retired) { error("lost completion reached checker") })
         check(!tasks.complete(cancelled) { error("cancelled completion reached checker") })
         val stale = checkNotNull(tasks.acquire(2))
+        faultQuery(problem, stale, seed, work, tasks.size, stop, bean, report, "stale")
         tasks.replaceContext(context.copy(mapping = "source-identity:1"))
         check(!tasks.complete(stale) { error("stale completion reached checker") })
         val leases = List(tasks.size) { worker -> checkNotNull(tasks.acquire(worker)) }
         for (lease in leases) {
             if (stop()) break
-            val pins = Assumptions(bools = lease.cube.literals.associate { Lit.variable(it) to Lit.isPositive(it) })
             val allocated = bean.getThreadAllocatedBytes(Thread.currentThread().threadId())
             val begin = System.nanoTime()
-            val result = BacktrackSolver(problem).solve(params(seed, stop).copy(
-                assumptions = pins, nodeBudget = NodeBudget(maxOf(1L, work / tasks.size)),
-            ))
+            val result = taskQuery(problem, lease, seed, work, tasks.size, stop)
             val accepted = tasks.complete(lease) { current ->
                 check(current.context == tasks.context && current.cube == lease.cube)
                 if (result is SolveResult.Unsat) BooleanTaskCheck.NativeRefutation else BooleanTaskCheck.Unresolved
@@ -182,6 +194,29 @@ object BooleanProofCoverageProfile {
         tasks.cancel()
     }
 
+    private fun faultQuery(
+        problem: BakedProblem, lease: BooleanTaskLease, seed: Long, work: Long, tasks: Int,
+        stop: Cancellation, bean: ThreadMXBean, report: File, fault: String,
+    ) {
+        val allocated = bean.getThreadAllocatedBytes(Thread.currentThread().threadId())
+        val begin = System.nanoTime()
+        val result = taskQuery(problem, lease, seed, work, tasks, stop)
+        val record = resultRecord(result, begin, allocated, bean).toMutableMap()
+        record["mode"] = JsonPrimitive("protocol-$fault")
+        record["task"] = JsonPrimitive(lease.task)
+        record["cube"] = JsonArray(lease.cube.literals.map(::JsonPrimitive))
+        record["mapping"] = JsonPrimitive(lease.context.mapping)
+        record["completionDiscarded"] = JsonPrimitive(true)
+        report.appendText("${JsonObject(record)}\n")
+    }
+
+    private fun taskQuery(
+        problem: BakedProblem, lease: BooleanTaskLease, seed: Long, work: Long, tasks: Int, stop: Cancellation,
+    ): SolveResult = BacktrackSolver(problem).solve(params(seed, stop).copy(
+        assumptions = Assumptions(bools = lease.cube.literals.associate { Lit.variable(it) to Lit.isPositive(it) }),
+        nodeBudget = NodeBudget(maxOf(1L, work / tasks)),
+    ))
+
     private fun params(seed: Long, stop: Cancellation): BacktrackParams = BacktrackParams(
         randomSeed = seed, cancellation = stop, nativeSat = false,
         variableSelector = InputOrder, valueSelector = IndomainMin,
@@ -195,7 +230,9 @@ object BooleanProofCoverageProfile {
             put("heapUsedBytes", ManagementFactory.getMemoryMXBean().heapMemoryUsage.used)
             put("decisions", result.stats.search.nodes.sum)
             put("propagationWork", result.stats.search.propagationWork.sum)
-            put("learningAndInprocessing", JsonObject(result.stats.search.learning.mapValues { JsonPrimitive(it.value) }))
+            put("learningAndInprocessing", JsonObject(result.stats.search.learning.mapValues {
+                JsonPrimitive(it.value)
+            }))
             put("independentlyVerifiedUnsatOrOptimality", false)
         }
 }

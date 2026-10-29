@@ -28,8 +28,8 @@ import com.eignex.klause.solver.forInvocation
 import com.eignex.klause.solver.incumbent.IncumbentSource
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SharingChannel
+import com.eignex.klause.solver.search.SearchBranchAttemptObserver
 import com.eignex.klause.solver.search.SearchComponent
-import com.eignex.klause.solver.search.SearchRunObserver
 import com.eignex.klause.solver.withLifetime
 import com.eignex.klause.util.Cancellation
 
@@ -63,11 +63,6 @@ data class BacktrackParams(
      * shared trail through [com.eignex.klause.solver.search.SearchSession] and must not read CP domains.
      */
     val componentFactory: (() -> List<SearchComponent>)? = null,
-    /**
-     * Inline diagnostic observer for attempted shared decisions, before propagation can refute them.
-     * The caller owns its scope, bounds and retention; callbacks must not mutate the search context.
-     */
-    val branchObserver: SearchRunObserver? = null,
     /**
      * Decisions one slice of the search may push before it gives up (Unknown). A restart, a resuming
      * portfolio arm or an ALNS repair re-enters the engine with the allowance renewed, so this bounds a
@@ -445,6 +440,11 @@ data class BacktrackParams(
     val historicalTableReasons: Boolean = false,
     /** Bounded propositional rebuild diagnostics within root simplification; zero disables capture. */
     val rootRebuildCaptureVisits: Int = 0,
+    /**
+     * Inline diagnostic observer for attempted shared decisions, before propagation can refute them.
+     * The caller owns its scope, bounds and retention; callbacks must not mutate the search context.
+     */
+    val branchObserver: SearchBranchAttemptObserver? = null,
 ) : SolverParams {
     init {
         require(rootRebuildCaptureVisits in 0..1_048_576) { "rebuild capture visits must be in 0..1048576" }

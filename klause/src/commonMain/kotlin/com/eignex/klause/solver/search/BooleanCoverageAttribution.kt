@@ -92,9 +92,11 @@ class BooleanCoverageAttribution(
      * whole mapped model, with no hidden integer, real or theory branches. Read a fresh context at
      * every attempt when objective authority can change. Incompatible epochs are refused.
      */
-    fun observer(worker: Int, numBoolVars: Int, currentContext: () -> BooleanProofContext = { context }): SearchRunObserver {
+    fun observer(
+        worker: Int, numBoolVars: Int, currentContext: () -> BooleanProofContext = { context },
+    ): SearchBranchAttemptObserver {
         require(worker >= 0 && numBoolVars in 0..4096)
-        return object : SearchRunObserver {
+        return object : SearchBranchAttemptObserver {
             override fun onAttempt(decision: SearchDecision, context: SearchContext) {
                 if (decision !is SearchDecision.Bool || Lit.variable(decision.literal) !in 0 until numBoolVars) {
                     declinedEntries++

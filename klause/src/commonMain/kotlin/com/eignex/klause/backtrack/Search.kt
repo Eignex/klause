@@ -40,6 +40,7 @@ import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.FiniteFactorEnforcer
 import com.eignex.klause.solver.search.PreparingSearchComponent
 import com.eignex.klause.solver.search.SearchAtomRegistry
+import com.eignex.klause.solver.search.SearchBranchAttemptObserver
 import com.eignex.klause.solver.search.SearchBrancher
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchComponentSet
@@ -564,7 +565,7 @@ internal class BacktrackBrancher(
     private val nativeConflict: () -> PropagationResult.Unsat? = { null },
     leafColumns: LeafColumns? = null,
 ) : SearchBrancher,
-    SearchRunObserver {
+    SearchBranchAttemptObserver {
     // Node count from which the next restart may count root fixings. The count visits every variable, so it runs
     // at most once per that many nodes: one visit per node, amortized.
     private var nextRootCount = 0L
