@@ -11,7 +11,7 @@ Build the distribution from the repository root:
 ```sh
 ./gradlew :klause-cli:installJvmDist
 minizinc --solver "$PWD/klause-mzn-lib/share/minizinc/solvers/klause.msc" \
-  klause-mzn-lib/test-models/queens.mzn -a -n 10
+  klause-mzn-lib/test-models/klause-test-queens.mzn -a -n 10
 ```
 
 The wrapper finds the CLI through `KLAUSE_HOME`, defaulting to the repository root. To register

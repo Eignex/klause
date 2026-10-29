@@ -57,7 +57,7 @@
       "file": "mzn-graph-coloring.kbtrace",
       "format": "MINIZINC",
       "route": "PRODUCTION_RELAXATION",
-      "source": "klause-mzn-lib/test-models/graph_coloring.mzn",
+      "source": "klause-mzn-lib/test-models/klause-test-graph_coloring.mzn",
       "license": "repository-internal",
       "sourceSha256": "c893e0eee1a53155b59ab069198704b10dffa7175e3c8bc43d36a52de5917bd2",
       "artifactSha256": "1226f4674ce6f03fc56684667fbbe4524462a5870c47165cd0c883543172853a",
@@ -123,7 +123,7 @@
   ],
   "excluded": [
     {
-      "source": "klause-mzn-lib/test-models/sudoku.mzn",
+      "source": "klause-mzn-lib/test-models/klause-test-sudoku.mzn",
       "reason": "no-lp",
       "detail": "The production relaxation assembled zero rows."
     },

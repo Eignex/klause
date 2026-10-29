@@ -65,7 +65,7 @@ internal object OptionalUnaryProfile {
         if (args.singleOrNull() == "mode=semantics") {
             for (mode in 1..10) {
                 val directory = out.resolve("mode-$mode").apply { mkdirs() }
-                File(CorpusFetcher.workspaceRoot(), "klause-mzn-lib/test-models/optional-unary-semantics.mzn")
+                File(CorpusFetcher.workspaceRoot(), "klause-mzn-lib/test-models/klause-test-optional-unary-semantics.mzn")
                     .copyTo(directory.resolve("source.mzn"))
                 directory.resolve("data.dzn").writeText("mode = $mode;\n")
                 inspectPair(directory, out, listOf("off"))
@@ -74,7 +74,7 @@ internal object OptionalUnaryProfile {
             return
         }
         val control = out.resolve("control").apply { mkdirs() }
-        File(CorpusFetcher.workspaceRoot(), "klause-mzn-lib/test-models/optional-unary.mzn")
+        File(CorpusFetcher.workspaceRoot(), "klause-mzn-lib/test-models/klause-test-optional-unary.mzn")
             .copyTo(control.resolve("source.mzn"))
         inspectPair(control, out)
         if (args.isNotEmpty()) {
