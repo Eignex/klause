@@ -401,7 +401,6 @@ object PresolvePipeline {
         if ((current === sourceProblem || onlyBaseBake) && sourceProblem === problem && !infeasible &&
             posted === reduced
         ) {
-            current.factorProjections?.let { projections?.retainLpTemplatesFrom(it, cancellation) }
             // The step-0 bake still ran; reporting its time keeps that cost from being misattributed to
             // the rest of the phase on a no-op presolve.
             return PresolveOutcome(
