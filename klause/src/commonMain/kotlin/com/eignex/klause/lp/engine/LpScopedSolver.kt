@@ -273,7 +273,9 @@ internal class LpScopedSolver(
             try {
                 if (!current.adopt(state, token)) return null
                 solveStarted = true
-                (if (warm == null) current.resolveBounds(allowance) else current.solve(warm)).also {
+                (if (warm == null) current.resolveBounds(
+                    allowance ?: if (current is ComponentLpSolver) LpFloatAllowance(workLimit, iterationLimit) else null,
+                ) else current.solve(warm)).also {
                     lastFloatTermination = current.lastTermination
                 }
             } catch (primary: Throwable) {
@@ -502,7 +504,9 @@ internal class LpScopedSolver(
         compaction: LpLayoutRemap? = null,
     ): Boolean {
         if (append) solver?.let { recordPendingAppendSolve(it) }
-        val warm = if (append) (solver as? PersistentLpSolver)?.retainedBasis()?.extended(state.model, next.state.model) else null
+        val warm = if (append) {
+            (solver as? PersistentLpSolver)?.retainedBasis()?.extended(state.model, next.state.model)
+        } else null
         val expected = if (compaction != null) {
             // Seat the disappearing logicals in an isolated old-size owner before deleting their slots.
             val staging = prepared(state, token) ?: return false
@@ -703,8 +707,9 @@ internal class LpScopedSolver(
             if (!candidate.adopt(next, token)) return null
             val basis = try {
                 when (val current = candidate) {
-                    is PersistentLpSolver -> if (warm == null) current.prepareLogicals(token) else current.prepareBasis(warm, token)
-                    is ComponentLpSolver -> current.prepareLogicals(token)
+                    is PersistentLpSolver -> if (warm == null) current.prepareLogicals(token) else
+                        current.prepareBasis(warm, token)
+                    is ComponentLpSolver -> current.prepareLogicals(token, remainingWork)
                     else -> null
                 }
             } finally {
