@@ -140,12 +140,12 @@ internal object MpsLpAdmission {
         return objective?.let { if (plan.maximize) it.negated() else it }
     }
 
-    private fun recipes(problem: BakedProblem, objective: LinearObjective?, mix: EngineMix): JsonObject {
+    internal fun recipes(problem: BakedProblem, objective: LinearObjective?, mix: EngineMix): JsonObject {
         val scenario = PortfolioScenario.sequential(Kind.COP, mix, seed = 3L)
         val factsType = Class.forName("com.eignex.klause.portfolio.ProblemFacts")
         val companion = factsType.getField("Companion").get(null)
         val facts = companion.javaClass.methods.single { it.name == "of" }.invoke(
-            companion, problem, ProblemProfile.of(problem, true), scenario.lpCeiling, objective,
+            companion, problem, ProblemProfile.of(problem, true), scenario.lpCeiling, objective, null,
         )
         val compositionType = Class.forName("com.eignex.klause.portfolio.PortfolioComposition")
         val composition = compositionType.getField("INSTANCE").get(null)
@@ -212,8 +212,9 @@ internal object MpsLpAdmission {
         // Reflection keeps diagnostic access to internal assembly out of the published API.
         val type = Class.forName("com.eignex.klause.lp.relaxation.CpToLpRelaxation")
         val constructor = type.constructors.single { it.parameterTypes.last().simpleName == "DefaultConstructorMarker" }
-        check(constructor.parameterCount == 24)
-        val values = arrayOfNulls<Any>(24)
+        val defaultMask = constructor.parameterCount - 2
+        check(defaultMask in 22..31 && constructor.parameterTypes[defaultMask] == Int::class.javaPrimitiveType)
+        val values = arrayOfNulls<Any>(constructor.parameterCount)
         constructor.parameterTypes.forEachIndexed { index, parameter ->
             if (parameter == Boolean::class.javaPrimitiveType) values[index] = false
         }
@@ -223,7 +224,7 @@ internal object MpsLpAdmission {
         values[3] = table
         values[11] = cone
         values[21] = elementIndexes
-        values[22] = (1 or (1 shl 1) or (1 shl 2) or (1 shl 3) or (1 shl 11) or (1 shl 21)).inv()
+        values[defaultMask] = (1 or (1 shl 1) or (1 shl 2) or (1 shl 3) or (1 shl 11) or (1 shl 21)).inv()
         val relaxer = constructor.newInstance(*values)
         val domainType = Class.forName("com.eignex.klause.lp.relaxation.RootDomains")
         val domains = domainType.constructors.single().newInstance(problem)
