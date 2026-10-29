@@ -200,7 +200,7 @@ internal object RealBooleanCutProfile {
         val consequences = field(result, "consequences") as List<SourceEvidence>
         val rounding = Class.forName(PREFIX + "LinearAuthorityCuts").getField("Companion").get(null)
         val installed = rounding.javaClass.declaredMethods.single { it.name == "prepare" }
-            .invoke(rounding, source, Cancellation.after(3.seconds), { _: Long -> })
+            .invoke(rounding, source, Cancellation.after(3.seconds), false, { _: Long -> })
         val quarter = BigFraction.ofLong(4).reciprocal()
         val common = consequences.single { it.claim == SourceClaim.Consequence(
             SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.MINUS_ONE), quarter)) }
