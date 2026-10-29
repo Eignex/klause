@@ -25,7 +25,7 @@ import com.eignex.klause.util.IntArrayList
 internal class ComponentLpSolver(
     private var model: LpModel,
     private var parts: List<LpNeighborhood>,
-    private val solvers: List<LpSolver>,
+    private var solvers: List<LpSolver>,
     private val isolated: IntArray,
 ) : RetainedComponentLpSolverCapability,
     ResumableLpSolver,
@@ -42,6 +42,8 @@ internal class ComponentLpSolver(
     override var lastDegenerateColumns: Int = 0
         private set
     override var lastColumns: Int = 0
+        private set
+    var lastReservedConstructionWork: Long = 0L
         private set
     private var closed = false
     private var continuationTarget: Basis? = null
@@ -225,6 +227,135 @@ internal class ComponentLpSolver(
             if (basis == null || stop()) return null
         }
         return componentBasis()
+    }
+
+    @Suppress("TooGenericExceptionCaught") // New children are private until the complete local edit can publish.
+    fun appendLocalRows(
+        state: LpExactState,
+        token: Cancellation,
+        workLimit: Long,
+        engine: (LpModel, Cancellation, Long) -> PersistentLpSolver,
+    ): Boolean {
+        check(!closed && activeSolve == null)
+        metrics = LpSolveMetrics()
+        lastReservedConstructionWork = 0L
+        val projection = LpProjectionMeter(
+            workLimit = workLimit.takeIf { it > 0L } ?: Long.MAX_VALUE, cancellation = token,
+        )
+        val (working, nextParts) = try {
+            localRowPlan(state, token, projection) ?: return false
+        } catch (_: LpProjectionStop) {
+            return false
+        } finally {
+            metrics += LpSolveMetrics(workOps = projection.work)
+        }
+        val changed = BooleanArray(parts.size) { nextParts[it] !== parts[it] }
+        val replacements = ArrayList<LpSolver>()
+        val nextSolvers = solvers.toMutableList()
+        var published = false
+        var failure: Throwable? = null
+        try {
+            val stop = token or Cancellation { workLimit > 0L && currentWork >= workLimit }
+            for (index in parts.indices) {
+                if (!changed[index]) continue
+                if (stop()) return false
+                val remaining = if (workLimit > 0L) workLimit - metrics.workOps else 0L
+                val child = engine(nextParts[index].model, token, remaining)
+                replacements += child
+                nextSolvers[index] = child
+                activeChild = child
+                val basis = try {
+                    child.prepareLogicals(stop)
+                } finally {
+                    activeChild = null
+                    metrics += child.lastMetrics
+                }
+                if (basis == null || !basis.validFor(nextParts[index].model) || stop()) return false
+            }
+            if (token()) return false
+            val retired = parts.indices.filter { changed[it] }.map { solvers[it] }
+            model = working
+            parts = nextParts
+            solvers = nextSolvers
+            for (index in parts.indices) if (changed[index]) {
+                reusable[index] = null
+                checkedBounds[index] = null
+            }
+            clearEvidence()
+            published = true
+            closeComponentSolvers(retired)
+            return true
+        } catch (primary: Throwable) {
+            failure = primary
+            if (published) {
+                try { close() } catch (cleanup: Throwable) {
+                    if (cleanup !== primary) primary.addSuppressed(cleanup)
+                }
+            }
+            throw primary
+        } finally {
+            if (!published) closeComponentSolvers(replacements, failure)
+        }
+    }
+
+    private fun localRowPlan(
+        state: LpExactState,
+        token: Cancellation,
+        projection: LpProjectionMeter,
+    ): Pair<LpModel, List<LpNeighborhood>>? {
+        val previous = model.exactState ?: return null
+        val source = state.model
+        if (source.n != model.n || source.m <= model.m || token()) return null
+        var entries = 0L
+        for (column in 0 until model.n) {
+            val values = source.columnEntries(column)
+            entries += values.size
+            projection.reserve(values.size.toLong() + 1L, values.size * 16L, matrix = true)
+            if (values.filter { it.row < model.m } != previous.model.columnEntries(column)) return null
+        }
+        projection.reserve(source.m.toLong() + source.n, (source.m.toLong() + source.n) * 16L, matrix = true)
+        if ((0 until model.m).any { previous.rows.row(it).id != state.rows.row(it).id }) return null
+        val owner = IntArray(model.n) { -1 }
+        for (index in parts.indices) for (column in parts[index].cols) owner[column] = index
+        val added = Array(parts.size) { IntArrayList() }
+        val working = state.ownerWorkingModel(projection) ?: return null
+        projection.reserve(entries * 2L + source.m, entries * 4L + source.m * 8L, matrix = true)
+        val rows = working.rowIndex()
+        for (row in model.m until source.m) {
+            projection.poll()
+            val from = rows.rowPtr[row]
+            val to = rows.rowPtr[row + 1]
+            if (from == to) return null
+            val block = owner[rows.colIdx[from]]
+            if (block < 0 || (from until to).any { owner[rows.colIdx[it]] != block }) return null
+            added[block].add(row)
+        }
+        val nextParts = ArrayList<LpNeighborhood>(parts.size)
+        val scratch = IntArray(source.m) { -1 }
+        for (index in parts.indices) {
+            val part = parts[index]
+            projection.reserve(part.cols.size.toLong() + part.rows.size, 0L, matrix = false)
+            if (added[index].size == 0) {
+                // Simultaneous edits to other blocks take the ordinary replacement route.
+                if (part.rebindExact(state, token) !== part) return null
+                nextParts += part
+            } else {
+                val columns = IntArrayList().apply { addAll(part.cols) }
+                val selected = IntArrayList().apply {
+                    addAll(part.rows)
+                    added[index].forEach { add(it) }
+                }
+                val nonzeros = part.cols.sumOf { source.columnEntries(it).size.toLong() }
+                projection.reserve(nonzeros * 8L + columns.size + selected.size,
+                    nonzeros * 128L + (columns.size.toLong() + selected.size) * 128L, matrix = true)
+                val next = working.restrictTo(columns, selected, null, copyCosts = true, scratch)
+                val construction = LpScalingView.constructionWorkBound(next.model)
+                projection.reserve(construction, 0L, matrix = true)
+                lastReservedConstructionWork += construction
+                nextParts += next
+            }
+        }
+        return working to nextParts
     }
 
     @Suppress("TooGenericExceptionCaught") // Clear the invocation reason for any child failure.

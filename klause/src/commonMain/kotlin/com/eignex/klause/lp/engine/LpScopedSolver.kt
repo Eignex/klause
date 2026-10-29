@@ -506,6 +506,37 @@ internal class LpScopedSolver(
         append: Boolean,
         compaction: LpLayoutRemap? = null,
     ): Boolean {
+        var replacementWorkLimit = workLimit
+        val components = solver as? ComponentLpSolver
+        if (append && compaction == null && components != null) {
+            preparationAttempts++
+            val adopted = try {
+                components.appendLocalRows(next.state, token, workLimit) { part, childToken, childWork ->
+                    newPersistentLpSolver(part, childToken, refactorUpdateLimit, iterationLimit,
+                        childWork, trackDegeneracy, context.engineFactory, pricing)
+                }
+            } catch (primary: Throwable) {
+                solver = null
+                closeOwner(components, primary)
+                throw primary
+            } finally {
+                preparationWork = saturated(preparationWork, components.lastMetrics.workOps)
+                reservedConstructionWork = saturated(reservedConstructionWork, components.lastReservedConstructionWork)
+                constructionWork = saturated(constructionWork, components.lastMetrics.preparationOps)
+                preparationRefactorizations += components.lastRefactorizations
+            }
+            if (adopted) {
+                preparationSuccesses++
+                publish(next)
+                return true
+            }
+            solver = null
+            closeOwner(components)
+            if (workLimit > 0L) {
+                if (components.lastMetrics.workOps >= workLimit) return false
+                replacementWorkLimit -= components.lastMetrics.workOps
+            }
+        }
         if (append) solver?.let { recordPendingAppendSolve(it) }
         val warm = if (append) {
             (solver as? PersistentLpSolver)?.retainedBasis()?.extended(state.model, next.state.model)
@@ -525,7 +556,7 @@ internal class LpScopedSolver(
         } else {
             IntArray(next.state.model.m) { next.state.model.n + it }
         }
-        val replacement = prepared(next.state, token, append, warm) ?: return false
+        val replacement = prepared(next.state, token, append, warm, replacementWorkLimit) ?: return false
         var published = false
         var failure: Throwable? = null
         try {
@@ -658,6 +689,7 @@ internal class LpScopedSolver(
         token: Cancellation,
         recordRejectedAppendWork: Boolean = false,
         warm: Basis? = null,
+        workBudget: Long = workLimit,
     ): Pair<RetainedLpSolver, Basis>? {
         preparationAttempts++
         var candidate: RetainedLpSolver? = null
@@ -666,7 +698,7 @@ internal class LpScopedSolver(
         try {
             if (token() || next.model.m > maxRetainedRows) return null
             val projection = LpProjectionMeter(
-                workLimit = if (workLimit > 0L) workLimit else Long.MAX_VALUE,
+                workLimit = if (workBudget > 0L) workBudget else Long.MAX_VALUE,
                 cancellation = token,
             )
             var constructionBound = 0L
@@ -683,8 +715,8 @@ internal class LpScopedSolver(
                 preparationWork = saturated(preparationWork, projection.work)
                 reservedConstructionWork = saturated(reservedConstructionWork, constructionBound)
             } ?: return null
-            val remainingWork = if (workLimit > 0L) workLimit - projection.work else 0L
-            if (workLimit > 0L && remainingWork <= 0L) return null
+            val remainingWork = if (workBudget > 0L) workBudget - projection.work else 0L
+            if (workBudget > 0L && remainingWork <= 0L) return null
             candidate = if (componentSplit && next.matrixRevision == 0L && warm == null) {
                 componentLpSolverOrNull(
                     working, token,
