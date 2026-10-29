@@ -54,6 +54,8 @@ class LpHarvestTest {
             .sumOf { it.outcomes["FACTORS_REUSED"] ?: 0L } > 0L)
         assertTrue(sink.snapshot().lp.phases.filterKeys { it.startsWith("TEMPLATE_ASSEMBLY_") }.values
             .sumOf { it.outcomes["ROWS"] ?: 0L } > 0L)
+        assertTrue(sink.snapshot().lp.phases.filterKeys { it.startsWith("TEMPLATE_ASSEMBLY_") }.values
+            .sumOf { it.outcomes["EXACT_BOUND_OBJECTS"] ?: 0L } > 0L)
     }
 
     @Test

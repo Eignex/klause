@@ -501,9 +501,10 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(delta)
     }
 
-    fun observeTemplateUse(rows: Int = 0, bounds: Int = 0) {
+    fun observeTemplateUse(rows: Int = 0, bounds: Int = 0, exactBounds: Int = 0) {
         val key = "TEMPLATE_ASSEMBLY_${probeRoute.name}"
-        val delta = LpPhaseStats(outcomes = mapOf("ROWS" to rows.toLong(), "BOUNDS" to bounds.toLong()))
+        val delta = LpPhaseStats(outcomes = mapOf("ROWS" to rows.toLong(), "BOUNDS" to bounds.toLong(),
+            "EXACT_BOUND_OBJECTS" to exactBounds.toLong()))
         phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(delta)
     }
 

@@ -80,7 +80,7 @@ internal class LpSourceCompaction(
 
 internal class LpRetainedSources(
     private val problem: Problem,
-    relaxer: CpToLpRelaxation,
+    private val relaxer: CpToLpRelaxation,
     private val auxiliarySources: LpAuxiliarySources = relaxer.auxiliarySources,
 ) {
     private sealed interface ColumnKey {
@@ -230,6 +230,7 @@ internal class LpRetainedSources(
         var epoch = columnEpoch
         var constant = state.model.objective.constant.value
         var emittedExtent = 0L
+        var boundTemplates = 0
         for (index in update.changed) {
             if (cancellation()) throw LpAssemblyCancelled()
             check(epoch < Long.MAX_VALUE)
@@ -251,7 +252,13 @@ internal class LpRetainedSources(
                 } else {
                     val definition = fragment.colPresence[local]
                     val column = if (fragment.colReq[local] == null) {
-                        source.column(local)
+                        val current = source.column(local)
+                        val prepared = if (!fragment.colIsBool[local] && fragment.colRealId[local] < 0) {
+                            relaxer.preparationTemplates?.bound(fragment.colVarId[local])
+                                ?.compatibleColumn(current)
+                        } else null
+                        if (prepared != null) boundTemplates++
+                        prepared ?: current
                     } else {
                         source.column(local).copy(bounds = ExactLpBounds(
                             ExactLpSide(ExactLpNumber.of(0L)),
@@ -314,6 +321,7 @@ internal class LpRetainedSources(
             next[index] = Binding(emission, mapped, rowIds)
         }
         if (cancellation()) throw LpAssemblyCancelled()
+        relaxer.observeBoundTemplates(boundTemplates)
         val uses = columnUses.copyOf(staged.size)
         var owned = ownedStorageUnits + staged.drop(columns.size).sumOf { it.storageUnits }
         var unused = unusedColumns + (columns.size until staged.size).count { staged[it].reclaimable() }

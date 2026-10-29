@@ -12,6 +12,9 @@ import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.lp.relaxation.CpToLpRelaxation
+import com.eignex.klause.lp.relaxation.RootDomains
+import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
@@ -67,6 +70,26 @@ class AffineObjectiveTest {
         ),
     )
     private val objective = LinearObjective(intCoefficients = longArrayOf(2, -2, 3), constant = 5)
+
+    @Test
+    fun `affine reconstruction should preserve objective authority after template preparation`() {
+        val baked = source.bake(FactorProjectionProviders.Default.prepare(source))
+        val before = CpToLpRelaxation(baked, objective)
+        before.build(RootDomains(baked))
+
+        val reduced = Presolver.run(baked, PresolveConfig.parse("affine"),
+            PresolveContext.of(objective, transformObjective = true))
+        val transformed = assertNotNull(reduced.objective)
+        val result = BacktrackSolver(reduced.problem).minimize(transformed)
+        val sample = assertNotNull(result.assignment)
+        reduced.mapping.requireObjectivePreserved(objective, transformed, sample)
+        val original = reduced.reconstruct(sample)
+
+        assertTrue(reduced.problem !== baked)
+        assertEquals(original.ints[1] + 1L, original.ints[0])
+        assertEquals(original.ints[2] + 1L, original.ints[1])
+        assertEquals(7.0, result.objectiveValue)
+    }
 
     @Test
     fun `an unsupported reflection should leave a later objective translation available`() {
