@@ -7,6 +7,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.SparseSourceLpPolicy
+import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
@@ -24,9 +25,40 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class JointLinearRepairTest {
+    @Test
+    fun `checked handoff should improve its first connected integer neighborhood`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(2), null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.GE, 0.0),
+            ), numRealVars = 1, realLower = doubleArrayOf(0.75), realUpper = doubleArrayOf(2.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val seed = Sample(booleanArrayOf(), longArrayOf(2), doubleArrayOf(0.75),
+            exactReals = listOf(BigFraction.ofLong(3) / BigFraction.ofLong(4)))
+
+        for (completion in listOf(false, true)) {
+            val result = JointLinearRepair(model, source, objective,
+                TheoryParams(sourceIncumbentCompletion = completion, maxFlips = 1), external = { seed }).use { repair ->
+                repair.search(adaptive = false).use { search ->
+                    var done = false
+                    repeat(32) { if (!done) done = search.advance(Cancellation.Never, 5_000) }
+                    search.minimizeResult(TerminationReason.BudgetExhausted)
+                }
+            }
+
+            if (completion) {
+                val sample = assertIs<MinimizeResult.WithSample>(result).sample
+                assertEquals(1L, sample.intValue(0))
+                assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority()).verify(
+                    SourceEvidence(source.scope, SourceClaim.Witness(sample), SourceDerivation.SourceWitness)))
+            } else assertNull((result as? MinimizeResult.WithSample)?.sample)
+        }
+    }
+
     @Test
     fun `an advisory pooled center should be completed before neighborhood consumption`() {
         val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(2), null, null),
