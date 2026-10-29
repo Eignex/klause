@@ -348,16 +348,17 @@ profile's 32 MiB source cap. Its decompressed bytes must match `sha256`; this le
 a retained original source avoid a cold download of its entire catalog archive.
 `source-preparation.json` records that input mode and parsing cost. Packed source
 bytes and raw profile records belong in the external evidence directory.
-Failed child runs forward at most 16 KiB of their error stream to the parent log,
-so an unavailable artifact receipt does not hide the diagnostic exception.
+Failed child runs forward at most 16 KiB of their error stream to the parent log.
+Retained files and complete parent logs still require lab artifact publication.
 
 The prepared-factory strict-bound, backtrack and compatible-decline controls pass
 on JVM and Linux native at `2337dbd102`; the new JVM cases take at most 5 ms.
 Original PWD [9192](https://lab.eignex.com/jobs/9192) stops during cold corpus
-acquisition, and [9215](https://lab.eignex.com/jobs/9215) exposes the required CLI
+acquisition, and [9215](https://lab.eignex.com/jobs/9215) stops at the missing CLI
 provenance installation. Frozen-source [9230](https://lab.eignex.com/jobs/9230)
 and diagnostic [9244](https://lab.eignex.com/jobs/9244) report failed commands with
-committed child artifacts unavailable through the maintained interface. These
+committed executions; child artifacts and the final live-log tail are unavailable
+through the maintained interface. These
 attempts establish no original-source consumption, throughput or terminal claim.
 Admission stays opt-in; [#3844](https://github.com/Eignex/klause/issues/3844)
 retains its required original-source consumption criterion.
