@@ -785,6 +785,10 @@ internal object Suites {
 
     private val lpComponentSplit = suite("lp-component-split", "Targeted separable and linked dense LP models") {
         license = "internal"
+        for ((name, optimum) in listOf("cover-2x3" to 4L, "cover-3x3" to 6L)) {
+            vendored("mps-$name", Category.OPTIMIZATION, Expected.Opt(optimum),
+                relPath = "lp-component-split/$name.mps", format = Format.MPS)
+        }
         for (name in listOf("dense-2x12", "dense-8x24", "linked-8x24")) {
             vendoredMzn("mzn-$name", Category.OPTIMIZATION, Expected.Opt(1), model = "lp-component-split/$name.mzn")
         }

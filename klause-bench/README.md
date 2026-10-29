@@ -490,6 +490,11 @@ reuse or zero-cut result. Component count alone establishes no saved work or
 whole-source improvement.
 `lpPhase_COMPONENT_LIFECYCLE_*` records child `SOLVED` and `REUSED` counts through
 the existing route ledger; numerical work, pivots and factors count actual solves.
+`set=lp-component-lifecycle-v1` selects two binary covering MPS sources with direct
+additive objectives. Each block needs two selected columns but has a fractional
+LP optimum, admitting local tableau cuts without an objective-definition row that
+connects the blocks. Compare ownership and `param.lp-root-cuts` independently;
+retain prepared block counts, child reuses, cut consumption and ordinary outcomes.
 
 The opt-in basis tool uses the [basis corpus](../klause/src/jvmTest/resources/basis-corpus/README.md):
 
