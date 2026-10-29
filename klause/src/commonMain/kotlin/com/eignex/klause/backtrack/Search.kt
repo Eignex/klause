@@ -239,6 +239,7 @@ internal class CpSatisfactionTraversal(
             lp?.let { components += it.component }
             components += params.componentFactory?.invoke().orEmpty()
             components.forEach(resources::ownComponent)
+            resources.own(AutoCloseable { params.clauseExchange?.onSearchClose(cp.session) })
             cp.useEnforcingPeers(components.filterIsInstance<FiniteFactorEnforcer>()
                 .flatMap { it.enforcingFiniteFactors(problem) }.toSet())
             deferredRoot = deferredInitialization &&
@@ -270,7 +271,10 @@ internal class CpSatisfactionTraversal(
                     sharedSession = session
                 } else {
                     rootOutcome = when (session.initialize()) {
-                        ComponentResult.Consistent -> null
+                        ComponentResult.Consistent -> {
+                            params.clauseExchange?.onSearchStart(cp.session)
+                            null
+                        }
                         is ComponentResult.Conflict -> SearchOutcome.Exhausted()
                         ComponentResult.Indeterminate -> SearchOutcome.BudgetCapped
                     }
@@ -332,7 +336,10 @@ internal class CpSatisfactionTraversal(
                     initialized
                 } else session.initialize()
                 rootOutcome = when (result) {
-                    ComponentResult.Consistent -> null
+                    ComponentResult.Consistent -> {
+                        params.clauseExchange?.onSearchStart(cp.session)
+                        null
+                    }
                     is ComponentResult.Conflict -> SearchOutcome.Exhausted()
                     ComponentResult.Indeterminate -> SearchOutcome.BudgetCapped
                 }
@@ -372,6 +379,7 @@ internal class CpSatisfactionTraversal(
             }
 
             SearchRunEvent.Paused -> if (slice != null) {
+                params.clauseExchange?.onSearchEnd(cp.session)
                 null
             } else {
                 close()
@@ -494,7 +502,6 @@ private class CpSatisfactionTraversalPolicy(
     }
 
     override fun onCancellation(context: SearchContext): SearchRunDisposition {
-        params.clauseExchange?.onSearchEnd(session)
         return if (slice?.pauses() == true) SearchRunDisposition.Pause else SearchRunDisposition.Indeterminate
     }
 }

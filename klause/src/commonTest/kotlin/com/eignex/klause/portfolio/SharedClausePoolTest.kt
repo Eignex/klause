@@ -200,6 +200,7 @@ class SharedClausePoolTest {
         exchange.onSearchEnd(session)
         val suspended = meter.snapshot().clauses
         val count = session.learnedClauseCount
+        session.reseedFrom(com.eignex.klause.propagation.Assumptions.None.withBool(100, true))
         exchange.onSearchStart(session)
         assertEquals(count, session.learnedClauseCount)
         assertEquals(suspended.getValue("seenCapacityBytes"), meter.snapshot().clauses.getValue("seenCapacityBytes"))
