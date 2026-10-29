@@ -5,6 +5,11 @@ import com.eignex.klause.backtrack.BacktrackPresets
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.VariableSelector
 import com.eignex.klause.bench.catalog.Catalog
+import com.eignex.klause.bench.catalog.Category
+import com.eignex.klause.bench.catalog.Expected
+import com.eignex.klause.bench.catalog.Format
+import com.eignex.klause.bench.catalog.ProblemRef
+import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
@@ -34,7 +39,7 @@ internal object OrdinaryArithmeticLearningProfile {
     fun main(args: Array<String>) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.keys.all {
-            it in setOf("suite", "problem", "sha256", "timeout-ms", "nodes", "lp", "trace")
+            it in setOf("suite", "problem", "sha256", "timeout-ms", "nodes", "lp", "trace", "source64", "format")
         })
         val suite = requireNotNull(options["suite"])
         val name = requireNotNull(options["problem"])
@@ -63,10 +68,14 @@ internal object OrdinaryArithmeticLearningProfile {
             put("javaRuntimeVersion", System.getProperty("java.runtime.version"))
             put("javaVmName", System.getProperty("java.vm.name"))
         }.toString())
-        val ref = Catalog.uncapped(suite).problems.single { it.name == name }
-        val bytes = CorpusFiles.open(CorpusFetcher.resolve(ref.source)).use { it.readNBytes(1_048_577) }
+        val source64 = options["source64"]
+        val catalogRef = if (source64 == null) Catalog.uncapped(suite).problems.single { it.name == name } else null
+        val format = catalogRef?.format ?: Format.valueOf(requireNotNull(options["format"]).uppercase())
+        val bytes = if (source64 == null) {
+            CorpusFiles.open(CorpusFetcher.resolve(requireNotNull(catalogRef).source)).use { it.readNBytes(1_048_577) }
+        } else trajectorySourceBytes(suite, name, hash, source64)
         require(bytes.size <= 1_048_576)
-        out.resolve("source.${ref.format.name.lowercase()}").writeBytes(bytes)
+        val sourceFile = out.resolve("source.${format.name.lowercase()}").apply { writeBytes(bytes) }
         val observedHash = sha256(bytes)
         publish(buildJsonObject {
             put("event", "source")
@@ -74,8 +83,11 @@ internal object OrdinaryArithmeticLearningProfile {
             put("problem", name)
             put("expectedSha256", hash)
             put("observedSha256", observedHash)
+            put("sourceMode", if (source64 == null) "catalog" else "frozen")
         }.toString())
         check(observedHash == hash) { "source hash mismatch: expected $hash, observed $observedHash" }
+        val ref = catalogRef ?: ProblemRef(name, format, ProblemSource.Prepared(sourceFile),
+            Category.CSP, Expected.Unknown)
         val codec = ProblemJson()
         out.resolve("ordinary-learning.jsonl").bufferedWriter().use { output ->
             for (learning in listOf(false, true)) {
@@ -167,6 +179,7 @@ internal object OrdinaryArithmeticLearningProfile {
                     put("suite", suite)
                     put("problem", name)
                     put("sourceSha256", hash)
+                    put("sourceMode", if (source64 == null) "catalog" else "frozen")
                     put("integerRowLearning", learning)
                     put("pbLearning", false)
                     put("lp", lp)
