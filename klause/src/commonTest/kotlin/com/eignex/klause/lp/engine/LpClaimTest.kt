@@ -1,6 +1,8 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.formats.mps.Mps
+import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
@@ -179,10 +181,11 @@ class LpClaimTest {
 
     @Test
     fun `unchanged real leaves should consume a compatible checked optimum`() {
-        val row = Linear(longArrayOf(), intArrayOf(), doubleArrayOf(2.0), intArrayOf(0), LinearOp.EQ, 3L)
-        val problem = Problem(numBoolVars = 0, numIntVars = 0, intDomains = emptyArray(),
-            factors = arrayOf<Factor>(row), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(10.0))
+        val compiled = Mps.parse(
+            "NAME CLAIM\nROWS\n N COST\n E ROW\nCOLUMNS\n X COST 1 ROW 2\n" +
+                "RHS\n R ROW 3\nBOUNDS\n UP B X 10\nENDATA",
+        ).toProblem()
+        val problem = compiled.model
         val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
         val sink = LpStatsSink(LpRoute.STANDALONE)
         val sample = Sample(booleanArrayOf(), longArrayOf())

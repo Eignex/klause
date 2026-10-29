@@ -443,6 +443,17 @@ objective edits invalidate dependent proofs.
 and [CpLpAdapter](../klause/src/commonMain/kotlin/com/eignex/klause/lp/bounding/CpLpAdapter.kt)
 hold bound trails, active-row identity and verification caches.
 
+Checked packages retain accepted bounds and witnesses under the same exact state
+and production acceptance policy. A weaker checked bound cannot satisfy an
+attainment request. Continuation retains cumulative import and feasibility work;
+an unfinished import requires the same authority, ordered headings and statuses.
+A ready feasibility tableau can rebind compatible bounds under its remaining
+allowance, with publication checked against the current source. Refinement admits
+one unseeded and one exact-point-seeded attempt per state, limits and claim, while
+spending remains cumulative across those changes. Repeated unsuccessful requests
+supply no infeasibility authority. Reconstruction still checks each floating
+candidate; candidate rejection supplies no reusable proof package.
+
 Numerical source traversal retains a `LinearAuthoritySession` per invocation.
 Its fixed matrix has free structural columns; extracted source sides are asserted
 in a replaceable scope. Child and sibling queries retract that scope and retain

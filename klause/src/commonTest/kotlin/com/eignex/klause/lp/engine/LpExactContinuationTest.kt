@@ -216,6 +216,60 @@ class LpExactContinuationTest {
     }
 
     @Test
+    fun `unchanged partial imports should retain the exhausted import allowance`() {
+        val model = LpBuilder().apply {
+            repeat(2) { j ->
+                addVar(0L, 10L)
+                addRow(intArrayOf(j), longArrayOf(3L), Relation.EQ, 1L)
+            }
+        }.build(Sense.MINIMIZE)
+        val basis = Basis(intArrayOf(0, 1), arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.FIXED, VarStatus.FIXED))
+        val cache = LpExactContinuationCache()
+        val limits = ExactContinuationLimits(maxImportPivots = 1)
+        val first = continueExactLp(model, basis, cache, limits = limits)
+        val spent = cache.usedWork
+
+        val repeated = continueExactLp(model, basis, cache, limits = limits)
+
+        assertEquals(ContinuationDecline.IMPORT_LIMIT, first.metrics.decline)
+        assertEquals(1, first.metrics.imports)
+        assertEquals(ContinuationDecline.IMPORT_LIMIT, repeated.metrics.decline)
+        assertEquals(0, repeated.metrics.imports)
+        assertEquals(0, repeated.metrics.builds)
+        assertEquals(first.metrics.importPosition, repeated.metrics.importPosition)
+        assertTrue(repeated.metrics.resumed)
+        assertFalse(repeated.metrics.invalidated)
+        assertTrue(cache.usedWork > spent)
+        assertNull(repeated.witness)
+        assertNull(repeated.conflict)
+    }
+
+    @Test
+    fun `a changed ordered target should invalidate an unfinished import`() {
+        val model = LpBuilder().apply {
+            repeat(2) { j ->
+                addVar(0L, 10L)
+                addRow(intArrayOf(j), longArrayOf(3L), Relation.EQ, 1L)
+            }
+        }.build(Sense.MINIMIZE)
+        val statuses = arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.FIXED, VarStatus.FIXED)
+        val cache = LpExactContinuationCache()
+        val limits = ExactContinuationLimits(maxImportPivots = 1)
+        assertEquals(ContinuationDecline.IMPORT_LIMIT,
+            continueExactLp(model, Basis(intArrayOf(0, 1), statuses), cache, limits = limits).metrics.decline)
+
+        val changed = continueExactLp(model, Basis(intArrayOf(1, 0), statuses), cache, limits = limits)
+
+        assertEquals(ContinuationDecline.IMPORT_LIMIT, changed.metrics.decline)
+        assertTrue(changed.metrics.invalidated)
+        assertFalse(changed.metrics.resumed)
+        assertEquals(1, changed.metrics.imports)
+        assertEquals(1, changed.metrics.builds)
+        assertNull(changed.witness)
+        assertNull(changed.conflict)
+    }
+
+    @Test
     fun `source verification should resume a limited import`() {
         val model = LpBuilder().apply {
             repeat(4) { j ->

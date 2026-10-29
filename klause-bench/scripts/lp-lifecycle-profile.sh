@@ -5,9 +5,11 @@ set -euo pipefail
 trace="${1:?usage: lp-lifecycle-profile.sh mps-afiro|mps-adlittle [repeats] [both|jvm|native]}"
 repeats="${2:-3}"
 runtime="${3:-both}"
+mode="${4:-lifecycle}"
 [[ "$trace" == mps-afiro || "$trace" == mps-adlittle ]] || exit 2
 [[ "$repeats" =~ ^[1-5]$ ]] || exit 2
 [[ "$runtime" == both || "$runtime" == jvm || "$runtime" == native ]] || exit 2
+[[ "$mode" == lifecycle || "$mode" == claims ]] || exit 2
 [[ "$(uname -s)/$(uname -m)" == Linux/x86_64 ]] || exit 2
 manifest="$LAB_WORKTREE/klause/src/jvmTest/resources/basis-corpus/manifest.json"
 fixture="$(sed -n "/\"id\": \"$trace\"/,/^    }/p" "$manifest")"
@@ -32,7 +34,7 @@ rm -rf "$source_repository"
 trap - EXIT
 printf '%s  %s\n' "$expected" "$OUT/source.mps" | sha256sum --check
 source64="$(base64 < "$OUT/source.mps" | tr -d '\n')"
-args=("source64=$source64" "source=$source_identity" "sha256=$expected" "repeats=$repeats")
+args=("source64=$source64" "source=$source_identity" "sha256=$expected" "repeats=$repeats" "mode=$mode")
 git -C "$LAB_WORKTREE" rev-parse HEAD > "$OUT/revision.txt"
 uname -a > "$OUT/platform.txt"
 if command -v lscpu >/dev/null; then lscpu > "$OUT/cpu.txt"; fi
