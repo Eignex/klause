@@ -551,12 +551,14 @@ internal class LinearAuthority(
                 val value = (accepted.indices.fold(constant) { value, id -> value + costs[id] * accepted[id] }) * sign
                 val proof = checked(SourceClaim.Optimal(candidate, SourceValue.Rational(value)),
                     SourceDerivation.Optimum(SourceDerivation.SourceWitness, bound.derivation))
-                if (proof != null) return LinearAuthorityResult(proof, bound, candidate, cutBoundFamilies = boundFamilies)
+                if (proof != null) return LinearAuthorityResult(proof, bound, candidate,
+                    cutBoundFamilies = boundFamilies)
             }
             if (candidate == null && primalAttempt?.progress?.pending == true) {
                 return LinearAuthorityResult(bound = bound, cutBoundFamilies = boundFamilies, paused = true)
             }
-            if (fractions.isNotEmpty()) return LinearAuthorityResult(bound = bound, cutBoundFamilies = boundFamilies, incumbent = candidate,
+            if (fractions.isNotEmpty()) return LinearAuthorityResult(bound = bound,
+                cutBoundFamilies = boundFamilies, incumbent = candidate,
                 split = fractions.first().floorSplit(), fractional = fractions)
             if (budget.admitsDimensions(costs.size, guide.workingRows.toLong())) {
                 observePrimal("PrimalExactFallback")
@@ -569,7 +571,8 @@ internal class LinearAuthority(
         }
         val endpoint = closure.exactPrimal?.take(coordinates.size)
         fractional(coordinates, endpoint).takeIf { it.isNotEmpty() }?.let {
-            return LinearAuthorityResult(bound = bound, cutBoundFamilies = boundFamilies, split = it.first().floorSplit(), fractional = it)
+            return LinearAuthorityResult(bound = bound, cutBoundFamilies = boundFamilies,
+                split = it.first().floorSplit(), fractional = it)
         }
         val endpointSample = endpoint?.let { sample(source, coordinates, it) }
         val endpointAccepted = endpointSample?.takeIf {
@@ -579,15 +582,20 @@ internal class LinearAuthority(
             val value = (bound.claim as SourceClaim.Bound).value
             val proof = checked(SourceClaim.Optimal(endpointAccepted, value),
                 SourceDerivation.Optimum(SourceDerivation.SourceWitness, bound.derivation))
-            if (proof != null) return LinearAuthorityResult(proof, bound, endpointAccepted, cutBoundFamilies = boundFamilies)
+            if (proof != null) return LinearAuthorityResult(proof, bound, endpointAccepted,
+                cutBoundFamilies = boundFamilies)
         }
         val feasible = if (endpointAccepted != null) endpointAccepted else {
             val original = lp.solve(rows, List(costs.size) { BigFraction.ZERO }, BigFraction.ZERO,
                 cancellation, inactive, claim = LpClaim.FEASIBLE_COMPLETION)
-            original?.let { refutation(it) }?.let { return LinearAuthorityResult(it, bound, cutBoundFamilies = boundFamilies, cutConflictFamilies = conflictFamilies) }
+            original?.let { refutation(it) }?.let {
+                return LinearAuthorityResult(it, bound, cutBoundFamilies = boundFamilies,
+                    cutConflictFamilies = conflictFamilies)
+            }
             val primal = original?.result?.exactPrimal?.take(coordinates.size)
             fractional(coordinates, primal).takeIf { it.isNotEmpty() }?.let {
-                return LinearAuthorityResult(bound = bound, cutBoundFamilies = boundFamilies, split = it.first().floorSplit(), fractional = it)
+                return LinearAuthorityResult(bound = bound, cutBoundFamilies = boundFamilies,
+                    split = it.first().floorSplit(), fractional = it)
             }
             primal?.let { sample(source, coordinates, it) }?.takeIf {
                 checked(SourceClaim.Witness(it), SourceDerivation.SourceWitness) != null
@@ -602,7 +610,8 @@ internal class LinearAuthority(
         closure.unboundedness?.let { unbounded ->
             var scale = BIG_ONE
             for (id in coordinates.indices) {
-                if (cancellation()) return LinearAuthorityResult(bound = bound, cutBoundFamilies = boundFamilies, incumbent = feasible)
+                if (cancellation()) return LinearAuthorityResult(bound = bound, cutBoundFamilies = boundFamilies,
+                    incumbent = feasible)
                 if (coordinates[id].kind == SourceCoordinate.Kind.Integer) scale *= unbounded.direction[id].den
             }
             val multiplier = BigFraction.of(scale, BIG_ONE)
@@ -625,7 +634,8 @@ internal class LinearAuthority(
             if (weights != null) {
                 val proof = checked(SourceClaim.Limit(feasible, SourceValue.Rational(value * sign)),
                     LinearApproach(endpointSample, LinearPinnedObjective(derivation(weights))))
-                if (proof != null) return LinearAuthorityResult(proof, bound, feasible, cutBoundFamilies = boundFamilies)
+                if (proof != null) return LinearAuthorityResult(proof, bound, feasible,
+                    cutBoundFamilies = boundFamilies)
             }
         }
         return LinearAuthorityResult(bound = bound, cutBoundFamilies = boundFamilies, incumbent = feasible)

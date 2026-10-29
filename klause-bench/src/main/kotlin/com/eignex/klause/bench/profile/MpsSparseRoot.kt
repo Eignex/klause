@@ -268,7 +268,7 @@ internal object MpsSparseRoot {
                 }
         }
         val session = Class.forName(LP + "optimization.LinearAuthoritySession").constructors
-            .single { it.parameterCount == 1 }.newInstance(budget)
+            .single { it.parameterCount == 2 }.newInstance(budget, { _: String, _: Long -> })
         val observerType = Class.forName(ENGINE + "LpCertificationObserver")
         val observer = Proxy.newProxyInstance(observerType.classLoader, arrayOf(observerType)) { _, _, _ -> null }
         val columns = call(packed, "getColumns") as List<*>
