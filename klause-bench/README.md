@@ -377,9 +377,17 @@ deduction events and 18 checks. The first paired control's differing intermediat
 work is retained as an unqualified comparison; it establishes no scheduling or
 throughput attribution. At the matching first boundary, only 1,871 of 11,671
 Booleans are assigned, establishing consumption before source completion.
-These observations establish no default throughput or terminal claim. Admission
-stays opt-in while [#3844](https://github.com/Eignex/klause/issues/3844) retains
-its completion audit.
+Current-main [9272](https://lab.eignex.com/jobs/9272) at `7d687be9eb` passes both
+paired snapshot comparisons with forty-second deadlines and zero operation stops.
+Its incremental continuation records 37 cumulative deduction events with only
+2,267 of 11,671 Booleans assigned, 32,582 assertion invalidations and 63,444
+compatible decline reuses. Source-row visits are 260,909 versus 736,684 in the
+cached control. Linux amd64 JDK 25.0.4.1+1 runs under a hard one-core, 4,608 MiB
+cgroup allowance; the measured JVM uses a 3 GiB heap and Serial GC. Original
+source, installed build/runtime hashes and exact states accompany the lab record.
+These observations complete the original-source consumption audit for
+[#3844](https://github.com/Eignex/klause/issues/3844); they establish no default
+throughput or terminal claim. Admission stays opt-in.
 
 The opt-in basis tool uses the [basis corpus](../klause/src/jvmTest/resources/basis-corpus/README.md):
 
