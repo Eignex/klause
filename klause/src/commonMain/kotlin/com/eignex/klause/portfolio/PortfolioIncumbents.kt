@@ -26,7 +26,10 @@ internal class PortfolioIncumbents<V>(
     fun isImproving(value: V): Boolean = exchange.current()?.let { improves(value, it.objective) } ?: true
 
     // Finite worker cutoffs and public results use doubles; neither projection orders the exchange.
-    fun bound(): Double = exchange.current()?.let { upperBound(it.objective) } ?: Double.POSITIVE_INFINITY
+    fun bound(): Double = bound(exchange.current())
+
+    fun bound(snapshot: VerifiedIncumbent<Sample, V>?): Double =
+        snapshot?.let { upperBound(it.objective) } ?: Double.POSITIVE_INFINITY
 
     fun projected(): VerifiedIncumbent<Sample, Double>? = exchange.current()?.let {
         VerifiedIncumbent(it.assignment, approximateValue(it.objective), it.version)

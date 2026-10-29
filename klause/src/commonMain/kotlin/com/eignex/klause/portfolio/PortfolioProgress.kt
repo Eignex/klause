@@ -44,6 +44,8 @@ data class PortfolioProgress(
     val constructionNanos: Long = 0,
     /** Private preparation was pending at query selection. Its cost is included in [nanos] and [work]. */
     val preparing: Boolean = false,
+    /** Delayed downstream-use settlement; it spends no new segment work or time. */
+    val idleCredit: Boolean = false,
 )
 
 /** Opt-in reward experiment. Results must be finite and in `[0, 1]`; coverage and family priors remain intact. */
