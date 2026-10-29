@@ -550,7 +550,7 @@ These controls establish no throughput improvement or independent proof validati
 
 ### Numerical lifecycle profiles
 
-`scripts/lp-lifecycle-profile.sh mps-afiro|mps-adlittle [repeats]` runs one
+`scripts/lp-lifecycle-profile.sh mps-afiro|mps-adlittle [repeats] [both|jvm|native]` runs one
 hash-pinned source from the existing basis corpus on JVM and Linux Native through
 the production source projection and scoped LP owner. Submit it as a lab profile
 script with build tasks `:klause:stageLpProfileJvm` and
@@ -562,6 +562,9 @@ internal access to the engine and add no Maven artifacts. Ordinary CI compiles
 them and runs the shared deterministic regressions; it runs no profiling workload.
 When requested together, JVM profile staging precedes native compilation to avoid
 overlapping both compiler heaps in a bounded preparation worker.
+Separate runtime jobs request only the selected target's build task. They retain
+their own CPU identity and resource receipts; different placements do not support
+an absolute cross-runtime speed comparison.
 
 Each owner runs cold, asserted-bound, bound-pop, appended-row and row-pop queries.
 Fresh owners at the same exact states control retained owners. One warmup precedes
