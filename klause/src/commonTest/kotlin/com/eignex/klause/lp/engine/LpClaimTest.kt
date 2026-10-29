@@ -13,6 +13,7 @@ import com.eignex.klause.lp.relaxation.leafRealFeasibility
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStatsSink
 import kotlin.test.Test
@@ -186,7 +187,7 @@ class LpClaimTest {
                 "RHS\n R ROW 3\nBOUNDS\n UP B X 10\nENDATA",
         ).toProblem()
         val problem = compiled.model
-        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+        val objective = assertNotNull(compiled.objective).toLinearObjective()
         val sink = LpStatsSink(LpRoute.STANDALONE)
         val sample = Sample(booleanArrayOf(), longArrayOf())
 
@@ -195,7 +196,7 @@ class LpClaimTest {
                 val result = owner.solve(sample)
                 assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
                 assertEquals(BigFraction.ofLong(3L) * BigFraction.ofLong(2L).reciprocal(),
-                    assertNotNull(result.exactReals).single())
+                    compiled.sourceWitness(sample.ints, assertNotNull(result.exactReals)).values.single())
             }
         }
 
