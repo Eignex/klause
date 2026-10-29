@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.cut
 
 import com.eignex.klause.lp.engine.Cut
+import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.util.IntHashSet
 
@@ -18,6 +19,8 @@ import com.eignex.klause.util.IntHashSet
  * https://doi.org/10.1016/S0377-2217(99)00015-6.
  */
 internal class CliqueCutSeparator : CutSeparator {
+    override val family: CutFamily = CutFamily.CLIQUE
+
     private val tol = 1e-6
 
     override fun separate(ctx: CutContext): List<Cut> {

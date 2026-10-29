@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.optimization
 
+import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
@@ -366,7 +367,7 @@ internal object LinearAuthorityAggregateCuts {
                 observe("AggregateCandidates", 1L)
                 observe("AggregateMixedCandidates", 1L)
                 return LinearAuthorityCut(terms.first().owner, conclusion, proof, mixed = true,
-                    owners = (terms + sides).mapTo(linkedSetOf()) { it.owner })
+                    owners = (terms + sides).mapTo(linkedSetOf()) { it.owner }, family = CutFamily.SOURCE_AGGREGATION)
             }
             meter.reserve(1L + limits.scalarBits / 64L, 64L + limits.scalarBits / 4L)
             val rounded = meter.number(if (strict) {
@@ -380,7 +381,7 @@ internal object LinearAuthorityAggregateCuts {
             meter.reserve(1L)
             observe("AggregateCandidates", 1L)
             LinearAuthorityCut(terms.first().owner, SourceInequality(normalized, rounded), proof,
-                owners = terms.mapTo(linkedSetOf()) { it.owner })
+                owners = terms.mapTo(linkedSetOf()) { it.owner }, family = CutFamily.SOURCE_AGGREGATION)
         } catch (stop: AggregateStop) {
             observe("Aggregate${stop.reason}", 1L)
             null

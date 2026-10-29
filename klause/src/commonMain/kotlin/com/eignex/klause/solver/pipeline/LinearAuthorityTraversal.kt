@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lp.SourceLpBudget
+import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.lp.optimization.LinearActiveRows
 import com.eignex.klause.lp.optimization.LinearApproach
 import com.eignex.klause.lp.optimization.LinearAuthority
@@ -21,12 +22,12 @@ import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
-import com.eignex.klause.solver.evidence.SourceIntegerAggregateSplit
 import com.eignex.klause.solver.evidence.SourceInequality
-import com.eignex.klause.solver.evidence.adjacentIntegerAbove
+import com.eignex.klause.solver.evidence.SourceIntegerAggregateSplit
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
+import com.eignex.klause.solver.evidence.adjacentIntegerAbove
 import com.eignex.klause.solver.evidence.integerPinBounds
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.RegisteredTheoryDecision
@@ -139,7 +140,8 @@ internal class LinearAuthorityTraversal(
 
     fun observations(): Map<String, Long> = observations + activeRows?.observations.orEmpty() +
         authority.cutObservations().mapValues { (key, value) ->
-        if (key.endsWith("Work") || key.startsWith("numericalCutSelection"))
+        if (key.endsWith("Work") || key.startsWith("numericalCutSelection") ||
+            key.startsWith("numericalCutLifecycle"))
             value - (initialCutObservations[key] ?: 0L) else value
     } + mapOf(
         "numericalPendingLeaves" to pending,
@@ -417,6 +419,8 @@ internal class LinearAuthorityTraversal(
                 val minimizes = source.scope.objective?.sense == com.eignex.klause.ir.ObjectiveSense.MINIMIZE
                 if (value != null && standing != null && if (minimizes) value >= standing else value <= standing) {
                     current.coveredBound = bound
+                    current.coveredCutFamilies = it.cutBoundFamilies
+                    authority.observeCutConsumption(it.cutBoundFamilies, "BOUND_PRUNE")
                     pending--
                     observe("numericalIncumbentBoundClosures")
                     observe("numericalClosedLeaves")
@@ -448,15 +452,19 @@ internal class LinearAuthorityTraversal(
         val queried = if (useGuidance && useCuts && pointCuts) authority.advanceWithPointCuts(branch, cancellation)
             else if (useGuidance) authority.advance(branch, cancellation, cuts = useCuts)
             else authority.check(branch, cancellation)
-        val result = if (current.partialBound == null) queried else
-            queried.copy(bound = strongerLinearBound(current.partialBound, queried.bound))
+        val strongestBound = strongerLinearBound(current.partialBound, queried.bound)
+        val result = queried.copy(bound = strongestBound,
+            cutBoundFamilies = if (strongestBound != null && strongestBound === current.partialBound) {
+                current.partialCutFamilies
+            } else queried.cutBoundFamilies)
         for ((stage, count) in result.primalStages) {
             val key = "numerical$stage"
             val previous = observations[key] ?: 0L
             observations[key] = if ("Max" in stage) maxOf(previous, count) else previous + count
         }
         if (result.paused) {
-            current.partialBound = strongerLinearBound(current.partialBound, result.bound)
+            current.partialBound = result.bound
+            current.partialCutFamilies = result.cutBoundFamilies
             feedback?.consume(branch, paused = true)?.let { onNumericalFeedback?.invoke(it) }
             current.pending = true
             observe("numericalLpPauses")
@@ -470,6 +478,12 @@ internal class LinearAuthorityTraversal(
         current.result = if (result.primalStages.isEmpty()) result else result.copy(primalStages = emptyMap())
         observe("numericalChecks")
         result.evidence?.takeIf { it.claim == SourceClaim.Refutation }?.let { refutations?.retain(it) }
+        if (result.evidence?.claim == SourceClaim.Refutation) {
+            authority.observeCutConsumption(result.cutConflictFamilies, "CONFLICT_PRUNE")
+        }
+        if (result.evidence?.claim is SourceClaim.Optimal) {
+            authority.observeCutConsumption(result.cutBoundFamilies, "ATTAINED_OPTIMUM")
+        }
         if (result.coordinateConflict) observe("numericalCoordinateConflicts")
         if (result.lpConflict) observe("numericalLpConflicts")
         if (result.bound != null) {
@@ -484,6 +498,8 @@ internal class LinearAuthorityTraversal(
             ) {
                 if (result.split != null) observe("numericalIncumbentDominatedSplits")
                 current.coveredBound = result.bound
+                current.coveredCutFamilies = result.cutBoundFamilies
+                authority.observeCutConsumption(result.cutBoundFamilies, "BOUND_PRUNE")
                 observe("numericalIncumbentBoundClosures")
             }
             if (parent != null) {
@@ -581,6 +597,8 @@ internal class LinearAuthorityTraversal(
             current.pending = false
             current.result = LinearAuthorityResult(bound = evidence)
             current.coveredBound = evidence
+            current.coveredCutFamilies = ancestor.cutFamilies(inherited)
+            authority.observeCutConsumption(current.coveredCutFamilies, "INHERITED_BOUND_PRUNE")
             pending--
             observe("numericalInheritedBoundClosures")
             observe("numericalClosedLeaves")
@@ -654,6 +672,15 @@ private class CoverageNode(val condition: SourceCondition) {
     var coveredBound: SourceEvidence? = null
     var pending: Boolean = false
     var partialBound: SourceEvidence? = null
+    var partialCutFamilies: Set<CutFamily> = emptySet()
+    var coveredCutFamilies: Set<CutFamily> = emptySet()
+
+    fun cutFamilies(bound: SourceEvidence): Set<CutFamily> = when {
+        bound === coveredBound -> coveredCutFamilies
+        bound === result?.bound -> result?.cutBoundFamilies.orEmpty()
+        bound === partialBound -> partialCutFamilies
+        else -> emptySet()
+    }
 
     fun boundCoverage(inherited: SourceEvidence?, minimizes: Boolean, cancellation: Cancellation): BoundCoverage? {
         if (cancellation()) return null

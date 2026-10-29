@@ -4,6 +4,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.CutExpression
+import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.lp.engine.CutPremise
 import com.eignex.klause.lp.engine.CutProofFact
 import com.eignex.klause.lp.engine.CutProvenance
@@ -67,6 +68,7 @@ internal class CutContext(
  * than all valid ones) keeps the LP from growing with constraints it does not need.
  */
 internal interface CutSeparator {
+    val family: CutFamily get() = CutFamily.UNSPECIFIED
     fun separate(ctx: CutContext): List<Cut>
 }
 

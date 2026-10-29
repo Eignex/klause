@@ -2,6 +2,7 @@ package com.eignex.klause.lp.cut
 
 import com.eignex.klause.factor.global.GlobalCardinality
 import com.eignex.klause.lp.engine.Cut
+import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.util.CheckedLongOverflowException
@@ -23,6 +24,8 @@ import com.eignex.klause.util.mulExact
  * skipped too: the present-count is then a range, which the fixed-`n` greedy does not model.
  */
 internal class GccSeparator : CutSeparator {
+    override val family: CutFamily = CutFamily.GCC
+
     private val tol = 1e-6
 
     override fun separate(ctx: CutContext): List<Cut> {

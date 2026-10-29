@@ -17,8 +17,8 @@ import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpCertifierCost
 import com.eignex.klause.lp.engine.LpClaim
-import com.eignex.klause.lp.engine.LpPhaseMetrics
 import com.eignex.klause.lp.engine.LpExactState
+import com.eignex.klause.lp.engine.LpPhaseMetrics
 import com.eignex.klause.lp.engine.LpScopedSolver
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.simplex.exact.BigFraction
@@ -53,6 +53,7 @@ internal class LinearAuthorityLp(
     private val onShape: (LinearAuthorityLpShape) -> Unit = {},
     retain: Boolean = false,
     private val guidancePolicy: SparseSourceLpPolicy = SparseSourceLpPolicy(),
+    private val onCutMetric: (String, Long) -> Unit = { _, _ -> },
     private val onPhase: (LpPhaseMetrics) -> Unit = {},
 ) : AutoCloseable {
     private var session = if (retain) LinearAuthoritySession(budget) else null
@@ -65,12 +66,25 @@ internal class LinearAuthorityLp(
     val reuses: Long get() = session?.reuses ?: 0L
     fun invalidateGuidance() = session?.invalidateGuidance() ?: Unit
     private val observer = object : LpCertificationObserver {
-        override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
+        override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
+            onCutMetric("${certifier.name}_${if (success) "CERTIFIED" else "DECLINED"}", 1L)
+            if (cost is LpCertifierCost.Metered) onCutMetric("${certifier.name}_Work", cost.work)
+        }
         override fun observePhase(metrics: LpPhaseMetrics) = onPhase(metrics)
         override fun observeExactInput(accepted: Boolean) = Unit
-        override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
+        override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) {
+            onCutMetric("ComponentSolved", metrics.componentSolves.toLong())
+            onCutMetric("ComponentReused", metrics.componentReuses.toLong())
+            onCutMetric("ColdFactors", metrics.initialRefactorizations.toLong())
+            onCutMetric("WarmFactors", metrics.warmStartRefactorizations.toLong())
+        }
         override fun observeContinuation(metrics: ExactContinuationMetrics) {
             budget.observe(continuation = metrics.work)
+            for ((phase, work) in metrics.workByPhase) {
+                onCutMetric("Continuation${phase.name}_Work", work)
+                onCutMetric("Continuation${phase.name}_Allocation", metrics.allocationByPhase[phase] ?: 0L)
+            }
+            onCutMetric("Continuation_${metrics.decline?.name ?: "COMPLETED"}", 1L)
         }
     }
     fun solve(

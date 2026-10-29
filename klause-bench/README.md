@@ -530,6 +530,24 @@ retain prepared block counts, child reuses, cut consumption and ordinary outcome
 Pin `param.bt-arm=lp-aggressive` and `param.arms=1` for lifecycle controls so an
 LP-free portfolio arm cannot finish the source before the component owner runs.
 
+Cut lifecycle controls retain `lpPhase_CUT_ROOT_*` and `lpPhase_CUT_NODE_*` phases
+alongside the ordinary LP totals. Family tags distinguish construction, mapping,
+admission, selection, aging, retraction, checked support and actual deduction use.
+`*_SOLVE`, `*_OWNER_EDIT` and certificate phases are shared containing costs;
+families participating in one query overlap and must not be summed. `*_FILL`
+reports factor entries for completed numerical results, without treating a failed
+result as zero fill. Retain ordinary numerical failure and work counters too.
+
+For finite controls compare `param.lp-root-cuts=false|true` under the same pinned
+LP arm. For numerical source traversal retain a no-cut arm
+(`param.source-cuts=false`), current cuts (`param.source-cuts=true`) and the
+existing point selection trial (`param.source-point-cuts=true`). Keep aggregation
+off unless it is the hypothesis under test. `numericalCutLifecycle*` separates
+installed rows, checked bound/conflict proposals and actual frontier closures;
+family work and allocation include failed containing operations and overlap the
+ordinary source ledger. Identical source hashes, invocation allowances, numerical
+policy, presolve, seed and runtime are required before interpreting a difference.
+
 [9277](https://lab.eignex.com/jobs/9277) exercises both sources at `0af8492830`
 with ownership and root cuts toggled independently. With root cuts off, node
 queries reuse 4 and 27 child results; with cuts on, 2 and 3 cuts become active.

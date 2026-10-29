@@ -3,6 +3,7 @@ package com.eignex.klause.lp.cut
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.Cut
+import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.propagation.propagatedImplicationGraph
 
@@ -20,6 +21,8 @@ import com.eignex.klause.propagation.propagatedImplicationGraph
  * the relaxation, never removes a feasible point.
  */
 internal class ImpliedBoundSeparator(private val maxCandidates: Int = DEFAULT_MAX_CANDIDATES) : CutSeparator {
+    override val family: CutFamily = CutFamily.IMPLIED_BOUND
+
 
     private var graph: Array<IntArray>? = null
 

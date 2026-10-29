@@ -2,14 +2,15 @@ package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.lp.engine.CutAuxiliaryDefinition
 import com.eignex.klause.lp.engine.CutExpression
+import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.lp.engine.CutPremise
 import com.eignex.klause.lp.engine.CutProvenance
 import com.eignex.klause.lp.engine.CutSource
 import com.eignex.klause.lp.engine.CutSourceKind
-import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpBounds
-import com.eignex.klause.lp.engine.LpModel
+import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.LpLayoutWeight
+import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.exactBounds
 import com.eignex.klause.lp.engine.exactShift
 import com.eignex.klause.simplex.exact.BigFraction
@@ -96,6 +97,7 @@ internal class CutSourceMap(
         it?.source == CutSource(CutSourceKind.INTEGER, variable)
     }
     fun parent(row: Int): CutProvenance? = parentSnapshot[row]
+    fun parentFamilies(): Map<Int, CutFamily> = parentSnapshot.mapValues { it.value.family }
     fun auxiliarySource(source: CutSource, definition: CutAuxiliaryDefinition): CutSource? =
         if (source.kind != CutSourceKind.AUXILIARY) null else if (auxiliarySnapshot[source] == definition) {
             source

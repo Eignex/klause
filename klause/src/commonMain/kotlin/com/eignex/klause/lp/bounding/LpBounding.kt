@@ -5,12 +5,12 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.lp.cut.CutContext
 import com.eignex.klause.lp.cut.CutPool
 import com.eignex.klause.lp.cut.CutSeparator
-import com.eignex.klause.lp.cut.SharedCut
 import com.eignex.klause.lp.cut.SourceCut
 import com.eignex.klause.lp.cut.orNull
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.CertifiedLpResult
 import com.eignex.klause.lp.engine.Cut
+import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.FarkasRoute
 import com.eignex.klause.lp.engine.FloatLpResult
@@ -271,6 +271,8 @@ internal fun LpEngine.lpBoundAndFix(
     warm: Basis? = null,
     cutsAllowed: Boolean = false,
 ): LpNodeOutcome = try {
+    sink.lp.cutLifecycle.recipe = LpRoute.NODE
+    sink.lp.cutLifecycle.families = emptySet()
     sink.lp.observeNodePass()
     sink.lp.clockStart()
     sparseSafePrune(
@@ -285,6 +287,7 @@ internal fun LpEngine.lpBoundAndFix(
     LpNodeOutcome(false, null)
 } finally {
     sink.lp.clockStop()
+    sink.lp.cutLifecycle.families = emptySet()
 }
 
 /**
@@ -326,8 +329,13 @@ private fun LpEngine.solveSelectedCuts(
 ): LpCutOutcome {
     if (selected.isEmpty() || cancellation()) return previous
     val base = previous.relaxation
-    val tightened = sink.lp.observeCutBuild(selected.size) { cpAdapter.cutRelaxation(base, session, selected) }
+    val families = selected.mapTo(HashSet()) { it.family }
+    sink.lp.cutLifecycle.families = sink.lp.cutLifecycle.families + families
+    val tightened = sink.lp.observeCutBuild(selected.size) {
+        sink.lp.cutLifecycle.measureShared("ASSEMBLY") { cpAdapter.cutRelaxation(base, session, selected) }
+    }
         ?: return previous
+    activateCutAttribution(tightened)
     if (tightened.model === base.model) return previous
     val attempt = try {
         solveNode(tightened.model, null, cancellation)
@@ -337,7 +345,10 @@ private fun LpEngine.solveSelectedCuts(
         noteSolveOps(propagator.lastMetrics.workOps)
     }
     if (attempt == null || cancellation()) return previous
-    attempt.second?.let { return LpCutOutcome.Solved(tightened, it) }
+    attempt.second?.let {
+        observeCutFill(it.luMaxFill, tightened.model.m)
+        return LpCutOutcome.Solved(tightened, it)
+    }
     if (lpCounterResults.read(tightened.model, solveContext.certificationPolicy)?.witness != null) return previous
     val floatRay = attempt.first.infeasibleRay ?: return previous
     val ray = solveContext.certificationPolicy.acceptNullable(
@@ -350,6 +361,7 @@ private fun LpEngine.solveSelectedCuts(
         }, observer = sink.lp.certificationObserver(LpRoute.NODE)),
     ) ?: return previous
     sink.lp.observeInfeasiblePrune()
+    observeCutRayUse(tightened, ray)
     LpClaim.CONTRADICTION.consumed(sink.lp.certificationObserver(LpRoute.NODE))
     return LpCutOutcome.Pruned(if (learn) LpExplanation.infeasibilityClause(tightened, ray, session) else null)
 }
@@ -455,6 +467,7 @@ internal fun LpEngine.sparseSafePrune(
         }
     }
     val relaxation = nodeRelaxation(relaxer, session) ?: return LpNodeOutcome(false, null)
+    activateCutAttribution(relaxation)
     if (cancellation()) return LpNodeOutcome(false, null)
     if (relaxation.model.n == 0 && relaxation.model.m == 0 && cutPool.size == 0) return LpNodeOutcome(false, null)
     sink.lp.observeSolve()
@@ -521,6 +534,7 @@ internal fun LpEngine.sparseSafePrune(
             null
         }
         if (ray != null) {
+            observeCutRayUse(relaxation, ray)
             sink.lp.observeInfeasiblePrune()
             LpClaim.CONTRADICTION.consumed(sink.lp.certificationObserver(LpRoute.NODE))
             hints?.recordInfeasible()
@@ -585,7 +599,7 @@ internal fun LpEngine.sparseSafePrune(
             val fresh = ArrayList<Cut>()
             for (i in lpSeparators.indices) {
                 if (!lpSeparatorGate.shouldRun(i)) continue
-                val produced = lpSeparators[i].separate(ctx)
+                val produced = constructCuts(lpSeparators[i], ctx)
                 lpSeparatorGate.record(i, produced.isNotEmpty())
                 fresh.addAll(produced)
             }
@@ -616,6 +630,7 @@ internal fun LpEngine.sparseSafePrune(
     // reduced-cost fixing. Compute it once when any of them needs it; a singular/unbounded certify
     // yields null and each falls back to its cheap certificate-less path, which is sound.
     if (cancellation()) return LpNodeOutcome(false, null)
+    activateCutAttribution(boundRel)
     val additionalCertificates = ArrayList<LpDeductionCertificate>(2)
     val cert = if ((learn && canPropagate) || canFix) {
         solveContext.certificationPolicy.acceptNullable(
@@ -642,6 +657,7 @@ internal fun LpEngine.sparseSafePrune(
     } else {
         null
     }
+    observeCutUse(boundRel, cert, "BINDING_CERTIFICATE")
     if (cancellation()) return LpNodeOutcome(false, null)
     val rationalCutoff = if (canPrune &&
         (cert?.let { permitsIntegralObjectiveCutoff(it) } == true || !boundRel.model.hasIntegralObjective())
@@ -660,6 +676,7 @@ internal fun LpEngine.sparseSafePrune(
             full >= rationalCutoff
         ) {
             sink.lp.observePrune()
+            observeCutUse(boundRel, cert, "BOUND_PRUNE")
             LpClaim.BOUND.consumed(sink.lp.certificationObserver(LpRoute.NODE))
             return LpNodeOutcome(true, null)
         }
@@ -681,6 +698,7 @@ internal fun LpEngine.sparseSafePrune(
     val sourceRange = sourceObjectiveRange(boundRel)
     val cutoff = if (canPrune) sourceObjectiveCutoff(boundRel, bound, sourceRange) else null
     if (cutoff != null && full >= cutoff) {
+        observeCutUse(boundRel, cert, "BOUND_PRUNE_SUPPORT")
         sink.lp.observePrune()
         LpClaim.BOUND.consumed(sink.lp.certificationObserver(LpRoute.NODE))
         return LpNodeOutcome(true, null)
@@ -714,11 +732,13 @@ internal fun LpEngine.sparseSafePrune(
             } else {
                 null
             }
+            val previousLower = session.intDomain(objectiveVar).min
             val res = if (reason != null) {
                 session.implyIntAtLeastWithReason(objectiveVar, rounded, reason)
             } else {
                 session.implyIntAtLeast(objectiveVar, rounded)
             }
+            if (rounded > previousLower) observeCutUse(boundRel, cert, "OBJECTIVE_PROPAGATION_SUPPORT")
             if (res is PropagationResult.Unsat) {
                 sink.lp.observePrune()
                 LpClaim.BOUND.consumed(sink.lp.certificationObserver(LpRoute.NODE))
@@ -970,6 +990,7 @@ internal fun LpEngine.applySparseReducedCostFixing(
     }
     val canLearn = reasonSupport != null
     noteNodeOverhead(relaxation.colVarId.size.toLong() * LpNodeOverhead.FIXING)
+    var cutUseObserved = false
     for (col in relaxation.colVarId.indices) {
         if (cancellation()) return false
         val varId = relaxation.colVarId[col]
@@ -1049,6 +1070,10 @@ internal fun LpEngine.applySparseReducedCostFixing(
             }
 
             else -> continue
+        }
+        if (!cutUseObserved) {
+            observeCutUse(relaxation, cert, "REDUCED_COST_PROPAGATION")
+            cutUseObserved = true
         }
         if (res is PropagationResult.Unsat) {
             sink.lp.observePrune()
@@ -1466,13 +1491,16 @@ internal fun LpEngine.harvestRootCuts(
 ): List<Cut> {
     if (session.isUnsatAtRoot) return emptyList()
     if (separators.isEmpty() && !gomory && !mir) return emptyList()
-    var pool = CutPool()
+    sink.lp.cutLifecycle.recipe = LpRoute.ROOT
+    fun pool(limit: Int = CutPool.DEFAULT_MAX_CUTS) = CutPool(maxCuts = limit,
+        observe = { family, stage, outcome -> sink.lp.cutLifecycle.event(family, stage, outcome) })
+    var pool = pool()
     try {
         var relaxation = relaxer.build(session, cancellation = cancellation)
         if (relaxation.model.n == 0) return emptyList()
         if (!cutSeparationSupported(relaxation, cancellation, root = true)) return emptyList()
         if (ordinaryCutSeparation) {
-            pool = CutPool(maxCuts = minOf(CutPool.DEFAULT_MAX_CUTS, relaxation.model.m))
+            pool = pool(minOf(CutPool.DEFAULT_MAX_CUTS, relaxation.model.m))
         }
         var simplex = dualSimplex(relaxation.model, cancellation)
         var ownedSimplex: TableauCutSolver? = simplex
@@ -1492,28 +1520,20 @@ internal fun LpEngine.harvestRootCuts(
                 resultObserved = true
                 val ctx = CutContext(problem, relaxation, result.primal, session)
                 // Keep only cuts justified beyond the root box; open source sides can have invented endpoints.
-                val structural = separators.flatMap { it.separate(ctx) }
-                    .mapNotNull {
-                        when {
-                            it.provenance != null || it.tableau != null -> SharedCut.fromCut(
-                                it,
-                                relaxation,
-                            )?.toCut(relaxation)
-
-                            it.global -> it
-
-                            else -> null
-                        }
+                val structural = separators.flatMap { constructCuts(it, ctx) }.mapNotNull {
+                    when {
+                        it.provenance != null || it.tableau != null -> mapGlobalCut(it, relaxation)
+                        it.global -> it
+                        else -> null
                     }
-                // Source mapping discharges every rounding bound and recursively retains parent premises.
-                val gomoryCuts = if (gomory) simplex.gomoryCuts(GOMORY_CUTS_PER_ROUND) else emptyList()
-                val mirCuts = if (mir) simplex.mirCuts(GOMORY_CUTS_PER_ROUND) else emptyList()
-                val mappedTableau = (gomoryCuts + mirCuts).mapNotNull {
-                    SharedCut.fromCut(
-                        it,
-                        relaxation,
-                    )?.toCut(relaxation)
                 }
+                val gomoryCuts = if (gomory) sink.lp.cutLifecycle.measure(CutFamily.GOMORY, "CONSTRUCTION") {
+                    simplex.gomoryCuts(GOMORY_CUTS_PER_ROUND).map { it.withFamily(CutFamily.GOMORY) }
+                } else emptyList()
+                val mirCuts = if (mir) sink.lp.cutLifecycle.measure(CutFamily.MIR, "CONSTRUCTION") {
+                    simplex.mirCuts(GOMORY_CUTS_PER_ROUND).map { it.withFamily(CutFamily.MIR) }
+                } else emptyList()
+                val mappedTableau = (gomoryCuts + mirCuts).mapNotNull { mapGlobalCut(it, relaxation) }
                 val candidates = structural + mappedTableau
                 val added = candidates.count { pool.add(it, relaxation) }
                 observeRootCutAccounting(candidates.size, 0, 0)
@@ -1523,7 +1543,11 @@ internal fun LpEngine.harvestRootCuts(
                     pool.retainMostActive()
                 }
                 val selected = pool.cuts()
-                relaxation = observeRootCutBuild(selected.size) { relaxer.build(session, selected, cancellation) }
+                sink.lp.cutLifecycle.families = selected.mapTo(HashSet()) { it.family }
+                relaxation = observeRootCutBuild(selected.size) {
+                    sink.lp.cutLifecycle.measureShared("ASSEMBLY") { relaxer.build(session, selected, cancellation) }
+                }
+                activateCutAttribution(relaxation)
                 val replacement = dualSimplex(relaxation.model, cancellation)
                 ownedSimplex = replacement
                 simplex.close()
@@ -1534,6 +1558,7 @@ internal fun LpEngine.harvestRootCuts(
                     observeRootSolve(simplex)
                 }
                 if (next == null) break
+                observeCutFill(next.luMaxFill, relaxation.model.m)
                 result = next
                 resultObserved = false
             }
@@ -1561,6 +1586,9 @@ internal fun LpEngine.harvestRootCuts(
         return pool.cuts() // keep whatever stayed within 64-bit determinants — still globally valid
     } catch (_: LpAssemblyCancelled) {
         return pool.cuts()
+    } finally {
+        sink.lp.cutLifecycle.families = emptySet()
+        sink.lp.cutLifecycle.recipe = LpRoute.NODE
     }
     return pool.cuts()
 }

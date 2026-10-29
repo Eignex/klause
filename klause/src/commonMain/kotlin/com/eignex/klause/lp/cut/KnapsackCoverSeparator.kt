@@ -4,6 +4,7 @@ import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.bool.internals.permitsLongPseudoBoolean
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lp.engine.Cut
+import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.util.IntArrayList
@@ -29,6 +30,8 @@ import com.eignex.klause.util.addExact
  * complementing.
  */
 internal class KnapsackCoverSeparator : CutSeparator {
+    override val family: CutFamily = CutFamily.KNAPSACK_COVER
+
     private val tol = 1e-6
 
     override fun separate(ctx: CutContext): List<Cut> {

@@ -6,6 +6,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.UnitConsts
 import com.eignex.klause.lp.engine.Cut
+import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.rootDomainOf
 import com.eignex.klause.lp.statesBinary
@@ -35,6 +36,8 @@ import kotlin.math.max
  * the relaxation. Cuts from globally valid rows are [Cut.global].
  */
 internal class FlowCoverSeparator : CutSeparator {
+    override val family: CutFamily = CutFamily.FLOW_COVER
+
 
     /** One flow arc over LP columns: the flow contributes `flowCoeff · primal(flowCol)` (so the cut term
      *  is `flowCoeff·flowCol`), gated by the `{0,1}` indicator column, with effective capacity [cap]. For

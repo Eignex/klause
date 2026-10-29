@@ -20,6 +20,7 @@ internal class Cut(
     global: Boolean = false,
     val provenance: CutProvenance? = null,
     val tableau: TableauCutProvenance? = null,
+    val family: CutFamily = provenance?.family ?: CutFamily.UNSPECIFIED,
 ) {
     val cols: IntArray = cols.copyOf()
     val coeffs: LongArray = coeffs.copyOf()
@@ -35,4 +36,7 @@ internal class Cut(
         val terms = cols.indices.sortedBy { cols[it] }.joinToString(",") { "${cols[it]}:${coeffs[it]}" }
         return "$terms|$rel|$rhs"
     }
+
+    fun withFamily(value: CutFamily): Cut =
+        Cut(cols, coeffs, rel, rhs, global, provenance?.withFamily(value), tableau, value)
 }

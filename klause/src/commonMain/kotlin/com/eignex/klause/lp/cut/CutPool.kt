@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.cut
 
 import com.eignex.klause.lp.engine.Cut
+import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.relaxation.CutSourceMap
 import com.eignex.klause.lp.relaxation.LpRelaxation
@@ -19,6 +20,7 @@ import kotlin.math.sqrt
 internal class CutPool(
     val maxCuts: Int = DEFAULT_MAX_CUTS,
     private val maxConsecutiveInactive: Int = DEFAULT_MAX_CONSECUTIVE_INACTIVE,
+    private val observe: (CutFamily, String, String) -> Unit = { _, _, _ -> },
 ) {
     private val seen = HashSet<Any>()
     private val entries = ArrayList<Entry>()
@@ -47,7 +49,7 @@ internal class CutPool(
         val proof = cut.provenance
         val row = proof?.conclusion
         val source = if (row != null && cut.global == proof.global) {
-            SourceCut(row.expression, row.relation, row.rhs, proof)
+            SourceCut(row.expression, row.relation, row.rhs, proof, cut.family)
         } else {
             null
         }
@@ -60,13 +62,17 @@ internal class CutPool(
             is CutMapping.Mapped -> add(mapped.value, checkNotNull(relaxation.sourceMap), origin)
 
             is CutMapping.Declined -> {
+                observe(cut.family, "VERIFICATION", mapped.reason.name)
                 val unscoped = cut.provenance == null && cut.tableau == null && cut.global
                 if (unscoped && mapped.reason == CutMappingDecline.MISSING_SOURCE) add(cut, origin) else false
             }
         }
 
     fun add(cut: SourceCut, map: CutSourceMap, origin: Int = NO_ORIGIN): Boolean {
-        if (cut.provenance.model !== map.model) return false
+        if (cut.provenance.model !== map.model) {
+            observe(cut.family, "VERIFICATION", CutMappingDecline.MODEL_SCOPE.name)
+            return false
+        }
         return store(cut.toCut(map).orNull(), cut, origin)
     }
 
@@ -76,7 +82,11 @@ internal class CutPool(
         } else {
             source.poolKey
         }
-        if (key in seen) return false
+        val family = source?.family ?: cut?.family ?: CutFamily.UNSPECIFIED
+        if (key in seen) {
+            observe(family, "ADMISSION", "DUPLICATE")
+            return false
+        }
         val mixed = if (cut?.global == true) {
             entries.firstOrNull {
                 (it.source == null) != (source == null) && it.cut?.global == true && it.cut?.key() == cut.key()
@@ -96,14 +106,20 @@ internal class CutPool(
         }
         seen.add(key)
         entries.add(Entry(cut, key, source, origin))
+        observe(family, "ADMISSION", if (cut == null) "DORMANT" else "ADMITTED")
         return true
     }
 
     fun remap(map: CutSourceMap): Map<CutMappingDecline, Int> {
         val declines = HashMap<CutMappingDecline, Int>()
         for (entry in entries) {
+            val wasActive = entry.cut != null
             val mapped = entry.source?.toCut(map) ?: CutMapping.Declined(CutMappingDecline.MISSING_PROVENANCE)
             entry.cut = mapped.orNull()
+            val family = entry.source?.family ?: CutFamily.UNSPECIFIED
+            observe(family, "REMAP", if (mapped is CutMapping.Declined) mapped.reason.name else "MAPPED")
+            if (wasActive && entry.cut == null) observe(family, "RETRACTION", "UNAVAILABLE")
+            if (!wasActive && entry.cut != null) observe(family, "RETRACTION", "REACTIVATED")
             if (mapped is CutMapping.Declined) declines[mapped.reason] = (declines[mapped.reason] ?: 0) + 1
         }
         return declines.toMap()
@@ -132,6 +148,7 @@ internal class CutPool(
         for (entry in entries) {
             val cut = entry.cut ?: continue
             val active = slack(cut, primal) <= ACTIVE_TOLERANCE
+            observe(cut.family, "AGING", if (active) "TIGHT" else "SLACK")
             entry.activity *= ACTIVITY_DECAY
             if (active) {
                 entry.activity += 1.0
@@ -140,7 +157,12 @@ internal class CutPool(
                 entry.inactiveCount++
             }
         }
-        entries.removeAll { it.inactiveCount >= maxConsecutiveInactive }
+        entries.removeAll {
+            (it.inactiveCount >= maxConsecutiveInactive).also { retired ->
+                if (retired) observe(it.source?.family ?: it.cut?.family ?: CutFamily.UNSPECIFIED,
+                    "RETIREMENT", "INACTIVE")
+            }
+        }
         rebuildSeen()
     }
 
@@ -148,7 +170,10 @@ internal class CutPool(
     fun retainMostActive() {
         if (entries.size <= maxCuts) return
         entries.sortByDescending { it.activity }
-        while (entries.size > maxCuts) entries.removeAt(entries.size - 1)
+        while (entries.size > maxCuts) {
+            val entry = entries.removeAt(entries.size - 1)
+            observe(entry.source?.family ?: entry.cut?.family ?: CutFamily.UNSPECIFIED, "RETIREMENT", "CAPACITY")
+        }
         rebuildSeen()
     }
 
@@ -198,6 +223,7 @@ internal class CutPool(
             val cut = entry.cut ?: return@mapNotNull null
             val norm = l2(cut)
             val efficacy = efficacy(cut, primal, norm)
+            observe(cut.family, "SELECTION", if (efficacy < minEfficacy) "LOW_EFFICACY" else "ELIGIBLE")
             if (efficacy < minEfficacy) {
                 null
             } else {
@@ -206,7 +232,10 @@ internal class CutPool(
             }
         }.sortedByDescending { it.score }
         val selected = selectNonparallelCuts(scored, max, 1.0 - minOrthogonality, cosine = ::cosine)
-        for (s in selected) importUses.note(s.origin)
+        for (s in selected) {
+            importUses.note(s.origin)
+            observe(s.cut.family, "SELECTION", "SELECTED")
+        }
         return selected.map { it.cut }
     }
 

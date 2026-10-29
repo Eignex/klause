@@ -3,6 +3,7 @@ package com.eignex.klause.lp.optimization
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.cut.CutPool
 import com.eignex.klause.lp.cut.selectNonparallelCuts
+import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.util.Cancellation
@@ -14,6 +15,7 @@ internal class LinearAuthorityPointCuts(
     private val budget: SourceLpBudget,
     private val maximumCuts: Int = 64,
     private val maximumSupport: Int = 8192,
+    private val onCut: (CutFamily, String, Long) -> Unit = { _, _, _ -> },
 ) {
     private data class Scored(
         val id: Int, val values: Map<SourceCoordinate, Double>, val norm: Double, val score: Double,
@@ -131,6 +133,11 @@ internal class LinearAuthorityPointCuts(
                     continue
                 }
                 val scored = Scored(id, projected, norm, score)
+                onCut(row.family, when {
+                    id in installed -> "POINT_RETAINED"
+                    efficacy >= CutPool.MIN_EFFICACY -> "POINT_ELIGIBLE"
+                    else -> "POINT_LOW_EFFICACY"
+                }, 1L)
                 if (id in installed) forced += scored else if (efficacy >= CutPool.MIN_EFFICACY) candidates += scored
             }
             val selected = selectNonparallelCuts(candidates.sortedWith(compareByDescending<Scored> { it.score }
@@ -143,6 +150,7 @@ internal class LinearAuthorityPointCuts(
                 }
             }
             observe("Selected", selected.size.toLong())
+            for (cut in selected) onCut(rows[cut.id].family, "POINT_SELECTED", 1L)
             return installed + selected.map { it.id }
         } finally {
             budget.observe(preparation = meter.work)

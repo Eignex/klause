@@ -5,6 +5,7 @@ import com.eignex.klause.factor.global.Inverse
 import com.eignex.klause.factor.global.SymmetricAllDifferent
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.Cut
+import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.util.addExact
@@ -53,6 +54,8 @@ internal fun allDifferentGroups(problem: Problem): List<IntArray> {
  * each side of [Inverse] — all injective, hence all-different.
  */
 internal class AllDifferentSeparator : CutSeparator {
+    override val family: CutFamily = CutFamily.ALL_DIFFERENT
+
     private val tol = 1e-6
 
     override fun separate(ctx: CutContext): List<Cut> {

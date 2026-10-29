@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.cut
 
 import com.eignex.klause.lp.engine.Cut
+import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
@@ -50,6 +51,8 @@ internal class CircuitArcModel(
  * n².
  */
 internal class CircuitSeparator : CutSeparator {
+    override val family: CutFamily = CutFamily.CIRCUIT
+
     private val queue = IntArrayDeque()
 
     override fun separate(ctx: CutContext): List<Cut> {

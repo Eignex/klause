@@ -265,6 +265,10 @@ class LinearAuthorityCutsTest {
             assertEquals(SourceEvidenceCheck.Checked,
                 SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)))
             assertEquals(1L, authority.cutObservations()["numericalMaxActiveMixedCuts"])
+            assertEquals(setOf(com.eignex.klause.lp.engine.CutFamily.SOURCE_MIXED_ROUNDING), result.cutBoundFamilies)
+            assertTrue((authority.cutObservations()["numericalCutLifecycleSOURCE_MIXED_ROUNDING_CHECKED_BOUND"]
+                ?: 0L) > 0L)
+            assertEquals(null, authority.cutObservations()["numericalCutLifecycleSOURCE_MIXED_ROUNDING_BOUND_PRUNE"])
         }
     }
 

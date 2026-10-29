@@ -2,6 +2,7 @@ package com.eignex.klause.lp.cut
 
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.CutExpression
+import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.lp.engine.CutPremise
 import com.eignex.klause.lp.engine.CutProofFact
 import com.eignex.klause.lp.engine.CutProvenance
@@ -17,6 +18,35 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class CutPoolTest {
+    @Test
+    fun `remapping should attribute retraction for every missing conditional premise`() {
+        val model = Any()
+        val source = CutSource(CutSourceKind.INTEGER, 0)
+        val expression = CutExpression(mapOf(source to BigFraction.ONE))
+        val premises = listOf(
+            CutPremise.Bound(expression, false, BigFraction.ONE),
+            CutPremise.Literal(1),
+            CutPremise.ObjectiveCutoff(expression, BigFraction.ofLong(5)),
+        )
+        val cut = SourceCut(expression, Relation.LE, BigFraction.ofLong(3),
+            CutProvenance(model, 0L, premises.map { CutProofFact(it, false) }, family = CutFamily.GOMORY))
+        for (missing in premises) {
+            val events = ArrayList<Triple<CutFamily, String, String>>()
+            val pool = CutPool(observe = { family, stage, outcome -> events.add(Triple(family, stage, outcome)) })
+            val active = CutSourceMap(model, 0L, listOf(CutColumnSource(source)), activePremises = premises.toSet())
+            assertTrue(pool.add(cut, active))
+
+            pool.remap(CutSourceMap(model, 1L, listOf(CutColumnSource(source)),
+                activePremises = (premises - missing).toSet()))
+
+            assertTrue(pool.cuts().isEmpty())
+            assertTrue(Triple(CutFamily.GOMORY, "RETRACTION", "UNAVAILABLE") in events)
+            pool.remap(active)
+            assertEquals(CutFamily.GOMORY, pool.cuts().single().family)
+            assertTrue(Triple(CutFamily.GOMORY, "RETRACTION", "REACTIVATED") in events)
+        }
+    }
+
 
     @Test
     fun `conditional deduplication should ignore premise order and preserve distinct guards`() {
