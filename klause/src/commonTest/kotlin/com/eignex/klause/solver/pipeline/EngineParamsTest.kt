@@ -39,6 +39,17 @@ class EngineParamsTest {
     }
 
     @Test
+    fun `propagation attribution and historical table refinement remain separate opt in controls`() {
+        val base = com.eignex.klause.backtrack.BacktrackParams()
+        val attributed = applyBacktrackParams(base, EngineParams(listOf("propagation-attribution=true")))
+        val refined = applyBacktrackParams(base, EngineParams(listOf("historical-table-reasons=true")))
+
+        assertTrue(!base.propagationAttribution && !base.historicalTableReasons)
+        assertTrue(attributed.propagationAttribution && !attributed.historicalTableReasons)
+        assertTrue(refined.historicalTableReasons && !refined.propagationAttribution)
+    }
+
+    @Test
     fun `directional lp gains remain opt in and survive fixed backtrack overrides`() {
         val base = com.eignex.klause.backtrack.BacktrackParams()
         assertTrue(!base.lpDirectionalGains)

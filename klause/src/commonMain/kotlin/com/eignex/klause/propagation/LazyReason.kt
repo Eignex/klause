@@ -2,6 +2,7 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
+import kotlin.time.TimeSource
 
 // Lazy reasons. A deduction may record, in place of its literal array, a marker array naming the propagator,
 // the trail position and level it was made at, and a propagator-specific payload. Conflict analysis reads every
@@ -46,6 +47,7 @@ internal fun PropagationState.lazyReasonSlots(size: Int, factorId: Int = current
     out[1] = factorId
     out[2] = undo.size
     out[3] = currentLevel
+    factorAttribution?.remember(out, attributionFamily(factorId))
     return out
 }
 
@@ -74,17 +76,38 @@ internal fun extendReason(base: IntArray?, extra: IntArray): IntArray? {
 internal fun PropagationState.reasonOf(reason: IntArray?): IntArray? {
     if (!isLazyReason(reason)) return reason
     val marker = requireNotNull(reason)
+    val attribution = factorAttribution
+    val family = if (marker[1] >= 0) attributionFamily(marker[1]) else attribution?.reasonFamily(marker) ?: 0
+    historicalTableReason?.read(marker)?.let {
+        attribution?.remember(it, family)
+        return it
+    }
+    if (lazyReasonMemo.containsKey(marker)) {
+        attribution?.note(family, FactorAttribution.Metric.MemoHits)
+        return lazyReasonMemo[marker]
+    }
+    val before = work
+    val start = if (attribution == null) null else TimeSource.Monotonic.markNow()
+    attribution?.note(family, FactorAttribution.Metric.LazyAttempts)
     val built = try {
-        historicalTableReason?.read(marker)?.let { return it }
-        if (lazyReasonMemo.containsKey(marker)) return lazyReasonMemo[marker]
         finiteWork.begin()
         buildLazyReason(marker)
     } catch (_: FinitePropagationInterrupted) {
         runCancelled = true
+        null
+    } finally {
+        attribution?.let {
+            it.note(family, FactorAttribution.Metric.ReasonWork, work - before)
+            it.note(family, FactorAttribution.Metric.ReasonNanos, requireNotNull(start).elapsedNow().inWholeNanoseconds)
+        }
+    }
+    if (runCancelled || built == null) {
+        attribution?.note(family, FactorAttribution.Metric.LazyInterrupted)
         return null
     }
-    if (runCancelled) return null
     check(!isLazyReason(built)) { "a lazy reason must explain itself in literals" }
+    attribution?.support(family, FactorAttribution.Metric.LazyCompleted, built.size)
+    attribution?.remember(built, family)
     lazyReasonMemo[marker] = built
     return built
 }

@@ -1,0 +1,7 @@
+# Scheduling, Table and mixed finite arithmetic; native SAT is the fast-path control.
+xcsp3-cop/RCPSP-j120-01-08_c22
+xcsp3-core/cyclic-mod3-sat
+xcsp3-core/overlap-tables-unsat
+xcsp3-core/evidence-linear-knapsack
+xcsp3-core/magic-square-3
+dimacs-core/php4

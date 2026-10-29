@@ -354,6 +354,7 @@ class PropagationState private constructor(
     val intMaxReason: IntArray = prepared?.intMaxReason ?: (IntArray(problem.numIntVars) { -1 })
 
     internal var integerRowLearning = false
+    internal var factorAttribution: FactorAttribution? = null
     internal var historicalTableReasons = false
     internal var historicalTableReason: HistoricalTableReason? = null
     internal var arithmeticLearningTrace: ArithmeticLearningTrace? = null
@@ -614,6 +615,7 @@ class PropagationState private constructor(
      *  Dispatches between bool pins ([pinBool]) and first-class atom assignment ([pinAtomLit]).
      *  Returns `false` on conflict. */
     fun pinLit(lit: Int, antecedents: IntArray? = null): Boolean {
+        attributeReason(antecedents)
         val v = Lit.variable(lit)
         val pos = Lit.isPositive(lit)
         if (v < problem.numBoolVars) return pinBoolImpl(v, pos, antecedents)
@@ -944,7 +946,10 @@ class PropagationState private constructor(
      *  pin. Lets the conflict analyzer reconstruct the propagation chain backwards. Pass
      *  `null` (the default no-arg form) when the factor doesn't track antecedents — that's
      *  fine, the analyzer just treats this pin as a leaf in the implication graph. */
-    fun pinBool(v: Int, value: Boolean, antecedents: IntArray?): Boolean = pinBoolImpl(v, value, antecedents)
+    fun pinBool(v: Int, value: Boolean, antecedents: IntArray?): Boolean {
+        attributeReason(antecedents)
+        return pinBoolImpl(v, value, antecedents)
+    }
 
     /** Raise int `v`'s lower bound to [lo]; returns false on conflict. */
     fun tightenIntMin(v: Int, lo: Long): Boolean = tightenIntMinImpl(v, lo, null)
@@ -952,19 +957,28 @@ class PropagationState private constructor(
     /** Variant that records [antecedents] — bool literals (false in the current state)
      *  whose collective truth forced this lower-bound tightening. Used by the conflict
      *  analyzer to walk the implication graph backwards through int-domain factors. */
-    fun tightenIntMin(v: Int, lo: Long, antecedents: IntArray?): Boolean = tightenIntMinImpl(v, lo, antecedents)
+    fun tightenIntMin(v: Int, lo: Long, antecedents: IntArray?): Boolean {
+        attributeReason(antecedents)
+        return tightenIntMinImpl(v, lo, antecedents)
+    }
 
     /** Lower int `v`'s upper bound to [hi]; returns false on conflict. */
     fun tightenIntMax(v: Int, hi: Long): Boolean = tightenIntMaxImpl(v, hi, null)
 
     /** As [tightenIntMax] with explicit conflict [antecedents]. */
-    fun tightenIntMax(v: Int, hi: Long, antecedents: IntArray?): Boolean = tightenIntMaxImpl(v, hi, antecedents)
+    fun tightenIntMax(v: Int, hi: Long, antecedents: IntArray?): Boolean {
+        attributeReason(antecedents)
+        return tightenIntMaxImpl(v, hi, antecedents)
+    }
 
     /** Pin int `v` to [value]; returns false on conflict. */
     fun setInt(v: Int, value: Long): Boolean = setIntImpl(v, value, null)
 
     /** As [setInt] with explicit conflict [antecedents]. */
-    fun setInt(v: Int, value: Long, antecedents: IntArray?): Boolean = setIntImpl(v, value, antecedents)
+    fun setInt(v: Int, value: Long, antecedents: IntArray?): Boolean {
+        attributeReason(antecedents)
+        return setIntImpl(v, value, antecedents)
+    }
 
     /** Punch a hole in `v`'s domain at [value]. Returns `true` on success (including the
      *  no-op case when [value] is already absent), `false` on conflict (would empty the
@@ -974,8 +988,10 @@ class PropagationState private constructor(
     fun excludeIntValue(v: Int, value: Long): Boolean = excludeIntValueImpl(v, value, null)
 
     /** Forbid [value] for int `v`; returns false on conflict. */
-    fun excludeIntValue(v: Int, value: Long, antecedents: IntArray?): Boolean =
-        excludeIntValueImpl(v, value, antecedents)
+    fun excludeIntValue(v: Int, value: Long, antecedents: IntArray?): Boolean {
+        attributeReason(antecedents)
+        return excludeIntValueImpl(v, value, antecedents)
+    }
 
     /** Pop one bool var that's been dirtied since the last call, or `-1` if none. */
     fun pollDirtyBool(): Int = if (dirtyBools.isEmpty()) -1 else dirtyBools.removeFirst()
@@ -1154,7 +1170,21 @@ class PropagationState private constructor(
         // The native-SAT lane runs its own arena-packed two-watched-literal BCP; the atom store,
         // channeling flush, factor queue, and dirty-var drains below are all inert when there are no
         // integer variables, so it bypasses them entirely.
-        nativeEngine?.let { return it.propagate(allFactors, cancellation) }
+        nativeEngine?.let { native ->
+            val attribution = factorAttribution ?: return native.propagate(allFactors, cancellation)
+            val before = work
+            val pins = propagations
+            val start = TimeSource.Monotonic.markNow()
+            val conflict = native.propagate(allFactors, cancellation)
+            val family = 1 shl FactorFamily.Clause.ordinal
+            attribution.note(family, FactorAttribution.Metric.Fires)
+            attribution.note(family, FactorAttribution.Metric.Work, work - before)
+            attribution.note(family, FactorAttribution.Metric.Nanos, start.elapsedNow().inWholeNanoseconds)
+            attribution.note(family, FactorAttribution.Metric.Deductions, propagations - pins)
+            if (conflict != null) attribution.note(family, FactorAttribution.Metric.Conflicts)
+            if (runCancelled) attribution.note(family, FactorAttribution.Metric.Interrupted)
+            return conflict
+        }
         // Clear conflict bookkeeping from any prior run — reusing the state across pushes
         // would otherwise mix old seeds into a new conflict's core.
         conflictSeedFactors.clear()
@@ -1243,6 +1273,11 @@ class PropagationState private constructor(
             // Cheap bake: defer an expensive factor's first fire (heavy state build + sweep) to the
             // first search fire. It re-enqueues if a cheap factor later wakes it, and is skipped again.
             if (skipExpensiveBake && f.expensiveBake) continue
+            val attribution = factorAttribution
+            val family = if (attribution == null) 0 else attribution.family(f)
+            val before = work
+            val pins = propagations
+            val start = if (attribution == null) null else TimeSource.Monotonic.markNow()
             work++
             currentLevel = effectiveLevelFor(f, fid)
             if (f is ClausePropagator && !f.allLiteralsBool(problem.numBoolVars)) deferredLevelClause = f.literals
@@ -1253,6 +1288,7 @@ class PropagationState private constructor(
                 finiteMutationInterruptible = f is InterruptiblePropagator
                 f.propagate(this, fid)
             } catch (_: FinitePropagationInterrupted) {
+                attribution?.note(family, FactorAttribution.Metric.Interrupted)
                 (f as? InterruptiblePropagator)?.interrupted(this, fid)
                 propEnq(fid)
                 if (pendingFiniteMutation != null) runCancelled = !cancelIsPause
@@ -1261,12 +1297,19 @@ class PropagationState private constructor(
                 return null
             } finally {
                 finiteMutationInterruptible = false
+                attribution?.let {
+                    it.note(family, FactorAttribution.Metric.Fires)
+                    it.note(family, FactorAttribution.Metric.Work, work - before)
+                    it.note(family, FactorAttribution.Metric.Deductions, propagations - pins)
+                    it.note(family, FactorAttribution.Metric.Nanos, requireNotNull(start).elapsedNow().inWholeNanoseconds)
+                }
             }
             if (runCancelled) {
                 propEnq(fid)
                 return null
             }
             if (!propagated) {
+                attribution?.note(family, FactorAttribution.Metric.Conflicts)
                 // The failing factor is always in the core, regardless of whether it
                 // recorded a conflict via the impl methods (some factors return false
                 // without calling pin/tighten — they just detected infeasibility from

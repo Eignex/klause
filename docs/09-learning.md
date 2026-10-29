@@ -102,6 +102,35 @@ has no factor conflict clause to analyze; conflicts reached by the ensuing fixpo
 use the factor that actually failed. An unrelated preceding factor's context cannot
 provide a fixing's level or conflict reason.
 
+## Propagation and explanation attribution
+
+Opt-in finite attribution retains fixed family aggregates for factor fires, charged
+work, elapsed nanoseconds, deductions and conflicts. Lazy explanation attempts,
+completed supports, memo hits and interrupted work remain distinct; an interrupted
+build supplies neither a support nor a memo entry. Historical Table retries record
+attempted work even when they decline, and accepted retries separately.
+
+First-UIP resolution credits the seed and each resolved antecedent. Its family set
+travels with the learned object's admission and subsequent native use events.
+Immediate assertion, first consumption and later force/conflict events are distinct:
+consumption follows the learned lifecycle below, while later events exclude the
+synchronous admission fixpoint. Several contributing families may receive credit
+for one learned object; these counters cannot be summed as disjoint total costs.
+They describe participation and consumption, without asserting causal benefit.
+
+One state owns at most 1,024 reason identities of at most 64 words each and 1,024
+learned provenance entries. Reason eviction and provenance exhaustion affect only
+diagnostics; missing identities use the unattributed family. Retirement releases
+learned provenance, and compaction preserves it by object identity. The native SAT
+lane retains packed propagation and credits its clause family without constructing
+general propagator projections. Its fire counter counts BCP calls rather than
+general factor invocations. Disabling attribution retains no diagnostic maps.
+
+The controls preserve propagation order, containing cancellation, historical trail
+boundaries and reason authority. Eager support observations occur at reason delivery;
+their construction cost is included in factor propagation. Lazy reconstruction and
+refinement work overlap the containing solve's work and time.
+
 ## Conflict analysis
 
 `ConflictAnalyzer` walks the implication graph backwards from a conflict, resolving

@@ -220,6 +220,8 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
     val lpRootCuts = p[ExecutionOption.lpRootCuts]
     val pbLearning = p[ExecutionOption.pbLearning]
     val integerRowLearning = p[ExecutionOption.integerRowLearning]
+    val propagationAttribution = p[ExecutionOption.propagationAttribution]
+    val historicalTableReasons = p[ExecutionOption.historicalTableReasons]
     val pbObjectiveCutoff = p[ExecutionOption.pbObjectiveCutoff]
     val objectiveGuidedValues = p[ExecutionOption.objectiveGuidedValues]
     val varKind = if (allowSelectors) p[ExecutionOption.variableSelector] else null
@@ -229,7 +231,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
         solutionPhasing, rephaseInterval, maxLearned, lbdGlue, tieredDb, midLbd, vivification, vivifyBatch,
         subsumption, subsumeBatch, inprocessingCadence, rootSimplification, rootSimplifyBatch, rootProbeBatch, rootProbeWork,
         lpCone, lpAutoOff, lpKnapsack, lpComponentSplit, lpBoundMaxPivots, lpAdaptiveWork, lpBranching, lpVariableShaving, lpPruneHulls, lpRootCuts, pbLearning,
-        pbObjectiveCutoff, integerRowLearning,
+        pbObjectiveCutoff, integerRowLearning, propagationAttribution, historicalTableReasons,
         objectiveGuidedValues, lpDirectionalGains,
     )
     if (scalars.all { it == null } && varKind == null && valKind == null) return null
@@ -270,6 +272,8 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
         lpRootCuts?.let { out = out.copy(lpPlan = out.lpPlan.copy(rootCutHarvest = it)) }
         pbLearning?.let { out = out.copy(pbLearning = it) }
         integerRowLearning?.let { out = out.copy(integerRowLearning = it) }
+        propagationAttribution?.let { out = out.copy(propagationAttribution = it) }
+        historicalTableReasons?.let { out = out.copy(historicalTableReasons = it) }
         pbObjectiveCutoff?.let { out = out.copy(pbObjectiveCutoff = it) }
         objectiveGuidedValues?.let { out = out.copy(objectiveGuidedValues = it) }
         varKind?.let { out = out.copy(variableSelector = it.selector(out.randomSeed)) }

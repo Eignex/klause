@@ -219,6 +219,7 @@ internal fun PropagationState.noteLearnedUse(fid: Int) {
     }
     val idx = fid - problem.numFactors
     if (idx !in 0 until learned.usedFlags.size) return
+    factorAttribution?.used(learned.store[idx])
     noteLearnedStage(idx, LearnedStage.Consumed, 2)
     if (learned.usedFlags[idx] == 0) learned.importUses.note(learned.origins[idx])
     learned.usedFlags[idx] = 1
@@ -253,6 +254,7 @@ internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd
     arithmeticLearningTrace?.remap(baseFactorCount, remap)
     for (i in 0 until n) if (remap[i] < 0) {
         learned.lifecycle.note(learnedKind(i), LearnedStage.Retired)
+        factorAttribution?.retire(learned.store[i])
     }
 
     learned.units.clear()
@@ -433,6 +435,7 @@ private fun PropagationState.noteLearnedStage(index: Int, stage: LearnedStage, b
     if (learned.stages[index] and bit != 0) return
     learned.stages[index] = learned.stages[index] or bit
     learned.lifecycle.note(learnedKind(index), stage)
+    if (stage == LearnedStage.Consumed) factorAttribution?.consumed(learned.store[index])
 }
 
 internal fun PropagationState.referencedLearned(count: Int): BooleanArray {

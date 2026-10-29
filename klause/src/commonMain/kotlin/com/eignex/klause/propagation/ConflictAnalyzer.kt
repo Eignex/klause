@@ -188,8 +188,15 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         beginAnalysis()
         val factor = state.factorAt(conflictFactorId)
         state.arithmeticLearningTrace?.seedEndpoints(state.factorIntVars(conflictFactorId), state)
+        val before = state.work
         val seedReason = factor.conflictReason(state, conflictFactorId)
             ?: return@boundedAnalysis AnalysisResult.NotApplicable
+        state.factorAttribution?.let {
+            val family = state.attributionFamily(conflictFactorId)
+            it.note(family, FactorAttribution.Metric.ReasonWork, state.work - before)
+            it.support(family, FactorAttribution.Metric.EagerReasons, seedReason.size)
+            it.remember(seedReason, family)
+        }
         return@boundedAnalysis analyzeFromSeed(seedReason, conflictLevelOf(seedReason), seedFactorId = conflictFactorId)
     }
 
@@ -227,6 +234,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
     private fun beginAnalysis() {
         state.arithmeticLearningTrace?.record("analysis.begin", state.currentFactor.toLong(),
             state.currentLevel.toLong(), state.undo.size.toLong())
+        state.factorAttribution?.beginAnalysis()
         state.lazyReasonMemo.clear()
         val atomCount = state.atoms.intVar.size
         if (atomLevelStamp.size < atomCount) {
@@ -384,6 +392,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
                 else -> alternate.literals.size < fallback.literals.size
             }
             if (!improves) return fallback
+            state.factorAttribution?.note(1 shl FactorFamily.Table.ordinal, FactorAttribution.Metric.RefinementAccepted)
             state.arithmeticLearningTrace?.record("table.accepted", fallback.backjumpLevel.toLong(),
                 alternate.backjumpLevel.toLong(), fallback.literals.size.toLong(), alternate.literals.size.toLong())
             lastResolvent = alternateResolvent
@@ -404,6 +413,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         val numBoolVars = state.problem.numBoolVars
         resolvent.reset(universe)
 
+        state.factorAttribution?.let { it.participate(it.reasonFamily(seedReason), seedReason.size) }
         resolvent.resolve(seedReason, currentLevel)
 
         // Pin-trail cursor for the 1UIP pivot scan. The pivot is always the most-recent still-seen
@@ -461,6 +471,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
                     resolvent.drainFrontier()
                     return resolvent.finalizeResult(currentLevel)
                 }
+            state.factorAttribution?.let { it.participate(it.reasonFamily(antecedents), antecedents.size) }
             resolvent.resolve(antecedents, currentLevel)
         }
         resolvent.drainFrontier()

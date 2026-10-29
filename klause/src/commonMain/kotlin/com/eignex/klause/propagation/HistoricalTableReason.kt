@@ -2,6 +2,7 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.factor.table.TablePropagator
 import com.eignex.klause.util.IntHashSet
+import kotlin.time.TimeSource
 
 internal class HistoricalTableReason(private val state: PropagationState) {
     private var selected: IntArray? = null
@@ -26,10 +27,23 @@ internal class HistoricalTableReason(private val state: PropagationState) {
         for (lit in ordinary) introduced.add(lit)
         val preferred = IntHashSet(frontier.size)
         for (lit in frontier) if (!introduced.contains(lit)) preferred.add(lit)
-        replacement = (state.factorAt(marker[1]) as TablePropagator).historicalAlternative(
-            state, marker.copyOfRange(LAZY_PAYLOAD, marker.size), marker[2], preferred,
-        )
+        val attribution = state.factorAttribution
+        val family = state.attributionFamily(marker[1])
+        val before = state.work
+        val start = if (attribution == null) null else TimeSource.Monotonic.markNow()
+        attribution?.note(family, FactorAttribution.Metric.RefinementAttempts)
+        replacement = try {
+            (state.factorAt(marker[1]) as TablePropagator).historicalAlternative(
+                state, marker.copyOfRange(LAZY_PAYLOAD, marker.size), marker[2], preferred,
+            )
+        } finally {
+            attribution?.let {
+                it.note(family, FactorAttribution.Metric.RefinementWork, state.work - before)
+                it.note(family, FactorAttribution.Metric.RefinementNanos, requireNotNull(start).elapsedNow().inWholeNanoseconds)
+            }
+        }
         val alternate = replacement ?: return false
+        attribution?.note(family, FactorAttribution.Metric.RefinementSupport, alternate.size.toLong())
         state.arithmeticLearningTrace?.clause("table.ordinary-reason", ordinary, state)
         state.arithmeticLearningTrace?.clause("table.alternate-reason", alternate, state)
         return !ordinary.contentEquals(alternate)
