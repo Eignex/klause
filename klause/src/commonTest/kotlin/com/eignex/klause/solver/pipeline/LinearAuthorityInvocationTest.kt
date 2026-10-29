@@ -38,6 +38,21 @@ class LinearAuthorityInvocationTest {
     )
 
     @Test
+    fun `external admission should distinguish missing exact coordinates from rejected points`() {
+        val source = SourceProofContext(scope, setOf(real), mapOf(
+            "upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ZERO)),
+        ), mapOf(real to BigFraction.ONE))
+        for ((exact, stage) in listOf(null to "MissingExactReals", listOf(BigFraction.ONE) to "PointRejected")) {
+            val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0), exactReals = exact)
+            val result = LinearAuthorityInvocation(source, TheoryParams(sourceLpWorkLimit = 0),
+                external = { point }).use { it.run { _, _ -> } }
+
+            assertEquals(1L, result.stats.smt.completeSearchStages?.get("numericalExternal$stage"))
+            assertNull(result.incumbent)
+        }
+    }
+
+    @Test
     fun `an accepted external incumbent should reach the retained bound consumer`() {
         val source = SourceProofContext(scope, setOf(real), mapOf(
             "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
