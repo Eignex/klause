@@ -23,6 +23,25 @@ import kotlin.test.assertTrue
 
 class ResumableSatisfactionTest {
     @Test
+    fun `ordinary and resumed solves publish attributed first uip consumption`() {
+        val solver = BacktrackSolver(pigeonhole(3, 2).bake())
+        for (nativeSat in listOf(false, true)) {
+            val params = BacktrackParams(randomSeed = 1L, nativeSat = nativeSat, pbLearning = false,
+                propagationAttribution = true)
+            val ordinary = assertIs<SolveResult.Unsat>(solver.solve(params.copy(propagationAttribution = false)))
+            val complete = assertIs<SolveResult.Unsat>(solver.solve(params))
+            val resumed = solver.resumableSolve(params).use { runToVerdict(it, 1L) }
+
+            assertIs<SolveResult.Unsat>(resumed)
+            assertTrue(ordinary.stats.search.learning.keys.none { it.startsWith("factor") })
+            for (result in listOf(complete, resumed)) {
+                assertTrue(result.stats.search.learning.getValue("factorClauseUipReasons") > 0)
+                assertTrue(result.stats.search.learning.getValue("factorClauseConsumed") > 0)
+            }
+        }
+    }
+
+    @Test
     fun `closing a deferred root should dispose its peer once`() {
         var closed = 0
         val component = object : PreparingSearchComponent, AutoCloseable {
