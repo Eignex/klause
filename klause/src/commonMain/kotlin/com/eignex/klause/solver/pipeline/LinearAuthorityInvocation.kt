@@ -62,6 +62,7 @@ internal class LinearAuthorityInvocation(
     aggregateBranching: Boolean = false,
     private val onIncumbentImport: (() -> Unit)? = null,
     private val onIncumbentUse: (() -> Unit)? = null,
+    private val observeExternalIncumbents: Boolean = false,
 ) : AutoCloseable {
     init {
         require(borrowedAuthority?.funding == null || borrowedAuthority.funding === funding) {
@@ -232,7 +233,7 @@ internal class LinearAuthorityInvocation(
     private fun offer(sample: Sample) = offer(sample, external = false)
 
     private fun observeExternalOffer(external: Boolean, stage: String) {
-        if (external) state.smt.observeCompleteSearchStage("numericalExternal$stage")
+        if (external && observeExternalIncumbents) state.smt.observeCompleteSearchStage("numericalExternal$stage")
     }
 
     private fun offer(sample: Sample, external: Boolean) {

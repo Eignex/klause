@@ -48,6 +48,7 @@ internal class JointLinearRepair(
     sourceIntegers: IntArray? = null,
     private val onIncumbentImport: (() -> Unit)? = null,
     private val onIncumbentUse: (() -> Unit)? = null,
+    private val observeExternalIncumbents: Boolean = false,
 ) : ExactNeighborhoodCompletion, AutoCloseable {
     private val sourceIntegers = sourceIntegers?.copyOf()
     private val stop = params.timeout or params.cancellation
@@ -91,6 +92,10 @@ internal class JointLinearRepair(
 
     private fun observe(stage: String) { stages[stage] = (stages[stage] ?: 0) + 1 }
 
+    private fun observeExternal(stage: String) {
+        if (observeExternalIncumbents) observe("jointRepairExternal$stage")
+    }
+
     private fun queryObservations(): Map<String, Long> =
         query?.stats?.smt?.completeSearchStages.orEmpty().mapKeys { (key, _) ->
             when (key) {
@@ -131,20 +136,19 @@ internal class JointLinearRepair(
                     val value = objective?.evaluateExact(sample)
                     when {
                         model.numRealVars != 0 && sample.exactReals?.size != model.numRealVars -> {
-                            observe("jointRepairExternalMissingExactReals")
+                            observeExternal("MissingExactReals")
                             false
                         }
                         cutoff != null && (value == null || value >= cutoff) -> {
-                            observe("jointRepairExternalNotImproving")
+                            observeExternal("NotImproving")
                             false
                         }
                         else -> {
                             val checked = SourceEvidenceVerifier(source.withLinearAuthority()).verify(
                                 SourceEvidence(source.scope, SourceClaim.Witness(sample),
                                     SourceDerivation.SourceWitness), stop)
-                            if (checked != SourceEvidenceCheck.Checked) observe(
-                                if (checked is SourceEvidenceCheck.Rejected) "jointRepairExternalPointRejected"
-                                else "jointRepairExternalPointUnavailable")
+                            if (checked != SourceEvidenceCheck.Checked) observeExternal(
+                                if (checked is SourceEvidenceCheck.Rejected) "PointRejected" else "PointUnavailable")
                             checked == SourceEvidenceCheck.Checked
                         }
                     }

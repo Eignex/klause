@@ -45,7 +45,7 @@ class LinearAuthorityInvocationTest {
         for ((exact, stage) in listOf(null to "MissingExactReals", listOf(BigFraction.ONE) to "PointRejected")) {
             val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0), exactReals = exact)
             val result = LinearAuthorityInvocation(source, TheoryParams(sourceLpWorkLimit = 0),
-                external = { point }).use { it.run { _, _ -> } }
+                external = { point }, observeExternalIncumbents = true).use { it.run { _, _ -> } }
 
             assertEquals(1L, result.stats.smt.completeSearchStages?.get("numericalExternal$stage"))
             assertNull(result.incumbent)
