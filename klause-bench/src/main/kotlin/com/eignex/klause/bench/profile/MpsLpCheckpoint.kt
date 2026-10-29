@@ -55,8 +55,8 @@ internal object MpsLpCheckpoint {
         val thread = Thread.currentThread().threadId()
         val stop = Cancellation.after(10.seconds)
         val context = Class.forName(ENGINE + "LpSolveContext").getConstructor().newInstance()
-        val pricing = Class.forName(ENGINE + "LpPricingOptions").constructors.single { it.parameterCount == 2 }
-            .newInstance(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, 3L)
+        val pricing = Class.forName(ENGINE + "LpPricingOptions").constructors.single { it.parameterCount == 4 }
+            .newInstance(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, 3L, Long.MAX_VALUE, Long.MAX_VALUE)
         val type = Class.forName(ENGINE + "LpSolveSession")
         val owner = type.constructors.single { it.parameterCount == 3 }.newInstance(context, pricing, false)
         val solverField = type.getDeclaredField("solver").apply { isAccessible = true }
