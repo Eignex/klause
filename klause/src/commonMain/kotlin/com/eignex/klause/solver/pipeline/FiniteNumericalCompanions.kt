@@ -63,7 +63,9 @@ internal fun finiteNumericalCompanionEligibility(
         if (requirements.fragment == WorkerFragment.AFFINE_BINARY_MIXED && !problem.binaryIntegers) {
             add("binary-integers-required")
         }
-        if ((0 until problem.numIntVars).any { !problem.intBounds.hasLower(it) || !problem.intBounds.hasUpper(it) }) {
+        if (cost.columns <= requireNotNull(cost.maxColumns) && (0 until problem.numIntVars).any {
+            !problem.intBounds.hasLower(it) || !problem.intBounds.hasUpper(it)
+        }) {
             add("finite-integer-bounds-required")
         }
         if (cost.columns > requireNotNull(cost.maxColumns) || cost.factors > requireNotNull(cost.maxFactors)) {
