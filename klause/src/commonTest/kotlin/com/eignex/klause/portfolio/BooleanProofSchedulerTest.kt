@@ -100,6 +100,23 @@ class BooleanProofSchedulerTest {
     }
 
     @Test
+    fun `idle workers should leave the allowance for an unfinished sibling`() {
+        val factors = arrayOf(
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
+        ) + Array(8) { mask ->
+            Clause(IntArray(3) { bit -> Lit.make(bit + 2, mask and (1 shl bit) != 0) })
+        }
+        val problem = Problem(5, 0, emptyArray(), factors).bake()
+        BooleanProofScheduler(problem, context, listOf(0), List(2) { BacktrackParams() }).use { scheduler ->
+            val result = scheduler.run(Cancellation.Never, 100L, 1L, 1L)
+
+            assertTrue(result is com.eignex.klause.solver.SolveResult.Unsat)
+            assertTrue(scheduler.nativeCoverageComplete)
+        }
+    }
+
+    @Test
     fun `objective contexts should decline before constructing private search`() {
         val optimizing = context.copy(scope = context.scope.copy(
             objective = SourceObjective("cost", ObjectiveSense.MINIMIZE),
