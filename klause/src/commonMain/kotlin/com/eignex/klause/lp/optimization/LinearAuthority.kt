@@ -316,8 +316,8 @@ internal class LinearAuthority(
         }
         val prepared = if (retainLp || cuts) {
             template?.takeIf { it.matches(source) && (it.cuts != null) == cuts &&
-                (!cuts || it.cuts?.complementary == (pointPolicy != null)) }
-                ?: LinearAuthorityTemplate.prepare(source, cancellation, cuts, pointPolicy != null) { work ->
+                (!cuts || it.cuts?.complementary == (cutMask != null)) }
+                ?: LinearAuthorityTemplate.prepare(source, cancellation, cuts, cutMask != null) { work ->
                     cutPreparationWork += work
                     budget.observe(preparation = work)
                 }?.let { if (cuts) withAdditionalCuts(it, cancellation) else it }?.also {
