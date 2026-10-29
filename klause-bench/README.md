@@ -410,6 +410,8 @@ with seed 3, 1,000 decision instructions and a two-second containing deadline.
 Its factory returns the production numerical owners with their resumable
 capabilities intact. Completion observers retain active numerical time, work,
 bounded traces and existing claim/certificate phases; pauses publish no completion.
+Containing cancellation closes the active owner and emits `profile-stop` with
+`complete=false`; partial records do not establish a completed capture.
 The worker record includes consumed LP prunes/fixings, its native result and full
 worker-coordinate sample. It establishes no CLI routing equivalence or independent
 source validation. Preparation, failed work and retirement remain in the worker
@@ -444,13 +446,57 @@ revision's repeats; the source and CLI hashes match across revisions. These are
 source and scheduling controls, not a throughput result or independently checked
 optimality proof.
 
-Profile [9276](https://lab.eignex.com/jobs/9276) reaches preparation but exhausts
-the heap while compiling both targets concurrently. The ordered build in
-[9282](https://lab.eignex.com/jobs/9282) loses its first infrastructure allocation
-before numerical execution; its automatic retry exhausts the thirty-minute
-containing allowance during compilation. These preparation failures establish no dominant
-numerical cost or policy disposition. JVM and Linux Native regressions and profile
-linking pass CI at `d3402479af`; the build-order change passes at `0b37e89770`.
+[9293](https://lab.eignex.com/jobs/9293) and [9294](https://lab.eignex.com/jobs/9294)
+capture Afiro on JVM and Linux Native at `e288e79cec`: 80 controlled queries per
+runtime, including warmup and three measured rounds. All corresponding exact
+results, points, terminations, pivots and charged work match across observation
+settings and runtimes. Each real worker consumes an attained-optimum claim after
+20 numerical pivots and 21,937 work units. Its captured coordinates remain separate
+from independently checked original-source claims.
+
+[9295](https://lab.eignex.com/jobs/9295) captures three Adlittle JVM rounds;
+[9300](https://lab.eignex.com/jobs/9300) captures one Native round plus warmup at
+the same revision. All 120 controlled queries remain indeterminate after a floating
+optimal candidate: reconstruction declines `CANDIDATE`, continuation reaches
+`IMPORT_LIMIT`, and refinement reaches `WORK`. Corresponding completed controls
+retain identical results and work. Both real workers return `Unknown` at their
+two-second limit, spending 1.65 seconds on JVM and 1.94 seconds on Native in the
+exact ladder. These failed claims remain part of the cost.
+
+Retained edit-stage observations expose the remaining cost. Entries below are
+ranges of stage medians; the Native Adlittle capture has one measured sample per
+stage. Claim time is inclusive and must not be added to numerical time.
+
+| Source/runtime | Numerical solve (ms) | Attainment claim (ms) | Timed process wall (s) | Peak process RSS (KiB) |
+|---|---:|---:|---:|---:|
+| Afiro/JVM | 0.153–0.273 | 2.80–3.51 | 2.93 | 126,632 |
+| Afiro/Native | 0.036–0.047 | 9.06–10.76 | 1.51 | 30,436 |
+| Adlittle/JVM | 0.102–0.194 | 494–559 | 58.20 | 187,376 |
+| Adlittle/Native | 0.131–0.152 | 1,740–1,867 | 98.61 | 42,192 |
+
+The process totals include warmup, diagnostics and the real worker; builds and
+source transfer have separate lab receipts. Different round counts, runtime startup
+and recording overhead prevent an absolute cross-runtime speed comparison.
+Adlittle's five-query JVM lifecycle allocates a median 1.03 GB with fresh owners
+and 0.84 GB with retention, with observations disabled. JFR allocation samples
+concentrate in exact continuation pivots and fraction arithmetic. Native allocator
+totals are unavailable; process RSS does not replace them.
+
+Retain the existing pricing, edge-weight, update/refactorization and allocation
+policies. The retention control removes most numerical work while certification
+dominates the remaining elapsed cost, including unsuccessful requests. These
+controls identify no justified numerical policy change or default activation;
+fewer pivots alone would misrepresent the Adlittle outcome. Exact acceptance and
+resource ceilings remain intact.
+
+Preparation failures in [9276](https://lab.eignex.com/jobs/9276) and
+[9282](https://lab.eignex.com/jobs/9282) precede numerical execution. The three-round
+Native Adlittle capture [9296](https://lab.eignex.com/jobs/9296) reaches the
+120-second containing limit after 49 completed queries and one cancelled query;
+it never reaches the real worker. Its 61 complete JSON records precede an aborted
+launcher and are partial evidence. [9298](https://lab.eignex.com/jobs/9298) loses
+its preparation daemon before running the structured-stop revision. None of these
+outcomes supplies a numerical improvement or a completed capture.
 
 ### Bounded sparse admission trials
 
