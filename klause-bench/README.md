@@ -388,8 +388,9 @@ up to five alternating rounds, with phase observations enabled and disabled.
 Preparation, edits, query, certificate phases and retirement remain in the record.
 JVM thread allocation and whole-process RSS are separate measurements; native
 allocation is unavailable. Inclusive numerical and certificate phase timings must
-not be summed. Feasibility timing covers violation scans; transform, pricing and
-update costs during repair remain in their respective numerical phases. Query
+not be summed. Feasibility repair includes its transforms, pricing and updates;
+violation scans have a separate nested observation. Checkpoint wall time,
+including suspended caller time, is reported separately from repair. Query
 time less floating time includes certificate work and query scaffolding.
 Serialization follows each query and enters the containing lifecycle time.
 The separate active total excludes record serialization. Preparation and edit

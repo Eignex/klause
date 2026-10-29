@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.engine
 
 internal enum class SimplexProfilePhase {
-    PRICING, FTRAN, BTRAN, UPDATE, REFACTOR, FEASIBILITY_REPAIR, OUTPUT,
+    PRICING, FTRAN, BTRAN, UPDATE, REFACTOR, FEASIBILITY_REPAIR, FEASIBILITY_SCAN, OUTPUT,
 }
 
 internal enum class SimplexPhase { DUAL, BOXED_DUAL, PRIMAL_FEASIBILITY, PRIMAL_OBJECTIVE }
@@ -32,6 +32,7 @@ internal data class SimplexProgressSample(
 internal class SimplexProgressTrace(val profile: Boolean = false) {
     val phaseNanos = mutableMapOf<SimplexProfilePhase, Long>()
     val phaseCalls = mutableMapOf<SimplexProfilePhase, Long>()
+    var checkpointNanos = 0L
     var sourcePrimalResidual: Double? = null
     var sourceBoundViolation: Double? = null
     var sourceBasicDualResidual: Double? = null

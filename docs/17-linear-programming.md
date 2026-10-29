@@ -78,8 +78,9 @@ phase observations. Elapsed profiling is separately enabled; ordinary progress
 capture reads no phase clock. Pricing, basis transforms, updates, rebuilds,
 feasibility scans and output construction retain their numerical and cancellation
 semantics. Timing regions can nest and carry no work, admission or certificate
-authority. A retained invocation replaces its trace without mutating published
-observations; compatible factors remain owned by the scoped solver.
+authority. Repair timing excludes checkpoint wall time, including suspension in
+the caller. A retained invocation replaces its completed trace; compatible
+factors remain owned by the scoped solver.
 
 The exact matrix, costs, objective sense/scale/constant, bounds, strictness,
 integrality, origins, source premises, ordered basis and nonbasic statuses determine

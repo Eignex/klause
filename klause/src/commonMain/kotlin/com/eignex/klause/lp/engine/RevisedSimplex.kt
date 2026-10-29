@@ -157,10 +157,22 @@ internal class RevisedSimplex(
     private inline fun <T> profiled(phase: SimplexProfilePhase, block: () -> T): T {
         val trace = progressTrace?.takeIf { it.profile } ?: return block()
         val started = TimeSource.Monotonic.markNow()
+        val checkpoints = trace.checkpointNanos
         try {
             return block()
         } finally {
-            trace.recordPhase(phase, started.elapsedNow().inWholeNanoseconds)
+            val elapsed = started.elapsedNow().inWholeNanoseconds - (trace.checkpointNanos - checkpoints)
+            trace.recordPhase(phase, maxOf(0L, elapsed))
+        }
+    }
+
+    private inline fun profiledCheckpoint(block: () -> Unit) {
+        val trace = progressTrace?.takeIf { it.profile } ?: return block()
+        val started = TimeSource.Monotonic.markNow()
+        try {
+            block()
+        } finally {
+            trace.checkpointNanos += started.elapsedNow().inWholeNanoseconds
         }
     }
 
@@ -1006,7 +1018,7 @@ internal class RevisedSimplex(
     private suspend fun pauseAtIteration(progress: SolveProgress) {
         val cursor = activeSolve ?: return
         chargeWork()
-        cursor.checkpoint(work.ops)
+        profiledCheckpoint { cursor.checkpoint(work.ops) }
         while (retainFundingStop && !cancellation()) {
             val stop = when {
                 effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit -> LpFloatTermination.WORK
@@ -1014,7 +1026,7 @@ internal class RevisedSimplex(
                 else -> break
             }
             observations.termination = stop
-            cursor.pauseAt(work.ops)
+            profiledCheckpoint { cursor.pauseAt(work.ops) }
             observations.termination = null
         }
     }
@@ -2831,8 +2843,11 @@ internal class RevisedSimplex(
      * [IterationResult.RESTART] or [IterationResult.BASIS_CHANGED] when a refactorization requires the
      * caller to restart. Mutates [basicVar] / [status].
      */
+    private suspend fun primalPhase1(progress: SolveProgress): IterationResult =
+        profiled(SimplexProfilePhase.FEASIBILITY_REPAIR) { repairPrimalFeasibility(progress) }
+
     @Suppress("CyclomaticComplexMethod", "NestedBlockDepth", "ReturnCount", "LongMethod")
-    private suspend fun primalPhase1(progress: SolveProgress): IterationResult {
+    private suspend fun repairPrimalFeasibility(progress: SolveProgress): IterationResult {
         val beta = basicValues(phaseOneBeta)
         if (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit) {
             observations.termination = LpFloatTermination.WORK
@@ -3015,7 +3030,7 @@ internal class RevisedSimplex(
     }
 
     private fun phaseOneViolation(beta: DoubleArray, gradient: DoubleArray): Double =
-        profiled(SimplexProfilePhase.FEASIBILITY_REPAIR) {
+        profiled(SimplexProfilePhase.FEASIBILITY_SCAN) {
         var violation = 0.0
         for (i in 0 until m) {
             val column = basicVar[i]

@@ -28,6 +28,7 @@ import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.RevisedSimplex
 import com.eignex.klause.lp.engine.SimplexPhase
+import com.eignex.klause.lp.engine.SimplexProfilePhase
 import com.eignex.klause.lp.engine.SimplexProgressTrace
 import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
@@ -257,6 +258,7 @@ private fun traceJson(trace: SimplexProgressTrace): JsonElement = buildJsonObjec
     put("degenerateSteps", trace.degenerateSteps.values.sum())
     put("basisWork", numbers(trace.basisWork))
     put("progressSamples", trace.samples.size)
+    put("checkpointNs", trace.checkpointNanos)
     put("samples", JsonArray(trace.samples.map { sample -> buildJsonObject {
         put("phase", sample.phase.name)
         put("pivots", sample.pivots)
