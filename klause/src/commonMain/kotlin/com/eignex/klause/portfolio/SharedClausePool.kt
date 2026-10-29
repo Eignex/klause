@@ -437,6 +437,7 @@ internal class PoolClauseExchange(
             session.retainedSharingMemory = { sample ->
                 if (sessionIdentity === identity) sample.owned(seen, seen.allocatedBytes, protected = true)
             }
+            session.retainedSharingSize = { if (sessionIdentity === identity) seen.allocatedBytes else 0L }
         }
     }
 
@@ -516,6 +517,7 @@ internal class PoolClauseExchange(
         )
         if (sessionIdentity == null || sessionIdentity === session.sharingIdentity) {
             session.retainedSharingMemory = null
+            session.retainedSharingSize = null
             sessionIdentity = null
             cursor = 0L
             seen.release()

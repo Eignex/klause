@@ -190,7 +190,7 @@ class SharedClausePoolTest {
     @Test
     fun `suspension should retain the filter while a fresh session releases its capacity`() {
         val problem = Problem(128, 0, emptyArray(), emptyList())
-        val pool = SharedClausePool(cap = 4, measureMemory = true)
+        val pool = SharedClausePool(cap = 4, measureMemory = true, memorySampleWork = 262_144L)
         val meter = SharingMeter()
         val exchange = PoolClauseExchange(pool, origin = 1, meter = meter)
         val session = PropagationSession(problem)
@@ -201,6 +201,7 @@ class SharedClausePoolTest {
         }
         exchange.onSearchEnd(session)
         val suspended = meter.snapshot().clauses
+        assertEquals(1L, suspended.getValue("memorySampleComplete"))
         assertEquals(24L, suspended.getValue("seenKeys"))
         assertEquals(24L, suspended.getValue("learnedObjects"))
         assertTrue(suspended.getValue("seenKeys") > suspended.getValue("poolClauses"))

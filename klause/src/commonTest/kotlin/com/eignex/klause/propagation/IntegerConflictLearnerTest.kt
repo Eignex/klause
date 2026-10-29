@@ -90,21 +90,20 @@ class IntegerConflictLearnerTest {
                 assertEquals(2 * x + y <= z, point.boolValue(program.boolVarsByName.getValue("active")))
                 assertTrue(2 * x <= y)
             }
+            val session = assertNotNull(native)
+            val retained = uses.entries.firstOrNull { it.value.size >= 2 }?.key?.first
+            assertNotNull(retained, "prepared=" + ProblemJson().encodeToString(prepared.problem) +
+                "; learning=" + session.learnedLifecycle() + "; uses=" + uses.values +
+                "; declines=" + trace.events.filter { "decline" in it.kind }.groupingBy { it.kind }.eachCount() +
+                "; tail=" + trace.events.takeLast(20).map { it.kind })
+            assertTrue(retained.row.guard != Lit.NONE)
+            session.popToLevel(0)
+            assertIs<PropagationResult.Implied>(session.pinBool(Lit.variable(retained.row.guard),
+                !Lit.isPositive(retained.row.guard)))
+            session.forgetLearnedClauses { _, _ -> false }
+            assertFalse(session.explanationState.learned.integerRows?.contains(retained) == true)
+            assertTrue((session.learnedLifecycle()["learningIntegerRetired"] ?: 0L) > 0L)
         }
-
-        val session = assertNotNull(native)
-        val retained = uses.entries.firstOrNull { it.value.size >= 2 }?.key?.first
-        assertNotNull(retained, "prepared=" + ProblemJson().encodeToString(prepared.problem) +
-            "; learning=" + session.learnedLifecycle() + "; uses=" + uses.values +
-            "; declines=" + trace.events.filter { "decline" in it.kind }.groupingBy { it.kind }.eachCount() +
-            "; tail=" + trace.events.takeLast(20).map { it.kind })
-        assertTrue(retained.row.guard != Lit.NONE)
-        session.popToLevel(0)
-        assertIs<PropagationResult.Implied>(session.pinBool(Lit.variable(retained.row.guard),
-            !Lit.isPositive(retained.row.guard)))
-        session.forgetLearnedClauses { _, _ -> false }
-        assertFalse(session.explanationState.learned.integerRows?.contains(retained) == true)
-        assertTrue((session.learnedLifecycle()["learningIntegerRetired"] ?: 0L) > 0L)
     }
 
     @Test

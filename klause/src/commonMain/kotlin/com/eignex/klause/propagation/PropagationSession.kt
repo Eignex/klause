@@ -117,6 +117,7 @@ class PropagationSession private constructor(
         levelTop = 0
         sharedLearningMemory = null
         retainedSharingMemory = null
+        retainedSharingSize = null
         retainedInprocessingMemory = null
         simplifiedRootSources = null
     }
@@ -1078,12 +1079,18 @@ class PropagationSession private constructor(
      *  not the general database, so clause-database introspection routes differently. */
     val usesNativeSat: Boolean get() = state.nativeEngine != null
 
-    internal fun chargeSharingWork(count: Long) { state.work += count }
+    private var sharingAccountingWork = 0L
+    internal val ownershipWork: Long get() = work - sharingAccountingWork
+    internal fun chargeSharingWork(count: Long) {
+        state.work += count
+        sharingAccountingWork += count
+    }
 
     internal val sharingIdentity = Any()
 
     internal var sharedLearningMemory: ((SharingMemoryObservation) -> Unit)? = null
     internal var retainedSharingMemory: ((SharingMemoryObservation) -> Unit)? = null
+    internal var retainedSharingSize: (() -> Long)? = null
     internal var retainedInprocessingMemory: ((SharingMemoryObservation) -> Unit)? = null
 
     internal fun reclaimLearnedMemory(
