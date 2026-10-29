@@ -93,11 +93,12 @@ internal class LinearAuthorityInvocation(
     val stats: SolveStats get() = SolveStats(
         run = SolveStats.EMPTY.run.copy(backend = "linear-authority",
             wallMs = started.elapsedNow().inWholeMilliseconds, timedOut = params.timeout()),
-        smt = state.smt.snapshot().copy(completeSearchStages = component.observations() +
+        smt = state.smt.snapshot().let { snapshot -> snapshot.copy(
+            completeSearchStages = snapshot.completeSearchStages.orEmpty() + component.observations() +
             mapOf("numericalFundedWork" to funding.spent, "numericalFundedAllocation" to funding.allocated,
                 "numericalImportedIncumbents" to importedIncumbents) +
             (frontier?.let { mapOf("numericalFrontierPending" to it.pending.toLong(),
-                "numericalFrontierPeakPending" to it.peakPending.toLong()) } ?: emptyMap())),
+                "numericalFrontierPeakPending" to it.peakPending.toLong()) } ?: emptyMap())) },
         openTheory = state.work.snapshot(),
         search = state.progress(if (closed) null else session))
     private val component = LinearAuthorityTraversal(context,
