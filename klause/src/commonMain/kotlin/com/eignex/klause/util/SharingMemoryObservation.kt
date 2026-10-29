@@ -99,6 +99,17 @@ internal class SharingMemoryObservation(
         return true
     }
 
+    fun <T : Any> contains(seen: Seen<T>, value: T): Boolean {
+        step()
+        var node = seen.head
+        while (node != null) {
+            step()
+            if (node.value == value) return true
+            node = node.next
+        }
+        return false
+    }
+
     class Seen<T : Any> {
         internal var head: Entry<T>? = null
         internal var size: Int = 0

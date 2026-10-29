@@ -87,7 +87,7 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
     }
 
     internal fun retainedMemory(sample: SharingMemoryObservation) {
-        learned.memory(sample) { index ->
+        val protectedOwners = learned.memory(sample) { index ->
             var protected = learned.literalsAt(index).size == 1 || learned.lbdAt(index) <= learnedDb.glueLbd
             for (slot in reasons.usedInternal.indices) {
                 sample.step()
@@ -101,10 +101,10 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
             "sharedLearnedReasonIndexBytes" to reasons.primitiveCapacityBytes,
             "sharedLearnedPendingEntries" to (pendingAttach.size + rechecks.size).toLong(),
         ))
-        sample.owned(stages.backingData, stages.backingData.size.toLong() * Int.SIZE_BYTES)
+        sample.owned(stages.backingData, stages.backingData.size.toLong() * Int.SIZE_BYTES, protectedOwners)
         sample.owned(reasons, reasons.primitiveCapacityBytes, protected = true)
         sample.owned(pendingAttach, pendingAttach.capacityBytes, protected = true)
-        sample.owned(rechecks, rechecks.capacityBytes)
+        sample.owned(rechecks, rechecks.capacityBytes, protectedOwners)
     }
 
     internal fun reclaimMemory(

@@ -233,7 +233,9 @@ reference slots and allocator overhead remain excluded. Diagnostic payload categ
 can alias and cannot be summed to reconstruct these ownership fields.
 
 Protected ownership includes permanent assertions, live and saved reasons, pending first
-assertions and interrupted root publication. Native packed arenas are protected at
+assertions and interrupted root publication. Required metadata, reference containers
+and posting allocations share the protection of the clauses they index.
+Native packed arenas are protected at
 allocation granularity while a retained reason needs them. This floor is conservative,
 rather than a minimum compacted representation. Pressure may release optional pass
 buffers, while interrupted propagation/publication retains them. Close detaches the
