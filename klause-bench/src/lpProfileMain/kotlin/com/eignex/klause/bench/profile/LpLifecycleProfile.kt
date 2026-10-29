@@ -196,7 +196,8 @@ private fun lifecycle(
             activeNs += stageNs
             val stageBytes = stageAllocated?.let { start -> profileAllocatedBytes()?.minus(start) }
             state = current.state
-            val numerical = primaryEngine
+            val numerical = primaryEngine.takeIf { prepared }
+            val metrics = if (prepared) current.lastMetrics else LpSolveMetrics()
             println(
                 buildJsonObject {
                     put("kind", "query")
@@ -220,25 +221,27 @@ private fun lifecycle(
                     put("cancelled", cancellation())
                     put("verdict", result?.verdict?.name)
                     put("bound", result?.lowerBound?.toString())
+                    put("witnessObjective", result?.witness?.objective?.toString())
+                    put("floatObjective", result?.float?.objective?.let(::profileNumber) ?: JsonNull)
                     put("exactPoint", result?.exactPrimal?.toString())
                     put("termination", numerical?.lastTermination?.name)
-                    put("pivots", current.lastMetrics.pivots)
-                    put("work", current.lastMetrics.workOps)
+                    put("pivots", metrics.pivots)
+                    put("work", metrics.workOps)
                     put("preparationWork", current.metrics.preparationWork)
                     put("createdOwners", current.metrics.createdOwners)
                     put("closedOwners", current.metrics.closedOwners)
                     put("retainedRows", current.metrics.retainedRows)
                     put("activeRows", current.metrics.activeRows)
-                    put("certificateWork", observer.work)
-                    put("certificateAttempts", numbers(observer.attempts))
-                    put("exactInputAttempts", observer.exactInputAttempts)
-                    put("exactInputAccepted", observer.exactInputAccepted)
-                    put("certificatePhases", numbers(observer.phases))
+                    put("certificateWork", if (observed) JsonPrimitive(observer.work) else JsonNull)
+                    put("certificateAttempts", if (observed) numbers(observer.attempts) else JsonNull)
+                    put("exactInputAttempts", if (observed) JsonPrimitive(observer.exactInputAttempts) else JsonNull)
+                    put("exactInputAccepted", if (observed) JsonPrimitive(observer.exactInputAccepted) else JsonNull)
+                    put("certificatePhases", if (observed) numbers(observer.phases) else JsonNull)
                     put("reconstructionDecline", result?.reconstruction?.decline?.name)
                     put("basisDecline", result?.basisVerification?.decline?.name)
                     put("continuationDecline", result?.continuation?.decline?.name)
                     put("refinementDecline", result?.refinement?.decline?.name)
-                    put("sourceResidualNs", current.lastMetrics.sourceResidualNanos)
+                    put("sourceResidualNs", metrics.sourceResidualNanos)
                     put("luMaxFill", result?.float?.luMaxFill?.let(::JsonPrimitive) ?: JsonNull)
                     put("luMaxDensity", result?.float?.luMaxDensity?.let(::JsonPrimitive) ?: JsonNull)
                     put(
