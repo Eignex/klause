@@ -27,6 +27,8 @@ internal class PreparingSatisfaction(
         solver.problem, propagationToken, params.propagationCancelFloor,
         params.pbLearning ?: (solver.problem.numIntVars == 0),
         cumulativeUnarySubsets = solver.problem.numRealVars == 0 && params.useCumulativeUnarySubsets,
+        attribution = params.propagationAttribution,
+        historicalTables = params.historicalTableReasons,
     )
     private var session: PropagationSession? = null
     private var seeding: Iterator<PropagationResult?>? = null
@@ -39,6 +41,7 @@ internal class PreparingSatisfaction(
     private val propagationWork: Long get() = session?.work ?: preparation?.work ?: 0L
 
     init {
+        sink.search.learning = { session?.learnedLifecycle() ?: preparation?.learning() ?: emptyMap() }
         sink.search.propagationWork = { propagationWork }
         sink.search.rootPropagationWork = { session?.rootWork ?: preparation?.work ?: 0L }
         sink.search.propagationNanos = { session?.propagationNanos ?: preparation?.propagationNanos ?: 0L }

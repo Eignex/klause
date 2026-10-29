@@ -1305,6 +1305,7 @@ class PropagationState private constructor(
                 }
             }
             if (runCancelled) {
+                attribution?.note(family, FactorAttribution.Metric.Interrupted)
                 propEnq(fid)
                 return null
             }
