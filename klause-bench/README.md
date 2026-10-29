@@ -979,6 +979,10 @@ companion active time. Approximate real seed coordinates guide exact rational
 reconstruction before residual LP completion; reconstruction and original-source
 checking remain charged to the containing funding. A reconstructed point can avoid
 an LP operation, but that alone establishes no source-level benefit.
+`jointRepairCheckedCenterStarts` counts enabled completion's first connected repair
+proposal from a checked pooled center, skipping its all-pinned bootstrap. The first
+proposal frees at most two connected integers under the same repair allowance;
+record completed checked improvements separately from proposal/import counts.
 
 [9366](https://lab.eignex.com/jobs/9366) exercises ordinary finite producers on
 `bell3a` and `bell5`, with completion off/on at `89d5153cd9`, seed 1, one core and

@@ -186,13 +186,20 @@ internal class JointLinearRepair(
                     focusedRemaining = sourceIntegers?.size ?: model.numIntVars
                     observe("jointRepairSourceInputPasses")
                 }
-                val width = if (sourceInputPass && !adaptive && round > 0L && focusedRemaining > 0) {
+                val checkedStart = pooled != null && completion != null && round == 0L
+                val width = if (checkedStart) {
+                    observe("jointRepairCheckedCenterStarts")
+                    minOf(count, 2)
+                } else if (sourceInputPass && !adaptive && round > 0L && focusedRemaining > 0) {
                     focusedRemaining--
                     observe("jointRepairSourceInputProposals")
                     minOf(count, 2)
                 } else count
                 if (pooled != null) onIncumbentUse?.invoke()
-                requireNotNull(selection).propose(from, pooled?.bools ?: bools, width, round, radius, limit)
+                // A checked center needs no all-pinned rounded-root bootstrap.
+                val proposalRound = if (pooled != null && completion != null)
+                    round.coerceAtMost(Long.MAX_VALUE - 1) + 1 else round
+                requireNotNull(selection).propose(from, pooled?.bools ?: bools, width, proposalRound, radius, limit)
             },
         )
     }

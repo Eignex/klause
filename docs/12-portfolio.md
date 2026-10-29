@@ -101,6 +101,11 @@ Ordinary linear sources reconstruct the completed point through the captured
 presolve mapping, check the original declarations and rows, and compare the original
 objective with the adjusted working value before import.
 
+With completion enabled, a checked pooled center starts joint repair in a small
+connected integer neighborhood. The all-pinned rounded-root bootstrap is reserved
+for a center without that checked handoff. Continuous columns stay free, source
+cutoff checks remain exact, and later proposals retain their captured conditions.
+
 Each companion owns at most sixteen source/point attempts without eviction. Identity
 includes the full source restrictions, rows, coordinates, objective, interpretation
 and checker, plus the seed values and coordinate frame. Failed unchanged attempts
