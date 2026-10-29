@@ -792,7 +792,7 @@ initial window. Deadlines, decisions and total work/lifecycle counts cover the
 entire invocation; discarding diagnostic data resets no solver allowance.
 
 Plain source bytes are hashed after corpus decompression with a 1 MiB input limit.
-A hash mismatch retains the bytes and observed digest and stops before solving.
+A catalog hash mismatch retains the bytes and observed digest and stops before solving.
 Optional `source64=BASE64 format=FORMAT` uses the existing 96 KiB encoded-input
 loader and requires the same source digest, avoiding runtime corpus discovery.
 Original source bytes, canonical original/prepared models and installed provenance
@@ -819,3 +819,24 @@ upper bounds, then retires after its guard is negated. Twenty reconstructed sour
 points satisfy both original relations. At `1a9a2cb15a`,
 [CI](https://github.com/Eignex/klause/actions/runs/40863068552) passes JVM, native
 and lint/docs; the prepared-source JVM test takes 62 ms.
+
+At `f7eeda662c`, [lab 9307](https://lab.eignex.com/jobs/9307) parses frozen original
+`MagicSquare-sum-06_c23` XCSP3 bytes with digest
+`f8bf86880a7020f41783f247b670c613f7a4615c640f5764210b630f20e53af2`.
+Ordinary preparation retains the overlapping linear sources. The trace includes
+the historical endpoint rows, complete fallback and an unguarded 16-term consequence,
+mapped to level 12 and stored as identity 0 / factor 1490. That same object forces
+variable 9 at most 19, then 16 after pick 48 and 15 after pick 49; sibling reuse also
+survives undo. The event cap cuts later observations, so retirement of this object
+is established by the prepared-source regression, not by the catalog trace.
+Catalog lifecycle counters report 16 admitted/consumed rows and 16 retired rows.
+
+Both arms retain seed 3, a 10-second deadline and `maxDecisions=4096`. The clause arm
+returns SAT with native reconstruction checks; the integer arm stops at its node
+limit as Unknown. Neither supplies independent source certification or a speedup.
+The containing run takes 282.799 seconds, including 87.923 seconds of compilation;
+the source command takes 33.769 seconds including output drain. Placement is automatic
+on macOS arm64, JDK 25.0.4.1+1, with advisory one-CPU / 4,608 MiB resource receipts.
+The smaller magic-square source's AllDifferent-only conflicts, compressed-byte
+hash refusal, worker network failure, earlier truncated captures and preparation
+timeouts retain their costs and provenance in the external campaign ledger.
