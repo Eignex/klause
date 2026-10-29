@@ -431,7 +431,12 @@ Boolean region attribution uses the [task coverage protocol](08-search.md#boolea
 with the same source, full assumptions, objective cutoff and mapping identity. Schedule
 events and read/import/use counts do not establish duplicate region coverage. The task
 board is separate from worker selection: it changes neither these scheduling rules nor
-terminal admission and owns no retained solver state.
+terminal admission and owns no retained solver state. The internal Boolean task
+executor keeps one repair handle per worker and rotates ordinary-sized bounded
+slices across disjoint tasks, reusing each private session for sibling cubes.
+Construction, reseeding, failed attempts, checks and retirement remain inside
+its containing work and physical cost observations; it supplies no independent
+proof certificate or automatic admission policy.
 
 ### Slice accounting and coverage
 

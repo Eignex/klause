@@ -1094,3 +1094,15 @@ on macOS arm64, JDK 25.0.4.1+1, with advisory one-CPU / 4,608 MiB resource recei
 The smaller magic-square source's AllDifferent-only conflicts, compressed-byte
 hash refusal, worker network failure, earlier truncated captures and preparation
 timeouts retain their costs and provenance in the external campaign ledger.
+
+`bench.profile.BooleanProofSchedulerProfile` compares retained Boolean task workers
+with independent replicas on one hash-pinned DIMACS source. Required arguments are
+`suite=ID problem=NAME sha256=HEX work=N seed=N splits=N repeats=N`. Two workers
+receive consecutive explicit seeds, one core, the same containing decision/work cap
+and normal 5000/150000 work slices. Each balanced control pays source construction,
+bake, private setup, source witness checking and retirement; process CPU, thread
+allocation, root/total propagation and native coverage remain separate observations.
+One warmup precedes measured repeats. Use the explicit build/classpath and JVM
+controls of `BooleanProofCoverageProfile`. The scheduler is internal and pure Boolean
+satisfaction only; the profile supplies neither independent UNSAT checking nor a
+production activation decision. Sampled heap is not a peak-memory bound.
