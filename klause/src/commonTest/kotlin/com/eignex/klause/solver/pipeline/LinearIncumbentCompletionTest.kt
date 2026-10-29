@@ -279,12 +279,18 @@ class LinearIncumbentCompletionTest {
     }
 
     @Test
-    fun `granting an exhausted containing allowance should not restart completion`() {
-        val funding = SourceLpFunding(1L, 64L * 1024L * 1024L)
+    fun `an exhausted completion should not restart after another funding grant`() {
+        val funding = SourceLpFunding(2_000_000L, 64L * 1024L * 1024L)
         var attempts = 0L
+        var recoveries = 0L
+        var reused = 0L
 
-        LinearIncumbentCompletion(SourceLpBudget(funding = funding)) { stage, count ->
-            if (stage == "Attempts") attempts += count
+        LinearIncumbentCompletion(SourceLpBudget(maxOperations = 0, funding = funding)) { stage, count ->
+            when (stage) {
+                "Attempts" -> attempts += count
+                "PrimalRecoveryAttempts" -> recoveries += count
+                "DeclineReused" -> reused += count
+            }
         }.use { completion ->
             repeat(3) {
                 funding.grant(2_000_000L)
@@ -292,7 +298,9 @@ class LinearIncumbentCompletionTest {
             }
         }
 
-        assertTrue(funding.exhausted)
-        assertEquals(0L, attempts)
+        assertTrue(funding.spent > 0L)
+        assertEquals(1L, attempts)
+        assertEquals(1L, recoveries)
+        assertEquals(2L, reused)
     }
 }
