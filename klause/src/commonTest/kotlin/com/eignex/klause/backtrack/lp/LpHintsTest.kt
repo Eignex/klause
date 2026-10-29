@@ -207,4 +207,34 @@ class LpHintsTest {
             assertTrue(hints.branchScore(VarRef.IntVar(0)).isFinite())
         }
     }
+
+    @Test
+    fun `stable objective constants preserve small directional gains`() {
+        for (constant in listOf(0L, 1L shl 60, -(1L shl 60))) {
+            val builder = LpBuilder()
+            builder.addVar(0, 10, cost = 1)
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+                booleanArrayOf(false), constant, intArrayOf(0), IntArray(0))
+            val hints = LpHints(1, 0, directionalGains = true)
+            val variable = VarRef.IntVar(0)
+            repeat(2) {
+                hints.beginNode(0, Double.POSITIVE_INFINITY)
+                hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+                hints.recordObjective(relaxation, 10.0)
+                hints.branch(variable)
+                for (up in listOf(false, true)) {
+                    hints.commit(if (up) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2), 1)
+                    hints.beginNode(1, Double.POSITIVE_INFINITY)
+                    hints.record(relaxation, doubleArrayOf(if (up) 3.0 else 2.0), DoubleArray(0))
+                    hints.recordObjective(relaxation, if (up) 13.0 else 11.0)
+                }
+            }
+            hints.beginNode(0, Double.POSITIVE_INFINITY)
+            hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+            hints.recordObjective(relaxation, 10.0)
+
+            assertEquals(1.5, hints.directionalScore(variable), 1e-9, "constant=$constant")
+        }
+    }
 }
