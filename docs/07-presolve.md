@@ -86,7 +86,8 @@ Protection discovery charges and polls the phase allowance; an incomplete discov
 publishes no affine elimination.
 
 `structuralImpactLimit` enables a bounded delta view for affine, structural and
-extensional reductions. Each factor, support entry, declared row term and affine
+extensional reductions. Support counts cover discrete Boolean and integer inputs.
+Each factor, support entry, declared row term and affine
 reconstruction dependency visits and charges the containing phase allowance.
 The cap is per productive invocation, including both sides and reconstruction;
 zero disables all diagnostic scans. Counts describe removed and added factors,
@@ -97,6 +98,8 @@ Non-integral or wide declared rows are explicitly uncounted. Affine reconstructi
 reports definitions, input edges and maximum recovery depth, with scratch space
 bounded by the visit cap. A partial view carries `Complete=0`; a diagnostic stop
 retains the already completed sound delta. Its visits join the invocation's work.
+Counters are sparse: an absent counter is zero only in a complete view; an absent
+view is unobserved, and a partial view cannot establish a zero count.
 
 Mixed-factor incidence is a channel proxy; support width is a potential explanation
 scope; equality inputs and reconstruction depth describe potential definition-cone

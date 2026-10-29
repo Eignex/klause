@@ -231,8 +231,9 @@ Both are request-local and survive local-search plan adaptation. The
 [presolve contract](07-presolve.md#rewrite-representation-controls) defines their
 scope and the limits of their representation proxies.
 Invocation groups add `ImpactCalls`, `ImpactComplete`, `ImpactVisits` and the
-observed representation counts. Missing impact fields mean unobserved. Completed
-observations count in `ImpactComplete`; it must equal `ImpactCalls` before treating
+observed representation counts. An absent impact group is unobserved. Within a
+complete group, absent counters are zero; partial groups cannot establish zero.
+Completed observations count in `ImpactComplete`; it must equal `ImpactCalls` before treating
 aggregate deltas as complete. Width and depth maxima take the maximum across the
 group; other fields sum. Diagnostic work is included in `Work`.
 
