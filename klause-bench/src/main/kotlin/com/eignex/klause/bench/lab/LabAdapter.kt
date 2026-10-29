@@ -159,7 +159,19 @@ internal object KlauseLabSuite : BenchSuite {
             )
         }
         val retained = record.copy(
-            comparisonControls = comparisonControls(case),
+            comparisonControls = comparisonControls(case) + buildMap {
+                provenance?.let { build ->
+                    put("runtimeFingerprint", build.copy(
+                        distribution = emptyMap(), harness = emptyMap(),
+                        runtimeOptions = build.runtimeOptions - "KLAUSE_CLI_OPTS" - "KLAUSE_CLI_PREFLIGHT_OPTS",
+                    ).fingerprint)
+                }
+                record.compilerIdentity?.let { compiler ->
+                    put("compilerFingerprint", com.eignex.klause.bench.metric.sha256(
+                        compiler.copy(executable = "", standardLibrary = "").toString().toByteArray(),
+                    ))
+                }
+            },
             buildProvenance = provenance,
             buildFingerprint = provenance?.fingerprint,
             stats = record.stats + mapOf(
@@ -188,6 +200,7 @@ internal object KlauseLabSuite : BenchSuite {
         }
         put("exact", p["exact"] ?: "false")
         put("deadlinePolicy", "cli-inclusive-v1")
+        case.attributes["labInputDigest"]?.let { put("inputDigest", it) }
     }
 
     internal fun failure(record: SolveRecord): String? = record.stats["loadError"] ?: record.stats["errorMessage"]
