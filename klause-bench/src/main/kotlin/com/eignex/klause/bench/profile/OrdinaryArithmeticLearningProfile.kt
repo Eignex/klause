@@ -74,9 +74,10 @@ internal object OrdinaryArithmeticLearningProfile {
                         }
                         check(native === session)
                         val picked = delegate.pick(session, rng)
-                        capture?.record("traversal.pick", session.decisionLevel.toLong(),
+                        val recorder = requireNotNull(capture)
+                        recorder.record("traversal.pick", session.decisionLevel.toLong(),
                             if (picked is VarRef.IntVar) picked.varId.toLong() else -1L)
-                        if (capture?.accepting == true && session.problem.numIntVars <= 64) capture?.record(
+                        if (recorder.accepting && session.problem.numIntVars <= 64) recorder.record(
                             "traversal.bounds",
                             *LongArray(session.problem.numIntVars * 2) { index ->
                                 val domain = session.intDomain(index / 2)
