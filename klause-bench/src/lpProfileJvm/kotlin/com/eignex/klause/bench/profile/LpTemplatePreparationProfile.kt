@@ -9,6 +9,7 @@ import com.eignex.klause.lp.engine.solveAndCertify
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.RootDomains
+import com.eignex.klause.lp.relaxation.authoritativeWithTemplates
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.LpStatsSink
@@ -109,7 +110,10 @@ internal object LpTemplatePreparationProfile {
                             assemblyNs += System.nanoTime() - opening
                             retainedUnits = maxOf(retainedUnits, consumer.preparationTemplates?.storageUnits ?: 0L)
                             val solving = System.nanoTime()
-                            val result = solveAndCertify(relaxation.model, cancellation = token)
+                            val exact = requireNotNull(relaxation.authoritativeWithTemplates(token)) {
+                                consumer.observeBoundTemplates(it)
+                            }
+                            val result = solveAndCertify(exact, cancellation = token)
                             solveNs += System.nanoTime() - solving
                             results.add("${result.verdict}:${result.lowerBound}:${result.witness?.objective}")
                             if (step == 0) coldNs = System.nanoTime() - start
