@@ -7,6 +7,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.RepairSearch
+import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.incumbent.Candidate
@@ -124,6 +125,10 @@ internal class BooleanProofScheduler(
             }
             return BooleanProofStep(lease.task, reason = result.reason)
         } catch (failure: Throwable) {
+            if (slot.search == null && failure is SearchInitializationCancelled) {
+                slot.retiredWork += failure.work
+                slot.retiredStats = slot.retiredStats.mergedWith(failure.stats)
+            }
             tasks.release(lease)
             slot.lease = null
             retire(worker, failure)
