@@ -80,6 +80,7 @@ internal class LpScopedSolver(
     val state: LpExactState get() = trail.state
     internal val proofPolicy: LpCertificationPolicy get() = context.certificationPolicy
     internal val cancellationToken: Cancellation get() = cancellation
+    internal val checkedResultStorageDeclined: Boolean get() = checkedResults.storageDeclined
     var lastResult: CertifiedLpResult? = null
         private set
     var lastMetrics: LpSolveMetrics = LpSolveMetrics()

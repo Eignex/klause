@@ -268,6 +268,10 @@ private fun lifecycle(
                         previousStatuses?.let { previous -> JsonPrimitive(previous == it) }
                     } ?: JsonNull)
                     put("certificationReused", result?.certificationReused)
+                    put("checkedResultStorageDeclined", current.checkedResultStorageDeclined)
+                    put("structuralBasisColumns", result?.float?.basis?.basicVars?.count {
+                        it < current.state.model.n
+                    })
                     put("stageNs", stageNs)
                     put("constructionNs", constructionNs)
                     put("editNs", editNs)

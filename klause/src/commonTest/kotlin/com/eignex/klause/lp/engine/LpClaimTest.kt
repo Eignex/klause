@@ -100,6 +100,23 @@ class LpClaimTest {
     }
 
     @Test
+    fun `oversized checked result keys should decline storage without changing the bound`() {
+        val model = LpBuilder().apply { repeat(1024) { addVar(0L, 3L, cost = 1L) } }.build(Sense.MINIMIZE)
+        val state = LpExactState(assertNotNull(model.authoritativeModel()))
+        LpScopedSolver(state).use { owner ->
+            val first = assertNotNull(owner.solve(claim = LpClaim.BOUND))
+
+            val repeated = assertNotNull(owner.solve(claim = LpClaim.BOUND))
+
+            assertEquals(BigFraction.ZERO, first.lowerBound)
+            assertEquals(first.lowerBound, repeated.lowerBound)
+            assertTrue(owner.checkedResultStorageDeclined)
+            assertFalse(repeated.certificationReused)
+            assertNull(repeated.witness)
+        }
+    }
+
+    @Test
     fun `checked packages should remain unavailable under another acceptance policy`() {
         val builder = LpBuilder()
         builder.addVar(0L, 3L, cost = 1L)
