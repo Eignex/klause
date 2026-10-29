@@ -30,6 +30,10 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
     private var reductionNanos = 0L
     private var releasedWatchVisits = 0L
     val size: Int get() = learned.size
+    internal var ownershipRevision: Long = 0L
+        private set
+    internal val storeOwnershipRevision: Long get() = learned.ownershipRevision
+    internal val watchPosition: Long get() = learned.watchVisits
 
     fun explanationOf(index: Int): SearchExplanation = learned.explanationOf(index)
 
@@ -50,6 +54,7 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
     fun onRootReset() {
         reasons.forEach { _, index -> queueRecheck(index) }
         reasons.clear()
+        ownershipRevision++
         propagatedTrail = 0
         unitsPending = learned.units.size > 0
     }
@@ -70,6 +75,7 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
     )
 
     internal fun release() {
+        ownershipRevision++
         releasedWatchVisits += learned.watchVisits
         learned = WatchedClauseStore()
         stages = IntArrayList()
@@ -163,6 +169,7 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
                 if (cancelled()) throw ReclamationStopped(true)
                 // No callback or cancellation point can observe a partially published index generation.
                 val retired = size - replacement.size
+                ownershipRevision++
                 learned = replacement
                 stages = replacementStages
                 reasons = replacementReasons
@@ -240,6 +247,7 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
             if (lbd <= GLUE_LBD) glueClauses++
             peakLearnedClauses = maxOf(peakLearnedClauses, learned.size.toLong())
             pendingAttach.addLast(index)
+            ownershipRevision++
         } else {
             relearnedClauses++
         }
@@ -322,6 +330,7 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
         replacement.clearUsed()
         step()
         if (cancelled()) throw ReclamationStopped(true)
+        ownershipRevision++
         stages = replacementStages
         rechecks = replacementRechecks
         reasons = retainedReasons
@@ -370,12 +379,14 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
     fun propagate(host: ClauseWatchHost, boolTrail: IntArrayList): ComponentResult {
         while (pendingAttach.isNotEmpty()) {
             val index = pendingAttach.removeFirst()
+            ownershipRevision++
             lifecycle.note(LearnedKind.Clause, LearnedStage.Asserted)
             val result = learned.attach(index, host)
             if (result !is ComponentResult.Consistent) return result
         }
         while (rechecks.isNotEmpty()) {
             val index = rechecks.removeFirst()
+            ownershipRevision++
             stages[index] = stages[index] and 2.inv()
             val result = learned.recheck(index, host)
             if (result !is ComponentResult.Consistent) return result
@@ -405,6 +416,7 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
 
     fun implied(index: Int, literal: Int) {
         reasons.put(literal ushr 1, index)
+        ownershipRevision++
         consumed(index)
     }
 
@@ -412,6 +424,7 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
         val index = reasons.getOrDefault(variable, -1)
         if (index < 0) return
         reasons.remove(variable)
+        ownershipRevision++
         queueRecheck(index)
     }
 
@@ -419,6 +432,7 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
         if (stages[index] and 2 != 0) return
         stages[index] = stages[index] or 2
         rechecks.addLast(index)
+        ownershipRevision++
     }
 
     fun consumed(index: Int) {

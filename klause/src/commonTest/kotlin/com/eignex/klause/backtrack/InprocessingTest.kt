@@ -204,9 +204,12 @@ class InprocessingTest {
             val source = Problem(3, 0, emptyArray(), arrayOf<Factor>(
                 Clause(intArrayOf(1)), Clause(intArrayOf(0, 2, 4)),
             ))
-            val session = PropagationSession(source.bake(), nativeSat = native)
+            val session = PropagationSession(source, nativeSat = native)
             val loop = Inprocessing(listOf(RootSimplificationPass()), cadence = 1)
             val params = BacktrackParams(cancellation = Cancellation { session.learnedClauseCount > 0 })
+            assertEquals(false, session.boolValue(0))
+            assertNull(session.boolValue(1))
+            assertNull(session.boolValue(2))
             loop.onRestart(session, params)
             assertTrue(session.fixpointCancelled)
             val sample = SharingMemoryObservation(1024L, 128, { false }, {})
@@ -226,11 +229,12 @@ class InprocessingTest {
     fun `memory pressure should preserve completed root facts awaiting publication`() {
         for (native in listOf(false, true)) {
             val source = Problem(2, 0, emptyArray(), arrayOf<Factor>(
-                Clause(intArrayOf(1)), Clause(intArrayOf(0, 2)),
+                Clause(intArrayOf(0, 2)), Clause(intArrayOf(0, 3)),
             ))
-            val session = PropagationSession(source.bake(), nativeSat = native)
-            val loop = Inprocessing(listOf(RootSimplificationPass()), cadence = 1)
-            val publicationNeeded = loop.onRestart(session, BacktrackParams())
+            val session = PropagationSession(source, nativeSat = native)
+            val loop = Inprocessing(listOf(RootProbingPass()), cadence = 1)
+            assertNull(session.boolValue(0))
+            val publicationNeeded = loop.onRestart(session, BacktrackParams(rootProbeBatch = 2))
             session.addLearnedClause(Clause(intArrayOf(0, 1)), 9)
             val count = session.learnedClauseCount
             val revision = session.learnedClauseRevision
@@ -245,7 +249,7 @@ class InprocessingTest {
             assertEquals(ReclamationStatus.DEFERRED, reclamation.status)
             assertEquals(count, session.learnedClauseCount)
             assertEquals(revision, session.learnedClauseRevision)
-            assertEquals(true, session.boolValue(1))
+            assertEquals(true, session.boolValue(0))
         }
     }
 }

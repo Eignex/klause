@@ -241,6 +241,9 @@ native generation; reseeding preserves compatible learning and invalidates obsol
 snapshots.
 
 Reclamation runs at safe propagation/branch boundaries independently of restarts.
+Unchanged ownership reuses its maintenance result across short resumed slices; store,
+trail, atom, pass and scope changes invalidate that decision rather than spending a
+whole slice repeatedly before search advances.
 `learned-memory-work` and `learned-memory-scratch-bytes` bound preparation and scratch.
 Native/general compaction requires a cancellable preflight of all arrays, watches, reasons,
 queues and event indexes, with a conservative envelope for indivisible publication.

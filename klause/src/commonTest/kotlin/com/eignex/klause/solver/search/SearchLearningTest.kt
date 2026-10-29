@@ -2,12 +2,60 @@ package com.eignex.klause.solver.search
 
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.SharingMemoryObservation
+import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class SearchLearningTest {
+    @Test
+    fun `unchanged shared ownership should reuse its completed reclamation attempt`() {
+        var charged = 0L
+        val cancellation = object : Cancellation {
+            override fun isCancelled(): Boolean = false
+            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+        }
+        val session = SearchSession(emptyList(), cancellation = cancellation,
+            learnedDb = SearchLearnedDbParams(glueLbd = 0, softLimitBytes = 0L))
+        val first = session.reclaimLearningMemory()
+        val initialWork = charged
+
+        repeat(5) { assertEquals(first, session.reclaimLearningMemory()) }
+
+        assertTrue(initialWork > 0L)
+        assertEquals(initialWork, charged)
+        session.learn(SearchExplanation(intArrayOf(0)))
+        session.reclaimLearningMemory()
+        assertTrue(charged > initialWork)
+        val learnedWork = charged
+        session.imply(2, SearchExplanation(intArrayOf(2)))
+        session.reclaimLearningMemory()
+        assertTrue(charged > learnedWork)
+    }
+
+    @Test
+    fun `unchanged shared ownership should reuse a deferred reclamation attempt`() {
+        var charged = 0L
+        val cancellation = object : Cancellation {
+            override fun isCancelled(): Boolean = false
+            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+        }
+        val session = SearchSession(emptyList(), cancellation = cancellation,
+            learnedDb = SearchLearnedDbParams(softLimitBytes = 0L, reclamationWork = 25L))
+        val first = requireNotNull(session.reclaimLearningMemory())
+        val initialWork = charged
+
+        repeat(5) { assertEquals(first, session.reclaimLearningMemory()) }
+
+        assertEquals(SharedLearningReclamationStatus.Deferred, first.status)
+        assertTrue(initialWork > 0L)
+        assertEquals(initialWork, charged)
+        session.imply(0, SearchExplanation(intArrayOf(0)))
+        session.reclaimLearningMemory()
+        assertTrue(charged > initialWork)
+    }
+
     @Test
     fun `soft memory reclamation should release shared payload and capacity without a restart`() {
         val session = SearchSession(emptyList(), learnedDb = SearchLearnedDbParams(glueLbd = 0, softLimitBytes = 0L))

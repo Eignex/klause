@@ -64,6 +64,20 @@ class SearchSession(
     private val learnedDbParams = learnedDb
     internal var learningReclamation: SharedLearningReclamation? = null
         private set
+    private var learningReclamationPosition: LearningMemoryPosition? = null
+
+    private data class LearningMemoryPosition(
+        val learning: Long,
+        val store: Long,
+        val watches: Long,
+        val trail: Long,
+        val pending: Long,
+    )
+
+    private fun learningMemoryPosition(): LearningMemoryPosition = LearningMemoryPosition(
+        learning.ownershipRevision, learning.storeOwnershipRevision, learning.watchPosition,
+        trail.ownershipRevision, trail.pendingAssertions.ownershipRevision,
+    )
     private var selfPublicationsPending = false
     private var activeComponent: SearchComponent? = null
     private var conflictResolver: SearchConflictResolver? = null
@@ -842,6 +856,7 @@ class SearchSession(
         learning.release()
         trail.releaseLearning()
         learningReclamation = null
+        learningReclamationPosition = null
     }
 
     /** Retain a sound clause-form explanation for subsequent propagation. */
@@ -895,13 +910,16 @@ class SearchSession(
      */
     private fun propagateLearnedClauses(): ComponentResult {
         conflictOwner = null
-        reclaimLearningMemory()
-        if (cancelled()) return ComponentResult.Indeterminate
+        if (learnedDbParams.softLimitBytes != null) {
+            reclaimLearningMemory()
+            if (cancelled()) return ComponentResult.Indeterminate
+        }
         return learning.propagate(this, trail.boolTrail)
     }
 
     internal fun reclaimLearningMemory(): SharedLearningReclamation? {
         val limit = learnedDbParams.softLimitBytes ?: return null
+        if (learningReclamationPosition == learningMemoryPosition()) return learningReclamation
         val sample = SharingMemoryObservation(
             learnedDbParams.reclamationWork,
             (learnedDbParams.reclamationScratchBytes / 64L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
@@ -928,6 +946,9 @@ class SearchSession(
             ).let { it.copy(work = it.work + reasons.work, scratchBytes = it.scratchBytes + scratch) }
         }
         learningReclamation = result
+        if (result.status != SharedLearningReclamationStatus.Cancelled) {
+            learningReclamationPosition = learningMemoryPosition()
+        }
         return result
     }
 

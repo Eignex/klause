@@ -58,6 +58,7 @@ internal class Inprocessing(
     private var restartsUntilRun = cadence
     private var nextPass = 0
     private var spent = 0L
+    internal val retainedRevision: Long get() = spent
     private var debt = 0L
     private var lastWork = 0L
     private var lastCount = 0
