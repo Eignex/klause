@@ -63,7 +63,7 @@ internal data class LabSettings(val parameters: Map<String, String>) {
         cpus,
         memory,
         wallTimeout,
-        requiredTags = if (inputOnly) emptySet() else setOf("platform:linux", "arch:x86_64"),
+        requiredTags = if (inputOnly) emptySet() else runtimeTags(),
     )
 
     fun caseParameters(engine: String, seed: Long, control: String = ""): Map<String, String> =
@@ -84,6 +84,20 @@ internal data class LabSettings(val parameters: Map<String, String>) {
         )
 
     companion object {
+        internal fun runtimeTags(os: String = System.getProperty("os.name"), arch: String = System.getProperty("os.arch")): Set<String> {
+            val platform = when {
+                os.startsWith("Mac") -> "mac"
+                os == "Linux" -> "linux"
+                else -> error("Unsupported lab platform: $os")
+            }
+            val architecture = when (arch) {
+                "aarch64", "arm64" -> "arm64"
+                "amd64", "x86_64" -> "x86_64"
+                else -> error("Unsupported lab architecture: $arch")
+            }
+            return setOf("platform:$platform", "arch:$architecture")
+        }
+
         val SELECTORS = setOf("suite", "set", "name", "category", "tag", "kind", "per-family", "seed", "max", "balance")
         private val OPTIONS = setOf(
             "input-only", "selections", "engines", "solver-seeds", "repeats", "cpus", "memory-mib", "timeout-ms", "lp",

@@ -81,7 +81,13 @@ class LabAdapterTest {
         val resources = settings.resources()
         assertEquals(202L, resources.timeoutSeconds)
         assertEquals(2, resources.cpus)
-        assertEquals(setOf("platform:linux", "arch:x86_64"), resources.requiredTags)
+        assertEquals(LabSettings.runtimeTags(), resources.requiredTags)
+    }
+
+    @ParameterizedTest
+    @CsvSource("Mac OS X,aarch64,mac,arm64", "Mac OS X,arm64,mac,arm64", "Mac OS X,x86_64,mac,x86_64", "Linux,amd64,linux,x86_64")
+    fun `prepared solver cases retain their build platform`(os: String, arch: String, platform: String, architecture: String) {
+        assertEquals(setOf("platform:$platform", "arch:$architecture"), LabSettings.runtimeTags(os, arch))
     }
 
     @Test

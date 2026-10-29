@@ -15,10 +15,6 @@
   ],
   "runtime": {
     "java": 25,
-    "requiredTags": [
-      "platform:linux",
-      "arch:x86_64"
-    ],
     "tools": [
       "time"
     ],
