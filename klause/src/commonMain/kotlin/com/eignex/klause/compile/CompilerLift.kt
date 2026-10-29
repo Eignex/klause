@@ -20,8 +20,11 @@ import com.eignex.klause.model.IntRef
 import com.eignex.klause.model.IntScale
 import com.eignex.klause.model.IntSum
 import com.eignex.klause.model.SetCard
-import com.eignex.klause.util.addExact
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.mulExact
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.toLongExact
 
 /**
  * Affine-fragment lift for [Lowering]. Rewrites a tree of [IntExpr] so the
@@ -159,14 +162,17 @@ internal fun Lowering.domainOf(expr: IntExpr): IntDomain = when (expr) {
     }
 
     is IntSum -> {
-        var lo = 0L
-        var hi = 0L
+        var lo = BIG_ZERO
+        var hi = BIG_ZERO
         for (ch in expr.children) {
             val d = domainOf(ch)
-            lo = addExact(lo, d.min)
-            hi = addExact(hi, d.max)
+            lo += bigIntOf(d.min)
+            hi += bigIntOf(d.max)
         }
-        IntDomain(checkedInt(lo) { "IntSum domain min" }.toLong(), checkedInt(hi) { "IntSum domain max" }.toLong())
+        IntDomain(
+            checkedInt(lo.toLongExact()) { "IntSum domain min" }.toLong(),
+            checkedInt(hi.toLongExact()) { "IntSum domain max" }.toLong(),
+        )
     }
 
     else -> error("domainOf called on non-affine expression: $expr")

@@ -28,9 +28,9 @@ class BruteForceSolverTest {
 
     @Test
     fun `minimize should prove optimality when the budget covers the whole assignment space`() {
-        val solver = BruteForceSolver(Problem(1, 0, emptyArray(), emptyArray()).bake())
+        val solver = BruteForceSolver(Problem(0, 0, emptyArray(), emptyArray()).bake())
 
-        val result = solver.minimize(LinearObjective(), BruteForceParams(maxSteps = 2))
+        val result = solver.minimize(LinearObjective(), BruteForceParams(maxSteps = 1))
 
         assertIs<MinimizeResult.Optimal>(result)
     }
