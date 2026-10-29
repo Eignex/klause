@@ -686,6 +686,7 @@ internal class LpEngine(
                 work = nodePreparationWorkBudget(),
                 trackDegeneracy = adaptiveWork,
                 pricing = pricingOptions,
+                componentSplit = params.lpPlan.componentOwnership,
             )
         },
         solveContext = solveContext,

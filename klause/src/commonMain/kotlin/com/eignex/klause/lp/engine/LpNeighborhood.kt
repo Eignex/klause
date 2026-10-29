@@ -346,6 +346,13 @@ internal fun LpNeighborhood.rebindExact(state: LpExactState, token: Cancellation
         if (column.origin != previous.model.column(local).origin) return null
         columns += column
     }
+    // Global trail revisions do not invalidate a block whose complete numerical and premise authority is unchanged.
+    if (columns.indices.all { columns[it] == previous.model.column(it) &&
+            source.objective.cost(indices[it]) == previous.model.objective.cost(it) } &&
+        rows.indices.all { source.rhs(rows[it]) == previous.model.rhs(it) &&
+            source.row(rows[it]) == previous.model.row(it) &&
+            state.rows.row(rows[it]).active == previous.rows.row(it).active }
+    ) return this
     val identities = LpScopedRows(
         List(rows.size) { LpRowIdentity(it.toLong(), null, active = state.rows.row(rows[it]).active) },
         rows.size - 1L,

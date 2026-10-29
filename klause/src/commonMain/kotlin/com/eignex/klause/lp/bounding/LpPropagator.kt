@@ -54,6 +54,7 @@ internal data class LpEffortProfile(
     val pricing: LpPricingOptions = LpPricingOptions(),
     val continuation: ExactContinuationLimits = ExactContinuationLimits(),
     val fullContinuation: Boolean = true,
+    val componentSplit: Boolean = false,
 )
 
 internal interface LpSearchPolicy {
@@ -206,6 +207,7 @@ internal class LpPropagator(
             trackDegeneracy = profile.trackDegeneracy,
             maxRetainedRows = profile.maxRows,
             pricing = profile.pricing,
+            componentSplit = profile.componentSplit,
         )
     }
 

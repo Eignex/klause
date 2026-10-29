@@ -40,13 +40,14 @@ internal class LpScopedSolver(
     private val trackDegeneracy: Boolean = false,
     private val maxRetainedRows: Int = Int.MAX_VALUE,
     private val pricing: LpPricingOptions = LpPricingOptions(),
+    private val componentSplit: Boolean = false,
 ) : AutoCloseable {
     private val continuationCache = LpExactContinuationCache()
     private val checkedResults = LpCounterResults()
     internal val refinementCache = LpRefinementCache()
     internal val pointRecoveryCache = LpRefinementCache()
     private var trail = LpBoundTrail(initial)
-    private var solver: PersistentLpSolver? = null
+    private var solver: RetainedLpSolver? = null
     private class PendingFloat(val cursor: LpSolveCursor<FloatLpResult?>, var allowance: LpFloatAllowance) {
         var reported = LpSolveMetrics()
     }
@@ -74,7 +75,7 @@ internal class LpScopedSolver(
     private var pendingAppendSolveWork: Long? = null
     private var pendingAppendSolveWorkComplete = false
     private var pendingAppendSolve = false
-    private var pendingAppendSolveOwner: PersistentLpSolver? = null
+    private var pendingAppendSolveOwner: RetainedLpSolver? = null
 
     val state: LpExactState get() = trail.state
     internal val proofPolicy: LpCertificationPolicy get() = context.certificationPolicy
@@ -209,7 +210,7 @@ internal class LpScopedSolver(
     fun compact(remap: LpLayoutRemap, token: Cancellation = cancellation): Boolean =
         edit(token, compaction = remap) { it.compact(remap, token) }
 
-    val basisLifecycleWork: BasisOperationWork? get() = solver?.basisLifecycleWork
+    val basisLifecycleWork: BasisOperationWork? get() = (solver as? PersistentLpSolver)?.basisLifecycleWork
 
     @Suppress("TooGenericExceptionCaught")
     fun solve(
@@ -430,7 +431,7 @@ internal class LpScopedSolver(
         val scopeToken = cancellation or token
         val child = LpScopedSolver(
             working.state, scopeToken, context, refactorUpdateLimit, childIterations, childWork,
-            trackDegeneracy, maxRetainedRows, pricing,
+            trackDegeneracy, maxRetainedRows, pricing, componentSplit,
         )
         val scope = LpWorkingScope(working, child, scopeToken)
         workingActive = true
@@ -501,7 +502,7 @@ internal class LpScopedSolver(
         compaction: LpLayoutRemap? = null,
     ): Boolean {
         if (append) solver?.let { recordPendingAppendSolve(it) }
-        val warm = if (append) solver?.retainedBasis()?.extended(state.model, next.state.model) else null
+        val warm = if (append) (solver as? PersistentLpSolver)?.retainedBasis()?.extended(state.model, next.state.model) else null
         val expected = if (compaction != null) {
             // Seat the disappearing logicals in an isolated old-size owner before deleting their slots.
             val staging = prepared(state, token) ?: return false
@@ -562,8 +563,8 @@ internal class LpScopedSolver(
         }
     }
 
-    private fun appendBasisLifecycleWork(owner: PersistentLpSolver) = try {
-        owner.basisLifecycleWork
+    private fun appendBasisLifecycleWork(owner: RetainedLpSolver) = try {
+        (owner as? PersistentLpSolver)?.basisLifecycleWork
     } catch (telemetry: Throwable) {
         appendUnknownWork = saturatingAdd(appendUnknownWork, 1)
         throw telemetry
@@ -580,7 +581,7 @@ internal class LpScopedSolver(
         work != null && work.complete && !work.saturated
 
     @Suppress("TooGenericExceptionCaught")
-    private fun recordPendingAppendSolve(current: PersistentLpSolver) {
+    private fun recordPendingAppendSolve(current: RetainedLpSolver) {
         if (!pendingAppendSolve) return
         if (current !== pendingAppendSolveOwner) {
             appendUnknownWork = saturatingAdd(appendUnknownWork, 1)
@@ -590,7 +591,7 @@ internal class LpScopedSolver(
         val before = pendingAppendSolveWork
         val beforeComplete = pendingAppendSolveWorkComplete
         try {
-            val afterWork = current.basisLifecycleWork
+            val afterWork = (current as? PersistentLpSolver)?.basisLifecycleWork
             val after = basisWorkUnits(afterWork)
             val delta = if (before != null && after != null && after >= before) after - before else null
             recordAppendWork(delta, beforeComplete && basisWorkComplete(afterWork))
@@ -610,7 +611,7 @@ internal class LpScopedSolver(
     }
 
     @Suppress("TooGenericExceptionCaught")
-    private fun completeSolveCompletion(current: PersistentLpSolver, primary: Throwable?, solveStarted: Boolean) {
+    private fun completeSolveCompletion(current: RetainedLpSolver, primary: Throwable?, solveStarted: Boolean) {
         try {
             recordSolveCompletion(current, primary, solveStarted)
         } catch (telemetry: Throwable) {
@@ -620,7 +621,7 @@ internal class LpScopedSolver(
     }
 
     @Suppress("TooGenericExceptionCaught")
-    private fun recordSolveCompletion(current: PersistentLpSolver, primary: Throwable?, solveStarted: Boolean) {
+    private fun recordSolveCompletion(current: RetainedLpSolver, primary: Throwable?, solveStarted: Boolean) {
         var failure = primary
         if (solveStarted) {
             try {
@@ -650,9 +651,9 @@ internal class LpScopedSolver(
         token: Cancellation,
         recordRejectedAppendWork: Boolean = false,
         warm: Basis? = null,
-    ): Pair<PersistentLpSolver, Basis>? {
+    ): Pair<RetainedLpSolver, Basis>? {
         preparationAttempts++
-        var candidate: PersistentLpSolver? = null
+        var candidate: RetainedLpSolver? = null
         var accepted = false
         var failure: Throwable? = null
         try {
@@ -677,7 +678,17 @@ internal class LpScopedSolver(
             } ?: return null
             val remainingWork = if (workLimit > 0L) workLimit - projection.work else 0L
             if (workLimit > 0L && remainingWork <= 0L) return null
-            candidate = newPersistentLpSolver(
+            candidate = if (componentSplit && next.matrixRevision == 0L && warm == null) {
+                componentLpSolverOrNull(
+                    working, token,
+                    { part, childToken ->
+                        newPersistentLpSolver(part, childToken, refactorUpdateLimit, iterationLimit,
+                            remainingWork, trackDegeneracy, context.engineFactory, pricing)
+                    },
+                    ::ComponentLpSolver,
+                )
+            } else null
+            if (candidate == null) candidate = newPersistentLpSolver(
                 working,
                 token,
                 refactorUpdateLimit,
@@ -691,7 +702,11 @@ internal class LpScopedSolver(
             peakOwners = maxOf(peakOwners, createdOwners - closedOwners)
             if (!candidate.adopt(next, token)) return null
             val basis = try {
-                if (warm == null) candidate.prepareLogicals(token) else candidate.prepareBasis(warm, token)
+                when (val current = candidate) {
+                    is PersistentLpSolver -> if (warm == null) current.prepareLogicals(token) else current.prepareBasis(warm, token)
+                    is ComponentLpSolver -> current.prepareLogicals(token)
+                    else -> null
+                }
             } finally {
                 preparationWork = saturated(preparationWork, candidate.lastMetrics.workOps)
                 constructionWork = saturated(constructionWork, candidate.lastMetrics.preparationOps)
@@ -722,11 +737,11 @@ internal class LpScopedSolver(
     }
 
     @Suppress("TooGenericExceptionCaught")
-    private fun closeRejectedCandidate(candidate: PersistentLpSolver, recordWork: Boolean, primary: Throwable?) {
+    private fun closeRejectedCandidate(candidate: RetainedLpSolver, recordWork: Boolean, primary: Throwable?) {
         var failure = primary
         if (recordWork) {
             try {
-                recordAppendWork(candidate.basisLifecycleWork)
+                recordAppendWork((candidate as? PersistentLpSolver)?.basisLifecycleWork)
             } catch (telemetry: Throwable) {
                 appendUnknownWork = saturatingAdd(appendUnknownWork, 1)
                 if (failure == null) failure = telemetry else failure.addSuppressed(telemetry)
@@ -736,7 +751,7 @@ internal class LpScopedSolver(
         if (primary == null && failure != null) throw failure
     }
 
-    private fun closeOwner(owner: PersistentLpSolver, primary: Throwable? = null) {
+    private fun closeOwner(owner: RetainedLpSolver, primary: Throwable? = null) {
         try {
             owner.close()
         } catch (failure: Throwable) {

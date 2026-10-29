@@ -45,6 +45,7 @@ import com.eignex.klause.lp.engine.lowerBoundDouble
 import com.eignex.klause.lp.engine.lpConditioning
 import com.eignex.klause.lp.engine.mixedRowBounds
 import com.eignex.klause.lp.engine.newPersistentLpSolver
+import com.eignex.klause.lp.engine.newComponentTableauCutSolver
 import com.eignex.klause.lp.engine.newTableauCutSolver
 import com.eignex.klause.lp.engine.nodeDualCertificate
 import com.eignex.klause.lp.engine.sourceObjective
@@ -135,6 +136,9 @@ internal fun LpEngine.dualSimplex(
     workLimit: Long = nodeWorkBudget(),
 ): TableauCutSolver {
     requireOpen()
+    if (params.lpPlan.componentOwnership) return newComponentTableauCutSolver(
+        model, cancellation, nodePivotBudget(), workLimit, adaptiveWork, solveContext.engineFactory, pricingOptions,
+    )
     return newTableauCutSolver(
         model,
         cancellation,

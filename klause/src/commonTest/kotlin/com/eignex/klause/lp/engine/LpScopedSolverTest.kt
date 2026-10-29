@@ -18,6 +18,29 @@ import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
     @Test
+    fun `component ownership should retain exact node bounds across a sibling edit`() {
+        val builder = LpBuilder()
+        repeat(2) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        LpScopedSolver(LpExactState(source), componentSplit = true).use { owner ->
+            assertEquals(BigFraction.ONE, assertNotNull(owner.solve()).lowerBound)
+            assertTrue(owner.push())
+            assertTrue(owner.assertBound(0, false, ExactLpSide(ExactLpNumber.of(3L)), 7L))
+
+            val changed = assertNotNull(owner.solve())
+
+            assertEquals(BigFraction.ofLong(7L) * BigFraction.ofLong(2L).reciprocal(), changed.lowerBound)
+            assertEquals(2, assertNotNull(changed.float).blocks)
+            assertEquals(1L, owner.metrics.createdOwners)
+            assertTrue(owner.pop(0))
+            assertEquals(BigFraction.ONE, assertNotNull(owner.solve()).lowerBound)
+        }
+    }
+
+    @Test
     fun `promoting a pivot stopped query should preserve its paid numerical path`() {
         val expected = LpScopedSolver(LpExactState(lowerBoundModel())).use { owner ->
             assertNotNull(owner.solveFloat()).second to owner.lastMetrics

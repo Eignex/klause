@@ -28,7 +28,11 @@ internal class ComponentLpSolver(
     private val solvers: List<LpSolver>,
     private val isolated: IntArray,
 ) : RetainedComponentLpSolverCapability,
-    ResumableLpSolver {
+    ResumableLpSolver,
+    TableauCutSolver {
+    private val reusable = arrayOfNulls<FloatLpResult>(parts.size)
+    private class CheckedBound(val policy: LpCertificationPolicy, val bound: CertifiedLpBound)
+    private val checkedBounds = arrayOfNulls<CheckedBound>(parts.size)
     private var activeSolve: LpSolveCursor<FloatLpResult?>? = null
     private var activeChild: LpSolver? = null
     private var solveStarted = false
@@ -46,6 +50,13 @@ internal class ComponentLpSolver(
         private set
 
     override val lastMetrics: LpSolveMetrics get() = activeChild?.let { metrics + it.lastMetrics } ?: metrics
+    override val lastPivots: Int get() = lastMetrics.pivots
+    override val lastWorkOps: Long get() = lastMetrics.workOps
+    override val lastRefactorizations: Int get() = lastMetrics.let {
+        it.initialRefactorizations + it.warmStartRefactorizations + it.singularRecoveryRefactorizations +
+            it.updateLimitRefactorizations + it.backendRequestedRefactorizations + it.reconcileRecoveryRefactorizations +
+            it.numericalRecoveryRefactorizations + it.primalRefactorizations
+    }
     override val currentWork: Long get() = metrics.workOps + when (val child = activeChild) {
         is ResumableLpSolver -> child.currentWork
         null -> 0L
@@ -72,6 +83,8 @@ internal class ComponentLpSolver(
             failure = cleanup
         }
         clearEvidence()
+        reusable.fill(null)
+        checkedBounds.fill(null)
         closeComponentSolvers(solvers, failure)
         failure?.let { throw it }
     }
@@ -92,9 +105,9 @@ internal class ComponentLpSolver(
         check(activeSolve == null) { "LP solve is suspended" }
         solveStarted = true
         return immediateLpSolve {
-            invoke { solver ->
+            invoke(allowance) { solver ->
                 check(solver is RetainedLpSolver)
-                solver.resolveBounds(allowance)
+                solver.resolveBounds(remainingAllowance(allowance))
             }
         }
     }
@@ -105,12 +118,12 @@ internal class ComponentLpSolver(
         return LpSolveCursor<FloatLpResult?>(completed = { activeSolve = null }) {
             val reuse = solveStarted
             solveStarted = true
-            invoke { child ->
+            invoke(allowance) { child ->
                 checkpoint(metrics.workOps)
                 var started = false
                 try {
                     if (child is ResumableLpSolver) {
-                        child.openSolve(allowance).use { cursor ->
+                        child.openSolve(remainingAllowance(allowance), retainFundingStop).use { cursor ->
                             activeChild = child
                             started = true
                             var step = cursor.advance(shouldPause = { shouldPause(currentWork) })
@@ -125,7 +138,7 @@ internal class ComponentLpSolver(
                         started = true
                         if (reuse) {
                             check(child is RetainedLpSolver)
-                            child.resolveBounds(allowance)
+                            child.resolveBounds(remainingAllowance(allowance))
                         } else {
                             child.solve(null)
                         }
@@ -151,6 +164,9 @@ internal class ComponentLpSolver(
         if (token()) return false
         try {
             for (index in solvers.indices) {
+                if (nextParts[index] === parts[index]) continue
+                reusable[index] = null
+                checkedBounds[index] = null
                 if (!(solvers[index] as RetainedLpSolver).adopt(
                     checkNotNull(nextParts[index].model.exactState),
                     token,
@@ -186,19 +202,43 @@ internal class ComponentLpSolver(
         lastTermination = null
     }
 
+    fun prepareLogicals(token: Cancellation): Basis? {
+        metrics = LpSolveMetrics()
+        for (solver in solvers) {
+            val persistent = solver as? PersistentLpSolver ?: return null
+            val basis = persistent.prepareLogicals(token)
+            metrics += persistent.lastMetrics
+            if (basis == null || token()) return null
+        }
+        return componentBasis()
+    }
+
     @Suppress("TooGenericExceptionCaught") // Clear the invocation reason for any child failure.
-    private suspend fun invoke(op: suspend (LpSolver) -> FloatLpResult?): FloatLpResult? = try {
-        stitch(op)
+    private suspend fun invoke(
+        allowance: LpFloatAllowance? = null,
+        op: suspend (LpSolver) -> FloatLpResult?,
+    ): FloatLpResult? = try {
+        stitch(allowance, op)
     } catch (primary: Throwable) {
         lastTermination = null
         blockResults = null
         solvedExactState = null
         continuationTarget = null
         recessionDirection = null
+        reusable.fill(null)
+        checkedBounds.fill(null)
         throw primary
     }
 
-    private suspend fun stitch(op: suspend (LpSolver) -> FloatLpResult?): FloatLpResult? {
+    private fun remainingAllowance(allowance: LpFloatAllowance?): LpFloatAllowance? = allowance?.copy(
+        work = if (allowance.work > 0L) (allowance.work - metrics.workOps).coerceAtLeast(1L) else 0L,
+        iterations = if (allowance.iterations > 0) (allowance.iterations - metrics.pivots).coerceAtLeast(1) else 0,
+    )
+
+    private suspend fun stitch(
+        allowance: LpFloatAllowance?,
+        op: suspend (LpSolver) -> FloatLpResult?,
+    ): FloatLpResult? {
         check(!closed)
         lastTermination = null
         infeasibleRay = null
@@ -249,7 +289,17 @@ internal class ComponentLpSolver(
         }
         for (k in parts.indices) {
             val part = parts[k]
-            val r = op(solvers[k]) ?: run {
+            val reused = reusable[k]?.takeIf { it.optimal && it.exactState === part.model.exactState &&
+                solvers[k].solvedExactState === part.model.exactState }
+            if (reused == null && allowance != null) {
+                lastTermination = when {
+                    allowance.work > 0L && metrics.workOps >= allowance.work -> LpFloatTermination.WORK
+                    allowance.iterations > 0 && metrics.pivots >= allowance.iterations -> LpFloatTermination.PIVOTS
+                    else -> null
+                }
+                if (lastTermination != null) return null
+            }
+            val r = (reused ?: op(solvers[k])) ?: run {
                 metrics += solvers[k].lastMetrics
                 lastTermination = solvers[k].lastTermination
                 // A dual-unbounded block is a candidate infeasibility of the whole model: its float
@@ -273,9 +323,10 @@ internal class ComponentLpSolver(
                 solvedExactState = null
                 return null
             }
-            metrics += solvers[k].lastMetrics
+            if (reused == null) metrics += solvers[k].lastMetrics
             if (!r.optimal && lastTermination == null) lastTermination = solvers[k].lastTermination
             results.add(r)
+            if (part.model.exactState != null && r.optimal) reusable[k] = r
             objective += r.objective - part.model.objConstantD
             val sub = part.model
             for (c in 0 until sub.n) {
@@ -289,7 +340,7 @@ internal class ComponentLpSolver(
             for (b in r.basis.basicVars) {
                 basicVars[basicAt++] = if (b < sub.n) part.cols[b] else model.slackCol(part.rows[b - sub.n])
             }
-            pivots += r.pivots
+            if (reused == null) pivots += r.pivots
             if (r.luMaxFill > maxFill) maxFill = r.luMaxFill
             if (r.luMaxDensity > maxDensity) {
                 maxDensity = r.luMaxDensity
@@ -316,8 +367,8 @@ internal class ComponentLpSolver(
             luMaxDim = maxDim,
             blocks = parts.size,
             optimal = results.all { it.optimal },
-            warmStarted = results.any { it.warmStarted },
-            refactorizations = results.sumOf { it.refactorizations },
+            warmStarted = metrics.warmHits > 0,
+            refactorizations = lastRefactorizations,
             exactState = model.exactState,
         )
     }
@@ -330,7 +381,10 @@ internal class ComponentLpSolver(
         val citedSides = ArrayList<LpExactCitedSide>()
         for (index in parts.indices) {
             val part = parts[index]
-            val bound = certifyLpBound(part.model, results[index].duals, observer, policy) ?: return null
+            val bound = checkedBounds[index]?.takeIf { it.policy === policy }?.bound
+                ?: certifyLpBound(part.model, results[index].duals, observer, policy)?.also {
+                    if (part.model.exactState != null) checkedBounds[index] = CheckedBound(policy, it)
+                } ?: return null
             value += bound.value - part.model.exactConstant()
             model.exactState?.let { state ->
                 val support = bound.support ?: return null
@@ -403,6 +457,40 @@ internal class ComponentLpSolver(
         solvedExactState === model.exactState
     } else {
         certificationKey?.let { exactLpStateKey(model)?.contentEquals(it) } == true
+    }
+
+    override fun gomoryCuts(maxCuts: Int): List<Cut> = localCuts(maxCuts) { owner, count -> owner.gomoryCuts(count) }
+
+    override fun mirCuts(maxCuts: Int): List<Cut> = localCuts(maxCuts) { owner, count -> owner.mirCuts(count) }
+
+    private fun localCuts(maxCuts: Int, separate: (TableauCutSolver, Int) -> List<Cut>): List<Cut> {
+        if (!currentAuthority() || blockResults == null || maxCuts <= 0) return emptyList()
+        val cuts = ArrayList<Cut>()
+        for (index in parts.indices) {
+            val owner = solvers[index] as? TableauCutSolver ?: continue
+            val part = parts[index]
+            for (cut in separate(owner, maxCuts - cuts.size)) {
+                val proof = cut.tableau ?: continue
+                if (proof.model !== part.model) continue
+                cuts += Cut(
+                    cut.cols.map { part.cols[it] }.toIntArray(), cut.coeffs, cut.rel, cut.rhs,
+                    tableau = TableauCutProvenance(
+                        model,
+                        proof.columns.map { it.copy(column = part.cols[it.column]) },
+                        proof.rows.map { row ->
+                            CutInputRow(
+                                part.rows[row.index], row.global, row.multiplier, row.rhs, row.relation,
+                                row.columns.map { part.cols[it] }.toIntArray(), row.coefficients,
+                                row.premises, row.exactPremises,
+                            )
+                        },
+                        proof.divisor, proof.mir, proof.reduction,
+                    ),
+                )
+                if (cuts.size == maxCuts) return cuts
+            }
+        }
+        return cuts
     }
 
     private fun isolatedValue(column: Int): BigFraction? {

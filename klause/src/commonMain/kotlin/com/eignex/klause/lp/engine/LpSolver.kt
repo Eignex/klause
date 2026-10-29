@@ -426,6 +426,20 @@ internal fun newTableauCutSolver(
     pricing: LpPricingOptions = LpPricingOptions(),
 ): TableauCutSolver = factory.newTableauSolver(model, cancellation, iterationLimit, workLimit, trackDegeneracy, pricing)
 
+internal fun newComponentTableauCutSolver(
+    model: LpModel,
+    cancellation: Cancellation = Cancellation.Never,
+    iterationLimit: Int = 0,
+    workLimit: Long = 0L,
+    trackDegeneracy: Boolean = false,
+    factory: LpEngineFactory = ProductionLpEngineFactory,
+    pricing: LpPricingOptions = LpPricingOptions(),
+): TableauCutSolver = componentLpSolverOrNull(
+    model, cancellation,
+    { part, token -> factory.newTableauSolver(part, token, iterationLimit, workLimit, trackDegeneracy, pricing) },
+    ::ComponentLpSolver,
+) ?: newTableauCutSolver(model, cancellation, iterationLimit, workLimit, trackDegeneracy, factory, pricing)
+
 /**
  * Construct an engine to keep across solves ([PersistentLpSolver]). Monolithic by construction: a
  * decomposed model has no single basis to carry, which is the whole of what such a caller keeps it for.
