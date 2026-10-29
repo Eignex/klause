@@ -780,7 +780,9 @@ retirement. The selector wrapper delegates all decisions and notifications.
 
 Original source bytes, canonical original/prepared models and installed provenance
 remain in the capture. Bounded records also go to stdout, including both canonical
-models, so retained live output can expose a capture awaiting file publication. Each arm's deadline contains loading, preparation, solving,
+models, so retained live output can expose a capture awaiting file publication.
+A five-second terminal drain lets asynchronous live-log publication retain the last
+records; it is inside the profile allowance and outside the arm timer. Each arm's deadline contains loading, preparation, solving,
 reconstruction, native point checking and retirement. Native propagation work is a
 subset of invocation cost; the arm timer excludes record serialization and output.
 Set the profile execution limit separately from `profile.runTimeoutSec`, which
