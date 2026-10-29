@@ -52,7 +52,7 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
         unitsPending = learned.units.size > 0
     }
 
-    fun snapshot(): OpenTheoryClauseStats = OpenTheoryClauseStats(
+    fun snapshot(measureMemory: Boolean = false): OpenTheoryClauseStats = OpenTheoryClauseStats(
         learnedClauses,
         relearnedClauses,
         restarts,
@@ -64,11 +64,11 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
         assertingConflicts,
         nonAssertingConflicts,
         reductionNanos,
-        lifecycle.snapshot() + learned.memory() + mapOf(
+        lifecycle.snapshot() + if (measureMemory) learned.memory() + mapOf(
             "sharedLearnedStageCapacityBytes" to stages.backingData.size.toLong() * Int.SIZE_BYTES,
             "sharedLearnedReasonIndexBytes" to reasons.primitiveCapacityBytes,
             "sharedLearnedPendingEntries" to (pendingAttach.size + rechecks.size).toLong(),
-        ),
+        ) else emptyMap(),
     )
 
     fun learn(literals: IntArray, host: ClauseWatchHost) {

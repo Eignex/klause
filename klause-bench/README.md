@@ -263,6 +263,28 @@ validation produces no verdict for these formats. All reported feasibility and
 optimality claims remain native and unchecked. Source-matched reference rows also
 lack independently checked proofs; their objective agreement adds no proof authority.
 
+## Clause sharing accounting
+
+The single-lane work schedule also samples retained clause-sharing memory. CLI arm
+records distinguish logical payload, primitive arena/metadata/seen capacity, reference
+slots, transient drains, import work and sampling work. Pool samples name one shared
+owner; worker samples include native/general learned stores, atom registries and
+historical reasons. Individual sampled peaks are not process RSS or concurrent totals.
+
+The lifecycle regressions cover repeated pool compaction with a slow consumer,
+retained-session assumption reseeding, fresh-session backing release, suspension,
+protected reasons through native/general compaction, and actual satisfaction and
+optimization workers consuming peer imports. They preserve the existing use-based
+reward drain. Sizing, retention age and targeted delivery are separate experiments.
+
+The focused eight-case source diagnostic prepared for F4 did not create a lab job:
+the maintained client at lab revision `53acb28` encountered HTTP400 for
+`bench.sourceValidation`, then for `bench.runTimeoutSec` on the compatible attempt.
+No source solve, independent check, RSS sample or performance result followed.
+The receipts distinguish that API limitation from solver outcomes. Current-source
+outcome and physical-memory qualification remain unclaimed; lifecycle correctness
+is validated by GitHub CI rather than a local build.
+
 ## LP capture and replay
 
 The opt-in basis tool uses the [basis corpus](../klause/src/jvmTest/resources/basis-corpus/README.md):
