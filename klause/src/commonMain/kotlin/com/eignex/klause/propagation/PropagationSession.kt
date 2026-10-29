@@ -1244,9 +1244,11 @@ class PropagationSession private constructor(
         maxLbd: Int,
         maxLen: Int,
         skipPermanent: Boolean,
+        alreadyShared: (Long) -> Boolean = { false },
         cancelled: () -> Boolean,
     ): List<SharedClause>? {
         val out = ArrayList<SharedClause>()
+        var tokens = LongArray(0)
         for (i in 0 until learnedClauseCount) {
             if (cancelled()) return null
             // Permanent clauses are the search-conditioned assertions — the incumbent objective bound
@@ -1259,8 +1261,22 @@ class PropagationSession private constructor(
             val lbd = learnedClauseLbd(i)
             if (lbd > maxLbd) continue
             if (learnedClauseLiteralCount(i) > maxLen) continue
-            val lits = learnedClauseLiterals(i)
-            out.add(asSharedClause(lits, lbd))
+            val native = state.nativeEngine
+            val literals = if (native == null) learnedClauseAt(i).literals else null
+            val length = learnedClauseLiteralCount(i)
+            if (tokens.size < length) tokens = LongArray(length)
+            for (offset in 0 until length) {
+                val lit = native?.literalOf(i, offset) ?: checkNotNull(literals)[offset]
+                val variable = Lit.variable(lit)
+                tokens[offset] = if (variable < problem.numBoolVars) lit.toLong() else {
+                    val atom = variable - problem.numBoolVars
+                    SharedClause.atomToken(state.atoms.intVar[atom].toLong(), state.atoms.kind[atom].ordinal.toLong(),
+                        state.atoms.threshold[atom], if (Lit.isPositive(lit)) 0L else 1L)
+                }
+            }
+            val key = SharedClause.contentKey(tokens, length)
+            if (alreadyShared(key)) continue
+            out.add(asSharedClause(literals ?: checkNotNull(native).literalsOf(i), lbd, key))
         }
         return out.takeUnless { cancelled() }
     }
@@ -1271,7 +1287,9 @@ class PropagationSession private constructor(
      * atom registry. The decode shared by [exportGlueClauses] and the direct publish of globally-valid
      * nogoods (LP Farkas certificates), which bypass the LBD glue filter.
      */
-    internal fun asSharedClause(lits: IntArray, lbd: Int): SharedClause {
+    internal fun asSharedClause(lits: IntArray, lbd: Int): SharedClause = asSharedClause(lits, lbd, null)
+
+    private fun asSharedClause(lits: IntArray, lbd: Int, key: Long?): SharedClause {
         val numBool = problem.numBoolVars
         var boolCount = 0
         for (lit in lits) if (Lit.variable(lit) < numBool) boolCount++
@@ -1291,7 +1309,7 @@ class PropagationSession private constructor(
                 quads[qi++] = if (Lit.isPositive(lit)) 0L else 1L
             }
         }
-        return SharedClause(bools, quads, lbd)
+        return if (key == null) SharedClause(bools, quads, lbd) else SharedClause(bools, quads, lbd, key)
     }
 
     /**

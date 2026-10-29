@@ -15,6 +15,29 @@ import kotlin.test.assertTrue
 
 class SharedClausePoolTest {
 
+    @Test
+    fun `repeated glue export should suppress payload construction without losing later learning`() {
+        for (native in listOf(false, true)) {
+            val problem = Problem(8, 0, emptyArray(), listOf(Clause(intArrayOf(0, 1))))
+            val pool = SharedClausePool()
+            val meter = SharingMeter()
+            val exchange = PoolClauseExchange(pool, origin = 1, meter = meter)
+            val session = PropagationSession(problem, nativeSat = native)
+            session.addLearnedClause(Clause(intArrayOf(0, 2)), 1)
+            exchange.onSearchStart(session)
+            val first = pool.drainSince(0)
+            session.addLearnedClause(Clause(intArrayOf(4, 6)), 1)
+
+            exchange.onSearchEnd(session)
+
+            assertEquals(1L, meter.snapshot().clauses.getValue("exportDuplicates"))
+            assertEquals(listOf(listOf(4, 6)), pool.drainSince(first.cursor).clauses.map { it.boolLits.toList() })
+            val consumer = PropagationSession(problem, nativeSat = native)
+            PoolClauseExchange(pool, origin = 2).onSearchStart(consumer)
+            assertEquals(2, consumer.learnedClauseCount)
+        }
+    }
+
     private fun twoIntVars(): Problem = Problem(
         numBoolVars = 0,
         numIntVars = 2,

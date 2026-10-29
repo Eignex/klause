@@ -366,6 +366,8 @@ internal class NativeSatState(private val state: PropagationState) {
 
     fun literalCountOf(i: Int): Int = clauseLen(baseCount + i)
 
+    fun literalOf(i: Int, k: Int): Int = litOf(baseCount + i, k)
+
     fun variableOf(i: Int, k: Int): Int = Lit.variable(litOf(baseCount + i, k))
 
     fun forEachBinaryPartner(lit: Int, action: (Int) -> Unit) {

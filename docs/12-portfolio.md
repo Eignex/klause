@@ -217,6 +217,13 @@ pool; resuming the same session retains both cursor and filter. Retirement relea
 the filter without sampling. An uncancelled retirement also drains uses and exports
 remaining glue; a cancelled retirement skips those scans.
 
+Glue export probes that same filter with the portable content key before copying
+native literals or constructing portable payloads. One temporary token buffer is
+reused across the scan and released with it; no second retained duplicate index is
+needed. Only completed export preparation admits publication keys. Pool eviction,
+session reseeding and reason retention follow the same filter lifetime.
+`exportDuplicates` counts previously shared candidates skipped before payload construction.
+
 With a shared byte limit, each worker's duplicate filter has a separate allowance
 of that size. Existing key capacity is protected with its retained session, including
 reseeded assumptions. Bounded admission prepares hash growth before publishing it;
