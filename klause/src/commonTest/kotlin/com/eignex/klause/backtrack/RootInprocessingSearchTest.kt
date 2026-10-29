@@ -25,11 +25,13 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class RootInprocessingSearchTest {
-    private fun problem(): Problem = Problem(5, 0, emptyArray(), arrayOf<Factor>(
+    private fun problem(): Problem = Problem(6, 0, emptyArray(), arrayOf<Factor>(
         Clause(intArrayOf(9)),
         Clause(intArrayOf(0, 2, 8)),
         Clause(intArrayOf(4, 6)),
         Clause(intArrayOf(4, 7)),
+        Clause(intArrayOf(2, 6, 10, 8)),
+        Clause(intArrayOf(2, 6, 11, 8)),
     ))
 
     private fun params(native: Boolean, exchange: ClauseExchange): BacktrackParams = BacktrackParams(
@@ -43,7 +45,7 @@ class RootInprocessingSearchTest {
             var retained: PropagationSession? = null
             val exchange = object : ClauseExchange {
                 override fun onRestart(session: PropagationSession) {
-                    if (retained == null) session.importClause(SharedClause(intArrayOf(0, 3, 8), longArrayOf(), 3), 6)
+                    if (retained == null) session.importClause(SharedClause(intArrayOf(2, 6, 8), longArrayOf(), 3), 6)
                     retained = session
                 }
             }
