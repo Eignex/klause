@@ -202,12 +202,14 @@ class InprocessingTest {
     fun `memory pressure should protect an interrupted root attachment`() {
         for (native in listOf(false, true)) {
             val source = Problem(3, 0, emptyArray(), arrayOf<Factor>(
-                Clause(intArrayOf(1)), Clause(intArrayOf(0, 2, 4)),
+                Clause(intArrayOf(0, 2)), Clause(intArrayOf(0, 3)),
             ))
             val session = PropagationSession(source, nativeSat = native)
-            val loop = Inprocessing(listOf(RootSimplificationPass()), cadence = 1)
-            val params = BacktrackParams(cancellation = Cancellation { session.learnedClauseCount > 0 })
-            assertEquals(false, session.boolValue(0))
+            repeat(2) { session.addLearnedClause(Clause(intArrayOf(4, 5)), 4) }
+            val loop = Inprocessing(listOf(Subsumption(), RootProbingPass()), cadence = 1)
+            val params = BacktrackParams(rootProbeBatch = 2, inprocessingSubsumeWork = 1L,
+                cancellation = Cancellation { session.learnedClauseCount > 2 })
+            assertNull(session.boolValue(0))
             assertNull(session.boolValue(1))
             assertNull(session.boolValue(2))
             loop.onRestart(session, params)
@@ -221,7 +223,8 @@ class InprocessingTest {
             assertTrue(assertNotNull(retained.completeValues).getValue("protectedPrimitiveBytes") >= 12L)
             loop.onRoot(session, BacktrackParams())
             assertFalse(session.fixpointCancelled)
-            assertEquals(setOf(2, 4), session.learnedClauseLiterals(0).toSet())
+            assertEquals(true, session.boolValue(0))
+            assertEquals(setOf(0), session.learnedClauseLiterals(2).toSet())
         }
     }
 

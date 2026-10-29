@@ -11,6 +11,8 @@ internal class LearnedMemoryMaintenance {
         val level: Int,
         val undo: Int,
         val atoms: Int,
+        val ownershipWork: Long,
+        val sharingBytes: Long,
         val inprocessingWork: Long,
         val publication: Boolean,
     )
@@ -27,6 +29,7 @@ internal class LearnedMemoryMaintenance {
         val limit = params.learnedMemoryBytes ?: return
         fun position() = Position(session.sharingIdentity, session.learnedClauseCount, session.learnedClauseRevision,
             session.decisionLevel, session.explanationState.undoTop, session.explanationState.atoms.intVar.size,
+            session.ownershipWork, session.retainedSharingSize?.invoke() ?: 0L,
             inprocessing?.retainedRevision ?: 0L, inprocessing?.retainsPublication == true)
         if (observed == position()) return
         val result = session.reclaimLearnedMemory(limit, params.learnedMemoryWork, params.learnedMemoryScratchBytes,

@@ -93,8 +93,9 @@ class LearnedReclamationTest {
 
     @Test
     fun `insufficient native arena scratch should defer after completing the observation`() {
-        val session = PropagationSession(Problem(2, 0, emptyArray(), emptyList()), nativeSat = true)
-        session.addLearnedClause(Clause(IntArray(4096) { if (it % 2 == 0) 0 else 2 }), 2)
+        val session = PropagationSession(Problem(4096, 0, emptyArray(), emptyList()), nativeSat = true)
+        session.addLearnedClause(Clause(IntArray(4096) { it * 2 }), 2)
+        assertEquals(4096, session.learnedClauseLiteralCount(0))
 
         val reclaimed = session.reclaimLearnedMemory(0L, maxWork = 1_000_000L, maxScratchBytes = 8192L)
 
@@ -153,16 +154,18 @@ class LearnedReclamationTest {
     @Test
     fun `a protected root reason should report its memory floor on both stores`() {
         for (native in listOf(false, true)) {
-            val session = PropagationSession(Problem(2, 0, emptyArray(), emptyList()), nativeSat = native)
-            session.addLearnedClause(Clause(intArrayOf(0)), 1)
+            val source = Problem(2, 0, emptyArray(), arrayOf(Clause(intArrayOf(1))))
+            val session = PropagationSession(source, nativeSat = native)
+            session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
+            val reason = assertNotNull(session.boolReasonClause(1)).toList()
 
             val reclaimed = session.reclaimLearnedMemory(0L, maxWork = 1_000_000L)
 
             assertEquals(ReclamationStatus.PROTECTED_FLOOR, reclaimed.status)
             assertTrue(assertNotNull(reclaimed.protectedBytes) > 0L)
             assertEquals(1, session.learnedClauseCount)
-            assertEquals(true, session.boolValue(0))
-            assertNotNull(session.boolReasonClause(0))
+            assertEquals(true, session.boolValue(1))
+            assertEquals(reason, assertNotNull(session.boolReasonClause(1)).toList())
         }
     }
 

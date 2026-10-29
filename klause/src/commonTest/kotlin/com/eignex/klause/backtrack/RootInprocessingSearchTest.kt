@@ -128,10 +128,16 @@ class RootInprocessingSearchTest {
     fun `real restarts should consume probing units and refreshed imported binaries`() {
         for (native in listOf(false, true)) {
             var retained: PropagationSession? = null
+            var rootValue: Boolean? = null
+            var importedUses = 0L
             val exchange = object : ClauseExchange {
                 override fun onRestart(session: PropagationSession) {
                     if (retained == null) session.importClause(SharedClause(intArrayOf(2, 6, 8), longArrayOf(), 3), 6)
                     retained = session
+                }
+                override fun onSearchClose(session: PropagationSession) {
+                    rootValue = session.boolValue(2)
+                    session.drainImportUses { origin, uses -> if (origin == 6) importedUses += uses }
                 }
             }
 
@@ -139,12 +145,10 @@ class RootInprocessingSearchTest {
 
             assertIs<SolveResult.Sat>(result)
             val session = assertNotNull(retained)
-            assertEquals(true, session.boolValue(2))
+            assertEquals(true, rootValue)
             assertTrue(session.learnedLifecycle().getValue("learningClauseConsumed") > 0L)
             assertTrue(result.stats.search.inprocessProbes.sum > 0.0)
             assertTrue(result.stats.search.inprocessVisits.sum > 0.0)
-            var importedUses = 0L
-            session.drainImportUses { origin, uses -> if (origin == 6) importedUses += uses }
             assertTrue(importedUses > 0L)
         }
     }
@@ -153,8 +157,10 @@ class RootInprocessingSearchTest {
     fun `suspension should preserve the root deductions and logical search result`() {
         for (native in listOf(false, true)) {
             var retained: PropagationSession? = null
+            var rootValue: Boolean? = null
             val exchange = object : ClauseExchange {
                 override fun onRestart(session: PropagationSession) { retained = session }
+                override fun onSearchClose(session: PropagationSession) { rootValue = session.boolValue(2) }
             }
             val search = BacktrackSolver(problem().bake()).resumableSolve(params(native, exchange))
             val result = search.use {
@@ -164,7 +170,7 @@ class RootInprocessingSearchTest {
 
             assertIs<SolveResult.Sat>(result)
             val session = assertNotNull(retained)
-            assertEquals(true, session.boolValue(2))
+            assertEquals(true, rootValue)
             assertTrue(session.learnedLifecycle().getValue("learningClauseConsumed") > 0L)
             assertTrue(result.stats.search.inprocessProbes.sum > 0.0)
         }
