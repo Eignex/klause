@@ -1136,6 +1136,12 @@ regression. A changed seed is not recovered performance.
 Use both `platform:linux` and `arch:x86_64` tags to constrain preparation as well
 as solves. The canonical manifest declares the same required runtime tags; the
 platform-wide `lab/bench.json` remains available for retained historical recipes.
+Canonical recipes pin `parallel=1`. Retain the actual iteration cgroup receipt:
+`cpus=1` and JVM `ActiveProcessorCount=1` describe the solver, while a parallel
+iteration shares its aggregate CPU/memory grant across CLI/JIT/harness processes.
+Preparation grants are separate. Compare matching physical group ceilings and
+complete CPU usage, rather than treating the logical processor count as a hard
+per-case quota. Cgroup CPU counters can be cumulative; sampled memory is not a peak.
 
 `compiler-seed=1` makes the fixed MiniZinc lowering seed explicit; other values
 are rejected. `comparison-series=NAME` labels a controlled series. Records retain
