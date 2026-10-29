@@ -10,3 +10,9 @@ Its minimum result is 2. The Element creates a source-oriented result definition
 
 These are applicability and representation controls, not evidence of corpus speedup.
 The lab's existing XCSP checker independently validates reconstructed source points.
+
+The Element source uses Klause's legacy outer startIndex placement. Official
+XCSP checking in job9219 rejected its points in both rewrite arms. It is retained
+as a source-format negative, not a validated outcome. The separately named
+rewrite-structure-canonical-v1 source places startIndex on list and retains its
+own source hash and checks; original bytes and catalog membership remain fixed.
