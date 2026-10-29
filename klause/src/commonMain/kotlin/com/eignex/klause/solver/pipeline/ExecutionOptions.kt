@@ -288,7 +288,9 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         val rootSimplifyBatch: ExecutionOption<Int> = ExecutionOption("root-simplify-batch", ValueKind.INT)
 
         /** Bounded propositional opportunity scan; zero disables capture. */
-        val rootRebuildCaptureVisits: ExecutionOption<Int> = ExecutionOption("root-rebuild-capture-visits", ValueKind.INT)
+        val rootRebuildCaptureVisits: ExecutionOption<Int> = ExecutionOption(
+            "root-rebuild-capture-visits", ValueKind.INT,
+        )
 
         /** Failed-literal probes per scheduled restart; zero disables probing. */
         val rootProbeBatch: ExecutionOption<Int> = ExecutionOption("root-probe-batch", ValueKind.INT)
