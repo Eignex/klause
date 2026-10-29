@@ -186,7 +186,10 @@ are capped before consumer preparation. The report retains actual maintained
 definitions/input edges/depth and emitted rows/columns/nonzeros. The forced LP
 views establish representation effects; ordinary worker admission and whole-source
 outcomes require separate adapter runs. Use `suite=rewrite-structure-v1` for the
-small affine Table and Element applicability controls.
+small affine Table control. The Element source under that identity retains a
+legacy start-index placement rejected by the independent checker; use
+`suite=rewrite-structure-canonical-v1 problem=element-cone` for its separately
+identified standard-list-index control.
 
 ## Corpus and build identity
 
