@@ -254,6 +254,9 @@ unfinished blocks contribute freshly checked zero-dual box bounds. Missing
 minimizing sides decline the aggregate. Every contribution uses the current
 child authority, and only their exact sum is projected to source units. This
 bound supplies no complete point, cut tableau or attainment claim.
+Node consumers can prune against the existing source-objective cutoff after
+charging aggregation and certificate work; they do not publish branching coordinates
+or train directional history from the partial aggregate.
 
 The same explicit setting dispatches root tableau separation to the owning block.
 Lifted cuts retain all row multipliers, bound substitutions, integrality premises

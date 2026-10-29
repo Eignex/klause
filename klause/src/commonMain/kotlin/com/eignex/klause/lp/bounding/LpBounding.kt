@@ -797,6 +797,7 @@ private fun LpEngine.pruneWithComponentBound(
     val component = solver as? ComponentLpSolverCapability ?: return false
     if (!cutoff.isFinite() || cancellation()) return false
     noteNodeOverhead(relaxation.model.extent() * LpNodeOverhead.EXACT)
+    if (lpWorkAllowanceSpent() || cancellation()) return false
     val observer = sink.lp.certificationObserver(LpRoute.NODE)
     val charged = object : LpCertificationObserver by observer {
         override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
