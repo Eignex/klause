@@ -534,12 +534,26 @@ internal object AffineSingletons {
         if (f.op != LinearOp.EQ || f.vars.size < 2) return null
         val row = f.integerConstants ?: return null
         cancellation.charge(AFFINE_WORK_WEIGHT * f.vars.size)
-        var best: AffineCandidate? = null
-        var bestWeight = Long.MAX_VALUE
-        for (xi in f.vars.indices) {
+        var reverse = false
+        if (minimizeRewrite && f.vars.size == 2) {
+            val first = f.vars[0]
+            val second = f.vars[1]
+            val firstWeight = if (eliminated[first] || first in objectiveIntVars) {
+                Long.MAX_VALUE
+            } else ws.rewriteWeight(di, first, cancellation)
+            if (firstWeight > 0L) {
+                val secondWeight = if (eliminated[second] || second in objectiveIntVars) {
+                    Long.MAX_VALUE
+                } else ws.rewriteWeight(di, second, cancellation)
+                reverse = secondWeight < firstWeight
+            }
+            if (cancellation()) return null
+        }
+        for (position in f.vars.indices) {
+            val xi = if (reverse) 1 - position else position
             // A single wide row can carry thousands of pivot candidates each running an O(occurrences)
             // overflow check, so poll the deadline between them (and inside the check below).
-            if ((xi and CANCEL_POLL_MASK) == 0 && cancellation()) return null
+            if ((position and CANCEL_POLL_MASK) == 0 && cancellation()) return null
             val x = f.vars[xi]
             val cx = row.coeff(xi)
             if (eliminated[x] || x in objectiveIntVars) continue
@@ -597,18 +611,10 @@ internal object AffineSingletons {
                 termCoeffs[0] in INT_RANGE && constTerm in INT_RANGE &&
                 ws.otherOccurrencesAffineSubstitutable(di, x, termCoeffs[0].toInt(), constTerm.toInt(), termVars[0])
             if (isAlias || ws.otherOccurrencesAllLinear(di, x) || singlePartnerSubstitutable) {
-                val candidate = AffineCandidate(di, x, constTerm, termVars, termCoeffs, isAlias)
-                if (!minimizeRewrite || f.vars.size != 2) return candidate
-                val weight = ws.rewriteWeight(di, x, cancellation)
-                if (cancellation()) return null
-                if (weight < bestWeight) {
-                    best = candidate
-                    bestWeight = weight
-                }
-                if (weight == 0L) return candidate
+                return AffineCandidate(di, x, constTerm, termVars, termCoeffs, isAlias)
             }
         }
-        return if (cancellation()) null else best
+        return null
     }
 
     /** Whether any variable in [touchedVars] heads a unit-pivot or residue candidate, testing only the
