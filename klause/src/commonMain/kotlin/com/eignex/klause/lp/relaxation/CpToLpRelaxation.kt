@@ -682,6 +682,7 @@ internal class CpToLpRelaxation(
     private val reuseSourceTemplates: Boolean = true,
     private val preparationCancellation: Cancellation = Cancellation.Never,
     private val reuseTemplateIndexes: Boolean = true,
+    private val reuseTemplateMetadata: Boolean = false,
 ) {
     private val elementIndexes = elementIndexes?.toSet()
     private val linearProjection = LinearLpProjection()
@@ -698,7 +699,8 @@ internal class CpToLpRelaxation(
         val start = TimeSource.Monotonic.markNow()
         var work = 0L
         try {
-            preparationTemplates = projections.prepareLpTemplates(objective, cancellation, reuseTemplateIndexes) {
+            preparationTemplates = projections.prepareLpTemplates(objective, cancellation,
+                reuseTemplateIndexes, reuseTemplateMetadata) {
                 work = it
             }
         } finally {
