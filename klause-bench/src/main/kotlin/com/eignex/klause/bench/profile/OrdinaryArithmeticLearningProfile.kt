@@ -61,8 +61,16 @@ internal object OrdinaryArithmeticLearningProfile {
         val ref = Catalog.uncapped(suite).problems.single { it.name == name }
         val bytes = CorpusFetcher.resolve(ref.source).readBytes()
         require(bytes.size <= 1_048_576)
-        check(sha256(bytes) == hash)
         out.resolve("source.${ref.format.name.lowercase()}").writeBytes(bytes)
+        val observedHash = sha256(bytes)
+        publish(buildJsonObject {
+            put("event", "source")
+            put("suite", suite)
+            put("problem", name)
+            put("expectedSha256", hash)
+            put("observedSha256", observedHash)
+        }.toString())
+        check(observedHash == hash) { "source hash mismatch: expected $hash, observed $observedHash" }
         val codec = ProblemJson()
         out.resolve("ordinary-learning.jsonl").bufferedWriter().use { output ->
             for (learning in listOf(false, true)) {
