@@ -26,6 +26,7 @@ class ConflictAnalyzerTest {
             val state = PropagationState(problem, Assumptions.None)
             state.undoLogging = true
             state.historicalTableReasons = enabled
+            state.factorAttribution = FactorAttribution()
             check(state.setIntMinAsDecision(2, 1))
             check(state.setIntMinAsDecision(1, 1))
             check(state.pinBoolAsDecision(0, true))
@@ -42,6 +43,7 @@ class ConflictAnalyzerTest {
             assertTrue(learned.asserting)
             assertEquals(if (enabled) 1 else 2, learned.backjumpLevel)
             assertEquals(if (enabled) 2 else 3, learned.literals.size)
+            assertTrue(state.factorAttribution!!.snapshot().getValue("factorTableUipReasons") > 0)
         }
     }
 
@@ -81,6 +83,7 @@ class ConflictAnalyzerTest {
             val state = PropagationState(problem, Assumptions.None)
             state.undoLogging = true
             state.historicalTableReasons = true
+            state.factorAttribution = FactorAttribution()
             check(state.setIntMinAsDecision(2, 1))
             check(state.setIntMinAsDecision(1, 1))
             check(state.pinBoolAsDecision(0, true))

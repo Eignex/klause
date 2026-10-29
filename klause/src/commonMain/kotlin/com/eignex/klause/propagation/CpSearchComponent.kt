@@ -575,6 +575,7 @@ class CpSearchComponent(
 
     private inner class CpLearnedConflict(private val learned: ConflictAnalyzer.AnalysisResult.LearnedConstraint) :
         SearchLearnedConflict {
+        private val factorFamilies = session.explanationState.factorAttribution?.analysisFamilies ?: 0
         override val decisionLevel: Int get() = sharedLevelForNative(learned.backjumpLevel)
         override val lbd: Int get() = learned.lbd
         override val guardLiterals: IntArray get() = learned.guardLiterals
@@ -584,7 +585,8 @@ class CpSearchComponent(
             this@CpSearchComponent.session.explanationState.arithmeticLearningTrace?.record(
                 "analysis.mapped-target", learned.backjumpLevel.toLong(), decisionLevel.toLong(),
                 this@CpSearchComponent.session.decisionLevel.toLong())
-            val result = when (learned) {
+            val result = this@CpSearchComponent.session.withAttribution(factorFamilies) {
+                when (learned) {
                 is ConflictAnalyzer.AnalysisResult.Learned -> this@CpSearchComponent.session.addLearnedClause(
                     Clause(learned.literals),
                     learned.lbd,
@@ -599,6 +601,7 @@ class CpSearchComponent(
 
                 is ConflictAnalyzer.AnalysisResult.LearnedIntegerRow ->
                     this@CpSearchComponent.session.addLearnedIntegerRow(learned.row, learned.lbd)
+                }
             }
             lastResult = result
             return when (result) {

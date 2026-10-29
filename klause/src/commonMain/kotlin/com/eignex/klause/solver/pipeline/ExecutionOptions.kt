@@ -332,6 +332,10 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
 
         /** The `integer-row-learning` execution setting. */
         val integerRowLearning: ExecutionOption<Boolean> = ExecutionOption("integer-row-learning", ValueKind.BOOLEAN)
+        /** Collect bounded propagation and explanation value diagnostics. */
+        val propagationAttribution: ExecutionOption<Boolean> = ExecutionOption("propagation-attribution", ValueKind.BOOLEAN)
+        /** Retry bounded historical Table explanations. */
+        val historicalTableReasons: ExecutionOption<Boolean> = ExecutionOption("historical-table-reasons", ValueKind.BOOLEAN)
 
         /** The `pb-objective-cutoff` execution setting. */
         val pbObjectiveCutoff: ExecutionOption<Boolean> = ExecutionOption("pb-objective-cutoff", ValueKind.BOOLEAN)
@@ -475,7 +479,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 rootProbeBatch, rootProbeWork, lpObjectiveCone, lpAutoOffReprobe,
                 lpKnapsackLagrangian, lpComponentSplit, lpBoundMaxPivots, lpAdaptiveWork,
                 lpBranching, lpDirectionalGains,
-                lpVariableShaving, lpPruneHulls, lpRootCuts, pbLearning, integerRowLearning, pbObjectiveCutoff,
+                lpVariableShaving, lpPruneHulls, lpRootCuts, pbLearning, integerRowLearning, propagationAttribution, historicalTableReasons, pbObjectiveCutoff,
                 objectiveGuidedValues, variableSelector, valueSelector, seed, dryRunSolver,
                 noise, cb, skewAlpha, initialTemp, coolingRate,
                 minTemp, smoothProb, smoothFactor, tabuTenure, sources,

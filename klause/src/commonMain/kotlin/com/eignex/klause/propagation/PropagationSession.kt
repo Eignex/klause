@@ -53,6 +53,8 @@ class PropagationSession private constructor(
     preparedMark: PropagationState.LevelMark? = null,
     initialAssumptions: Assumptions = Assumptions.None,
     cumulativeUnarySubsets: Boolean = false,
+    attribution: Boolean = false,
+    historicalTables: Boolean = false,
 ) {
     /** Construct a private propagation projection over [problem]. */
     constructor(
@@ -70,8 +72,10 @@ class PropagationSession private constructor(
         nativeSat: Boolean = false,
         pbLearning: Boolean = false,
         cumulativeUnarySubsets: Boolean = false,
+        attribution: Boolean = false,
+        historicalTables: Boolean = false,
     ) : this(projection.problem, cancellation, propagationCancelFloor, nativeSat, pbLearning, projection,
-        cumulativeUnarySubsets = cumulativeUnarySubsets)
+        cumulativeUnarySubsets = cumulativeUnarySubsets, attribution = attribution, historicalTables = historicalTables)
 
     internal fun checkSelectedProjection(
         checks: SelectedProjectionChecks? = projection.selection?.originalChecks,
@@ -91,6 +95,8 @@ class PropagationSession private constructor(
         ).also {
             it.cancelFloor = propagationCancelFloor
             it.cumulativeUnarySubsets = cumulativeUnarySubsets
+            if (attribution) it.factorAttribution = FactorAttribution()
+            it.historicalTableReasons = historicalTables
         }
 
     /** Subscribe to per-variable unassign events fired by every backtrack/undo; see
@@ -865,6 +871,10 @@ class PropagationSession private constructor(
     private inline fun registerAndPropagate(base: Int, register: () -> Int): PropagationResult {
         bakedUnsat?.let { return it }
         val newFid = register()
+        state.factorAttribution?.let {
+            if (state.nativeEngine == null) it.admit(state.factorAt(newFid))
+            else if (it.admissionFamilies != 0) it.note(it.admissionFamilies, FactorAttribution.Metric.Learned)
+        }
         val conflict = state.runToFixpoint(allFactors = false, initialFactor = newFid, cancellation = cancellation)
         if (conflict != null) return revertAndUnsat(conflict)
         // The asserted facts are implied by the decisions up to the current level, so they join the
@@ -1001,7 +1011,24 @@ class PropagationSession private constructor(
         )
     }
 
-    internal fun learnedLifecycle(): Map<String, Long> = state.learned.lifecycle.snapshot()
+    internal fun learnedLifecycle(): Map<String, Long> =
+        state.learned.lifecycle.snapshot() + (state.factorAttribution?.snapshot() ?: emptyMap())
+
+    internal fun configureAttribution(enabled: Boolean, historicalTables: Boolean) {
+        if (enabled && state.factorAttribution == null) state.factorAttribution = FactorAttribution()
+        state.historicalTableReasons = historicalTables
+    }
+
+    internal inline fun <T> withAttribution(families: Int, action: () -> T): T {
+        val attribution = explanationState.factorAttribution
+        val previous = attribution?.admissionFamilies ?: 0
+        attribution?.admissionFamilies = families
+        try {
+            return action()
+        } finally {
+            attribution?.admissionFamilies = previous
+        }
+    }
 
     /** Current learned-constraint count, including PB constraints and integer rows. Used to invoke
      *  [forgetLearnedClauses] based on `BacktrackParams.maxLearnedClauses`. */

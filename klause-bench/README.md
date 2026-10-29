@@ -329,6 +329,27 @@ provides no independent check receipt or basis for a performance/default claim.
 Additional reason journal, event and root-retirement capacity fields are covered
 by CI at the later source revision.
 
+## Propagation and explanation value
+
+`set=propagation-value-v1` retains scheduling, Table and mixed finite arithmetic
+sources plus a native SAT control. Use `param.propagation-attribution=true` with
+ordinary `engine=cp` or fixed-work single-lane portfolio runs. Compare
+`param.historical-table-reasons=false|true` at the same source/revision, preparation,
+seed, worker recipe and containing allowance. This exposes the existing historical
+Table retry; it changes neither priorities nor its disabled default.
+
+Retain `factor<Family><Metric>` alongside total propagation work, nodes, outcomes,
+witnesses and independent source-check receipts. `Work` and `ReasonWork` charge
+attempts including interruption; `Support`, `UipReasons`, `Learned`, `Consumed`
+and `LaterUseEvents` separate construction from downstream consumption. Eager
+reason construction is inside factor cost, and shared family credits overlap.
+`Unattributed` and tracking occupancy expose bounded metadata coverage. An admitted
+or consumed object alone establishes no whole-source benefit. Include preparation,
+checking, unsuccessful work and retirement in the containing comparison; preserve
+native verdicts separately from independent checks. A priority trial additionally
+needs periodic opportunities preventing starvation and lower total cost or improved
+checked outcomes before activation.
+
 ## LP capture and replay
 
 The opt-in basis tool uses the [basis corpus](../klause/src/jvmTest/resources/basis-corpus/README.md):

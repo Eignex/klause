@@ -395,6 +395,10 @@ data class BacktrackParams(
     val pbLearning: Boolean? = null,
     /** Learn bounded mandatory integer rows from finite conflicts; disabled by default. */
     val integerRowLearning: Boolean = false,
+    /** Collect bounded factor-family propagation, reason and learned-use diagnostics. */
+    val propagationAttribution: Boolean = false,
+    /** Retry bounded historical Table reasons against the minimized conflict frontier. */
+    val historicalTableReasons: Boolean = false,
     /**
      * Enforce the incumbent as a refutable pseudo-Boolean cutoff for a pure-Boolean weighted objective
      * (no single objective variable): at the root each incumbent `K` posts `Σ boolWeights·x ≤ K − 1` as a

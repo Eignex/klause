@@ -160,7 +160,9 @@ internal class NativeSatState(private val state: PropagationState) {
     private fun clauseLits(h: Int): IntArray {
         val lits = if (h < baseCount) arena.lits else learnedLits.backingData
         val start = if (h < baseCount) arena.start(h) else learnedStarts[h - baseCount]
-        return lits.copyOfRange(start, start + clauseLen(h))
+        return lits.copyOfRange(start, start + clauseLen(h)).also {
+            state.factorAttribution?.remember(it, 1 shl FactorFamily.Clause.ordinal)
+        }
     }
 
     /** The clause's literals except index [skip] — the antecedent set recorded for a forced unit,
@@ -339,9 +341,11 @@ internal class NativeSatState(private val state: PropagationState) {
     fun markUsed(fid: Int) {
         val i = fid - baseCount
         if (i !in 0 until learnedCount) return
+        state.factorAttribution?.used(1 shl FactorFamily.Clause.ordinal)
         if (lifecycleStages[i] and 1 == 0) {
             lifecycleStages[i] = lifecycleStages[i] or 1
             state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Consumed)
+            state.factorAttribution?.note(1 shl FactorFamily.Clause.ordinal, FactorAttribution.Metric.Consumed)
         }
         if (learnedUsed[i] == 0) importUses.note(learnedOrigin[i])
         learnedUsed[i] = 1

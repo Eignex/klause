@@ -182,8 +182,13 @@ internal class CpSatisfactionTraversal(
             params.propagationCancelFloor,
             nativeSat = params.nativeSat ?: true,
             pbLearning = params.pbLearning ?: (problem.numIntVars == 0),
+            attribution = params.propagationAttribution,
+            historicalTables = params.historicalTableReasons,
             cumulativeUnarySubsets = problem.numRealVars == 0 && params.useCumulativeUnarySubsets,
-        )).also { if (params.integerRowLearning) it.enableIntegerRowLearning() },
+        )).also {
+            if (params.integerRowLearning) it.enableIntegerRowLearning()
+            it.configureAttribution(params.propagationAttribution, params.historicalTableReasons)
+        },
         branching = CpBranching.None,
     ).also {
         it.conflictStats = sink?.ca

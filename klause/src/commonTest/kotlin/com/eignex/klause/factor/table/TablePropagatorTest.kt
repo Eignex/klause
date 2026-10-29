@@ -11,6 +11,7 @@ import com.eignex.klause.ir.intdomain.SurvivorsDomain
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.AtomKind
+import com.eignex.klause.propagation.FactorAttribution
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.PropagationState
@@ -239,7 +240,7 @@ class TablePropagatorTest {
                 }
             })),
         )
-        val state = PropagationState(problem, Assumptions.None)
+        val state = PropagationState(problem, Assumptions.None).also { it.factorAttribution = FactorAttribution() }
         assertNull(state.runToFixpoint(allFactors = true))
         state.undoLogging = true
         state.levelToDecisionVar.add(0)
@@ -254,6 +255,9 @@ class TablePropagatorTest {
 
         assertTrue(state.runCancelled)
         assertFalse(state.lazyReasonMemo.containsKey(reason))
+        val attribution = state.factorAttribution!!.snapshot()
+        assertEquals(1L, attribution["factorTableLazyInterrupted"])
+        assertEquals(null, attribution["factorTableLazyCompleted"])
     }
 
     @Test
@@ -576,7 +580,7 @@ class TablePropagatorTest {
                     Table(intArrayOf(0, 1, 2), tuples, hi = if (shortSupport) tuples else null),
                 ),
             )
-            val state = PropagationState(problem, Assumptions.None)
+            val state = PropagationState(problem, Assumptions.None).also { it.factorAttribution = FactorAttribution() }
             assertNull(state.runToFixpoint(allFactors = true))
             state.undoLogging = true
             state.levelToDecisionVar.add(0)
@@ -608,7 +612,7 @@ class TablePropagatorTest {
                     Table(xs = intArrayOf(0, 1), tuples = values.flatMap { listOf(it, it) }.toLongArray()),
                 ),
             )
-            val state = PropagationState(problem, Assumptions.None)
+            val state = PropagationState(problem, Assumptions.None).also { it.factorAttribution = FactorAttribution() }
             assertNull(state.runToFixpoint(allFactors = true))
             state.undoLogging = true
             val mark = state.mark()
