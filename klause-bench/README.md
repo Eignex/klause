@@ -473,6 +473,9 @@ within that pair, and compare refinement at fixed ordering in a separate pair.
 The candidate charges its bounded prefix inspection and stable queue shifts to
 propagation work; its fixed family estimates add no timers. Retain the same source,
 compiled input, compiler/runtime bytes, seed, recipe and containing allowances.
+`nativePropagationSchedule{Dispatches,Bypasses,Forced,Work}` distinguishes
+actual ordering opportunities and charged queue cost from later search changes.
+They are subsets and events, without a causal-benefit claim.
 
 Use `param.propagation-attribution=true` with
 ordinary `engine=cp` or fixed-work single-lane portfolio runs. Compare

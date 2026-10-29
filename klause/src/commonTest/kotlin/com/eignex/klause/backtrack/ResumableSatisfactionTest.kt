@@ -31,11 +31,13 @@ class ResumableSatisfactionTest {
         val solver = BacktrackSolver(pigeonhole(3, 2).bake())
         for (resumed in listOf(false, true)) {
             var observed = false
+            var native: PropagationSession? = null
             val exchange = object : ClauseExchange {
                 override fun onSearchStart(session: PropagationSession) {
                     assertNotNull(session.explanationState.propagationSchedule)
                     assertNull(session.explanationState.factorAttribution)
                     observed = true
+                    native = session
                 }
                 override fun onRestart(session: PropagationSession) = Unit
             }
@@ -47,6 +49,9 @@ class ResumableSatisfactionTest {
 
             assertIs<SolveResult.Unsat>(result)
             assertTrue(observed)
+            val retained = assertNotNull(native).learnedLifecycle()
+            assertTrue(retained.getValue("propagationScheduleDispatches") > 0L)
+            assertTrue(retained.getValue("propagationScheduleWork") > 0L)
         }
     }
 

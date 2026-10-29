@@ -43,7 +43,7 @@ class PropagationScheduleTest {
     @Test
     fun `unobserved families should receive a sampling opportunity`() {
         val schedule = PropagationSchedule()
-        schedule.observe(FactorFamily.Linear, 1)
+        schedule.observe(FactorFamily.Linear, 100)
         val queue = IntArrayDeque()
         queue.addLast(0)
         queue.addLast(1)
@@ -51,6 +51,43 @@ class PropagationScheduleTest {
         val next = schedule.remove(queue) { if (it == 0) FactorFamily.Linear else FactorFamily.Table }
 
         assertEquals(1, next)
+    }
+
+    @Test
+    fun `an already cheap head should avoid inspecting the rest of the prefix`() {
+        val schedule = PropagationSchedule()
+        schedule.observe(FactorFamily.Linear, 2)
+        val queue = IntArrayDeque()
+        repeat(8) { queue.addLast(it) }
+        var inspected = 0
+
+        val next = schedule.remove(queue) {
+            inspected++
+            FactorFamily.Linear
+        }
+
+        assertEquals(0, next)
+        assertEquals(1, inspected)
+        assertEquals(1L, schedule.selectionWork)
+    }
+
+    @Test
+    fun `observations should retain charged work and bypasses across queue replacement`() {
+        val schedule = PropagationSchedule()
+        schedule.observe(FactorFamily.Scheduling, 100)
+        schedule.observe(FactorFamily.Linear, 2)
+        val queue = IntArrayDeque()
+        queue.addLast(0)
+        queue.addLast(1)
+        schedule.remove(queue) { if (it == 0) FactorFamily.Scheduling else FactorFamily.Linear }
+        schedule.begin()
+
+        schedule.remove(queue) { FactorFamily.Scheduling }
+
+        assertEquals(2L, schedule.snapshot().getValue("propagationScheduleDispatches"))
+        assertEquals(1L, schedule.snapshot().getValue("propagationScheduleBypasses"))
+        assertEquals(0L, schedule.snapshot().getValue("propagationScheduleForced"))
+        assertEquals(4L, schedule.snapshot().getValue("propagationScheduleWork"))
     }
 
     @Test
@@ -67,7 +104,7 @@ class PropagationScheduleTest {
     @Test
     fun `selection should not inspect beyond its bounded prefix`() {
         val schedule = PropagationSchedule()
-        schedule.observe(FactorFamily.Linear, 10)
+        schedule.observe(FactorFamily.Linear, 100)
         val queue = IntArrayDeque()
         repeat(9) { queue.addLast(it) }
 

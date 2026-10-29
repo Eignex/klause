@@ -298,8 +298,10 @@ The finite-domain fixpoint runs watched propagators until no domain changes or a
 conflict appears. [Explanation lifetime](09-learning.md#explanation-lifetime)
 defines the reasons retained for its deductions.
 
-An opt-in cost-aware worklist selects the least measured mechanism-family work
-within the oldest eight pending factors, retaining FIFO order for ties. Each family
+An opt-in cost-aware worklist retains FIFO order when the oldest factor's measured
+mechanism-family work is at most the fifteen-visit inspection-and-shift budget. Otherwise it selects
+the least measured work within the oldest eight pending factors, retaining FIFO
+order for ties. Each family
 starts unobserved and receives a sampling opportunity; completed and interrupted
 fires update a smoothed containing-work estimate. Learned provenance credits do not
 rank execution: a learned clause has its clause mechanism's cost. No new timer runs.
@@ -309,6 +311,9 @@ dispatches. Selection and queue shifts charge the containing propagation work.
 Family estimates survive retraction without retaining factor identities; queue
 replacement resets the bypass count. The fixed family array belongs to the state
 and participates in its retained memory observation. FIFO remains the default.
+Exact dispatch, bypass, forced-opportunity and charged selection-work counters
+survive queue replacement and state retirement; selection work is a subset of the
+containing propagation work.
 
 [PropagationSession](../klause/src/commonMain/kotlin/com/eignex/klause/propagation/PropagationSession.kt)
 owns the finite-domain trail and fixpoint. Sessions over one immutable model share

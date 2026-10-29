@@ -30,7 +30,8 @@ internal class PropagationPreparation(
 
     val work: Long get() = state?.work ?: 0L
     val propagationNanos: Long get() = state?.propagationNanos ?: 0L
-    fun learning(): Map<String, Long> = state?.factorAttribution?.snapshot() ?: emptyMap()
+    fun learning(): Map<String, Long> = (state?.factorAttribution?.snapshot() ?: emptyMap()) +
+        (state?.propagationSchedule?.snapshot() ?: emptyMap())
 
     fun advance(): PropagationSession? {
         result?.let { return it }
