@@ -8,7 +8,9 @@ internal class PropagationSchedule {
     var selectionWork = 0L
         private set
 
-    fun begin() { bypasses = 0 }
+    fun begin() {
+        bypasses = 0
+    }
 
     fun observe(family: FactorFamily, work: Long) {
         val cost = work.coerceAtLeast(1)
