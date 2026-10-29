@@ -18,6 +18,8 @@ tasks.withType<org.jetbrains.dokka.gradle.tasks.DokkaGenerateTask>().configureEa
     enabled = false
 }
 
+val labMacOs = System.getProperty("os.name").startsWith("Mac")
+
 repositories {
     exclusiveContent {
         forRepository {
@@ -35,8 +37,12 @@ repositories {
         forRepository {
             ivy {
                 name = "miniZincReleases"
-                url = uri("https://github.com/MiniZinc/libminizinc/releases/download")
-                patternLayout { artifact("[revision]/minizinc-compiler-only-[classifier].[ext]") }
+                url = uri(if (labMacOs) "https://github.com/MiniZinc/libminizinc/releases/download"
+                    else "https://github.com/MiniZinc/MiniZincIDE/releases/download")
+                patternLayout {
+                    artifact(if (labMacOs) "[revision]/minizinc-compiler-only-[classifier].[ext]"
+                        else "[revision]/MiniZincIDE-[revision]-[classifier].[ext]")
+                }
                 metadataSources { artifact() }
             }
         }
@@ -49,19 +55,19 @@ val labMiniZinc = configurations.create("labMiniZinc") {
     isCanBeResolved = true
 }
 val labMiniZincTarget = when {
-    System.getProperty("os.name").startsWith("Mac") -> when (System.getProperty("os.arch")) {
+    labMacOs -> when (System.getProperty("os.arch")) {
         "aarch64", "arm64" -> "aarch64-apple-darwin" to "aeb1a25471ad753e67c2a73034b0725dff7c4d011d23cc8c8c91499efdb26f29"
         "amd64", "x86_64" -> "x86_64-apple-darwin" to "02b7ce514714d57c50865e4c2458169eb76fb18bb789af26b45026a362460d06"
         else -> null
     }
     System.getProperty("os.name") == "Linux" && System.getProperty("os.arch") in setOf("amd64", "x86_64") ->
-        "x86_64-linux-gnu" to "aebc4b1422fd1073ca105275dce1eea302656b2889dda80ed338904c8e6c88e6"
+        "x86_64-linux-gnu" to "b63dd88491d47b05d0eb0ff4aa1112d1e6f77292c023800b20b98851458ce01c"
     else -> null
 }
 
 dependencies {
     labMiniZincTarget?.let { (target, _) ->
-        add(labMiniZinc.name, "org.minizinc:minizinc:2.10.1:$target@tar.gz")
+        add(labMiniZinc.name, "org.minizinc:minizinc:2.10.1:$target@${if (labMacOs) "tar.gz" else "tgz"}")
     }
     implementation("com.eignex:lab-bench:$labBenchVersion")
     implementation(project(":klause"))
@@ -155,7 +161,11 @@ val prepareLabRuntime = tasks.register("prepareLabRuntime") {
         check(HexFormat.of().formatHex(digest.digest()) == checksum) { "MiniZinc release checksum mismatch" }
         project.sync {
             from(tarTree(resources.gzip(file)))
-            include("bin/minizinc", "share/minizinc/std/**")
+            if (labMacOs) include("bin/minizinc", "share/minizinc/std/**")
+            else {
+                include("*/bin/minizinc", "*/share/minizinc/std/**")
+                eachFile { relativePath = RelativePath(!isDirectory, *relativePath.segments.drop(1).toTypedArray()) }
+            }
             includeEmptyDirs = false
             into(destination)
         }
