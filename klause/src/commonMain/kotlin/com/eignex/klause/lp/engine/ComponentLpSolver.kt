@@ -35,6 +35,7 @@ internal class ComponentLpSolver(
     private var activeSolve: LpSolveCursor<FloatLpResult?>? = null
     private var activeChild: LpSolver? = null
     private var solveStarted = false
+    var queryAllowance: LpFloatAllowance? = null
     private val certificationKey = if (model.exactState == null) exactLpStateKey(model) else null
     private var blockResults: List<FloatLpResult>? = null
     private var metrics = LpSolveMetrics()
@@ -96,6 +97,14 @@ internal class ComponentLpSolver(
 
     override fun solve(warm: Basis?): FloatLpResult? {
         check(activeSolve == null) { "LP solve is suspended" }
+        queryAllowance?.let { allowance ->
+            return openSolve(allowance).use { cursor ->
+                when (val step = cursor.advance()) {
+                    is LpSolveStep.Completed -> step.value
+                    LpSolveStep.Paused -> error("synchronous LP solve suspended")
+                }
+            }
+        }
         solveStarted = true
         return immediateLpSolve { invoke { s -> s.solve(null) } }
     }

@@ -811,11 +811,7 @@ internal class LpScopedSolver(
     }
 
     private fun componentPricing(part: LpModel, columns: Int): LpPricingOptions {
-        val limit = pricing.basisEntryLimit
-        if (limit == Long.MAX_VALUE) return pricing
-        // Column ownership stays fixed when local cut rows are appended, so unaffected children keep their shares.
-        val share = limit / columns * part.n + (limit % columns) * part.n / columns
-        return pricing.copy(basisEntryLimit = share)
+        return pricing.componentShare(part.n, columns)
     }
 
     override fun close() {

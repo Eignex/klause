@@ -442,9 +442,23 @@ internal fun newComponentTableauCutSolver(
     pricing: LpPricingOptions = LpPricingOptions(),
 ): TableauCutSolver = componentLpSolverOrNull(
     model, cancellation,
-    { part, token -> factory.newTableauSolver(part, token, iterationLimit, workLimit, trackDegeneracy, pricing) },
-    ::ComponentLpSolver,
+    { part, token -> factory.newTableauSolver(
+        part, token, iterationLimit, workLimit, trackDegeneracy, pricing.componentShare(part.n, model.n),
+    ) },
+    { parent, parts, children, isolated ->
+        ComponentLpSolver(parent, parts, children, isolated).apply {
+            queryAllowance = LpFloatAllowance(workLimit, iterationLimit)
+        }
+    },
 ) ?: newTableauCutSolver(model, cancellation, iterationLimit, workLimit, trackDegeneracy, factory, pricing)
+
+internal fun LpPricingOptions.componentShare(columns: Int, totalColumns: Int): LpPricingOptions {
+    val limit = basisEntryLimit
+    if (limit == Long.MAX_VALUE) return this
+    // Column ownership keeps the allocation stable across component-local row additions.
+    val share = limit / totalColumns * columns + (limit % totalColumns) * columns / totalColumns
+    return copy(basisEntryLimit = share)
+}
 
 /**
  * Construct an engine to keep across solves ([PersistentLpSolver]). Monolithic by construction: a
