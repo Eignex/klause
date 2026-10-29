@@ -4,6 +4,7 @@ import com.eignex.klause.backtrack.BacktrackPresets
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.toProblem
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.ExactBasisMetrics
 import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.ExactLpColumn
@@ -12,6 +13,7 @@ import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpCertifierCost
+import com.eignex.klause.lp.engine.LpClaim
 import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpModel
@@ -31,31 +33,34 @@ import com.eignex.klause.lp.engine.SimplexProfilePhase
 import com.eignex.klause.lp.engine.SimplexProgressTrace
 import com.eignex.klause.lp.engine.TableauCutSolver
 import com.eignex.klause.lp.engine.authoritativeModel
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.util.Cancellation
+import kotlin.io.encoding.Base64
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource.Monotonic
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import kotlin.io.encoding.Base64
-import kotlin.time.Duration.Companion.seconds
-import kotlin.time.TimeSource.Monotonic
 
 internal expect fun profileAllocatedBytes(): Long?
 
 /** Runs bounded cold and retained LP lifecycle observations for one hash-pinned source. */
 fun main(args: Array<String>) {
     val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
-    require(options.keys == setOf("source64", "source", "sha256", "repeats"))
+    require(options.keys - "mode" == setOf("source64", "source", "sha256", "repeats"))
+    val mode = options["mode"] ?: "lifecycle"
+    val claims = mode == "claims"
+    require(claims || mode == "lifecycle")
     val bytes = Base64.decode(options.getValue("source64"))
     require(bytes.size in 1..1_048_576)
     val repeats = options.getValue("repeats").toInt().also { require(it in 1..5) }
@@ -102,6 +107,13 @@ fun main(args: Array<String>) {
         },
     )
     for (round in -1 until repeats) {
+        if (claims) {
+            for (claim in LpClaim.entries) {
+                if (profileExpired(stop)) return
+                lifecycle(initial, column, side, round, true, true, stop, claim, true)
+            }
+            continue
+        }
         for (retained in if (round % 2 == 0) listOf(true, false) else listOf(false, true)) {
             for (observed in listOf(false, true)) {
                 if (profileExpired(stop)) return
@@ -131,6 +143,8 @@ private fun lifecycle(
     retained: Boolean,
     observed: Boolean,
     cancellation: Cancellation,
+    claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
+    claims: Boolean = false,
 ) {
     val factory = LifecycleFactory(observed)
     val context = LpSolveContext(engineFactory = factory)
@@ -140,8 +154,15 @@ private fun lifecycle(
     val allocated = profileAllocatedBytes()
     var closeNs = 0L
     var activeNs = 0L
+    var previousState: LpExactState? = null
+    var previousHeadings: List<Int>? = null
+    var previousStatuses: List<String>? = null
+    val stages = if (claims) {
+        listOf("cold", "unchanged", "authority", "authority-repeat", "bound", "bound-repeat", "bound-pop",
+            "row", "row-repeat", "row-pop", "objective", "objective-repeat", "activation", "activation-repeat")
+    } else listOf("cold", "bound", "bound-pop", "row", "row-pop")
     try {
-        for ((index, stage) in listOf("cold", "bound", "bound-pop", "row", "row-pop").withIndex()) {
+        for (stage in stages) {
             if (cancellation()) return
             val stageStart = Monotonic.markNow()
             val stageAllocated = profileAllocatedBytes()
@@ -161,15 +182,26 @@ private fun lifecycle(
             val previousTrace = previousEngine?.progressTrace
             val previousPhases = previousTrace?.phaseNanos?.toMap().orEmpty()
             val editStart = Monotonic.markNow()
-            when (index) {
-                1 -> {
+            when (stage) {
+                "authority" -> check(current.adopt(LpExactState(current.state.baseModel)) || cancellation())
+
+                "objective" -> {
+                    val objective = current.state.model.objective
+                    check(current.replaceObjective(objective.withConstant(
+                        ExactLpNumber.of(objective.constant.value + BigFraction.ONE),
+                    )) || cancellation())
+                }
+
+                "activation" -> check(current.deactivate(initial.rows.row(0).id) || cancellation())
+
+                "bound" -> {
                     check(current.push() || cancellation())
                     check(current.assertBound(column, false, side, 1L) || cancellation())
                 }
 
-                2, 4 -> check(current.pop(0) || cancellation())
+                "bound-pop", "row-pop" -> check(current.pop(0) || cancellation())
 
-                3 -> {
+                "row" -> {
                     check(current.push() || cancellation())
                     check(
                         current.append(
@@ -203,7 +235,7 @@ private fun lifecycle(
             val queryStart = Monotonic.markNow()
             factory.queryActive = true
             val result = try {
-                if (prepared) current.solve(observer = observer.takeIf { observed }) else null
+                if (prepared) current.solve(observer = observer.takeIf { observed }, claim = claim) else null
             } finally {
                 factory.queryActive = false
             }
@@ -222,6 +254,20 @@ private fun lifecycle(
                     put("retained", retained)
                     put("observed", observed)
                     put("stage", stage)
+                    put("claim", claim.name)
+                    put("sameAuthority", previousState?.let { JsonPrimitive(it === current.state) } ?: JsonNull)
+                    put("matrixRevision", current.state.matrixRevision)
+                    put("boundRevision", current.state.boundRevision)
+                    put("objectiveRevision", current.state.objectiveRevision)
+                    put("rowRevision", current.state.rowRevision)
+                    put("depth", current.state.depth)
+                    put("sameBasisHeadings", result?.float?.basis?.basicVars?.toList()?.let {
+                        previousHeadings?.let { previous -> JsonPrimitive(previous == it) }
+                    } ?: JsonNull)
+                    put("sameBasisStatuses", result?.float?.basis?.status?.map { it.name }?.let {
+                        previousStatuses?.let { previous -> JsonPrimitive(previous == it) }
+                    } ?: JsonNull)
+                    put("certificationReused", result?.certificationReused)
                     put("stageNs", stageNs)
                     put("constructionNs", constructionNs)
                     put("editNs", editNs)
@@ -255,9 +301,37 @@ private fun lifecycle(
                     put("exactInputAccepted", if (observed) JsonPrimitive(observer.exactInputAccepted) else JsonNull)
                     put("certificatePhases", if (observed) numbers(observer.phases) else JsonNull)
                     put("reconstructionDecline", result?.reconstruction?.decline?.name)
+                    put("reconstructionWork", result?.reconstruction?.work)
+                    put("reconstructionAllocation", result?.reconstruction?.allocation)
+                    put("reconstructionPointChecks", result?.reconstruction?.pointChecks)
+                    put("reconstructionDualChecks", result?.reconstruction?.dualChecks)
+                    put("reconstructionVectorRejection", result?.reconstruction?.vectorRejection?.toString())
+                    put("reconstructionEntryRejection", result?.reconstruction?.entryRejection?.toString())
                     put("basisDecline", result?.basisVerification?.decline?.name)
                     put("continuationDecline", result?.continuation?.decline?.name)
+                    put("continuation", result?.continuation?.let { metrics -> buildJsonObject {
+                        put("phase", metrics.phase.name)
+                        put("work", metrics.work)
+                        put("allocation", metrics.allocation)
+                        put("elapsedNs", metrics.elapsedNs)
+                        put("builds", metrics.builds)
+                        put("imports", metrics.imports)
+                        put("importPosition", metrics.importPosition)
+                        put("maxImportPivots", ExactContinuationLimits().maxImportPivots)
+                        put("restarts", metrics.restarts)
+                        put("resumed", metrics.resumed)
+                        put("invalidated", metrics.invalidated)
+                        put("workByPhase", numbers(metrics.workByPhase))
+                    } } ?: JsonNull)
                     put("refinementDecline", result?.refinement?.decline?.name)
+                    put("refinementWork", result?.refinement?.work)
+                    put("refinementAllocation", result?.refinement?.allocation)
+                    put("refinementElapsedNs", result?.refinement?.elapsed?.inWholeNanoseconds)
+                    put("refinementReconstructionWork", result?.refinement?.reconstructionWork)
+                    put("refinementLuWork", result?.refinement?.luWork)
+                    put("refinementFloatWork", result?.refinement?.floatWork)
+                    put("refinementLifetimeWork", current.refinementCache.work)
+                    put("refinementLifetimeAllocation", current.refinementCache.allocation)
                     put("sourceResidualNs", metrics.sourceResidualNanos)
                     put("luMaxFill", result?.float?.luMaxFill?.let(::JsonPrimitive) ?: JsonNull)
                     put("luMaxDensity", result?.float?.luMaxDensity?.let(::JsonPrimitive) ?: JsonNull)
@@ -278,6 +352,9 @@ private fun lifecycle(
                     put("trace", numerical?.progressTrace?.let(::traceJson) ?: JsonNull)
                 },
             )
+            previousState = current.state
+            previousHeadings = result?.float?.basis?.basicVars?.toList()
+            previousStatuses = result?.float?.basis?.status?.map { it.name }
             if (!retained) {
                 val closing = Monotonic.markNow()
                 current.close()
@@ -294,6 +371,7 @@ private fun lifecycle(
         println(
             buildJsonObject {
                 put("kind", "lifecycle")
+                put("claim", claim.name)
                 put("round", round)
                 put("retained", retained)
                 put("observed", observed)

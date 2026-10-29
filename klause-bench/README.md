@@ -590,6 +590,17 @@ Separate runtime jobs request only the selected target's build task. They retain
 their own CPU identity and resource receipts; different placements do not support
 an absolute cross-runtime speed comparison.
 
+The optional fourth script argument claims selects retained, observed requests
+for each claim kind. It includes unchanged repeats, an equal-valued replacement
+authority, bound and row edits and pops, objective-constant changes and row
+deactivation, with one warmup and the requested measured rounds. Records expose
+state revisions, ordered-basis/status comparisons, checked-result reuse,
+reconstruction work and rejection details, continuation import position and
+cumulative-limit behavior, and refinement phase and lifetime spending. These are
+diagnostic controls; unchanged requests and changed scopes are separate samples.
+All work stays under the existing 120-second containing profile deadline. The
+ordinary source worker follows the controls under its own nested deadline.
+
 Each owner runs cold, asserted-bound, bound-pop, appended-row and row-pop queries.
 Fresh owners at the same exact states control retained owners. One warmup precedes
 up to five alternating rounds, with phase observations enabled and disabled.
