@@ -61,11 +61,13 @@ class PreparedFactorProjections internal constructor(
     private var lpFiniteTemplateCache = AtomicReference<LpPreparationTemplates?>(null)
 
     internal fun prepareLpTemplates(
-        objective: LinearObjective?, token: Cancellation, onWork: (Long) -> Unit = {},
+        objective: LinearObjective?, token: Cancellation, reuseIndexes: Boolean = true,
+        onWork: (Long) -> Unit = {},
     ): LpPreparationTemplates? {
         val cache = if (problem is BakedProblem) lpFiniteTemplateCache else lpSourceTemplateCache
         val previous = cache.load()
-        val next = LpPreparationTemplates.prepare(this, lpTemplateNamespace, objective, previous, token, onWork)
+        val next = LpPreparationTemplates.prepare(this, lpTemplateNamespace, objective, previous, token, onWork,
+            reuseIndexes)
             ?: return null
         cache.compareAndSet(previous, next)
         return next

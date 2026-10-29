@@ -3,6 +3,7 @@ package com.eignex.klause.lp.relaxation
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -34,6 +35,45 @@ class LpPreparationTemplatesTest {
     ))
     private val selection = FactorProjectionProviders.Default.prepare(source)
     private val objective = LinearObjective(intCoefficients = LongArray(6) { 1L })
+
+    @Test
+    fun `unchanged consumers should reuse completed indexes with less preparation work`() {
+        val before = assertNotNull(selection.prepareLpTemplates(objective, Cancellation.Never))
+        var reusedWork = 0L
+        val view = source.withFactors(source.factors.copyOf())
+        val captured = selection.forEngineView(view)
+
+        val after = assertNotNull(captured.prepareLpTemplates(objective.copy(), Cancellation.Never) {
+            reusedWork = it
+        })
+        var rebuiltWork = 0L
+        captured.prepareLpTemplates(objective, Cancellation.Never, reuseIndexes = false) { rebuiltWork = it }
+
+        assertTrue(after.reusedIndexes)
+        assertSame(before.factors, after.factors)
+        assertSame(before.bounds, after.bounds)
+        assertSame(before.components, after.components)
+        assertTrue(reusedWork < rebuiltWork)
+    }
+
+    @Test
+    fun `changed late Boolean cost should reject index reuse and match fresh assembly`() {
+        val problem = Problem(7, 0, emptyArray(), arrayOf<Factor>(
+            Clause(intArrayOf(12, 0, 8)),
+        ))
+        val captured = FactorProjectionProviders.Default.prepare(problem)
+        val original = LinearObjective(boolWeights = LongArray(7) { 1L })
+        captured.prepareLpTemplates(original, Cancellation.Never)
+        val changed = original.copy(boolWeights = LongArray(7) { if (it == 4) 3L else 1L })
+        val consumer = CpToLpRelaxation(problem, changed, projections = captured)
+
+        val reused = consumer.build(RootDomains(problem)).model.authoritativeModel()
+        val fresh = CpToLpRelaxation(problem, changed, projections = null)
+            .build(RootDomains(problem)).model.authoritativeModel()
+
+        assertTrue(!assertNotNull(consumer.preparationTemplates).reusedIndexes)
+        assertTrue(assertNotNull(reused).sameAuthority(assertNotNull(fresh)))
+    }
 
     @Test
     fun `compatible preparation should reuse row and bound objects across consumers`() {
@@ -132,9 +172,23 @@ class LpPreparationTemplatesTest {
         val after = assertNotNull(selection.forEngineView(view).prepareLpTemplates(objective, Cancellation.Never))
 
         assertNotSame(before.bounds[0], after.bounds[0])
+        assertTrue(!after.reusedIndexes)
         assertNotSame(before.components[0], after.components[0])
         assertSame(before.components[1], after.components[1])
         assertSame(before.factors[0], after.factors[0])
+    }
+
+    @Test
+    fun `changed stated upper side should invalidate indexes with equal finite endpoints`() {
+        val before = assertNotNull(selection.prepareLpTemplates(objective, Cancellation.Never))
+        val view = Problem(1, 6, Array(6) { IntDomain(0, 10) }, source.factors,
+            openIntHi = BooleanArray(6) { it == 5 })
+
+        val after = assertNotNull(selection.forEngineView(view).prepareLpTemplates(objective, Cancellation.Never))
+
+        assertTrue(!after.reusedIndexes)
+        assertNotSame(before.bounds[5], after.bounds[5])
+        assertSame(before.components[0], after.components[0])
     }
 
     @Test
@@ -145,6 +199,7 @@ class LpPreparationTemplatesTest {
         val after = assertNotNull(selection.prepareLpTemplates(revised, Cancellation.Never))
 
         assertNotSame(before.components[0], after.components[0])
+        assertTrue(!after.reusedIndexes)
         assertSame(before.components[1], after.components[1])
         assertSame(before.factors[0], after.factors[0])
     }
@@ -156,6 +211,7 @@ class LpPreparationTemplatesTest {
         val after = assertNotNull(selection.prepareLpTemplates(objective.copy(constant = 7), Cancellation.Never))
 
         assertEquals(0, after.reusedComponents)
+        assertTrue(!after.reusedIndexes)
         assertSame(before.factors[0], after.factors[0])
     }
 

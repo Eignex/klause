@@ -110,6 +110,7 @@ internal class LpFactorTemplate(
 internal class LpTemplateComponent(
     val factors: List<LpFactorTemplate>,
     val bounds: Map<Int, LpIntegerBoundTemplate>,
+    val references: List<Int>,
     val costs: List<Long>,
 ) {
     private val rowIndex = factors.associateWith { it.rows }
@@ -132,14 +133,14 @@ internal class LpPreparationTemplates private constructor(
     val reusedBounds: Int,
     val reusedComponents: Int,
     val storageUnits: Long,
-) {
-    private val factorComponents = buildMap {
+    val reusedIndexes: Boolean = false,
+    private val factorComponents: Map<LpFactorTemplate, LpTemplateComponent> = buildMap {
         for (component in components) for (factor in component.factors) put(factor, component)
-    }
-    private val boundComponents = buildMap {
+    },
+    private val boundComponents: Map<Int, LpTemplateComponent> = buildMap {
         for (component in components) for (variable in component.bounds.keys) put(variable, component)
-    }
-
+    },
+) {
     fun bound(variable: Int): LpIntegerBoundTemplate? = boundComponents[variable]?.bounds?.get(variable)
 
     fun emit(problem: Problem, factorId: Int, builder: RelaxationBuilder, projection: LinearLpProjection): Boolean {
@@ -160,6 +161,7 @@ internal class LpPreparationTemplates private constructor(
             previous: LpPreparationTemplates?,
             token: Cancellation,
             onWork: (Long) -> Unit = {},
+            reuseIndexes: Boolean = true,
         ): LpPreparationTemplates? {
             val problem = selection.problem
             // Continuous and custom projections keep their own authority and preparation path.
@@ -176,6 +178,43 @@ internal class LpPreparationTemplates private constructor(
                     token.charge(count)
                     return units <= MAX_UNITS && !token()
                 }
+                fun unchanged(): Boolean {
+                    if (old == null || old.factors.size != problem.numFactors ||
+                        old.objectiveConstant != (objective?.constant ?: 0L)
+                    ) return false
+                    for (index in old.factors.indices) {
+                        if (!visit() || old.factors[index].factor !== problem.factors[index]) return false
+                    }
+                    for ((variable, bound) in old.bounds) {
+                        if (!visit()) return false
+                        val domain = problem.rootDomainOf(variable)
+                        if (bound.lower != domain.min || bound.upper != domain.max ||
+                            bound.statedLower != problem.statesLowerBound(variable) ||
+                            bound.statedUpper != problem.statesUpperBound(variable)
+                        ) return false
+                    }
+                    for (component in old.components) for (index in component.references.indices) {
+                        if (!visit()) return false
+                        val reference = component.references[index]
+                        val cost = if (Term.isInt(reference)) {
+                            objective?.intCoefficientValues?.getOrElse(Term.intVar(reference)) { 0L } ?: 0L
+                        } else {
+                            objective?.boolWeightValues?.getOrElse(Term.lit(reference) shr 1) { 0L } ?: 0L
+                        }
+                        if (cost != component.costs[index]) return false
+                    }
+                    return true
+                }
+                if (reuseIndexes && unchanged()) {
+                    if (!visit()) return null
+                    return requireNotNull(old).let {
+                        LpPreparationTemplates(problem, namespace, problem.semantics, problem is BakedProblem,
+                            dimensions, it.objectiveConstant, it.factors, it.bounds, it.components,
+                            it.source !== problem, it.factors.size, it.bounds.size, it.components.size,
+                            it.storageUnits, true, it.factorComponents, it.boundComponents)
+                    }
+                }
+                if (units > MAX_UNITS || token()) return null
                 val oldFactors = HashMap<Factor, LpFactorTemplate>()
                 for (entry in old?.factors.orEmpty()) {
                     if (!visit()) return null
@@ -277,7 +316,7 @@ internal class LpPreparationTemplates private constructor(
                 val components = groups.map { group ->
                     val componentBounds = LinkedHashMap<Int, LpIntegerBoundTemplate>()
                     val costs = ArrayList<Long>()
-                    val seen = HashSet<Int>()
+                    val seen = LinkedHashSet<Int>()
                     for (entry in group) for (reference in entry.support) {
                         if (!visit()) return null
                         if (!seen.add(reference)) continue
@@ -289,14 +328,14 @@ internal class LpPreparationTemplates private constructor(
                             costs.add(objective?.boolWeightValues?.getOrElse(Term.lit(reference) shr 1) { 0L } ?: 0L)
                         }
                     }
-                    storage += group.size * 3L + seen.size * 3L
+                    storage += group.size * 3L + seen.size * 4L
                     if (storage > MAX_UNITS) return null
                     val retained = previousComponents[group.firstOrNull()]?.takeIf {
                         old?.objectiveConstant == (objective?.constant ?: 0L) && it.factors == group &&
                             it.bounds == componentBounds && it.costs == costs
                     }
                     if (retained != null) reusedComponents++
-                    retained ?: LpTemplateComponent(group.toList(), componentBounds, costs)
+                    retained ?: LpTemplateComponent(group.toList(), componentBounds, seen.toList(), costs)
                 }
                 if (!visit(1L + factors.size * 2L + bounds.size)) return null
                 return LpPreparationTemplates(problem, namespace, problem.semantics, problem is BakedProblem,

@@ -681,6 +681,7 @@ internal class CpToLpRelaxation(
     private val templateStats: LpStatsSink? = null,
     private val reuseSourceTemplates: Boolean = true,
     private val preparationCancellation: Cancellation = Cancellation.Never,
+    private val reuseTemplateIndexes: Boolean = true,
 ) {
     private val elementIndexes = elementIndexes?.toSet()
     private val linearProjection = LinearLpProjection()
@@ -697,13 +698,16 @@ internal class CpToLpRelaxation(
         val start = TimeSource.Monotonic.markNow()
         var work = 0L
         try {
-            preparationTemplates = projections.prepareLpTemplates(objective, cancellation) { work = it }
+            preparationTemplates = projections.prepareLpTemplates(objective, cancellation, reuseTemplateIndexes) {
+                work = it
+            }
         } finally {
             val templates = preparationTemplates
             templateStats?.observeTemplatePreparation(start.elapsedNow().inWholeNanoseconds, work,
                 if (templates == null) mapOf("DECLINED" to 1L) else mapOf(
                     "PREPARED" to 1L, "FACTORS_REUSED" to templates.reusedFactors.toLong(),
                     "SOURCE_REBOUND" to if (templates.reboundSource) 1L else 0L,
+                    "INDEXES_REUSED" to if (templates.reusedIndexes) 1L else 0L,
                     "BOUNDS_REUSED" to templates.reusedBounds.toLong(),
                     "COMPONENTS_REUSED" to templates.reusedComponents.toLong(),
                     "COMPONENTS_DIRTY" to (templates.components.size - templates.reusedComponents).toLong(),
