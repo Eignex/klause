@@ -69,10 +69,21 @@ custom and unsupported projections retain their ordinary emission paths.
 
 An unchanged preparation validates ordered factor identities, integer endpoints,
 stated bound sides, the objective constant and every component cost before sharing
-the completed lookup collections. Component references retain the cost-coordinate
+the completed collections. Source-factor order indexes rows directly, and the
+integer-bound map indexes exact endpoints without component lookup maps.
+Component references retain the cost-coordinate
 order. A failed match uses selective reconstruction; a source revision alone cannot
 authorize reuse. The new source binding owns no predecessor snapshot, so repeated
 compatible preparations retain no generation chain.
+
+An internal selective-metadata preparation mode validates row identity and exact
+bound sides before retaining the row index. Bound changes replace their exact
+objects and component metadata; objective changes replace only affected component
+costs and objective-constant scopes. Captured objective identity can retain costs
+without a coordinate scan. Bound endpoints are checked even on the same finite
+view, whose domains can follow its owning presolve session. The ordinary mode
+retains its complete-match check. Both modes publish only completed immutable
+snapshots within the same containing allowance and storage cap.
 
 Template construction polls and charges the containing token, including failed
 attempts, and caps visits and retained storage at 262,144 modeled units each.

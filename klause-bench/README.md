@@ -698,12 +698,14 @@ These controls establish no throughput improvement or independent proof validati
 
 ### Numerical lifecycle profiles
 
-`scripts/lp-template-preparation-profile.sh cover-2x3|cover-3x3 [repeats] [steps]`
-compares disabled templates, selective object reuse and complete index reuse on the
+`scripts/lp-template-preparation-profile.sh <source> [repeats] [steps]` accepts
+`cover-2x3`, `cover-3x3`, `dense-2x12` and `dense-8x24`. It compares disabled
+templates, object reuse, complete index reuse and selective metadata reuse on the
 existing MPS component fixtures. Submit as a lab profile script with build task
 `:klause:stageLpProfileJvm`, Linux x86_64 placement and a 180-second runtime cap.
-It includes cold preparation and alternating unchanged views, bound, objective and
-row edits through actual relaxation assembly and native LP certification. Records
+It includes repeated cold preparation, unchanged views, alternating bound, objective
+and row edits, and cancellation through actual relaxation assembly and native LP
+certification. Records
 retain source bytes/hash, total preparation/assembly/solve work, time, allocation,
 modeled retained units and negative results. One warmup precedes up to five measured
 rounds; mode order rotates. Equal native results across modes check consistency,

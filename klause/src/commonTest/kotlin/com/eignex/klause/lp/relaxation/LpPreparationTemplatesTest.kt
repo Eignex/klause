@@ -37,6 +37,79 @@ class LpPreparationTemplatesTest {
     private val objective = LinearObjective(intCoefficients = LongArray(6) { 1L })
 
     @Test
+    fun `objective metadata refresh should retain row and bound indexes and match fresh authority`() {
+        val before = assertNotNull(selection.prepareLpTemplates(objective, Cancellation.Never))
+        val revised = objective.copy(intCoefficients = longArrayOf(2, 1, 1, 1, 1, 1))
+        val consumer = CpToLpRelaxation(source, revised, projections = selection, reuseTemplateMetadata = true)
+
+        val reused = assertNotNull(consumer.build(RootDomains(source)).model.authoritativeModel())
+        val after = assertNotNull(consumer.preparationTemplates)
+        val fresh = assertNotNull(CpToLpRelaxation(source, revised, projections = null)
+            .build(RootDomains(source)).model.authoritativeModel())
+
+        assertSame(before.factors, after.factors)
+        assertSame(before.bounds, after.bounds)
+        assertNotSame(before.components[0], after.components[0])
+        assertSame(before.components[1], after.components[1])
+        assertTrue(reused.sameAuthority(fresh))
+    }
+
+    @Test
+    fun `bound metadata refresh should retain unrelated component scopes and match fresh authority`() {
+        val before = assertNotNull(selection.prepareLpTemplates(objective, Cancellation.Never))
+        val view = Problem(1, 6, Array(6) { IntDomain(if (it == 0) 1 else 0, 10) }, source.factors)
+        val consumer = CpToLpRelaxation(view, objective, projections = selection.forEngineView(view),
+            reuseTemplateMetadata = true)
+
+        val reused = assertNotNull(consumer.build(RootDomains(view)).model.authoritativeModel())
+        val after = assertNotNull(consumer.preparationTemplates)
+        val fresh = assertNotNull(CpToLpRelaxation(view, objective, projections = null)
+            .build(RootDomains(view)).model.authoritativeModel())
+
+        assertSame(before.factors, after.factors)
+        assertSame(before.bounds[1], after.bounds[1])
+        assertNotSame(before.bounds[0], after.bounds[0])
+        assertNotSame(before.components[0], after.components[0])
+        assertSame(before.components[1], after.components[1])
+        assertTrue(reused.sameAuthority(fresh))
+    }
+
+    @Test
+    fun `interrupted metadata refresh should preserve the last complete snapshot`() {
+        val before = assertNotNull(selection.prepareLpTemplates(objective, Cancellation.Never))
+        val revised = objective.copy(intCoefficients = longArrayOf(2, 1, 1, 1, 1, 1))
+        var work = 0L
+        val meter = WorkMeter { work += it }
+        val token = object : Cancellation {
+            override fun isCancelled(): Boolean = work >= 12L
+            override fun workMeter(): WorkMeter = meter
+        }
+
+        val stopped = selection.prepareLpTemplates(revised, token, reuseMetadata = true)
+        val after = assertNotNull(selection.prepareLpTemplates(objective, Cancellation.Never, reuseMetadata = true))
+
+        assertNull(stopped)
+        assertTrue(work >= 12L)
+        assertSame(before.factors, after.factors)
+        assertSame(before.bounds, after.bounds)
+        assertSame(before.components, after.components)
+    }
+
+    @Test
+    fun `metadata refresh should replace objective translation scopes without rebuilding rows`() {
+        val before = assertNotNull(selection.prepareLpTemplates(objective, Cancellation.Never))
+
+        val after = assertNotNull(selection.prepareLpTemplates(objective.copy(constant = 7L),
+            Cancellation.Never, reuseMetadata = true))
+
+        assertEquals(0, after.reusedComponents)
+        assertSame(before.factors, after.factors)
+        assertSame(before.bounds, after.bounds)
+        assertSame(before.components[0].references, after.components[0].references)
+        assertSame(before.components[0].costs, after.components[0].costs)
+    }
+
+    @Test
     fun `unchanged consumers should reuse completed indexes with less preparation work`() {
         val before = assertNotNull(selection.prepareLpTemplates(objective, Cancellation.Never))
         var reusedWork = 0L

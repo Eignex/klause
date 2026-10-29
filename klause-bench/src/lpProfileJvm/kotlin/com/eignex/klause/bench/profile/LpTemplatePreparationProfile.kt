@@ -7,6 +7,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.lp.engine.solveAndCertify
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
+import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.RootDomains
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.objective.toLinearObjective
@@ -40,10 +41,10 @@ internal object LpTemplatePreparationProfile {
         val objective = requireNotNull(compiled.objective).toLinearObjective()
             .let { if (compiled.maximize) it.negated() else it }
         val stop = Cancellation.after(120.seconds)
-        val modes = listOf("disabled", "current", "candidate")
+        val modes = listOf("disabled", "object", "index", "candidate")
         out.resolve("runs.jsonl").bufferedWriter().use { writer ->
             repeat(repeats + 1) { round ->
-                for (change in listOf("unchanged", "bound", "objective", "row")) {
+                for (change in listOf("cold", "unchanged", "bound", "objective", "row", "cancel")) {
                     val signatures = HashMap<String, List<String>>()
                     for (offset in modes.indices) {
                         val mode = modes[(round + offset) % modes.size]
@@ -76,24 +77,42 @@ internal object LpTemplatePreparationProfile {
                         var assemblyNs = 0L
                         var solveNs = 0L
                         var retainedUnits = 0L
+                        var coldNs = 0L
                         val results = ArrayList<String>()
-                        repeat(steps) { step ->
+                        repeat(steps) consumers@ { step ->
                             check(!stop())
                             val view = (if (step % 2 == 1) changedSource else source)
                                 .let { it.withFactors(it.factors.copyOf()) }
                             val cost = if (step % 2 == 1) changedObjective else objective
                             val opening = System.nanoTime()
+                            val selectedView = if (change == "cold") {
+                                FactorProjectionProviders.Default.prepare(view)
+                            } else selected.forEngineView(view)
+                            val consumerToken = if (change == "cancel" && step % 2 == 1) {
+                                object : Cancellation {
+                                    override fun isCancelled(): Boolean = true
+                                    override fun workMeter(): WorkMeter = meter
+                                }
+                            } else token
                             val consumer = CpToLpRelaxation(view, cost,
-                                projections = selected.forEngineView(view), templateStats = sink,
-                                reuseSourceTemplates = mode != "disabled", reuseTemplateIndexes = mode == "candidate",
-                                preparationCancellation = token)
-                            val relaxation = consumer.build(RootDomains(view), cancellation = token)
+                                projections = selectedView, templateStats = sink,
+                                reuseSourceTemplates = mode != "disabled", reuseTemplateIndexes = mode != "object",
+                                reuseTemplateMetadata = mode == "candidate", preparationCancellation = consumerToken)
+                            val relaxation = try {
+                                consumer.build(RootDomains(view), cancellation = consumerToken)
+                            } catch (_: LpAssemblyCancelled) {
+                                check(change == "cancel" && step % 2 == 1)
+                                assemblyNs += System.nanoTime() - opening
+                                results.add("cancelled")
+                                return@consumers
+                            }
                             assemblyNs += System.nanoTime() - opening
                             retainedUnits = maxOf(retainedUnits, consumer.preparationTemplates?.storageUnits ?: 0L)
                             val solving = System.nanoTime()
                             val result = solveAndCertify(relaxation.model, cancellation = token)
                             solveNs += System.nanoTime() - solving
                             results.add("${result.verdict}:${result.lowerBound}:${result.witness?.objective}")
+                            if (step == 0) coldNs = System.nanoTime() - start
                         }
                         val totalNs = System.nanoTime() - start
                         val allocatedBytes = profileAllocatedBytes()?.let { it - requireNotNull(startBytes) }
@@ -111,6 +130,7 @@ internal object LpTemplatePreparationProfile {
                             put("change", change)
                             put("steps", steps)
                             put("totalNs", totalNs)
+                            put("coldSetupAndConsumerNs", coldNs)
                             put("assemblyIncludingPreparationNs", assemblyNs)
                             put("solveAndCertificationNs", solveNs)
                             put("totalThreadBytes", allocatedBytes)
