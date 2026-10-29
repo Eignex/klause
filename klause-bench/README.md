@@ -268,3 +268,24 @@ large-source no-yield evidence retained. They establish no whole-source speedup,
 independent source proof or basis for default activation. Earlier controls and
 negatives remain in [9134](https://lab.eignex.com/jobs/9134) and
 [9166](https://lab.eignex.com/jobs/9166).
+
+## Worker admission qualification
+
+`param.companion-integers=true` trials bounded general-integer/continuous numerical
+companions on the ordinary finite route. `false` retains the binary-only gate.
+Both settings capture `admission` lines with fragment, objective, proof authority,
+source mapping, retained state, setup dimensions, numerical resource limits and
+explicit decline reasons. Capture dimensions are setup estimates, not measured RSS.
+Use source-matched current default, binary-gate, expanded-gate and direct
+`param.linear-traversal=numerical-frontier` controls with identical preparation,
+seeds and containing budgets. Preserve qualified binary sources as admission
+controls and the broad numerical-first recipe as a separate allocation control.
+
+Compare independently checked feasibility and original objectives, routing and
+construction time, worker initialization/segments/active-time retirement, source LP
+work and allocation, publication checks, total wall/core time and measured RSS.
+Failed preparation, checking and retirement belong to the containing comparison.
+F1's work-driven mode remains available for finite integer/Boolean controls and
+rejects numerical companions; mixed numerical elapsed schedules are not reproducible
+work traces. S1's directional LP gains remain a separate opt-in branch control.
+Native completion flags do not independently validate proofs.

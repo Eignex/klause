@@ -15,12 +15,14 @@ import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.withRealDifferenceSystem
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class FiniteNumericalCompanionsTest {
     @Test
@@ -36,6 +38,7 @@ class FiniteNumericalCompanionsTest {
             Triple(integers, ordinary, false),
             Triple(general, ordinary, false),
             Triple(binary, ordinary.copy(arms = 1), false),
+            Triple(binary, ordinary.copy(explicitArms = true), false),
             Triple(binary, ordinary.copy(arms = PortfolioScenario.DEFAULT_ARMS + 1), false),
             Triple(binary, ordinary.copy(cores = 2), false),
             Triple(binary, ordinary.copy(kind = Kind.CSP), false),
@@ -44,8 +47,55 @@ class FiniteNumericalCompanionsTest {
         )
 
         for ((model, scenario, admitted) in cases) {
-            assertEquals(admitted, finiteNumericalCompanionsAdmitted(model, scenario))
+            assertEquals(admitted, finiteNumericalCompanionEligibility(model, scenario,
+                LinearObjective(intCoefficients = longArrayOf(1)), TheoryParams()).admitted)
         }
+    }
+
+    @Test
+    fun `general integer companion admission should explain its fragment and containing costs`() {
+        val model = Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val scenario = PortfolioScenario.sequential(Kind.COP)
+        val params = TheoryParams(sourceLpWorkLimit = 100, sourceLpAllocationLimit = 200)
+
+        val ordinary = finiteNumericalCompanionEligibility(model, scenario, objective, params)
+        val trial = finiteNumericalCompanionEligibility(model, scenario.copy(companionIntegers = true),
+            objective, params)
+
+        assertEquals(listOf("binary-integers-required"), ordinary.declines)
+        assertEquals(emptyList(), trial.declines)
+        assertEquals(2L, trial.requirements.construction.columns)
+        assertEquals(50L, trial.requirements.construction.lpWorkLimit)
+        assertEquals(100L, trial.requirements.construction.allocationLimit)
+        assertEquals(4_000L, trial.requirements.construction.activeMillis)
+    }
+
+    @Test
+    fun `integrated companions should report distinct proof authority and preserve finite workers`() {
+        val model = Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val plan = model.prepareExecutionPlan(objective, preferFinite = true)
+        val events = mutableListOf<SearchEvent.WorkerAdmission>()
+        val scenario = PortfolioScenario.sequential(Kind.COP).copy(companionIntegers = true)
+        val executor = FinitePipeline.portfolioExecutor(model, scenario, objective, null, null,
+            { _, event -> if (event is SearchEvent.WorkerAdmission) events += event },
+            null, plan, Cancellation.Never, numericalCompletion = true, numericalCompanions = TheoryParams())
+
+        executor.use { result ->
+            val completed = result.minimize(Cancellation.Never, null)
+            assertEquals(0.0, assertIs<MinimizeResult.Optimal>(completed).objective)
+        }
+
+        val frontier = events.single { it.recipe == "numerical/finite-companion" }
+        val repair = events.single { it.recipe == "ls/finite-joint-companion" }
+        assertEquals(true, frontier.admitted)
+        assertEquals(true, repair.admitted)
+        assertTrue(frontier.requirements.contains("authority=CHECKED_TERMINALS"))
+        assertTrue(repair.requirements.contains("authority=WITNESS_ONLY"))
+        assertTrue(events.any { it.recipe == "satOptimized" && it.admitted })
     }
 
     @Test

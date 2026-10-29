@@ -16,6 +16,15 @@ import kotlin.test.assertTrue
 
 class EngineParamsTest {
     @Test
+    fun `companion trial should retain an explicitly selected default arm count`() {
+        val selected = scenario(1, listOf("arms=6", "companion-integers=true"))
+
+        assertTrue(selected.explicitArms)
+        assertTrue(selected.companionIntegers)
+        assertEquals(PortfolioScenario.DEFAULT_ARMS, selected.arms)
+    }
+
+    @Test
     fun `directional lp gains remain opt in and survive fixed backtrack overrides`() {
         val base = com.eignex.klause.backtrack.BacktrackParams()
         assertTrue(!base.lpDirectionalGains)

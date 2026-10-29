@@ -8,6 +8,12 @@ import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioIncumbents
 import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.portfolio.PortfolioWorker
+import com.eignex.klause.portfolio.WorkerConstructionCost
+import com.eignex.klause.portfolio.WorkerEligibility
+import com.eignex.klause.portfolio.WorkerFragment
+import com.eignex.klause.portfolio.WorkerObjectiveView
+import com.eignex.klause.portfolio.WorkerProofAuthority
+import com.eignex.klause.portfolio.WorkerRequirements
 import com.eignex.klause.portfolio.SourceWorkerBinding
 import com.eignex.klause.portfolio.binaryIntegers
 import com.eignex.klause.propagation.BakedProblem
@@ -31,14 +37,43 @@ internal val PreparedSourceInvocation.requestsFiniteNumericalCompanions: Boolean
     request.linearTraversal == LinearTraversal.FINITE_COMPANIONS ||
         (request.linearTraversal == LinearTraversal.AUTOMATIC && linearSource != null)
 
-internal fun finiteNumericalCompanionsAdmitted(problem: BakedProblem, scenario: PortfolioScenario): Boolean =
-    scenario.cores == 1 && scenario.kind == Kind.COP && scenario.engine == EngineMix.MIXED &&
-        scenario.arms == PortfolioScenario.DEFAULT_ARMS &&
-        scenario.btPool == null && scenario.lsPool == null && scenario.btEdit == null &&
-        scenario.annotationArm == null &&
-        problem.numIntVars > 0 && problem.numRealVars > 0 && problem.binaryIntegers &&
-        problem.numBoolVars == 0 && problem.numIntVars.toLong() + problem.numRealVars <= 4_096L &&
-        problem.factors.size <= 16_384 && scenario.lpCeiling.resolved(LpTechnique.BOUNDING)
+internal fun finiteNumericalCompanionEligibility(
+    problem: BakedProblem,
+    scenario: PortfolioScenario,
+    objective: LinearObjective?,
+    params: TheoryParams,
+): WorkerEligibility {
+    val cost = WorkerConstructionCost(problem.numIntVars.toLong() + problem.numRealVars, problem.factors.size,
+        lpWorkLimit = params.sourceLpWorkLimit / 2, allocationLimit = params.sourceLpAllocationLimit / 2,
+        activeMillis = 4_000, sliceMillis = 1_000, sliceWork = 5_000,
+        maxColumns = 4_096, maxFactors = 16_384)
+    val requirements = WorkerRequirements(
+        if (scenario.companionIntegers) WorkerFragment.AFFINE_MIXED else WorkerFragment.AFFINE_BINARY_MIXED,
+        WorkerObjectiveView.CANONICAL, WorkerProofAuthority.CHECKED_TERMINALS, cost)
+    val declines = buildList {
+        if (scenario.cores != 1) add("single-lane-required")
+        if (scenario.kind != Kind.COP || objective == null) add("canonical-objective-required")
+        if (scenario.engine != EngineMix.MIXED) add("mixed-pool-required")
+        if (scenario.explicitArms || scenario.arms != PortfolioScenario.DEFAULT_ARMS || scenario.btPool != null ||
+            scenario.lsPool != null || scenario.btEdit != null || scenario.annotationArm != null
+        ) add("explicit-finite-recipe")
+        if (problem.numIntVars == 0 || problem.numRealVars == 0 || problem.numBoolVars != 0) {
+            add("integer-continuous-fragment-required")
+        }
+        if (requirements.fragment == WorkerFragment.AFFINE_BINARY_MIXED && !problem.binaryIntegers) {
+            add("binary-integers-required")
+        }
+        if ((0 until problem.numIntVars).any { !problem.intBounds.hasLower(it) || !problem.intBounds.hasUpper(it) }) {
+            add("finite-integer-bounds-required")
+        }
+        if (cost.columns > requireNotNull(cost.maxColumns) || cost.factors > requireNotNull(cost.maxFactors)) {
+            add("construction-size-limit")
+        }
+        if (!scenario.lpCeiling.resolved(LpTechnique.BOUNDING)) add("lp-bounding-disabled")
+        if (scenario.diagnosticWorkLimit != null) add("numerical-work-schedule-unsupported")
+    }
+    return WorkerEligibility(requirements, declines)
+}
 
 internal class FiniteNumericalCompanions private constructor(
     private val model: BakedProblem,
@@ -46,6 +81,7 @@ internal class FiniteNumericalCompanions private constructor(
     private val context: SourceProofContext,
     private val params: TheoryParams,
     private val cancellation: Cancellation,
+    private val cost: WorkerConstructionCost,
 ) {
     val incumbents = PortfolioIncumbents.exact(objective)
 
@@ -59,14 +95,15 @@ internal class FiniteNumericalCompanions private constructor(
         fun local(slot: PortfolioWorkerSlot) = params.copy(
             randomSeed = slot.seed, nodeBudget = slot.nodeBudget,
             cancellation = cancellation or params.cancellation or slot.cancellation,
-            sourceLpWorkLimit = params.sourceLpWorkLimit / 2,
-            sourceLpAllocationLimit = params.sourceLpAllocationLimit / 2,
+            sourceLpWorkLimit = requireNotNull(cost.lpWorkLimit),
+            sourceLpAllocationLimit = requireNotNull(cost.allocationLimit),
         )
         return listOf(
             factory(firstArm, ArmFamily.Backtrack) { slot ->
                 PortfolioWorker.ofMinimize("numerical/finite-companion", firstArm, resumable = {
                     BoundedCompanionSearch(numericalSearch(local(slot)), "finiteNumericalCompanion",
-                        sliceLimit = 1_000.milliseconds)
+                        activeLimit = requireNotNull(cost.activeMillis).milliseconds,
+                        sliceLimit = requireNotNull(cost.sliceMillis).milliseconds)
                 }) { _, _, _, _ -> error("numerical companion runs only by slice") }.bindEvidence(identity)
             },
             factory(firstArm + 1, ArmFamily.LocalSearch) { slot ->
@@ -80,7 +117,7 @@ internal class FiniteNumericalCompanions private constructor(
                 PortfolioWorker.ofMinimize("ls/finite-joint-companion", firstArm + 1, countsInstructions = true,
                     resumable = {
                         BoundedCompanionSearch(requireNotNull(worker.newResumableSearch(incumbents::bound)),
-                            "finiteJointCompanion")
+                            "finiteJointCompanion", activeLimit = requireNotNull(cost.activeMillis).milliseconds)
                     }) { _, _, _, _ -> error("joint companion runs only by slice") }
                     .bindEvidence(identity, provesResults = false)
             },
@@ -113,12 +150,12 @@ internal class FiniteNumericalCompanions private constructor(
 
     companion object {
         fun prepare(model: BakedProblem, objective: LinearObjective, params: TheoryParams,
-            cancellation: Cancellation): FiniteNumericalCompanions? {
+            cancellation: Cancellation, cost: WorkerConstructionCost): FiniteNumericalCompanions? {
             // The propagated difference graph duplicates affine rows and bounds in these coordinates.
             val affine = model.withFactors(model.factors.filterNot { it is DifferenceSystem }.toTypedArray())
             val context = affine.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, cancellation,
                 numericalIndicators = true) ?: return null
-            return FiniteNumericalCompanions(model, objective, context, params, cancellation)
+            return FiniteNumericalCompanions(model, objective, context, params, cancellation, cost)
         }
     }
 }
