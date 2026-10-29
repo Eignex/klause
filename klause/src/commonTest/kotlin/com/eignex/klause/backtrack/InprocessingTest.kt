@@ -6,6 +6,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.propagation.ReclamationStatus
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.result.SearchStatsSink
 import com.eignex.klause.util.Cancellation
@@ -230,12 +231,20 @@ class InprocessingTest {
             val session = PropagationSession(source.bake(), nativeSat = native)
             val loop = Inprocessing(listOf(RootSimplificationPass()), cadence = 1)
             val publicationNeeded = loop.onRestart(session, BacktrackParams())
+            session.addLearnedClause(Clause(intArrayOf(0, 1)), 9)
+            val count = session.learnedClauseCount
+            val revision = session.learnedClauseRevision
 
             val released = loop.releaseRetainedBuffers()
+            val reclamation = session.reclaimLearnedMemory(0L, maxWork = 1_000_000L,
+                publicationPending = loop.retainsPublication)
 
             assertTrue(publicationNeeded)
             assertFalse(session.fixpointCancelled)
             assertFalse(released)
+            assertEquals(ReclamationStatus.DEFERRED, reclamation.status)
+            assertEquals(count, session.learnedClauseCount)
+            assertEquals(revision, session.learnedClauseRevision)
             assertEquals(true, session.boolValue(1))
         }
     }

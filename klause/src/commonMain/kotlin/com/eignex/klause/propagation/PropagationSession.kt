@@ -116,6 +116,7 @@ class PropagationSession private constructor(
         levelStates = emptyArray()
         levelTop = 0
         sharedLearningMemory = null
+        retainedSharingMemory = null
         retainedInprocessingMemory = null
         simplifiedRootSources = null
     }
@@ -1082,6 +1083,7 @@ class PropagationSession private constructor(
     internal val sharingIdentity = Any()
 
     internal var sharedLearningMemory: ((SharingMemoryObservation) -> Unit)? = null
+    internal var retainedSharingMemory: ((SharingMemoryObservation) -> Unit)? = null
     internal var retainedInprocessingMemory: ((SharingMemoryObservation) -> Unit)? = null
 
     internal fun reclaimLearnedMemory(
@@ -1089,6 +1091,7 @@ class PropagationSession private constructor(
         maxWork: Long = 65_536L,
         maxScratchBytes: Long = 1_048_576L,
         releaseBuffers: () -> Boolean = { false },
+        publicationPending: Boolean = false,
     ): LearnedReclamation {
         require(softLimitBytes >= 0L && maxWork >= 0L && maxScratchBytes >= 0L)
         val start = work
@@ -1102,6 +1105,9 @@ class PropagationSession private constructor(
         val floor = before.getValue("protectedPrimitiveBytes") + before.getValue("protectedReferenceSlots") * Long.SIZE_BYTES
         if (beforeBytes <= softLimitBytes) return LearnedReclamation(ReclamationStatus.WITHIN_LIMIT,
             beforeBytes, beforeBytes, floor, work - start)
+        if (fixpointCancelled || inprocessingRootPending || publicationPending) return LearnedReclamation(
+            ReclamationStatus.DEFERRED, beforeBytes, beforeBytes, floor, work - start,
+            protectedLimitExceeded = floor > softLimitBytes)
         releaseBuffers()
         val count = learnedClauseCount
         val published = state.forgetLearnedClauses({ _, _ -> false },
@@ -1136,7 +1142,9 @@ class PropagationSession private constructor(
         return sample.snapshot {
             state.sharingMemory(sample)
             sharedLearningMemory?.invoke(sample)
+            retainedSharingMemory?.invoke(sample)
             retainedInprocessingMemory?.invoke(sample)
+            simplifiedRootSources?.let { sample.ownedReferences(it, it.size.toLong(), true) }
             sample.record(mapOf(
                 "sharedLearningObserved" to if (sharedLearningMemory == null) 0L else 1L,
                 "rootRetiredSourceReferenceSlots" to (simplifiedRootSources?.size?.toLong() ?: 0L),

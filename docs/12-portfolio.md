@@ -194,6 +194,14 @@ pool; resuming the same session retains both cursor and filter. Retirement relea
 the filter without sampling. An uncancelled retirement also drains uses and exports
 remaining glue; a cancelled retirement skips those scans.
 
+With a shared byte limit, each worker's duplicate filter has a separate allowance
+of that size. Existing key capacity is protected with its retained session, including
+reseeded assumptions. Bounded admission prepares hash growth before publishing it;
+insufficient bytes, work, scratch or cancellation declines the optional import or
+export and increments `seenDeclined`. Declines are separate from duplicates. A full
+filter keeps its existing keys through pool generation changes, preventing repeated
+imports into the retained native store. Close or a fresh session releases its arrays.
+
 The pool's optional byte limit includes payload and private capacity. Its protected
 floor is zero: eviction removes optional shares while imported reasons and a
 previously drained batch retain their own references. Pressure prepares a replacement

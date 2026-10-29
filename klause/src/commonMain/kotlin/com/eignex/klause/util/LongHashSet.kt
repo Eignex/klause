@@ -42,6 +42,76 @@ internal class LongHashSet(initialCapacity: Int = 8) {
         return true
     }
 
+    internal fun tryAddBounded(
+        value: Long,
+        maxBytes: Long,
+        maxWork: Long,
+        maxScratchBytes: Long,
+        cancelled: () -> Boolean,
+        charge: () -> Unit,
+    ): Boolean? {
+        require(maxBytes >= 0L && maxWork >= 0L && maxScratchBytes >= 0L)
+        var work = 0L
+        fun step(): Boolean {
+            if (work >= maxWork || cancelled()) return false
+            charge()
+            work++
+            return !cancelled()
+        }
+        var slot = mix(value) and mask
+        while (true) {
+            if (!step()) return null
+            if (!used[slot]) break
+            if (keys[slot] == value) return false
+            slot = (slot + 1) and mask
+        }
+        val capacity = when {
+            used === EMPTY_USED -> initialCap
+            (size + 1L) * 2L > keys.size -> if (keys.size <= Int.MAX_VALUE / 2) keys.size * 2 else return null
+            else -> keys.size
+        }
+        if (capacity.toLong() * 9L > maxBytes) return null
+        if (capacity == keys.size && used !== EMPTY_USED) {
+            if (!step()) return null
+            used[slot] = true
+            keys[slot] = value
+            size++
+            return true
+        }
+        if (capacity.toLong() * 9L > maxScratchBytes || capacity.toLong() * 2L > maxWork - work) return null
+        repeat(capacity) { if (!step() || !step()) return null }
+        if (!step()) return null
+        val nextKeys = LongArray(capacity)
+        val nextUsed = BooleanArray(capacity)
+        val nextMask = capacity - 1
+        for (index in used.indices) {
+            if (!step()) return null
+            if (!used[index]) continue
+            var target = mix(keys[index]) and nextMask
+            while (true) {
+                if (!step()) return null
+                if (!nextUsed[target]) break
+                target = (target + 1) and nextMask
+            }
+            nextKeys[target] = keys[index]
+            nextUsed[target] = true
+        }
+        slot = mix(value) and nextMask
+        while (true) {
+            if (!step()) return null
+            if (!nextUsed[slot]) break
+            slot = (slot + 1) and nextMask
+        }
+        nextKeys[slot] = value
+        nextUsed[slot] = true
+        if (!step()) return null
+        keys = nextKeys
+        used = nextUsed
+        mask = nextMask
+        size++
+        return true
+    }
+
     /** Remove [value]; returns true if it was present. Never writes through the shared empty table. */
     fun remove(value: Long): Boolean {
         var i = mix(value) and mask

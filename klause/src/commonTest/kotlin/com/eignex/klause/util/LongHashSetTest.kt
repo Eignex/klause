@@ -8,6 +8,67 @@ import kotlin.test.assertTrue
 class LongHashSetTest {
 
     @Test
+    fun `bounded insertion protects existing keys when growth exceeds its byte allowance`() {
+        val set = LongHashSet(1)
+        repeat(4) { assertEquals(true, set.tryAddBounded(it.toLong(), 72L, 1000L, 1000L, { false }, {})) }
+
+        val added = set.tryAddBounded(4L, 72L, 1000L, 1000L, { false }, {})
+
+        assertEquals(null, added)
+        assertEquals(72L, set.allocatedBytes)
+        assertEquals(4, set.size)
+        repeat(4) { assertTrue(it.toLong() in set) }
+        assertEquals(false, set.tryAddBounded(0L, 0L, 1000L, 0L, { false }, {}))
+    }
+
+    @Test
+    fun `bounded insertion discards cancelled growth before publication`() {
+        val set = LongHashSet(1)
+        repeat(4) { set.add(it.toLong()) }
+        var charged = 0
+
+        val added = set.tryAddBounded(4L, 1000L, 1000L, 1000L, { charged >= 10 }, { charged++ })
+
+        assertEquals(null, added)
+        assertEquals(72L, set.allocatedBytes)
+        assertEquals(4, set.size)
+        repeat(4) { assertTrue(it.toLong() in set) }
+        assertFalse(4L in set)
+    }
+
+    @Test
+    fun `tiny bounded insertion allowances retain no backing arrays`() {
+        for ((work, scratch) in listOf(0L to 1000L, 1000L to 0L)) {
+            val set = LongHashSet()
+
+            val added = set.tryAddBounded(1L, 1000L, work, scratch, { false }, {})
+
+            assertEquals(null, added)
+            assertEquals(0L, set.allocatedBytes)
+            assertEquals(0, set.size)
+        }
+    }
+
+    @Test
+    fun `final insertion debit cancellation preserves the published table`() {
+        val control = LongHashSet(1)
+        repeat(4) { control.add(it.toLong()) }
+        var required = 0
+        assertEquals(true, control.tryAddBounded(4L, 1000L, 1000L, 1000L, { false }, { required++ }))
+        val set = LongHashSet(1)
+        repeat(4) { set.add(it.toLong()) }
+        var charged = 0
+
+        val added = set.tryAddBounded(4L, 1000L, 1000L, 1000L, { charged >= required }, { charged++ })
+
+        assertEquals(null, added)
+        assertEquals(required, charged)
+        assertEquals(72L, set.allocatedBytes)
+        assertEquals(4, set.size)
+        assertFalse(4L in set)
+    }
+
+    @Test
     fun `never populated set should answer every query and stay usable`() {
         val s = LongHashSet()
         assertFalse(s.contains(0L))

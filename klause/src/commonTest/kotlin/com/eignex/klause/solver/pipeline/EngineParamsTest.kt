@@ -16,6 +16,22 @@ import kotlin.test.assertTrue
 
 class EngineParamsTest {
     @Test
+    fun `learned memory controls should reach fixed and portfolio workers without enabling defaults`() {
+        val base = com.eignex.klause.backtrack.BacktrackParams()
+        val settings = listOf("learned-memory-bytes=4096", "learned-memory-work=1234", "learned-memory-scratch-bytes=789")
+
+        val fixed = applyFixedBacktrackParams(base, EngineParams(settings), allowSelectors = true)
+        val worker = applyBacktrackParams(base, EngineParams(settings))
+
+        assertEquals(null, base.learnedMemoryBytes)
+        for (configured in listOf(fixed, worker)) {
+            assertEquals(4096L, configured.learnedMemoryBytes)
+            assertEquals(1234L, configured.learnedMemoryWork)
+            assertEquals(789L, configured.learnedMemoryScratchBytes)
+        }
+    }
+
+    @Test
     fun `companion timing controls should remain separate from admission`() {
         val selected = scenario(1, listOf("companion-after-incumbent=true", "companion-active-ms=7000",
             "portfolio-progress=true"))

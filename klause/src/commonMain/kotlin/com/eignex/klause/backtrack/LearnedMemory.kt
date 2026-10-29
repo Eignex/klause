@@ -11,7 +11,7 @@ internal fun maintainLearnedMemory(
 ) {
     val limit = params.learnedMemoryBytes ?: return
     val result = session.reclaimLearnedMemory(limit, params.learnedMemoryWork, params.learnedMemoryScratchBytes,
-        { inprocessing?.releaseRetainedBuffers() ?: false })
+        { inprocessing?.releaseRetainedBuffers() ?: false }, inprocessing?.retainsPublication == true)
     stats?.noteInprocessing("learnedMemory${result.status.name}", 1L)
     stats?.noteInprocessing("learnedMemoryWork", result.work)
     if (result.protectedLimitExceeded) stats?.noteInprocessing("learnedMemoryProtectedLimit", 1L)
