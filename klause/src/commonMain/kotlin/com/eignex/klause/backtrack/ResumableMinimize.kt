@@ -1315,7 +1315,7 @@ internal class ResumableMinimize(
             if (!pruned) {
                 return SearchNodeDisposition.Expand
             }
-            val learned = lpEngine.lastBackjump()
+            val learned = cp.mappedLearnedConstraint(lpEngine.lastBackjump())
             return if (learned != null &&
                 learned.asserting &&
                 !session.learnedConstraintSatisfied(learned)
@@ -1374,7 +1374,7 @@ internal class ResumableMinimize(
                 }
 
                 is PropagationResult.Unsat -> {
-                    val next = result.learnedClause as? LearnedConstraint
+                    val next = cp.mappedLearnedConstraint(result.learnedClause as? LearnedConstraint)
                     when {
                         next == null -> SearchLearnedConflictResult.Chronological
 

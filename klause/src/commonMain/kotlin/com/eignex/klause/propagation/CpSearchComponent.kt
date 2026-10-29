@@ -543,15 +543,7 @@ class CpSearchComponent(
 
     override fun resolveConflict(context: com.eignex.klause.solver.search.SearchContext): SearchConflictResolution {
         val unsat = lastResult as? PropagationResult.Unsat ?: return SearchConflictResolution.Chronological
-        var learned = unsat.learnedClause as? ConflictAnalyzer.AnalysisResult.LearnedConstraint
-        if (session.problem.numIntVars > 0 &&
-            learned is ConflictAnalyzer.AnalysisResult.LearnedPb && !usableMixedPb(learned)
-        ) {
-            learned = learned.fallbackClause
-        }
-        if (learned is ConflictAnalyzer.AnalysisResult.LearnedIntegerRow && !usableIntegerRow(learned)) {
-            learned = learned.fallbackClause
-        }
+        val learned = mappedLearnedConstraint(unsat.learnedClause as? ConflictAnalyzer.AnalysisResult.LearnedConstraint)
         if (learned == null) {
             conflictStats?.observeNotApplicable()
             return SearchConflictResolution.Chronological
@@ -564,6 +556,16 @@ class CpSearchComponent(
             return SearchConflictResolution.Exhausted
         }
         return SearchConflictResolution.Backjump(CpLearnedConflict(learned))
+    }
+
+    internal fun mappedLearnedConstraint(
+        learned: ConflictAnalyzer.AnalysisResult.LearnedConstraint?,
+    ): ConflictAnalyzer.AnalysisResult.LearnedConstraint? = when {
+        session.problem.numIntVars > 0 && learned is ConflictAnalyzer.AnalysisResult.LearnedPb &&
+            !usableMixedPb(learned) -> learned.fallbackClause
+        learned is ConflictAnalyzer.AnalysisResult.LearnedIntegerRow && !usableIntegerRow(learned) ->
+            learned.fallbackClause
+        else -> learned
     }
 
     /** Shared level corresponding to the latest native level not above [nativeLevel]. */
@@ -631,7 +633,8 @@ class CpSearchComponent(
 
                 is PropagationResult.Unsat -> {
                     cascadeConflictObserver?.invoke(result)
-                    val next = result.learnedClause as? ConflictAnalyzer.AnalysisResult.LearnedConstraint
+                    val next = mappedLearnedConstraint(
+                        result.learnedClause as? ConflictAnalyzer.AnalysisResult.LearnedConstraint)
                     when {
                         next == null -> SearchLearnedConflictResult.Chronological
                         next.backjumpLevel == 0 && next.isContradiction -> SearchLearnedConflictResult.Exhausted
