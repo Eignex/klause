@@ -99,7 +99,8 @@ internal class BooleanProofScheduler(
             }
             val search = checkNotNull(slot.search)
             if (started[worker] !== lease) {
-                search.begin(assumptions(lease), parameters[worker].maxDecisions, Double.POSITIVE_INFINITY, cancellation)
+                search.begin(assumptions(lease), parameters[worker].maxDecisions,
+                    Double.POSITIVE_INFINITY, cancellation)
                 started[worker] = lease
             }
             val result = search.runSlice(cancellation, millis, offeredWork)

@@ -2,8 +2,8 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.NodeBudget
-import com.eignex.klause.factor.Factor
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
@@ -14,6 +14,7 @@ import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceObjective
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
+import com.eignex.klause.solver.search.BooleanProofContext
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -45,7 +46,9 @@ class BooleanProofSchedulerTest {
 
     @Test
     fun `a checked witness should preserve caller pins and leave proof coverage open`() {
-        val problem = Problem(2, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))))).bake()
+        val problem = Problem(2, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+        )).bake()
         val assumptions = Assumptions(bools = mapOf(1 to false))
         val scoped = context.copy(scope = context.scope.copy(condition = SourceCondition(bools = assumptions.bools)))
         BooleanProofScheduler(problem, scoped, listOf(0), listOf(BacktrackParams(assumptions = assumptions)))
