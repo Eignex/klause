@@ -184,6 +184,14 @@ rechecks authority before reusing its basis. A declined retained source layout
 retires that attempt and uses the existing standalone numerical route within the
 same remaining work and storage limits.
 
+An admitted sparse root advances the scoped owner's floating cursor in adaptive
+work quanta. Pauses publish no point or bound and charge only the new work. A
+pivoting pause can grow the next quantum under the existing adaptive ceiling;
+the operation keeps its original cumulative work and pivot limits. Consultations
+continue only within the remaining root, invocation and cancellation allowances.
+Authority edits discard the cursor before adoption. Completed floating results
+enter the existing exact bound check, independently of dense exact continuation.
+
 Preparation is capped at eight million modeled work units; root and node LP work
 stop at 150 million units or the containing invocation's smaller allowance.
 Preparation admission respects the remaining caller root, slice and LP work limits;
