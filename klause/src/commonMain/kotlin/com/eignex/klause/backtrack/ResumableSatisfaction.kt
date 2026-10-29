@@ -31,6 +31,7 @@ internal class ResumableSatisfaction(
     preparedSession: PropagationSession? = null,
     preparedSeed: PropagationResult? = null,
     private val rebindable: Boolean = false,
+    atRoot: ((PropagationSession) -> Boolean)? = null,
 ) : ResumableSolve {
     private val lifetimeToken = params0.cancellation.lifetimeCancellation()
     private var globalToken: Cancellation = params0.cancellation
@@ -62,7 +63,7 @@ internal class ResumableSatisfaction(
         preparedSession = preparedSession,
         preparedSeed = preparedSeed,
         rebindable = rebindable,
-        slice = TraversalSlice(pauses = { !globalToken() }, beforeBranch = {
+        slice = TraversalSlice(pauses = { !globalToken() }, atRoot = atRoot, beforeBranch = {
             slice.charge()
             slice.workExpired()
         }),
