@@ -150,8 +150,8 @@ class LinearAuthorityCaptureTest {
 
         assertEquals(baseline.value, treatment.value)
         assertEquals(baseline.terminal?.claim, treatment.terminal?.claim)
-        assertEquals(baseline.stats.smt.completeSearchStages.filterKeys { !it.endsWith("Nanos") },
-            treatment.stats.smt.completeSearchStages.filterKeys { !it.endsWith("Nanos") })
+        assertEquals(assertNotNull(baseline.stats.smt.completeSearchStages).filterKeys { !it.endsWith("Nanos") },
+            assertNotNull(treatment.stats.smt.completeSearchStages).filterKeys { !it.endsWith("Nanos") })
         assertEquals(baseline.stats.openTheory.openTheoryChecks, treatment.stats.openTheory.openTheoryChecks)
         assertEquals(baseline.stats.smt.sourceLp.operations, treatment.stats.smt.sourceLp.operations)
         assertEquals(baseline.stats.smt.sourceLp.floatWork, treatment.stats.smt.sourceLp.floatWork)
