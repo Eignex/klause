@@ -34,7 +34,7 @@ class RootInprocessingSearchTest {
         Clause(intArrayOf(2, 6, 11, 8)),
     ))
 
-    private fun params(native: Boolean, exchange: ClauseExchange): BacktrackParams = BacktrackParams(
+    private fun params(native: Boolean, exchange: ClauseExchange? = null): BacktrackParams = BacktrackParams(
         nativeSat = native, variableSelector = InputOrder, valueSelector = IndomainMax, randomSeed = 1L,
         lubyRestartBase = 1L, rootSimplification = true, rootProbeBatch = 10, clauseExchange = exchange,
     )
@@ -95,10 +95,7 @@ class RootInprocessingSearchTest {
                     return ComponentResult.Consistent
                 }
             }
-            val exchange = object : ClauseExchange {
-                override fun onRestart(session: PropagationSession) {}
-            }
-            val params = params(native, exchange).copy(componentFactory = { listOf(peer) })
+            val params = params(native).copy(componentFactory = { listOf(peer) })
 
             val result = BacktrackSolver(problem().bake()).solve(params)
 
@@ -113,10 +110,7 @@ class RootInprocessingSearchTest {
             val guarded = Problem(5, 0, emptyArray(), arrayOf<Factor>(
                 Clause(intArrayOf(0, 2)), Clause(intArrayOf(5, 6, 8)), Clause(intArrayOf(5, 6, 9)),
             ))
-            val exchange = object : ClauseExchange {
-                override fun onRestart(session: PropagationSession) {}
-            }
-            val configured = params(native, exchange).copy(assumptions = Assumptions(bools = mapOf(2 to true)))
+            val configured = params(native).copy(assumptions = Assumptions(bools = mapOf(2 to true)))
 
             val result = BacktrackSolver(guarded.bake()).solve(configured)
 
