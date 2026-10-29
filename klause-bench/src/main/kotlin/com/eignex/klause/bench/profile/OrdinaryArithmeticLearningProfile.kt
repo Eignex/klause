@@ -1,0 +1,149 @@
+package com.eignex.klause.bench.profile
+
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackPresets
+import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.backtrack.selector.VariableSelector
+import com.eignex.klause.bench.catalog.Catalog
+import com.eignex.klause.bench.metric.InstalledBuild
+import com.eignex.klause.bench.metric.sha256
+import com.eignex.klause.bench.report.Reports
+import com.eignex.klause.bench.runner.Runners
+import com.eignex.klause.bench.source.CorpusFetcher
+import com.eignex.klause.formats.json.ProblemJson
+import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.solver.pipeline.FiniteEngine
+import com.eignex.klause.solver.pipeline.FinitePipeline
+import com.eignex.klause.solver.pipeline.FinitePipelineRequest
+import com.eignex.klause.solver.search.VarRef
+import com.eignex.klause.util.Cancellation
+import java.io.File
+import kotlin.random.Random
+import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+
+internal object OrdinaryArithmeticLearningProfile {
+    @JvmStatic
+    fun main(args: Array<String>) {
+        val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
+        require(options.keys.all { it in setOf("suite", "problem", "sha256", "timeout-ms", "nodes", "lp") })
+        val suite = requireNotNull(options["suite"])
+        val name = requireNotNull(options["problem"])
+        val hash = requireNotNull(options["sha256"])
+        val timeout = (options["timeout-ms"] ?: "10000").toLong().also { require(it in 1..30_000L) }
+        val nodes = (options["nodes"] ?: "4096").toLong().also { require(it in 1..100_000L) }
+        val lp = options["lp"] ?: "auto"
+        require(lp in setOf("auto", "off"))
+        val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
+        Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
+        val ref = Catalog.uncapped(suite).problems.single { it.name == name }
+        val bytes = CorpusFetcher.resolve(ref.source).readBytes()
+        require(bytes.size <= 1_048_576)
+        check(sha256(bytes) == hash)
+        out.resolve("source.${ref.format.name.lowercase()}").writeBytes(bytes)
+        val codec = ProblemJson()
+        out.resolve("ordinary-learning.jsonl").bufferedWriter().use { output ->
+            for (learning in listOf(false, true)) {
+                val opened = System.nanoTime()
+                val stop = Cancellation.after(timeout.milliseconds)
+                val entry = Runners.resolve(ref)
+                val original = entry.problem
+                require(original.numIntVars <= 4096 && original.numBoolVars <= 4096)
+                val prepared = FinitePipeline.prepare(FinitePipelineRequest(
+                    original, FiniteEngine.BACKTRACK, entry.objective,
+                    cancellation = stop, solveCancellation = stop, randomSeed = 3L,
+                ))
+                val label = if (learning) "integer" else "clause"
+                out.resolve("$label-original.json").writeText(codec.encodeToString(original))
+                out.resolve("$label-prepared.json").writeText(codec.encodeToString(prepared.problem))
+                var native: PropagationSession? = null
+                var capture: PreparedArithmeticLearningProfile.Capture? = null
+                val base = entry.searchParams ?: BacktrackPresets.conflictDriven(randomSeed = 3L)
+                val selector = base.variableSelector
+                fun observing(delegate: VariableSelector): VariableSelector = object : VariableSelector by delegate {
+                    override fun fresh(): VariableSelector = observing(delegate.fresh())
+                    override fun pick(session: PropagationSession, rng: Random): VarRef? {
+                        if (native == null) {
+                            native = session
+                            capture = PreparedArithmeticLearningProfile.Capture(session, 1024, 65536)
+                        }
+                        check(native === session)
+                        val picked = delegate.pick(session, rng)
+                        capture?.record("traversal.pick", session.decisionLevel.toLong(),
+                            if (picked is VarRef.IntVar) picked.varId.toLong() else -1L)
+                        if (session.problem.numIntVars <= 64) capture?.record("traversal.bounds",
+                            *LongArray(session.problem.numIntVars * 2) { index ->
+                                val domain = session.intDomain(index / 2)
+                                if (index % 2 == 0) domain.min else domain.max
+                            })
+                        return picked
+                    }
+                }
+                val params: BacktrackParams = base.copy(
+                    variableSelector = observing(selector), randomSeed = 3L, cancellation = stop,
+                    maxDecisions = nodes, pbLearning = false, integerRowLearning = learning,
+                    lpConfig = if (lp == "auto") LpConfig.AUTO else null,
+                )
+                var verdict = "preparation-terminal"
+                var witness: String? = null
+                var checked = false
+                var stats: String? = null
+                val model = prepared.problem as? BakedProblem
+                if (model != null && prepared.presolve?.infeasible != true && !stop()) {
+                    val solver = BacktrackSolver(model)
+                    val objective = prepared.objective
+                    val sample = if (objective == null) {
+                        val result = solver.solve(params)
+                        verdict = result::class.simpleName ?: "unknown"
+                        stats = result.stats.toString()
+                        result.assignment
+                    } else {
+                        val result = solver.minimize(objective, params)
+                        verdict = result::class.simpleName ?: "unknown"
+                        stats = result.stats.toString()
+                        result.assignment
+                    }
+                    sample?.let {
+                        val point = prepared.reconstruct(it)
+                        checked = PreparedArithmeticLearningProfile.checkPoint(original, point, stop)
+                        witness = "bools=${point.bools.joinToString()};ints=${point.ints.joinToString()}"
+                    }
+                }
+                val beforeRetirement = native?.learnedClauseCount
+                capture?.record("traversal.finished")
+                native?.popToLevel(0)
+                native?.forgetLearnedClauses { _, _ -> false }
+                capture?.record("traversal.retired")
+                output.appendLine(buildJsonObject {
+                    put("revision", Reports.readGitSha())
+                    put("suite", suite)
+                    put("problem", name)
+                    put("sourceSha256", hash)
+                    put("integerRowLearning", learning)
+                    put("pbLearning", false)
+                    put("lp", lp)
+                    put("seed", 3)
+                    put("maxDecisions", nodes)
+                    put("timeoutMs", timeout)
+                    put("verdict", verdict)
+                    put("witness", witness)
+                    put("nativeReconstructedPointCheck", checked)
+                    put("independentWitnessOrProofCheck", false)
+                    put("presolve", prepared.presolve.toString())
+                    put("stats", stats)
+                    put("storedBeforeRetirement", beforeRetirement)
+                    put("storedAfterRetirement", native?.learnedClauseCount)
+                    put("finiteWorkIncludingRetirement", capture?.work())
+                    put("invocationElapsedNs", System.nanoTime() - opened)
+                    put("cancelled", stop())
+                    put("trace", capture?.export())
+                }.toString())
+                output.flush()
+                capture?.release()
+            }
+        }
+    }
+}
