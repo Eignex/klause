@@ -443,7 +443,10 @@ logical trace, and distinguish emergency interruption from completed work.
 `bench.profile.RewriteStructureProfile` takes `suite=ID problem=NAME sha256=HEX
 presolve=CONFIG`. It captures each structure-control arm through production source
 and finite preparation, then reuses projected source hints, maintained definition
-networks and core/Table-hull LP assembly. Each arm has a 30-second containing
+networks and core/Table-hull LP assembly. Optional
+`orders=markowitz,rewrite_cost` compares those pivot policies with structure
+protection disabled instead of comparing blanket protection. At most two arms run.
+Each arm has a 30-second containing
 deadline, five million preparation work units and one million consumer-diagnostic
 units; the whole capture has 120 seconds. Sources, lowered coordinates and factors
 are capped before consumer preparation. The report retains actual maintained

@@ -608,7 +608,7 @@ internal object AffineSingletons {
                 if (weight == 0L) return candidate
             }
         }
-        return best
+        return if (cancellation()) null else best
     }
 
     /** Whether any variable in [touchedVars] heads a unit-pivot or residue candidate, testing only the
