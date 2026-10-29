@@ -753,7 +753,9 @@ The other two inputs provide separate original-source controls.
 
 `scripts/lp-lifecycle-profile.sh mps-NAME 1 both checkpoint` compares complete
 tableau promotion on actual overflow with fixed-width replay under the same
-limits. `precision` compares early arbitrary precision with replay. Runtime can
+limits. `precision` compares early arbitrary precision with replay. Mode
+`checkpoint-feasibility` restricts the checkpoint query cohort to feasible
+completion while retaining the same edit controls and real workers. Runtime can
 be `jvm`, `native` or `both`; build `:klause:stageLpProfileJvm` and/or
 `:klause:linkLpProfileReleaseExecutableLinuxX64` accordingly. For a source outside
 the basis manifest, append its original SHA-256 and full HiGHS revision.

@@ -9,7 +9,10 @@ mode="${4:-lifecycle}"
 [[ "$trace" =~ ^mps-[a-z0-9_-]+$ ]] || exit 2
 [[ "$repeats" =~ ^[1-5]$ ]] || exit 2
 [[ "$runtime" == both || "$runtime" == jvm || "$runtime" == native ]] || exit 2
-[[ "$mode" == lifecycle || "$mode" == claims || "$mode" == precision || "$mode" == checkpoint || "$mode" == consumers ]] || exit 2
+case "$mode" in
+  lifecycle|claims|precision|checkpoint|checkpoint-feasibility|consumers) ;;
+  *) exit 2 ;;
+esac
 [[ "$(uname -s)/$(uname -m)" == Linux/x86_64 ]] || exit 2
 manifest="$LAB_WORKTREE/klause/src/jvmTest/resources/basis-corpus/manifest.json"
 fixture="$(sed -n "/\"id\": \"$trace\"/,/^    }/p" "$manifest")"
