@@ -281,6 +281,26 @@ internal class NativeSatState(private val state: PropagationState) {
 
     // Learned-clause policy accessors: the native mirror of the LearnedClauseDb columns.
 
+    internal fun sharingMemory(): Map<String, Long> {
+        val columns = listOf(learnedLits, learnedStarts, learnedLbd, learnedPermanent, learnedTier,
+            learnedUsed, lifecycleStages, learnedUnits, rechecks, learnedOrigin, learnedScanPos, learnedWatchPos)
+        return mapOf(
+            "memorySampleWork" to learnedCount.toLong() * 3L + columns.size + watchEntries.size,
+            "learnedObjects" to learnedCount.toLong(),
+            "learnedPayloadBytes" to learnedLits.size.toLong() * Int.SIZE_BYTES,
+            "learnedCapacityBytes" to columns.sumOf { it.backingData.size.toLong() * Int.SIZE_BYTES },
+            "sessionWatchCapacityBytes" to watchEntries.sumOf { it.size.toLong() * Long.SIZE_BYTES } +
+                watchSizes.size.toLong() * Int.SIZE_BYTES,
+            "pendingAttachments" to (rechecks.size - recheckHead).toLong(),
+            "importUseCapacityBytes" to importUses.allocatedBytes,
+            "retainedPeerImports" to (0 until learnedCount).count { learnedOrigin[it] >= 0 }.toLong(),
+            "retainedConsumedPeerImports" to (0 until learnedCount).count {
+                learnedOrigin[it] >= 0 && lifecycleStages[it] and 1 != 0
+            }.toLong(),
+            "retainedConsumed" to (0 until learnedCount).count { lifecycleStages[it] and 1 != 0 }.toLong(),
+        )
+    }
+
     val count: Int get() = learnedCount
     fun lbdOf(i: Int): Int = learnedLbd[i]
     fun permanentOf(i: Int): Boolean = learnedPermanent[i] == 1

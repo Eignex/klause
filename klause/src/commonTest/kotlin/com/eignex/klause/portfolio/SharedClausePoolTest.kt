@@ -142,6 +142,118 @@ class SharedClausePoolTest {
         assertEquals(0, armSession.learnedClauseCount)
     }
 
+    @Test
+    fun `a duplicate at capacity should preserve the generation`() {
+        val pool = SharedClausePool(cap = 2)
+        val clause = boolClause(0, 1)
+        pool.publish(listOf(clause, boolClause(2, 1)))
+        val cursor = pool.drainSince(0).cursor
+
+        pool.publish(listOf(clause))
+
+        assertEquals(cursor, pool.drainSince(cursor).cursor)
+        assertTrue(pool.drainSince(cursor).clauses.isEmpty())
+    }
+
+    @Test
+    fun `slow consumers should suppress retained and evicted keys across generations`() {
+        for (native in listOf(false, true)) {
+            val problem = Problem(128, 0, emptyArray(), emptyList())
+            val pool = SharedClausePool(cap = 4, measureMemory = true)
+            val meter = SharingMeter()
+            val exchange = PoolClauseExchange(pool, origin = 1, meter = meter)
+            val session = PropagationSession(problem, nativeSat = native)
+            val retained = boolClause(0, 1)
+            val evicted = boolClause(2, 9)
+            pool.publish(listOf(retained, evicted), origin = 2)
+            exchange.onSearchStart(session)
+            repeat(16) { round ->
+                pool.publish(listOf(boolClause(4 + round * 2, 2), boolClause(40 + round * 2, 2)), origin = 2)
+            }
+            pool.publish(listOf(evicted), origin = 2)
+            exchange.onRestart(session)
+            val count = session.learnedClauseCount
+
+            exchange.onRestart(session)
+
+            assertEquals(count, session.learnedClauseCount)
+            assertEquals(1, (0 until count).count {
+                session.learnedClauseLiterals(it).contentEquals(evicted.boolLits)
+            })
+            assertTrue(meter.snapshot().channels.getValue(com.eignex.klause.solver.result.SharingChannel.Clauses).duplicates > 0)
+            assertTrue(meter.snapshot().clauses.getValue("poolCompactions") > 1)
+        }
+    }
+
+    @Test
+    fun `suspension should retain the filter while a fresh session releases its capacity`() {
+        val problem = Problem(128, 0, emptyArray(), emptyList())
+        val pool = SharedClausePool(cap = 4, measureMemory = true)
+        val meter = SharingMeter()
+        val exchange = PoolClauseExchange(pool, origin = 1, meter = meter)
+        val session = PropagationSession(problem)
+        exchange.onSearchStart(session)
+        repeat(24) { i ->
+            pool.publish(listOf(boolClause(i * 2, 1)), origin = 2)
+            exchange.onRestart(session)
+        }
+        exchange.onSearchEnd(session)
+        val suspended = meter.snapshot().clauses
+        val count = session.learnedClauseCount
+        exchange.onSearchStart(session)
+        assertEquals(count, session.learnedClauseCount)
+        assertEquals(suspended.getValue("seenCapacityBytes"), meter.snapshot().clauses.getValue("seenCapacityBytes"))
+
+        val fresh = PropagationSession(problem)
+        exchange.onSearchStart(fresh)
+
+        assertEquals(pool.drainSince(0).clauses.size, fresh.learnedClauseCount)
+        assertTrue(meter.snapshot().clauses.getValue("seenCapacityBytes") < suspended.getValue("seenCapacityBytes"))
+        assertEquals(suspended.getValue("seenCapacityBytes"), meter.snapshot().clauses.getValue("peakSeenCapacityBytes"))
+    }
+
+    @Test
+    fun `retiring a search should release its duplicate filter`() {
+        val problem = Problem(4, 0, emptyArray(), emptyList())
+        val pool = SharedClausePool(measureMemory = true)
+        val meter = SharingMeter()
+        val exchange = PoolClauseExchange(pool, origin = 1, meter = meter)
+        val session = PropagationSession(problem)
+        pool.publish(listOf(boolClause(0, 1)), origin = 2)
+        exchange.onSearchStart(session)
+
+        exchange.onSearchClose(session)
+
+        assertEquals(0L, meter.snapshot().clauses.getValue("seenCapacityBytes"))
+        assertTrue(meter.snapshot().clauses.getValue("peakSeenCapacityBytes") > 0)
+    }
+
+    @Test
+    fun `shared consumption should retain accounted reasons through native compaction`() {
+        for (native in listOf(false, true)) {
+            val problem = Problem(4, 0, emptyArray(), emptyList())
+            val pool = SharedClausePool(measureMemory = true)
+            val meter = SharingMeter()
+            val exchange = PoolClauseExchange(pool, origin = 1, meter = meter)
+            val session = PropagationSession(problem, nativeSat = native)
+            pool.publish(listOf(boolClause(0, 1)), origin = 2)
+            exchange.onSearchStart(session)
+            session.pinBool(0, false)
+            assertEquals(true, session.boolValue(1))
+            session.forgetLearnedClauses { _, _ -> false }
+
+            exchange.onSearchEnd(session)
+
+            val stats = meter.snapshot().clauses
+            assertEquals(1, session.learnedClauseCount)
+            assertEquals(1L, stats.getValue("uses"))
+            assertEquals(1L, stats.getValue("retainedConsumedPeerImports"))
+            assertTrue(stats.getValue("reasonPayloadBytes") >= 4L)
+            assertTrue(stats.getValue("importWork") >= stats.getValue("translatedLiterals"))
+            assertEquals(1L, stats.getValue("reasonProtectedObjects"))
+        }
+    }
+
     private class PortfolioExchangeFixture(problem: Problem, pool: SharedClausePool) {
         val session = PropagationSession(problem)
         val exchange = PoolClauseExchange(pool)

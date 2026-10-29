@@ -64,7 +64,11 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
         assertingConflicts,
         nonAssertingConflicts,
         reductionNanos,
-        lifecycle.snapshot(),
+        lifecycle.snapshot() + learned.memory() + mapOf(
+            "sharedLearnedStageCapacityBytes" to stages.backingData.size.toLong() * Int.SIZE_BYTES,
+            "sharedLearnedReasonIndexBytes" to reasons.primitiveCapacityBytes,
+            "sharedLearnedPendingEntries" to (pendingAttach.size + rechecks.size).toLong(),
+        ),
     )
 
     fun learn(literals: IntArray, host: ClauseWatchHost) {

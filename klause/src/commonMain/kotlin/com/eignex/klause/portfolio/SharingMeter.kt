@@ -20,6 +20,21 @@ internal class SharingMeter {
         observed[channel.ordinal] = revision
         listener(channel, revision, 1)
     }
+    private val clauseCounts = HashMap<String, Long>()
+    private val clauseMemory = HashMap<String, Long>()
+
+    internal fun clauseCount(name: String, count: Long) {
+        clauseCounts[name] = (clauseCounts[name] ?: 0L) + count
+    }
+
+    internal fun clauseMemory(values: Map<String, Long>) {
+        for ((name, value) in values) {
+            clauseMemory[name] = value
+            clauseMemory["peak" + name.replaceFirstChar { it.uppercaseChar() }] =
+                maxOf(clauseMemory["peak" + name.replaceFirstChar { it.uppercaseChar() }] ?: 0L, value)
+        }
+    }
+
     private val nanos = LongArray(CHANNELS)
     private val exported = LongArray(CHANNELS)
     private val imported = LongArray(CHANNELS)
@@ -63,6 +78,7 @@ internal class SharingMeter {
             val traffic = ChannelTraffic(nanos[i], exported[i], imported[i], duplicates[i])
             if (traffic == ChannelTraffic()) null else channel to traffic
         }.toMap(),
+        clauseCounts + clauseMemory,
     )
 
     private companion object {

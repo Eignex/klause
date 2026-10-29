@@ -8,6 +8,7 @@ package com.eignex.klause.util
 internal class IntArrayDeque(initialCapacity: Int = 8) {
 
     private var buf: IntArray = IntArray(nextPow2(maxOf(initialCapacity, 1)))
+    internal val allocatedBytes: Long get() = buf.size.toLong() * Int.SIZE_BYTES
     private var head: Int = 0
     private var count: Int = 0
 

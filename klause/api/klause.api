@@ -9877,6 +9877,7 @@ public final class com/eignex/klause/propagation/BuiltInPropagationProjectionPro
 
 public abstract interface class com/eignex/klause/propagation/ClauseExchange {
 	public abstract fun onRestart (Lcom/eignex/klause/propagation/PropagationSession;)V
+	public fun onSearchClose (Lcom/eignex/klause/propagation/PropagationSession;)V
 	public fun onSearchEnd (Lcom/eignex/klause/propagation/PropagationSession;)V
 	public fun onSearchStart (Lcom/eignex/klause/propagation/PropagationSession;)V
 	public fun publishGlobal (Lcom/eignex/klause/propagation/SharedClause;)V
@@ -15392,11 +15393,17 @@ public final class com/eignex/klause/solver/result/SharingStats {
 	public fun <init> ()V
 	public fun <init> (Ljava/util/Map;)V
 	public synthetic fun <init> (Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/util/Map;Ljava/util/Map;)V
+	public synthetic fun <init> (Ljava/util/Map;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/util/Map;
+	public final fun component2 ()Ljava/util/Map;
 	public final fun copy (Ljava/util/Map;)Lcom/eignex/klause/solver/result/SharingStats;
+	public final fun copy (Ljava/util/Map;Ljava/util/Map;)Lcom/eignex/klause/solver/result/SharingStats;
 	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/SharingStats;Ljava/util/Map;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/SharingStats;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/SharingStats;Ljava/util/Map;Ljava/util/Map;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/SharingStats;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getChannels ()Ljava/util/Map;
+	public final fun getClauses ()Ljava/util/Map;
 	public final fun getNanos ()J
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;

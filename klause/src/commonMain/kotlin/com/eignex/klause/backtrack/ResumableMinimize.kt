@@ -600,7 +600,11 @@ internal class ResumableMinimize(
         closed = true
         installation = null
         lpHints?.resetHistory()
-        resources.close()
+        try {
+            if (::cp.isInitialized) params.clauseExchange?.onSearchClose(session)
+        } finally {
+            resources.close()
+        }
     }
 
     // A lazy sequence can be abandoned while suspended, so it must not carry native factors across a yield.

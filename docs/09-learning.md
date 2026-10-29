@@ -180,6 +180,14 @@ checked application in a compatible condition; a returned unit can still be decl
 by traversal before consumption. These counters describe ownership and use, not
 proof coverage or independent validation.
 
+Shared-search learning statistics also report primitive clause payload, allocated
+watch/signature/stage/reason-index capacity and copied trail-reason payload.
+Native sharing observations report their specialized store and saved reasons at
+exchange boundaries. Payload counts and index capacity have separate ownership;
+reference counts exclude platform object layout. Neither surface establishes a
+global learned-memory bound, and active and historical reason protection retains
+its ordinary authority through compaction.
+
 ## Native SAT lane
 
 A pure-Boolean model whose factors are all clauses runs on a dedicated lane. The

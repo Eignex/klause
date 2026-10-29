@@ -45,6 +45,21 @@ internal class WatchedClauseStore {
     private val signatures = MutableIntObjectMap<IntArrayList>()
     private val unitClauses = IntArrayList()
 
+    internal fun memory(): Map<String, Long> {
+        var watchBytes = 0L
+        var signatureBytes = 0L
+        watchers.forEach { _, entries -> watchBytes += entries.backingData.size.toLong() * Int.SIZE_BYTES }
+        signatures.forEach { _, entries -> signatureBytes += entries.backingData.size.toLong() * Int.SIZE_BYTES }
+        return mapOf(
+            "sharedLearnedPayloadBytes" to clauses.sumOf { it.size.toLong() * Int.SIZE_BYTES },
+            "sharedLearnedIndexCapacityBytes" to watchBytes + signatureBytes + watchers.primitiveCapacityBytes +
+                signatures.primitiveCapacityBytes + lbds.backingData.size.toLong() * Int.SIZE_BYTES +
+                unitClauses.backingData.size.toLong() * Int.SIZE_BYTES,
+            "sharedLearnedReferenceSlots" to clauses.size.toLong() * 2L + watchers.referenceCapacity +
+                signatures.referenceCapacity,
+        )
+    }
+
     /** Number of retained clauses. */
     val size: Int get() = clauses.size
 

@@ -827,7 +827,9 @@ class SearchSession(
     internal fun learnedLifecycle(): Map<String, Long> = learning.lifecycle.snapshot()
 
     /** Snapshot learned-clause telemetry for a completed open-theory solve. */
-    fun learnedClauseStats(): OpenTheoryClauseStats = learning.snapshot()
+    fun learnedClauseStats(): OpenTheoryClauseStats = learning.snapshot().let {
+        it.copy(learning = it.learning + trail.reasonMemory())
+    }
 
     /** Retain a sound clause-form explanation for subsequent propagation. */
     fun learn(explanation: SearchExplanation?) {

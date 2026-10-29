@@ -31,6 +31,16 @@ internal class SearchTrail {
         else -> null
     }
     fun levelOf(literal: Int): Int = boolLevels.getOrDefault(literal ushr 1, 0)
+    internal fun reasonMemory(): Map<String, Long> {
+        val arrays = HashSet<IntArray>()
+        boolReasons.forEach { _, reason -> arrays.add(reason.literals) }
+        return mapOf(
+            "sharedReasonPayloadBytes" to arrays.sumOf { it.size.toLong() * Int.SIZE_BYTES },
+            "sharedReasonIndexCapacityBytes" to boolReasons.primitiveCapacityBytes,
+            "sharedReasonReferenceSlots" to boolReasons.referenceCapacity.toLong(),
+        )
+    }
+
     fun reasonFor(variable: Int): SearchExplanation? = boolReasons[variable]
     fun publisherOf(variable: Int): SearchComponent? = boolPublishers[variable]
     fun retainReason(variable: Int, reason: SearchExplanation) {

@@ -383,7 +383,9 @@ internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> {
             "failures=${arm.failures} faults=${arm.faults} maxMs=${arm.maxMillis} " +
             "initMs=${arm.initializationMillis} reseeds=${arm.reseeds}" +
             " initWork=${arm.initializationWork} initCancelled=${arm.initializationCancelled}" +
-            "$credit$sharing"
+            "$credit$sharing" + arm.sharing.clauses.entries.sortedBy { it.key }.joinToString("") {
+                " clause" + it.key.replaceFirstChar { c -> c.uppercaseChar() } + "=" + it.value
+            }
     }
     val failures = stats.portfolio.arms.mapNotNull { arm ->
         arm.failure?.let {

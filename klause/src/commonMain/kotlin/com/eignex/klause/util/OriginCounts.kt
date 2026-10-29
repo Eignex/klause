@@ -7,6 +7,8 @@ package com.eignex.klause.util
 internal class OriginCounts {
     private var counts = LongArray(0)
 
+    internal val allocatedBytes: Long get() = counts.size.toLong() * Long.SIZE_BYTES
+
     /** Count one use for [origin]; a negative origin, one naming no source, is ignored. */
     fun note(origin: Int) {
         if (origin < 0) return
