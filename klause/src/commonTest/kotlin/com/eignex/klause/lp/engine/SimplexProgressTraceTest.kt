@@ -93,7 +93,8 @@ class SimplexProgressTraceTest {
             val result = assertNotNull(solver.solvePrimal())
 
             assertEquals(1.0, result.objective, 1e-9)
-            assertTrue(assertNotNull(solver.progressTrace).phaseCalls.getValue(SimplexProfilePhase.FEASIBILITY_REPAIR) > 0L)
+            val phases = assertNotNull(solver.progressTrace).phaseCalls
+            assertTrue(phases.getValue(SimplexProfilePhase.FEASIBILITY_REPAIR) > 0L)
         }
     }
 
@@ -107,7 +108,8 @@ class SimplexProgressTraceTest {
         val engines = mutableListOf<RevisedSimplex>()
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int,
-                iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions): PersistentLpSolver =
+                iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean,
+                pricing: LpPricingOptions): PersistentLpSolver =
                 RevisedSimplex(model, cancellation, refactorUpdateLimit = refactorUpdateLimit,
                     iterationLimit = iterationLimit, workLimit = workLimit, pricing = pricing).also {
                     it.enableProgressTrace(profile = true)

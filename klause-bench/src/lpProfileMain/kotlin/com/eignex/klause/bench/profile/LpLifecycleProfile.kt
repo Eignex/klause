@@ -212,7 +212,8 @@ private fun lifecycle(
                 put("refactorTriggers", numerical?.lastRefactorPolicyMetrics?.triggers?.let { triggers ->
                     numbers(triggers)
                 } ?: JsonNull)
-                put("qualitySamples", numerical?.lastRefactorPolicyMetrics?.qualitySamples?.let(::JsonPrimitive) ?: JsonNull)
+                put("qualitySamples",
+                    numerical?.lastRefactorPolicyMetrics?.qualitySamples?.let(::JsonPrimitive) ?: JsonNull)
                 put("pivotSpread", numerical?.lastRefactorPolicyMetrics?.pivotSpread?.let(::profileNumber) ?: JsonNull)
                 put("trace", numerical?.progressTrace?.let(::traceJson) ?: JsonNull)
             })
@@ -314,7 +315,8 @@ private class LifecycleFactory(private val observed: Boolean) : LpEngineFactory 
     override fun newPersistentSolver(model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int,
         iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions): PersistentLpSolver {
         val solver = RevisedSimplex(model, cancellation, refactorUpdateLimit = refactorUpdateLimit,
-            iterationLimit = iterationLimit, workLimit = workLimit, trackDegeneracy = trackDegeneracy, pricing = pricing)
+            iterationLimit = iterationLimit, workLimit = workLimit,
+            trackDegeneracy = trackDegeneracy, pricing = pricing)
         if (observed) solver.enableProgressTrace(profile = true)
         lastEngine = solver
         return object : PersistentLpSolver by solver {
@@ -322,7 +324,8 @@ private class LifecycleFactory(private val observed: Boolean) : LpEngineFactory 
             override fun solvePrimal(warm: Basis?): FloatLpResult? = timed(solver) { solver.solvePrimal(warm) }
             override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? =
                 timed(solver) { solver.resolveBounds(allowance) }
-            override fun resolveGated(enforced: BooleanArray): FloatLpResult? = timed(solver) { solver.resolveGated(enforced) }
+            override fun resolveGated(enforced: BooleanArray): FloatLpResult? =
+                timed(solver) { solver.resolveGated(enforced) }
         }
     }
     private inline fun <T> timed(solver: RevisedSimplex, block: () -> T): T {
