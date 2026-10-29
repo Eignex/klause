@@ -64,11 +64,13 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
         assertingConflicts,
         nonAssertingConflicts,
         reductionNanos,
-        lifecycle.snapshot() + if (measureMemory) learned.memory() + mapOf(
-            "sharedLearnedStageCapacityBytes" to stages.backingData.size.toLong() * Int.SIZE_BYTES,
-            "sharedLearnedReasonIndexBytes" to reasons.primitiveCapacityBytes,
-            "sharedLearnedPendingEntries" to (pendingAttach.size + rechecks.size).toLong(),
-        ) else emptyMap(),
+        lifecycle.snapshot() + if (measureMemory) retainedMemory() else emptyMap(),
+    )
+
+    internal fun retainedMemory(): Map<String, Long> = learned.memory() + mapOf(
+        "sharedLearnedStageCapacityBytes" to stages.backingData.size.toLong() * Int.SIZE_BYTES,
+        "sharedLearnedReasonIndexBytes" to reasons.primitiveCapacityBytes,
+        "sharedLearnedPendingEntries" to (pendingAttach.size + rechecks.size).toLong(),
     )
 
     fun learn(literals: IntArray, host: ClauseWatchHost) {

@@ -239,7 +239,13 @@ internal class CpSatisfactionTraversal(
             lp?.let { components += it.component }
             components += params.componentFactory?.invoke().orEmpty()
             components.forEach(resources::ownComponent)
-            resources.own(AutoCloseable { params.clauseExchange?.onSearchClose(cp.session) })
+            resources.own(AutoCloseable {
+                try {
+                    params.clauseExchange?.onSearchClose(cp.session)
+                } finally {
+                    cp.session.sharedLearningMemory = null
+                }
+            })
             cp.useEnforcingPeers(components.filterIsInstance<FiniteFactorEnforcer>()
                 .flatMap { it.enforcingFiniteFactors(problem) }.toSet())
             deferredRoot = deferredInitialization &&
@@ -252,6 +258,7 @@ internal class CpSatisfactionTraversal(
                 } else params.cancellation,
                 learnedDb = params.sharedLearnedDb(),
             )
+            if (params.clauseExchange != null) cp.session.sharedLearningMemory = session::retainedLearningMemory
             val seed = preparedSeed ?: cp.session.seed(params.assumptions)
             val seeded = if (projectAssumptionCore && seed is PropagationResult.Unsat) {
                 cp.session.projectSeedCore(params.assumptions, seed, propagationCancellation)

@@ -213,8 +213,11 @@ Memory fields are boundary samples with individual `peak*` maxima, not an atomic
 process peak or a sum of concurrent high-water marks. `drain*` fields describe
 transient batch storage. ALNS repair pools remain worker-private, skip search-conditioned permanent clauses
 and decline direct global nogoods; their worker meter reports that separate owner.
-Shared-search learned stores and copied reasons report
-separately in their learning statistics. A pool cap bounds its entries, not cumulative
+The finite adapter observes its shared-search learned store and copied reasons
+through a read-only callback in the native session; its lifecycle owner clears
+that callback after the final exchange snapshot. These `shared*` fields belong to
+the coordinator, separately from native storage. Work-scheduled open-theory
+learning statistics expose the same owner observations. A pool cap bounds its entries, not cumulative
 worker seen keys, learned stores or pinned reasons. Retention and delivery policy
 remain separate from these observations.
 

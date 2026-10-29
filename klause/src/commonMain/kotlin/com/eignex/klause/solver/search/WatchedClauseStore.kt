@@ -51,6 +51,9 @@ internal class WatchedClauseStore {
         watchers.forEach { _, entries -> watchBytes += entries.backingData.size.toLong() * Int.SIZE_BYTES }
         signatures.forEach { _, entries -> signatureBytes += entries.backingData.size.toLong() * Int.SIZE_BYTES }
         return mapOf(
+            "sharedLearnedObjects" to clauses.size.toLong(),
+            "sharedMemorySampleWork" to clauses.size.toLong() + watchers.referenceCapacity +
+                signatures.referenceCapacity,
             "sharedLearnedPayloadBytes" to clauses.sumOf { it.size.toLong() * Int.SIZE_BYTES },
             "sharedLearnedIndexCapacityBytes" to watchBytes + signatureBytes + watchers.primitiveCapacityBytes +
                 signatures.primitiveCapacityBytes + lbds.backingData.size.toLong() * Int.SIZE_BYTES +

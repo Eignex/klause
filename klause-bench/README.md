@@ -291,10 +291,11 @@ RSS across the eight cases is 111,716–145,420 KiB and includes runtime and mod
 The optimization reseed control retires the main native worker 32 times and the
 private ALNS repair owner 14 times. Its automatic recipe has only one
 clause-sharing backtrack worker, so it supplies no peer-clause import evidence.
-Both `php4` controls and retained optimization repeat their logical trace; forced
-mixed optimization has two distinct traces and establishes no reproducibility
-claim for that configuration. Explicit clause-capable workers separate the sharing
-control from that mixed recipe.
+Both `php4` controls repeat their complete logical trace. Optimization stderr
+capture ends at 16,384 bytes: its captured complete events match across repeats,
+and incomplete final lines establish no scheduling divergence. Full-trace
+reproducibility is unqualified for those captures. Explicit clause-capable workers
+separate the sharing control from that mixed recipe.
 
 Preparation spends about 549 seconds, including 234 seconds waiting for a compiler.
 All eight native case records are present, but the containing 900-second job ends

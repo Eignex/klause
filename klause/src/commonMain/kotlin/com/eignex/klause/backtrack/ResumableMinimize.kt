@@ -405,7 +405,13 @@ internal class ResumableMinimize(
             branching = CpBranching.None,
         ).also {
             it.conflictStats = sink.ca
-            resources.own(AutoCloseable { params.clauseExchange?.onSearchClose(it.session) })
+            resources.own(AutoCloseable {
+                try {
+                    params.clauseExchange?.onSearchClose(it.session)
+                } finally {
+                    it.session.sharedLearningMemory = null
+                }
+            })
             sink.search.propagationWork = { it.session.work }
             sink.search.learning = { it.session.learnedLifecycle() }
             sink.search.valueOrdering = { it.session.valueOrdering.snapshot() }
@@ -453,6 +459,7 @@ internal class ResumableMinimize(
             cancellation = params.cancellation,
             learnedDb = params.sharedLearnedDb(),
         )
+        if (params.clauseExchange != null) session.sharedLearningMemory = searchSession::retainedLearningMemory
         yield(Unit)
         val seeded = if (deferredInstallation) {
             var result: PropagationResult? = null

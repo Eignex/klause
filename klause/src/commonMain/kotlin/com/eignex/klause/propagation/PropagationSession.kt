@@ -988,7 +988,17 @@ class PropagationSession private constructor(
 
     internal val sharingIdentity = Any()
 
-    internal fun sharingMemory(): Map<String, Long> = state.sharingMemory()
+    internal var sharedLearningMemory: (() -> Map<String, Long>)? = null
+
+    internal fun sharingMemory(): Map<String, Long> {
+        val native = state.sharingMemory()
+        val observer = sharedLearningMemory
+        val shared = observer?.invoke() ?: emptyMap()
+        return native + shared + mapOf(
+            "sharedLearningObserved" to if (observer == null) 0L else 1L,
+            "memorySampleWork" to native.getValue("memorySampleWork") + (shared["sharedMemorySampleWork"] ?: 0L),
+        )
+    }
 
     internal fun learnedLifecycle(): Map<String, Long> = state.learned.lifecycle.snapshot()
 
