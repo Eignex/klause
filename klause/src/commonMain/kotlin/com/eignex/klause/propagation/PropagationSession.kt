@@ -1339,8 +1339,8 @@ class PropagationSession private constructor(
         val numBool = problem.numBoolVars
         var boolCount = 0
         for (lit in lits) if (Lit.variable(lit) < numBool) boolCount++
-        val bools = IntArray(boolCount)
-        val quads = LongArray((lits.size - boolCount) * SharedClause.QUAD)
+        val bools = if (boolCount == 0) EmptyIntArray else IntArray(boolCount)
+        val quads = if (boolCount == lits.size) EmptyLongArray else LongArray((lits.size - boolCount) * SharedClause.QUAD)
         var bi = 0
         var qi = 0
         for (lit in lits) {
