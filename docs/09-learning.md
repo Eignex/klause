@@ -327,6 +327,11 @@ historical hole cannot supply a raw bound assertion. Literal counts do not estab
 assertion. Foreign unavailable bound premises retain clause analysis. The producer
 admits at most 16 terms, 16 combinations, 64 native levels and 64 stored rows, with
 bounded duplicate lookup.
+Assertion checks reconstruct each historical term domain once per target level and
+reuse its exact activity for the candidate bounds. A retained row with the same
+normalized coefficients and a stronger bound suppresses a new consequence only
+when its guard is unconditional or identical; opposite or unrelated guards retain
+separate consequences. Retirement still follows the owning row's live reasons.
 
 Rows retain at most one distinct signed guard; combinations requiring different
 guards retain clause fallback. A guarded row asserts only where its guard already

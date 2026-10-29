@@ -3,6 +3,7 @@ package com.eignex.klause.propagation
 import com.eignex.klause.factor.arithmetic.LinearPropagator
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.util.CheckedLongOverflowException
 import kotlin.test.Test
@@ -13,6 +14,42 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class IntegerConflictRowTest {
+    @Test
+    fun `subsumption should require a stronger bound and an implied guard`() {
+        val guards = listOf(Lit.NONE, Lit.make(0, true), Lit.make(0, false), Lit.make(1, true))
+        for (guard in guards) for (otherGuard in guards) for (bound in listOf(3L, 5L, 7L)) {
+            val retained = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
+                longArrayOf(2), intArrayOf(0), LinearOp.LE, 10), useLo = true, guard = guard))
+            val candidate = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
+                longArrayOf(1), intArrayOf(0), LinearOp.LE, bound), useLo = true, guard = otherGuard))
+
+            assertEquals(bound >= 5 && (guard == Lit.NONE || guard == otherGuard), retained.subsumes(candidate),
+                "guard=$guard otherGuard=$otherGuard bound=$bound")
+        }
+    }
+
+    @Test
+    fun `subsumption should keep different numerical directions`() {
+        val retained = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0, 1),
+            longArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0), useLo = true))
+        for (coefficients in listOf(longArrayOf(1, 1), longArrayOf(-1, 1), longArrayOf(2, -1))) {
+            val candidate = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0, 1),
+                coefficients, intArrayOf(0, 1), LinearOp.LE, 1), useLo = true))
+
+            assertFalse(retained.subsumes(candidate))
+        }
+    }
+
+    @Test
+    fun `a later term should assert when an earlier raw target is a hole`() {
+        val row = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0, 1),
+            longArrayOf(2, -3), intArrayOf(0, 1), LinearOp.LE, -1), useLo = true))
+        val state = PropagationState(Problem(0, 2,
+            arrayOf(IntDomain(0, 10).excludeValue(5), IntDomain(0, 4)), emptyArray()), Assumptions.None)
+
+        assertTrue(row.assertsAt(state, 0))
+    }
+
     @Test
     fun `an assertion whose raw target is a historical hole should decline`() {
         val row = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
