@@ -20,6 +20,7 @@ source64="$(base64 < "$OUT/source.mps" | tr -d '\n')"
 args=("source64=$source64" "source=$source_identity" "sha256=$expected" "repeats=$repeats")
 git -C "$LAB_WORKTREE" rev-parse HEAD > "$OUT/revision.txt"
 uname -a > "$OUT/platform.txt"
+if command -v lscpu >/dev/null; then lscpu > "$OUT/cpu.txt"; fi
 "${JAVA_HOME:+$JAVA_HOME/bin/}java" -version > "$OUT/java-version.txt" 2>&1
 native="$LAB_WORKTREE/klause/build/bin/linuxX64/lpProfileReleaseExecutable/klause-lp-profile.kexe"
 sha256sum "$native" > "$OUT/native-sha256.txt"
@@ -30,4 +31,5 @@ find "$LAB_WORKTREE/klause/build/lp-profile/jvm" -type f -print0 | sort -z | xar
   "-XX:StartFlightRecording=filename=$OUT/lifecycle.jfr,settings=profile,dumponexit=true" \
   -cp "$LAB_WORKTREE/klause/build/lp-profile/jvm/classes:$LAB_WORKTREE/klause/build/lp-profile/jvm/lib/*" \
   com.eignex.klause.bench.profile.LpLifecycleProfileKt "${args[@]}" > "$OUT/jvm.ndjson"
+"${JAVA_HOME:+$JAVA_HOME/bin/}jfr" print --json --events jdk.ObjectAllocationSample "$OUT/lifecycle.jfr" > "$OUT/allocations.json"
 /usr/bin/time -v -o "$OUT/native-resources.txt" "$native" "${args[@]}" > "$OUT/native.ndjson"
