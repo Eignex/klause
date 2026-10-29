@@ -996,6 +996,7 @@ class PropagationSession private constructor(
         val shared = observer?.invoke() ?: emptyMap()
         return native + shared + mapOf(
             "sharedLearningObserved" to if (observer == null) 0L else 1L,
+            "rootRetiredSourceReferenceSlots" to (simplifiedRootSources?.size?.toLong() ?: 0L),
             "memorySampleWork" to native.getValue("memorySampleWork") + (shared["sharedMemorySampleWork"] ?: 0L),
         )
     }

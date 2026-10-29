@@ -15,6 +15,9 @@ internal class IntHashSet(initialCapacity: Int = 8) {
     /** Backing size to allocate on the first [add] — next power of two keeping load ≤ 0.5. */
     private val initialCap: Int = openAddressingCapacity(initialCapacity)
 
+    internal val allocatedBytes: Long
+        get() = if (used === EMPTY_USED) 0L else keys.size.toLong() * (Int.SIZE_BYTES + 1L)
+
     /** Number of members currently in the set. */
     var size: Int = 0
         private set

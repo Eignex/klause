@@ -291,7 +291,9 @@ internal class NativeSatState(private val state: PropagationState) {
             "learnedArenaCapacityBytes" to learnedLits.backingData.size.toLong() * Int.SIZE_BYTES,
             "learnedMetadataCapacityBytes" to columns.sumOf { it.backingData.size.toLong() * Int.SIZE_BYTES },
             "sessionWatchCapacityBytes" to watchEntries.sumOf { it.size.toLong() * Long.SIZE_BYTES } +
-                watchSizes.size.toLong() * Int.SIZE_BYTES,
+                (watchSizes.size.toLong() + watchPos.size) * Int.SIZE_BYTES +
+                baseUnits.backingData.size.toLong() * Int.SIZE_BYTES,
+            "rootRetiredSourceCapacityBytes" to (retiredRootSources?.allocatedBytes ?: 0L),
             "pendingAttachments" to (rechecks.size - recheckHead).toLong(),
             "importUseCapacityBytes" to importUses.allocatedBytes,
             "retainedPeerImports" to (0 until learnedCount).count { learnedOrigin[it] >= 0 }.toLong(),
