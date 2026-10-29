@@ -499,6 +499,17 @@ retain prepared block counts, child reuses, cut consumption and ordinary outcome
 Pin `param.bt-arm=lp-aggressive` and `param.arms=1` for lifecycle controls so an
 LP-free portfolio arm cannot finish the source before the component owner runs.
 
+[9277](https://lab.eignex.com/jobs/9277) exercises both sources at `0af8492830`
+with ownership and root cuts toggled independently. With root cuts off, node
+queries reuse 4 and 27 child results; with cuts on, 2 and 3 cuts become active.
+All eight source witnesses pass the independent MIPLIB solchecker with zero
+violations and objectives 4 and 6. Witness checking does not certify optimality.
+Preparation takes 6.4 seconds through a verified build cache; the preceding
+[9275](https://lab.eignex.com/jobs/9275) takes 333 seconds to prepare and retains
+the unpinned controls that often finish in LP-free arms. Earlier admission,
+worker-loss and deadline failures retain no numerical outcome. These small
+controls support lifecycle consumption, without a timing or default-activation claim.
+
 The opt-in basis tool uses the [basis corpus](../klause/src/jvmTest/resources/basis-corpus/README.md):
 
 ```sh
