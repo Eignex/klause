@@ -185,7 +185,12 @@ private fun lifecycle(
             val before = factory.floatingNanos
             val firstInvocation = factory.invocations.size
             val queryStart = Monotonic.markNow()
-            val result = current.solve(observer = observer.takeIf { observed })
+            factory.queryActive = true
+            val result = try {
+                if (prepared) current.solve(observer = observer.takeIf { observed }) else null
+            } finally {
+                factory.queryActive = false
+            }
             val queryNs = queryStart.elapsedNow().inWholeNanoseconds
             val stageNs = stageStart.elapsedNow().inWholeNanoseconds
             activeNs += stageNs
@@ -349,6 +354,7 @@ private class LifecycleCertificates : LpCertificationObserver {
 
 private class LifecycleFactory(private val observed: Boolean) : LpEngineFactory by ProductionLpEngineFactory {
     var lastEngine: RevisedSimplex? = null
+    var queryActive = false
     var floatingNanos = 0L
     val invocations = mutableListOf<JsonElement>()
     var droppedInvocations = 0
@@ -384,7 +390,7 @@ private class LifecycleFactory(private val observed: Boolean) : LpEngineFactory 
             pricing = pricing,
         )
         if (observed) solver.enableProgressTrace(profile = true)
-        lastEngine = solver
+        if (!queryActive) lastEngine = solver
         return object : PersistentLpSolver by solver {
             override fun solve(warm: Basis?): FloatLpResult? = timed(solver) { solver.solve(warm) }
             override fun solvePrimal(warm: Basis?): FloatLpResult? = timed(solver) { solver.solvePrimal(warm) }
@@ -406,6 +412,7 @@ private class LifecycleFactory(private val observed: Boolean) : LpEngineFactory 
                     invocations.add(
                         buildJsonObject {
                             put("elapsedNs", elapsed)
+                        put("primary", solver === lastEngine)
                             put("work", solver.lastMetrics.workOps)
                             put("termination", solver.lastTermination?.name)
                             put("trace", solver.progressTrace?.let(::traceJson) ?: JsonNull)
