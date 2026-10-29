@@ -32,6 +32,8 @@ class BooleanTaskLease internal constructor(
  * solver verdict authority and runs no workers. Its caller owns execution, result checking and loss
  * detection. Lost or cancelled attempts return their whole region; a context change invalidates all
  * attempts and closures, even for a tighter incumbent. At most 4096 tasks are retained.
+ * [splitVariables] are unpinned original source Boolean IDs; the executor owns validated translation
+ * into its private mapping before asserting the cube together with the complete caller condition.
  */
 class BooleanProofTasks(
     context: BooleanProofContext,

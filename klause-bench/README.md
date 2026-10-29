@@ -224,7 +224,9 @@ This repository owns catalog selection, runtime configuration and build/launch r
 
 `bench.profile.BooleanProofCoverageProfile` accepts `suite=ID problem=NAME sha256=HEX
 work=N seed=N splits=N` for one DIMACS source with at most 4,096 Boolean variables,
-one MiB of input and four partition variables. It records an ordinary F1 control,
+one MiB of input and four partition variables. Its provenance capture requires both
+`:klause-cli:installJvmDist` and `:klause-bench:installDist`; use the JVM flags from
+the bench manifest and `-XX:ActiveProcessorCount=1`. It records an ordinary F1 control,
 two attributed repeats, two independent replicas and bounded task qualification through
 actual finite solves. Source bytes, build/runtime identities, logical schedule and
 branch traces, preparation time, per-query native work, inprocessing counters, thread
@@ -234,6 +236,13 @@ Witnesses and stops leave coverage open; native refutations remain independently
 unverified. This diagnostic includes inline trace cost, uses no production task
 scheduler and establishes no equal-resource speed or heap benefit. Sampled heap and
 literal payload bytes are separate observations, not complete worker memory bounds.
+Optional `cost-repeats=1..12` adds two warmup pairs followed by alternating F1/cube
+pairs without branch or schedule trace I/O. Each pair captures inclusive private
+preparation, native checking and retirement time, process CPU (including concurrent
+JIT/GC), thread allocation and root/total propagation work. Record storage has its
+own elapsed observation. Whole-invocation elapsed time and lab process resources
+contain warmup, tracing, failed attempts, source preparation and final retirement;
+these nested scopes must not be summed with their containers.
 
 `lab/recipes/` contains the migrated lab recipes. `scripts/convert-lab-recipe.sh`
 translates legacy experiments or schedules from stdin without submitting them;

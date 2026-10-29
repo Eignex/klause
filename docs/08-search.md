@@ -12,8 +12,9 @@ reasons those mechanisms supply.
 `BooleanProofTasks` owns a bounded partition over at most twelve distinct Boolean
 variables. Every assignment selects exactly one cube; the complete caller condition
 stays in `BooleanProofContext` with the original source revision, semantics, objective
-direction, exact strict cutoff and prepared mapping identity. Cube coordinates require
-the caller's validated mapping. This protocol runs no workers and supplies no solver
+direction, exact strict cutoff and prepared mapping identity. Cubes use original source
+Boolean IDs; the caller validates their translation into private coordinates. This
+protocol runs no workers and supplies no solver
 verdict. Its serialized caller owns execution, scoped result checking and loss detection.
 
 Only one attempt owns a region. Loss, release and cancellation return unclosed regions;
@@ -31,7 +32,8 @@ alone prove no completed coverage or saved work. `SearchBranchAttemptObserver` o
 a tightening alternative before assertion, including immediate conflicts. Finite
 backtrack exposes it through `BacktrackParams.branchObserver`. Its Boolean adapter
 captures all established Boolean values and the attempted literal; callers restrict it
-to pure Boolean models with the complete mapped variable count and a matching context.
+to pure Boolean models with identity source Boolean coordinates, the complete variable
+count and a matching context.
 Hidden finite or arithmetic branches require another vocabulary. Capture limits mark
 partial observations, and retirement releases retained keys. Literal payload bytes
 exclude collection capacity, headers and all solver state. Observers run inline and

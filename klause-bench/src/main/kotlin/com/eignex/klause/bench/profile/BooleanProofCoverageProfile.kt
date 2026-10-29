@@ -30,6 +30,7 @@ import com.eignex.klause.solver.search.BooleanProofTasks
 import com.eignex.klause.solver.search.BooleanTaskCheck
 import com.eignex.klause.solver.search.BooleanTaskLease
 import com.eignex.klause.util.Cancellation
+import com.sun.management.OperatingSystemMXBean
 import com.sun.management.ThreadMXBean
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
@@ -47,10 +48,12 @@ object BooleanProofCoverageProfile {
     @JvmStatic
     fun main(args: Array<String>) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
-        require(options.keys == setOf("suite", "problem", "sha256", "work", "seed", "splits"))
+        val required = setOf("suite", "problem", "sha256", "work", "seed", "splits")
+        require(options.keys.containsAll(required) && (options.keys - required).all { it == "cost-repeats" })
         val work = options.getValue("work").toLong().also { require(it in 1..100000) }
         val seed = options.getValue("seed").toLong()
         val splits = options.getValue("splits").toInt().also { require(it in 0..4) }
+        val costRepeats = (options["cost-repeats"]?.toInt() ?: 0).also { require(it in 0..12) }
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         val stop = Cancellation.after(120.seconds)
         val reference = Catalog.uncapped(options.getValue("suite")).problems
@@ -114,6 +117,7 @@ object BooleanProofCoverageProfile {
         }
         independentReplicas(problem, context, seed, work, stop, bean, report)
         qualifyTasks(problem, context, splits, seed, work, stop, bean, report)
+        qualifyCosts(problem, context, splits, seed, work, costRepeats, stop, bean, report)
         out.resolve("completed.json").writeText(buildJsonObject {
             put("sourceSha256", sha256(bytes))
             put("revision", Reports.readGitSha())
@@ -126,6 +130,71 @@ object BooleanProofCoverageProfile {
             put("independentlyVerifiedUnsatOrOptimality", false)
             put("runtimeScheduler", false)
         }.toString())
+    }
+
+    private fun qualifyCosts(
+        problem: BakedProblem, context: BooleanProofContext, splits: Int, seed: Long, work: Long,
+        repeats: Int, stop: Cancellation, bean: ThreadMXBean, report: File,
+    ) {
+        if (repeats == 0) return
+        val process = ManagementFactory.getOperatingSystemMXBean() as OperatingSystemMXBean
+        for (iteration in -2 until repeats) {
+            val modes = if (iteration and 1 == 0) listOf("f1", "cubes") else listOf("cubes", "f1")
+            for (mode in modes) {
+                if (stop()) return
+                val beforeCpu = process.processCpuTime
+                val beforeAllocated = bean.getThreadAllocatedBytes(Thread.currentThread().threadId())
+                val begin = System.nanoTime()
+                val results = ArrayList<SolveResult>()
+                val complete = if (mode == "f1") {
+                    val workers = List(2) { worker ->
+                        PortfolioWorker.of("bt/input-order", worker,
+                            BacktrackSolver(problem).session(), params(seed, stop))
+                    }
+                    val result = Portfolio.thompson(workers, baseSliceWork = 8, maxSliceWork = 64,
+                        sliceGrowth = 1.5, reseedStaleThreshold = 0,
+                        diagnostics = PortfolioDiagnostics(work, seed)).use { it.solve(stop) }
+                    results += result
+                    result is SolveResult.Unsat
+                } else {
+                    val tasks = BooleanProofTasks(context, (0 until splits).toList())
+                    val leases = List(tasks.size) { checkNotNull(tasks.acquire(it)) }
+                    for (lease in leases) {
+                        val result = taskQuery(problem, lease, seed, work, tasks.size, stop)
+                        results += result
+                        tasks.complete(lease) {
+                            if (result is SolveResult.Unsat) BooleanTaskCheck.NativeRefutation
+                            else BooleanTaskCheck.Unresolved
+                        }
+                    }
+                    tasks.nativeCoverageComplete.also { tasks.cancel() }
+                }
+                val elapsed = System.nanoTime() - begin
+                val allocated = bean.getThreadAllocatedBytes(Thread.currentThread().threadId()) - beforeAllocated
+                val cpu = process.processCpuTime - beforeCpu
+                val record = buildJsonObject {
+                    put("mode", "cost-$mode")
+                    put("iteration", iteration)
+                    put("warmup", iteration < 0)
+                    put("nativeCoverageComplete", complete)
+                    put("inclusiveControlElapsedNs", elapsed)
+                    put("inclusiveControlProcessCpuNs", cpu)
+                    put("threadAllocatedBytes", allocated)
+                    put("decisions", results.sumOf { it.stats.search.nodes.sum })
+                    put("propagationWork", results.sumOf { it.stats.search.propagationWork.sum })
+                    put("rootPropagationWork", results.sumOf { it.stats.search.rootPropagationWork.sum })
+                    put("independentlyVerifiedUnsatOrOptimality", false)
+                }
+                val storeStarted = System.nanoTime()
+                report.appendText("$record\n")
+                report.appendText(buildJsonObject {
+                    put("mode", "cost-record-store")
+                    put("control", mode)
+                    put("iteration", iteration)
+                    put("elapsedNs", System.nanoTime() - storeStarted)
+                }.toString() + "\n")
+            }
+        }
     }
 
     private fun independentReplicas(
@@ -212,10 +281,15 @@ object BooleanProofCoverageProfile {
 
     private fun taskQuery(
         problem: BakedProblem, lease: BooleanTaskLease, seed: Long, work: Long, tasks: Int, stop: Cancellation,
-    ): SolveResult = BacktrackSolver(problem).solve(params(seed, stop).copy(
-        assumptions = Assumptions(bools = lease.cube.literals.associate { Lit.variable(it) to Lit.isPositive(it) }),
-        nodeBudget = NodeBudget(maxOf(1L, work / tasks)),
-    ))
+    ): SolveResult {
+        require(lease.context.scope.objective == null && lease.context.cutoff == null)
+        val condition = lease.context.scope.condition
+        require(condition.lower.isEmpty() && condition.upper.isEmpty())
+        val pins = condition.bools + lease.cube.literals.associate { Lit.variable(it) to Lit.isPositive(it) }
+        return BacktrackSolver(problem).solve(params(seed, stop).copy(
+            assumptions = Assumptions(bools = pins), nodeBudget = NodeBudget(maxOf(1L, work / tasks)),
+        ))
+    }
 
     private fun params(seed: Long, stop: Cancellation): BacktrackParams = BacktrackParams(
         randomSeed = seed, cancellation = stop, nativeSat = false,
@@ -230,6 +304,7 @@ object BooleanProofCoverageProfile {
             put("heapUsedBytes", ManagementFactory.getMemoryMXBean().heapMemoryUsage.used)
             put("decisions", result.stats.search.nodes.sum)
             put("propagationWork", result.stats.search.propagationWork.sum)
+            put("rootPropagationWork", result.stats.search.rootPropagationWork.sum)
             put("learningAndInprocessing", JsonObject(result.stats.search.learning.mapValues {
                 JsonPrimitive(it.value)
             }))

@@ -89,7 +89,8 @@ class BooleanCoverageAttribution(
 
     /**
      * Observe pure Boolean traversal attempts in a fixed context. [numBoolVars] must describe the
-     * whole mapped model, with no hidden integer, real or theory branches. Read a fresh context at
+     * whole model with identity source Boolean coordinates and no hidden integer, real or theory
+     * branches. Read a fresh context at
      * every attempt when objective authority can change. Incompatible epochs are refused.
      */
     fun observer(
