@@ -17,6 +17,7 @@ import com.eignex.klause.util.gcd
 import com.eignex.klause.util.isZero
 import com.eignex.klause.util.magnitudeBitLength
 import com.eignex.klause.util.times
+import kotlin.math.abs
 
 internal class LinearAuthorityCut(
     val owner: Int,
@@ -36,14 +37,29 @@ internal class LinearAuthorityCuts private constructor(
     val work: Long,
     val observations: Map<String, Long>,
     val complementary: Boolean,
+    val pointDirected: Boolean,
 ) {
     fun withAdditional(additional: List<LinearAuthorityCut>): LinearAuthorityCuts =
-        if (additional.isEmpty()) this else LinearAuthorityCuts(rows + additional, work, observations, complementary)
+        if (additional.isEmpty()) this else LinearAuthorityCuts(rows + additional, work, observations,
+            complementary, pointDirected)
 
     companion object {
         fun prepare(
             source: SourceProofContext, cancellation: Cancellation, complementary: Boolean = false,
             onWork: (Long) -> Unit = {},
+        ): LinearAuthorityCuts? = prepareInternal(source, cancellation, complementary, null, 65_536L, onWork)
+
+        fun prepareAtPoint(
+            source: SourceProofContext, cancellation: Cancellation, point: Map<SourceCoordinate, Double>,
+            maximumWork: Long, onWork: (Long) -> Unit = {},
+        ): LinearAuthorityCuts? {
+            require(maximumWork in 0L..65_536L)
+            return prepareInternal(source, cancellation, true, point, maximumWork, onWork)
+        }
+
+        private fun prepareInternal(
+            source: SourceProofContext, cancellation: Cancellation, complementary: Boolean,
+            point: Map<SourceCoordinate, Double>?, maximumWork: Long, onWork: (Long) -> Unit,
         ): LinearAuthorityCuts? {
             var work = 0L
             try {
@@ -62,7 +78,7 @@ internal class LinearAuthorityCuts private constructor(
                     if (cancellation()) return null
                     val row = premise.inequality
                     val cost = if (row.supportSize == 1) 2L else 1L
-                    if (cost > 32_768L - work) {
+                    if (cost > minOf(32_768L, maximumWork) - work) {
                         observe("BoundScanLimited")
                         break
                     }
@@ -83,7 +99,7 @@ internal class LinearAuthorityCuts private constructor(
                     val row = entry.value.inequality
                     val coefficients = row.coefficients
                     val cost = 1L + coefficients.size * 12L
-                    if (cost > 65_536L - work) {
+                    if (cost > maximumWork - work) {
                         observe("RowScanLimited")
                         break
                     }
@@ -128,14 +144,26 @@ internal class LinearAuthorityCuts private constructor(
                         val preferred = sides.filterNotNull()
                         val alternatives = if (complementary) coefficients
                             .filterKeys { it.kind == SourceCoordinate.Kind.Real }.map { (id, value) ->
-                                bounds[id to (value < BigFraction.ZERO)] ?: bounds[id to (value > BigFraction.ZERO)]
+                                val opposite = bounds[id to (value < BigFraction.ZERO)]
+                                val original = bounds[id to (value > BigFraction.ZERO)]
+                                val at = point?.get(id)
+                                fun distance(bound: Pair<SourceInequality, SourceDerivation>?): Double? {
+                                    if (bound == null || at == null || !at.isFinite()) return null
+                                    val row = bound.first
+                                    val endpoint = row.rhs.toDouble() / row.coefficients.getValue(id).toDouble()
+                                    return abs(at - endpoint).takeIf { it.isFinite() }
+                                }
+                                val originalDistance = distance(original)
+                                val oppositeDistance = distance(opposite)
+                                if (originalDistance != null && oppositeDistance != null &&
+                                    originalDistance <= oppositeDistance) original else opposite ?: original
                             }.filterNotNull() else preferred
                         val choices = if (alternatives == preferred) listOf(preferred)
                             else listOf(preferred, alternatives)
                         var eligible = false
                         for ((choice, selected) in choices.withIndex()) {
                             if (choice > 0) {
-                                if (cost > 65_536L - work) {
+                                if (cost > maximumWork - work) {
                                     observe("RowScanLimited")
                                     break
                                 }
@@ -180,7 +208,7 @@ internal class LinearAuthorityCuts private constructor(
                     val proof = SourceDerivation.IntegerRounding(combination)
                     cuts += LinearAuthorityCut(owner, conclusion, proof)
                 }
-                return LinearAuthorityCuts(cuts, work, observations, complementary)
+                return LinearAuthorityCuts(cuts, work, observations, complementary, point != null)
             } finally {
                 onWork(work)
             }
