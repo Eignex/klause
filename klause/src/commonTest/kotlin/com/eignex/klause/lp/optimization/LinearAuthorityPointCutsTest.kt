@@ -91,19 +91,20 @@ class LinearAuthorityPointCutsTest {
                 "upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ofLong(2))),
             ), mapOf(x to BigFraction.ONE))
 
-        val current = LinearAuthority(SourceLpBudget(), retainLp = true).use {
-            it.advance(maximum, Cancellation.Never, cuts = true)
-        }
-        val candidate = LinearAuthority(SourceLpBudget(), retainLp = true).use {
-            it.advanceWithPointCuts(maximum, Cancellation.Never)
-        }
+        LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
+            val current = authority.advance(maximum, Cancellation.Never, cuts = true)
+            val candidate = authority.advanceWithPointCuts(maximum, Cancellation.Never)
+            val restored = authority.advance(maximum, Cancellation.Never, cuts = true)
 
-        assertEquals(SourceValue.Rational(BigFraction.ofLong(5) * BigFraction.ofLong(2).reciprocal()),
-            (assertNotNull(current.bound).claim as SourceClaim.Bound).value)
-        assertEquals(SourceValue.Rational(BigFraction.ofLong(2)),
-            (assertNotNull(candidate.bound).claim as SourceClaim.Bound).value)
-        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(maximum.withLinearAuthority())
-            .verify(assertNotNull(candidate.bound)))
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(5) * BigFraction.ofLong(2).reciprocal()),
+                (assertNotNull(current.bound).claim as SourceClaim.Bound).value)
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(2)),
+                (assertNotNull(candidate.bound).claim as SourceClaim.Bound).value)
+            assertEquals((assertNotNull(current.bound).claim as SourceClaim.Bound).value,
+                (assertNotNull(restored.bound).claim as SourceClaim.Bound).value)
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(maximum.withLinearAuthority())
+                .verify(assertNotNull(candidate.bound)))
+        }
     }
 
     @Test
