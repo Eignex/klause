@@ -39,6 +39,8 @@ internal class WatchedClauseStore {
     /** Watch entries and retracted-implication literals inspected by propagation. */
     var watchVisits: Long = 0
         private set
+    internal var ownershipRevision: Long = 0L
+        private set
     private val clauses = ClauseArrays()
     private val lbds = IntArrayList()
     private val used = IntArrayList()
@@ -167,6 +169,7 @@ internal class WatchedClauseStore {
     /** Start watching [literal] in clause [index]. */
     fun addWatcher(literal: Int, index: Int) {
         watchers.getOrPut(literal) { IntArrayList() }.add(index)
+        ownershipRevision++
     }
 
     /**
@@ -187,6 +190,7 @@ internal class WatchedClauseStore {
         lbds.add(lbd)
         used.add(0)
         attached.add(0)
+        ownershipRevision++
         return index
     }
 

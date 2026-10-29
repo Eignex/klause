@@ -66,10 +66,14 @@ class ResumableSatisfactionTest {
                 override fun onRestart(session: PropagationSession) = Unit
             }
             val params = BacktrackParams(nativeSat = native, randomSeed = 1L, pbLearning = false,
-                clauseExchange = exchange, learnedMemoryBytes = 0L, learnedMemoryWork = 1_000_000L)
+                clauseExchange = exchange, learnedMemoryBytes = 0L, learnedMemoryWork = 1_000_000L, maxDecisions = 100L)
             val solver = BacktrackSolver(pigeonhole(3, 2).bake())
 
-            val result = if (resumed) solver.resumableSolve(params).use { runToVerdict(it, 1L) }
+            val result = if (resumed) solver.resumableSolve(params).use { search ->
+                var verdict: SolveResult? = null
+                repeat(100) { if (verdict == null) verdict = search.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L) }
+                assertNotNull(verdict)
+            }
             else solver.solve(params)
 
             assertIs<SolveResult.Unsat>(result)

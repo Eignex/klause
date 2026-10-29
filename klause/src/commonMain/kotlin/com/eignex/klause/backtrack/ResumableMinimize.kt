@@ -342,6 +342,7 @@ internal class ResumableMinimize(
     private var rootRoundingAttempted = false
     private var treeBudgetExhausted = false
     private val inprocessing = Inprocessing.from(params, sink.search)
+    private val learnedMemory = LearnedMemoryMaintenance()
     private val pooledIncumbents = params.pooledIncumbents?.let { IncumbentSubscription(it) }
     private val traversal by lazy(LazyThreadSafetyMode.NONE) { OptimizationTraversalPolicy() }
 
@@ -682,6 +683,7 @@ internal class ResumableMinimize(
         decisionLimit = decisionBudget
         run.reset()
         inprocessing?.reset()
+        learnedMemory.reset()
         firstRun = true
         rootRoundingPending = false
         lpEngine.rootRoundingWarmStart = null
@@ -1538,7 +1540,7 @@ internal class ResumableMinimize(
 
     private fun simplify(context: SearchContext, restart: Boolean): SearchRunDisposition {
         session.retainedInprocessingMemory = inprocessing?.let { it::retainedMemory }
-        maintainLearnedMemory(session, params, inprocessing, sink.search)
+        learnedMemory.run(session, params, inprocessing, sink.search)
         if (context.decisionLevel != 0) return SearchRunDisposition.Continue
         val refresh = if (restart) inprocessing?.onRestart(session, params) else inprocessing?.onRoot(session, params)
         if (session.isUnsatAtRoot) return SearchRunDisposition.Exhausted

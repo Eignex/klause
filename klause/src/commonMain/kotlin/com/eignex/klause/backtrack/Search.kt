@@ -520,6 +520,7 @@ private class CpSatisfactionTraversalPolicy(
     override val lifecycle: SearchRunLifecycle get() = this
 
     private val inprocessing = Inprocessing.from(params, sink?.search)
+    private val learnedMemory = LearnedMemoryMaintenance()
 
     init { session.retainedInprocessingMemory = inprocessing?.let { it::retainedMemory } }
 
@@ -530,7 +531,7 @@ private class CpSatisfactionTraversalPolicy(
     override fun onResume(context: SearchContext): SearchRunDisposition = simplify(context, false)
 
     private fun simplify(context: SearchContext, restart: Boolean): SearchRunDisposition {
-        maintainLearnedMemory(session, params, inprocessing, sink?.search)
+        learnedMemory.run(session, params, inprocessing, sink?.search)
         if (context.decisionLevel != 0) return SearchRunDisposition.Continue
         val refresh = if (restart) inprocessing?.onRestart(session, params) else inprocessing?.onRoot(session, params)
         if (session.isUnsatAtRoot) return SearchRunDisposition.Exhausted

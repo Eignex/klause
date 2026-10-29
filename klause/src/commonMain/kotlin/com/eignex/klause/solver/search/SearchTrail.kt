@@ -16,6 +16,8 @@ internal class SearchTrail {
     private val priorIntFactsAtLevel = ArrayList<MutableIntObjectMap<IntFact?>>().apply { add(MutableIntObjectMap()) }
     val pendingAssertions = SearchAssertionQueue()
     val boolTrail = IntArrayList()
+    internal var ownershipRevision: Long = 0L
+        private set
     private val trailStartAtLevel = IntArrayList().apply { add(0) }
     val decisionLevel: Int get() = decisions.size
     val rootFixedCount: Int get() = valuesAtLevel[0].size
@@ -58,12 +60,14 @@ internal class SearchTrail {
 
     fun reasonFor(variable: Int): SearchExplanation? = boolReasons[variable]
     internal fun releaseLearning() {
+        ownershipRevision++
         boolReasons = MutableIntObjectMap()
         pendingAssertions.clear()
     }
     fun publisherOf(variable: Int): SearchComponent? = boolPublishers[variable]
     fun retainReason(variable: Int, reason: SearchExplanation) {
         boolReasons.put(variable, reason)
+        ownershipRevision++
     }
     fun retainPublisher(variable: Int, publisher: SearchComponent) {
         boolPublishers.put(variable, publisher)
@@ -83,6 +87,7 @@ internal class SearchTrail {
     }
 
     fun assignBool(variable: Int, value: Int, source: SearchComponent?, atoms: SearchAtomRegistry?) {
+        ownershipRevision++
         boolValues.put(variable, value)
         boolLevels.put(variable, decisionLevel)
         valuesAtLevel[decisionLevel].add(variable)
@@ -96,6 +101,7 @@ internal class SearchTrail {
     fun retractTo(level: Int, listener: SearchUnassignListener?) {
         require(level in 0..decisionLevel) { "invalid search decision level $level" }
         if (level == decisionLevel) return
+        ownershipRevision++
         for (current in decisionLevel downTo level + 1) {
             val assigned = valuesAtLevel[current]
             for (position in assigned.size - 1 downTo 0) {
@@ -119,6 +125,7 @@ internal class SearchTrail {
     }
 
     fun resetRoot() {
+        ownershipRevision++
         boolValues.clear()
         boolLevels.clear()
         boolReasons = MutableIntObjectMap()
@@ -212,6 +219,8 @@ internal class SearchAssertionQueue : Iterable<PendingSearchAssertion> {
     private var head = 0
     var size: Int = 0
         private set
+    internal var ownershipRevision: Long = 0L
+        private set
     val capacity: Int get() = data.size
     fun isEmpty(): Boolean = size == 0
     fun isNotEmpty(): Boolean = size > 0
@@ -223,6 +232,7 @@ internal class SearchAssertionQueue : Iterable<PendingSearchAssertion> {
             head = 0
         }
         data[(head + size++) % data.size] = assertion
+        ownershipRevision++
     }
     fun removeFirst(): PendingSearchAssertion {
         check(size > 0)
@@ -230,9 +240,11 @@ internal class SearchAssertionQueue : Iterable<PendingSearchAssertion> {
         data[head] = null
         head = (head + 1) % data.size
         size--
+        ownershipRevision++
         return assertion
     }
     fun clear() {
+        ownershipRevision++
         data = arrayOfNulls(8)
         size = 0
         head = 0
