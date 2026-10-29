@@ -46,7 +46,8 @@ class RootInprocessingSearchTest {
     fun `ordinary search should consume root probes without a restart schedule`() {
         for (native in listOf(false, true)) {
             val configured = params(native).copy(lubyRestartBase = null, inprocessingInterval = 1L,
-                inprocessingWork = 4096L, inprocessingRootWork = 512L, inprocessingProbeWork = 512L)
+                inprocessingWork = 4096L, inprocessingRootWork = 512L, inprocessingProbeWork = 512L,
+                rootRebuildCaptureVisits = 1024)
 
             val result = BacktrackSolver(problem().bake()).solve(configured)
 
@@ -54,6 +55,7 @@ class RootInprocessingSearchTest {
             assertEquals(0.0, result.stats.search.restarts.sum)
             assertTrue(result.stats.search.learning.getValue("inprocessWorkTriggers") > 0L)
             assertTrue(result.stats.search.learning.getValue("inprocessProbeUnits") > 0L)
+            assertTrue(result.stats.search.learning.getValue("inprocessRootRebuildComplete") > 0L)
         }
     }
 

@@ -437,8 +437,11 @@ data class BacktrackParams(
     val propagationAttribution: Boolean = false,
     /** Retry bounded historical Table reasons against the minimized conflict frontier. */
     val historicalTableReasons: Boolean = false,
+    /** Bounded propositional rebuild diagnostics within root simplification; zero disables capture. */
+    val rootRebuildCaptureVisits: Int = 0,
 ) : SolverParams {
     init {
+        require(rootRebuildCaptureVisits in 0..1_048_576) { "rebuild capture visits must be in 0..1048576" }
         require(rootSimplifyBatch > 0) { "root simplification batch must be positive" }
         require(rootProbeBatch >= 0) { "root probe batch must be nonnegative" }
         require(rootProbeWork > 0L) { "root probe work must be positive" }
