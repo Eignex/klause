@@ -96,7 +96,8 @@ internal class LinearAuthorityInvocation(
         run = SolveStats.EMPTY.run.copy(backend = "linear-authority",
             wallMs = started.elapsedNow().inWholeMilliseconds, timedOut = params.timeout()),
         smt = state.smt.snapshot().let { snapshot -> snapshot.copy(
-            completeSearchStages = snapshot.completeSearchStages.orEmpty() + component.observations() + externalOffers +
+            completeSearchStages = snapshot.completeSearchStages.orEmpty() + component.observations() +
+            externalOffers +
             mapOf("numericalFundedWork" to funding.spent, "numericalFundedAllocation" to funding.allocated,
                 "numericalImportedIncumbents" to importedIncumbents) +
             (frontier?.let { mapOf("numericalFrontierPending" to it.pending.toLong(),
