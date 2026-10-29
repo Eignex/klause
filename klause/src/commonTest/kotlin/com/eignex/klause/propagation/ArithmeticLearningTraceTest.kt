@@ -79,18 +79,22 @@ class ArithmeticLearningTraceTest {
     }
 
     @Test
-    fun `an oversized clause capture should preserve later consumers`() {
+    fun `oversized reason payloads should preserve later consumers`() {
         val state = PropagationState(Problem(0, 0, emptyArray(), emptyArray()), Assumptions.None)
-        val trace = ArithmeticLearningTrace()
-        trace.stored(4, "integer")
-        trace.clause("analysis.seed-clause", IntArray(65), state)
+        for (marker in listOf(false, true)) {
+            val trace = ArithmeticLearningTrace()
+            trace.stored(4, "integer")
+            if (marker) trace.marker(0, true, IntArray(33))
+            else trace.clause("analysis.seed-clause", IntArray(65), state)
 
-        trace.pin(4, 0, 2, "upper", 1)
+            trace.pin(4, 0, 2, "upper", 1)
 
-        assertContentEquals(longArrayOf(65), trace.events.single { it.kind.endsWith(".omitted") }.data)
-        assertTrue(trace.events.any { it.kind == "consumer.upper" })
-        assertEquals(1, trace.omittedPayloads)
-        assertFalse(trace.truncated)
+            assertContentEquals(longArrayOf(if (marker) 33L else 65L),
+                trace.events.single { it.kind.endsWith(".omitted") }.data)
+            assertTrue(trace.events.any { it.kind == "consumer.upper" })
+            assertEquals(1, trace.omittedPayloads)
+            assertFalse(trace.truncated)
+        }
     }
 
     @Test
@@ -106,6 +110,7 @@ class ArithmeticLearningTraceTest {
         assertContentEquals(longArrayOf(1, 2), trace.events.single().data)
         assertEquals(2, trace.words)
         assertTrue(trace.truncated)
+        assertEquals("words", trace.truncationCause)
     }
 
     @Test
@@ -117,6 +122,7 @@ class ArithmeticLearningTraceTest {
 
         assertEquals(2, trace.events.size)
         assertTrue(trace.truncated)
+        assertEquals("events", trace.truncationCause)
         assertNull(state.arithmeticLearningTrace)
     }
 

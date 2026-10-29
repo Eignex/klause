@@ -269,6 +269,7 @@ internal object PreparedArithmeticLearningProfile {
             put("eventLimit", maxEvents)
             put("wordLimit", maxWords)
             put("truncated", trace.javaClass.getMethod("getTruncated").invoke(trace) as Boolean)
+            put("truncationCause", trace.javaClass.getMethod("getTruncationCause").invoke(trace) as String?)
             put("omittedPayloads", trace.javaClass.getMethod("getOmittedPayloads").invoke(trace) as Int)
             put("words", trace.javaClass.getMethod("getWords").invoke(trace) as Int)
             put("events", buildJsonArray {
