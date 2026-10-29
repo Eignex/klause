@@ -3,11 +3,13 @@ package com.eignex.klause.presolve
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Table
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
+import com.eignex.klause.presolve.linear.AffineSingletons
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
@@ -33,6 +35,26 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class AffinePivotOrderTest {
+    @Test
+    fun `interrupted rewrite scoring should leave the source unchanged`() {
+        var stopped = false
+        val table = Table(intArrayOf(0, 2), longArrayOf(1, 0, 2, 1, 3, 2))
+        val consumer = object : Factor by table {
+            override val structuralKeyWeight: Int get() {
+                stopped = true
+                return table.structuralKeyWeight
+            }
+        }
+        val source = Problem(0, 3, arrayOf(IntDomain(1, 3), IntDomain(0, 2), IntDomain(0, 2)), listOf(
+            Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1), consumer,
+        ))
+
+        val delta = AffineSingletons.eliminateSourceAffineSingletons(source,
+            cancellation = Cancellation { stopped }, pivotOrder = AffinePivotOrder.REWRITE_COST)
+
+        assertTrue(delta.isEmpty)
+    }
+
     @Test
     fun `rewrite cost should preserve maintained element values and gradients after reversing its index definition`() {
         val domains = arrayOf(IntDomain(1, 3), IntDomain(0, 2), IntDomain(0, 2), IntDomain(2, 6))
