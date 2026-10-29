@@ -7,19 +7,46 @@ import com.eignex.klause.ir.LinearSourceVariable
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.SemanticRational
+import com.eignex.klause.ir.SourceFormat
+import com.eignex.klause.ir.SourceSemantics
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.presolve.ObjectiveAdjustment
 import com.eignex.klause.presolve.SourceMapping
 import com.eignex.klause.presolve.TransformationGuarantees
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.validation.LinearSourceCheck
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class FiniteIncumbentCompletionTest {
+    @Test
+    fun `tolerance acceptance should not supply exact completed incumbent authority`() {
+        val source = LinearSourceProblem(listOf(LinearSourceVariable("r", false,
+            SemanticRational.ZERO, SemanticRational.ONE)), emptyList(),
+            LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
+            SourceSemantics(SourceFormat.MPS, feasibilityTolerance = SourceTolerance(
+                absolute = SemanticRational.of(BIG_ONE, bigIntOf(1_000_000)))).resolve())
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED))
+        val original = assertNotNull(invocation.linearSource)
+        val value = BigFraction.ONE + BigFraction.ofLong(2_000_000).reciprocal()
+        val point = Sample(booleanArrayOf(), LongArray(original.view.model.numIntVars),
+            doubleArrayOf(value.toDouble()), exactReals = listOf(value))
+
+        val tolerated = assertIs<LinearSourceCheck.Accepted>(original.check(point, Cancellation.Never))
+
+        assertFalse(tolerated.witness.exact)
+        assertFalse(original.incumbentCompletionCheck(null)(point, value, Cancellation.Never))
+    }
+
     @Test
     fun `original checking should preserve objective sense scale and presolve adjustment`() {
         for (sense in ObjectiveSense.entries) {

@@ -21,7 +21,7 @@ internal fun PreparedLinearSource.incumbentCompletionCheck(
             mapping?.stages.orEmpty().sumOf { it.rebuild.steps.size.toLong() })
         if (token()) false else {
             val lifted = mapping?.reconstructFrom(mapping.target, sample) ?: sample
-            val witness = (check(lifted, token) as? LinearSourceCheck.Accepted)?.witness
+            val witness = (check(lifted, token) as? LinearSourceCheck.Accepted)?.witness?.takeIf { it.exact }
             val sourceValue = witness?.objective?.let {
                 val scaled = it * view.objectiveScale
                 if (view.source.objective?.sense == ObjectiveSense.MAXIMIZE) scaled.negated() else scaled
