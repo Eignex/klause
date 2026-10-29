@@ -49,7 +49,7 @@ class OpenTheorySolverTest {
     @Test
     fun `incremental ordinary linear traversal should publish a strict guard consequence`() {
         val model = Problem(2, 0, emptyArray(), arrayOf(
-            ExactLinear.of(intArrayOf(Term.real(0), Term.real(1)),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
                 listOf(BigFraction.ofLong(2), BigFraction.ofLong(3)), LinearOp.LE, BigFraction.ONE),
             ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
                 doubleArrayOf(2.0, -3.0), LinearOp.LE, 0.0, strict = true),
