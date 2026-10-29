@@ -305,6 +305,30 @@ remain unchecked. Earlier HTTP400 schema rejections created no jobs. These recor
 demonstrate accounting and consumption, not a speedup, independently checked proof,
 memory bound or basis for changing retention/delivery defaults.
 
+
+[9238](https://lab.eignex.com/jobs/9238) isolates two clause-capable CP workers on
+`sporttournament06` at `b81cc434e8`, with the existing `pb-learning=false`
+diagnostic control. All four native records retain a 156-byte learned payload,
+but no clause passes the export filter. The 1,200-second containing job expires
+after preparation, execution and finalization; no independent check receipt is
+available. This is an export-applicability negative, not peer-consumption evidence.
+
+[9257](https://lab.eignex.com/jobs/9257) captures the native/shared observation
+integration at `3d189f2d97` after the root-simplification integration, using the
+same two sources, explicit CP workers and one repeat per retained/reseed control.
+Both workers report `sharedLearningObserved=1`, 224 bytes of shared learned
+index capacity and 80 bytes of shared trail reason index capacity. The shared
+learned payload remains empty in these captures. Each `php4` control imports
+7 and 8 peer clauses; 7 and 4 retained peer imports respectively have consumed
+consequences. Both workers release their seen buffers. Optimization exports no
+clauses; the forced control reports 32 and 27 reseeds and objective -5, versus
+-6 with retention. Its stderr is truncated, so complete work-trace equality
+is unqualified. Process RSS spans 115,544–131,072 KiB. Preparation includes
+315 seconds of compilation and 66 seconds of upload. Native case completion
+provides no independent check receipt or basis for a performance/default claim.
+Additional reason journal, event and root-retirement capacity fields are covered
+by CI at the later source revision.
+
 ## LP capture and replay
 
 The opt-in basis tool uses the [basis corpus](../klause/src/jvmTest/resources/basis-corpus/README.md):
