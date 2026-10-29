@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 
 class ExactContinuationTest {
     @Test
-    fun `early arbitrary precision should avoid abandoned imports under the same ceiling`() {
+    fun `precision selection should preserve cumulative imports under the same ceiling`() {
         val huge = BigFraction.of(BIG_ONE shl 100, BIG_ONE)
         val input = ExactContinuationInput(
             listOf(
@@ -24,12 +24,16 @@ class ExactContinuationTest {
             listOf(0, 1, 2),
             List(3) { ContinuationStatus.BASIC } + List(3) { ContinuationStatus.FIXED },
         )
-        val limits = ExactContinuationLimits(maxImportPivots = 3)
+        val limits = ExactContinuationLimits(maxImportPivots = 3, preserveOverflowCheckpoint = false)
         val fixed = ExactContinuation(input)
         val early = ExactContinuation(input)
 
         val replayed = fixed.resume(limits)
         val direct = early.resume(limits.copy(startArbitraryPrecision = true))
+        val promoted = ExactContinuation(input).resume(limits.copy(preserveOverflowCheckpoint = true))
+        val paused = ExactContinuation(input)
+        val partial = paused.resume(limits.copy(maxImportPivots = 1))
+        val continued = paused.resume(limits.copy(preserveOverflowCheckpoint = true))
         val repeated = fixed.resume(limits.copy(startArbitraryPrecision = true))
 
         assertEquals(ContinuationDecline.IMPORT_LIMIT, replayed.metrics.decline)
@@ -42,6 +46,16 @@ class ExactContinuationTest {
         assertEquals(BigFraction.ONE, point[1] + huge * point[2])
         assertEquals(3, direct.metrics.imports)
         assertEquals(0, direct.metrics.restarts)
+        assertEquals(point, assertNotNull(promoted.values))
+        assertEquals(3, promoted.metrics.imports)
+        assertEquals(1, promoted.metrics.restarts)
+        assertTrue(requireNotNull(promoted.metrics.workByPhase[ContinuationPhase.PROMOTION]) > 0L)
+        assertEquals(point, assertNotNull(continued.values))
+        assertEquals(1, partial.metrics.imports)
+        assertEquals(2, continued.metrics.imports)
+        assertEquals(3, paused.usedImportPivots)
+        assertEquals(partial.metrics.work + continued.metrics.work, paused.usedWork)
+        assertEquals(partial.metrics.allocation + continued.metrics.allocation, paused.usedAllocation)
         assertEquals(ContinuationDecline.IMPORT_LIMIT, repeated.metrics.decline)
         assertEquals(0, repeated.metrics.imports)
         assertEquals(3, fixed.usedImportPivots)
