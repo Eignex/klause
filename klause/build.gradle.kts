@@ -75,8 +75,9 @@ val lpProfileSources = kotlin.sourceSets.create("lpProfile") {
     kotlin.srcDir(rootProject.file("klause-bench/src/lpProfileMain/kotlin"))
 }
 kotlin.targets.withType<org.jetbrains.kotlin.gradle.targets.jvm.KotlinJvmTarget>().configureEach {
+    val main = compilations.getByName("main")
     val profile = compilations.create("lpProfile") {
-        associateWith(compilations.getByName("main"))
+        associateWith(main)
         defaultSourceSet.dependsOn(lpProfileSources)
         defaultSourceSet.kotlin.srcDir(rootProject.file("klause-bench/src/lpProfileJvm/kotlin"))
     }
@@ -84,13 +85,14 @@ kotlin.targets.withType<org.jetbrains.kotlin.gradle.targets.jvm.KotlinJvmTarget>
         dependsOn(profile.compileTaskProvider)
         into(layout.buildDirectory.dir("lp-profile/jvm"))
         from(profile.output.allOutputs) { into("classes") }
-        from(compilations.getByName("main").output.allOutputs) { into("classes") }
+        from(main.output.allOutputs) { into("classes") }
         from(profile.runtimeDependencyFiles) { into("lib") }
     }
 }
 kotlin.targets.withType<org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget>().configureEach {
+    val main = compilations.getByName("main")
     val profile = compilations.create("lpProfile") {
-        associateWith(compilations.getByName("main"))
+        associateWith(main)
         defaultSourceSet.dependsOn(lpProfileSources)
         defaultSourceSet.kotlin.srcDir(rootProject.file("klause-bench/src/lpProfileNative/kotlin"))
     }
