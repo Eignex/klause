@@ -23,7 +23,7 @@ import com.eignex.klause.util.IntArrayList
 internal class PseudoBooleanPropagator(
     override val boolVars: IntArray,
     override val intVars: IntArray,
-    private val weights: LongArray,
+    internal val weights: LongArray,
     val literals: IntArray,
     private val op: PbOp,
     private val bound: Long,
@@ -36,7 +36,7 @@ internal class PseudoBooleanPropagator(
 
     /** Literal indices ordered by descending weight — the greedy pick order for the smallest covering
      *  watch set. Built only in [watched] mode. */
-    private val byWeightDesc: IntArray = if (watched) {
+    internal val byWeightDesc: IntArray = if (watched) {
         (0 until literals.size).sortedByDescending { weights[it] }.toIntArray()
     } else {
         EmptyIntArray

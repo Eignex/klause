@@ -174,6 +174,46 @@ including for direct engine publications. The low-level portfolio API also
 supports caller-trusted unbound workers with an explicit witness checker. Learned
 clauses are exchanged only when at least two backtrack workers exist.
 
+Detailed memory sampling is enabled by the single-lane charged-work diagnostic
+schedule (portfolio-work); ordinary schedules retain inexpensive traffic/work/use
+counters. Clause accounting is reported per worker in `ArmSchedule.sharing.clauses` and as
+`clause*` fields in the CLI arm record. Pool payload and key/origin capacities
+belong to one shared pool; repeated worker observations must not be summed.
+Worker `seenKeys` and `seenCapacityBytes` describe the session-spanning duplicate
+filter, including exported and evicted keys. Its lifetime is the native session,
+not the pool generation. Compaction invalidates the drain cursor but preserves
+that filter. A fresh session releases its backing arrays and reimports the current
+pool; resuming the same session retains both cursor and filter. Retirement drains
+uses, exports remaining glue and releases the filter.
+
+`inspected` counts entries examined, including duplicates, and
+`translatedLiterals` counts imported literals. `importWork` includes drain visits,
+translation scalar visits and immediate native attachment; subsequent fixpoint
+work remains ordinary propagation work. Channel time includes export, compaction,
+accounting and use draining. Memory sampling charges deterministic store/reference
+visits separately as accountingWork to the containing propagation allowance. `uses` drains the existing origin-use counter once,
+sharing that observation with contribution rewards: it counts consumption once per
+reduction window, rather than exports or checks. The retained peer-import and
+consumed-peer-import counts describe distinct live objects, so repeated window
+uses do not imply additional imports.
+
+Learned-store observations include native arena capacity or general clause/PB/row
+payload, policy columns, session watch/queue capacity, pending attachments and
+active or historical antecedent arrays. Session watch capacity includes base
+watches and cannot be added to a separate base-watch estimate. Reason arrays are
+identity-deduplicated within their observation, including saved integer/atom reasons
+and lazy markers/memo results; they can alias learned payload. Reference-slot
+counts describe live entries unless explicitly named capacity. Object headers,
+collection spare reference capacity and allocator overhead are platform-dependent
+and excluded; physical resident memory requires an external process measurement.
+
+Memory fields are boundary samples with individual `peak*` maxima, not an atomic
+process peak or a sum of concurrent high-water marks. `drain*` fields describe
+transient batch storage. Shared-search learned stores and copied reasons report
+separately in their learning statistics. A pool cap bounds its entries, not cumulative
+worker seen keys, learned stores or pinned reasons. Retention and delivery policy
+remain separate from these observations.
+
 ### Exhaustion and metadata
 
 Optimization exhaustion without an incumbent is an original-source refutation only

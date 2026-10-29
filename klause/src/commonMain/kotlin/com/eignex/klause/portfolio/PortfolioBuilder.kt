@@ -320,6 +320,7 @@ object PortfolioBuilder {
             if (clausePeers) {
                 SharedClausePool(
                     concurrency.lock(),
+                    measureMemory = scenario.diagnosticWorkLimit != null,
                     shareMaxLbd = scenario.clauseShareMaxLbd,
                     shareMaxLen = scenario.clauseShareMaxLen,
                 )

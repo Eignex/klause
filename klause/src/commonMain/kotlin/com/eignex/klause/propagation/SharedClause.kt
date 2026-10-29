@@ -43,6 +43,9 @@ class SharedClause internal constructor(
         h
     }
 
+    internal val payloadBytes: Long
+        get() = boolLits.size.toLong() * Int.SIZE_BYTES + atomQuads.size.toLong() * Long.SIZE_BYTES
+
     internal companion object {
         const val QUAD = 4
         private const val SEED = 1_125_899_906_842_597L
@@ -76,6 +79,10 @@ interface ClauseExchange {
      *  could be all-false mid-search); exporting the learned DB is level-independent. Default no-op for
      *  exchanges that publish only at restarts. */
     fun onSearchEnd(session: PropagationSession) {}
+
+    /** Release worker-private exchange state when the owning search is retired, after its final use drain.
+     *  Suspension uses [onSearchEnd] and retains that state for resumption. */
+    fun onSearchClose(session: PropagationSession) {}
 
     /** Publish a globally-valid nogood (an LP Farkas infeasibility certificate) to the shared pool
      *  directly, bypassing the LBD glue filter: it holds for every arm of the same problem regardless

@@ -12,6 +12,8 @@ internal class MutableLongIntMap(initialCapacity: Int = 8) {
     private var used: BooleanArray
     private var mask: Int
 
+    internal val primitiveCapacityBytes: Long get() = keys.size.toLong() * 13L
+
     /** Number of entries currently stored. */
     var size: Int = 0
         private set

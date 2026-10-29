@@ -984,6 +984,12 @@ class PropagationSession private constructor(
      *  not the general database, so clause-database introspection routes differently. */
     val usesNativeSat: Boolean get() = state.nativeEngine != null
 
+    internal fun chargeSharingWork(count: Long) { state.work += count }
+
+    internal val sharingIdentity = Any()
+
+    internal fun sharingMemory(): Map<String, Long> = state.sharingMemory()
+
     internal fun learnedLifecycle(): Map<String, Long> = state.learned.lifecycle.snapshot()
 
     /** Current learned-constraint count, including PB constraints and integer rows. Used to invoke
@@ -1099,6 +1105,7 @@ class PropagationSession private constructor(
      * see [drainImportUses].
      */
     fun importClause(shared: SharedClause, origin: Int = OWN_ORIGIN) {
+        state.work += shared.boolLits.size.toLong() + shared.atomQuads.size
         val lits = IntArray(shared.boolLits.size + shared.atomQuads.size / SharedClause.QUAD)
         var j = 0
         for (l in shared.boolLits) lits[j++] = l

@@ -9,6 +9,8 @@ internal class LongArrayList(initialCapacity: Int = 8) {
     var size: Int = 0
         private set
 
+    internal val allocatedBytes: Long get() = data.size.toLong() * Long.SIZE_BYTES
+
     fun add(value: Long) {
         if (size == data.size) data = data.copyOf(data.size * 2)
         data[size++] = value

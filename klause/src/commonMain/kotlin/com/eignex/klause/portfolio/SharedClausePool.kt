@@ -38,6 +38,7 @@ import com.eignex.kumulant.stream.lock
 internal class SharedClausePool(
     private val lock: Mutex = Concurrency.None.lock(),
     private val cap: Int = DEFAULT_CAP,
+    internal val measureMemory: Boolean = false,
     /** Default LBD bound for the arms' glue export ([PoolClauseExchange]); the pool carries it so
      *  every arm of one portfolio shares a single tunable filter (`--param clause-share-lbd`). */
     val shareMaxLbd: Int = PoolClauseExchange.DEFAULT_MAX_LBD,
@@ -52,6 +53,20 @@ internal class SharedClausePool(
     private val origins = IntArrayList()
     private val keys = LongHashSet()
     private var generation = 0
+    private var payloadBytes = 0L
+    private var compactions = 0L
+
+    internal fun memory(): Map<String, Long> = lock.withLock {
+        mapOf(
+            "poolClauses" to clauses.size.toLong(),
+            "poolPayloadBytes" to payloadBytes,
+            "poolKeyCapacityBytes" to keys.allocatedBytes,
+            "poolOriginCapacityBytes" to origins.backingData.size.toLong() * Int.SIZE_BYTES,
+            "poolReferenceSlots" to clauses.size.toLong() * 2L,
+            "poolGeneration" to generation.toLong(),
+            "poolCompactions" to compactions,
+        )
+    }
 
     /** Append the unseen clauses of [batch] (by key) as published by arm [origin], compacting on overflow.
      *  [isGlobal] marks a globally-published nogood for retention priority over filtered glue. A clause
@@ -60,10 +75,12 @@ internal class SharedClausePool(
         if (batch.isEmpty()) return
         lock.withLock {
             for (c in batch) {
+                if (c.key in keys) continue
                 if (clauses.size >= cap) compact()
                 if (clauses.size >= cap) break
                 if (keys.add(c.key)) {
                     clauses.add(c)
+                    payloadBytes += c.payloadBytes
                     global.add(isGlobal)
                     origins.add(origin)
                 }
@@ -110,7 +127,9 @@ internal class SharedClausePool(
         global.addAll(keptGlobal)
         origins.clear()
         for (i in 0 until keptOrigins.size) origins.add(keptOrigins[i])
+        payloadBytes = clauses.sumOf { it.payloadBytes }
         generation++
+        compactions++
     }
 
     /** A drained batch, the arm that published each of its clauses, and the advanced cursor. */
@@ -155,24 +174,48 @@ internal class PoolClauseExchange(
 ) : ClauseExchange {
     private var cursor = 0L
     private val seen = LongHashSet()
+    private var sessionIdentity: Any? = null
+
+    private fun observe(session: PropagationSession) {
+        val m = meter ?: return
+        if (!pool.measureMemory) return
+        val memory = session.sharingMemory()
+        val work = memory.getValue("memorySampleWork")
+        session.chargeSharingWork(work)
+        m.clauseCount("accountingWork", work)
+        m.clauseMemory(pool.memory() + mapOf(
+            "seenKeys" to seen.size.toLong(),
+            "seenCapacityBytes" to seen.allocatedBytes,
+        ) + memory)
+    }
 
     override fun onRestart(session: PropagationSession) = metered {
         val drained = pool.drainSince(cursor)
         cursor = drained.cursor
         var imported = 0
+        val before = session.work
+        session.chargeSharingWork(drained.clauses.size.toLong())
+        var literalVisits = 0L
         for (i in drained.clauses.indices) {
             val c = drained.clauses[i]
             // An arm's own clause, re-imported into a rebuilt session, earns it nothing.
             val from = drained.origins[i].takeIf { it != origin } ?: SharedClausePool.NO_ORIGIN
             if (seen.add(c.key)) {
+                literalVisits += c.boolLits.size + c.atomQuads.size / SharedClause.QUAD
                 session.importClause(c, from)
                 imported++
             }
         }
+        meter?.clauseCount("inspected", drained.clauses.size.toLong())
+        meter?.clauseCount("translatedLiterals", literalVisits)
+        meter?.clauseCount("importWork", session.work - before)
+        meter?.clauseMemory(mapOf("drainReferenceSlots" to drained.clauses.size.toLong(),
+            "drainOriginBytes" to drained.origins.size.toLong() * Int.SIZE_BYTES))
         meter?.imported(SharingChannel.Clauses, imported, drained.cursor)
         meter?.duplicates(SharingChannel.Clauses, drained.clauses.size - imported)
         countUses(session)
         export(session)
+        observe(session)
     }
 
     override fun onSearchStart(session: PropagationSession) {
@@ -180,19 +223,39 @@ internal class PoolClauseExchange(
         // pool — including this arm's own clauses from earlier sessions, which `seen`/`cursor` would
         // otherwise suppress. Resetting both makes the import unconditional; the pool de-dups any
         // re-export by key.
-        cursor = 0L
-        seen.clear()
+        if (sessionIdentity !== session.sharingIdentity) {
+            cursor = 0L
+            seen.release()
+            sessionIdentity = session.sharingIdentity
+            meter?.clauseCount("sessions", 1L)
+        }
         onRestart(session)
     }
 
     override fun onSearchEnd(session: PropagationSession) = metered {
         countUses(session)
         export(session)
+        observe(session)
+    }
+
+    override fun onSearchClose(session: PropagationSession) = metered {
+        countUses(session)
+        export(session)
+        observe(session)
+        if (sessionIdentity === session.sharingIdentity) {
+            sessionIdentity = null
+            cursor = 0L
+            seen.release()
+            meter?.clauseMemory(mapOf("seenKeys" to 0L, "seenCapacityBytes" to 0L))
+        }
     }
 
     private fun countUses(session: PropagationSession) {
-        val tally = tally ?: return
-        session.drainImportUses { from, uses -> tally.note(Contribution.Clause, from, uses.toDouble()) }
+        if (tally == null && meter == null) return
+        session.drainImportUses { from, uses ->
+            tally?.note(Contribution.Clause, from, uses.toDouble())
+            meter?.clauseCount("uses", uses)
+        }
     }
 
     /** Publish a globally-valid nogood straight to the pool (no LBD/length filter), deduped by the

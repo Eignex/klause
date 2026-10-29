@@ -1,6 +1,8 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.backtrack.BacktrackRecipe
+import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.propagation.SharedClause
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
@@ -107,6 +109,36 @@ class BacktrackWorkerConfigTest {
 
         worker.use { it.improvements({ Double.POSITIVE_INFINITY }, Cancellation.Never).last() }
 
-        assertTrue(SharingChannel.Clauses in assertNotNull(worker.sharingMeter).snapshot().channels)
+        val sharing = assertNotNull(worker.sharingMeter).snapshot()
+        assertTrue(SharingChannel.Clauses in sharing.channels)
+        assertTrue(sharing.clauses.getValue("sessions") > 0L)
+    }
+    @Test
+    fun `a worker should account for a consumed peer import and release its filter`() {
+        val problem = Problem(
+            numBoolVars = 2,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = listOf(
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
+            ),
+        ).bake()
+        val pool = SharedClausePool(measureMemory = true)
+        pool.publish(listOf(SharedClause(intArrayOf(Lit.make(0, true)), LongArray(0), 1)), origin = 1)
+        val worker = BacktrackWorkerConfig(BacktrackCatalog.byLabel("conflictDriven")).materialize(
+            problem, index = 0, armId = 0, seed = 0L, lsLambda = 1.0,
+            objective = LinearObjective(boolWeights = longArrayOf(1L, 1L)),
+            lsObjective = null, definitionalSweep = null, onEvent = null,
+            pools = SharedPools(clauses = pool, cuts = null, bounds = null, varBounds = null),
+        )
+
+        worker.use { it.improvements({ Double.POSITIVE_INFINITY }, Cancellation.Never).last() }
+
+        val stats = assertNotNull(worker.sharingMeter).snapshot()
+        assertTrue(stats.channels.getValue(SharingChannel.Clauses).imported > 0L)
+        assertTrue(stats.clauses.getValue("uses") > 0L)
+        assertTrue(stats.clauses.getValue("peakLearnedPayloadBytes") > 0L)
+        assertEquals(0L, stats.clauses.getValue("seenCapacityBytes"))
     }
 }

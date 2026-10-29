@@ -34,7 +34,16 @@ data class ChannelTraffic(
 data class SharingStats(
     /** Traffic per channel the arm exchanged on. */
     val channels: Map<SharingChannel, ChannelTraffic> = emptyMap(),
+    /** Clause lifecycle observations. Byte fields measure primitive buffers or logical payload, not RSS.
+     *  Pool fields describe a shared owner and must not be summed across workers. */
+    val clauses: Map<String, Long> = emptyMap(),
 ) {
+    /** Construct sharing traffic without clause lifecycle observations. */
+    constructor(channels: Map<SharingChannel, ChannelTraffic> = emptyMap()) : this(channels, emptyMap())
+
+    /** Copy channel traffic while retaining clause observations. */
+    fun copy(channels: Map<SharingChannel, ChannelTraffic> = this.channels): SharingStats = SharingStats(channels, clauses)
+
     /** Nanoseconds spent across every channel. */
     val nanos: Long get() = channels.values.sumOf { it.nanos }
 }

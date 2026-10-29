@@ -12,6 +12,10 @@ internal class MutableIntObjectMap<V>(initialCapacity: Int = 8) {
     private var used: BooleanArray
     private var mask: Int
 
+    internal val primitiveCapacityBytes: Long get() = keys.size.toLong() * 5L
+
+    internal val referenceCapacity: Int get() = values.size
+
     /** Number of entries currently stored. */
     var size: Int = 0
         private set

@@ -68,6 +68,15 @@ internal class LongHashSet(initialCapacity: Int = 8) {
         return out
     }
 
+    internal val allocatedBytes: Long get() = if (used === EMPTY_USED) 0L else keys.size.toLong() * 9L
+
+    internal fun release() {
+        keys = EMPTY_KEYS
+        used = EMPTY_USED
+        mask = 0
+        size = 0
+    }
+
     fun clear() {
         if (used !== EMPTY_USED) used.fill(false)
         size = 0
