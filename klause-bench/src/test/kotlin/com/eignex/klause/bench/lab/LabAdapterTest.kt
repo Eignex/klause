@@ -40,6 +40,20 @@ class LabAdapterTest {
         assertFailsWith<IllegalArgumentException> { LabSettings(mapOf(key to value)) }
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = ["default,+table-substitution", "off,+affine", "aggressive,-structural"])
+    fun `presolve pass controls should reach the subprocess unchanged`(spec: String) {
+        val settings = LabSettings(mapOf("presolve" to spec))
+
+        assertEquals(spec, settings.caseParameters("cp", 3)["presolve"])
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["default,+missing", "default,affine", "off,-missing"])
+    fun `unknown presolve pass controls should fail before planning`(spec: String) {
+        assertFailsWith<IllegalArgumentException> { LabSettings(mapOf("presolve" to spec)) }
+    }
+
     @Test
     fun `case resource ceilings include compilation and subprocess shutdown`() {
         val settings = LabSettings(mapOf("timeout-ms" to "1000", "compile-timeout-sec" to "30", "cpus" to "2"))
