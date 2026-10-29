@@ -3,6 +3,7 @@ package com.eignex.klause.lp.relaxation
 import com.eignex.klause.lp.cut.SourceCut
 import com.eignex.klause.lp.cut.orNull
 import com.eignex.klause.lp.engine.Cut
+import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.lp.engine.CutProvenance
 import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.ExactLpColumn
@@ -29,7 +30,7 @@ internal class LpCutEdit(
     fun commit() = publish()
 }
 
-internal class LpRetainedCuts {
+internal class LpRetainedCuts(private val observe: (CutFamily, String) -> Unit = { _, _ -> }) {
     private class Binding(val id: Long, val source: SourceCut, val numeric: Cut) {
         val numericKey: String = numeric.key()
         val proof: CutProvenance get() = requireNotNull(numeric.provenance)
@@ -49,7 +50,10 @@ internal class LpRetainedCuts {
         require(targetDepth in 0..depth)
         check(generation < Long.MAX_VALUE)
         while (trail.isNotEmpty() && trail.last().depth > targetDepth) {
-            bindings = trail.removeAt(trail.lastIndex).previous
+            val previous = trail.removeAt(trail.lastIndex).previous
+            val kept = previous.mapTo(HashSet()) { it.id }
+            for (binding in bindings) if (binding.id !in kept) observe(binding.numeric.family, "SCOPE_POP")
+            bindings = previous
         }
         depth = targetDepth
         updateStorage()
@@ -89,7 +93,7 @@ internal class LpRetainedCuts {
             val columns = IntArray(cut.cols.size) { remap.column(cut.cols[it]).also { column -> check(column >= 0) } }
             if (columns.contentEquals(cut.cols)) previous else {
                 Binding(previous.id, previous.source, Cut(columns, cut.coeffs, cut.rel, cut.rhs,
-                    cut.global, previous.proof))
+                    cut.global, previous.proof, family = cut.family))
             }
         }
         val next = bindings.map {
@@ -168,6 +172,11 @@ internal class LpRetainedCuts {
             check(generation == expectedGeneration) { "stale cut edit" }
             if (changed && state.depth > 0 && trail.lastOrNull()?.depth != state.depth) {
                 trail.add(Change(state.depth, bindings))
+            }
+            for (binding in bindings) if (binding.id in retired) observe(binding.numeric.family, "PREMISE_OR_SELECTION")
+            val priorIds = bindings.mapTo(HashSet()) { it.id }
+            for (binding in next) if (binding.id !in priorIds) {
+                observe(binding.numeric.family, "INSTALLED")
             }
             bindings = next.toList()
             depth = state.depth

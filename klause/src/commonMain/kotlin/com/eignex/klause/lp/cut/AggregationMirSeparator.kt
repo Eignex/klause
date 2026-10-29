@@ -7,6 +7,7 @@ import com.eignex.klause.factor.bool.internals.permitsLongPseudoBoolean
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lp.engine.Cut
+import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.util.CheckedLongOverflowException
@@ -36,6 +37,8 @@ import com.eignex.klause.util.mulExact
  * [FlowCoverSeparator].
  */
 internal class AggregationMirSeparator : CutSeparator {
+    override val family: CutFamily = CutFamily.AGGREGATION_MIR
+
     private val tol = 1e-6
 
     /** A `≤`-row over shifted nonnegative variables `y_j = x_j − lo_j`: `Σ a[k]·y_{cols[k]} ≤ b`. */

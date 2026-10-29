@@ -3,6 +3,7 @@ package com.eignex.klause.lp.cut
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.CutAuxiliaryDefinition
 import com.eignex.klause.lp.engine.CutExpression
+import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.lp.engine.CutPremise
 import com.eignex.klause.lp.engine.CutProofFact
 import com.eignex.klause.lp.engine.CutProvenance
@@ -79,6 +80,7 @@ internal fun CutProvenance.retainReferencedDefinitions(additional: CutExpression
         rules,
         conclusion,
         definitions.filterKeys { it in referenced },
+        family,
     )
 }
 
@@ -143,6 +145,7 @@ internal class SourceCut(
     val relation: Relation,
     val rhs: BigFraction,
     val provenance: CutProvenance,
+    val family: CutFamily = provenance.family,
 ) {
     val key: String by lazy(LazyThreadSafetyMode.PUBLICATION) {
         val definitions = provenance.auxiliaryDefinitions
@@ -247,6 +250,7 @@ internal class SourceCut(
             provenance.rules,
             conclusion,
             provenance.auxiliaryDefinitions,
+            family,
         )
         if (!limits.accepts(proof)) return CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT)
         return CutMapping.Mapped(
@@ -257,6 +261,7 @@ internal class SourceCut(
                 integers.last().toLongExact(),
                 global = proof.global,
                 provenance = proof,
+                family = family,
             ),
         )
     }
@@ -473,8 +478,9 @@ private class SourceCutMapper(
             rules,
             CutPremise.Row(inequality, cut.rel, BigFraction.ofLong(cut.rhs)),
             auxiliary,
+            cut.family,
         ).retainReferencedDefinitions(inequality) ?: decline(CutMappingDecline.MISSING_SOURCE)
         if (!limits.accepts(proof)) decline(CutMappingDecline.ARITHMETIC_LIMIT)
-        return CutMapping.Mapped(SourceCut(inequality, cut.rel, BigFraction.ofLong(cut.rhs), proof))
+        return CutMapping.Mapped(SourceCut(inequality, cut.rel, BigFraction.ofLong(cut.rhs), proof, cut.family))
     }
 }

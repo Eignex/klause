@@ -20,6 +20,7 @@ import com.eignex.klause.lp.relaxation.withCpBounds
 import com.eignex.klause.lp.relaxation.withModel
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.result.LpPhaseStats
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomPremise
@@ -36,7 +37,10 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
     private var persistentState = false
     private var sourceRelaxer: CpToLpRelaxation? = null
     private var sources: LpRetainedSources? = null
-    private var cuts = LpRetainedCuts()
+    private fun newCuts() = LpRetainedCuts { family, outcome ->
+        engine.sink.lp.cutLifecycle.event(family, "ROW_LIFECYCLE", outcome)
+    }
+    private var cuts = newCuts()
     var branching: ((SearchContext) -> List<SearchDecision>?)? = null
     var fractional: ((SearchContext) -> LpFractionalBranch?)? = null
     var currentModel: LpModel? = null
@@ -88,7 +92,7 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         currentModel = null
         sourceRelaxer = null
         sources = null
-        cuts = LpRetainedCuts()
+        cuts = newCuts()
     }
 
     fun resetRoot() {
@@ -106,7 +110,7 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         persistentState = false
         sourceRelaxer = null
         sources = null
-        cuts = LpRetainedCuts()
+        cuts = newCuts()
         currentModel = null
         engine.propagator.reset()
     }
@@ -201,7 +205,7 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         if (base.model.hasContinuous || base.model.doubleView != null || base.model.exactState != null) return null
         if (native !== session) {
             engine.propagator.reset()
-            cuts = LpRetainedCuts()
+            cuts = newCuts()
             native = session
         }
         val core = engine.propagator
@@ -230,7 +234,7 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         // Standalone callers may replace a root or sibling without delivering shared retract events.
         if (weakens) {
             if (!core.resetRoot()) {
-                cuts = LpRetainedCuts()
+                cuts = newCuts()
                 if (!core.install(base, base.authoritativeWithTemplates(engine.params.cancellation) {
                         engine.sink.lp.observeTemplateUse(exactBounds = it)
                     } ?: return null)
@@ -272,7 +276,20 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         val edit = cuts.prepare(before, base.withModel(base.model, map), selected, engine.params.cancellation)
             ?: return null
         engine.noteNodeOverhead(edit.emittedExtent * LpNodeOverhead.BUILD)
-        if (!core.editCuts(edit)) return null
+        val beforeMetrics = core.metrics
+        val applied = try {
+            core.editCuts(edit)
+        } finally {
+            core.metrics?.let { after ->
+                if (beforeMetrics != null) engine.sink.lp.cutLifecycle.shared("OWNER_EDIT", LpPhaseStats(calls = 1L,
+                    work = after.preparationWork - beforeMetrics.preparationWork,
+                    outcomes = mapOf("CREATED" to after.createdOwners - beforeMetrics.createdOwners,
+                        "CLOSED" to after.closedOwners - beforeMetrics.closedOwners,
+                        "DECLINED" to after.editDeclines - beforeMetrics.editDeclines,
+                        "RETIRED_ROWS" to edit.retired.size.toLong(), "ADDED_ROWS" to edit.rows.size.toLong())))
+            }
+        }
+        if (!applied) return null
         val state = requireNotNull(core.state)
         val model = if (state === before) base.model else state.ownerWorkingModel() ?: return null
         val parents = cuts.parentRows(state)

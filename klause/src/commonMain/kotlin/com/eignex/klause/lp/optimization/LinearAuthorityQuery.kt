@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.optimization
 
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.evidence.IntegerPinStatus
@@ -31,6 +32,7 @@ internal class LinearAuthorityQuery private constructor(
     val cutMask: Set<Int>?,
     val checkedCuts: Set<Int>,
     val installedCuts: Set<Int>,
+    val cutFamilies: Map<Int, CutFamily>,
 ) {
     val context: SourceProofContext = source.withLinearAuthority()
     val closureRows: List<ExactRationalInequality> = rows.map {
@@ -53,6 +55,7 @@ internal class LinearAuthorityQuery private constructor(
             onCutWork: (Long) -> Unit = {},
             cutMask: Set<Int>? = null,
             consequences: List<SourceEvidence> = emptyList(),
+            onCut: (CutFamily, String, Long) -> Unit = { _, _, _ -> },
         ): LinearAuthorityQuery? {
             val coordinates = template?.coordinates ?: source.numericCoordinates()
             val numeric = template?.numeric ?: source.numericContext()
@@ -93,10 +96,18 @@ internal class LinearAuthorityQuery private constructor(
             onCutWork(cutVerificationWork)
             val accepted = active.indices.filter { checks[it] == SourceEvidenceCheck.Checked }
                 .mapTo(HashSet()) { active[it] }
+            val cutFamilies = HashMap<Int, CutFamily>()
             for ((id, cut) in cuts.withIndex()) {
                 if (cancellation()) return null
+                onCut(cut.family, when {
+                    id !in active -> "INACTIVE_PREMISE"
+                    id !in accepted -> "VERIFICATION_DECLINED"
+                    cutMask != null && id !in cutMask -> "UNSELECTED"
+                    else -> "INSTALLED"
+                }, 1L)
                 if (cutMask != null && id !in cutMask) continue
                 if (id in accepted && (cutMask == null || id in cutMask)) {
+                    cutFamilies[cited.size] = cut.family
                     activeCuts++
                     if (cut.mixed) activeMixedCuts++
                 } else inactive += cited.size
@@ -126,7 +137,8 @@ internal class LinearAuthorityQuery private constructor(
             val costs = coordinates.map { sign * (numeric.objective[it] ?: BigFraction.ZERO) }
             return LinearAuthorityQuery(source, coordinates, cited, rows, inactive, unconditional && inactive.isEmpty(),
                 costs, numeric.objectiveConstant * sign, sign, template?.cuts != null, activeCuts, activeMixedCuts,
-                cutMask?.toSet(), accepted.toSet(), accepted.filterTo(HashSet()) { cutMask == null || it in cutMask })
+                cutMask?.toSet(), accepted.toSet(), accepted.filterTo(HashSet()) { cutMask == null || it in cutMask },
+                cutFamilies.toMap())
         }
     }
 }

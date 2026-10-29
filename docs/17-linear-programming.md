@@ -252,6 +252,24 @@ count, and root and node separation keep their round, depth, pool and work
 allowances. The [portfolio](12-portfolio.md#lp-arm-admission) decides when
 an aggressive LP companion runs.
 
+Cut family identity follows portable proofs and retained rows without contributing
+to proof authority or deduplication. Finite root and node phases distinguish
+construction, mapping refusal, admission, efficacy selection, tightness observations,
+capacity or inactivity retirement, and premise or scope retraction. A tight or
+selected row establishes no deduction. Nonzero exact certificate support is reported
+separately when a checked bound, conflict or reduced-cost deduction is consumed.
+Source traversal likewise distinguishes installed rows, checked combinations and
+actual bound or conflict closures.
+
+Per-family solve and certificate observations are inclusive containing costs:
+several participating families share the same solve, factor construction and exact
+attempt. They overlap each other and the ordinary LP totals and must not be added
+together. Failed reconstruction, continuation import, refinement and basis work keep
+their existing charges and decline reasons. Assembly and factor-fill observations
+include replacement owners; compatible component reuse is distinct from another
+solve. Telemetry retains aggregate counters by the fixed family and recipe set,
+without retaining cut histories or granting additional numerical allowances.
+
 Explicit bound-ordered sparse frontiers consume single-row Chvatal–Gomory rounding
 and bounded mixed-integer residual rounding.
 Other guidance calls can opt in through the adapter. The adapter

@@ -99,6 +99,7 @@ internal class CutProvenance(
     rules: List<CutRoundingRule> = emptyList(),
     val conclusion: CutPremise.Row? = null,
     auxiliaryDefinitions: Map<CutSource, CutAuxiliaryDefinition> = emptyMap(),
+    val family: CutFamily = CutFamily.UNSPECIFIED,
 ) {
     private val factSnapshot = facts.distinct().toList()
     private val assumptionSnapshot = assumptions.toSet()
@@ -132,8 +133,12 @@ internal class CutProvenance(
             },
             conclusion?.let { it.copy(expression = it.expression.remapSources(mapping)) },
             definitions,
+            family,
         )
     }
+
+    fun withFamily(value: CutFamily): CutProvenance =
+        CutProvenance(model, epoch, facts, assumptions, rules, conclusion, auxiliaryDefinitions, value)
 }
 
 private fun CutPremise.storageUnits(): Long = when (this) {

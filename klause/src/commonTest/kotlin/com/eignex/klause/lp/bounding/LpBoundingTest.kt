@@ -45,14 +45,14 @@ import kotlin.test.assertTrue
 
 class LpBoundingTest {
     // Optimum 3 at (1,1,1); the separable per-term bound sees only zero minima, so only the LP prunes.
-    private fun triangle(): Problem = Problem(
+    private fun triangle(rhs: Int = 2): Problem = Problem(
         numBoolVars = 0,
         numIntVars = 3,
         intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5)),
         factors = arrayOf<Factor>(
-            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2),
-            Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 2),
-            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 2),
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, rhs),
+            Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, rhs),
+            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, rhs),
         ),
     )
 
@@ -100,6 +100,21 @@ class LpBoundingTest {
         )
         assertTrue(result is MinimizeResult.Optimal)
         assertEquals(3.0, result.objectiveValue)
+    }
+
+    @Test
+    fun `fractional root cuts should expose construction and containing solve work`() {
+        val result = BacktrackSolver(triangle(3).bake()).minimize(sumObjective,
+            BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, cuts = true)))
+
+        assertIs<MinimizeResult.Optimal>(result)
+        assertEquals(5.0, result.objectiveValue)
+        val phases = result.stats.lp.phases
+        assertTrue(phases.keys.any { it.startsWith("CUT_ROOT_") && it.endsWith("CONSTRUCTION") })
+        assertTrue(phases.any { (key, value) -> key.startsWith("CUT_ROOT_") &&
+            key.endsWith("ADMISSION") && (value.outcomes["ADMITTED"] ?: 0L) > 0L })
+        assertTrue(phases.any { (key, value) -> key.startsWith("CUT_ROOT_") &&
+            key.endsWith("SOLVE") && value.work > 0L })
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.optimization
 
+import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
@@ -23,6 +24,7 @@ internal class LinearAuthorityCut(
     val derivation: SourceDerivation,
     val mixed: Boolean = false,
     owners: Set<Int> = setOf(owner),
+    val family: CutFamily = if (mixed) CutFamily.SOURCE_MIXED_ROUNDING else CutFamily.SOURCE_ROUNDING,
 ) {
     val owners: Set<Int> = owners.toSet()
 

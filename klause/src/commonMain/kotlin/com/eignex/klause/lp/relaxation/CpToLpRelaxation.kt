@@ -1363,7 +1363,8 @@ internal class CpToLpRelaxation(
                     } else {
                         sources
                     }
-                    SourceCut(conclusion.expression, conclusion.relation, conclusion.rhs, proof).toCut(active).orNull()
+                    SourceCut(conclusion.expression, conclusion.relation, conclusion.rhs, proof, candidate.family)
+                        .toCut(active).orNull()
                         ?: continue
                 } else {
                     if (proof?.auxiliaryDefinitions?.any { (source, definition) ->
