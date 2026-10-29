@@ -33,7 +33,9 @@ class ClauseDbTest {
                         tieredLearnedDb = tiered,
                         learnedMemoryWork = if (mode == "work") 0L else 10_000L,
                         learnedMemoryScratchBytes = if (mode == "scratch") 0L else 10_000L,
-                        cancellation = Cancellation { mode == "cancelled" || (mode == "scan" && session.work - before >= 28L) },
+                        cancellation = Cancellation {
+                            mode == "cancelled" || (mode == "scan" && session.work - before >= 28L)
+                        },
                         onEvent = { events.add(it) },
                     )
 

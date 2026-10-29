@@ -238,10 +238,10 @@ internal fun PropagationState.noteLearnedUse(fid: Int) {
  * Cost is amortised across infrequent calls (typically once per restart).
  */
 internal fun PropagationState.forgetLearnedClauses(
-    keep: (learnedIndex: Int, lbd: Int) -> Boolean,
     maxWork: Long = 65_536L,
     maxScratchBytes: Long = 1_048_576L,
     cancelled: () -> Boolean = { false },
+    keep: (learnedIndex: Int, lbd: Int) -> Boolean,
 ): Boolean {
     val budget = ReclamationPreparation(maxWork, maxScratchBytes, cancelled) { work += it }
     val retained = try {

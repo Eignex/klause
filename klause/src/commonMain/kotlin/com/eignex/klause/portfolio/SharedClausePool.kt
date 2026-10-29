@@ -285,12 +285,22 @@ internal class SharedClausePool(
         fun additionalPayload(clause: SharedClause, budget: Budget): Long {
             if (size == 0) return clause.payloadBytes
             var bytes = 0L
-            if (owners[ownerSlot(clause.boolLits, budget)] == null) bytes += clause.boolLits.size.toLong() * Int.SIZE_BYTES
-            if (owners[ownerSlot(clause.atomQuads, budget)] == null) bytes += clause.atomQuads.size.toLong() * Long.SIZE_BYTES
+            if (owners[ownerSlot(clause.boolLits, budget)] == null) {
+                bytes += clause.boolLits.size.toLong() * Int.SIZE_BYTES
+            }
+            if (owners[ownerSlot(clause.atomQuads, budget)] == null) {
+                bytes += clause.atomQuads.size.toLong() * Long.SIZE_BYTES
+            }
             return bytes
         }
 
-        fun append(clause: SharedClause, isGlobal: Boolean, origin: Int, budget: Budget, limit: Long = Long.MAX_VALUE): Boolean {
+        fun append(
+            clause: SharedClause,
+            isGlobal: Boolean,
+            origin: Int,
+            budget: Budget,
+            limit: Long = Long.MAX_VALUE,
+        ): Boolean {
             val key = keySlot(clause.key, budget)
             val boolOwner = ownerSlot(clause.boolLits, budget)
             val atomOwner = ownerSlot(clause.atomQuads, budget, if (owners[boolOwner] == null) boolOwner else -1)

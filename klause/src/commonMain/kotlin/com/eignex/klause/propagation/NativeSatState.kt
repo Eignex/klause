@@ -394,7 +394,11 @@ internal class NativeSatState(private val state: PropagationState) {
      * clauses keep their drifted watch positions, and every watch-list entry naming a learned handle is
      * remapped or removed. Called at a restart boundary to bound the learned database.
      */
-    internal fun prepareReclamation(budget: ReclamationPreparation, retained: BooleanArray, keep: (Int, Int) -> Boolean) {
+    internal fun prepareReclamation(
+        budget: ReclamationPreparation,
+        retained: BooleanArray,
+        keep: (Int, Int) -> Boolean,
+    ) {
         for (i in 0 until learnedCount) {
             budget.visit()
             retained[i] = retained[i] || learnedPermanent[i] == 1 || keep(i, learnedLbd[i])
@@ -498,7 +502,9 @@ internal class NativeSatState(private val state: PropagationState) {
             if (clauseLen(baseCount + i) == 1) learnedUnits.add(baseCount + i)
         }
         for (column in listOf(learnedLits, learnedStarts, learnedLbd, learnedPermanent, learnedTier,
-            learnedUsed, lifecycleStages, learnedUnits, rechecks, learnedOrigin, learnedScanPos, learnedWatchPos)) column.trim()
+            learnedUsed, lifecycleStages, learnedUnits, rechecks, learnedOrigin, learnedScanPos, learnedWatchPos)) {
+            column.trim()
+        }
     }
 
     private fun pinUnit(h: Int, unitIdx: Int): Boolean {

@@ -1045,7 +1045,7 @@ class PropagationSession private constructor(
      *  restart hook to bound the learned-clause database. */
     fun forgetLearnedClauses(keep: (learnedIndex: Int, lbd: Int) -> Boolean) {
         val before = learnedClauseCount
-        state.forgetLearnedClauses(keep, cancelled = { cancelRequested })
+        state.forgetLearnedClauses(cancelled = { cancelRequested }, keep = keep)
         if (learnedClauseCount != before) learnedClauseRevision++
     }
 
@@ -1102,7 +1102,8 @@ class PropagationSession private constructor(
         val before = sample().completeValues ?: return LearnedReclamation(
             if (cancelRequested) ReclamationStatus.CANCELLED else ReclamationStatus.DEFERRED, work = work - start)
         val beforeBytes = bytes(before)
-        val floor = before.getValue("protectedPrimitiveBytes") + before.getValue("protectedReferenceSlots") * Long.SIZE_BYTES
+        val floor = before.getValue("protectedPrimitiveBytes") +
+            before.getValue("protectedReferenceSlots") * Long.SIZE_BYTES
         if (beforeBytes <= softLimitBytes) return LearnedReclamation(ReclamationStatus.WITHIN_LIMIT,
             beforeBytes, beforeBytes, floor, work - start)
         if (fixpointCancelled || inprocessingRootPending || publicationPending) return LearnedReclamation(
@@ -1110,8 +1111,8 @@ class PropagationSession private constructor(
             protectedLimitExceeded = floor > softLimitBytes)
         releaseBuffers()
         val count = learnedClauseCount
-        val published = state.forgetLearnedClauses({ _, _ -> false },
-            (maxWork - (work - start)).coerceAtLeast(0L), maxScratchBytes, { cancelRequested })
+        val published = state.forgetLearnedClauses(
+            (maxWork - (work - start)).coerceAtLeast(0L), maxScratchBytes, { cancelRequested }, { _, _ -> false })
         if (learnedClauseCount != count) learnedClauseRevision++
         if (!published) return LearnedReclamation(
             if (cancelRequested) ReclamationStatus.CANCELLED else ReclamationStatus.DEFERRED,
@@ -1123,7 +1124,8 @@ class PropagationSession private constructor(
         }
         return LearnedReclamation(
             when {
-                learnedClauseCount < count || (afterBytes != null && afterBytes < beforeBytes) -> ReclamationStatus.RECLAIMED
+                learnedClauseCount < count || (afterBytes != null && afterBytes < beforeBytes) ->
+                    ReclamationStatus.RECLAIMED
                 afterFloor != null && afterFloor > softLimitBytes -> ReclamationStatus.PROTECTED_FLOOR
                 else -> ReclamationStatus.DEFERRED
             }, beforeBytes, afterBytes, afterFloor ?: floor, work - start,
