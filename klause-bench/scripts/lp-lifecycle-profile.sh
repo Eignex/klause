@@ -19,7 +19,17 @@ source_revision="${source_identity##*@}"
 [[ "$source_revision" =~ ^[a-f0-9]{40}$ && "$expected" =~ ^[a-f0-9]{64}$ ]] || exit 2
 mkdir -p "$OUT"
 cp "$manifest" "$OUT/basis-manifest.json"
-curl -fsSL --max-time 30 "https://raw.githubusercontent.com/ERGO-Code/HiGHS/$source_revision/${source_path#HiGHS/}" -o "$OUT/source.mps"
+source_repository="$(mktemp -d)"
+trap 'rm -rf "$source_repository"' EXIT
+git -C "$source_repository" init -q
+git -C "$source_repository" remote add origin https://github.com/ERGO-Code/HiGHS.git
+git -C "$source_repository" config remote.origin.promisor true
+git -C "$source_repository" config remote.origin.partialclonefilter blob:none
+timeout 30 git -C "$source_repository" fetch -q --depth=1 --filter=blob:none origin "$source_revision"
+git -C "$source_repository" rev-parse FETCH_HEAD > "$OUT/source-revision.txt"
+timeout 30 git -C "$source_repository" show "FETCH_HEAD:${source_path#HiGHS/}" > "$OUT/source.mps"
+rm -rf "$source_repository"
+trap - EXIT
 printf '%s  %s\n' "$expected" "$OUT/source.mps" | sha256sum --check
 source64="$(base64 < "$OUT/source.mps" | tr -d '\n')"
 args=("source64=$source64" "source=$source_identity" "sha256=$expected" "repeats=$repeats")

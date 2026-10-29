@@ -397,8 +397,8 @@ not be summed. Feasibility repair includes its transforms, pricing and updates;
 violation scans have a separate nested observation. Checkpoint wall time,
 including suspended caller time, is reported separately from repair. Query
 time less floating time includes certificate work, query scaffolding and bounded
-completion-trace materialization. The observation-disabled control retains that
-diagnostic overhead in the comparison. Record emission follows each query and
+completion-trace materialization. The enabled/disabled comparison includes that
+diagnostic overhead. Record emission follows each query and
 enters the containing lifecycle time. The separate active total excludes record
 emission. Preparation and edit
 phase deltas include operations on retiring and replacement engines; invocation
