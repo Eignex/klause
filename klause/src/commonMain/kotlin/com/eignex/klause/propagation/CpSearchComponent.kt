@@ -607,7 +607,7 @@ class CpSearchComponent(
                     )
 
                     is ConflictAnalyzer.AnalysisResult.LearnedIntegerRow ->
-                        this@CpSearchComponent.session.addLearnedIntegerRow(learned.row, learned.lbd)
+                        this@CpSearchComponent.session.addLearnedIntegerRow(learned)
                 }
             }
             lastResult = result

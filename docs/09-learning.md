@@ -349,8 +349,14 @@ The registry admits at most 4,096 atoms; an exhausted registry stops the travers
 as indeterminate. Without names, a non-root integer decision cannot supply a
 shared premise and mapped admission must decline.
 
-Rows share the learned store and integer bounds propagation. Eager reasons freeze
-the historical clause premises without a compactable lazy factor id. Integer bound
+Rows share the learned store and integer bounds propagation. A successful ordinary
+row assertion also retains its first-UIP clause in that native store. The two
+constraints can prune different branches; their deductions publish together from
+the undo position before either assertion. They follow their own ordinary retention
+policies and reason protection.
+
+Eager reasons freeze the historical clause premises without a compactable lazy
+factor id. Integer bound
 event subscriptions wake rows after undo and are remapped or removed on forgetting.
 A live bound reason or a reason saved in undo protects its row from retirement;
 after those references retract, retirement removes its guard and endpoint subscriptions.

@@ -43,6 +43,29 @@ import kotlin.test.assertTrue
 
 class IntegerConflictLearnerTest {
     @Test
+    fun `a paired arithmetic assertion should publish both row and clause deductions`() {
+        val native = PropagationSession(Problem(2, 3,
+            arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)), arrayOf(
+                Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+                Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
+            )), pbLearning = false).apply { enableIntegerRowLearning() }
+        assertIs<PropagationResult.Implied>(native.pinIntAtMost(2, 7))
+        val row = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0, 2),
+            longArrayOf(4, -1), intArrayOf(0, 2), LinearOp.LE, 0), useLo = true))
+        val fallback = ConflictAnalyzer.AnalysisResult.Learned(intArrayOf(Lit.make(0, true)),
+            backjumpLevel = 0, lbd = 1, decisionLevels = intArrayOf(0))
+        val learned = ConflictAnalyzer.AnalysisResult.LearnedIntegerRow(row,
+            backjumpLevel = 1, lbd = 2, decisionLevels = intArrayOf(0, 1), fallbackClause = fallback)
+
+        val result = assertIs<PropagationResult.Implied>(native.addLearnedIntegerRow(learned))
+
+        assertEquals(1L, result.intMaxOrNullCompat(0))
+        assertEquals(true, result.boolValueOrNull(0))
+    }
+
+    @Test
     fun `prepared optimization should consume a guarded arithmetic consequence`() {
         val program = parseFlatZinc("""
             var bool: active;

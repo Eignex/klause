@@ -1352,7 +1352,7 @@ internal class ResumableMinimize(
                 }
 
                 is com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.LearnedIntegerRow -> {
-                    this@ResumableMinimize.session.addLearnedIntegerRow(learned.row, learned.lbd)
+                    this@ResumableMinimize.session.addLearnedIntegerRow(learned)
                 }
             }
             return when (result) {
