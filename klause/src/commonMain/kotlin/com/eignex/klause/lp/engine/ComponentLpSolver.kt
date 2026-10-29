@@ -691,7 +691,6 @@ internal class ComponentLpSolver(
             }
         }
         val basic = IntArray(model.m)
-        var at = 0
         for (index in parts.indices) {
             val part = parts[index]
             val sub = part.model
@@ -703,8 +702,9 @@ internal class ComponentLpSolver(
                 val parent = if (column < sub.n) part.cols[column] else model.slackCol(part.rows[column - sub.n])
                 status[parent] = basis.status[column]
             }
-            for (column in basis.basicVars) {
-                basic[at++] = if (column < sub.n) part.cols[column] else model.slackCol(part.rows[column - sub.n])
+            for (row in basis.basicVars.indices) {
+                val column = basis.basicVars[row]
+                basic[part.rows[row]] = if (column < sub.n) part.cols[column] else model.slackCol(part.rows[column - sub.n])
             }
         }
         return Basis(basic, status, captureEligible = false)
