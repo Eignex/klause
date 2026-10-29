@@ -11,6 +11,7 @@ import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.magnitudeBitLength
 import com.eignex.klause.util.plus
 import com.eignex.klause.util.shl
 import com.eignex.klause.util.toLongExact
@@ -1464,7 +1465,11 @@ internal class LpCounterResults {
     }
 
     fun read(model: LpModel, policy: LpCertificationPolicy): CertifiedLpResult? {
-        val current = keyOf(model)
+        val exact = model.exactState
+        if (exact != null && state === exact && acceptedBy === policy &&
+            policy === ProductionLpCertificationPolicy
+        ) return evidence
+        val current = if (exact == null) keyOf(model) else null
         if (policy !== ProductionLpCertificationPolicy || current == null ||
             key?.contentEquals(current) != true || acceptedBy !== policy || state !== model.exactState
         ) {
@@ -1478,11 +1483,14 @@ internal class LpCounterResults {
     }
 
     fun remember(model: LpModel, result: CertifiedLpResult, policy: LpCertificationPolicy) {
-        val current = keyOf(model) ?: run {
+        if (policy !== ProductionLpCertificationPolicy || (result.witness == null && result.bound == null)) return
+        val exact = model.exactState
+        val current = if (exact == null) keyOf(model) else null
+        if ((exact == null && current == null) || (exact != null && !admitsPackage(model, result))) {
             declineStorage()
             return
         }
-        if (policy !== ProductionLpCertificationPolicy || (result.witness == null && result.bound == null)) return
+        storageDeclined = false
         state = model.exactState
         key = current
         // No float vectors, lazy model views, candidate rejections or infeasibility claims are cached.
@@ -1491,6 +1499,24 @@ internal class LpCounterResults {
     }
 
     private fun keyOf(model: LpModel): ByteArray? = exactLpStateKey(model).also { storageDeclined = it == null }
+
+    private fun admitsPackage(model: LpModel, result: CertifiedLpResult): Boolean {
+        // Immutable state identity already covers all source rows, premises, bounds and objective authority.
+        // Reserve the retained vectors and support separately from that shared authority.
+        val units = model.m.toLong() * 2L + model.numVars.toLong() * 4L + (result.witness?.primal?.size ?: 0)
+        if (units > MAX_COUNTER_KEY_VALUES) return false
+        var bytes = units * 8L
+        fun admits(value: BigFraction): Boolean {
+            bytes += (value.num.magnitudeBitLength().toLong() + value.den.magnitudeBitLength() + 7L) / 8L
+            return bytes <= 64L * 1024L
+        }
+        if (result.witness?.let { point -> !admits(point.objective) || point.primal.any { !admits(it) } } == true) {
+            return false
+        }
+        return result.bound?.let { bound ->
+            admits(bound.value) && bound.dualMultipliers?.all(::admits) != false
+        } != false
+    }
 }
 
 internal fun exactLpStateKey(model: LpModel): ByteArray? {

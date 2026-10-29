@@ -100,7 +100,7 @@ class LpClaimTest {
     }
 
     @Test
-    fun `oversized checked result keys should decline storage without changing the bound`() {
+    fun `unchanged immutable authority should reuse a bound beyond the serialized key limit`() {
         val model = LpBuilder().apply { repeat(1024) { addVar(0L, 3L, cost = 1L) } }.build(Sense.MINIMIZE)
         val state = LpExactState(assertNotNull(model.authoritativeModel()))
         LpScopedSolver(state).use { owner ->
@@ -110,10 +110,38 @@ class LpClaimTest {
 
             assertEquals(BigFraction.ZERO, first.lowerBound)
             assertEquals(first.lowerBound, repeated.lowerBound)
-            assertTrue(owner.checkedResultStorageDeclined)
-            assertFalse(repeated.certificationReused)
+            assertFalse(owner.checkedResultStorageDeclined)
+            assertTrue(repeated.certificationReused)
             assertNull(repeated.witness)
         }
+    }
+
+    @Test
+    fun `checked packages should decline oversized retained vectors`() {
+        val model = LpBuilder().apply { repeat(1025) { addVar(0L, 3L, cost = 1L) } }.build(Sense.MINIMIZE)
+        val state = LpExactState(assertNotNull(model.authoritativeModel()))
+        LpScopedSolver(state).use { owner ->
+            val first = assertNotNull(owner.solve(claim = LpClaim.BOUND))
+
+            val repeated = assertNotNull(owner.solve(claim = LpClaim.BOUND))
+
+            assertEquals(first.lowerBound, repeated.lowerBound)
+            assertTrue(owner.checkedResultStorageDeclined)
+            assertFalse(repeated.certificationReused)
+        }
+    }
+
+    @Test
+    fun `a separate immutable state should not inherit a checked package`() {
+        val model = LpBuilder().apply { repeat(1024) { addVar(0L, 3L, cost = 1L) } }.build(Sense.MINIMIZE)
+        val authority = assertNotNull(model.authoritativeModel())
+        val first = assertNotNull(LpExactState(authority).ownerWorkingModel())
+        val separate = assertNotNull(LpExactState(authority).ownerWorkingModel())
+        val cache = LpCounterResults()
+        assertNotNull(solveAndCertify(first, claim = LpClaim.BOUND, counterResults = cache).bound)
+        assertNotNull(cache.read(first, ProductionLpCertificationPolicy))
+
+        assertNull(cache.read(separate, ProductionLpCertificationPolicy))
     }
 
     @Test
