@@ -457,6 +457,8 @@ deltas. It can replace the rate reward while family priors, clause-use credit an
 complete-worker coverage retain their existing owners. The default reward formula
 does not score terminal closure; the callback can inspect that distinct signal.
 Idle downstream-use credit reaches the same callback with zero new work or time.
+Auxiliary productivity and retirement use the ordinary accepted/use evidence, so an
+experimental score cannot extend a trial's allowance or change its admission state.
 
 Each arm retains at most three phase summaries and one lifecycle summary. They
 separate factory construction, handle initialization, pending preparation, verification

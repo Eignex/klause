@@ -150,35 +150,35 @@ internal class FiniteNumericalCompanions private constructor(
 
     private fun numericalSearch(limits: TheoryParams, worker: PortfolioWorker): ResumableSearch =
         object : ResumableSearch {
-        private var readVersion = 0L
-        private var importedVersion = 0L
-        private val search = LinearAuthorityInvocation(context, limits, boundOrdered = true,
-            external = { sharedIncumbent(worker) { readVersion = it } }, onIncumbentImport = {
-                importedVersion = readVersion
-                worker.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_IMPORTED, importedVersion)
-            }, onIncumbentUse = {
-                worker.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_CONSUMED, importedVersion)
-            })
-        private var result: MinimizeResult? = null
-        override val isDone: Boolean get() = result != null
-        override val stats get() = search.stats
-        override val work: Long get() = search.work
+            private var readVersion = 0L
+            private var importedVersion = 0L
+            private val search = LinearAuthorityInvocation(context, limits, boundOrdered = true,
+                external = { sharedIncumbent(worker) { readVersion = it } }, onIncumbentImport = {
+                    importedVersion = readVersion
+                    worker.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_IMPORTED, importedVersion)
+                }, onIncumbentUse = {
+                    worker.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_CONSUMED, importedVersion)
+                })
+            private var result: MinimizeResult? = null
+            override val isDone: Boolean get() = result != null
+            override val stats get() = search.stats
+            override val work: Long get() = search.work
 
-        override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
-            onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
-            result?.let { return it }
-            val finished = search.runSlice(global, sliceMillis, sliceNodes) { sample, value ->
-                onIncumbent(MinimizeResult.BestFound(sample, value.toDouble(),
-                    TerminationReason.BudgetExhausted, stats))
-            } ?: return null
-            val original = LinearOptimizationResult(context.scope, finished.terminal, finished.bound,
-                finished.incumbent, finished.value, finished.reason, finished.stats, context.semantics)
-            result = finiteNumericalCompletion(original, context, global or limits.cancellation or limits.timeout)
-            return result
+            override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+                onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
+                result?.let { return it }
+                val finished = search.runSlice(global, sliceMillis, sliceNodes) { sample, value ->
+                    onIncumbent(MinimizeResult.BestFound(sample, value.toDouble(),
+                        TerminationReason.BudgetExhausted, stats))
+                } ?: return null
+                val original = LinearOptimizationResult(context.scope, finished.terminal, finished.bound,
+                    finished.incumbent, finished.value, finished.reason, finished.stats, context.semantics)
+                result = finiteNumericalCompletion(original, context, global or limits.cancellation or limits.timeout)
+                return result
+            }
+
+            override fun close() = search.close()
         }
-
-        override fun close() = search.close()
-    }
 
     companion object {
         fun prepare(model: BakedProblem, objective: LinearObjective, params: TheoryParams,
