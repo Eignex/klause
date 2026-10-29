@@ -44,11 +44,12 @@ internal class RootSimplificationPass : InprocessingPass {
         if (!dropped.isEmpty()) {
             if (budget.stopped()) return
             val before = session.work
+            val beforeCount = session.learnedClauseCount
             session.forgetLearnedClauses { index, _ -> index !in dropped }
             budget.note("RetirementWork", session.work - before)
             dropped = IntHashSet()
             revision = session.learnedClauseRevision
-            cursor = 0
+            if (session.learnedClauseCount < beforeCount) cursor = 0
             return
         }
         if (cursor !in 0 until count) cursor = 0
