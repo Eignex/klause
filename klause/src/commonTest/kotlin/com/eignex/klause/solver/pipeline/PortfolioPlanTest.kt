@@ -28,11 +28,24 @@ class PortfolioPlanTest {
         val scenario = buildPortfolioScenario(params, 17L, 1, Kind.COP, EngineMix.MIXED, 6)
 
         assertEquals(1000L, scenario.diagnosticWorkLimit)
+        assertFalse(scenario.sharingMemory)
         assertFailsWith<PipelineConfigException> {
             buildPortfolioScenario(EngineParams(listOf("portfolio-work=1000")), 17L, 2, Kind.COP, EngineMix.MIXED, 6)
         }
     }
 
+
+    @Test
+    fun `sharing memory controls work without diagnostic scheduling`() {
+        val params = EngineParams(listOf("sharing-memory=true", "sharing-memory-work=7", "sharing-memory-scratch=1"))
+
+        val scenario = buildPortfolioScenario(params, 17L, 1, Kind.COP, EngineMix.MIXED, 6)
+
+        assertTrue(scenario.sharingMemory)
+        assertEquals(null, scenario.diagnosticWorkLimit)
+        assertEquals(7L, scenario.sharingMemoryWork)
+        assertEquals(1, scenario.sharingMemoryScratch)
+    }
 
     @Test
     fun `automatic sequential clausal satisfaction should use one arm per family`() {
@@ -148,6 +161,8 @@ class PortfolioPlanTest {
             listOf("slice-growth=Infinity"),
             listOf("portfolio-work=0"),
             listOf("portfolio-work=-1"),
+            listOf("sharing-memory-work=-1"),
+            listOf("sharing-memory-scratch=-1"),
         )) {
             assertFailsWith<PipelineConfigException> {
                 buildPortfolioScenario(EngineParams(params), 1L, 1, Kind.COP, EngineMix.MIXED, 6)

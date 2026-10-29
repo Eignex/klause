@@ -248,7 +248,8 @@ class PropagationState private constructor(
         prepared?.boundMovePriorMax ?: (arrayOfNulls(problem.numIntVars))
 
     // Built lazy reasons, keyed by their marker array (identity); see [reasonOf].
-    internal val lazyReasonMemo = HashMap<IntArray, IntArray?>()
+    // Diagnostic iteration must visit entries without scanning spare hash-table capacity.
+    internal val lazyReasonMemo = LinkedHashMap<IntArray, IntArray?>()
     internal val holeHistVal: Array<LongArrayList?> = prepared?.holeHistVal ?: (arrayOfNulls(problem.numIntVars))
     internal val holeHistIndex: Array<MutableLongIntMap?> = prepared?.holeHistIndex ?: arrayOfNulls(problem.numIntVars)
     internal val holeHistLvl: Array<IntArrayList?> = prepared?.holeHistLvl ?: (arrayOfNulls(problem.numIntVars))

@@ -8,6 +8,7 @@ import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.OriginCounts
+import com.eignex.klause.util.SharingMemoryObservation
 
 /**
  * Two-watched-literal BCP (Moskewicz et al., "Chaff: engineering an efficient SAT solver", DAC 2001,
@@ -283,27 +284,39 @@ internal class NativeSatState(private val state: PropagationState) {
 
     // Learned-clause policy accessors: the native mirror of the LearnedClauseDb columns.
 
-    internal fun sharingMemory(): Map<String, Long> {
+    internal fun sharingMemory(sample: SharingMemoryObservation) {
         val columns = listOf(learnedStarts, learnedLbd, learnedPermanent, learnedTier,
             learnedUsed, lifecycleStages, learnedUnits, rechecks, learnedOrigin, learnedScanPos, learnedWatchPos)
-        return mapOf(
-            "memorySampleWork" to learnedCount.toLong() * 3L + columns.size + watchEntries.size,
+        var metadata = 0L
+        for (column in columns) { sample.step(); metadata += column.backingData.size.toLong() * Int.SIZE_BYTES }
+        var watchBytes = 0L
+        for (entries in watchEntries) { sample.step(); watchBytes += entries.size.toLong() * Long.SIZE_BYTES }
+        var peerImports = 0L
+        var consumedPeerImports = 0L
+        var consumed = 0L
+        for (i in 0 until learnedCount) {
+            sample.step()
+            val peer = learnedOrigin[i] >= 0
+            val used = lifecycleStages[i] and 1 != 0
+            if (peer) peerImports++
+            if (peer && used) consumedPeerImports++
+            if (used) consumed++
+        }
+        sample.record(mapOf(
             "learnedObjects" to learnedCount.toLong(),
             "learnedPayloadBytes" to learnedLits.size.toLong() * Int.SIZE_BYTES,
             "learnedArenaCapacityBytes" to learnedLits.backingData.size.toLong() * Int.SIZE_BYTES,
-            "learnedMetadataCapacityBytes" to columns.sumOf { it.backingData.size.toLong() * Int.SIZE_BYTES },
-            "sessionWatchCapacityBytes" to watchEntries.sumOf { it.size.toLong() * Long.SIZE_BYTES } +
+            "learnedMetadataCapacityBytes" to metadata,
+            "sessionWatchCapacityBytes" to watchBytes +
                 (watchSizes.size.toLong() + watchPos.size) * Int.SIZE_BYTES +
                 baseUnits.backingData.size.toLong() * Int.SIZE_BYTES,
             "rootRetiredSourceCapacityBytes" to (retiredRootSources?.allocatedBytes ?: 0L),
             "pendingAttachments" to (rechecks.size - recheckHead).toLong(),
             "importUseCapacityBytes" to importUses.allocatedBytes,
-            "retainedPeerImports" to (0 until learnedCount).count { learnedOrigin[it] >= 0 }.toLong(),
-            "retainedConsumedPeerImports" to (0 until learnedCount).count {
-                learnedOrigin[it] >= 0 && lifecycleStages[it] and 1 != 0
-            }.toLong(),
-            "retainedConsumed" to (0 until learnedCount).count { lifecycleStages[it] and 1 != 0 }.toLong(),
-        )
+            "retainedPeerImports" to peerImports,
+            "retainedConsumedPeerImports" to consumedPeerImports,
+            "retainedConsumed" to consumed,
+        ))
     }
 
     val count: Int get() = learnedCount

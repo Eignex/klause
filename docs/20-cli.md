@@ -150,6 +150,13 @@ Verbose portfolio diagnostics stream to stderr separately from the solution
 protocol. The subprocess caller owns retention, persistence and stream-completion
 tracking; a retained diagnostic prefix alone cannot establish a completed trace.
 
+The portfolio diagnostic `sharing-memory=true` enables bounded retained-memory
+samples independently of `portfolio-work`. `sharing-memory-work` caps charged
+visits per sample (default 32,768); `sharing-memory-scratch` caps deduplication
+entries (default 4,096). Both accept zero. Samples report complete, partial or
+stale status; only complete current samples can support byte accounting. See
+[portfolios](12-portfolio.md#shared-channels) for ownership and aliasing.
+
 The finite backtrack controls `propagation-attribution=true` and
 `historical-table-reasons=true` independently enable bounded family diagnostics
 and the historical Table retry. Both default to false. Attribution exports sparse

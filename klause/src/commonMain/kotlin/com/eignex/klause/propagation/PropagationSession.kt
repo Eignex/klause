@@ -13,6 +13,8 @@ import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.SharingMemoryObservation
+import com.eignex.klause.util.SharingMemorySnapshot
 import kotlin.math.ln
 
 /** Variable kind discriminator for [PropagationSession.popUntilUnpinned]. */
@@ -1060,17 +1062,23 @@ class PropagationSession private constructor(
 
     internal val sharingIdentity = Any()
 
-    internal var sharedLearningMemory: (() -> Map<String, Long>)? = null
+    internal var sharedLearningMemory: ((SharingMemoryObservation) -> Unit)? = null
 
-    internal fun sharingMemory(): Map<String, Long> {
-        val native = state.sharingMemory()
-        val observer = sharedLearningMemory
-        val shared = observer?.invoke() ?: emptyMap()
-        return native + shared + mapOf(
-            "sharedLearningObserved" to if (observer == null) 0L else 1L,
-            "rootRetiredSourceReferenceSlots" to (simplifiedRootSources?.size?.toLong() ?: 0L),
-            "memorySampleWork" to native.getValue("memorySampleWork") + (shared["sharedMemorySampleWork"] ?: 0L),
+    internal fun sharingMemory(
+        maxWork: Long = SharingMemoryObservation.DEFAULT_WORK,
+        maxScratchEntries: Int = SharingMemoryObservation.DEFAULT_SCRATCH_ENTRIES,
+    ): SharingMemorySnapshot {
+        val sample = SharingMemoryObservation(
+            maxWork, maxScratchEntries, { cancelRequested }, { chargeSharingWork(1L) },
         )
+        return sample.snapshot {
+            state.sharingMemory(sample)
+            sharedLearningMemory?.invoke(sample)
+            sample.record(mapOf(
+                "sharedLearningObserved" to if (sharedLearningMemory == null) 0L else 1L,
+                "rootRetiredSourceReferenceSlots" to (simplifiedRootSources?.size?.toLong() ?: 0L),
+            ))
+        }
     }
 
     internal fun learnedLifecycle(): Map<String, Long> =

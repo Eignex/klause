@@ -7,6 +7,9 @@ import com.eignex.klause.solver.result.SharingChannel
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongHashSet
+import com.eignex.klause.util.SharingMemoryObservation
+import com.eignex.klause.util.SharingMemorySnapshot
+import com.eignex.klause.util.SharingMemoryStatus
 import com.eignex.kumulant.core.Concurrency
 import com.eignex.kumulant.stream.Mutex
 import com.eignex.kumulant.stream.lock
@@ -39,6 +42,8 @@ internal class SharedClausePool(
     private val lock: Mutex = Concurrency.None.lock(),
     private val cap: Int = DEFAULT_CAP,
     internal val measureMemory: Boolean = false,
+    internal val memorySampleWork: Long = SharingMemoryObservation.DEFAULT_WORK,
+    internal val memorySampleScratchEntries: Int = SharingMemoryObservation.DEFAULT_SCRATCH_ENTRIES,
     /** Default LBD bound for the arms' glue export ([PoolClauseExchange]); the pool carries it so
      *  every arm of one portfolio shares a single tunable filter (`--param clause-share-lbd`). */
     val shareMaxLbd: Int = PoolClauseExchange.DEFAULT_MAX_LBD,
@@ -179,14 +184,13 @@ internal class PoolClauseExchange(
     private fun observe(session: PropagationSession) {
         val m = meter ?: return
         if (!pool.measureMemory) return
-        val memory = session.sharingMemory()
-        val work = memory.getValue("memorySampleWork")
-        session.chargeSharingWork(work)
+        val sample = session.sharingMemory(pool.memorySampleWork, pool.memorySampleScratchEntries)
+        val work = sample.work
         m.clauseCount("accountingWork", work)
-        m.clauseMemory(pool.memory() + mapOf(
+        m.clauseMemorySample(pool.memory() + mapOf(
             "seenKeys" to seen.size.toLong(),
             "seenCapacityBytes" to seen.allocatedBytes,
-        ) + memory)
+        ) + sample.telemetry())
     }
 
     private fun retainSession(session: PropagationSession) {
@@ -240,16 +244,22 @@ internal class PoolClauseExchange(
 
     override fun onSearchEnd(session: PropagationSession) = metered {
         retainSession(session)
-        countUses(session)
-        export(session)
+        if (!session.cancelRequested) {
+            countUses(session)
+            export(session)
+        }
         observe(session)
     }
 
     override fun onSearchClose(session: PropagationSession) = metered {
-        retainSession(session)
-        countUses(session)
-        export(session)
-        observe(session)
+        if (sessionIdentity != null && sessionIdentity !== session.sharingIdentity) return@metered
+        if (!session.cancelRequested) {
+            countUses(session)
+            export(session)
+        }
+        if (pool.measureMemory) meter?.clauseMemorySample(
+            SharingMemorySnapshot(SharingMemoryStatus.STALE, emptyMap(), 0L, 0).telemetry(),
+        )
         if (sessionIdentity == null || sessionIdentity === session.sharingIdentity) {
             sessionIdentity = null
             cursor = 0L

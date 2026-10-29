@@ -43,6 +43,31 @@ import kotlin.test.assertTrue
 
 class PortfolioBuilderTest {
     @Test
+    fun `memory observation is independently controlled through materialized workers`() {
+        for (enabled in listOf(false, true)) {
+            val problem = Problem(2, 0, emptyArray(), listOf(Clause(intArrayOf(0, 2)))).bake()
+            val scenario = PortfolioScenario(1, 2, Kind.CSP, EngineMix.BACKTRACK,
+                diagnosticWorkLimit = 1000L, sharingMemory = enabled, sharingMemoryWork = 1L)
+            val workers = PortfolioBuilder.build(problem, scenario)
+
+            try {
+                for (worker in workers) {
+                    worker.solve(Cancellation.Never)
+                    val stats = requireNotNull(worker.sharingMeter).snapshot().clauses
+                    if (enabled) {
+                        assertTrue(stats.getValue("accountingWork") > 0L)
+                        assertEquals(1L, stats.getValue("peakMemorySamplePartial"))
+                    } else {
+                        assertFalse("memorySampleWork" in stats)
+                    }
+                }
+            } finally {
+                workers.forEach { it.close() }
+            }
+        }
+    }
+
+    @Test
     fun `early core admission should preserve its pool and ordinary worker admission`() {
         val problem = Problem(2, 0, emptyArray(), emptyArray()).bake()
         val objective = LinearObjective(longArrayOf(1, 2))

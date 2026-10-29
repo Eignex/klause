@@ -4,6 +4,7 @@ import com.eignex.klause.solver.result.GLUE_LBD
 import com.eignex.klause.solver.result.OpenTheoryClauseStats
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableIntIntMap
+import com.eignex.klause.util.SharingMemoryObservation
 import kotlin.time.TimeSource
 
 internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
@@ -52,7 +53,7 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
         unitsPending = learned.units.size > 0
     }
 
-    fun snapshot(measureMemory: Boolean = false): OpenTheoryClauseStats = OpenTheoryClauseStats(
+    fun snapshot(): OpenTheoryClauseStats = OpenTheoryClauseStats(
         learnedClauses,
         relearnedClauses,
         restarts,
@@ -64,14 +65,17 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
         assertingConflicts,
         nonAssertingConflicts,
         reductionNanos,
-        lifecycle.snapshot() + if (measureMemory) retainedMemory() else emptyMap(),
+        lifecycle.snapshot(),
     )
 
-    internal fun retainedMemory(): Map<String, Long> = learned.memory() + mapOf(
-        "sharedLearnedStageCapacityBytes" to stages.backingData.size.toLong() * Int.SIZE_BYTES,
-        "sharedLearnedReasonIndexBytes" to reasons.primitiveCapacityBytes,
-        "sharedLearnedPendingEntries" to (pendingAttach.size + rechecks.size).toLong(),
-    )
+    internal fun retainedMemory(sample: SharingMemoryObservation) {
+        learned.memory(sample)
+        sample.record(mapOf(
+            "sharedLearnedStageCapacityBytes" to stages.backingData.size.toLong() * Int.SIZE_BYTES,
+            "sharedLearnedReasonIndexBytes" to reasons.primitiveCapacityBytes,
+            "sharedLearnedPendingEntries" to (pendingAttach.size + rechecks.size).toLong(),
+        ))
+    }
 
     fun learn(literals: IntArray, host: ClauseWatchHost) {
         lifecycle.note(LearnedKind.Clause, LearnedStage.Constructed)

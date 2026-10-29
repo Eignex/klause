@@ -5,8 +5,9 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.SharedClause
-import com.eignex.klause.solver.result.SharingChannel
 import com.eignex.klause.propagation.addLearnedClause
+import com.eignex.klause.solver.result.SharingChannel
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -273,6 +274,58 @@ class SharedClausePoolTest {
             assertTrue(stats.getValue("importWork") >= stats.getValue("translatedLiterals"))
             assertEquals(1L, stats.getValue("reasonProtectedObjects"))
         }
+    }
+
+    @Test
+    fun `cancelled close releases the filter without observing or exporting the store`() {
+        for (native in listOf(false, true)) {
+            var cancelled = false
+            val problem = Problem(8, 0, emptyArray(), emptyList())
+            val pool = SharedClausePool(measureMemory = true)
+            val meter = SharingMeter()
+            val exchange = PoolClauseExchange(pool, origin = 1, meter = meter)
+            val session = PropagationSession(problem, nativeSat = native, cancellation = Cancellation { cancelled })
+            pool.publish(listOf(boolClause(0, 1)), origin = 2)
+            exchange.onSearchStart(session)
+            session.addLearnedClause(Clause(intArrayOf(4, 6)), 1)
+            val before = session.work
+            cancelled = true
+
+            exchange.onSearchClose(session)
+
+            val stats = meter.snapshot().clauses
+            assertEquals(before, session.work)
+            assertEquals(0L, stats.getValue("seenCapacityBytes"))
+            assertEquals(1L, stats.getValue("memorySampleStale"))
+            assertEquals(0L, stats.getValue("memorySampleComplete"))
+            assertEquals(0L, stats.getValue("memorySampleWork"))
+            assertEquals(1, pool.drainSince(0).clauses.size)
+            val fresh = PropagationSession(problem, nativeSat = native)
+            exchange.onSearchStart(fresh)
+            assertEquals(1, fresh.learnedClauseCount)
+            assertEquals(1L, meter.snapshot().clauses.getValue("memorySampleComplete"))
+        }
+    }
+
+    @Test
+    fun `partial samples remove fields from the previous complete sample`() {
+        val problem = Problem(4, 0, emptyArray(), emptyList())
+        var cancelled = false
+        val pool = SharedClausePool(measureMemory = true)
+        val meter = SharingMeter()
+        val exchange = PoolClauseExchange(pool, meter = meter)
+        val session = PropagationSession(problem, cancellation = Cancellation { cancelled })
+        exchange.onSearchStart(session)
+        assertEquals(1L, meter.snapshot().clauses.getValue("memorySampleComplete"))
+        cancelled = true
+
+        exchange.onSearchEnd(session)
+
+        val stats = meter.snapshot().clauses
+        assertEquals(1L, stats.getValue("memorySamplePartial"))
+        assertEquals(0L, stats.getValue("memorySampleComplete"))
+        assertTrue("learnedPayloadBytes" !in stats)
+        assertTrue("peakLearnedPayloadBytes" in stats)
     }
 
     private class PortfolioExchangeFixture(problem: Problem, pool: SharedClausePool) {
