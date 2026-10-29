@@ -43,6 +43,7 @@ internal class LinearAuthorityTemplate private constructor(
     companion object {
         fun prepare(
             source: SourceProofContext, cancellation: Cancellation, cuts: Boolean = false,
+            complementaryCuts: Boolean = false,
             onCutWork: (Long) -> Unit = {},
         ): LinearAuthorityTemplate? {
             val numeric = source.numericContext()
@@ -54,7 +55,7 @@ internal class LinearAuthorityTemplate private constructor(
                 rows += premise.inequality.row(indices)
             }
             val separated = if (cuts) {
-                LinearAuthorityCuts.prepare(numeric, cancellation, onCutWork) ?: return null
+                LinearAuthorityCuts.prepare(numeric, cancellation, complementaryCuts, onCutWork) ?: return null
             } else null
             return LinearAuthorityTemplate(source, numeric, coordinates, indices, rows, separated)
         }

@@ -296,6 +296,11 @@ term, preferring the side that retains a negative residual. Exact shifting and
 complementing precede mixed rounding; missing sides and integral shifted right
 sides decline. At most 64 mixed cuts are retained per template. Eligibility and
 decline observations describe only rows visited within the preparation allowance.
+The explicit point-selection policy also proposes the complementary available
+continuous sides within the same row, work and scalar limits. Missing opposite
+sides retain their original premise; identical side choices produce one candidate.
+Both variants retain their exact bound derivations and require fresh checking
+before selection. Ordinary source separation keeps its preferred side policy.
 Preparation visits at most 65,536 modeled row/support operations with
 4,096-bit input, denominator and intermediate scalar limits. Cut definitions and source-row ownership
 stay in the retained template, ahead of changing invocation-bound rows. Every

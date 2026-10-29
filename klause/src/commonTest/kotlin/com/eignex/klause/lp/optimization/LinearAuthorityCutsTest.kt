@@ -276,6 +276,42 @@ class LinearAuthorityCutsTest {
     }
 
     @Test
+    fun `complementary mixed rounding should cite the available opposite bound`() {
+        val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val source = SourceProofContext(scope, setOf(x, real), mapOf(
+            "mixed" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                real to BigFraction.MINUS_ONE), BigFraction.ofLong(3))),
+            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ofLong(2))),
+        ))
+
+        val cuts = assertNotNull(LinearAuthorityCuts.prepare(source, Cancellation.Never, complementary = true))
+        val complementary = cuts.rows.single { it.inequality.coefficients == mapOf(x to BigFraction.ONE) }
+
+        assertEquals(BigFraction.ofLong(2), complementary.inequality.rhs)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(SourceEvidence(scope,
+            SourceClaim.Consequence(complementary.inequality), complementary.derivation)))
+        val missing = SourceProofContext(scope, source.coordinates, source.premises - "upper")
+        assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(missing).verify(SourceEvidence(scope,
+            SourceClaim.Consequence(complementary.inequality), complementary.derivation)))
+    }
+
+    @Test
+    fun `complementary mixed rounding should reuse the sole available side without duplicating rows`() {
+        val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val source = SourceProofContext(scope, setOf(x, real), mapOf(
+            "mixed" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                real to BigFraction.MINUS_ONE), BigFraction.ofLong(3))),
+            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ))
+
+        val cuts = assertNotNull(LinearAuthorityCuts.prepare(source, Cancellation.Never, complementary = true))
+
+        assertEquals(1, cuts.rows.size)
+        assertEquals(null, cuts.observations["MixedComplementaryRetained"])
+    }
+
+    @Test
     fun `mixed cuts should retract and reactivate with their Boolean source owner`() {
         val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
         val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
