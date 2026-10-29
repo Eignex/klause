@@ -5,6 +5,7 @@ import com.eignex.klause.backtrack.selector.InputOrder
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.ClauseExchange
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.SharedClause
@@ -101,6 +102,45 @@ class RootInprocessingSearchTest {
 
             assertIs<SolveResult.Sat>(result)
             assertTrue(consumed)
+        }
+    }
+
+    @Test
+    fun `restarting assumption searches should keep root passes disabled`() {
+        for (native in listOf(false, true)) {
+            val guarded = Problem(5, 0, emptyArray(), arrayOf<Factor>(
+                Clause(intArrayOf(0, 2)), Clause(intArrayOf(5, 6, 8)), Clause(intArrayOf(5, 6, 9)),
+            ))
+            val exchange = object : ClauseExchange {
+                override fun onRestart(session: PropagationSession) {}
+            }
+            val configured = params(native, exchange).copy(assumptions = Assumptions(bools = mapOf(2 to true)))
+
+            val result = BacktrackSolver(guarded.bake()).solve(configured)
+
+            assertIs<SolveResult.Sat>(result)
+            assertTrue(result.assignment.bools[3])
+            assertEquals(0.0, result.stats.search.inprocessProbes.sum)
+            assertEquals(0.0, result.stats.search.inprocessVisits.sum)
+        }
+    }
+
+    @Test
+    fun `a completed probing contradiction should close the real root`() {
+        for (native in listOf(false, true)) {
+            val unsat = Problem(4, 0, emptyArray(), arrayOf<Factor>(
+                Clause(intArrayOf(0, 2)), Clause(intArrayOf(4, 6)), Clause(intArrayOf(4, 7)),
+                Clause(intArrayOf(5, 6)), Clause(intArrayOf(5, 7)),
+            ))
+            var retained: PropagationSession? = null
+            val exchange = object : ClauseExchange {
+                override fun onRestart(session: PropagationSession) { retained = session }
+            }
+
+            val result = BacktrackSolver(unsat.bake()).solve(params(native, exchange))
+
+            assertIs<SolveResult.Unsat>(result)
+            assertTrue(assertNotNull(retained).isUnsatAtRoot)
         }
     }
 

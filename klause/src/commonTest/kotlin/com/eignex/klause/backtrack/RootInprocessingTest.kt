@@ -46,6 +46,22 @@ class RootInprocessingTest {
     }
 
     @Test
+    fun `a root slice should advance within its configured clause limit`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(problem(intArrayOf(1), intArrayOf(0, 2, 4)).bake(), nativeSat = native)
+            val pass = RootSimplificationPass()
+            val params = BacktrackParams(rootSimplifyBatch = 1)
+
+            pass.run(session, params, null)
+            assertEquals(0, session.learnedClauseCount)
+            pass.run(session, params, null)
+
+            assertEquals(1, session.learnedClauseCount)
+            assertEquals(setOf(2, 4), session.learnedClauseLiterals(0).toSet())
+        }
+    }
+
+    @Test
     fun `root refresh should preserve imported origin through compaction`() {
         for (native in listOf(false, true)) {
             val session = PropagationSession(problem(intArrayOf(1)).bake(), nativeSat = native)
