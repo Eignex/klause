@@ -8,6 +8,7 @@ import com.eignex.klause.factor.arithmetic.LinearPropagator
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.Table
+import com.eignex.klause.formats.flatzinc.linearObjective
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.formats.flatzinc.toSearchHints
 import com.eignex.klause.formats.json.ProblemJson
@@ -18,6 +19,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
 import com.eignex.klause.solver.pipeline.FinitePipelineRequest
+import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchComponent
@@ -40,6 +42,43 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class IntegerConflictLearnerTest {
+    @Test
+    fun `prepared optimization should consume a guarded arithmetic consequence`() {
+        val program = parseFlatZinc("""
+            var bool: active;
+            var 7..12: z;
+            var 0..3: x;
+            var 0..6: y;
+            constraint int_lin_le_reif([2,1,-1],[x,y,z],0,active);
+            constraint int_lin_le([2,-1],[x,y],0);
+            solve :: seq_search([
+                bool_search([active],input_order,indomain_max,complete),
+                int_search([z],input_order,indomain_min,complete),
+                int_search([x,y],input_order,indomain_max,complete)
+            ]) maximize x;
+        """.trimIndent())
+        val prepared = FinitePipeline.prepare(FinitePipelineRequest(
+            program.problem, FiniteEngine.BACKTRACK, program.linearObjective(), randomSeed = 3L,
+        ))
+        val base = assertNotNull(program.searchHints).toSearchHints().toBacktrackParams(
+            prepared.problem.numBoolVars, prepared.problem.numIntVars)
+        val params = base.copy(integerRowLearning = true, pbLearning = false,
+            objectiveGuidedValues = false, randomSeed = 3L, maxDecisions = 1_000)
+
+        val result = BacktrackSolver(assertIs<BakedProblem>(prepared.problem)).minimize(
+            assertNotNull(prepared.objective), params)
+
+        val optimum = assertIs<MinimizeResult.Optimal>(result)
+        val point = prepared.reconstruct(optimum.sample)
+        val x = point.intValue(program.intVarsByName.getValue("x"))
+        val y = point.intValue(program.intVarsByName.getValue("y"))
+        val z = point.intValue(program.intVarsByName.getValue("z"))
+        assertEquals(3L, x)
+        assertEquals(2 * x + y <= z, point.boolValue(program.boolVarsByName.getValue("active")))
+        assertTrue(2 * x <= y)
+        assertTrue((result.stats.search.learning["learningIntegerConsumed"] ?: 0L) > 0L)
+    }
+
     @Test
     fun `a prepared enumeration should reuse and retire its guarded arithmetic consequence`() {
         val program = parseFlatZinc("""
