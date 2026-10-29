@@ -35,6 +35,24 @@ import kotlin.test.assertTrue
 
 class MpsModeTest {
     @Test
+    fun `prepared separable MPS search should consume compatible child results`() {
+        val relative = "klause-bench/smoke-corpus/lp-component-split/cover-2x3.mps"
+        val source = listOf(File(relative), File("../$relative")).first { it.isFile }
+
+        val text = capture {
+            assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", "-s", "--exact", "--presolve", "off",
+                "--lp", "aggressive,-cuts", "--param", "lp-component-ownership=true",
+                "--param", "max-decisions=1000", source.absolutePath)))
+        }
+
+        assertTrue("s OPTIMUM FOUND" in text.lines(), text)
+        assertTrue("o 4" in text.lines(), text)
+        val reuses = Regex("lpPhase_COMPONENT_LIFECYCLE_[A-Z]+_REUSED=(\\d+)").findAll(text)
+            .sumOf { it.groupValues[1].toLong() }
+        assertTrue(reuses > 0L, text)
+    }
+
+    @Test
     fun `inexact working optima should retain scoped metadata beside accepted source points`() {
         for (claimsCoverTolerance in listOf(false, true)) {
             val output = MpsOutput(
