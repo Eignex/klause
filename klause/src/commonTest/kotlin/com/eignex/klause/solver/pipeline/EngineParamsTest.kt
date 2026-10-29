@@ -18,7 +18,9 @@ class EngineParamsTest {
     @Test
     fun `learned memory controls should reach fixed and portfolio workers without enabling defaults`() {
         val base = com.eignex.klause.backtrack.BacktrackParams()
-        val settings = listOf("learned-memory-bytes=4096", "learned-memory-work=1234", "learned-memory-scratch-bytes=789")
+        val settings = listOf(
+            "learned-memory-bytes=4096", "learned-memory-work=1234", "learned-memory-scratch-bytes=789",
+        )
 
         val fixed = applyFixedBacktrackParams(base, EngineParams(settings), allowSelectors = true)
         val worker = applyBacktrackParams(base, EngineParams(settings))

@@ -1041,8 +1041,8 @@ class PropagationSession private constructor(
         return impliedSince(base)
     }
 
-    /** Forward to [PropagationState.forgetLearnedClauses]. Called by the engine's
-     *  restart hook to bound the learned-clause database. */
+    /** Request a bounded learned-store compaction, preserving permanent, live and historical reasons.
+     * Cancelled or unfunded preparation leaves the generation intact. */
     fun forgetLearnedClauses(keep: (learnedIndex: Int, lbd: Int) -> Boolean) {
         val before = learnedClauseCount
         state.forgetLearnedClauses(cancelled = { cancelRequested }, keep = keep)
