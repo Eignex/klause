@@ -28,7 +28,8 @@ internal class FactorAttribution(private val capacity: Int = 1024) {
 
     enum class Metric {
         Fires, Work, Nanos, Deductions, Conflicts, Interrupted,
-        EagerReasons, LazyAttempts, LazyCompleted, LazyInterrupted, ReasonWork, ReasonNanos,
+        EagerReasons, ConflictReasonAttempts, ConflictReasonUnavailable,
+        LazyAttempts, LazyCompleted, LazyInterrupted, ReasonWork, ReasonNanos,
         Support, MaxSupport, MemoHits, UipReasons, UipSupport, Learned, Consumed, UseEvents, LaterUseEvents, Untracked,
         RefinementAttempts, RefinementWork, RefinementNanos, RefinementSupport, RefinementAccepted,
     }
@@ -80,6 +81,8 @@ internal class FactorAttribution(private val capacity: Int = 1024) {
     }
 
     fun beginAnalysis() { analysisFamilies = 0 }
+
+    fun selectFamilies(mask: Int) { analysisFamilies = mask }
 
     fun participate(mask: Int, size: Int) {
         analysisFamilies = analysisFamilies or mask
