@@ -57,21 +57,24 @@ class PreparedFactorProjections internal constructor(
     },
 ) {
     private var lpTemplateNamespace: Any = Any()
-    private var lpTemplateCache = AtomicReference<LpPreparationTemplates?>(null)
+    private var lpSourceTemplateCache = AtomicReference<LpPreparationTemplates?>(null)
+    private var lpFiniteTemplateCache = AtomicReference<LpPreparationTemplates?>(null)
 
     internal fun prepareLpTemplates(
         objective: LinearObjective?, token: Cancellation, onWork: (Long) -> Unit = {},
     ): LpPreparationTemplates? {
-        val previous = lpTemplateCache.load()
+        val cache = if (problem is BakedProblem) lpFiniteTemplateCache else lpSourceTemplateCache
+        val previous = cache.load()
         val next = LpPreparationTemplates.prepare(this, lpTemplateNamespace, objective, previous, token, onWork)
             ?: return null
-        lpTemplateCache.compareAndSet(previous, next)
+        cache.compareAndSet(previous, next)
         return next
     }
 
     private fun inheritLpTemplates(source: PreparedFactorProjections): PreparedFactorProjections = apply {
         lpTemplateNamespace = source.lpTemplateNamespace
-        lpTemplateCache = source.lpTemplateCache
+        lpSourceTemplateCache = source.lpSourceTemplateCache
+        lpFiniteTemplateCache = source.lpFiniteTemplateCache
     }
 
     /** Immutable whole-relation selection in this canonical source's factor namespace. */

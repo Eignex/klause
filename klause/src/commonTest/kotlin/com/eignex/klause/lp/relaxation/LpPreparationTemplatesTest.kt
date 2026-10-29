@@ -209,6 +209,20 @@ class LpPreparationTemplatesTest {
     }
 
     @Test
+    fun `temporary source preparation should retain the completed finite snapshot`() {
+        val first = source.bake(selection)
+        val before = assertNotNull(first.factorProjections?.prepareLpTemplates(objective, Cancellation.Never))
+        selection.prepareLpTemplates(objective, Cancellation.Never)
+        val next = source.bake(selection)
+
+        val after = assertNotNull(next.factorProjections?.prepareLpTemplates(objective, Cancellation.Never))
+
+        assertSame(before.factors[0], after.factors[0])
+        assertSame(before.bounds[0], after.bounds[0])
+        assertTrue(after.reboundSource)
+    }
+
+    @Test
     fun `foreign projection selection should reject a matching source shape`() {
         val foreign = source.withFactors(source.factors.copyOf())
 
