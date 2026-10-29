@@ -12,6 +12,7 @@ import com.eignex.lab.bench.BenchRequest
 import com.eignex.lab.bench.BenchInputRoot
 import com.eignex.lab.bench.BenchContext
 import java.nio.file.Files
+import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -136,7 +137,7 @@ class LabInputsTest {
             val file = directory.resolve("tool")
             Files.writeString(file, "original")
             val inputs = listOf(BenchInput("runtime", BenchInputRoot.SOURCE, role))
-            val compilerTrees = mutableMapOf<java.nio.file.Path, String>()
+            val compilerTrees = mutableMapOf<Path, String>()
             val original = LabInputs.treeHashes(inputs, compilerTrees)
             val frozen = BenchCase("fixture", inputs = inputs, attributes = original)
             val context = BenchContext(root, worktree = root)
