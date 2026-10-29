@@ -702,6 +702,7 @@ internal class CpToLpRelaxation(
             templateStats?.observeTemplatePreparation(start.elapsedNow().inWholeNanoseconds, work,
                 if (templates == null) mapOf("DECLINED" to 1L) else mapOf(
                     "PREPARED" to 1L, "FACTORS_REUSED" to templates.reusedFactors.toLong(),
+                    "SOURCE_REBOUND" to if (templates.reboundSource) 1L else 0L,
                     "BOUNDS_REUSED" to templates.reusedBounds.toLong(),
                     "COMPONENTS_REUSED" to templates.reusedComponents.toLong(),
                     "COMPONENTS_DIRTY" to (templates.components.size - templates.reusedComponents).toLong(),

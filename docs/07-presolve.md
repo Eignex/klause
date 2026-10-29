@@ -56,6 +56,9 @@ buffers; changed bounds, rows, objectives and component joins replace the affect
 component snapshots. Namespace remaps and semantic-scope changes require fresh
 bindings. The later model-facing LP consumers instantiate their own mutable owners
 from these definitions; see [LP preparation](17-linear-programming.md#exact-source-row-projections).
+A no-op preparation preserves the canonical model handle and retains its completed
+immutable finite-template seed for the later engine bake. That bake rebinds the
+index to its own source and checks its current bounds before reuse.
 Template construction spends the same containing allowance, and unfinished preparation
 publishes no reusable state. Template reuse changes assembly work, not pass admission,
 probe selection, reconstruction guarantees or source authority.

@@ -74,6 +74,21 @@ class PreparedFactorProjections internal constructor(
         lpTemplateCache.store(source.lpTemplateCache.load())
     }
 
+    internal fun retainLpTemplatesFrom(prepared: PreparedFactorProjections, token: Cancellation): Boolean {
+        if (lpTemplateNamespace !== prepared.lpTemplateNamespace || providers !== prepared.providers ||
+            problem.semantics != prepared.problem.semantics || problem.numBoolVars != prepared.problem.numBoolVars ||
+            problem.numIntVars != prepared.problem.numIntVars || problem.numRealVars != prepared.problem.numRealVars ||
+            problem.numFactors != prepared.problem.numFactors || token()
+        ) return false
+        val snapshot = prepared.lpTemplateCache.load() ?: return false
+        for (id in problem.factors.indices) {
+            token.charge(1L)
+            if (token() || problem.factors[id] !== prepared.problem.factors[id]) return false
+        }
+        val previous = lpTemplateCache.load()
+        return lpTemplateCache.compareAndSet(previous, snapshot)
+    }
+
     /** Immutable whole-relation selection in this canonical source's factor namespace. */
     fun encoder(factorId: Int, target: EncodingTarget): Encoder = encoders.getValue(target)[factorId]
 

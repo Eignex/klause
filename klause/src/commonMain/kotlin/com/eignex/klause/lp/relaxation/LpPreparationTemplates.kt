@@ -87,6 +87,7 @@ internal class LpPreparationTemplates private constructor(
     val factors: List<LpFactorTemplate>,
     val bounds: Map<Int, LpIntegerBoundTemplate>,
     val components: List<LpTemplateComponent>,
+    val reboundSource: Boolean,
     val reusedFactors: Int,
     val reusedBounds: Int,
     val reusedComponents: Int,
@@ -259,7 +260,8 @@ internal class LpPreparationTemplates private constructor(
                 if (!visit(1L + factors.size * 2L + bounds.size)) return null
                 return LpPreparationTemplates(problem, namespace, problem.semantics, problem is BakedProblem,
                     dimensions,
-                    objective?.constant ?: 0L, factors, bounds, components, reusedFactors, reusedBounds,
+                    objective?.constant ?: 0L, factors, bounds, components, old != null && old.source !== problem,
+                    reusedFactors, reusedBounds,
                     reusedComponents, storage)
             } finally {
                 onWork(units)
