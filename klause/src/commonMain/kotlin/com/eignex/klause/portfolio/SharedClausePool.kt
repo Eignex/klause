@@ -219,10 +219,8 @@ internal class PoolClauseExchange(
     }
 
     override fun onSearchStart(session: PropagationSession) {
-        // Fresh session (a rebuilt or reseeded arm): its learned DB is empty, so re-import the whole
-        // pool — including this arm's own clauses from earlier sessions, which `seen`/`cursor` would
-        // otherwise suppress. Resetting both makes the import unconditional; the pool de-dups any
-        // re-export by key.
+        // A fresh native store needs the pool's retained clauses, including this arm's old exports.
+        // Rebinding assumptions on the same store preserves its imports and duplicate filter.
         if (sessionIdentity !== session.sharingIdentity) {
             cursor = 0L
             seen.release()

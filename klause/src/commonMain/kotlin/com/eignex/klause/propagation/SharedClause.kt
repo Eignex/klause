@@ -66,11 +66,10 @@ interface ClauseExchange {
      *  restart, so clauses the arm already holds are not re-imported. */
     fun onRestart(session: PropagationSession)
 
-    /** Full (re)import at the post-seed root before the first DFS run. Unlike [onRestart] this
-     *  fires on a *fresh* session — a single-threaded portfolio rebuilds the session every scheduled
-     *  segment, so its learned DB is empty and the arm must re-import the whole pool, **including its
-     *  own** clauses from earlier segments (which a persistent session would still hold). The session
-     *  is at the post-seed root, so imported literals are free. Default no-op for non-pooled exchanges. */
+    /** Import at the post-seed root before traversal. A fresh session needs the whole current pool,
+     *  including its own clauses from earlier sessions. Rebinding assumptions on a retained session
+     *  keeps its learned store, so the exchange preserves that session's duplicate suppression.
+     *  Default no-op for non-pooled exchanges. */
     fun onSearchStart(session: PropagationSession) {}
 
     /** Export-only hook fired when a search ends without a clean restart boundary — a slice-truncated

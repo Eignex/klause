@@ -19,7 +19,7 @@ internal fun PropagationState.sharingMemory(): Map<String, Long> {
     add(nativeConflictReason)
     add(atoms.pendingMoveAnt)
     val atomColumns = listOf(atoms.intVar, atoms.truth, atoms.lvl, atoms.undoAtomId, atoms.undoTruth, atoms.undoLvl)
-    val atomRuns = (atoms.byIntVar.asList() + atoms.watchedByVar.asList()).filterNotNull()
+    val atomRuns = (atoms.byIntVar.asList() + atoms.watchedByVar.asList()).filterNotNull().distinct()
     var atomBytes = atoms.threshold.allocatedBytes + atomColumns.sumOf { it.backingData.size.toLong() * Int.SIZE_BYTES }
     for (index in atomRuns) for (run in listOf(index.ge, index.le, index.eq)) {
         atomBytes += run.mainKeys.allocatedBytes + run.pendKeys.allocatedBytes +
@@ -79,7 +79,7 @@ private fun PropagationState.learnedSharingMemory(): Map<String, Long> {
         "learnedObjects" to learned.size.toLong(),
         "learnedPayloadBytes" to ints.sumOf { it.size.toLong() * Int.SIZE_BYTES } +
             longs.sumOf { it.size.toLong() * Long.SIZE_BYTES },
-        "learnedCapacityBytes" to columns.sumOf { it.backingData.size.toLong() * Int.SIZE_BYTES },
+        "learnedMetadataCapacityBytes" to columns.sumOf { it.backingData.size.toLong() * Int.SIZE_BYTES },
         "learnedReferenceSlots" to learned.size.toLong() * 2L + (learned.integerRows?.size ?: 0),
         "sessionWatchCapacityBytes" to watchers + watches.pos.primitiveCapacityBytes,
         "sessionQueueCapacityBytes" to propQueue.allocatedBytes + atoms.dirtyFactors.allocatedBytes,

@@ -200,7 +200,8 @@ uses do not imply additional imports.
 
 Learned-store observations include native arena capacity or general clause/PB/row
 payload, policy columns, session watch/queue capacity, pending attachments and
-active or historical antecedent arrays. Session watch capacity includes base
+active or historical antecedent arrays. The immutable source clause arena belongs to the prepared problem and is shared
+across workers. Session watch capacity includes base
 watches and cannot be added to a separate base-watch estimate. Reason arrays are
 identity-deduplicated within their observation, including saved integer/atom reasons
 and lazy markers/memo results; they can alias learned payload. Reference-slot

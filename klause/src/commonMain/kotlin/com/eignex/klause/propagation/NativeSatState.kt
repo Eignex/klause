@@ -282,13 +282,14 @@ internal class NativeSatState(private val state: PropagationState) {
     // Learned-clause policy accessors: the native mirror of the LearnedClauseDb columns.
 
     internal fun sharingMemory(): Map<String, Long> {
-        val columns = listOf(learnedLits, learnedStarts, learnedLbd, learnedPermanent, learnedTier,
+        val columns = listOf(learnedStarts, learnedLbd, learnedPermanent, learnedTier,
             learnedUsed, lifecycleStages, learnedUnits, rechecks, learnedOrigin, learnedScanPos, learnedWatchPos)
         return mapOf(
             "memorySampleWork" to learnedCount.toLong() * 3L + columns.size + watchEntries.size,
             "learnedObjects" to learnedCount.toLong(),
             "learnedPayloadBytes" to learnedLits.size.toLong() * Int.SIZE_BYTES,
-            "learnedCapacityBytes" to columns.sumOf { it.backingData.size.toLong() * Int.SIZE_BYTES },
+            "learnedArenaCapacityBytes" to learnedLits.backingData.size.toLong() * Int.SIZE_BYTES,
+            "learnedMetadataCapacityBytes" to columns.sumOf { it.backingData.size.toLong() * Int.SIZE_BYTES },
             "sessionWatchCapacityBytes" to watchEntries.sumOf { it.size.toLong() * Long.SIZE_BYTES } +
                 watchSizes.size.toLong() * Int.SIZE_BYTES,
             "pendingAttachments" to (rechecks.size - recheckHead).toLong(),
