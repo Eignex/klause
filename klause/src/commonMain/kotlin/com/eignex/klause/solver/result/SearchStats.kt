@@ -38,7 +38,7 @@ data class SearchStats(
     val rootFixed: MaxResult = NO_MAX,
     /** Literals inprocessing pinned and propagated to a fixpoint to strengthen a clause. */
     val inprocessProbes: SumResult = ZERO_COUNT,
-    /** Clause literals inprocessing scanned looking for subsumed or strengthenable clauses. */
+    /** Inprocessing scan and preparation observations, overlapping the propagation-work ledger. */
     val inprocessVisits: SumResult = ZERO_COUNT,
     /** Learned clauses with a literal block distance of at most two: the short, reusable ones. */
     val glueClauses: SumResult = ZERO_COUNT,
