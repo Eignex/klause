@@ -21,68 +21,141 @@ internal fun forgetIfOverCap(session: PropagationSession, params: BacktrackParam
         forgetTiered(session, params, cap, learnedSize)
         return
     }
+    val prepared = prepareCapReduction(session, params, learnedSize, tiered = false) ?: return
     val glueThreshold = params.lbdGlueThreshold
-    val nonGlue = ArrayList<IntArray>(learnedSize)
-    for (index in 0 until learnedSize) {
-        val lbd = session.learnedClauseLbd(index)
-        if (lbd > glueThreshold && !session.learnedClausePermanent(index)) nonGlue += intArrayOf(lbd, index)
-    }
-    if (nonGlue.isEmpty()) return
-    val remaining = (cap - (learnedSize - nonGlue.size)).coerceAtLeast(0)
-    if (nonGlue.size <= remaining) return
-    nonGlue.sortBy { it[0] }
-    val kept = IntHashSet(remaining)
-    for (index in 0 until remaining) kept.add(nonGlue[index][1])
+    val remaining = (cap - (learnedSize - prepared.count)).coerceAtLeast(0)
+    if (prepared.count <= remaining) return
+    if (!prepared.select(remaining)) return
     session.forgetLearnedClauses { index, lbd ->
-        lbd <= glueThreshold || session.learnedClausePermanent(index) || index in kept
+        lbd <= glueThreshold || session.learnedClausePermanent(index) || prepared.kept[index]
     }
     val dropped = learnedSize - session.learnedClauseCount
-    params.onEvent?.invoke(SearchEvent.LearnedDbSweep(kept = learnedSize - dropped, dropped = dropped))
+    if (dropped > 0) params.onEvent?.invoke(SearchEvent.LearnedDbSweep(kept = learnedSize - dropped, dropped = dropped))
 }
 
 private fun forgetTiered(session: PropagationSession, params: BacktrackParams, cap: Int, learnedSize: Int) {
-    val coreThreshold = params.lbdGlueThreshold
-    val midThreshold = params.midLbdThreshold
-    val locals = ArrayList<IntArray>(learnedSize)
-    for (index in 0 until learnedSize) {
-        val lbd = session.learnedClauseLbd(index)
-        val used = session.learnedClauseUsedSinceReduction(index)
-        val tier = session.learnedClauseTier(index).takeUnless { it == ClauseTier.UNSET } ?: when {
-            lbd <= coreThreshold -> ClauseTier.CORE
-            lbd <= midThreshold -> ClauseTier.MID
-            else -> ClauseTier.LOCAL
-        }
-        if (session.learnedClausePermanent(index)) {
-            session.setLearnedClauseTier(index, tier)
-            continue
-        }
-        when (tier) {
-            ClauseTier.CORE -> session.setLearnedClauseTier(index, ClauseTier.CORE)
+    val prepared = prepareCapReduction(session, params, learnedSize, tiered = true) ?: return
+    val residual = (cap - (learnedSize - prepared.count)).coerceAtLeast(0)
+    if (prepared.count > residual && !prepared.select(residual)) return
+    if (!prepared.publishTiers()) return
+    if (prepared.count > residual) {
+        session.forgetLearnedClauses { index, _ -> prepared.kept[index] }
+        val retired = learnedSize - session.learnedClauseCount
+        if (retired > 0) params.onEvent?.invoke(SearchEvent.LearnedDbSweep(kept = session.learnedClauseCount, dropped = retired))
+    }
+}
 
-            ClauseTier.MID -> session.setLearnedClauseTier(index, if (used) ClauseTier.MID else ClauseTier.LOCAL)
+private fun prepareCapReduction(
+    session: PropagationSession,
+    params: BacktrackParams,
+    count: Int,
+    tiered: Boolean,
+): CapReductionPreparation? {
+    val levels = Int.SIZE_BITS - count.countLeadingZeroBits()
+    val work = count.toLong() * (levels * 4L + 16L)
+    val scratch = count.toLong() * if (tiered) 13L else 9L
+    if (work > params.learnedMemoryWork || scratch > params.learnedMemoryScratchBytes ||
+        params.cancellation() || session.cancelRequested
+    ) return null
+    session.chargeSharingWork(count.toLong() * 3L)
+    if (params.cancellation() || session.cancelRequested) return null
+    val prepared = CapReductionPreparation(session, params, count, tiered)
+    return prepared.takeIf { it.scan(tiered) }
+}
 
-            ClauseTier.LOCAL -> if (used) {
-                session.setLearnedClauseTier(index, ClauseTier.MID)
-            } else {
-                session.setLearnedClauseTier(index, ClauseTier.LOCAL)
-                locals.add(intArrayOf(lbd, index))
+private class CapReductionPreparation(
+    private val session: PropagationSession,
+    private val params: BacktrackParams,
+    size: Int,
+    tiered: Boolean,
+) {
+    private val candidates = LongArray(size)
+    val kept = BooleanArray(size) { true }
+    val tiers = IntArray(if (tiered) size else 0)
+    var count = 0
+        private set
+    private var work = size.toLong() * 3L
+
+    private fun step(): Boolean {
+        if (work >= params.learnedMemoryWork || params.cancellation() || session.cancelRequested) return false
+        session.chargeSharingWork(1L)
+        work++
+        return true
+    }
+
+    fun scan(tiered: Boolean): Boolean {
+        for (index in candidates.indices) {
+            if (!step()) return false
+            val lbd = session.learnedClauseLbd(index)
+            if (!tiered) {
+                if (lbd > params.lbdGlueThreshold && !session.learnedClausePermanent(index)) add(index, lbd)
+                continue
             }
-
-            ClauseTier.UNSET -> error("tier was resolved")
+            val used = session.learnedClauseUsedSinceReduction(index)
+            val tier = session.learnedClauseTier(index).takeUnless { it == ClauseTier.UNSET } ?: when {
+                lbd <= params.lbdGlueThreshold -> ClauseTier.CORE
+                lbd <= params.midLbdThreshold -> ClauseTier.MID
+                else -> ClauseTier.LOCAL
+            }
+            val permanent = session.learnedClausePermanent(index)
+            tiers[index] = when {
+                permanent || tier == ClauseTier.CORE -> tier
+                tier == ClauseTier.MID -> if (used) ClauseTier.MID else ClauseTier.LOCAL
+                used -> ClauseTier.MID
+                else -> {
+                    add(index, lbd)
+                    ClauseTier.LOCAL
+                }
+            }.ordinal
         }
+        return true
     }
-    val residual = (cap - (learnedSize - locals.size)).coerceAtLeast(0)
-    if (locals.size <= residual) {
-        for (index in 0 until learnedSize) session.clearLearnedClauseUsed(index)
-        return
+
+    private fun add(index: Int, lbd: Int) {
+        candidates[count++] = (lbd.toLong() shl Int.SIZE_BITS) or index.toLong()
+        kept[index] = false
     }
-    locals.sortBy { it[0] }
-    val dropped = IntHashSet(locals.size - residual)
-    for (index in residual until locals.size) dropped.add(locals[index][1])
-    session.forgetLearnedClauses { index, _ -> index !in dropped }
-    val retired = learnedSize - session.learnedClauseCount
-    params.onEvent?.invoke(SearchEvent.LearnedDbSweep(kept = session.learnedClauseCount, dropped = retired))
-    for (index in 0 until session.learnedClauseCount) session.clearLearnedClauseUsed(index)
+
+    fun select(remaining: Int): Boolean {
+        fun sift(start: Int, end: Int): Boolean {
+            var root = start
+            while (root * 2 + 1 < end) {
+                if (!step()) return false
+                var child = root * 2 + 1
+                if (child + 1 < end && candidates[child] < candidates[child + 1]) child++
+                if (candidates[root] >= candidates[child]) break
+                val value = candidates[root]
+                candidates[root] = candidates[child]
+                candidates[child] = value
+                root = child
+            }
+            return true
+        }
+        for (index in count / 2 - 1 downTo 0) if (!sift(index, count)) return false
+        for (end in count - 1 downTo 1) {
+            if (!step()) return false
+            val value = candidates[0]
+            candidates[0] = candidates[end]
+            candidates[end] = value
+            if (!sift(0, end)) return false
+        }
+        for (index in 0 until remaining) {
+            if (!step()) return false
+            kept[candidates[index].toInt()] = true
+        }
+        return step()
+    }
+
+    fun publishTiers(): Boolean {
+        if (!step()) return false
+        session.chargeSharingWork(tiers.size.toLong() * 2L)
+        if (params.cancellation() || session.cancelRequested) return false
+        for (index in tiers.indices) {
+            session.setLearnedClauseTier(index, ClauseTier.entries[tiers[index]])
+            session.clearLearnedClauseUsed(index)
+        }
+        return true
+    }
 }
 
 // Retaining the batch prevents repeated attachments when retirement must wait for another slice.

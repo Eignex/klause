@@ -14,4 +14,5 @@ internal fun maintainLearnedMemory(
         { inprocessing?.releaseRetainedBuffers() ?: false })
     stats?.noteInprocessing("learnedMemory${result.status.name}", 1L)
     stats?.noteInprocessing("learnedMemoryWork", result.work)
+    if (result.protectedLimitExceeded) stats?.noteInprocessing("learnedMemoryProtectedLimit", 1L)
 }

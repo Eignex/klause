@@ -1120,7 +1120,8 @@ class PropagationSession private constructor(
                 learnedClauseCount < count || (afterBytes != null && afterBytes < beforeBytes) -> ReclamationStatus.RECLAIMED
                 afterFloor != null && afterFloor > softLimitBytes -> ReclamationStatus.PROTECTED_FLOOR
                 else -> ReclamationStatus.DEFERRED
-            }, beforeBytes, afterBytes, afterFloor ?: floor, work - start)
+            }, beforeBytes, afterBytes, afterFloor ?: floor, work - start,
+            protectedLimitExceeded = (afterFloor ?: floor) > softLimitBytes)
     }
 
     internal fun sharingMemory(

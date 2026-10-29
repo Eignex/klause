@@ -72,6 +72,39 @@ class LearnedReclamationTest {
     }
 
     @Test
+    fun `an exhausted preparation allowance should defer before publication on both stores`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(Problem(4, 0, emptyArray(), emptyList()), nativeSat = native)
+            session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
+            val allowance = session.sharingMemory(maxWork = 1_000_000L).work + 2L
+            val revision = session.learnedClauseRevision
+
+            val reclaimed = session.reclaimLearnedMemory(0L, maxWork = allowance)
+            session.pinBool(0, false)
+
+            assertEquals(ReclamationStatus.DEFERRED, reclaimed.status)
+            assertNotNull(reclaimed.beforeBytes)
+            assertTrue(reclaimed.work <= allowance)
+            assertEquals(revision, session.learnedClauseRevision)
+            assertEquals(1, session.learnedClauseCount)
+            assertEquals(true, session.boolValue(1))
+        }
+    }
+
+    @Test
+    fun `insufficient native arena scratch should defer after completing the observation`() {
+        val session = PropagationSession(Problem(2, 0, emptyArray(), emptyList()), nativeSat = true)
+        session.addLearnedClause(Clause(IntArray(4096) { if (it % 2 == 0) 0 else 2 }), 2)
+
+        val reclaimed = session.reclaimLearnedMemory(0L, maxWork = 1_000_000L, maxScratchBytes = 8192L)
+
+        assertEquals(ReclamationStatus.DEFERRED, reclaimed.status)
+        assertNotNull(reclaimed.beforeBytes)
+        assertEquals(1, session.learnedClauseCount)
+        assertEquals(4096, session.learnedClauseLiteralCount(0))
+    }
+
+    @Test
     fun `cancellation during reclamation preparation should preserve the complete store`() {
         for (native in listOf(false, true)) {
             var limit = Long.MAX_VALUE

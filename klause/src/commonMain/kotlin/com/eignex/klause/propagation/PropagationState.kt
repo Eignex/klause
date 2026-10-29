@@ -440,11 +440,15 @@ class PropagationState private constructor(
 
     /** Backing list for [refPayload]; mutable so [addLearnedClause] can grow it
      *  alongside the learned-clause registry without copying the full array. */
-    internal val refPayloadStore: ArrayList<Any?> by lazy(LazyThreadSafetyMode.NONE) {
-        prepared?.refPayloadStore ?: ArrayList<Any?>(problem.numFactors).apply {
+    private class PayloadOwner(var values: ArrayList<Any?>)
+    private val payloadOwner: PayloadOwner by lazy(LazyThreadSafetyMode.NONE) {
+        PayloadOwner(prepared?.refPayloadStore ?: ArrayList<Any?>(problem.numFactors).apply {
             repeat(problem.numFactors) { add(null) }
-        }
+        })
     }
+    internal var refPayloadStore: ArrayList<Any?>
+        get() = payloadOwner.values
+        set(value) { payloadOwner.values = value }
 
     /** Indices in [refPayloadStore] currently holding a [SnapshottablePayload]. Maintained on every
      *  write through [refPayload] so [mark] visits only these slots instead of scanning the whole
@@ -457,7 +461,11 @@ class PropagationState private constructor(
     /** Per-factor mutable payload slots (reference-typed). Writes route through this view so
      *  [snapshottableIndices] stays in sync; reads and structural ops delegate to [refPayloadStore]. */
     val refPayload: MutableList<Any?> by lazy(LazyThreadSafetyMode.NONE) {
-        object : MutableList<Any?> by refPayloadStore {
+        object : AbstractMutableList<Any?>() {
+            override val size: Int get() = refPayloadStore.size
+            override fun get(index: Int): Any? = refPayloadStore[index]
+            override fun add(index: Int, element: Any?) { refPayloadStore.add(index, element) }
+            override fun removeAt(index: Int): Any? = refPayloadStore.removeAt(index)
             override fun set(index: Int, element: Any?): Any? {
                 if (element is SnapshottablePayload) {
                     snapshottableIndices.add(

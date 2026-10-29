@@ -91,7 +91,8 @@ internal class IntEventMachinery private constructor(
     }
 
     fun remapLearned(remap: IntArray, base: Int) {
-        overflow?.forEach { _, list ->
+        val replacement = MutableIntObjectMap<IntArrayList>()
+        overflow?.forEach { event, list ->
             var write = 0
             for (index in 0 until list.size) {
                 val factor = list[index]
@@ -102,7 +103,9 @@ internal class IntEventMachinery private constructor(
             }
             list.truncateTo(write)
             list.trim()
+            if (write > 0) replacement.put(event, list)
         }
+        overflow = replacement.takeUnless { it.isEmpty() }
     }
 
     /** Visit every factor subscribed to event [packed]: base subscribers (CSR, ascending factor id) then

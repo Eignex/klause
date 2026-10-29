@@ -309,6 +309,8 @@ internal fun PropagationState.forgetLearnedClauses(
         }
     }
     while (refPayloadStore.size > rw) refPayloadStore.removeAt(refPayloadStore.size - 1)
+    refPayloadStore = ArrayList(refPayloadStore)
+    learned.integerRows = learned.integerRows?.let { ArrayList(it) }
 
     for (lit in watches.byLit.indices) {
         work++
@@ -359,6 +361,7 @@ internal fun PropagationState.forgetLearnedClauses(
     // The compaction renumbered learned fids and shifted every list position, so the
     // back-pointer index is stale — rebuild it wholesale from the final lists. Cheap
     // relative to the rest of forget, which is itself infrequent (≈ once per restart).
+    work += watches.pos.size.toLong() * watches.pos.size
     watches.pos = com.eignex.klause.util.MutableLongIntMap()
     for (lit in watches.byLit.indices) {
         work++
@@ -382,7 +385,11 @@ internal fun PropagationState.forgetLearnedClauses(
     }
     learned.pendingAttach.truncateTo(pending)
     remapQueue(atoms.dirtyFactors, remap, refBase)
-    if (learned.integerRows != null) intEvents.remapLearned(remap, refBase)
+    if (learned.integerRows != null) {
+        val overflow = intEvents.overflow
+        work += (overflow?.primitiveCapacityBytes ?: 0L) + (overflow?.size?.toLong() ?: 0L) * (overflow?.size ?: 0)
+        intEvents.remapLearned(remap, refBase)
+    }
 
     // The per-variable reason fields record which factor forced each currently-implied
     // value, learned-clause ids included. Level-0 facts — e.g. a permanent blocking nogood

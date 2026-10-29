@@ -30,6 +30,7 @@ internal class ArithmeticLearningTrace(
         private set
     private var pendingPick = false
     private val storedIds = mutableMapOf<Int, Int>()
+    internal val reclamationEntries: Int get() = storedIds.size
     private var nextId = 0
     val accepting: Boolean get() = !truncated
 

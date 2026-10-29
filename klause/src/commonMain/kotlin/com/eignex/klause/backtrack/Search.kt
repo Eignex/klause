@@ -213,6 +213,7 @@ internal class CpSatisfactionTraversal(
     private val completion: BacktrackCompletion
     private var run: SearchRun? = null
     private var sharedSession: SearchSession? = null
+    private var learningSession: SearchSession? = null
     private var rootLp: LpFeasibilityComponent? = null
     private var rootPrepared = false
     private var initialization: Iterator<ComponentResult?>? = null
@@ -268,6 +269,7 @@ internal class CpSatisfactionTraversal(
                 learnedDb = params.sharedLearnedDb(),
                 atoms = if (params.integerRowLearning) SearchAtomRegistry(problem.numBoolVars) else null,
             )
+            learningSession = session
             if (params.clauseExchange != null || params.learnedMemoryBytes != null) {
                 cp.session.sharedLearningMemory = session::retainedLearningMemory
             }
@@ -420,7 +422,8 @@ internal class CpSatisfactionTraversal(
         closed = true
         initialization = null
         run = null
-        sharedSession?.releaseLearning()
+        learningSession?.releaseLearning()
+        learningSession = null
         sharedSession = null
         resources.close()
     }
@@ -431,7 +434,8 @@ internal class CpSatisfactionTraversal(
         closed = true
         initialization = null
         run = null
-        sharedSession?.releaseLearning()
+        learningSession?.releaseLearning()
+        learningSession = null
         sharedSession = null
         resources.closeAfter(failure)
     }
