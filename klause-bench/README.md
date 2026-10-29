@@ -396,9 +396,11 @@ allocation is unavailable. Inclusive numerical and certificate phase timings mus
 not be summed. Feasibility repair includes its transforms, pricing and updates;
 violation scans have a separate nested observation. Checkpoint wall time,
 including suspended caller time, is reported separately from repair. Query
-time less floating time includes certificate work and query scaffolding.
-Serialization follows each query and enters the containing lifecycle time.
-The separate active total excludes record serialization. Preparation and edit
+time less floating time includes certificate work, query scaffolding and bounded
+completion-trace materialization. The observation-disabled control retains that
+diagnostic overhead in the comparison. Record emission follows each query and
+enters the containing lifecycle time. The separate active total excludes record
+emission. Preparation and edit
 phase deltas include operations on retiring and replacement engines; invocation
 traces reset at the next solve. Scoped owner counters are cumulative gauges and
 must not be summed across queries.

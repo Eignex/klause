@@ -10,10 +10,13 @@ runtime="${3:-both}"
 [[ "$runtime" == both || "$runtime" == jvm || "$runtime" == native ]] || exit 2
 [[ "$(uname -s)/$(uname -m)" == Linux/x86_64 ]] || exit 2
 manifest="$LAB_WORKTREE/klause/src/jvmTest/resources/basis-corpus/manifest.json"
-source_identity="$(jq -er --arg id "$trace" '.fixtures[] | select(.id == $id) | .source' "$manifest")"
-expected="$(jq -er --arg id "$trace" '.fixtures[] | select(.id == $id) | .sourceSha256' "$manifest")"
+fixture="$(sed -n "/\"id\": \"$trace\"/,/^    }/p" "$manifest")"
+source_identity="$(printf '%s\n' "$fixture" | sed -n 's/^ *"source": "\([^"]*\)".*/\1/p')"
+expected="$(printf '%s\n' "$fixture" | sed -n 's/^ *"sourceSha256": "\([^"]*\)".*/\1/p')"
 source_path="${source_identity%@*}"
 source_revision="${source_identity##*@}"
+[[ "$source_path" == "HiGHS/check/instances/${trace#mps-}.mps" ]] || exit 2
+[[ "$source_revision" =~ ^[a-f0-9]{40}$ && "$expected" =~ ^[a-f0-9]{64}$ ]] || exit 2
 mkdir -p "$OUT"
 cp "$manifest" "$OUT/basis-manifest.json"
 curl -fsSL --max-time 30 "https://raw.githubusercontent.com/ERGO-Code/HiGHS/$source_revision/${source_path#HiGHS/}" -o "$OUT/source.mps"
