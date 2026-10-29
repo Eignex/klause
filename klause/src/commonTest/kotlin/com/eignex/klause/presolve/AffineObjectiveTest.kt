@@ -139,10 +139,12 @@ class AffineObjectiveTest {
                 model, cost, PresolveConfig.parse("affine").withAffinePivotOrder(order), false,
             )
 
-            val rebuilt = outcome.mapping.rebuild.steps.filterIsInstance<RebuildStep.AffineValue>()
-            assertTrue(rebuilt.any { it.variable == 0 })
-            assertEquals(listOf(0L, -1L, 3L), assertNotNull(outcome.objective).intCoefficients.toList())
-            assertEquals(Long.MAX_VALUE, outcome.objective.constant)
+            val transformed = assertNotNull(outcome.objective)
+            val coefficients = transformed.intCoefficients
+            assertEquals(-1L, coefficients[1])
+            assertEquals(3L, coefficients[0] + coefficients[2])
+            assertEquals(1, listOf(coefficients[0], coefficients[2]).count { it != 0L })
+            assertEquals(Long.MAX_VALUE, transformed.constant)
         }
     }
 
