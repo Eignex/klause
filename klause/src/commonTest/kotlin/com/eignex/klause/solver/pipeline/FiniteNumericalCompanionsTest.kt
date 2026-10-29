@@ -8,6 +8,8 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioScenario
+import com.eignex.klause.portfolio.PortfolioProgress
+import com.eignex.klause.portfolio.PortfolioRewardPolicy
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceCondition
@@ -25,6 +27,26 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class FiniteNumericalCompanionsTest {
+    @Test
+    fun `a finite source invocation should deliver accepted progress to the reward interface`() {
+        val model = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val plan = model.prepareExecutionPlan(objective, preferFinite = true)
+        val observed = mutableListOf<PortfolioProgress>()
+        val scenario = PortfolioScenario.sequential(Kind.COP).copy(rewardPolicy = PortfolioRewardPolicy {
+            observed += it
+            it.ordinaryReward
+        })
+
+        FinitePipeline.portfolioExecutor(model, scenario, objective, null, null, null, null,
+            plan, Cancellation.Never, numericalCompletion = true, numericalCompanions = TheoryParams()).use {
+            it.minimize(Cancellation.Never, null)
+        }
+
+        assertTrue(observed.any { it.acceptedIncumbents > 0 })
+    }
+
     @Test
     fun `numerical admission should retain explicit finite recipes and pure integer coverage`() {
         val binary = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray(), numRealVars = 1,
