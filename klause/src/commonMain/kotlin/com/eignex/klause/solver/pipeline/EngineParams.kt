@@ -58,6 +58,7 @@ import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.LocalSearchCatalog
 import com.eignex.klause.portfolio.PortfolioScenario
+import com.eignex.klause.portfolio.SourceProgressReward
 
 /** Invalid solver-policy configuration. */
 class PipelineConfigException(message: String) : RuntimeException(message)
@@ -715,6 +716,11 @@ internal fun buildPortfolioScenario(
         pipelineConfigError("portfolio-work requires one core and a positive work limit")
     }
     val phaseRetention = p[ExecutionOption.phaseRetention]
+    val rewardPolicy = when (val reward = p[ExecutionOption.portfolioReward]?.lowercase()) {
+        null, "ordinary" -> null
+        "source" -> SourceProgressReward
+        else -> pipelineConfigError("portfolio-reward expects ordinary|source, got `$reward`")
+    }
     val reseedStaleThreshold = p[ExecutionOption.reseedStaleThreshold]
     val reportLsResiduals = p[ExecutionOption.lsResiduals] ?: false
     val reportLsPhaseTimes = p[ExecutionOption.lsPhaseTimes] ?: false
@@ -728,7 +734,7 @@ internal fun buildPortfolioScenario(
     if (sliceGrowth != null && (!sliceGrowth.isFinite() || sliceGrowth < 1.0)) {
         pipelineConfigError("slice-growth must be finite and >= 1")
     }
-    p.finish("portfolio", "arms, ls, bt, seed, lambda, clause-share-lbd, clause-share-len, slice-work, slice-max-work, slice-growth, portfolio-work, sharing-memory, sharing-memory-bytes, sharing-memory-work, sharing-memory-scratch, portfolio-progress, core-early, companion-integers, companion-after-incumbent, companion-active-ms, core-refinement, phase-retention, reseed-stale-threshold, ls-residuals, ls-phase-times")
+    p.finish("portfolio", "arms, ls, bt, seed, lambda, clause-share-lbd, clause-share-len, slice-work, slice-max-work, slice-growth, portfolio-work, sharing-memory, sharing-memory-bytes, sharing-memory-work, sharing-memory-scratch, portfolio-progress, portfolio-reward, core-early, companion-integers, companion-after-incumbent, companion-active-ms, core-refinement, phase-retention, reseed-stale-threshold, ls-residuals, ls-phase-times")
     if (armsParam != null && (ls != null || bt != null)) {
         pipelineConfigError("portfolio: set either `arms=N` or `ls=/bt=`, not both")
     }
@@ -779,6 +785,7 @@ internal fun buildPortfolioScenario(
         companionAfterIncumbent = companionAfterIncumbent,
         companionActiveMillis = companionActiveMillis,
         reportPortfolioProgress = portfolioProgress,
+        rewardPolicy = rewardPolicy,
         explicitArms = armsParam != null || ls != null || bt != null,
     )
     clauseShareLbd?.let { scenario = scenario.copy(clauseShareMaxLbd = it) }

@@ -415,6 +415,13 @@ The scheduler assigns bounded slices, revisits pending preparation and reseeds s
 workers under the containing [allowance](06-sessions.md#resource-allowances).
 Scheduling changes work order, never publication authority.
 
+The opt-in `portfolio-reward=source` ablation retains ordinary feasibility rewards.
+After a source incumbent exists, only an accepted strict incumbent or terminal
+closure earns reward. Violation reductions, created deductions and delayed sharing
+credit stay observable without earning improvement turns. Ordinary rewards remain
+the default. The experiment changes neither admission nor complete-worker coverage;
+construction, preparation, checking and retirement retain their ordinary accounting.
+
 ### Reproducible diagnostics
 
 `portfolio-work=N` opts finite Boolean/integer portfolios into a single-lane
