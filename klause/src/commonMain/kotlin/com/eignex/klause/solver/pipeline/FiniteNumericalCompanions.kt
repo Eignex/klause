@@ -86,6 +86,7 @@ internal class FiniteNumericalCompanions private constructor(
     private val cancellation: Cancellation,
     private val cost: WorkerConstructionCost,
     private val afterIncumbent: Boolean,
+    private val incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)?,
 ) {
     val incumbents = PortfolioIncumbents.exact(objective)
 
@@ -126,7 +127,8 @@ internal class FiniteNumericalCompanions private constructor(
                     }, onIncumbentUse = {
                         companion.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_CONSUMED, importedVersion)
                     },
-                    publicationLifetime = limits.cancellation or limits.timeout, observeExternalIncumbents = true))
+                    publicationLifetime = limits.cancellation or limits.timeout, observeExternalIncumbents = true,
+                    incumbentCompletionCheck = incumbentCompletionCheck))
                 val worker = exactNeighborhoodWorker("ls/finite-joint-companion", firstArm + 1, objective,
                     limits.cancellation, limits.timeout, { repair.exhausted },
                     open = { repair.search(adaptive = false, seed = slot.seed) })
@@ -158,7 +160,7 @@ internal class FiniteNumericalCompanions private constructor(
                     worker.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_IMPORTED, importedVersion)
                 }, onIncumbentUse = {
                     worker.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_CONSUMED, importedVersion)
-                }, observeExternalIncumbents = true)
+                }, observeExternalIncumbents = true, incumbentCompletionCheck = incumbentCompletionCheck)
             private var result: MinimizeResult? = null
             override val isDone: Boolean get() = result != null
             override val stats get() = search.stats
@@ -183,12 +185,14 @@ internal class FiniteNumericalCompanions private constructor(
     companion object {
         fun prepare(model: BakedProblem, objective: LinearObjective, params: TheoryParams,
             cancellation: Cancellation, cost: WorkerConstructionCost,
-            afterIncumbent: Boolean = false): FiniteNumericalCompanions? {
+            afterIncumbent: Boolean = false,
+            incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)? = null): FiniteNumericalCompanions? {
             // The propagated difference graph duplicates affine rows and bounds in these coordinates.
             val affine = model.withFactors(model.factors.filterNot { it is DifferenceSystem }.toTypedArray())
             val context = affine.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, cancellation,
                 numericalIndicators = true) ?: return null
-            return FiniteNumericalCompanions(model, objective, context, params, cancellation, cost, afterIncumbent)
+            return FiniteNumericalCompanions(model, objective, context, params, cancellation, cost, afterIncumbent,
+                incumbentCompletionCheck)
         }
     }
 }

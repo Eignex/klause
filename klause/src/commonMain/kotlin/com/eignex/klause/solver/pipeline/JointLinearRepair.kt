@@ -49,6 +49,7 @@ internal class JointLinearRepair(
     private val onIncumbentImport: (() -> Unit)? = null,
     private val onIncumbentUse: (() -> Unit)? = null,
     private val observeExternalIncumbents: Boolean = false,
+    incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)? = null,
 ) : ExactNeighborhoodCompletion, AutoCloseable {
     private val sourceIntegers = sourceIntegers?.copyOf()
     private val stop = params.timeout or params.cancellation
@@ -57,10 +58,11 @@ internal class JointLinearRepair(
     private val budget = SourceLpBudget(maxOperations = params.sourceLpOperations,
         onWork = state.smt::observeSourceLp, funding = funding)
     private val stages = linkedMapOf<String, Long>()
-    private val completion = if (params.sourceIncumbentCompletion) LinearIncumbentCompletion(budget) { stage, count ->
-        val key = "jointRepairExternalCompletion$stage"
-        stages[key] = combine(key, stages[key] ?: 0L, count)
-    } else null
+    private val completion = if (params.sourceIncumbentCompletion)
+        LinearIncumbentCompletion(budget, incumbentCompletionCheck) { stage, count ->
+            val key = "jointRepairExternalCompletion$stage"
+            stages[key] = combine(key, stages[key] ?: 0L, count)
+        } else null
     private var importedCenter: Sample? = null
     private val authority = LinearAuthority(budget, onLpShape = { shape ->
         if (shape.sparse) observe(shape.phase?.let { "jointRepairLpPhase_$it" } ?: "jointRepairLpNoPhase")

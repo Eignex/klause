@@ -95,6 +95,9 @@ pins. The real coordinates carry no authority: connected continuous residuals us
 the existing exact recovery path. Original-source witness and exact objective
 checks precede incumbent admission, cutoff use or neighborhood centering. Supplied
 exact payloads retain their direct admission checks.
+Ordinary linear sources reconstruct the completed point through the captured
+presolve mapping, check the original declarations and rows, and compare the original
+objective with the adjusted working value before import.
 
 Each companion owns at most sixteen source/point attempts without eviction. Identity
 includes the full source restrictions, rows, coordinates, objective, interpretation

@@ -98,6 +98,9 @@ class LinearIncumbentCompletionTest {
             BigFraction.ZERO)))
         val contexts = listOf(
             SourceProofContext(scope, source.coordinates, rows, source.objective),
+            SourceProofContext(scope, source.coordinates, mapOf(
+                "negative" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ONE), BigFraction.MINUS_ONE)),
+            ), source.objective),
             SourceProofContext(scope.copy(revision = SourceRevision("other", "exact")), source.coordinates,
                 rows, source.objective),
             SourceProofContext(scope.copy(condition = scope.condition.bound(integer, BigFraction.ZERO, true)),
@@ -116,6 +119,43 @@ class LinearIncumbentCompletionTest {
         }
 
         assertEquals(contexts.size.toLong(), attempts)
+    }
+
+    @Test
+    fun `Boolean and integer seed pins should select their source guarded rows`() {
+        val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
+        val guarded = SourceProofContext(scope, setOf(bool, integer, real), mapOf(
+            "upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), third),
+                mapOf(0 to true), mapOf(integer to BigFraction.ONE)),
+            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), third.negated()),
+                mapOf(0 to true), mapOf(integer to BigFraction.ONE)),
+        ), mapOf(real to BigFraction.ONE))
+        val offered = Sample(booleanArrayOf(true), longArrayOf(1), doubleArrayOf(0.0))
+
+        val point = LinearIncumbentCompletion(SourceLpBudget()) { _, _ -> }.use {
+            assertNotNull(it.complete(guarded, offered, Cancellation.Never))
+        }
+
+        assertTrue(point.boolValue(0))
+        assertEquals(1L, point.intValue(0))
+        assertEquals(listOf(third), point.exactReals)
+    }
+
+    @Test
+    fun `an original objective rejection should remain distinct from a completed working point`() {
+        var originalChecks = 0
+        var checked = 0L
+
+        LinearIncumbentCompletion(SourceLpBudget(), originalCheck = { _, _, _ ->
+            originalChecks++
+            false
+        }) { stage, count -> if (stage == "Checked") checked += count }.use {
+            assertNull(it.complete(source, seed, Cancellation.Never))
+            assertNull(it.complete(source, seed.copy(), Cancellation.Never))
+        }
+
+        assertEquals(1, originalChecks)
+        assertEquals(0L, checked)
     }
 
     @Test
@@ -196,10 +236,10 @@ class LinearIncumbentCompletionTest {
 
         LinearIncumbentCompletion(SourceLpBudget(funding = funding)) { stage, count ->
             if (stage == "Attempts") attempts += count
-        }.use {
+        }.use { completion ->
             repeat(3) {
                 funding.grant(2_000_000L)
-                assertNull(it.complete(source, seed, Cancellation.Never))
+                assertNull(completion.complete(source, seed, Cancellation.Never))
             }
         }
 
