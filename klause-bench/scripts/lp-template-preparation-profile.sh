@@ -4,7 +4,7 @@ set -euo pipefail
 : "${OUT:?lab output directory is required}"
 source_name="${1:?source fixture is required}"
 case "$source_name" in
-  cover-2x3|cover-3x3|dense-2x12|dense-8x24) ;;
+  cover-2x3|cover-3x3) ;;
   *) exit 2 ;;
 esac
 source_path="$LAB_WORKTREE/klause-bench/smoke-corpus/lp-component-split/$source_name.mps"

@@ -132,6 +132,38 @@ class LpPreparationTemplatesTest {
     }
 
     @Test
+    fun `candidate import should adopt exact columns with unchanged normalized authority`() {
+        val consumer = CpToLpRelaxation(source, objective, projections = selection, reuseTemplateMetadata = true)
+        val relaxation = consumer.build(RootDomains(source))
+        var adopted = 0
+
+        val reused = assertNotNull(relaxation.authoritativeWithTemplates(Cancellation.Never) { adopted = it })
+        val fresh = assertNotNull(CpToLpRelaxation(source, objective, projections = null)
+            .build(RootDomains(source)).model.authoritativeModel())
+
+        assertTrue(adopted > 0)
+        assertSame(assertNotNull(consumer.preparationTemplates).bounds.getValue(0).column, reused.column(0))
+        assertTrue(reused.sameAuthority(fresh))
+    }
+
+    @Test
+    fun `cancelled candidate import should withhold exact authority`() {
+        val consumer = CpToLpRelaxation(source, objective, projections = selection, reuseTemplateMetadata = true)
+        val relaxation = consumer.build(RootDomains(source))
+        var work = 0L
+        val meter = WorkMeter { work += it }
+        val token = object : Cancellation {
+            override fun isCancelled(): Boolean = work >= 2L
+            override fun workMeter(): WorkMeter = meter
+        }
+
+        val result = relaxation.authoritativeWithTemplates(token)
+
+        assertNull(result)
+        assertEquals(2L, work)
+    }
+
+    @Test
     fun `unchanged consumers should reuse completed indexes with less preparation work`() {
         val before = assertNotNull(selection.prepareLpTemplates(objective, Cancellation.Never))
         var reusedWork = 0L
@@ -408,7 +440,7 @@ class LpPreparationTemplatesTest {
         val captured = FactorProjectionProviders.Default.prepare(problem)
         val relaxer = CpToLpRelaxation(problem, null, projections = captured, reuseTemplateMetadata = true)
 
-        val reused = assertNotNull(relaxer.build(RootDomains(problem)).model.authoritativeModel())
+        val reused = assertNotNull(relaxer.build(RootDomains(problem)).authoritativeWithTemplates(Cancellation.Never))
         val fresh = assertNotNull(CpToLpRelaxation(problem, null, projections = null)
             .build(RootDomains(problem)).model.authoritativeModel())
 
