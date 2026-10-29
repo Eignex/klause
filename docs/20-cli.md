@@ -142,13 +142,13 @@ transcendental work defaults to 100,000 units. Polynomial representation caps st
 apply. Exhausted candidates or work yield UNKNOWN; LS and ALNS keep checked incumbents,
 and neighborhood exhaustion supplies no global claim.
 
-#The finite backtrack controls `propagation-attribution=true` and
+### Statistics
+
+The finite backtrack controls `propagation-attribution=true` and
 `historical-table-reasons=true` independently enable bounded family diagnostics
 and the historical Table retry. Both default to false. Attribution exports sparse
-`factor<Family><Metric>` counters with the existing learning statistics; see
+`nativeFactor<Family><Metric>` counters with the existing learning statistics; see
 [attribution ownership](09-learning.md#propagation-and-explanation-attribution).
-
-## Statistics
 
 Learned-object counters use the `nativeLearning{Kind}{Stage}` and
 `sharedLearning{Kind}{Stage}` names for native and shared stores. Source refutation

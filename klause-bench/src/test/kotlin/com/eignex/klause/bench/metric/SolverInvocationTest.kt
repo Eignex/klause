@@ -1,5 +1,8 @@
 package com.eignex.klause.bench.metric
 
+import com.eignex.klause.bench.runner.Budget
+import com.eignex.klause.bench.source.CorpusFiles
+
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 import java.io.File
@@ -13,6 +16,47 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SolverInvocationTest {
+    @Test
+    fun `compressed input reaches the solver as original bytes and is retired afterwards`() {
+        val root = Files.createTempDirectory("solver-source").toFile()
+        try {
+            val body = "p cnf 2 1\n1 -2 0\n"
+            val packed = CorpusFiles.compress(File(root, "input.cnf").apply { writeText(body) })
+            var staged: File? = null
+
+            val result = SolverInvocation.withSourceInput(packed, Budget(10_000)) { plain, remaining ->
+                staged = plain
+                assertEquals(body, plain.readText())
+                assertTrue(remaining.timeoutMillis in 1..10_000)
+                SolverInvocation.Result(true, null, 2L, proven = false,
+                    stats = emptyMap(), rawOutput = "sat", command = plain.path, elapsedMs = 3L)
+            }
+
+            assertFalse(assertNotNull(staged).exists())
+            assertEquals(body, CorpusFiles.readText(packed))
+            assertEquals(3L, result.elapsedMs)
+            assertEquals(2L, result.timeToBestMs)
+            assertTrue("sourceDecodeMs" in result.stats && "sourceInvocationMs" in result.stats)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `exhausted input preparation supplies no solver verdict`() {
+        val root = Files.createTempDirectory("solver-source").toFile()
+        try {
+            val packed = CorpusFiles.compress(File(root, "input.cnf").apply { writeText("p cnf 0 0\n") })
+            val result = SolverInvocation.withSourceInput(packed, Budget(0)) { _, _ -> error("budget exhausted") }
+
+            assertNull(result.feasible)
+            assertFalse(result.proven)
+            assertEquals("true", result.stats["sourcePreparationBudgetExhausted"])
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
 
     @ParameterizedTest
     @ValueSource(booleans = [false, true])

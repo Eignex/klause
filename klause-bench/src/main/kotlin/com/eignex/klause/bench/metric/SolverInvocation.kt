@@ -6,6 +6,7 @@ import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.MiniZincRunner
 import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.bench.source.CorpusFetcher
+import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.bench.tools.CliProfile
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -66,18 +67,39 @@ internal object SolverInvocation {
 
     /** Run klause-cli over [entry] under [budget]. [optimize] selects intermediate-solution mode (`-a`). */
     fun run(entry: ResolvedProblem, settings: Settings, budget: Budget, optimize: Boolean): Result {
-        val cmd = klauseCommand(entry, settings, budget, optimize)
-        // Hard wall-clock ceiling: a solve that ignores its `-t` deadline (e.g. an expensive move source
-        // that polls cancellation too rarely) must not hang the harness. Generous over the budget so it
-        // only ever kills a genuine runaway, never a solve that's merely flushing at the deadline.
-        return invoke(
-            cmd,
-            dialectFor(entry.ref.format),
-            hardTimeoutMs = budget.timeoutMillis * 2 + 20_000,
-            captureDirectory = settings.captureDirectory,
-            measureResources = settings.measureResources,
-        )
-            .copy(buildProvenance = InstalledBuild.current)
+        val file = if (entry.ref.format == Format.MINIZINC) MiniZincRunner().compileFzn(entry.ref)
+            else CorpusFetcher.resolve(entry.ref.source)
+        return withSourceInput(file, budget) { plain, remaining ->
+            val cmd = klauseCommand(entry, settings, remaining, optimize, plain)
+            invoke(
+                cmd,
+                dialectFor(entry.ref.format),
+                hardTimeoutMs = remaining.timeoutMillis * 2 + 20_000,
+                captureDirectory = settings.captureDirectory,
+                measureResources = settings.measureResources,
+            )
+        }.copy(buildProvenance = InstalledBuild.current)
+    }
+
+    internal fun withSourceInput(file: File, budget: Budget, solve: (File, Budget) -> Result): Result {
+        if (!CorpusFiles.isCompressed(file)) return solve(file, budget)
+        val start = System.nanoTime()
+        var preparationMs = 0L
+        val result = CorpusFiles.withPlainFile(file) { plain ->
+            preparationMs = (System.nanoTime() - start) / 1_000_000L
+            val remaining = budget.timeoutMillis - preparationMs
+            val result = if (remaining <= 0L) {
+                Result(null, null, null, proven = false, stats = mapOf("sourcePreparationBudgetExhausted" to "true"),
+                    rawOutput = "", command = "SOURCE_PREPARATION")
+            } else {
+                solve(plain, Budget(remaining))
+            }
+            result
+        }
+        return result.copy(stats = result.stats + mapOf(
+            "sourceDecodeMs" to preparationMs.toString(),
+            "sourceInvocationMs" to ((System.nanoTime() - start) / 1_000_000L).toString(),
+        ))
     }
 
     /** The provisioned klause-cli launcher. */
@@ -116,16 +138,11 @@ internal object SolverInvocation {
         }
 
     /** klause-cli on the model file (compiled `.fzn` for MiniZinc, else the original source). */
-    private fun klauseCommand(entry: ResolvedProblem, s: Settings, budget: Budget, optimize: Boolean): List<String> {
+    private fun klauseCommand(
+        entry: ResolvedProblem, s: Settings, budget: Budget, optimize: Boolean, file: File,
+    ): List<String> {
         val bin = klauseCliBin()
         check(bin.canExecute()) { "klause-cli not installed at $bin (run :klause-cli:installJvmDist)" }
-        val file = if (entry.ref.format == Format.MINIZINC) {
-            MiniZincRunner().compileFzn(entry.ref)
-        } else {
-            // A compressed `.zst` instance is passed as is: klause-cli decompresses it while reading, so
-            // the decompression counts toward the solve time as it would for any compressed input.
-            CorpusFetcher.resolve(entry.ref.source)
-        }
         return buildList {
             add(bin.absolutePath)
             // MPS instances (notably extension-less MIPLIB files) can't be auto-detected by suffix;

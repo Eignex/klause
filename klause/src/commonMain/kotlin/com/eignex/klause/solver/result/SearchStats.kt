@@ -69,7 +69,7 @@ data class SearchStats(
     val clausalPrimalIncomplete: SumResult = ZERO_COUNT,
     /** Relation-count and residual-domain value guidance, separate from real search conflicts. */
     val valueOrdering: ValueOrderingStats = ValueOrderingStats(),
-    /** Learned-object lifetime counters, grouped by kind and stage. */
+    /** Learned-object lifetime and opt-in finite factor-attribution counters. */
     val learning: Map<String, Long> = emptyMap(),
 
 ) {
