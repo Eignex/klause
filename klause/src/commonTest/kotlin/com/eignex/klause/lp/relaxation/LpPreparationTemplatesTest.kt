@@ -110,6 +110,24 @@ class LpPreparationTemplatesTest {
     }
 
     @Test
+    fun `metadata refresh should recheck bounds in a shared finite view`() {
+        val finite = source.bake(selection)
+        val captured = assertNotNull(finite.factorProjections)
+        val before = assertNotNull(captured.prepareLpTemplates(objective, Cancellation.Never))
+        finite.rootIntDomainsInPlace[0] = IntDomain(1, 10)
+        val consumer = CpToLpRelaxation(finite, objective, projections = captured, reuseTemplateMetadata = true)
+
+        val reused = assertNotNull(consumer.build(RootDomains(finite)).model.authoritativeModel())
+        val after = assertNotNull(consumer.preparationTemplates)
+        val fresh = assertNotNull(CpToLpRelaxation(finite, objective, projections = null)
+            .build(RootDomains(finite)).model.authoritativeModel())
+
+        assertNotSame(before.bounds[0], after.bounds[0])
+        assertSame(before.components[1], after.components[1])
+        assertTrue(reused.sameAuthority(fresh))
+    }
+
+    @Test
     fun `unchanged consumers should reuse completed indexes with less preparation work`() {
         val before = assertNotNull(selection.prepareLpTemplates(objective, Cancellation.Never))
         var reusedWork = 0L
@@ -138,7 +156,7 @@ class LpPreparationTemplatesTest {
         val original = LinearObjective(boolWeights = LongArray(7) { 1L })
         captured.prepareLpTemplates(original, Cancellation.Never)
         val changed = original.copy(boolWeights = LongArray(7) { if (it == 4) 3L else 1L })
-        val consumer = CpToLpRelaxation(problem, changed, projections = captured)
+        val consumer = CpToLpRelaxation(problem, changed, projections = captured, reuseTemplateMetadata = true)
 
         val reused = consumer.build(RootDomains(problem)).model.authoritativeModel()
         val fresh = CpToLpRelaxation(problem, changed, projections = null)
@@ -320,7 +338,7 @@ class LpPreparationTemplatesTest {
         val view = source.withFactors(source.factors.map { it.remap(remap) }.toTypedArray())
 
         val after = assertNotNull(selection.projected(view, intArrayOf(0, 1, 2), remap)
-            .prepareLpTemplates(objective, Cancellation.Never))
+            .prepareLpTemplates(objective, Cancellation.Never, reuseMetadata = true))
 
         assertEquals(0, after.reusedFactors)
         assertEquals(0, after.reusedBounds)
@@ -331,7 +349,8 @@ class LpPreparationTemplatesTest {
         selection.prepareLpTemplates(objective, Cancellation.Never)
         val finite = source.bake(selection)
 
-        val after = assertNotNull(finite.factorProjections?.prepareLpTemplates(objective, Cancellation.Never))
+        val after = assertNotNull(finite.factorProjections?.prepareLpTemplates(objective, Cancellation.Never,
+            reuseMetadata = true))
 
         assertEquals(0, after.reusedFactors)
         assertEquals(0, after.reusedBounds)
@@ -383,7 +402,7 @@ class LpPreparationTemplatesTest {
             Linear(longArrayOf(1), intArrayOf(0), LinearOp.GE, lower),
         ))
         val captured = FactorProjectionProviders.Default.prepare(problem)
-        val relaxer = CpToLpRelaxation(problem, null, projections = captured)
+        val relaxer = CpToLpRelaxation(problem, null, projections = captured, reuseTemplateMetadata = true)
 
         val reused = assertNotNull(relaxer.build(RootDomains(problem)).model.authoritativeModel())
         val fresh = assertNotNull(CpToLpRelaxation(problem, null, projections = null)
@@ -399,7 +418,7 @@ class LpPreparationTemplatesTest {
             ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 8),
         ))
         val captured = FactorProjectionProviders.Default.prepare(problem)
-        val relaxer = CpToLpRelaxation(problem, null, projections = captured)
+        val relaxer = CpToLpRelaxation(problem, null, projections = captured, reuseTemplateMetadata = true)
         for (pin in listOf(null, true, false)) {
             val domains = object : RelaxationDomains {
                 override fun intDomain(varId: Int): IntDomain = problem.finiteIntDomain(varId)
