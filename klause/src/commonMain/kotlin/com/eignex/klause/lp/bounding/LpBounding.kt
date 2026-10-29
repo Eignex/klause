@@ -701,7 +701,7 @@ internal fun LpEngine.sparseSafePrune(
     val sourceRange = sourceObjectiveRange(boundRel)
     val cutoff = if (canPrune) sourceObjectiveCutoff(boundRel, bound, sourceRange) else null
     if (cutoff != null && full >= cutoff) {
-        observeCutUse(boundRel, cert, "BOUND_PRUNE_SUPPORT")
+        observeAcceptedCutBoundUse(boundRel, cert, boundRes.duals, cutoff, "BOUND_PRUNE")
         sink.lp.observePrune()
         LpClaim.BOUND.consumed(sink.lp.certificationObserver(LpRoute.NODE))
         return LpNodeOutcome(true, null)
@@ -741,7 +741,9 @@ internal fun LpEngine.sparseSafePrune(
             } else {
                 session.implyIntAtLeast(objectiveVar, rounded)
             }
-            if (rounded > previousLower) observeCutUse(boundRel, cert, "OBJECTIVE_PROPAGATION_SUPPORT")
+            if (rounded > previousLower) {
+                observeAcceptedCutBoundUse(boundRel, cert, boundRes.duals, sourceLower, "OBJECTIVE_PROPAGATION")
+            }
             if (res is PropagationResult.Unsat) {
                 sink.lp.observePrune()
                 LpClaim.BOUND.consumed(sink.lp.certificationObserver(LpRoute.NODE))

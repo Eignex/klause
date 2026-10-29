@@ -5,7 +5,9 @@ import com.eignex.klause.lp.cut.CutSeparator
 import com.eignex.klause.lp.cut.SharedCut
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.LpDeductionCertificate
+import com.eignex.klause.lp.engine.hasIntegralObjective
 import com.eignex.klause.lp.relaxation.LpRelaxation
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.result.LpPhaseStats
 
 internal fun LpEngine.constructCuts(separator: CutSeparator, context: CutContext): List<Cut> =
@@ -47,6 +49,32 @@ internal fun LpEngine.observeCutRayUse(relaxation: LpRelaxation, ray: LongArray)
     for ((row, family) in families) {
         if (params.cancellation()) break
         if (row in ray.indices && ray[row] != 0L) sink.lp.cutLifecycle.event(family, "CHECKED_USE", "CONFLICT_PRUNE")
+    }
+    noteNodeOverhead(families.size.toLong())
+}
+
+internal fun LpEngine.observeAcceptedCutBoundUse(
+    relaxation: LpRelaxation,
+    certificate: LpDeductionCertificate?,
+    duals: DoubleArray,
+    required: BigFraction,
+    outcome: String,
+) {
+    val certified = certificate?.let {
+        if (relaxation.model.hasIntegralObjective()) {
+            it.objectiveBoundCeil(relaxation.objectiveConstant)?.let(BigFraction::ofLong)
+        } else it.exactObjectiveBound() + BigFraction.ofLong(relaxation.objectiveConstant)
+    }
+    if (certified != null && certified >= required) {
+        observeCutUse(relaxation, certificate, outcome)
+        return
+    }
+    val families = relaxation.sourceMap?.parentFamilies() ?: return
+    for ((row, family) in families) {
+        if (params.cancellation()) break
+        if (row in duals.indices && duals[row] != 0.0) {
+            sink.lp.cutLifecycle.event(family, "CHECKED_USE", "SAFE_$outcome")
+        }
     }
     noteNodeOverhead(families.size.toLong())
 }
