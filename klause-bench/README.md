@@ -4,6 +4,47 @@ JVM problem catalog and single-case runner for
 [eignex-lab](https://github.com/Eignex/eignex-lab). Use the lab for experiments,
 revision comparisons, reference solvers, witness checks, schedules and profiling.
 
+## Private rebuild qualification capture
+
+Enable `param.root-simplification=true` and
+`param.root-rebuild-capture-visits=8192` with explicit containing
+`param.inprocessing-work` and `param.inprocessing-root-work` grants. The opt-in scan
+runs after stable-ID simplification at eligible scheduled roots and shares I2's work,
+cooldown and debt controls. Keep capture disabled as an equal-total-allowance control.
+`nativeInprocessRootRebuildComplete` counts full views; `Partial` and `Unsupported`
+withhold conclusions. `ProgressPins` excludes the original baked-root facts.
+`StableRemoved`/`StableShortened` count changes already handled without elimination;
+`NewCandidates` counts unfixed columns newly meeting the non-growing resolvent-pair
+proxy described in [the contract](../docs/07-presolve.md#private-worker-qualification).
+It does not build resolvents or qualify objectives, arithmetic passes or learned imports.
+Aggregated views can revisit the same facts. `ScratchBytes` is cumulative modeled
+array allocation, not a peak; a view uses at most `18 * floor(visits / 10)` primitive
+bytes and retains no capture buffers. `CaptureWork` is included in root `Work` and
+worker work, not additional work to sum. Tiny grants may leave every scan partial.
+
+`deploy/lab cases ID --json | klause-bench/scripts/capture-private-rebuild.sh`
+extracts the source/build/resource identities, original outcomes/check receipts,
+existing P3 preparation and I2 lifecycle metrics, and a full-cost ledger. Keep the
+complete lab record and physical execution metadata beside the extracted view.
+No runtime rebuild is performed by capture. Unmeasured stages stay `null`, including
+reconstruction/source checks, lost warm state, import/publication and retirement;
+an absent consuming-worker count or memory peak is not zero. A replacement producer
+can supply `record.privateRebuildLifecycle` with disjoint `stageNs` in the named
+stages, modeled simultaneous owned/protected primitive bytes and reference slots,
+released obsolete generations and actual consuming workers. `totalNs` is withheld
+until all stages are observed; it excludes ordinary solve time, which remains
+separate. Do not sum overlapping preparation/inprocessing counters or sampled peaks.
+Whole-job active time must additionally include failed preparation, checking and
+artifact/retirement work from the lab job record.
+
+Qualification compares the same hashed source, seed, runtime, physical allocation
+and containing allowances with stable-ID work alone. A runtime rebuild requires
+the [private generation contract](../docs/07-presolve.md#private-worker-qualification),
+bounded ownership/reclamation, compatible consuming workers and a benefit after
+all lifecycle costs. A lack of new candidates on a complete propositional control
+supports only a bounded no-go for that control. Unsupported/partial views need an
+applicability or grant diagnosis and cannot support a general no-go.
+
 ## Build and run
 
 Run from the repository root with JDK 25 or newer:

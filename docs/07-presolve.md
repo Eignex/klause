@@ -195,6 +195,77 @@ These results carry diagnostics only, with no search publication or terminal.
 
 ## Rebuild ownership
 
+### Private worker qualification
+
+`rootRebuildCaptureVisits` enables a bounded propositional opportunity view inside
+root simplification. Zero disables it. The view accepts only a baked Boolean clause
+model at an unconditional, consistent fixpoint. Assumptions, scoped assertions,
+conditional cutoffs and unfinished propagation supply no global authority. It compares
+the baked root with the current root over the identical canonical factor objects,
+separating newly fixed columns and stable-ID clause removal/shortening from newly
+eligible elimination candidates. For an unfixed column with positive/negative
+occurrence counts `p` and `n`, the diagnostic requires `0 < p + n` and
+`p * n <= p + n`. It counts only candidates that failed that bound at the baked
+root. This is a sufficient clause-count proxy for a single elimination, not a
+resolvent construction, literal-growth bound, admission decision or prediction of
+search savings. Objective preservation, other pass families and learned-clause
+remapping require separate qualification. Learned clauses are excluded from this
+canonical-source proxy; retaining them can increase elimination and import costs.
+
+The capture shares root-class and containing inprocessing work, cancellation and
+overspend debt. A scan charges initialization, factor/literal/column visits and
+disposal; it withholds all candidate totals on an incomplete view. Four temporary
+arrays use `18 * columns` modeled primitive bytes, excluding headers and allocator
+overhead, with columns bounded by one tenth of the visit cap. No array survives
+the call. Repeated complete views are observations, not distinct opportunities.
+An unsupported or partial observation cannot establish absence of opportunities.
+
+Qualification of a replacement worker requires the following authority and ownership
+contract. The diagnostic itself creates no replacement or publication authority.
+
+- A canonical source handle, its source scope, semantics and exact objective define
+  publication identity. Only globally justified facts enter an updated source view;
+  an incumbent cutoff, neighborhood, assumption or branch condition remains attached
+  to its own scope. A fresh worker and mapping/import generation identify every
+  private reduced namespace. Equal dimensions or revision numbers do not bind maps.
+- Reconstruction composes typed `SourceMapping` stages through the actual intermediate
+  objects, retaining objective units and the query's required preservation guarantee.
+  Every candidate lifts to canonical coordinates and passes source checks before
+  publication. Reduced infeasibility or optimality alone supplies no canonical proof.
+- Imported clauses and bounds carry their original scope and premises. An exact
+  supported translation into the new namespace is required before attachment;
+  eliminated coordinates, missing premises, changed guards or incompatible objective
+  units decline import. Duplicate suppression and import cursors belong to their
+  generation. A retained incumbent is checked in canonical coordinates and projected
+  only through a supported inverse; failure leaves it advisory.
+- Immutable LP templates retain P3's namespace, raw/finite, scope, row, bound,
+  objective and component compatibility checks. Mutable bases, factors, propagation
+  queues, watches and search cursors belong to one worker. No live shared SAT arena
+  is eliminated or remapped. Lost bases, cuts, phases, learned state and continuations
+  are charged as cold-start or revalidation costs, even when a template survives.
+- Preparation and replacement overlap under the original containing deadline and
+  work allowance. Construction, source checks, reconstruction, import, publication,
+  failed attempts and retirement remain charged; reopening does not renew a budget.
+  Publication is an atomic handoff after complete checks, with cancellation before
+  handoff leaving the established worker valid. A partial replacement publishes nothing.
+- Resource admission covers both generations, canonical/mapping payloads, retained
+  templates, pass buffers and scratch. Count shared payload once and private indexes,
+  capacities and reference slots per owner. Modeled owned/protected bytes cover only
+  their declared owners; sampled peaks and aliased reason totals are not heap totals.
+  Live/historical reasons, sibling undo, pending assertions and attachments remain
+  protected until their last consumer releases them. Close/reseed drops obsolete
+  generation cursors, imports, buffers and maps only after final drains; suspension
+  retains them. Replacement requires bounded cancellable reclamation preparation and
+  safe publication or an explicit defer/decline when the protected floor prevents it.
+
+The cost decision requires compatible actual consumers and the complete lifecycle,
+including reconstruction/checking, worker reopening, lost warm state, overlapping
+memory and obsolete-generation cleanup. Missing costs remain unobserved. A smaller
+model, template hit or successful scan establishes neither net benefit nor permission
+to enable rebuilding.
+
+### Finite reconstruction
+
 For a selected private float grid, finite presolve reconstructs into the private grid
 model first, then the invocation's explicit grid map lifts to original real
 coordinates before source checking. Source and engine plans keep separate

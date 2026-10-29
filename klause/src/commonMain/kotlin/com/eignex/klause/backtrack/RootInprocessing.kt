@@ -29,7 +29,10 @@ internal class RootSimplificationPass : InprocessingPass {
 
     override fun run(session: PropagationSession, params: BacktrackParams, stats: SearchStatsSink?) {
         if (!session.canSimplifyRoot) return
-        spending.run(session, params, stats) { budget -> simplify(session, params, budget) }
+        spending.run(session, params, stats) { budget ->
+            simplify(session, params, budget)
+            PrivateRebuildCapture.observe(session, budget, params.rootRebuildCaptureVisits)
+        }
     }
 
     private fun simplify(session: PropagationSession, params: BacktrackParams, budget: InprocessingBudget) {
