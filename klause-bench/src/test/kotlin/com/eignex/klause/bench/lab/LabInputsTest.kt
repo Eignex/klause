@@ -6,6 +6,8 @@ import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.source.CorpusFetcher
+import com.eignex.lab.bench.BenchCase
+import com.eignex.lab.bench.BenchInput
 import com.eignex.lab.bench.BenchRequest
 import com.eignex.lab.bench.BenchInputRoot
 import com.eignex.lab.bench.BenchContext
@@ -13,6 +15,8 @@ import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNotEquals
 import kotlin.test.assertContentEquals
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
@@ -118,4 +122,40 @@ class LabInputsTest {
             root.toFile().deleteRecursively()
         }
     }
+    @ParameterizedTest
+    @CsvSource("compiler,true", "include,false")
+    fun `only compiler identities are shared within a plan and execution checks changed trees`(
+        role: String,
+        shared: Boolean,
+    ) {
+        val root = Files.createTempDirectory("planned-compiler-")
+        val workspaceProperty = System.getProperty("klause.workspace.root")
+        try {
+            System.setProperty("klause.workspace.root", root.toString())
+            val directory = Files.createDirectory(root.resolve("runtime"))
+            val file = directory.resolve("tool")
+            Files.writeString(file, "original")
+            val inputs = listOf(BenchInput("runtime", BenchInputRoot.SOURCE, role))
+            val compilerTrees = mutableMapOf<java.nio.file.Path, String>()
+            val original = LabInputs.treeHashes(inputs, compilerTrees)
+            val frozen = BenchCase("fixture", inputs = inputs, attributes = original)
+            val context = BenchContext(root, worktree = root)
+            LabInputs.verify(frozen, context)
+
+            Files.writeString(file, "changed")
+            val repeated = LabInputs.treeHashes(inputs, compilerTrees)
+
+            assertEquals(shared, original == repeated)
+            assertNotEquals(original, LabInputs.treeHashes(inputs))
+            assertFailsWith<IllegalArgumentException> { LabInputs.verify(frozen, context) }
+        } finally {
+            if (workspaceProperty == null) {
+                System.clearProperty("klause.workspace.root")
+            } else {
+                System.setProperty("klause.workspace.root", workspaceProperty)
+            }
+            root.toFile().deleteRecursively()
+        }
+    }
+
 }

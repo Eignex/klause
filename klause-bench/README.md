@@ -102,6 +102,9 @@ Lab source builds disable JVM incremental-compilation indexes because each build
 starts from a fresh source tree and the lab reuses complete verified distributions.
 Developer and CI builds retain their incremental-compilation settings.
 The status sweep and `klause-reference*` schedules use `tags: ["local"]` to stay on the Mac.
+Compiler tree identity is shared within one plan; each case execution verifies its pinned tree again.
+Include trees are scanned when each workload is planned.
+
 Corpus files with names outside the lab's portable path contract are copied into
 `klause-bench/build/lab-inputs` under their content hash. Selection identities and
 input bytes stay fixed; private workspace cleanup removes these staged files.
