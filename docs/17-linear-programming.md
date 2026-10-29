@@ -182,8 +182,10 @@ optima alone supply no global optimum or conflict authority.
 The same explicit setting dispatches root tableau separation to the owning block.
 Lifted cuts retain all row multipliers, bound substitutions, integrality premises
 and source addresses; the ordinary source mapper and cut pool check and retain
-them. Structural node edits retire the component collection and prepare the
-ordinary owner. Mutable component merging and automatic expansion stay outside
+them. Appended rows confined to existing blocks replace only those children and
+retain the other blocks' results. Cross-block rows, new columns and other structural
+edits retire the collection and prepare the ordinary owner. Mutable component
+merging and automatic expansion stay outside
 this setting. Persistent callers requiring one retained basis keep the monolithic
 constructor.
 

@@ -18,6 +18,56 @@ import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
     @Test
+    fun `a local cut should replace only its component and retract with its scope`() {
+        val builder = LpBuilder()
+        repeat(2) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        val factory = RecordingLpEngineFactory()
+        LpScopedSolver(LpExactState(source), context = LpSolveContext(factory), componentSplit = true).use { owner ->
+            assertNotNull(owner.solve())
+            assertTrue(owner.push())
+            val zero = ExactLpNumber.of(0L)
+            assertTrue(owner.append(LpScopedRow(2L, listOf(0 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-3L),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))), true))
+
+            val result = assertNotNull(owner.solve())
+
+            assertEquals(BigFraction.ofLong(7L) * BigFraction.ofLong(2L).reciprocal(), result.lowerBound)
+            assertEquals(2, assertNotNull(result.float).blocks)
+            assertEquals(1, owner.lastMetrics.componentSolves)
+            assertEquals(1, owner.lastMetrics.componentReuses)
+            assertEquals(3, factory.calls.count { it.kind == EngineConstruction.PERSISTENT })
+            assertTrue(owner.pop(0))
+            assertEquals(BigFraction.ONE, assertNotNull(owner.solve()).lowerBound)
+        }
+    }
+
+    @Test
+    fun `a cross block cut should use ordinary replacement without merging retained children`() {
+        val builder = LpBuilder()
+        repeat(2) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        LpScopedSolver(LpExactState(source), componentSplit = true).use { owner ->
+            assertNotNull(owner.solve())
+            val zero = ExactLpNumber.of(0L)
+            val minus = ExactLpNumber.of(-1L)
+
+            assertTrue(owner.append(LpScopedRow(2L, listOf(0 to minus, 1 to minus), ExactLpNumber.of(-3L),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))), false))
+            val result = assertNotNull(owner.solve())
+
+            assertEquals(BigFraction.ofLong(3L), result.lowerBound)
+            assertEquals(1, assertNotNull(result.float).blocks)
+        }
+    }
+
+    @Test
     fun `a component conflict should retain its guarded row and active bound premise`() {
         val builder = LpBuilder()
         val x = builder.addVar(0L, 5L)

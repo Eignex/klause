@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
 
 class LpSolveSessionTest {
     @Test
-    fun `component cursors should cold solve children without resumable support before reusing them`() {
+    fun `component cursors should reuse unchanged child results without resumable support`() {
         val builder = LpBuilder()
         val x = builder.addRealVar(0.0, 5.0, cost = 1.0)
         val y = builder.addRealVar(0.0, 5.0, cost = 1.0)
@@ -62,7 +62,7 @@ class LpSolveSessionTest {
         }
 
         assertEquals(2, cold)
-        assertEquals(2, retained)
+        assertEquals(0, retained)
     }
 
     @Test
