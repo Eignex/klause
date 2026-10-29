@@ -13,6 +13,7 @@ import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.formats.dimacs.Dimacs
 import com.eignex.klause.formats.dimacs.toProblem
+import com.eignex.klause.portfolio.BacktrackCatalog
 import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioDiagnostics
 import com.eignex.klause.portfolio.PortfolioWorker
@@ -37,7 +38,11 @@ object BooleanProofSchedulerProfile {
     @JvmStatic
     fun main(args: Array<String>) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
-        require(options.keys == setOf("suite", "problem", "sha256", "work", "seed", "splits", "repeats"))
+        val required = setOf("suite", "problem", "sha256", "work", "seed", "splits", "repeats")
+        require(options.keys.containsAll(required) &&
+            (options.keys - required).all { it in setOf("recipe", "native") })
+        val recipe = options["recipe"] ?: "input-order"
+        val native = options["native"]?.toBooleanStrict() ?: false
         val limit = options.getValue("work").toLong().also { require(it in 10000L..2000000L) }
         val seed = options.getValue("seed").toLong()
         val splits = options.getValue("splits").toInt().also { require(it in 1..8) }
@@ -66,10 +71,12 @@ object BooleanProofSchedulerProfile {
                 // Each control pays its own source construction, bake, private setup, checking and retirement.
                 val problem = Dimacs.parse(bytes.decodeToString()).toProblem().bake(cancellation = stop)
                 val budget = NodeBudget(limit)
-                val parameters = List(2) { worker -> BacktrackParams(
-                    randomSeed = seed + worker, cancellation = stop, nodeBudget = budget,
-                    variableSelector = InputOrder, valueSelector = IndomainMin, nativeSat = false,
-                ) }
+                val parameters = List(2) { worker ->
+                    val params = if (recipe == "input-order") BacktrackParams(
+                        randomSeed = seed + worker, variableSelector = InputOrder, valueSelector = IndomainMin,
+                    ) else BacktrackCatalog.byLabel(recipe).build(seed + worker, null)
+                    params.copy(cancellation = stop, nodeBudget = budget, nativeSat = native)
+                }
                 var completedTasks = 0
                 var totalTasks = 0
                 var schedulerWork = 0L
@@ -95,6 +102,10 @@ object BooleanProofSchedulerProfile {
                 val cpuElapsed = process.processCpuTime - cpu
                 report.appendText(buildJsonObject {
                     put("mode", mode)
+                    put("recipe", recipe)
+                    put("nativeSat", native)
+                    put("sharing", false)
+                    put("presolve", false)
                     put("iteration", iteration)
                     put("warmup", iteration < 0)
                     put("sourceSha256", sha256(bytes))
