@@ -228,6 +228,13 @@ to that aggregate. Bound support lifts every contributing row and side to the
 current parent state, including its current assertion witnesses. Floating child
 optima alone supply no global optimum or conflict authority.
 
+At owner construction, blocks are ordered by row-and-column dimensions. After a work or
+pivot stop, completed blocks can contribute their checked dual bounds while
+unfinished blocks contribute freshly checked zero-dual box bounds. Missing
+minimizing sides decline the aggregate. Every contribution uses the current
+child authority, and only their exact sum is projected to source units. This
+bound supplies no complete point, cut tableau or attainment claim.
+
 The same explicit setting dispatches root tableau separation to the owning block.
 Lifted cuts retain all row multipliers, bound substitutions, integrality premises
 and source addresses; the ordinary source mapper and cut pool check and retain
