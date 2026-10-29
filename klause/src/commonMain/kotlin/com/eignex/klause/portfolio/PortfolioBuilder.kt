@@ -154,11 +154,11 @@ object PortfolioBuilder {
                 }
                 val bounded = (budget?.let(completion::withNodeBudget) ?: completion)
                     .withCoreRefinement(scenario.coreRefinement)
-                val worker = if (objectiveCoordinates != null && bounded is LocalSearchWorkerConfig &&
+                val privateCoordinates = objectiveCoordinates != null && bounded is LocalSearchWorkerConfig &&
                     config.label == LocalSearchArm.CblsPlateauIlsBasin.label &&
                     scenario.cores == 1 && scenario.engine == EngineMix.MIXED &&
                     scenario.lsPool == null && scenario.btPool == null
-                ) {
+                val worker = if (privateCoordinates) {
                     bounded.materializeObjectiveCoordinates(
                         objectiveCoordinates, index, armId, seed, scenario.lsLambda, onEvent,
                     )
@@ -166,18 +166,27 @@ object PortfolioBuilder {
                     problem, index, armId, seed, scenario.lsLambda, objective, selectedObjective,
                     selectedSweep, onEvent, pools,
                 )
-                val requirements = WorkerRequirements(WorkerFragment.FINITE,
-                    if (family == ArmFamily.Backtrack) WorkerObjectiveView.CANONICAL
-                    else WorkerObjectiveView.CANONICAL_WITH_GUIDANCE,
-                    if (worker.permitsSourceProofs) WorkerProofAuthority.CHECKED_TERMINALS
-                    else WorkerProofAuthority.WITNESS_ONLY, facts.construction)
-                onEvent?.invoke("portfolio", SearchEvent.WorkerAdmission(config.label, true,
-                    requirements.toString(), emptyList()))
                 worker.bindEvidence(ModelIdentity.of(problem, objective)).also {
                     it.improvementOnly = if (config is CoreGuidedWorkerConfig && deferCore) {
                         !scenario.earlyCoreAdmission
                     } else armId >= plan.firstSolutionCount
                 }
+                onEvent?.let { observe ->
+                    val authority = when {
+                        !worker.permitsSourceProofs -> WorkerProofAuthority.WITNESS_ONLY
+                        worker.auxiliaryProof || worker.improvementOnly -> WorkerProofAuthority.CONDITIONED_TERMINALS
+                        else -> WorkerProofAuthority.CHECKED_TERMINALS
+                    }
+                    val requirements = WorkerRequirements(WorkerFragment.FINITE,
+                        if (family == ArmFamily.Backtrack) WorkerObjectiveView.CANONICAL
+                        else WorkerObjectiveView.CANONICAL_WITH_GUIDANCE,
+                        authority, facts.construction,
+                        sourceMapping = if (privateCoordinates) WorkerSourceMapping.CHECKED_RECONSTRUCTION
+                        else WorkerSourceMapping.WORKING_COORDINATES)
+                    observe("portfolio", SearchEvent.WorkerAdmission(config.label, true,
+                        requirements.toString(), emptyList()))
+                }
+                worker
             }
         }
     }

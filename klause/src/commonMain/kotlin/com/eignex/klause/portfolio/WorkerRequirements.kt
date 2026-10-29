@@ -2,8 +2,8 @@ package com.eignex.klause.portfolio
 
 internal enum class WorkerFragment { FINITE, AFFINE_MIXED, AFFINE_BINARY_MIXED }
 internal enum class WorkerObjectiveView { CANONICAL, CANONICAL_WITH_GUIDANCE }
-internal enum class WorkerProofAuthority { CHECKED_TERMINALS, WITNESS_ONLY }
-internal enum class WorkerSourceMapping { WORKING_COORDINATES }
+internal enum class WorkerProofAuthority { CHECKED_TERMINALS, CONDITIONED_TERMINALS, WITNESS_ONLY }
+internal enum class WorkerSourceMapping { WORKING_COORDINATES, CHECKED_RECONSTRUCTION }
 internal enum class WorkerRetainedState { PRIVATE_RESUMABLE }
 
 internal data class WorkerConstructionCost(

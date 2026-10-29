@@ -73,8 +73,9 @@ invocation. Original-source derivation capture is the subject of
 
 Finite recipe and numerical companion admission uses `WorkerRequirements`: supported
 fragment, canonical objective or canonical objective with heuristic guidance, checked
-terminal or witness-only authority, working-coordinate publication mapping, private
-resumable state, and structural construction dimensions. Dimensions estimate setup
+terminal, conditioned proof or witness-only authority, working-coordinate or
+checked-reconstruction publication mapping, private resumable state, and structural
+construction dimensions. Dimensions estimate setup
 size rather than elapsed time or retained bytes. Numerical requirements also carry
 the containing per-owner LP work/allocation ceilings, active-time limit and segment
 limits; construction uses those same ceilings. Candidate checks and typed terminal

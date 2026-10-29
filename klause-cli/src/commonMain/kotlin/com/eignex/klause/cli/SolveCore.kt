@@ -619,7 +619,8 @@ internal fun describeEvent(e: SearchEvent, t: Long, worker: String? = null): Str
         is SearchEvent.Restart -> "[$t ms]$who restart #${e.index} after ${e.steps} decisions"
         is SearchEvent.LearnedDbSweep -> "[$t ms]$who learned-DB sweep: kept ${e.kept}, dropped ${e.dropped}"
         is SearchEvent.Incumbent -> "[$t ms]$who incumbent objective ${e.objective}"
-        is SearchEvent.WorkerAdmission -> "admission ${e.recipe} admitted=${e.admitted} ${e.requirements} declines=${e.declines}"
+        is SearchEvent.WorkerAdmission -> "admission ${e.recipe} admitted=${e.admitted} " +
+            "${e.requirements} declines=${e.declines}"
         is SearchEvent.PortfolioDiagnostic -> "portfolio ${e.event}"
     }
 }
