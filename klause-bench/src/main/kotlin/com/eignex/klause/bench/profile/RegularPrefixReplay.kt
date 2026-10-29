@@ -240,7 +240,7 @@ internal object RegularPrefixReplay {
                     Lit.variable(it) in source.numBoolVars until model.numBoolVars
                 }
             }
-            val state = native.javaClass.getDeclaredField("state").apply { isAccessible = true }.get(native)
+            val state = LivePropagationState.require(native)
             val atoms = state.javaClass.declaredMethods.single {
                 it.name.startsWith("getAtoms") && it.parameterCount == 0
             }.invoke(state)

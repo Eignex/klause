@@ -103,7 +103,7 @@ internal object GuardedIntegerRowProfile {
         check(backjump.apply(shared) == SearchLearnedConflictResult.Resume)
         check(native.intDomain(0).max == 1L)
         val acquisitionNs = total.elapsed() - constructionNs
-        val state = native.javaClass.getDeclaredField("state").apply { isAccessible = true }.get(native)
+        val state = LivePropagationState.require(native)
         val storedGetter = state.javaClass.declaredMethods.single {
             it.name.startsWith("getLearnedClauses") && it.parameterCount == 0
         }

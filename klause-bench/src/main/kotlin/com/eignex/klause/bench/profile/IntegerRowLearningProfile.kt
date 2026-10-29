@@ -54,7 +54,7 @@ internal object IntegerRowLearningProfile {
             val backjump = (cp.resolveConflict(shared) as SearchConflictResolution.Backjump).conflict
             shared.popTo(backjump.decisionLevel)
             check(backjump.apply(shared) == SearchLearnedConflictResult.Resume)
-            val state = native.javaClass.getDeclaredField("state").apply { isAccessible = true }.get(native)
+            val state = LivePropagationState.require(native)
             val rowsGetter = state.javaClass.declaredMethods.single {
                 it.name.startsWith("getLearnedClauses") && it.parameterCount == 0
             }
@@ -83,7 +83,7 @@ internal object IntegerRowLearningProfile {
                 val point = problem.withIntDomains(arrayOf(IntDomain(x, x), IntDomain(y, y), IntDomain(upper, upper)))
                 val checker = PropagationSession(point)
                 check(!checker.isUnsatAtRoot)
-                val pointState = checker.javaClass.getDeclaredField("state").apply { isAccessible = true }.get(checker)
+                val pointState = LivePropagationState.require(checker)
                 pointCheckWork += workGetter.invoke(pointState) as Long
                 val record = buildJsonObject {
                     put("revision", Reports.readGitSha())
