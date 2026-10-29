@@ -335,7 +335,7 @@ by CI at the later source revision.
 SMT source. It compares the existing cached partial interval producer with the
 same producer plus literal-to-row assertion scheduling. Both arms use seed 1,
 one processor, a containing 100,000,000-unit open-work allowance and the same
-ten-second emergency deadline. Fresh ordinary source preparation precedes each
+thirty-second emergency deadline. Fresh ordinary source preparation precedes each
 arm; exact prefix and continuation snapshots must agree. The profile reports row
 visits, literal touches, retracted assertions, compatible decline reuse, consumed
 guard implications and producer/assertion/numerical time separately. These are
@@ -356,10 +356,13 @@ on JVM and Linux native at `2337dbd102`; the new JVM cases take at most 5 ms.
 Original PWD [9192](https://lab.eignex.com/jobs/9192) stops during cold corpus
 acquisition, and [9215](https://lab.eignex.com/jobs/9215) stops at the missing CLI
 provenance installation. Frozen-source [9230](https://lab.eignex.com/jobs/9230)
-and diagnostic [9244](https://lab.eignex.com/jobs/9244) report failed commands with
-committed executions; child artifacts and the final live-log tail are unavailable
-through the maintained interface. These
-attempts establish no original-source consumption, throughput or terminal claim.
+reaches 3 of 8 boundaries in its cached control before the ten-second emergency
+deadline, reporting 3 deductions and 2 deferred numerical queries. Its delayed
+artifacts identify that limit failure; the incremental arm did not run.
+Diagnostic [9244](https://lab.eignex.com/jobs/9244) reports a failed command with
+a committed execution, but its child artifacts remain unavailable through the
+maintained interface. These attempts establish no incremental-source consumption,
+throughput or terminal claim.
 Admission stays opt-in; [#3844](https://github.com/Eignex/klause/issues/3844)
 retains its required original-source consumption criterion.
 
