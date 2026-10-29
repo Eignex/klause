@@ -424,6 +424,8 @@ local ceilings stop later optional work and retain the cleanup's overspend as de
 The containing invocation still cancels them. An interrupted root attachment keeps
 its queued fixpoint and completes under the next invocation before publishing root
 facts or making a decision. Root publication retains its bounded scan across slices.
+It retains the CP publisher so a consequence reaches peers without creating another
+private decision level in its producer.
 
 Root and probe cursors, vivification replacement batches and subsumption preparation
 survive suspension. The subsumption occurrence window retains at most 1,024 clauses
@@ -435,7 +437,8 @@ historical reasons retain their ordinary protection.
 Restart cadence remains a trigger. Optional propagation-work intervals and learned
 clause growth also request work at natural roots, without forcing a restart. The
 cooldown requires non-inprocessing work after an attempted slice and applies to
-restart requests too; a pass cannot earn its own next opportunity. Class rotation
+restart requests too. The growth mark excludes the pass's own attachments, so a
+pass cannot earn its own next opportunity. Class rotation
 prevents a cheap pass from always taking the entire offered slice. Work and growth
 triggers and cooldown are disabled by default; the additional work ceilings are
 unlimited unless configured. Existing general off and SAT preset controls remain.

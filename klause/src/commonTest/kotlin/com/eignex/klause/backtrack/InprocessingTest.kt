@@ -19,6 +19,7 @@ class InprocessingTest {
     private class CountingPass(
         override val preservesVariables: Boolean = true,
         private val work: Long = 0L,
+        private val grow: Boolean = false,
     ) : InprocessingPass {
         var runs = 0
         var resets = 0
@@ -26,6 +27,7 @@ class InprocessingTest {
         override fun run(session: PropagationSession, params: BacktrackParams, stats: SearchStatsSink?) {
             runs++
             session.chargeInprocessingWork(work)
+            if (grow) session.addRootDerivedClause(Clause(intArrayOf(0, 2)), 2, 0, false)
         }
 
         override fun reset() {
@@ -114,6 +116,19 @@ class InprocessingTest {
         session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
         loop.onRoot(session, params)
         loop.onRoot(session, params)
+
+        assertEquals(1, pass.runs)
+    }
+
+    @Test
+    fun `pass attachments should not earn another growth opportunity`() {
+        val pass = CountingPass(grow = true)
+        val loop = Inprocessing(listOf(pass), cadence = 100)
+        val session = session()
+        val params = BacktrackParams(inprocessingGrowth = 1)
+        session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
+
+        repeat(3) { loop.onRoot(session, params) }
 
         assertEquals(1, pass.runs)
     }
