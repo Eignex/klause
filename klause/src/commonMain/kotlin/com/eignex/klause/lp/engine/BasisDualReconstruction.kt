@@ -45,6 +45,8 @@ private class BasisDualRun(
     private var largest = 0
     private var solved = 0
     private var openBasicColumns = 0
+    private var restrictedComponents = 0
+    private var restrictedColumns = 0
     private var factorWork = 0L
     private var factorAllocation = 0L
     private var decline: String? = null
@@ -112,7 +114,8 @@ private class BasisDualRun(
         null
     } finally {
         meter.basisRepair = ReconstructionBasisMetrics(peeledRows, peeledColumns, coreRows, components,
-            largest, solved, factorWork, factorAllocation, openBasicColumns, decline)
+            largest, solved, factorWork, factorAllocation, openBasicColumns, decline,
+            restrictedComponents, restrictedColumns)
     }
 
     // Singleton elimination preserves the remaining equations without creating factor fill.
@@ -212,23 +215,78 @@ private class BasisDualRun(
             val selected = groupedEquations[key] ?: throw BasisDualStop("SINGULAR")
             if (selected.size != group.size) throw BasisDualStop("SINGULAR")
             if (group.size > limits.dimension) {
-                decline = "DIMENSION"
+                val open = selected.filter { equation ->
+                    meter.step()
+                    val bounds = a.bounds[basis.basicVars[layout.structuralSlots[equation]]]
+                    bounds.lower == null || bounds.upper == null
+                }
+                if (open.size > limits.dimension) {
+                    decline = "DIMENSION"
+                    continue
+                }
+                val matched = matchOpen(group, open)
+                if (matched == null) {
+                    decline = "OPEN_RANK"
+                    continue
+                }
+                if (open.isNotEmpty() && !solve(matched, open, local, restricted = true)) break
+                restrictedComponents++
+                restrictedColumns += open.size
                 continue
             }
             if (!solve(group, selected, local)) break
         }
     }
 
-    private fun solve(group: List<Int>, selected: List<Int>, local: IntArray): Boolean {
+    private fun matchOpen(group: List<Int>, selected: List<Int>): List<Int>? {
+        if (selected.isEmpty()) return emptyList()
+        meter.step(a.m.toLong())
+        meter.storage(a.m * 8L + selected.size * 8L)
+        val matched = IntArray(a.m) { -1 }
+        val seen = IntArray(a.m)
+        var stamp = 0
+        fun augment(index: Int): Boolean {
+            for ((row, _) in equations[selected[index]]) {
+                meter.step()
+                if (!activeRow[row] || seen[row] == stamp) continue
+                seen[row] = stamp
+                val previous = matched[row]
+                if (previous < 0 || augment(previous)) {
+                    matched[row] = index
+                    return true
+                }
+            }
+            return false
+        }
+        for (index in selected.indices) {
+            stamp++
+            if (!augment(index)) return null
+        }
+        val result = IntArray(selected.size) { -1 }
+        for (row in group) {
+            meter.step()
+            if (matched[row] >= 0) result[matched[row]] = row
+        }
+        return result.toList()
+    }
+
+    private fun solve(
+        group: List<Int>, selected: List<Int>, local: IntArray, restricted: Boolean = false,
+    ): Boolean {
         val size = group.size
         meter.step(size.toLong() * size)
         meter.storage(size.toLong() * size * 16L + size * 80L)
         for (id in group.indices) local[group[id]] = id
         val matrix = List(size) { MutableList(size) { BigFraction.ZERO } }
+        val target = selected.map { rhs[it] }.toMutableList()
         for (id in selected.indices) {
             for ((row, value) in equations[selected[id]]) {
                 meter.step()
-                if (activeRow[row]) matrix[id][local[row]] = value
+                if (!activeRow[row]) continue
+                if (local[row] >= 0) matrix[id][local[row]] = value else {
+                    check(restricted)
+                    target[id] = subtract(target[id], value, y[row])
+                }
             }
         }
         val factorAllowance = allowance()
@@ -236,18 +294,22 @@ private class BasisDualRun(
         record(build.stats)
         val factors = when (build) {
             is RationalBasisBuild.Ready -> build.factors
-            is RationalBasisBuild.Singular -> throw BasisDualStop("SINGULAR")
+            is RationalBasisBuild.Singular -> {
+                if (!restricted) throw BasisDualStop("SINGULAR")
+                decline = "OPEN_SINGULAR"
+                return false
+            }
             is RationalBasisBuild.Declined -> {
                 decline = build.reason.name
                 return false
             }
         }
-        val result = factors.solve(selected.map { rhs[it] }, limits = allowance(), cancellation = token)
+        val result = factors.solve(target, limits = allowance(), cancellation = token)
         record(result.stats)
         when (result) {
             is RationalBasisSolve.Solved -> {
                 for (id in group.indices) y[group[id]] = meter.fraction(result.values[id])
-                solved++
+                if (!restricted) solved++
             }
             is RationalBasisSolve.Declined -> {
                 decline = result.reason.name
