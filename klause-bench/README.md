@@ -646,6 +646,12 @@ allocation are shared among attempted families; numerical and certificate phases
 name families actually installed in the query. Proof-verification work includes
 declined and unselected rows. Identical source hashes, invocation allowances, numerical
 policy, presolve, seed and runtime are required before interpreting a difference.
+Point selection also checks complementary continuous bound choices within the
+existing mixed-rounding family and shared limits. `numericalCutMixedEligibleRows`
+counts source rows once; `MixedCandidates`, `MixedComplementaryAttempts` and
+`MixedComplementaryRetained` distinguish candidate work and retained alternatives.
+Bound-side alternatives and selected rows establish no useful bound or cost gain
+without subsequent checked support and actual frontier consumption.
 
 [9277](https://lab.eignex.com/jobs/9277) exercises both sources at `0af8492830`
 with ownership and root cuts toggled independently. With root cuts off, node

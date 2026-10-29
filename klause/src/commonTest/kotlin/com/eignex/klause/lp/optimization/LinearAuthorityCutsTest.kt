@@ -312,6 +312,26 @@ class LinearAuthorityCutsTest {
     }
 
     @Test
+    fun `mixed side variants should share the retained row and preparation limits`() {
+        val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val premises = (0 until 100).associate { index ->
+            "mixed/$index" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                real to BigFraction.MINUS_ONE), BigFraction.ofLong(3)))
+        } + mapOf(
+            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ofLong(2))),
+        )
+        val source = SourceProofContext(scope, setOf(x, real), premises)
+
+        for (complementary in listOf(false, true)) {
+            val cuts = assertNotNull(LinearAuthorityCuts.prepare(source, Cancellation.Never, complementary))
+
+            assertEquals(64, cuts.rows.size)
+            assertTrue(cuts.work <= 65_536L)
+        }
+    }
+
+    @Test
     fun `mixed cuts should retract and reactivate with their Boolean source owner`() {
         val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
         val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
