@@ -213,6 +213,57 @@ class RootInprocessingTest {
     }
 
     @Test
+    fun `a short learned neighborhood should reach a failed literal within one funded probe`() {
+        for (native in listOf(false, true)) {
+            val source = Problem(8, 0, emptyArray(), arrayOf<Factor>(
+                Clause(intArrayOf(14, 2)), Clause(intArrayOf(14, 3)),
+            ))
+            val session = PropagationSession(source.bake(), nativeSat = native)
+            session.addLearnedClause(Clause(intArrayOf(14, 12)), 2)
+
+            RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 1), null)
+
+            assertEquals(true, session.boolValue(7))
+            assertEquals(0, session.decisionLevel)
+        }
+    }
+
+    @Test
+    fun `reset should release a retained probe neighborhood`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(problem(intArrayOf(0, 2)).bake(), nativeSat = native)
+            session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
+            val pass = RootProbingPass()
+            pass.run(session, BacktrackParams(rootProbeBatch = 1), null)
+            val before = SharingMemoryObservation(1024L, 128, { false }, {})
+            val retained = before.snapshot { pass.retainedMemory(before, false) }
+
+            pass.reset()
+            val after = SharingMemoryObservation(1024L, 128, { false }, {})
+            val released = after.snapshot { pass.retainedMemory(after, false) }
+
+            assertTrue(assertNotNull(retained.completeValues).getValue("ownedPrimitiveBytes") >= 8L)
+            assertEquals(0L, assertNotNull(released.completeValues).getValue("ownedPrimitiveBytes"))
+        }
+    }
+
+    @Test
+    fun `a root slice should refresh binaries using facts proved by its funded probe`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(problem(intArrayOf(0, 2), intArrayOf(0, 3),
+                intArrayOf(1, 4, 6)).bake(), nativeSat = native)
+            val params = BacktrackParams(rootSimplification = true, rootProbeBatch = 2)
+            val loop = assertNotNull(Inprocessing.from(params))
+
+            loop.onRestart(session, params)
+            session.pinBool(2, false)
+
+            assertEquals(true, session.boolValue(3))
+            assertEquals(setOf(4, 6), assertNotNull(session.boolReasonClause(3)).toSet())
+        }
+    }
+
+    @Test
     fun `a locally capped probe should restore the complete root for another invocation`() {
         for (native in listOf(false, true)) {
             val session = PropagationSession(problem(intArrayOf(0, 2), intArrayOf(0, 3)).bake(), nativeSat = native)
