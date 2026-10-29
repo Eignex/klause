@@ -13,7 +13,7 @@ internal class LinearCutLifecycle(private val budget: SourceLpBudget) {
         counts[key] = (counts[key] ?: 0L) + count
     }
 
-    fun <T> containing(block: () -> T): T {
+    fun <T> containing(recipe: String, block: () -> T): T {
         fun costs() = listOf(budget.measuredPreparationWork, budget.measuredFloatWork,
             budget.measuredContinuationWork, budget.measuredRefinementWork, budget.measuredBoundCertificationWork,
             budget.measuredConflictCertificationWork, budget.reservedAllocation, budget.activeNanos)
@@ -25,8 +25,12 @@ internal class LinearCutLifecycle(private val budget: SourceLpBudget) {
             val after = costs()
             val stages = listOf("PreparationWork", "FloatWork", "ContinuationWork", "RefinementWork",
                 "BoundCertificationWork", "ConflictCertificationWork", "ModeledAllocation", "ActiveNanos")
-            for (family in attempted + families) for (index in stages.indices) {
-                observe(family, stages[index], after[index] - before[index])
+            for (index in stages.indices) {
+                val delta = after[index] - before[index]
+                val key = "numericalCutLifecycleRECIPE_${recipe}_${stages[index]}"
+                counts[key] = (counts[key] ?: 0L) + delta
+                val participants = if (index == 0 || index == 6) attempted + families else families
+                for (family in participants) observe(family, stages[index], delta)
             }
         }
     }

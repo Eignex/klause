@@ -482,7 +482,10 @@ internal class LinearAuthorityTraversal(
             authority.observeCutConsumption(result.cutConflictFamilies, "CONFLICT_PRUNE")
         }
         if (result.evidence?.claim is SourceClaim.Optimal) {
-            authority.observeCutConsumption(result.cutBoundFamilies, "ATTAINED_OPTIMUM")
+            authority.observeCutConsumption(queried.cutBoundFamilies, "ATTAINED_OPTIMUM")
+        }
+        if (result.evidence?.claim is SourceClaim.Limit) {
+            authority.observeCutConsumption(queried.cutBoundFamilies, "LIMIT_CLOSURE")
         }
         if (result.coordinateConflict) observe("numericalCoordinateConflicts")
         if (result.lpConflict) observe("numericalLpConflicts")

@@ -222,7 +222,8 @@ internal class LinearAuthority(
         cutLifecycle.families = if (cuts) setOf(CutFamily.SOURCE_ROUNDING, CutFamily.SOURCE_MIXED_ROUNDING) +
             (if (aggregateCuts || additionalCuts.isNotEmpty()) setOf(CutFamily.SOURCE_AGGREGATION) else emptySet())
             else emptySet()
-        return cutLifecycle.containing { advanceInternal(source, cancellation, cuts, cutMask) }
+        val recipe = if (!cuts) "NO_CUT" else if (cutMask == null) "CURRENT" else "POINT_SELECTION"
+        return cutLifecycle.containing(recipe) { advanceInternal(source, cancellation, cuts, cutMask) }
     }
 
     private fun advanceInternal(
@@ -327,6 +328,9 @@ internal class LinearAuthority(
         return LinearAuthorityQuery.prepare(source, prepared, cancellation, onCutWork = { work ->
             cutVerificationWork += work
             budget.observe(boundCertification = work)
+            for (family in prepared?.cuts?.rows.orEmpty().mapTo(HashSet()) { it.family }) {
+                cutLifecycle.observe(family, "ProofVerificationWork", work)
+            }
         }, cutMask = cutMask, onCut = cutLifecycle::observe)?.also {
             cutLifecycle.families = it.cutFamilies.values.toSet()
             activeCutPeak = maxOf(activeCutPeak, it.activeCuts.toLong())
@@ -373,6 +377,7 @@ internal class LinearAuthority(
         val prepared = cached ?: prepareQuery(source, cancellation, cuts, cutMask)?.also {
             if (retainLp || guidance) query = it
         } ?: return LinearAuthorityResult()
+        cutLifecycle.families = prepared.cutFamilies.values.toSet()
         if (capture?.accepting == true && capturedQuery == null) {
             capturedQuery = prepared
             capturedTemplate = template

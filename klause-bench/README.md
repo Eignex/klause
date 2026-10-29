@@ -544,7 +544,11 @@ existing point selection trial (`param.source-point-cuts=true`). Keep aggregatio
 off unless it is the hypothesis under test. `numericalCutLifecycle*` separates
 installed rows, checked bound/conflict proposals and actual frontier closures;
 family work and allocation include failed containing operations and overlap the
-ordinary source ledger. Identical source hashes, invocation allowances, numerical
+ordinary source ledger. `numericalCutLifecycleRECIPE_*` retains each complete
+no-cut, current-cut or point-selection query cost once. Family preparation and
+allocation are shared among attempted families; numerical and certificate phases
+name families actually installed in the query. Proof-verification work includes
+declined and unselected rows. Identical source hashes, invocation allowances, numerical
 policy, presolve, seed and runtime are required before interpreting a difference.
 
 [9277](https://lab.eignex.com/jobs/9277) exercises both sources at `0af8492830`

@@ -69,6 +69,7 @@ internal class LinearAuthorityPointCuts(
             return installed
         }
         val meter = Meter(cancellation)
+        val visitedFamilies = HashSet<CutFamily>()
         try {
             if (point.size != coordinates.size || point.size > maximumSupport ||
                 !meter.charge(point.size.toLong(), 128L + point.size * 128L)) {
@@ -100,6 +101,7 @@ internal class LinearAuthorityPointCuts(
                     break
                 }
                 support += size
+                visitedFamilies.add(row.family)
                 observe("Visited")
                 val projected = LinkedHashMap<SourceCoordinate, Double>()
                 var normSquared = 0.0
@@ -156,6 +158,10 @@ internal class LinearAuthorityPointCuts(
             budget.observe(preparation = meter.work)
             observe("Work", meter.work)
             observe("Allocation", meter.allocation)
+            for (family in visitedFamilies) {
+                onCut(family, "POINT_SELECTION_WORK", meter.work)
+                onCut(family, "POINT_SELECTION_ALLOCATION", meter.allocation)
+            }
             if (meter.limited) observe("WorkLimited")
         }
     }
