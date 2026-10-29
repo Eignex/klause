@@ -19,8 +19,27 @@ class PortfolioDiagnostics(
     init { require(workLimit > 0L) { "diagnostic work limit must be positive" } }
 }
 
-/** Logical portfolio events in execution order; physical timing belongs to ordinary statistics. */
+/** Streamed portfolio events. Work-schedule events and physical lifecycle observations have separate sinks. */
 sealed interface PortfolioEvent {
+    /** Physical lifecycle observation; separate from deterministic finite work traces. */
+    data class Lifecycle(
+        /** Stable slot. */
+        val arm: Int,
+        /** Worker recipe. */
+        val worker: String,
+        /** Actual observation site. */
+        val kind: PortfolioLifecycleKind,
+        /** Nanoseconds from containing invocation construction. */
+        val nanos: Long,
+        /** Pool incumbent version, zero if absent or unknown. */
+        val version: Long,
+    ) : PortfolioEvent
+
+    /** Inclusive settled progress; emitted only by the optional physical progress observer. */
+    data class Progressed(
+        /** Segment accounting and ordinary reward. */
+        val progress: PortfolioProgress,
+    ) : PortfolioEvent
     /** A fresh invocation and its scheduler seed and containing work allowance. */
     data class Started(
         /** Scheduler seed. */

@@ -369,6 +369,7 @@ internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> {
     }
     val reseeding = stats.portfolio.reseedStaleThreshold?.let { "portfolioReseedStaleThreshold" to "$it" }
     val slices = listOfNotNull(
+        "portfolioInvocationNs" to "${stats.portfolio.invocationNanos}",
         stats.portfolio.baseSliceWork?.let { "portfolioBaseSliceWork" to "$it" },
         stats.portfolio.maxSliceWork?.let { "portfolioMaxSliceWork" to "$it" },
         stats.portfolio.sliceGrowth?.let { "portfolioSliceGrowth" to "$it" },
@@ -395,6 +396,25 @@ internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> {
                 "\"message\":${it.message?.let(::diagnosticString) ?: "null"},\"trace\":${diagnosticString(it.trace)}}"
         }
     }
+    val phases = stats.portfolio.arms.flatMap { arm -> arm.phases.map { phase ->
+        "armPhase.${arm.label}.${phase.phase}" to
+            "segments=${phase.segments} work=${phase.work} ns=${phase.nanos} " +
+            "checks=${phase.checks} checkNs=${phase.checkingNanos} incumbents=${phase.incumbents} " +
+            "closures=${phase.closures} initNs=${phase.initializationNanos} initWork=${phase.initializationWork} " +
+            "preparationNs=${phase.preparationNanos}" + phase.credit.entries.joinToString("") {
+                " ${it.key}=${round4(it.value)}"
+            }
+    } }
+    val lifecycle = stats.portfolio.arms.map { arm ->
+        val life = arm.lifecycle
+        "armLifecycle.${arm.label}" to
+            "createdNs=${life.createdNanos} constructionNs=${life.constructionNanos} " +
+            "firstQueryNs=${life.firstQueryNanos} availableNs=${life.incumbentAvailableNanos} " +
+            "readNs=${life.incumbentReadNanos} importedNs=${life.incumbentImportedNanos} " +
+            "consumedNs=${life.incumbentConsumedNanos} retiredNs=${life.retiredNanos} " +
+            "retirementNs=${life.retirementNanos} reads=${life.incumbentReads} " +
+            "imports=${life.incumbentImports} uses=${life.incumbentUses}"
+    }
     val alns = stats.alns
     val inner = if (alns == AlnsStats()) emptyList() else listOf(
         "alnsBootstrapCpNodes" to "${alns.bootstrapCpNodes}",
@@ -406,7 +426,7 @@ internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> {
         "alnsBootstrapLsMillis" to "${alns.bootstrapLsMillis}",
         "alnsRepairMillis" to "${alns.repairMillis}",
     )
-    return listOfNotNull(profile, reseeding) + slices + schedule + failures + inner
+    return listOfNotNull(profile, reseeding) + slices + schedule + phases + lifecycle + failures + inner
 }
 
 private fun diagnosticString(value: String): String = buildString {

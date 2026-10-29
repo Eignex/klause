@@ -447,6 +447,16 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** Opt-in general-integer/continuous admission for bounded numerical companions. */
         val companionIntegers: ExecutionOption<Boolean> = ExecutionOption("companion-integers", ValueKind.BOOLEAN)
 
+        /** Defer finite numerical companion queries until a checked pool incumbent exists. */
+        val companionAfterIncumbent: ExecutionOption<Boolean> =
+            ExecutionOption("companion-after-incumbent", ValueKind.BOOLEAN)
+
+        /** Active companion lifetime in milliseconds, contained by the ordinary solve deadline. */
+        val companionActiveMillis: ExecutionOption<Long> = ExecutionOption("companion-active-ms", ValueKind.LONG)
+
+        /** Stream physical phase and lifecycle progress independently of deterministic work diagnostics. */
+        val portfolioProgress: ExecutionOption<Boolean> = ExecutionOption("portfolio-progress", ValueKind.BOOLEAN)
+
         /** Select bounded private objective-core refinement. Default [CoreRefinementMode.NONE]. */
         val coreRefinement: ExecutionOption<CoreRefinementMode> =
             ExecutionOption("core-refinement", ValueKind.CORE_REFINEMENT)
@@ -493,7 +503,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 scoring, acceptance, restart, strategy, localSearchArm, objectiveGuidance,
                 lambda, arms, localSearchArms, backtrackArms, clauseShareLbd,
                 clauseShareLen, sliceWork, sliceMaxWork, sliceGrowth, portfolioWork, coreEarly, companionIntegers,
-                coreRefinement,
+                coreRefinement, companionAfterIncumbent, companionActiveMillis, portfolioProgress,
                 phaseRetention, reseedStaleThreshold, lsResiduals, lsPhaseTimes, backtrackArmsByLabel,
             ).associateBy { it.id }
         }

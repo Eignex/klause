@@ -19,6 +19,8 @@ data class PortfolioStats(
     val maxSliceWork: Long? = null,
     /** Effective geometric growth of ordinary segments. */
     val sliceGrowth: Double? = null,
+    /** Inclusive construction, scheduling, checking and handle retirement time; source preparation precedes it. */
+    val invocationNanos: Long = 0,
 ) {
     /** Combine two runs' schedules: the arms of both, in order, under the first one's classification. */
     fun mergedWith(o: PortfolioStats): PortfolioStats = PortfolioStats(
@@ -28,6 +30,7 @@ data class PortfolioStats(
         baseSliceWork ?: o.baseSliceWork,
         maxSliceWork ?: o.maxSliceWork,
         sliceGrowth ?: o.sliceGrowth,
+        invocationNanos + o.invocationNanos,
     )
 }
 
@@ -63,6 +66,10 @@ data class ArmSchedule(
     val initializationCancelled: Long = 0L,
     /** The first ordinary exception that retired the arm; distinct from a refuted claim. */
     val failure: ArmFailure? = null,
+    /** Fixed-size phase progress and inclusive costs. */
+    val phases: List<PortfolioPhaseStats> = emptyList(),
+    /** Factory, query, sharing opportunity and disposal lifecycle. */
+    val lifecycle: PortfolioLifecycleStats = PortfolioLifecycleStats(),
 )
 
 /** Bounded diagnostics for an ordinary portfolio arm exception. */

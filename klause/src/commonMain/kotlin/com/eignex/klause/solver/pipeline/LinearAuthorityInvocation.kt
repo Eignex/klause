@@ -60,6 +60,8 @@ internal class LinearAuthorityInvocation(
     latestFeedback: Boolean = true,
     feedbackRequest: LinearAuthorityFeedbackRequest? = null,
     aggregateBranching: Boolean = false,
+    private val onIncumbentImport: (() -> Unit)? = null,
+    private val onIncumbentUse: (() -> Unit)? = null,
 ) : AutoCloseable {
     init {
         require(borrowedAuthority?.funding == null || borrowedAuthority.funding === funding) {
@@ -82,6 +84,8 @@ internal class LinearAuthorityInvocation(
     private var value: BigFraction? = null
     private var incumbentRevision = 0L
     private var importedIncumbents = 0L
+    private var importedIncumbent: Sample? = null
+    private var consumedIncumbent: Sample? = null
     private var result: LinearInvocationResult? = null
     val isDone: Boolean get() = result != null
     fun captureTo(journal: LinearAuthorityCapture) = component.captureTo(journal)
@@ -99,7 +103,13 @@ internal class LinearAuthorityInvocation(
     private val component = LinearAuthorityTraversal(context,
         SourceLpBudget(maxOperations = params.sourceLpOperations, onWork = state.smt::observeSourceLp,
             funding = funding), stop, ::paused, ::offer,
-        { incumbent?.let { sample -> value?.let { sample to it } } }, useBranchHistory, borrowedAuthority,
+        { incumbent?.let { sample -> value?.let {
+            if (sample === importedIncumbent && sample !== consumedIncumbent) {
+                consumedIncumbent = sample
+                onIncumbentUse?.invoke()
+            }
+            sample to it
+        } } }, useBranchHistory, borrowedAuthority,
         useGuidance = boundOrdered || guidance || supportBranching || onNumericalFeedback != null,
         inheritBounds = boundOrdered, useCuts = cuts,
         useActiveRows = activeRows, useRefutationReuse = params.sourceRefutationReuse,
@@ -165,7 +175,11 @@ internal class LinearAuthorityInvocation(
             external()?.takeUnless { it === incumbent }?.let { sample ->
                 val before = incumbentRevision
                 offer(sample)
-                if (incumbentRevision != before) importedIncumbents++
+                if (incumbentRevision != before) {
+                    importedIncumbents++
+                    importedIncumbent = sample
+                    onIncumbentImport?.invoke()
+                }
             }
             if (stop()) return finish(null, if (params.timeout()) TerminationReason.Timeout
                 else TerminationReason.Cancelled)
@@ -228,6 +242,7 @@ internal class LinearAuthorityInvocation(
         val minimizes = context.scope.objective?.sense == ObjectiveSense.MINIMIZE
         if (standing != null && if (minimizes) exact >= standing else exact <= standing) return
         incumbent = sample
+        importedIncumbent = null
         value = exact
         incumbentRevision++
         callback(sample, exact)

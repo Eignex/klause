@@ -46,6 +46,8 @@ internal class JointLinearRepair(
     private val external: () -> Sample? = { null },
     private val publicationLifetime: Cancellation? = null,
     sourceIntegers: IntArray? = null,
+    private val onIncumbentImport: (() -> Unit)? = null,
+    private val onIncumbentUse: (() -> Unit)? = null,
 ) : ExactNeighborhoodCompletion, AutoCloseable {
     private val sourceIntegers = sourceIntegers?.copyOf()
     private val stop = params.timeout or params.cancellation
@@ -54,6 +56,7 @@ internal class JointLinearRepair(
     private val budget = SourceLpBudget(maxOperations = params.sourceLpOperations,
         onWork = state.smt::observeSourceLp, funding = funding)
     private val stages = linkedMapOf<String, Long>()
+    private var importedCenter: Sample? = null
     private val authority = LinearAuthority(budget, onLpShape = { shape ->
         if (shape.sparse) observe(shape.phase?.let { "jointRepairLpPhase_$it" } ?: "jointRepairLpNoPhase")
         if (!shape.admitted) observe("jointRepairLpDeclinedAttempts")
@@ -134,6 +137,10 @@ internal class JointLinearRepair(
                 }
                 val from = pooled?.let { sample ->
                     observe("jointRepairImportedCenters")
+                    if (sample !== importedCenter) {
+                        importedCenter = sample
+                        onIncumbentImport?.invoke()
+                    }
                     List(model.numIntVars) { BigFraction.of(sample.exactIntValue(it), BIG_ONE) } +
                         sample.exactReals.orEmpty()
                 } ?: centers
@@ -148,6 +155,7 @@ internal class JointLinearRepair(
                     observe("jointRepairSourceInputProposals")
                     minOf(count, 2)
                 } else count
+                if (pooled != null) onIncumbentUse?.invoke()
                 requireNotNull(selection).propose(from, pooled?.bools ?: bools, width, round, radius, limit)
             },
         )

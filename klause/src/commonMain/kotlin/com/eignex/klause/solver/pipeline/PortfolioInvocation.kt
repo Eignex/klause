@@ -7,6 +7,8 @@ import com.eignex.klause.portfolio.ArmFault
 import com.eignex.klause.portfolio.AttributedImprovement
 import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioDiagnostics
+import com.eignex.klause.portfolio.PortfolioEvent
+import com.eignex.klause.portfolio.PortfolioRewardPolicy
 import com.eignex.klause.portfolio.PortfolioEvidence
 import com.eignex.klause.portfolio.PortfolioExecutor
 import com.eignex.klause.portfolio.PortfolioIncumbents
@@ -18,6 +20,7 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.util.Cancellation
+import kotlin.time.TimeSource
 
 internal data class PortfolioInvocationControls(
     val parallelism: Int = 1,
@@ -34,6 +37,8 @@ internal data class PortfolioInvocationControls(
     val reseedStaleThreshold: Int = 3,
     val phaseRetention: Double = Portfolio.DEFAULT_PHASE_RETENTION,
     val diagnostics: PortfolioDiagnostics? = null,
+    val rewardPolicy: PortfolioRewardPolicy? = null,
+    val onProgress: ((PortfolioEvent) -> Unit)? = null,
 )
 
 internal class PortfolioInvocationPolicy(
@@ -72,9 +77,13 @@ internal class PortfolioInvocation(
         }.toSet(),
     )
     private val workers = ArrayList<PortfolioWorker>()
+    private val started = TimeSource.Monotonic.markNow()
     private val portfolio: Portfolio = try {
         for (slot in resources.slots) {
+            val construction = TimeSource.Monotonic.markNow()
             val worker = this.factories[slot.index % this.factories.size].materialize(preparedPlan, slot)
+            worker.constructionNanos = construction.elapsedNow().inWholeNanoseconds
+            worker.createdNanos = started.elapsedNow().inWholeNanoseconds
             workers += worker
             require(worker.sourceBinding?.preparedPlan === preparedPlan) {
                 "source portfolio requires a complete worker binding"
@@ -90,7 +99,10 @@ internal class PortfolioInvocation(
             reseedStaleThreshold = controls.reseedStaleThreshold, phaseRetention = controls.phaseRetention,
             profile = selected.profile, minShares = selected.shares, onFault = onFault,
             diagnostics = controls.diagnostics,
+            rewardPolicy = controls.rewardPolicy,
+            onProgress = controls.onProgress,
         ).also {
+            it.invocationStarted = started
             it.exactLinearObjective = objective
             it.evidenceVerification = evidence
             it.reserveBeforeIncumbentOnly = selected.reserveBeforeIncumbentOnly

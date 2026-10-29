@@ -8,6 +8,7 @@ import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioIncumbents
 import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.portfolio.PortfolioWorker
+import com.eignex.klause.portfolio.PortfolioLifecycleKind
 import com.eignex.klause.portfolio.WorkerConstructionCost
 import com.eignex.klause.portfolio.WorkerEligibility
 import com.eignex.klause.portfolio.WorkerFragment
@@ -45,7 +46,7 @@ internal fun finiteNumericalCompanionEligibility(
 ): WorkerEligibility {
     val cost = WorkerConstructionCost(problem.numIntVars.toLong() + problem.numRealVars, problem.factors.size,
         lpWorkLimit = params.sourceLpWorkLimit / 2, allocationLimit = params.sourceLpAllocationLimit / 2,
-        activeMillis = 4_000, sliceMillis = 1_000, sliceWork = 5_000,
+        activeMillis = scenario.companionActiveMillis, sliceMillis = 1_000, sliceWork = 5_000,
         maxColumns = 4_096, maxFactors = 16_384)
     val requirements = WorkerRequirements(
         if (scenario.companionIntegers) WorkerFragment.AFFINE_MIXED else WorkerFragment.AFFINE_BINARY_MIXED,
@@ -84,6 +85,7 @@ internal class FiniteNumericalCompanions private constructor(
     private val params: TheoryParams,
     private val cancellation: Cancellation,
     private val cost: WorkerConstructionCost,
+    private val afterIncumbent: Boolean,
 ) {
     val incumbents = PortfolioIncumbents.exact(objective)
 
@@ -102,33 +104,45 @@ internal class FiniteNumericalCompanions private constructor(
         )
         return listOf(
             factory(firstArm, ArmFamily.Backtrack) { slot ->
-                PortfolioWorker.ofMinimize("numerical/finite-companion", firstArm, resumable = {
-                    BoundedCompanionSearch(numericalSearch(local(slot)), "finiteNumericalCompanion",
+                lateinit var worker: PortfolioWorker
+                worker = PortfolioWorker.ofMinimize("numerical/finite-companion", firstArm, resumable = {
+                    BoundedCompanionSearch(numericalSearch(local(slot), worker), "finiteNumericalCompanion",
                         activeLimit = requireNotNull(cost.activeMillis).milliseconds,
                         sliceLimit = requireNotNull(cost.sliceMillis).milliseconds)
                 }) { _, _, _, _ -> error("numerical companion runs only by slice") }.bindEvidence(identity)
+                worker.also { it.startAfterIncumbent = afterIncumbent }
             },
             factory(firstArm + 1, ArmFamily.LocalSearch) { slot ->
+                lateinit var companion: PortfolioWorker
                 val limits = local(slot)
                 val repair = slot.own(JointLinearRepair(model, context, objective, limits,
-                    boundOrdered = true, external = { incumbents.exchange.current()?.assignment },
+                    boundOrdered = true, external = { sharedIncumbent(companion) },
+                    onIncumbentImport = { companion.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_IMPORTED) },
+                    onIncumbentUse = { companion.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_CONSUMED) },
                     publicationLifetime = limits.cancellation or limits.timeout))
                 val worker = exactNeighborhoodWorker("ls/finite-joint-companion", firstArm + 1, objective,
                     limits.cancellation, limits.timeout, { repair.exhausted },
                     open = { repair.search(adaptive = false, seed = slot.seed) })
-                PortfolioWorker.ofMinimize("ls/finite-joint-companion", firstArm + 1, countsInstructions = true,
+                companion = PortfolioWorker.ofMinimize("ls/finite-joint-companion", firstArm + 1, countsInstructions = true,
                     resumable = {
                         BoundedCompanionSearch(requireNotNull(worker.newResumableSearch(incumbents::bound)),
                             "finiteJointCompanion", activeLimit = requireNotNull(cost.activeMillis).milliseconds)
                     }) { _, _, _, _ -> error("joint companion runs only by slice") }
                     .bindEvidence(identity, provesResults = false)
+                companion.also { it.startAfterIncumbent = afterIncumbent }
             },
         )
     }
 
-    private fun numericalSearch(limits: TheoryParams): ResumableSearch = object : ResumableSearch {
+    private fun sharedIncumbent(worker: PortfolioWorker) = incumbents.exchange.current()?.also {
+        worker.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_READ, it.version)
+    }?.assignment
+
+    private fun numericalSearch(limits: TheoryParams, worker: PortfolioWorker): ResumableSearch = object : ResumableSearch {
         private val search = LinearAuthorityInvocation(context, limits, boundOrdered = true,
-            external = { incumbents.exchange.current()?.assignment })
+            external = { sharedIncumbent(worker) },
+            onIncumbentImport = { worker.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_IMPORTED) },
+            onIncumbentUse = { worker.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_CONSUMED) })
         private var result: MinimizeResult? = null
         override val isDone: Boolean get() = result != null
         override val stats get() = search.stats
@@ -152,12 +166,13 @@ internal class FiniteNumericalCompanions private constructor(
 
     companion object {
         fun prepare(model: BakedProblem, objective: LinearObjective, params: TheoryParams,
-            cancellation: Cancellation, cost: WorkerConstructionCost): FiniteNumericalCompanions? {
+            cancellation: Cancellation, cost: WorkerConstructionCost,
+            afterIncumbent: Boolean = false): FiniteNumericalCompanions? {
             // The propagated difference graph duplicates affine rows and bounds in these coordinates.
             val affine = model.withFactors(model.factors.filterNot { it is DifferenceSystem }.toTypedArray())
             val context = affine.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, cancellation,
                 numericalIndicators = true) ?: return null
-            return FiniteNumericalCompanions(model, objective, context, params, cancellation, cost)
+            return FiniteNumericalCompanions(model, objective, context, params, cancellation, cost, afterIncumbent)
         }
     }
 }

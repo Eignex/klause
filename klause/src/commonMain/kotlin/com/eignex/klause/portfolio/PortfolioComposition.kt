@@ -152,6 +152,14 @@ data class PortfolioScenario(
     val coreRefinement: CoreRefinementMode = CoreRefinementMode.NONE,
     /** Trial bounded general-integer/continuous companions; preserves explicit finite recipes. */
     val companionIntegers: Boolean = false,
+    /** Defer numerical companion queries until a source incumbent exists, without changing admission. */
+    val companionAfterIncumbent: Boolean = false,
+    /** Per-companion active lifetime inside the containing solve deadline. */
+    val companionActiveMillis: Long = 4_000,
+    /** Stream physical phase/lifecycle events independently of work scheduling. */
+    val reportPortfolioProgress: Boolean = false,
+    /** Opt-in reward experiment; source admission, complete-worker coverage and priors are preserved. */
+    val rewardPolicy: PortfolioRewardPolicy? = null,
     /** Whether the caller selected arm counts, including the ordinary default count. */
     val explicitArms: Boolean = false,
 ) {
@@ -170,6 +178,7 @@ data class PortfolioScenario(
         require(sliceWork > 0L && maxSliceWork >= sliceWork) { "invalid work slice bounds" }
         require(sliceGrowth.isFinite() && sliceGrowth >= 1.0) { "sliceGrowth must be finite and >= 1" }
         require(phaseRetention in 0.0..1.0) { "phaseRetention must be in [0, 1]" }
+        require(companionActiveMillis in 1..60_000) { "companionActiveMillis must be in [1, 60000]" }
     }
 
     /** Factories for the two execution shapes a scenario can take. */

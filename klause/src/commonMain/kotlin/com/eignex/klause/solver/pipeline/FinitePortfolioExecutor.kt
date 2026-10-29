@@ -86,7 +86,7 @@ internal fun FinitePipeline.portfolioExecutor(
     }
     val companions = if (companionEligibility?.admitted == true) {
         FiniteNumericalCompanions.prepare(problem, requireNotNull(objective), requireNotNull(numericalCompanions),
-            cancellation, companionEligibility.requirements.construction)
+            cancellation, companionEligibility.requirements.construction, scenario.companionAfterIncumbent)
     } else null
     companionEligibility?.let { eligibility ->
         val declines = if (eligibility.admitted && companions == null) listOf("complete-affine-capture-unavailable")
@@ -131,6 +131,10 @@ internal fun FinitePipeline.portfolioExecutor(
             baseSliceWork = scenario.sliceWork, maxSliceWork = scenario.maxSliceWork,
             sliceGrowth = scenario.sliceGrowth, phaseRetention = scenario.phaseRetention,
             reseedStaleThreshold = scenario.reseedStaleThreshold,
+            rewardPolicy = scenario.rewardPolicy,
+            onProgress = if (scenario.reportPortfolioProgress) { event ->
+                onEvent?.invoke("portfolio", SearchEvent.PortfolioDiagnostic(event))
+            } else null,
             diagnostics = scenario.diagnosticWorkLimit?.let { limit ->
                 PortfolioDiagnostics(limit, scenario.seed) { event ->
                     onEvent?.invoke("portfolio", SearchEvent.PortfolioDiagnostic(event))

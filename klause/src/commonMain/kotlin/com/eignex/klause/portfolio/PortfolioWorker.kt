@@ -75,6 +75,15 @@ class PortfolioWorker private constructor(
 
     internal var auxiliaryProof: Boolean = false
 
+    internal var startAfterIncumbent: Boolean = false
+    internal var constructionNanos: Long = 0
+    internal var createdNanos: Long = 0
+    internal var onLifecycle: ((PortfolioLifecycleKind, Long) -> Unit)? = null
+
+    internal fun observeLifecycle(kind: PortfolioLifecycleKind, version: Long = 0) {
+        onLifecycle?.invoke(kind, version)
+    }
+
     internal var controlsObjectiveCutoff: Boolean = false
 
     private var configuredModel: ModelIdentity? = null

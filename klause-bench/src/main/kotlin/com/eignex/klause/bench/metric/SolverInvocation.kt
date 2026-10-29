@@ -162,7 +162,8 @@ internal object SolverInvocation {
             add("-r")
             add(s.seed.toString())
             add("-s")
-            if (s.params.any { it.startsWith("portfolio-work=") || it.startsWith("companion-integers=") }) add("-v")
+            if (s.params.any { it.startsWith("portfolio-work=") || it.startsWith("companion-integers=") ||
+                    it == "portfolio-progress=true" }) add("-v")
             if (s.exact) add("--exact")
             if (s.completeAssignment && entry.ref.format == Format.MINIZINC) add("--output-complete-assignment")
             if (optimize) {
