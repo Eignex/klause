@@ -212,20 +212,24 @@ internal class PrivateRebuildSatisfaction(
     private fun retire() {
         val search = consumer ?: return
         val start = TimeSource.Monotonic.markNow()
-        search.close()
-        retiredWork += search.work
-        retiredStats = retiredStats.mergedWith(search.stats)
-        consumer = null
-        generation = null
-        candidate = null
-        root = null
-        note("Retired")
-        note("RetirementNanos", start.elapsedNow().inWholeNanoseconds)
+        try {
+            search.close()
+        } finally {
+            retiredWork = saturatedWork(retiredWork, search.work)
+            retiredStats = retiredStats.mergedWith(search.stats)
+            consumer = null
+            generation = null
+            candidate = null
+            checkedFactors = 0
+            root = null
+            note("Retired")
+            note("RetirementNanos", start.elapsedNow().inWholeNanoseconds)
+        }
     }
 
     private fun finish(result: SolveResult): SolveResult {
         close()
-        return result.withStats(stats).also { done = it }
+        return result.withStats(stats).withSourceSemantics(solver.problem.semantics).also { done = it }
     }
 
     override fun close() {

@@ -11,6 +11,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNotSame
 import kotlin.test.assertNull
@@ -65,6 +66,19 @@ class PrivateRebuildGenerationTest {
             assertNull(generation)
             assertEquals(1, session.problem.numFactors)
             assertNull(session.boolValue(0))
+        }
+    }
+
+    @Test
+    fun `matching dimensions should not grant another model reconstruction authority`() {
+        val source = Problem(2, 0, emptyArray(), arrayOf(Clause(intArrayOf(0, 2)))).bake()
+        val generation = assertNotNull(PrivateRebuildGeneration.prepare(
+            PropagationSession(source), 1_048_576L, Cancellation.Never,
+        ))
+        val unrelated = Problem(2, 0, emptyArray(), emptyArray()).bake()
+
+        assertFailsWith<IllegalArgumentException> {
+            generation.mapping.reconstructFrom(unrelated, Sample(BooleanArray(2), longArrayOf()))
         }
     }
 }
