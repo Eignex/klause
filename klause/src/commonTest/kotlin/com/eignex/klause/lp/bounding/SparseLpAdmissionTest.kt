@@ -34,7 +34,7 @@ class SparseLpAdmissionTest {
 
         val (lower, work) = LpEngine(problem, LinearObjective(intCoefficients = LongArray(96) { 1L }),
             LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")), sink).use { engine ->
-            repeat(3) { engine.observeNodeWork(false, 96, 96, 1L) }
+            repeat(3) { engine.observeNodeWork(false, 96, 96, 1) }
             val bound = engine.rootLpRelaxationBound(requireNotNull(engine.lpRelaxer), emptyList())
             bound to engine.totalSolveWork()
         }
@@ -56,7 +56,7 @@ class SparseLpAdmissionTest {
 
         val (lower, work) = LpEngine(problem, LinearObjective(intCoefficients = LongArray(96) { 1L }),
             LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")), sink).use { engine ->
-            repeat(3) { engine.observeNodeWork(false, 96, 96, 1L) }
+            repeat(3) { engine.observeNodeWork(false, 96, 96, 1) }
             val bound = engine.rootLpRelaxationBound(requireNotNull(engine.lpRelaxer), emptyList(), stop)
             bound to engine.totalSolveWork()
         }
