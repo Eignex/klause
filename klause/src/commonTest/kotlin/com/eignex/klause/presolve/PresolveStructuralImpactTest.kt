@@ -7,12 +7,14 @@ import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.presolve.linear.AffineSingletons
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.PresolveLane
 import com.eignex.klause.solver.result.PresolveSizeStats
 import com.eignex.klause.util.Cancellation
@@ -86,7 +88,7 @@ class PresolveStructuralImpactTest {
     @Test
     fun `structural control should retain a table that ordinary reduction rewrites`() {
         val source = Problem(0, 2, arrayOf(IntDomain(0, 0), IntDomain(0, 2)),
-            listOf(Table(intArrayOf(0, 1), longArrayOf(0, 1))))
+            listOf(Table(intArrayOf(0, 1), longArrayOf(0, 1, 1, 2))))
         for (lane in PresolveLane.entries) for (preserve in listOf(false, true)) {
             val config = PresolveConfig.parse("off,+structural").withEffort(preserveStructure = preserve)
 
@@ -109,6 +111,54 @@ class PresolveStructuralImpactTest {
 
         assertEquals(5L, budget.spent())
         assertEquals(5L, invocation.structuralImpact["Visits"])
+        assertEquals(0L, invocation.structuralImpact["Complete"])
+    }
+
+    @Test
+    fun `structure protection should include exactly substitutable objective coordinates`() {
+        val source = Problem(0, 3, arrayOf(IntDomain(1, 3), IntDomain(0, 2), IntDomain(0, 2)),
+            listOf(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1),
+                Table(intArrayOf(0, 2), longArrayOf(1, 0, 2, 1, 3, 2)),
+                Table(intArrayOf(1, 2), longArrayOf(0, 0, 1, 1, 2, 2)),
+            ))
+        val objective = LinearObjective(
+            intCoefficients = longArrayOf(1, 0, 0),
+        )
+        val context = PresolveContext.of(objective, transformObjective = true)
+        val config = PresolveConfig.parse("off,+affine").withEffort(preserveStructure = true)
+
+        val result = Presolver.runSource(source, config, context)
+
+        assertTrue(result.rebuild.isEmpty)
+        assertTrue(result.problem === source)
+    }
+
+    @Test
+    fun `interrupted protection discovery should publish no affine elimination`() {
+        val source = Problem(0, 2, arrayOf(IntDomain(1, 3), IntDomain(0, 2)),
+            listOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1)))
+        val budget = PresolveBudget(1)
+
+        val delta = AffineSingletons.eliminateSourceAffineSingletons(
+            source, cancellation = budget.orSpent(Cancellation.Never), preserveStructure = true,
+        )
+
+        assertTrue(delta.isEmpty)
+        assertTrue(budget.spent() >= 1L)
+    }
+
+    @Test
+    fun `impact scan should honor the containing phase stop before its own cap`() {
+        val row = Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 1)
+        val source = Problem(0, 2, Array(2) { IntDomain(0, 1) }, listOf(row))
+        val invocation = PresolveInvocation("affine", PresolveLane.SOURCE, PresolveSizeStats(1, 0, 2))
+        val budget = PresolveBudget(2)
+
+        invocation.recordStructuralImpact(source, intArrayOf(0), emptyList(), SourceRebuilds.NONE,
+            100, budget.orSpent(Cancellation.Never))
+
+        assertEquals(2L, budget.spent())
         assertEquals(0L, invocation.structuralImpact["Complete"])
     }
 
