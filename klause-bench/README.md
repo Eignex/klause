@@ -838,6 +838,31 @@ launcher and are partial evidence. [9298](https://lab.eignex.com/jobs/9298) lose
 its preparation daemon before running the structured-stop revision. None of these
 outcomes supplies a numerical improvement or a completed capture.
 
+### Early exact-import precision
+
+[Adlittle 9361](https://lab.eignex.com/jobs/9361) pairs the internal early-big
+request with fixed-width-first continuation under unchanged ceilings. The measured
+14-state attainment-request lifecycle takes 1.67 s and allocates 320 MB versus
+7.57 s and 1.35 GB. Early big completes 93 imports; fixed-width overflow replay
+spends 128 cumulative imports and stops at position 102/154. Conservative modeled
+cold import/check spending rises from 25.5 to 35.8 million work units and from
+147 to 242 MB, within the existing limits. Returned feasibility does not satisfy
+attainment: the exact bound remains unavailable under the existing reconstruction
+and refinement allowances.
+
+[The real JVM consumer](https://lab.eignex.com/jobs/9372) returns a best-known
+Adlittle point with one consumed feasible-completion claim under early big;
+fixed-width-first returns Unknown at the import ceiling. Both finish inside the
+equal five-second allowance. The observed invocation costs are 1.69 s/113 MB and
+3.59 s/315 MB; fixed-first worker order includes warming effects, so these are not
+a general throughput estimate. Process RSS spans both arms. The worker point is
+native checked, without an independent Adlittle source receipt or optimality proof.
+[Afiro 9373](https://lab.eignex.com/jobs/9373) preserves consumed attainment and
+compatible checked-package reuse in both arms. [Ordinary controls 9375](https://lab.eignex.com/jobs/9375)
+independently accept the original points/objectives 9 and exact 1/3; they do not
+independently prove optimality. Arithmetic selection stays opt-in, with numerical
+defaults, ceilings and proof acceptance unchanged.
+
 ### Bounded sparse admission trials
 
 `lp=default,+sparse-trial` selects the ordinary model-facing LP route's bounded

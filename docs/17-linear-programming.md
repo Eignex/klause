@@ -842,12 +842,11 @@ stall heuristics only schedule work; they never authorize proofs.
 
 Rational work escalates from `Frac128` to `BigFraction`; fixed-width overflow
 restarts the operation from authority, and every attempt is charged. An internal
-consumer context or continuation request can opt into arbitrary precision before building its first
-tableau; this selects arithmetic without changing cumulative limits, import identity
-or the current-source verification required for publication. A retained tableau
-keeps its arithmetic across requests. Owner-local
-exact factors require the same matrix and ordered basis. An off-status feasible
-point cannot furnish a claimed warm basis.
+consumer context or continuation request can opt into arbitrary precision before
+the first tableau. This selects arithmetic without changing cumulative limits,
+import identity or current-source verification. A retained tableau keeps its
+arithmetic across requests. Owner-local exact factors require the same matrix and
+ordered basis. An off-status feasible point cannot furnish a claimed warm basis.
 
 A fully imported exact feasibility tableau can retain its own basis across bound
 assertions and retraction when the source matrix, right-hand side and objective
