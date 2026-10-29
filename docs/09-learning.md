@@ -454,7 +454,9 @@ elimination runs once in [presolve](07-presolve.md) instead. Seeded searches ski
 inprocessing, since derivations under assumption pins would not hold globally.
 
 Opt-in root simplification examines bounded slices of source and learned Boolean
-clauses against permanent root facts. A shortened source clause enters as a permanent
+clauses against permanent root facts. An empty Boolean pin trail withholds the scan;
+without a pinned literal it cannot satisfy or shorten a Boolean clause. A shortened
+source clause enters as a permanent
 session-local replacement before its watches retire; immutable source text remains
 available for reasons. Satisfied source watches retire without changing variable IDs.
 Learned replacements retain their imported origin. Compaction protects live and
@@ -467,8 +469,8 @@ with Boolean coordinates from newly examined learned clauses of two to eight lit
 The learned cursor advances without replaying an exhausted unchanged neighborhood;
 compaction invalidates its indices. Preparation and retained literal storage share the
 probe class allowance and memory observation. Funded probing precedes cheap root
-simplification so proved facts can refresh binaries in the same safe-root opportunity. Each attempt has a propagation-work ceiling within the invocation
-token. A completed root conflict proves the complementary unit, which is attached and
+simplification so proved facts can refresh binaries in the same safe-root opportunity. Each attempt has a propagation-work ceiling within
+the invocation token. A completed root conflict proves the complementary unit, which is attached and
 propagated through ordinary search. Completed root facts are published to shared
 components before traversal resumes. Successful and interrupted probes retract to the
 complete root; interruption supplies no deduction. Clause scans and probes enter the
