@@ -19,6 +19,18 @@ import kotlin.test.assertTrue
 
 class PropagationSessionTest {
     @Test
+    fun `stopped duplicate lookup should decline export without consuming new learning`() {
+        val session = PropagationSession(Problem(2, 0, emptyArray(), emptyList()))
+        session.addLearnedClause(Clause(intArrayOf(0, 2)), 1)
+
+        val stopped = session.exportGlueClausesBounded(6, 12, false,
+            alreadyShared = { null }, cancelled = { false })
+
+        assertNull(stopped)
+        assertEquals(1, session.exportGlueClauses(6, 12).size)
+    }
+
+    @Test
     fun `glue export should preserve portable identity while suppressing known clauses`() {
         for (native in listOf(false, true)) {
             val problem = Problem(8, 0, emptyArray(), listOf(Clause(intArrayOf(0, 1))))
