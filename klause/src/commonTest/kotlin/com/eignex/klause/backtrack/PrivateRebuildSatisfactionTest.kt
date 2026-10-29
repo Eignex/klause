@@ -86,6 +86,37 @@ class PrivateRebuildSatisfactionTest {
     }
 
     @Test
+    fun `one shot cancellation during opening should return unknown`() {
+        for (native in listOf(false, true)) {
+            val source = Problem(2, 0, emptyArray(), arrayOf(Clause(intArrayOf(0, 2)))).bake()
+
+            val result = BacktrackSolver(source).solve(BacktrackParams(
+                nativeSat = native, privateRebuildWork = 65_536L, cancellation = Cancellation { true },
+            ))
+
+            assertIs<SolveResult.Unknown>(result)
+            assertNull(result.stats.search.learning["privateRebuildConsumers"])
+        }
+    }
+
+    @Test
+    fun `an expired opening token should not cancel a later private consumer`() {
+        val source = Problem(3, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(0, 2)), Clause(intArrayOf(1, 4)),
+        )).bake()
+        var openingEnded = false
+        val search = BacktrackSolver(source).resumableSolve(BacktrackParams(
+            privateRebuildWork = 65_536L, cancellation = Cancellation { openingEnded },
+        ))
+        openingEnded = true
+
+        val result = search.use { it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) }
+
+        val accepted = assertIs<SolveResult.Sat>(result)
+        assertEquals(1L, accepted.stats.search.learning["privateRebuildSourceAccepted"])
+    }
+
+    @Test
     fun `cancellation after private opening should release the generation without publishing a point`() {
         for (lifetime in listOf(false, true)) {
             val source = Problem(3, 0, emptyArray(), arrayOf(
