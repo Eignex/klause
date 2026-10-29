@@ -480,6 +480,15 @@ These observations complete the original-source consumption audit for
 [#3844](https://github.com/Eignex/klause/issues/3844); they establish no default
 throughput or terminal claim. Admission stays opt-in.
 
+`lp-component-split` supplies existing separable MPS and MiniZinc sources plus
+`mzn-linked-8x24` as a connected control. For immutable node lifecycle controls use
+`param.lp-component-ownership=true|false` with identical source hashes, presolve,
+LP effort and containing work limits. This option also dispatches root tableau
+cuts to their owning blocks. It leaves automatic component admission unchanged;
+record prepared block counts and actual bound edits before interpreting a zero
+reuse or zero-cut result. Component count alone establishes no saved work or
+whole-source improvement.
+
 The opt-in basis tool uses the [basis corpus](../klause/src/jvmTest/resources/basis-corpus/README.md):
 
 ```sh

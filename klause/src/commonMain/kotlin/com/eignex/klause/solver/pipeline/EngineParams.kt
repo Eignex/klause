@@ -163,7 +163,7 @@ val BACKTRACK_OVERRIDE_KEYS = listOf(
     "mid-lbd", "vivification", "vivify-batch", "subsumption", "subsume-batch", "inprocessing-cadence",
     "root-simplification", "root-simplify-batch", "root-probe-batch", "root-probe-work",
     "lp-objective-cone", "lp-auto-off-reprobe",
-    "lp-knapsack-lagrangian", "lp-component-split", "lp-bound-max-pivots", "lp-adaptive-work",
+    "lp-knapsack-lagrangian", "lp-component-split", "lp-component-ownership", "lp-bound-max-pivots", "lp-adaptive-work",
     "lp-branching", "lp-directional-gains", "lp-variable-shaving", "lp-prune-hulls", "lp-root-cuts",
     "pb-learning", "pb-objective-cutoff", "propagation-attribution", "historical-table-reasons",
     "objective-guided-values",
@@ -211,6 +211,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
     val lpAutoOff = p[ExecutionOption.lpAutoOffReprobe]
     val lpKnapsack = p[ExecutionOption.lpKnapsackLagrangian]
     val lpComponentSplit = p[ExecutionOption.lpComponentSplit]
+    val lpComponentOwnership = p[ExecutionOption.lpComponentOwnership]
     val lpBoundMaxPivots = p[ExecutionOption.lpBoundMaxPivots]
     val lpAdaptiveWork = p[ExecutionOption.lpAdaptiveWork]
     val lpBranching = p[ExecutionOption.lpBranching]
@@ -230,7 +231,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
         maxDecisions, luby, adaptiveRestart, emaRestart, modeSwitchingRestart, phaseSaving, targetPhasing,
         solutionPhasing, rephaseInterval, maxLearned, lbdGlue, tieredDb, midLbd, vivification, vivifyBatch,
         subsumption, subsumeBatch, inprocessingCadence, rootSimplification, rootSimplifyBatch, rootProbeBatch, rootProbeWork,
-        lpCone, lpAutoOff, lpKnapsack, lpComponentSplit, lpBoundMaxPivots, lpAdaptiveWork, lpBranching, lpVariableShaving, lpPruneHulls, lpRootCuts, pbLearning,
+        lpCone, lpAutoOff, lpKnapsack, lpComponentSplit, lpComponentOwnership, lpBoundMaxPivots, lpAdaptiveWork, lpBranching, lpVariableShaving, lpPruneHulls, lpRootCuts, pbLearning,
         pbObjectiveCutoff, integerRowLearning, propagationAttribution, historicalTableReasons,
         objectiveGuidedValues, lpDirectionalGains,
     )
@@ -263,6 +264,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
         lpAutoOff?.let { out = out.copy(lpPlan = out.lpPlan.copy(autoOffReprobe = it)) }
         lpKnapsack?.let { out = out.copy(lpPlan = out.lpPlan.copy(knapsackLagrangian = it)) }
         lpComponentSplit?.let { out = out.copy(lpPlan = out.lpPlan.copy(componentSplit = it)) }
+        lpComponentOwnership?.let { out = out.copy(lpPlan = out.lpPlan.copy(componentOwnership = it)) }
         lpBoundMaxPivots?.let { out = out.copy(lpPlan = out.lpPlan.copy(boundMaxPivots = it)) }
         lpAdaptiveWork?.let { out = out.copy(lpPlan = out.lpPlan.copy(boundAdaptiveWork = it)) }
         lpBranching?.let { out = out.copy(lpPlan = out.lpPlan.copy(branching = it)) }

@@ -15,6 +15,136 @@ import kotlin.test.assertTrue
 
 class ComponentLpSolverTest {
     @Test
+    fun `a bound edit should solve only its owning component`() {
+        val builder = LpBuilder()
+        repeat(2) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(1L), Relation.GE, 1L)
+        }
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val solves = IntArray(2)
+        var acquired = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int,
+                iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val index = acquired++
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                    model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                )
+                return object : PersistentLpSolver by delegate {
+                    override fun solve(warm: Basis?): FloatLpResult? {
+                        solves[index]++
+                        return delegate.solve(warm)
+                    }
+                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
+                        solves[index]++
+                        return delegate.resolveBounds(allowance)
+                    }
+                }
+            }
+        }
+        newRetainedLpSolver(assertNotNull(trail.state.ownerWorkingModel()), factory = factory).use { owner ->
+            assertNotNull(owner.solve())
+            assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(3L)), 7L))
+            assertTrue(owner.adopt(trail.state))
+
+            val raw = assertNotNull(owner.resolveBounds())
+
+            assertEquals(listOf(2, 1), solves.toList())
+            assertEquals(BigFraction.ofLong(4L), assertNotNull(
+                (owner as ComponentLpSolverCapability).exactBound(),
+            ).value)
+            assertEquals(listOf(3.0, 1.0), raw.primal.toList())
+        }
+    }
+
+    @Test
+    fun `unchanged children should reuse checked bounds and charge no numerical work`() {
+        val builder = LpBuilder()
+        repeat(2) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val owner = assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel())))
+        owner.use {
+            assertNotNull(it.solve())
+            val expected = assertNotNull(it.exactBound()).value
+            var checks = 0
+            val observer = object : LpCertificationObserver {
+                override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) { checks++ }
+                override fun observeExactInput(accepted: Boolean) = Unit
+                override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
+            }
+            assertTrue(it.adopt(state))
+
+            val raw = assertNotNull(it.resolveBounds())
+            val bound = assertNotNull(it.exactBound(observer))
+
+            assertEquals(expected, bound.value)
+            assertEquals(0, checks)
+            assertEquals(0L, it.lastMetrics.workOps)
+            assertEquals(0, raw.pivots)
+            assertEquals(0, raw.refactorizations)
+        }
+    }
+
+    @Test
+    fun `a reused component bound should cite the current parent bound witness`() {
+        val builder = LpBuilder()
+        repeat(2) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(1L), Relation.GE, 1L)
+        }
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        assertTrue(trail.push())
+        assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(3L)), 7L))
+        val owner = assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(trail.state.ownerWorkingModel())))
+        owner.use {
+            assertNotNull(it.solve())
+            assertNotNull(it.exactBound())
+            assertTrue(trail.pop(0))
+            assertTrue(trail.push())
+            assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(3L)), 8L))
+            assertTrue(it.adopt(trail.state))
+            assertNotNull(it.resolveBounds())
+
+            val support = assertNotNull(assertNotNull(it.exactBound()).support)
+
+            assertSame(trail.state, support.state)
+            assertEquals(8L, support.sides.single { side -> side.column == 0 && !side.upper }.witness)
+        }
+    }
+
+    @Test
+    fun `tableau cuts should lift only their owning rows and structural columns`() {
+        val builder = LpBuilder()
+        repeat(2) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val model = builder.build(Sense.MINIMIZE)
+        newComponentTableauCutSolver(model).use { owner ->
+            assertEquals(2, assertNotNull(owner.solve()).blocks)
+
+            val cuts = owner.gomoryCuts(2)
+
+            assertEquals(2, cuts.size)
+            for ((index, cut) in cuts.withIndex()) {
+                assertEquals(listOf(index), cut.cols.toList())
+                val proof = assertNotNull(cut.tableau)
+                assertSame(model, proof.model)
+                assertEquals(listOf(index), proof.rows.map { it.index })
+                assertEquals(listOf(index), proof.columns.map { it.column })
+                assertEquals(listOf(index), proof.rows.single().columns.toList())
+                assertFalse(cut.global)
+            }
+        }
+    }
+
+    @Test
     fun `a rounded component optimum should preserve its exact fractional contradiction`() {
         val builder = LpBuilder()
         val x = builder.addRealVar(0.0, 1.0)
@@ -129,6 +259,7 @@ class ComponentLpSolverTest {
         )
         assertNotNull(owner.solve())
         assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(3L)), 7L))
+        assertTrue(trail.assertBound(1, false, ExactLpSide(ExactLpNumber.of(3L)), 8L))
 
         assertFalse(owner.adopt(trail.state))
 

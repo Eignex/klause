@@ -21,7 +21,7 @@ CP / COP, mixed-integer models, open theories, shared search
 [RevisedSimplex](../klause/src/commonMain/kotlin/com/eignex/klause/lp/engine/RevisedSimplex.kt)
 is the floating implementation and
 [ProductionLpEngineFactory](../klause/src/commonMain/kotlin/com/eignex/klause/lp/engine/LpEngineFactory.kt)
-the default factory; `ComponentLpSolver` composes it for component-wise OBBT.
+the default factory; `ComponentLpSolver` composes independent blocks for solving and certification.
 `lp.engine` depends only on `util`, `simplex.exact`, `lp.lattice` and
 `simplex.basis`; model assembly, factors, propagation, presolve and search stay
 outside it, and consumers use interfaces and factories. See
@@ -157,10 +157,35 @@ The two-GiB modeled storage envelope includes source authority, sparse owners,
 scratch and capped factor construction. Each sparse factor attempt reserves entries
 before writing input, fill or factors, and stops at two million entries or eight
 million work units. Declines publish no factors or exact rank claim. Cancelled
-and failed attempts retain their work charges. Component estimates do not imply
+and failed attempts retain their work charges. Component estimates alone do not activate
 component-owned node solvers. Existing work, pivot, factor-fill, certificate and
 consumed-deduction statistics accompany the admission estimates. Sparse admission
 never changes the dense exact-continuation cell or column caps.
+
+### Immutable component ownership
+
+The explicit `lp-component-ownership=true` setting lets finite node bounding retain
+one numerical owner per independent row-coupled block. Each child keeps its basis
+and exact result authority. Bound, cost, row activation and premise changes
+invalidate only affected children; unchanged exact child states reuse optimal
+floating results and successful bounds under the same certification policy.
+Global trail revision numbers alone do not invalidate an unchanged child.
+Explicit query work and pivot allowances cover the collection, including failed
+children. Reused results add no numerical work or factorization charges.
+
+Child bounds remain exact rationals until their sum, isolated-column contributions
+and the original objective constant, scale and sense are combined. Rounding applies
+to that aggregate. Bound support lifts every contributing row and side to the
+current parent state, including its current assertion witnesses. Floating child
+optima alone supply no global optimum or conflict authority.
+
+The same explicit setting dispatches root tableau separation to the owning block.
+Lifted cuts retain all row multipliers, bound substitutions, integrality premises
+and source addresses; the ordinary source mapper and cut pool check and retain
+them. Structural node edits retire the component collection and prepare the
+ordinary owner. Mutable component merging and automatic expansion stay outside
+this setting. Persistent callers requiring one retained basis keep the monolithic
+constructor.
 
 ### Cuts
 
