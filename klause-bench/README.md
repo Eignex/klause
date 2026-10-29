@@ -158,6 +158,24 @@ The adapter accepts `LAB_CORPUS_MIRROR`, `LAB_CORPUS_MIRROR_WRITE`,
 `LAB_CORPUS_KEEP_PACKED` and the preparation-only `LAB_INPUT_SIGNER`, with existing
 local corpus settings as fallbacks. No lab-specific dependency is added to the core.
 
+## Rewrite impact controls
+
+Use `param.presolve-structural-impact=65536` for bounded rewrite delta counts and
+`param.presolve-preserve-structure=true` for the affine/structural control. Keep
+both arms on the same revision, source hashes, preparation work allowance and
+containing solve allowance. Pair the representation counts with root propagation,
+search work, learned literals, admitted LP nonzeros, local-search consumption and
+independent source checks. The counts describe representation rather than benefit;
+partial impact observations cannot establish full deltas. Disable the impact scan
+in timing controls to separate diagnostic cost.
+
+The existing `xcsp3-smoke/table-substitution-interior`, `-hole` and
+`-outside-reader` controls exercise `presolve=default,+table-substitution`
+against the default. They qualify exact optimization-scoped value exclusion,
+separately from affine Table-column substitution and structural Table reduction.
+Use `portfolio-work` only for compatible mixed/LS worker comparisons, retain its
+logical trace, and distinguish emergency interruption from completed work.
+
 ## Corpus and build identity
 
 `corpus status` lists cached collections, `corpus gc` applies the cache cap and

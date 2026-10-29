@@ -72,6 +72,39 @@ be enabled or disabled by name, but a pass that would break the query's required
 disabled. Explicitly enabling a problem pass under `off` gives both schedules the
 default round cap; an explicit zero round cap still suppresses those schedules.
 
+### Rewrite representation controls
+
+`PresolveConfig.preserveStructure` is an opt-in performance control for affine and
+structural reduction. Structured factors are all factors except plain `Linear`
+and `Clause`; binary partition rows have equal nonzero coefficients and right-hand
+side over declared integer bounds within `0..1`. Affine elimination protects every
+integer coordinate of these factors, including aliases and exact objective
+translations. Structural reduction retains these factors. Unrelated linear
+reductions remain eligible. These controls do not change correctness admission,
+query guarantees or source reconstruction, and do not suppress other passes.
+Protection discovery charges and polls the phase allowance; an incomplete discovery
+publishes no affine elimination.
+
+`structuralImpactLimit` enables a bounded delta view for affine, structural and
+extensional reductions. Each factor, support entry, declared row term and affine
+reconstruction dependency visits and charges the containing phase allowance.
+The cap is per productive invocation, including both sides and reconstruction;
+zero disables all diagnostic scans. Counts describe removed and added factors,
+structured factors, binary partition rows, mixed Boolean/integer factors, Table
+cells, support width, integral declared linear nonzeros and equality definition
+inputs. Table cells use their stored array length without scanning the payload.
+Non-integral or wide declared rows are explicitly uncounted. Affine reconstruction
+reports definitions, input edges and maximum recovery depth, with scratch space
+bounded by the visit cap. A partial view carries `Complete=0`; a diagnostic stop
+retains the already completed sound delta. Its visits join the invocation's work.
+
+Mixed-factor incidence is a channel proxy; support width is a potential explanation
+scope; equality inputs and reconstruction depth describe potential definition-cone
+changes. They do not establish a worker's installed channels, actual reasons,
+maintained local-search sweep or emitted LP nonzeros. Those consumers retain their
+own admission and runtime statistics. A smaller representation alone does not
+qualify a default policy change.
+
 ## Guarantees and source mappings
 
 `PresolvePass.guarantees` separates equisatisfiability, objective preservation,

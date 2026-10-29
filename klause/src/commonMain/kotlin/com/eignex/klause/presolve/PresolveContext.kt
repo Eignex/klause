@@ -38,6 +38,8 @@ data class PresolveContext(
     val keepBinaryComparisons: Boolean = false,
     /** Exact objective available for substitution, or null for protection-only contexts. */
     val linearObjective: LinearObjective? = null,
+    /** Keep structured readers and binary partitions in affine and structural passes. */
+    val preserveStructure: Boolean = false,
 ) {
     internal fun withObjective(objective: LinearObjective?): PresolveContext {
         if (objective == null || linearObjective == null || objective === linearObjective) return this

@@ -7,6 +7,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PassDelta
 import com.eignex.klause.presolve.SourceDelta
+import com.eignex.klause.presolve.retainsStructure
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
@@ -19,7 +20,11 @@ internal object StructuralReduction {
      * solution-set exact (the hook's contract), so the pass preserves the solution set; the driver only
      * collects the replacements, intersects any returned bound narrowings into the domains, and rebuilds.
      */
-    fun reduce(problem: BakedProblem, cancellation: Cancellation = Cancellation.Never): PassDelta {
+    fun reduce(
+        problem: BakedProblem,
+        cancellation: Cancellation = Cancellation.Never,
+        preserveStructure: Boolean = false,
+    ): PassDelta {
         if (cancellation()) return PassDelta()
         val dropped = IntArrayList()
         val added = ArrayList<Factor>()
@@ -28,7 +33,7 @@ internal object StructuralReduction {
         for ((i, f) in problem.factors.withIndex()) {
             if (!visit(cancellation)) break
             // Clause is final and inherits the unchanged hook.
-            if (f is Clause) continue
+            if (f is Clause || (preserveStructure && f.retainsStructure(problem, cancellation))) continue
             for (v in f.intVars) if (!visit(cancellation)) {
                 return PassDelta(dropped.toIntArray(), added, domains)
             }
@@ -62,7 +67,11 @@ internal object StructuralReduction {
      * logical domain, so the hook's exactness holds as it does on the finite lane. A narrowing it returns
      * is stated as a range, which is all a source pass may carry.
      */
-    fun reduceSource(problem: Problem, cancellation: Cancellation = Cancellation.Never): SourceDelta {
+    fun reduceSource(
+        problem: Problem,
+        cancellation: Cancellation = Cancellation.Never,
+        preserveStructure: Boolean = false,
+    ): SourceDelta {
         if (cancellation()) return SourceDelta()
         val declared = problem.declaredIntDomains
         val bounds = problem.intBounds
@@ -82,7 +91,7 @@ internal object StructuralReduction {
         val tightening = bounds.tightening()
         for ((i, f) in problem.factors.withIndex()) {
             if (!visit(cancellation)) break
-            if (f is Clause) continue
+            if (f is Clause || (preserveStructure && f.retainsStructure(problem, cancellation))) continue
             var allClosed = true
             for (v in f.intVars) {
                 if (!visit(cancellation)) return SourceDelta(dropped.toIntArray(), added, tightening.build())

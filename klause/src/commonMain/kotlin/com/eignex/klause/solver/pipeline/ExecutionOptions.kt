@@ -114,6 +114,14 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         val affinePivotOrder: ExecutionOption<AffinePivotOrder> =
             ExecutionOption("affine-pivot-order", ValueKind.AFFINE_PIVOT_ORDER)
 
+        /** Keep structured readers and binary partitions during affine and structural rewriting. */
+        val presolvePreserveStructure: ExecutionOption<Boolean> =
+            ExecutionOption("presolve-preserve-structure", ValueKind.BOOLEAN)
+
+        /** Factor/entry visit cap per rewrite impact observation; zero disables it. */
+        val presolveStructuralImpact: ExecutionOption<Int> =
+            ExecutionOption("presolve-structural-impact", ValueKind.INT)
+
         /** Minimum relative gain that keeps a presolve round active. */
         val presolveAbortFraction: ExecutionOption<Double> = ExecutionOption(
             "presolve-abort-fraction",
@@ -450,7 +458,8 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
 
         internal val byId by lazy {
             listOf(
-                dryRunPresolve, affinePivotOrder, presolveAbortFraction, presolveMaxRounds,
+                dryRunPresolve, affinePivotOrder, presolvePreserveStructure, presolveStructuralImpact,
+                presolveAbortFraction, presolveMaxRounds,
                 presolveProbePerVar, presolveProbeTotal,
                 nodeLimit, openWorkLimit, sourceLpWorkLimit, sourceLpAllocationLimit, sourceLpOperations, sourceCuts,
                 sourcePointCuts, sourceAggregateCuts, sourceRefutationReuse, sourceRefutationPropagation,

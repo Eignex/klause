@@ -68,6 +68,7 @@ internal class PresolveInvocation(
     var narrowedColumns = 0
     var fixedColumns = 0
     var outputOccurrences: Long? = null
+    var structuralImpact: Map<String, Long> = emptyMap()
 }
 
 internal fun Problem.presolveSize() = PresolveSizeStats(factors.size, numBoolVars, numIntVars, reals = numRealVars)
@@ -123,6 +124,7 @@ internal fun <T> PresolveBudget?.observe(
             narrowedColumns = invocation.narrowedColumns,
             fixedColumns = invocation.fixedColumns,
             nativeWork = invocation.nativeWork,
+            structuralImpact = invocation.structuralImpact,
         ))
     }
 }

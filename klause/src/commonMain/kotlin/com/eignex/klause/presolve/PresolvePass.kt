@@ -1,7 +1,9 @@
 package com.eignex.klause.presolve
 
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.presolve.linear.AffineSingletons
 import com.eignex.klause.presolve.linear.LinearSubSumAggregation
+import com.eignex.klause.presolve.structural.StructuralReduction
 import com.eignex.klause.presolve.structural.RedundantConstraints
 import com.eignex.klause.presolve.structural.RedundantConstraints.SubsumeIncremental
 import com.eignex.klause.propagation.BakedProblem
@@ -129,23 +131,25 @@ enum class PresolvePass(
         // The source form states a bound row only for a side the model bounds and leaves the
         // residue-class doubletons alone, since restricting a partner to a residue class is a value set
         // a range cannot state. The finite form below keeps both.
-        override fun applySource(problem: Problem, ctx: PresolveContext) = Presolve.eliminateSourceAffineSingletons(
+        override fun applySource(problem: Problem, ctx: PresolveContext) = AffineSingletons.eliminateSourceAffineSingletons(
             problem,
             ctx.objectiveIntVars,
             ctx.cancellation,
-            ctx.affinePivotOrder,
-            ctx.linearObjective,
+            pivotOrder = ctx.affinePivotOrder,
+            objective = ctx.linearObjective,
+            preserveStructure = ctx.preserveStructure,
         )
 
-        override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) = Presolve.eliminateAffineSingletons(
+        override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) = AffineSingletons.eliminateAffineSingletons(
             problem,
             ctx.objectiveIntVars,
             ctx.cancellation,
             ctx.sharedIntOcc,
             ctx.affineUnderdetermined,
             ctx.affineTouchedVars,
-            ctx.affinePivotOrder,
-            ctx.linearObjective,
+            pivotOrder = ctx.affinePivotOrder,
+            objective = ctx.linearObjective,
+            preserveStructure = ctx.preserveStructure,
         )
     },
 
@@ -230,12 +234,12 @@ enum class PresolvePass(
         autoEligible = true,
     ) {
         override fun applySource(problem: Problem, ctx: PresolveContext) =
-            Presolve.reduceSourceStructural(problem, ctx.cancellation)
+            StructuralReduction.reduceSource(problem, ctx.cancellation, ctx.preserveStructure)
 
         // Root-propagated domains are narrower than the declarations, so the finite lane hands every factor
         // the tighter view rather than offering it only to factors over closed columns.
         override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) =
-            Presolve.reduceStructural(problem, ctx.cancellation)
+            StructuralReduction.reduce(problem, ctx.cancellation, ctx.preserveStructure)
     },
 
     /** Bounded joint-tuple filtering of overlapping tables and table-to-MDD root composition. */

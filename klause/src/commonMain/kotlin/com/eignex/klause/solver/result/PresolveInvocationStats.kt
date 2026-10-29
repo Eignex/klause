@@ -64,4 +64,6 @@ class PresolveInvocationStats internal constructor(
     val fixedColumns: Int = 0,
     /** Native visits outside the phase currency; existing containing charges are forwarded unchanged. */
     val nativeWork: Long = 0L,
+    /** Bounded rewrite counts; empty when disabled, Complete=0 for an incomplete view. */
+    val structuralImpact: Map<String, Long> = emptyMap(),
 )
