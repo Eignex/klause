@@ -93,7 +93,7 @@ internal class BooleanProofScheduler(
         try {
             if (slot.search == null) {
                 slot.search = BacktrackSolver(problem).openRepair(objective, parameters[worker].copy(
-                    nativeSat = false, assumptions = Assumptions.None,
+                    assumptions = Assumptions.None,
                 ))
             }
             val search = checkNotNull(slot.search)
