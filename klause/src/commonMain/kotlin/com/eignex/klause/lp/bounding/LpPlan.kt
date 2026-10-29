@@ -299,8 +299,6 @@ data class LpPlan(
      * of the monolithic one. On by default; the `lp-component-split` param opts a run out.
      */
     val componentSplit: Boolean = true,
-    /** Retain immutable component owners for node bounds and dispatch tableau cuts within each block. */
-    val componentOwnership: Boolean = false,
     /**
      * Subgradient Lagrangian bounding for structured globals. When true and the objective is a
      * [com.eignex.klause.solver.objective.LinearObjective], a node also computes a Lagrangian bound from an
@@ -410,6 +408,8 @@ data class LpPlan(
     val booleanRlt: Boolean = false,
     /** Harvest globally valid cuts before search. Node separation remains independent. */
     val rootCutHarvest: Boolean = true,
+    /** Retain immutable component owners for node bounds and dispatch tableau cuts within each block. */
+    val componentOwnership: Boolean = false,
 ) {
     /**
      * Whether Gomory integrality cuts actually run: [gomory] permits them, [cuts] admits the

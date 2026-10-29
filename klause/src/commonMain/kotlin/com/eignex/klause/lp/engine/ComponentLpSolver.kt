@@ -202,13 +202,19 @@ internal class ComponentLpSolver(
         lastTermination = null
     }
 
-    fun prepareLogicals(token: Cancellation): Basis? {
+    fun prepareLogicals(token: Cancellation, workLimit: Long): Basis? {
         metrics = LpSolveMetrics()
+        val stop = token or Cancellation { workLimit > 0L && currentWork >= workLimit }
         for (solver in solvers) {
             val persistent = solver as? PersistentLpSolver ?: return null
-            val basis = persistent.prepareLogicals(token)
-            metrics += persistent.lastMetrics
-            if (basis == null || token()) return null
+            activeChild = solver
+            val basis = try {
+                persistent.prepareLogicals(stop)
+            } finally {
+                activeChild = null
+                metrics += persistent.lastMetrics
+            }
+            if (basis == null || stop()) return null
         }
         return componentBasis()
     }
