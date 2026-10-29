@@ -444,6 +444,8 @@ data class BacktrackParams(
     val propagationAttribution: Boolean = false,
     /** Retry bounded historical Table reasons against the minimized conflict frontier. */
     val historicalTableReasons: Boolean = false,
+    /** Prefer lower measured family work within a bounded, starvation-protected queue prefix. */
+    val costAwarePropagation: Boolean = false,
     /** Bounded propositional rebuild diagnostics within root simplification; zero disables capture. */
     val rootRebuildCaptureVisits: Int = 0,
     /**

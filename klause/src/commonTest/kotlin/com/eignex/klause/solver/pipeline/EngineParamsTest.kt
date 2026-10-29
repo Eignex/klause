@@ -102,6 +102,17 @@ class EngineParamsTest {
     }
 
     @Test
+    fun `cost aware propagation should be independent from explanation controls`() {
+        val base = com.eignex.klause.backtrack.BacktrackParams()
+
+        val configured = applyBacktrackParams(base, EngineParams(listOf("cost-aware-propagation=true")))
+
+        assertTrue(!base.costAwarePropagation)
+        assertTrue(configured.costAwarePropagation)
+        assertTrue(!configured.propagationAttribution && !configured.historicalTableReasons)
+    }
+
+    @Test
     fun `directional lp gains remain opt in and survive fixed backtrack overrides`() {
         val base = com.eignex.klause.backtrack.BacktrackParams()
         assertTrue(!base.lpDirectionalGains)

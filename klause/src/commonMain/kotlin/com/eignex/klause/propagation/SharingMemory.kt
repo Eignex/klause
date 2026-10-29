@@ -241,6 +241,7 @@ private fun PropagationState.learnedSharingMemory(
     sample.ownedReferences(events.dirtyVars, events.dirtyVars.size.toLong(), true)
     sample.ownedReferences(events.dirtyMark, events.dirtyMark.size.toLong(), true)
     sample.owned(propQueue, propQueue.allocatedBytes, true)
+    propagationSchedule?.let { sample.owned(it, it.capacityBytes, true) }
     sample.owned(atoms.dirtyFactors, atoms.dirtyFactors.allocatedBytes, true)
     sample.owned(learned.importUses, learned.importUses.allocatedBytes)
     sample.record(mapOf(
@@ -253,6 +254,7 @@ private fun PropagationState.learnedSharingMemory(
         "learnedReferenceSlots" to learned.size.toLong() * 2L + (learned.integerRows?.size ?: 0),
         "sessionWatchCapacityBytes" to watchers,
         "sessionQueueCapacityBytes" to propQueue.allocatedBytes + atoms.dirtyFactors.allocatedBytes,
+        "propagationScheduleCapacityBytes" to (propagationSchedule?.capacityBytes ?: 0L),
         "pendingAttachments" to learned.pendingAttach.size.toLong(),
         "importUseCapacityBytes" to learned.importUses.allocatedBytes,
         "retainedPeerImports" to peerImports,

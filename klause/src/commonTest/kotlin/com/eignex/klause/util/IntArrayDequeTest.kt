@@ -8,6 +8,20 @@ import kotlin.test.assertTrue
 class IntArrayDequeTest {
 
     @Test
+    fun `indexed removal should preserve pending order across ring wrap`() {
+        val q = IntArrayDeque(initialCapacity = 4)
+        repeat(4) { q.addLast(it) }
+        q.removeFirst()
+        q.removeFirst()
+        q.addLast(4)
+        q.addLast(5)
+
+        assertEquals(4, q.removeAt(2))
+
+        assertEquals(listOf(2, 3, 5), List(3) { q.removeFirst() })
+    }
+
+    @Test
     fun `addLast and removeFirst should preserve FIFO order across growth`() {
         val q = IntArrayDeque(initialCapacity = 4)
         for (i in 0 until 17) q.addLast(i)

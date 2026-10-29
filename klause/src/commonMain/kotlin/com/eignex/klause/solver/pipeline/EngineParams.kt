@@ -239,6 +239,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
     val integerRowLearning = p[ExecutionOption.integerRowLearning]
     val propagationAttribution = p[ExecutionOption.propagationAttribution]
     val historicalTableReasons = p[ExecutionOption.historicalTableReasons]
+    val costAwarePropagation = p[ExecutionOption.costAwarePropagation]
     val pbObjectiveCutoff = p[ExecutionOption.pbObjectiveCutoff]
     val objectiveGuidedValues = p[ExecutionOption.objectiveGuidedValues]
     val varKind = if (allowSelectors) p[ExecutionOption.variableSelector] else null
@@ -253,7 +254,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
         inprocessingVivifyWork, inprocessingInterval, inprocessingGrowth, inprocessingCooldown,
         lpCone, lpAutoOff, lpKnapsack, lpComponentSplit, lpComponentOwnership, lpBoundMaxPivots, lpAdaptiveWork,
         lpBranching, lpVariableShaving, lpPruneHulls, lpRootCuts, pbLearning,
-        pbObjectiveCutoff, integerRowLearning, propagationAttribution, historicalTableReasons,
+        pbObjectiveCutoff, integerRowLearning, propagationAttribution, historicalTableReasons, costAwarePropagation,
         objectiveGuidedValues, lpDirectionalGains,
     )
     if (scalars.all { it == null } && varKind == null && valKind == null) return null
@@ -309,6 +310,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
         integerRowLearning?.let { out = out.copy(integerRowLearning = it) }
         propagationAttribution?.let { out = out.copy(propagationAttribution = it) }
         historicalTableReasons?.let { out = out.copy(historicalTableReasons = it) }
+        costAwarePropagation?.let { out = out.copy(costAwarePropagation = it) }
         pbObjectiveCutoff?.let { out = out.copy(pbObjectiveCutoff = it) }
         objectiveGuidedValues?.let { out = out.copy(objectiveGuidedValues = it) }
         varKind?.let { out = out.copy(variableSelector = it.selector(out.randomSeed)) }

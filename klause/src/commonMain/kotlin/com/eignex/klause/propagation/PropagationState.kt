@@ -183,6 +183,7 @@ class PropagationState private constructor(
     private var propStamp: IntArray =
         prepared?.propStamp ?: (IntArray(if (usesNativeSat) 8 else problem.numFactors.coerceAtLeast(8)))
     private var propGen: Int = 0
+    internal var propagationSchedule: PropagationSchedule? = null
 
     /** Reset the worklist for a new propagation run over [factorCount] factors. Grows
      *  [propStamp] when learned clauses have pushed the factor count past its capacity, and
@@ -199,6 +200,7 @@ class PropagationState private constructor(
         }
         propGen++
         propQueue.clear()
+        propagationSchedule?.begin()
     }
 
     /** Enqueue [fid] if not already queued this run. */
@@ -1292,7 +1294,12 @@ class PropagationState private constructor(
                 }
             }
             fireCount++
-            val fid = propQueue.removeFirst()
+            val schedule = propagationSchedule
+            val fid = if (schedule == null) propQueue.removeFirst() else {
+                val selected = schedule.remove(propQueue) { factorAt(it).propagationFamily() }
+                work += schedule.selectionWork
+                selected
+            }
             propStamp[fid] = propGen - 1 // mark dequeued (≠ propGen) so it can re-enqueue
             val f = factorAt(fid)
             // Cheap bake: defer an expensive factor's first fire (heavy state build + sweep) to the
@@ -1322,6 +1329,7 @@ class PropagationState private constructor(
                 return null
             } finally {
                 finiteMutationInterruptible = false
+                schedule?.observe(f.propagationFamily(), work - before)
                 attribution?.let {
                     it.note(family, FactorAttribution.Metric.Fires)
                     it.note(family, FactorAttribution.Metric.Work, work - before)

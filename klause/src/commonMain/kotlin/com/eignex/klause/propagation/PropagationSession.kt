@@ -57,6 +57,7 @@ class PropagationSession private constructor(
     cumulativeUnarySubsets: Boolean = false,
     attribution: Boolean = false,
     historicalTables: Boolean = false,
+    costAware: Boolean = false,
 ) {
     /** Construct a private propagation projection over [problem]. */
     constructor(
@@ -76,8 +77,10 @@ class PropagationSession private constructor(
         cumulativeUnarySubsets: Boolean = false,
         attribution: Boolean = false,
         historicalTables: Boolean = false,
+        costAware: Boolean = false,
     ) : this(projection.problem, cancellation, propagationCancelFloor, nativeSat, pbLearning, projection,
-        cumulativeUnarySubsets = cumulativeUnarySubsets, attribution = attribution, historicalTables = historicalTables)
+        cumulativeUnarySubsets = cumulativeUnarySubsets, attribution = attribution, historicalTables = historicalTables,
+        costAware = costAware)
 
     internal fun checkSelectedProjection(
         checks: SelectedProjectionChecks? = projection.selection?.originalChecks,
@@ -99,6 +102,7 @@ class PropagationSession private constructor(
             it.cumulativeUnarySubsets = cumulativeUnarySubsets
             if (attribution) it.factorAttribution = FactorAttribution()
             it.historicalTableReasons = historicalTables
+            if (costAware) it.propagationSchedule = PropagationSchedule()
         }
     private val state: PropagationState get() = checkNotNull(retainedState) { "propagation session is released" }
     private var retiredWork = 0L
@@ -1167,9 +1171,10 @@ class PropagationSession private constructor(
         it.learned.lifecycle.snapshot() + (it.factorAttribution?.snapshot() ?: emptyMap())
     } ?: retiredLifecycle
 
-    internal fun configureAttribution(enabled: Boolean, historicalTables: Boolean) {
+    internal fun configureAttribution(enabled: Boolean, historicalTables: Boolean, costAware: Boolean = false) {
         state.factorAttribution = if (enabled) state.factorAttribution ?: FactorAttribution() else null
         state.historicalTableReasons = historicalTables
+        state.propagationSchedule = if (costAware) state.propagationSchedule ?: PropagationSchedule() else null
     }
 
     internal inline fun <T> withAttribution(families: Int, action: () -> T): T {

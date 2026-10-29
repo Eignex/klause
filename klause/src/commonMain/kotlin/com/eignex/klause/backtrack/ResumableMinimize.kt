@@ -403,10 +403,12 @@ internal class ResumableMinimize(
                 pbLearning = params.pbLearning ?: (problem.numIntVars == 0),
                 attribution = params.propagationAttribution,
                 historicalTables = params.historicalTableReasons,
+                costAware = params.costAwarePropagation,
                 cumulativeUnarySubsets = problem.numRealVars == 0 && params.useCumulativeUnarySubsets,
             )).also {
                 if (params.integerRowLearning) it.enableIntegerRowLearning()
-                it.configureAttribution(params.propagationAttribution, params.historicalTableReasons)
+                it.configureAttribution(params.propagationAttribution, params.historicalTableReasons,
+                    params.costAwarePropagation)
             },
             branching = CpBranching.None,
         ).also {

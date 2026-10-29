@@ -380,6 +380,9 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** Retry bounded historical Table explanations. */
         val historicalTableReasons: ExecutionOption<Boolean> =
             ExecutionOption("historical-table-reasons", ValueKind.BOOLEAN)
+        /** Prefer lower measured propagation-family work with bounded queue bypasses. */
+        val costAwarePropagation: ExecutionOption<Boolean> =
+            ExecutionOption("cost-aware-propagation", ValueKind.BOOLEAN)
 
         /** The `pb-objective-cutoff` execution setting. */
         val pbObjectiveCutoff: ExecutionOption<Boolean> = ExecutionOption("pb-objective-cutoff", ValueKind.BOOLEAN)
@@ -551,7 +554,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 lpKnapsackLagrangian, lpComponentSplit, lpComponentOwnership, lpBoundMaxPivots, lpAdaptiveWork,
                 lpBranching, lpDirectionalGains,
                 lpVariableShaving, lpPruneHulls, lpRootCuts, pbLearning, integerRowLearning,
-                propagationAttribution, historicalTableReasons, pbObjectiveCutoff,
+                propagationAttribution, historicalTableReasons, costAwarePropagation, pbObjectiveCutoff,
                 objectiveGuidedValues, variableSelector, valueSelector, seed, dryRunSolver,
                 noise, cb, skewAlpha, initialTemp, coolingRate,
                 minTemp, smoothProb, smoothFactor, tabuTenure, sources,

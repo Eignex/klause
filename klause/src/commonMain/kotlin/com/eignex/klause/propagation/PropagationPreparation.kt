@@ -13,6 +13,7 @@ internal class PropagationPreparation(
     private val cumulativeUnarySubsets: Boolean = false,
     private val attribution: Boolean = false,
     private val historicalTables: Boolean = false,
+    private val costAware: Boolean = false,
 ) {
     private val projections = PropagationProblem.preparation(problem)
     private var projection: PropagationProblem? = null
@@ -45,6 +46,7 @@ internal class PropagationPreparation(
                 it.cumulativeUnarySubsets = cumulativeUnarySubsets
                 if (attribution) it.factorAttribution = FactorAttribution()
                 it.historicalTableReasons = historicalTables
+                if (costAware) it.propagationSchedule = PropagationSchedule()
                 states = null
             }
             return null

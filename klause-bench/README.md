@@ -467,6 +467,13 @@ ordinary, attributed and historical-Table cases in one repository-owned plan. Ca
 IDs retain the control suffix, and `pairKey` retains their common source identity.
 Explicit attribution/refinement overrides conflict with this paired control.
 
+Queue ordering is a separate control: compare `param.cost-aware-propagation=false|true`
+with `param.historical-table-reasons=false` in both arms. Match attribution settings
+within that pair, and compare refinement at fixed ordering in a separate pair.
+The candidate charges its bounded prefix inspection and stable queue shifts to
+propagation work; its fixed family estimates add no timers. Retain the same source,
+compiled input, compiler/runtime bytes, seed, recipe and containing allowances.
+
 Use `param.propagation-attribution=true` with
 ordinary `engine=cp` or fixed-work single-lane portfolio runs. Compare
 `param.historical-table-reasons=false|true` at the same source/revision, preparation,
