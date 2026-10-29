@@ -78,9 +78,10 @@ compatible preparations retain no generation chain.
 
 An internal selective-metadata preparation mode validates row identity and exact
 bound sides before retaining the row index. Bound changes replace their exact
-objects and component metadata; objective changes replace only affected component
-costs and objective-constant scopes. Captured objective identity can retain costs
-without a coordinate scan. Bound endpoints are checked even on the same finite
+objects and component metadata. Its source definitions carry no objective authority:
+every assembly reads costs and the objective constant from its current objective,
+so changing that objective requires no source-template cost scan or replacement.
+Bound endpoints are checked even on the same finite
 view, whose domains can follow its owning presolve session. The ordinary mode
 retains its complete-match check. Both modes publish only completed immutable
 snapshots within the same containing allowance and storage cap.
