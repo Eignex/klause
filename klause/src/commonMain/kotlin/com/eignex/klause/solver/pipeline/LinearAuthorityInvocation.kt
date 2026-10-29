@@ -85,6 +85,7 @@ internal class LinearAuthorityInvocation(
     private var value: BigFraction? = null
     private var incumbentRevision = 0L
     private var importedIncumbents = 0L
+    private val externalOffers = mutableMapOf<String, Long>()
     private var importedIncumbent: Sample? = null
     private var consumedIncumbent: Sample? = null
     private var result: LinearInvocationResult? = null
@@ -95,7 +96,7 @@ internal class LinearAuthorityInvocation(
         run = SolveStats.EMPTY.run.copy(backend = "linear-authority",
             wallMs = started.elapsedNow().inWholeMilliseconds, timedOut = params.timeout()),
         smt = state.smt.snapshot().let { snapshot -> snapshot.copy(
-            completeSearchStages = snapshot.completeSearchStages.orEmpty() + component.observations() +
+            completeSearchStages = snapshot.completeSearchStages.orEmpty() + component.observations() + externalOffers +
             mapOf("numericalFundedWork" to funding.spent, "numericalFundedAllocation" to funding.allocated,
                 "numericalImportedIncumbents" to importedIncumbents) +
             (frontier?.let { mapOf("numericalFrontierPending" to it.pending.toLong(),
@@ -233,7 +234,10 @@ internal class LinearAuthorityInvocation(
     private fun offer(sample: Sample) = offer(sample, external = false)
 
     private fun observeExternalOffer(external: Boolean, stage: String) {
-        if (external && observeExternalIncumbents) state.smt.observeCompleteSearchStage("numericalExternal$stage")
+        if (external && observeExternalIncumbents) {
+            val key = "numericalExternal$stage"
+            externalOffers[key] = (externalOffers[key] ?: 0L) + 1L
+        }
     }
 
     private fun offer(sample: Sample, external: Boolean) {
