@@ -217,6 +217,8 @@ in minimized working objective units. Each gain is divided by the fractional mov
 to the actual lower or upper branch. A missing or interrupted optimum, infeasibility,
 negative or nonfinite gain, integral point or mismatched split supplies no numeric
 sample. These advisory observations supply no certified bound or pruning authority.
+The common objective constant stays in the scope key and is excluded from gain
+subtraction, preserving small gains when the constant exceeds floating precision.
 
 The finite consumer is opt-in through `BacktrackParams.lpDirectionalGains` or
 `lp-directional-gains=true`, with LP bounding and branching enabled. Two recent samples

@@ -68,9 +68,9 @@ internal class LpHints(
             scopeConstant = relaxation.objectiveConstant
             scopeCutoff = cutoff
         }
-        val value = objective + relaxation.objectiveConstant
-        objectiveRecorded = value.isFinite()
-        history.record(value)
+        // The scoped constant cancels in every gain; adding it can round away a small difference.
+        objectiveRecorded = objective.isFinite()
+        history.record(objective)
     }
 
     override fun recordInfeasible() = history.infeasible()
