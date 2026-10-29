@@ -39,6 +39,7 @@ import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.FiniteFactorEnforcer
 import com.eignex.klause.solver.search.PreparingSearchComponent
+import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchBrancher
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchComponentSet
@@ -262,6 +263,7 @@ internal class CpSatisfactionTraversal(
                     if (run == null) propagationCancellation() else params.cancellation()
                 } else params.cancellation,
                 learnedDb = params.sharedLearnedDb(),
+                atoms = if (params.integerRowLearning) SearchAtomRegistry(problem.numBoolVars) else null,
             )
             if (params.clauseExchange != null) cp.session.sharedLearningMemory = session::retainedLearningMemory
             val seed = preparedSeed ?: cp.session.seed(params.assumptions)
