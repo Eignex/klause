@@ -11,6 +11,20 @@ import kotlin.test.assertTrue
 
 class PortfolioProgressTest {
     @Test
+    fun `experimental rewards should not extend an unproductive auxiliary lifetime`() {
+        val workers = listOf(
+            trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) { }),
+            trackingWorker("trial", 1, ScriptedSearch({ false }) { }).also { it.improvementOnly = true },
+        )
+        val result = Portfolio.thompson(workers, baseSliceWork = 1, maxSliceWork = 1, sliceGrowth = 1.0,
+            diagnostics = PortfolioDiagnostics(80), rewardPolicy = PortfolioRewardPolicy { 1.0 }).also {
+            it.incumbentProbeArms = setOf(1)
+        }.use { it.minimize(Cancellation.Never) }
+
+        assertEquals(12L, result.stats.portfolio.arms[1].work)
+    }
+
+    @Test
     fun `idle sharing use should retain its phase credit without charging a segment`() {
         val observed = mutableListOf<PortfolioProgress>()
         val pools = SharedPools(null, null)

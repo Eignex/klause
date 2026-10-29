@@ -1232,7 +1232,7 @@ class Portfolio(
             progressLog.record(settled, claim.checkingNanos)
             onProgress?.invoke(PortfolioEvent.Progressed(settled))
             val reward = if (failed || claim.fault != null) 0.0 else rewardFor(settled)
-            if (reward > 0.0 || claim.improved) productive[arm] = true
+            if ((!failed && claim.fault == null && earned > 0.0) || claim.improved) productive[arm] = true
             val unproductiveTrial = claim.hadIncumbent && arm in incumbentProbeArms && !productive[arm] &&
                 !failed && claim.fault == null
             if (unproductiveTrial) {
@@ -1269,7 +1269,7 @@ class Portfolio(
                 progressLog.record(idleProgress, 0)
                 onProgress?.invoke(PortfolioEvent.Progressed(idleProgress))
                 val idleReward = rewardFor(idleProgress)
-                if (idleReward > 0.0) productive[other] = true
+                if (idleProgress.ordinaryReward > 0.0) productive[other] = true
                 if (!workers[other].auxiliaryProof) {
                     bandit.update(other, idleReward, 1.0)
                     diagnostics?.onEvent?.invoke(PortfolioEvent.Rewarded(other, idleReward, 1.0))
