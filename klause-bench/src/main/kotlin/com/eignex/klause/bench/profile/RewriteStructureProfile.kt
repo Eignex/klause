@@ -4,6 +4,7 @@ import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.formats.xcsp3.Xcsp3
 import com.eignex.klause.localsearch.DefinitionalSweep
+import com.eignex.klause.presolve.AffinePivotOrder
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.solver.objective.toLinearObjective
@@ -24,7 +25,16 @@ internal object RewriteStructureProfile {
     @JvmStatic
     fun main(args: Array<String>) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
-        require(options.keys == setOf("suite", "problem", "sha256", "presolve"))
+        val required = setOf("suite", "problem", "sha256", "presolve")
+        require(options.keys.containsAll(required) && (options.keys - required - "orders").isEmpty())
+        val arms = options["orders"]?.split(',')?.map { name ->
+            val order = AffinePivotOrder.valueOf(name.uppercase())
+            Triple(order.name.lowercase(), false, order)
+        } ?: listOf(
+            Triple("false", false, AffinePivotOrder.MARKOWITZ),
+            Triple("true", true, AffinePivotOrder.MARKOWITZ),
+        )
+        require(arms.size in 1..2 && arms.distinct().size == arms.size)
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         val containing = Cancellation.after(120.seconds)
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
@@ -33,7 +43,7 @@ internal object RewriteStructureProfile {
             options.getValue("sha256"), null)
         require(bytes.size <= 1024 * 1024 && !containing())
         out.resolve("source.xml").writeBytes(bytes)
-        for (preserve in listOf(false, true)) {
+        for ((label, preserve, order) in arms) {
             val started = System.nanoTime()
             val stop = containing or Cancellation.after(30.seconds)
             val parsed = Xcsp3.parse(bytes.decodeToString(), recoveryCancellation = stop)
@@ -51,9 +61,9 @@ internal object RewriteStructureProfile {
             val plan = requireNotNull(invocation.preparedPlan)
             val prepared = FinitePipeline.prepare(FinitePipelineRequest(
                 requireNotNull(plan.model), FiniteEngine.MIXED, objective,
-                presolveConfig = PresolveConfig.parse(options.getValue("presolve")).withEffort(
-                    preserveStructure = preserve, structuralImpactLimit = 65536,
-                ),
+                presolveConfig = PresolveConfig.parse(options.getValue("presolve"))
+                    .withAffinePivotOrder(order)
+                    .withEffort(preserveStructure = preserve, structuralImpactLimit = 65536),
                 explicitPresolveConfig = true, cancellation = stop, solveCancellation = stop,
                 presolveBudget = budget, preparedPlan = plan, randomSeed = 3,
             ))
@@ -91,6 +101,7 @@ internal object RewriteStructureProfile {
                 put("sourceSha256", options.getValue("sha256"))
                 put("revision", Reports.readGitSha())
                 put("preserveStructure", preserve)
+                put("affinePivotOrder", order.name)
                 put("presolve", options.getValue("presolve"))
                 put("declaredSemantics", parsed.semantics.declared.toString())
                 put("effectiveSemantics", parsed.semantics.effective.toString())
@@ -123,8 +134,8 @@ internal object RewriteStructureProfile {
                 put("architecture", System.getProperty("os.arch"))
                 put("runtime", System.getProperty("java.runtime.version"))
             }
-            out.resolve("view-$preserve.json").writeText(report.toString())
-            out.resolve("invocations-$preserve.txt").writeText(budget.invocations.joinToString("\n") {
+            out.resolve("view-$label.json").writeText(report.toString())
+            out.resolve("invocations-$label.txt").writeText(budget.invocations.joinToString("\n") {
                 "${it.lane} ${it.pass} ${it.outcome} ${it.work} ${it.structuralImpact}"
             })
             println(report)
