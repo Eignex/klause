@@ -848,17 +848,17 @@ internal object Suites {
         format = Format.MINIZINC
         license = "internal"
         val base = "klause-mzn-lib/test-models"
-        workspace("argmax", "$base/argmax.mzn", Category.CSP, Expected.Sat)
-        workspace("bin_packing", "$base/bin_packing.mzn", Category.PACKING, Expected.Sat)
-        workspace("connected", "$base/connected.mzn", Category.CSP, Expected.Sat)
-        workspace("diffn_nonstrict_k", "$base/diffn_nonstrict_k.mzn", Category.PACKING, Expected.Sat)
-        workspace("graph_coloring", "$base/graph_coloring.mzn", Category.CSP, Expected.Sat)
-        workspace("latin_square", "$base/latin_square.mzn", Category.CSP, Expected.Sat)
-        workspace("magic_square", "$base/magic_square.mzn", Category.CSP, Expected.Sat)
-        workspace("queens", "$base/queens.mzn", Category.CSP, Expected.Sat)
-        workspace("send_more_money", "$base/send_more_money.mzn", Category.CSP, Expected.Sat)
-        workspace("sudoku", "$base/sudoku.mzn", Category.CSP, Expected.Sat)
-        workspace("zero_one_knapsack", "$base/zero_one_knapsack.mzn", Category.PACKING, Expected.Unknown)
+        workspace("argmax", "$base/klause-test-argmax.mzn", Category.CSP, Expected.Sat)
+        workspace("bin_packing", "$base/klause-test-bin_packing.mzn", Category.PACKING, Expected.Sat)
+        workspace("connected", "$base/klause-test-connected.mzn", Category.CSP, Expected.Sat)
+        workspace("diffn_nonstrict_k", "$base/klause-test-diffn_nonstrict_k.mzn", Category.PACKING, Expected.Sat)
+        workspace("graph_coloring", "$base/klause-test-graph_coloring.mzn", Category.CSP, Expected.Sat)
+        workspace("latin_square", "$base/klause-test-latin_square.mzn", Category.CSP, Expected.Sat)
+        workspace("magic_square", "$base/klause-test-magic_square.mzn", Category.CSP, Expected.Sat)
+        workspace("queens", "$base/klause-test-queens.mzn", Category.CSP, Expected.Sat)
+        workspace("send_more_money", "$base/klause-test-send_more_money.mzn", Category.CSP, Expected.Sat)
+        workspace("sudoku", "$base/klause-test-sudoku.mzn", Category.CSP, Expected.Sat)
+        workspace("zero_one_knapsack", "$base/klause-test-zero_one_knapsack.mzn", Category.PACKING, Expected.Unknown)
     }
 }
 

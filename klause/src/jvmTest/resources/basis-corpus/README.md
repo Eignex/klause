@@ -8,7 +8,7 @@ The six traces total 219,993 bytes. Preserve that manifest with the traces.
 | Trace | Origin and license | Capture route |
 |---|---|---|
 | `mps-afiro`, `mps-adlittle` | Public MPS test inputs; exact upstream paths/revision in manifest; MIT | Production CP/MIP relaxation |
-| `mzn-graph-coloring` | Repository `klause-mzn-lib/test-models/graph_coloring.mzn` | Production CP/MIP relaxation |
+| `mzn-graph-coloring` | Repository `klause-mzn-lib/test-models/klause-test-graph_coloring.mzn` | Production CP/MIP relaxation |
 | `mzn-timetabling` | Public FlatZinc example; exact upstream path/revision in manifest; Apache-2.0 | Production CP/MIP relaxation |
 | `smt-lia-wide-span`, `smt-lia-unsat` | Self-authored `klause-bench/smoke-corpus/smtlib/` inputs | `SMT_SOURCE_DERIVED` |
 
