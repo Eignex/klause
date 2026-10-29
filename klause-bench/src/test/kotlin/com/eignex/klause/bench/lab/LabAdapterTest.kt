@@ -85,8 +85,13 @@ class LabAdapterTest {
     }
 
     @ParameterizedTest
-    @CsvSource("Mac OS X,aarch64,mac,arm64", "Mac OS X,arm64,mac,arm64", "Mac OS X,x86_64,mac,x86_64", "Linux,amd64,linux,x86_64")
-    fun `prepared solver cases retain their build platform`(os: String, arch: String, platform: String, architecture: String) {
+    @CsvSource(
+        "Mac OS X,aarch64,mac,arm64", "Mac OS X,arm64,mac,arm64",
+        "Mac OS X,x86_64,mac,x86_64", "Linux,amd64,linux,x86_64",
+    )
+    fun `prepared solver cases retain their build platform`(
+        os: String, arch: String, platform: String, architecture: String,
+    ) {
         assertEquals(setOf("platform:$platform", "arch:$architecture"), LabSettings.runtimeTags(os, arch))
     }
 
