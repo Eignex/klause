@@ -79,6 +79,11 @@ internal class ResumableSatisfaction(
 
     override val work: Long get() = slice.spent()
 
+    internal val clauseWork: Long get() = saturatedWork(
+        sink.search.searchWork.coerceAtMost(Long.MAX_VALUE / PROPAGATION_WORK_PER_NODE) * PROPAGATION_WORK_PER_NODE,
+        traversal.propagationWork(),
+    )
+
     override val initialWork: Long = slice.spent()
 
     init {

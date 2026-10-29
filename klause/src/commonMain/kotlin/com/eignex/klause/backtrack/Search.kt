@@ -611,9 +611,11 @@ private class CpSatisfactionTraversalPolicy(
         return rootDisposition()
     }
 
-    private fun rootDisposition(): SearchRunDisposition =
-        if (session.canSimplifyRoot && slice?.atRoot?.invoke(session) == true) SearchRunDisposition.Pause
+    private fun rootDisposition(): SearchRunDisposition {
+        val observer = slice?.atRoot ?: return SearchRunDisposition.Continue
+        return if (session.canSimplifyRoot && observer(session)) SearchRunDisposition.Pause
         else SearchRunDisposition.Continue
+    }
 
     override fun onRestart(context: SearchContext): SearchRunDisposition {
         params.clauseExchange?.onRestart(session)
