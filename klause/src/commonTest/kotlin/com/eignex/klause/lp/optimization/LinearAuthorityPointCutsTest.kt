@@ -35,6 +35,19 @@ class LinearAuthorityPointCutsTest {
     ), mapOf(x to BigFraction.ONE))
 
     @Test
+    fun `point policy preparation should include scoring in its containing recipe`() {
+        val budget = SourceLpBudget()
+        LinearAuthority(budget, retainLp = true).use { authority ->
+            authority.advanceWithPointCuts(source, Cancellation.Never)
+
+            val observations = authority.cutObservations()
+            assertTrue((observations["numericalCutSelectionWork"] ?: 0L) > 0L)
+            assertEquals(budget.measuredPreparationWork,
+                observations["numericalCutLifecycleRECIPE_POINT_SELECTION_PreparationWork"])
+        }
+    }
+
+    @Test
     fun `a checked violated cut should strengthen the retained bound`() {
         val budget = SourceLpBudget()
         val capture = LinearAuthorityCapture(2, 10_000L, 1_000_000L, Cancellation.Never)
