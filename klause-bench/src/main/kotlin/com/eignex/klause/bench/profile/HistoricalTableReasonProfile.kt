@@ -174,7 +174,7 @@ internal object HistoricalTableReasonProfile {
         val q = mapping?.bool(program.boolVarsByName.getValue("q")) ?: -1
         val codec = ProblemJson()
         val native = PropagationSession(problem, cancellation = stop)
-        val state = native.javaClass.getDeclaredField("state").apply { isAccessible = true }.get(native)
+        val state = LivePropagationState.require(native)
         val flag = state.javaClass.getDeclaredField("historicalTableReasons").apply { isAccessible = true }
         flag.setBoolean(state, enabled)
         val traceField = state.javaClass.getDeclaredField("arithmeticLearningTrace")

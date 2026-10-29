@@ -18,6 +18,22 @@ import org.junit.jupiter.params.provider.ValueSource
 
 class LearnedResidualRestrictionsTest {
     @Test
+    fun `a released session should decline residual inspection`() {
+        val session = PropagationSession(Problem(2, 0, emptyArray(), emptyArray()))
+        session.addLearnedClause(Clause(intArrayOf(0, 2)), 1)
+        session.javaClass.declaredMethods.single {
+            it.name.startsWith("releaseRetainedState") && it.parameterCount == 0
+        }.invoke(session)
+
+        val observed = LearnedResidualRestrictions.inspect(session)
+
+        assertEquals("released-session", observed.decline)
+        assertFalse(observed.complete)
+        assertEquals(0, observed.storeCount)
+        assertTrue(observed.entries.isEmpty())
+    }
+
+    @Test
     fun `a live objective PB should join two source cycles`() {
         val cycles = List(2) { c -> (0 until 5).map { c * 5 + it } }
         val factors = cycles.flatMap { vs -> vs.indices.map { i ->

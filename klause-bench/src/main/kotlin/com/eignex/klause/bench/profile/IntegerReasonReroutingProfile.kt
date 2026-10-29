@@ -65,7 +65,7 @@ internal object IntegerReasonReroutingProfile {
             val cp = CpSearchComponent(native)
             val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(0))
             check(shared.initialize() is ComponentResult.Consistent)
-            val state = native.javaClass.getDeclaredField("state").apply { isAccessible = true }.get(native)
+            val state = LivePropagationState.require(native)
             val workGetter = state.javaClass.declaredMethods.single {
                 it.name.startsWith("getWork") && it.parameterCount == 0
             }
@@ -130,7 +130,7 @@ internal object IntegerReasonReroutingProfile {
                     IntDomain(values[index], values[index])
                 }))
                 check(!checker.isUnsatAtRoot)
-                val checkState = checker.javaClass.getDeclaredField("state").apply { isAccessible = true }.get(checker)
+                val checkState = LivePropagationState.require(checker)
                 checkWork += workGetter.invoke(checkState) as Long
                 endpoints.add(buildJsonObject {
                     put("wUpper", upper)

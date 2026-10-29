@@ -245,15 +245,15 @@ internal object PreparedArithmeticLearningProfile {
         private val maxWords: Int = 8192,
         captureFirstInteger: Boolean = false,
     ) {
-        private val state = native.javaClass.getDeclaredField("state").apply { isAccessible = true }.get(native)
-        private val field = state.javaClass.getDeclaredField("arithmeticLearningTrace").apply { isAccessible = true }
+        private val field = LivePropagationState.require(native).javaClass.getDeclaredField("arithmeticLearningTrace")
+            .apply { isAccessible = true }
         private val trace = Class.forName("com.eignex.klause.propagation.ArithmeticLearningTrace")
             .getConstructor(Int::class.javaPrimitiveType, Int::class.javaPrimitiveType).newInstance(maxEvents, maxWords)
 
         init {
             trace.javaClass.getMethod("setCaptureFirstInteger", Boolean::class.javaPrimitiveType)
                 .invoke(trace, captureFirstInteger)
-            field.set(state, trace)
+            field.set(LivePropagationState.require(native), trace)
         }
 
         val accepting: Boolean get() = trace.javaClass.getMethod("getAccepting").invoke(trace) as Boolean
@@ -265,9 +265,7 @@ internal object PreparedArithmeticLearningProfile {
             for ((key, value) in counts) put(key as String, (value as Number).toLong())
         }
 
-        fun work(): Long = state.javaClass.declaredMethods.single {
-            it.name.startsWith("getWork") && it.parameterCount == 0
-        }.invoke(state) as Long
+        fun work(): Long = native.work
 
         fun export(): JsonObject = buildJsonObject {
             put("schemaVersion", 1)
@@ -298,6 +296,6 @@ internal object PreparedArithmeticLearningProfile {
             trace.javaClass.getMethod("record", String::class.java, LongArray::class.java).invoke(trace, kind, data)
         }
 
-        fun release() { field.set(state, null) }
+        fun release() { LivePropagationState.current(native)?.let { field.set(it, null) } }
     }
 }

@@ -194,6 +194,11 @@ Profile mains live in [bench/profile/](src/main/kotlin/com/eignex/klause/bench/p
 and run as lab profile jobs; consult the selected main for its arguments and
 retain its output through `$OUT`.
 
+Profile reflection reads the session's nullable retained propagation owner through
+`LivePropagationState`; live-only probes fail explicitly after release, and residual
+inspection declines a released session. Captures retain bounded diagnostic traces
+and lifetime totals without retaining the propagation owner after retirement.
+
 For repeatable finite portfolio diagnostics, use one processor, a fixed solver seed,
 `param.portfolio-work=N` and explicit `param.slice-work`, `param.slice-max-work` and
 `param.slice-growth` settings. The containing timeout is an emergency stop. Keep it

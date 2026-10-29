@@ -59,7 +59,7 @@ internal object MixedPbLocalityProfile {
                     val clauseKind = native.javaClass.declaredMethods.single {
                         it.name.startsWith("isLearnedClause") && it.parameterCount == 1
                     }
-                    val state = native.javaClass.getDeclaredField("state").apply { isAccessible = true }.get(native)
+                    val state = LivePropagationState.require(native)
                     val reasons = state.javaClass.getMethod("getBoolReason").invoke(state) as IntArray
                     var consumedPins = 0
                     var decisions = 0
