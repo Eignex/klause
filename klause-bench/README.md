@@ -779,9 +779,12 @@ conflicts, historical endpoint rows, mapped admission, retained consumers and
 retirement. The selector wrapper delegates all decisions and notifications.
 
 Original source bytes, canonical original/prepared models and installed provenance
-remain in the capture. Each arm's deadline contains loading, preparation, solving,
+remain in the capture. Bounded records also go to stdout, including both canonical
+models, so retained live output can expose a capture awaiting file publication. Each arm's deadline contains loading, preparation, solving,
 reconstruction, native point checking and retirement. Native propagation work is a
-subset of invocation cost. The instrumented capture supplies neither independent
+subset of invocation cost; the arm timer excludes record serialization and output.
+Set the profile execution limit separately from `profile.runTimeoutSec`, which
+contains remote preparation, cache work, retries, capture and retirement. The instrumented capture supplies neither independent
 source checking nor a throughput claim. Use an ordinary lab adapter comparison
 with source validation for whole-source outcomes; a missing consumer requires
 further source or integration diagnosis. Defaults and export scope remain separate.
