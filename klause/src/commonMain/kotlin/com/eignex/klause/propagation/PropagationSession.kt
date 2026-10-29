@@ -933,6 +933,16 @@ class PropagationSession private constructor(
     internal fun addLearnedIntegerRow(row: IntegerConflictRow, lbd: Int): PropagationResult =
         registerAndPropagate(base = state.undoTop) { state.addLearnedIntegerRow(row, lbd) }
 
+    internal fun addLearnedIntegerRow(learned: ConflictAnalyzer.AnalysisResult.LearnedIntegerRow): PropagationResult {
+        val publicationBase = state.undoTop
+        val result = addLearnedIntegerRow(learned.row, learned.lbd)
+        if (result is PropagationResult.Unsat || fixpointCancelled) return result
+        val fallback = learned.fallbackClause
+        return registerAndPropagate(base = publicationBase) {
+            state.addLearnedClause(Clause(fallback.literals), fallback.lbd)
+        }
+    }
+
     internal fun learnedConstraintSatisfied(learned: ConflictAnalyzer.AnalysisResult.LearnedConstraint): Boolean =
         when (learned) {
             is ConflictAnalyzer.AnalysisResult.Learned -> learned.literals.any { litTruth(it) == true }
