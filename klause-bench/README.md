@@ -59,6 +59,23 @@ installed-build identity and available witnesses. Inspect the JSON record even
 when the bench process exits successfully. Independent source validation runs in
 the lab; the bench records `validationPolicy=reported-result-v1`.
 
+Subprocess stderr is drained in fixed-size chunks. Records retain at most 16 Ki
+characters of normalized stderr, with `stderrComplete` true only for an untruncated
+stream that reached EOF without a forced kill or drain failure. Refusal and crash
+classification scans the whole stream incrementally; diagnostic summaries have a
+separate 2,000-character bound and report `diagnosticsTruncated` when exceeded.
+
+When capture is configured, `cli.stderr` preserves raw bytes independently of the
+record prefix. `stderrCapture` in the record and `cli.stderr.json` beside the artifact
+report `bytesRead`, `eof`, `recordTruncated`, `diagnosticsTruncated`, `processKilled`,
+`drainTimedOut`, `artifactRequested`, `artifactComplete` and any `readFailure`,
+`artifactFailure` or `metadataFailure`. Artifact write failures preserve draining and
+classification. Cleanup waits at most two seconds for the stderr reader; a timed-out
+reader gets asynchronous close and incomplete metadata. Failed invocations retain
+their exit status, partial output and capture metadata in error records. Trace
+comparisons require `artifactComplete=true` in the completion marker, rather than
+the record prefix; killed or failed captures cannot establish full-trace equality.
+
 `complete-assignment=true` also works in lab request parameters and stays off by
 default. The final witness preserves its framed comments after model reconstruction;
 normal model output stays unchanged. Retain `report/model.fzn`, `model.ozn`, the

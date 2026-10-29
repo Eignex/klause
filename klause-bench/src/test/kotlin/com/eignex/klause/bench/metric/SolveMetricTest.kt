@@ -13,6 +13,7 @@ import org.junit.jupiter.params.provider.ValueSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertNotNull
 
 class SolveMetricTest {
     private val ref = ProblemRef("fam/inst", Format.MINIZINC, corpus("absent.mzn"), Category.CSP, Expected.Unknown)
@@ -83,6 +84,24 @@ class SolveMetricTest {
 
         assertEquals(DIAGNOSTICS, result.stderr)
         assertEquals(true, result.stderrComplete)
+    }
+
+    @Test
+    fun `a failed invocation retains its exit and stderr metadata in the solve record`() {
+        val capture = StderrCapture("diagnostic\n".byteInputStream()).start().await(100, processKilled = false)
+        val invocation = SolverInvocation.Result(null, null, null, proven = false,
+            stats = mapOf("exit" to "7"), rawOutput = "partial\n", command = "fake",
+            stderr = capture.text, stderrComplete = capture.complete, stderrCapture = capture.status)
+
+        val (result, raw) = SolveMetric.solve(entry(), SolverInvocation.Settings(), Budget(),
+            "now", "fixture", installedBuild = { null },
+            invoke = { _, _, _, _ -> throw SolverInvocation.Failure(invocation, "failed") })
+
+        assertEquals("7", result.stats["exit"])
+        assertNotNull(result.stats["errorClass"])
+        assertEquals(invocation.stderrCapture, result.stderrCapture)
+        assertEquals(invocation.stderr, result.stderr)
+        assertEquals("partial\n", raw)
     }
 
     @Test

@@ -144,6 +144,10 @@ and neighborhood exhaustion supplies no global claim.
 
 ### Statistics
 
+Verbose portfolio diagnostics stream to stderr separately from the solution
+protocol. The subprocess caller owns retention, persistence and stream-completion
+tracking; a retained diagnostic prefix alone cannot establish a completed trace.
+
 The finite backtrack controls `propagation-attribution=true` and
 `historical-table-reasons=true` independently enable bounded family diagnostics
 and the historical Table retry. Both default to false. Attribution exports sparse
