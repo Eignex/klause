@@ -66,6 +66,7 @@ internal class Inprocessing(
     private var publication: Iterator<ComponentResult?>? = null
     private var publicationVisits = 0L
     private var needsPublication = false
+    internal val retainsPublication: Boolean get() = pendingRoot != null || publication != null || needsPublication
 
     fun retainedMemory(sample: SharingMemoryObservation) {
         val protected = pendingRoot != null || publication != null || needsPublication

@@ -567,4 +567,76 @@ class SharedClausePoolTest {
         assertEquals(listOf(first), pool.drainSince(0).clauses)
         assertEquals(before, pool.memory().getValue("poolOwnedBytes"))
     }
+
+    @Test
+    fun `private duplicate filters decline growth across pool generations without reimporting`() {
+        for (native in listOf(false, true)) {
+            val pool = SharedClausePool(cap = 100, softLimitBytes = 200L, measureMemory = true)
+            val meter = SharingMeter()
+            val exchange = PoolClauseExchange(pool, origin = 1, meter = meter)
+            val problem = Problem(128, 0, emptyArray(), emptyList())
+            val session = PropagationSession(problem, nativeSat = native)
+            exchange.onSearchStart(session)
+            repeat(24) {
+                pool.publish(listOf(boolClause(it * 4, 1)), origin = 2)
+                exchange.onRestart(session)
+            }
+            val count = session.learnedClauseCount
+            val stats = meter.snapshot().clauses
+            assertEquals(8, count)
+            assertEquals(144L, stats.getValue("seenCapacityBytes"))
+            assertTrue(stats.getValue("seenDeclined") > 0L)
+            assertTrue(stats.getValue("poolCompactions") > 1L)
+            pool.publish(listOf(boolClause(0, 1)), origin = 2)
+            session.reseedFrom(com.eignex.klause.propagation.Assumptions.None.withBool(100, true))
+
+            exchange.onSearchStart(session)
+
+            assertEquals(count, session.learnedClauseCount)
+            assertEquals(144L, meter.snapshot().clauses.getValue("seenCapacityBytes"))
+            exchange.onSearchClose(session)
+            assertEquals(0L, meter.snapshot().clauses.getValue("seenCapacityBytes"))
+            val fresh = PropagationSession(problem, nativeSat = native)
+            exchange.onSearchStart(fresh)
+            assertEquals(pool.drainSince(0).clauses.size, fresh.learnedClauseCount)
+        }
+    }
+
+    @Test
+    fun `tiny private admission allowances decline global sharing without retaining keys`() {
+        for ((work, scratch) in listOf(0L to 1000, 1000L to 0)) {
+            val pool = SharedClausePool(softLimitBytes = 1000L, reclamationWork = work,
+                reclamationScratchEntries = scratch, measureMemory = true)
+            val meter = SharingMeter()
+            val exchange = PoolClauseExchange(pool, meter = meter)
+
+            exchange.publishGlobal(boolClause(0, 1))
+            exchange.onSearchEnd(PropagationSession(Problem(2, 0, emptyArray(), emptyList())))
+
+            assertEquals(1L, meter.snapshot().clauses.getValue("seenDeclined"))
+            assertEquals(0L, meter.snapshot().clauses.getValue("seenCapacityBytes"))
+            assertTrue(pool.drainSince(0).clauses.isEmpty())
+        }
+    }
+
+    @Test
+    fun `final reclamation debit cancellation preserves the published generation`() {
+        val clauses = (0 until 4).map { boolClause(it * 10, it) }
+        val control = SharedClausePool(cap = 4)
+        control.publish(clauses)
+        var required = 0
+        assertEquals(SharedClausePool.ReclamationStatus.RECLAIMED, control.reclaim(charge = { required++ }).status)
+        val pool = SharedClausePool(cap = 4)
+        pool.publish(clauses)
+        val before = pool.drainSince(0)
+        var charged = 0
+
+        val result = pool.reclaim(cancelled = { charged >= required }, charge = { charged++ })
+
+        assertEquals(SharedClausePool.ReclamationStatus.CANCELLED, result.status)
+        assertEquals(required, charged)
+        assertEquals(before.cursor, pool.drainSince(0).cursor)
+        assertEquals(before.clauses, pool.drainSince(0).clauses)
+        assertEquals(result.beforeBytes, result.afterBytes)
+    }
 }

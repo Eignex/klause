@@ -80,7 +80,7 @@ private class CapReductionPreparation(
         if (work >= params.learnedMemoryWork || params.cancellation() || session.cancelRequested) return false
         session.chargeSharingWork(1L)
         work++
-        return true
+        return !params.cancellation() && !session.cancelRequested
     }
 
     fun scan(tiered: Boolean): Boolean {

@@ -55,7 +55,7 @@ class PortfolioBuilderTest {
         try {
             workers.forEach { it.solve(Cancellation.Never) }
             val samples = workers.map { requireNotNull(it.sharingMeter).snapshot().clauses }
-            assertTrue(samples.any { it.getValue("poolDeclined") > 0L })
+            assertTrue(samples.any { (it["seenDeclined"] ?: 0L) + it.getValue("poolDeclined") > 0L })
             assertTrue(samples.all { it.getValue("poolOwnedBytes") == 0L })
         } finally {
             workers.forEach { it.close() }

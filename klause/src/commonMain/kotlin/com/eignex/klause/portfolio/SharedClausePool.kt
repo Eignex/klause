@@ -52,6 +52,8 @@ internal class SharedClausePool(
      *  (`--param clause-share-len`). */
     val shareMaxLen: Int = PoolClauseExchange.DEFAULT_MAX_LEN,
     internal val softLimitBytes: Long? = null,
+    internal val reclamationWork: Long = DEFAULT_RECLAMATION_WORK,
+    internal val reclamationScratchEntries: Int = DEFAULT_RECLAMATION_SCRATCH,
 ) {
     private var store = Store(0)
     private var generation = 0
@@ -62,6 +64,7 @@ internal class SharedClausePool(
     init {
         require(cap > 0)
         require(softLimitBytes == null || softLimitBytes >= 0L)
+        require(reclamationWork >= 0L && reclamationScratchEntries >= 0)
     }
 
     internal fun memory(): Map<String, Long> = lock.withLock {
@@ -88,8 +91,8 @@ internal class SharedClausePool(
         batch: List<SharedClause>,
         origin: Int = NO_ORIGIN,
         isGlobal: Boolean = false,
-        maxWork: Long = DEFAULT_RECLAMATION_WORK,
-        maxScratchEntries: Int = DEFAULT_RECLAMATION_SCRATCH,
+        maxWork: Long = reclamationWork,
+        maxScratchEntries: Int = reclamationScratchEntries,
         cancelled: () -> Boolean = { false },
         charge: () -> Unit = {},
     ): Int = lock.withLock {
@@ -115,8 +118,8 @@ internal class SharedClausePool(
     }
 
     internal fun reclaim(
-        maxWork: Long = DEFAULT_RECLAMATION_WORK,
-        maxScratchEntries: Int = DEFAULT_RECLAMATION_SCRATCH,
+        maxWork: Long = reclamationWork,
+        maxScratchEntries: Int = reclamationScratchEntries,
         cancelled: () -> Boolean = { false },
         charge: () -> Unit = {},
     ): Reclamation = lock.withLock {
@@ -332,6 +335,7 @@ internal class SharedClausePool(
             if (work >= maxWork || cancelled()) throw Stopped()
             charge()
             work++
+            if (cancelled()) throw Stopped()
         }
 
         fun reserve(entries: Long) {
@@ -418,6 +422,23 @@ internal class PoolClauseExchange(
             sessionIdentity = session.sharingIdentity
             meter?.clauseCount("sessions", 1L)
         }
+        if (sessionIdentity === session.sharingIdentity) {
+            val identity = session.sharingIdentity
+            session.retainedSharingMemory = { sample ->
+                if (sessionIdentity === identity) sample.owned(seen, seen.allocatedBytes, protected = true)
+            }
+        }
+    }
+
+    private fun admit(key: Long, session: PropagationSession? = null): Boolean? {
+        val limit = pool.softLimitBytes ?: return seen.add(key)
+        val added = seen.tryAddBounded(
+            key, limit, pool.reclamationWork, pool.reclamationScratchEntries.toLong() * Long.SIZE_BYTES,
+            cancelled = { session?.cancelRequested == true },
+            charge = { session?.chargeSharingWork(1L) },
+        )
+        if (added == null) meter?.clauseCount("seenDeclined", 1L)
+        return added
     }
 
     override fun onRestart(session: PropagationSession) = metered {
@@ -425,6 +446,7 @@ internal class PoolClauseExchange(
         val drained = pool.drainSince(cursor)
         cursor = drained.cursor
         var imported = 0
+        var duplicates = 0
         val before = session.work
         session.chargeSharingWork(drained.clauses.size.toLong())
         var literalVisits = 0L
@@ -432,11 +454,13 @@ internal class PoolClauseExchange(
             val c = drained.clauses[i]
             // An arm's own clause, re-imported into a rebuilt session, earns it nothing.
             val from = drained.origins[i].takeIf { it != origin } ?: SharedClausePool.NO_ORIGIN
-            if (seen.add(c.key)) {
+            val admitted = admit(c.key, session)
+            if (admitted == true) {
                 literalVisits += c.boolLits.size + c.atomQuads.size / SharedClause.QUAD
                 session.importClause(c, from)
                 imported++
             }
+            if (admitted == false) duplicates++
         }
         meter?.clauseCount("inspected", drained.clauses.size.toLong())
         meter?.clauseCount("translatedLiterals", literalVisits)
@@ -444,7 +468,7 @@ internal class PoolClauseExchange(
         meter?.clauseMemory(mapOf("drainReferenceSlots" to drained.clauses.size.toLong(),
             "drainOriginBytes" to drained.origins.size.toLong() * Int.SIZE_BYTES))
         meter?.imported(SharingChannel.Clauses, imported, drained.cursor)
-        meter?.duplicates(SharingChannel.Clauses, drained.clauses.size - imported)
+        meter?.duplicates(SharingChannel.Clauses, duplicates)
         countUses(session)
         export(session)
         observe(session)
@@ -481,6 +505,7 @@ internal class PoolClauseExchange(
             SharingMemorySnapshot(SharingMemoryStatus.STALE, emptyMap(), 0L, 0).telemetry(),
         )
         if (sessionIdentity == null || sessionIdentity === session.sharingIdentity) {
+            session.retainedSharingMemory = null
             sessionIdentity = null
             cursor = 0L
             seen.release()
@@ -501,7 +526,7 @@ internal class PoolClauseExchange(
     override fun publishGlobal(clause: SharedClause) {
         if (!shareGlobalNogoods) return
         metered {
-            if (seen.add(clause.key)) {
+            if (admit(clause.key) == true) {
                 val published = pool.publish(listOf(clause), origin, isGlobal = true)
                 meter?.exported(SharingChannel.Clauses, published)
             }
@@ -511,7 +536,7 @@ internal class PoolClauseExchange(
     /** Publish this arm's not-yet-seen glue clauses; safe at any decision level (read-only on the
      *  trail). The `seen` set guards against re-export within a session; the pool de-dups globally. */
     private fun export(session: PropagationSession) {
-        val fresh = session.exportGlueClauses(maxLbd, maxLen, skipPermanent).filter { seen.add(it.key) }
+        val fresh = session.exportGlueClauses(maxLbd, maxLen, skipPermanent).filter { admit(it.key, session) == true }
         val published = if (fresh.isEmpty()) 0 else pool.publish(
             fresh,
             origin,
