@@ -22,8 +22,9 @@ fun OpenTheoryPipeline.optimizeLinear(
     require(context.scope.objective != null) { "linear optimization requires a source objective" }
     return LinearAuthorityInvocation(context, params).use { invocation ->
         val result = requireNotNull(invocation.runSlice(Cancellation.Never, Long.MAX_VALUE, -1, onIncumbent))
+        invocation.close()
         LinearOptimizationResult(context.scope, result.terminal, result.bound, result.incumbent,
-            result.value, result.reason, result.stats, context.semantics)
+            result.value, result.reason, invocation.stats, context.semantics)
     }
 }
 
