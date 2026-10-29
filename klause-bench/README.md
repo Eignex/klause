@@ -75,6 +75,8 @@ reader gets asynchronous close and incomplete metadata. Failed invocations retai
 their exit status, partial output and capture metadata in error records. Trace
 comparisons require `artifactComplete=true` in the completion marker, rather than
 the record prefix; killed or failed captures cannot establish full-trace equality.
+Complete artifact capture certifies emitted bytes, not successful solving or logical
+termination. Check the recorded process exit and producer termination events too.
 
 `complete-assignment=true` also works in lab request parameters and stays off by
 default. The final witness preserves its framed comments after model reconstruction;
