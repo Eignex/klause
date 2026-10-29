@@ -78,7 +78,7 @@ internal object SolverInvocation {
         val compiled = if (entry.ref.format == Format.MINIZINC) SolveEvidence.fileHashes(mapOf(
             "flatzinc" to file,
             "outputMapping" to MiniZincRunner().outputFile(file),
-        )) else emptyMap()
+        )) + ("flatzincContentV1" to SolveEvidence.flatZincContentHash(file)) else emptyMap()
         return withSourceInput(file, budget) { plain, remaining ->
             val cmd = klauseCommand(entry, settings, remaining, optimize, plain)
             try {
