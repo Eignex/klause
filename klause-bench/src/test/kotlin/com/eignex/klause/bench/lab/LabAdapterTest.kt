@@ -24,9 +24,16 @@ import kotlin.test.assertTrue
 class LabAdapterTest {
     @Test
     fun `paired propagation controls retain source identity and distinct case identities`() {
-        val cases = KlauseLabSuite.plan(BenchRequest(parameters = mapOf(
-            "suite" to "dimacs-core", "name" to "php4", "engines" to "cp", "propagation-controls" to "true",
-        )))
+        val cases = KlauseLabSuite.plan(
+            BenchRequest(
+                parameters = mapOf(
+            "suite" to "dimacs-core",
+            "name" to "php4",
+            "engines" to "cp",
+            "propagation-controls" to "true",
+        )
+            )
+        )
 
         assertEquals(3, cases.map { it.id }.distinct().size)
         assertEquals(1, cases.map { it.inputs }.distinct().size)
@@ -38,8 +45,13 @@ class LabAdapterTest {
     @Test
     fun `paired propagation controls reject conflicting switch overrides`() {
         assertFailsWith<IllegalArgumentException> {
-            LabSettings(mapOf("engines" to "cp", "propagation-controls" to "true",
-                "param.historical-table-reasons" to "false"))
+            LabSettings(
+                mapOf(
+                "engines" to "cp",
+                "propagation-controls" to "true",
+                "param.historical-table-reasons" to "false",
+            )
+            )
         }
     }
 
@@ -63,10 +75,17 @@ class LabAdapterTest {
 
     @Test
     fun `compiler seed remains explicit in each planned seed and repeat block`() {
-        val cases = KlauseLabSuite.plan(BenchRequest(parameters = mapOf(
-            "suite" to "dimacs-core", "name" to "php4", "compiler-seed" to "1",
-            "solver-seeds" to "1,3", "repeats" to "2",
-        )))
+        val cases = KlauseLabSuite.plan(
+            BenchRequest(
+                parameters = mapOf(
+            "suite" to "dimacs-core",
+            "name" to "php4",
+            "compiler-seed" to "1",
+            "solver-seeds" to "1,3",
+            "repeats" to "2",
+        )
+            )
+        )
 
         assertEquals(4, cases.size)
         assertEquals(setOf("1"), cases.map { it.parameters["compiler-seed"] }.toSet())
@@ -78,7 +97,9 @@ class LabAdapterTest {
     fun `comparison controls distinguish resource and deadline policies`() {
         fun controls(parameters: Map<String, String>): Map<String, String> {
             val settings = LabSettings(parameters)
-            return KlauseLabSuite.comparisonControls(BenchCase("case", settings.caseParameters("cp", 3), settings.resources()))
+            return KlauseLabSuite.comparisonControls(
+                BenchCase("case", settings.caseParameters("cp", 3), settings.resources()),
+            )
         }
         val baseline = controls(emptyMap())
 
@@ -116,11 +137,16 @@ class LabAdapterTest {
 
     @ParameterizedTest
     @CsvSource(
-        "Mac OS X,aarch64,mac,arm64", "Mac OS X,arm64,mac,arm64",
-        "Mac OS X,x86_64,mac,x86_64", "Linux,amd64,linux,x86_64",
+        "Mac OS X,aarch64,mac,arm64",
+        "Mac OS X,arm64,mac,arm64",
+        "Mac OS X,x86_64,mac,x86_64",
+        "Linux,amd64,linux,x86_64",
     )
     fun `prepared solver cases retain their build platform`(
-        os: String, arch: String, platform: String, architecture: String,
+        os: String,
+        arch: String,
+        platform: String,
+        architecture: String,
     ) {
         assertEquals(setOf("platform:$platform", "arch:$architecture"), LabSettings.runtimeTags(os, arch))
     }

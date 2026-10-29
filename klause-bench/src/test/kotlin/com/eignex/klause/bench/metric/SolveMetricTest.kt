@@ -12,8 +12,8 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 
 class SolveMetricTest {
     private val ref = ProblemRef("fam/inst", Format.MINIZINC, corpus("absent.mzn"), Category.CSP, Expected.Unknown)
@@ -66,8 +66,13 @@ class SolveMetricTest {
         val hashes = mapOf("model" to "captured-source-identity")
 
         val record = SolveMetric.loadFailureRecord(
-            ref, SolverInvocation.Settings(), Budget(1000), "now", null,
-            IllegalStateException("load failed"), sourceHashes = hashes,
+            ref,
+            SolverInvocation.Settings(),
+            Budget(1000),
+            "now",
+            null,
+            IllegalStateException("load failed"),
+            sourceHashes = hashes,
         )
 
         assertEquals(hashes, record.sourceHashes)
@@ -75,12 +80,20 @@ class SolveMetricTest {
 
     @Test
     fun `a solve should retain complete subprocess diagnostics`() {
-        val (result, _) = SolveMetric.solve(entry(), SolverInvocation.Settings(), Budget(),
-            "now", "fixture", installedBuild = { null },
+        val (result, _) = SolveMetric.solve(
+            entry(),
+            SolverInvocation.Settings(),
+            Budget(),
+            "now",
+            "fixture",
+            installedBuild = { null },
             invoke = { _, _, _, _ ->
-                SolverInvocation.Result(null, null, null, proven = false, stats = emptyMap(), rawOutput = "",
-                    command = "cli", stderr = DIAGNOSTICS, stderrComplete = true)
-            })
+                SolverInvocation.Result(
+                    null, null, null, proven = false, stats = emptyMap(), rawOutput = "",
+                    command = "cli", stderr = DIAGNOSTICS, stderrComplete = true,
+                )
+            },
+        )
 
         assertEquals(DIAGNOSTICS, result.stderr)
         assertEquals(true, result.stderrComplete)
@@ -89,14 +102,22 @@ class SolveMetricTest {
     @Test
     fun `a failed invocation retains its exit and stderr metadata in the solve record`() {
         val capture = StderrCapture("diagnostic\n".byteInputStream()).start().await(100, processKilled = false)
-        val invocation = SolverInvocation.Result(null, null, null, proven = false,
+        val invocation = SolverInvocation.Result(
+            null, null, null, proven = false,
             stats = mapOf("exit" to "7"), rawOutput = "partial\n", command = "fake",
             stderr = capture.text, stderrComplete = capture.complete, stderrCapture = capture.status,
-            compiledInputHashes = mapOf("flatzinc" to "retained-input"))
+            compiledInputHashes = mapOf("flatzinc" to "retained-input"),
+        )
 
-        val (result, raw) = SolveMetric.solve(entry(), SolverInvocation.Settings(), Budget(),
-            "now", "fixture", installedBuild = { null },
-            invoke = { _, _, _, _ -> throw SolverInvocation.Failure(invocation, "failed") })
+        val (result, raw) = SolveMetric.solve(
+            entry(),
+            SolverInvocation.Settings(),
+            Budget(),
+            "now",
+            "fixture",
+            installedBuild = { null },
+            invoke = { _, _, _, _ -> throw SolverInvocation.Failure(invocation, "failed") },
+        )
 
         assertEquals("7", result.stats["exit"])
         assertNotNull(result.stats["errorClass"])
@@ -111,13 +132,27 @@ class SolveMetricTest {
         val settings = SolverInvocation.Settings(params = listOf("source-validation=true", "bt-arm=satOptimized"))
         var invoked: SolverInvocation.Settings? = null
 
-        val (result, _) = SolveMetric.solve(entry(), settings, Budget(),
-            "now", "fixture", installedBuild = { null },
+        val (result, _) = SolveMetric.solve(
+            entry(),
+            settings,
+            Budget(),
+            "now",
+            "fixture",
+            installedBuild = { null },
             invoke = { _, native, _, _ ->
                 invoked = native
-                SolverInvocation.Result(true, 0.125, 1, proven = true, stats = emptyMap(),
-                    rawOutput = "o 1/8\nv I=0 X=1/10\n", command = "cli", exactObjective = "1/8")
-            })
+                SolverInvocation.Result(
+                    true,
+                    0.125,
+                    1,
+                    proven = true,
+                    stats = emptyMap(),
+                    rawOutput = "o 1/8\nv I=0 X=1/10\n",
+                    command = "cli",
+                    exactObjective = "1/8",
+                )
+            },
+        )
 
         assertEquals(settings, invoked)
         assertEquals(REPORTED_RESULT_POLICY, result.validationPolicy)
@@ -129,8 +164,13 @@ class SolveMetricTest {
     }
 
     private fun entry(): ResolvedProblem {
-        val mps = ProblemRef("bounded-decimal-constant", Format.MPS,
-            corpus("mps-linear-source-v1/bounded-decimal-constant.mps"), Category.OPTIMIZATION, Expected.Unknown)
+        val mps = ProblemRef(
+            "bounded-decimal-constant",
+            Format.MPS,
+            corpus("mps-linear-source-v1/bounded-decimal-constant.mps"),
+            Category.OPTIMIZATION,
+            Expected.Unknown,
+        )
         return ResolvedProblem(mps, lazy { error("source parsing must stay lazy") })
     }
 

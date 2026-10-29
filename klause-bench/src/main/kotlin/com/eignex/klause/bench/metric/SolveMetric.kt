@@ -91,11 +91,11 @@ internal object SolveMetric {
             { entry ->
                 if (ref.format == Format.MINIZINC) {
                     settings.captureDirectory?.let { directory ->
-                    directory.mkdirs()
-                    val runner = MiniZincRunner()
-                    runner.compileFzn(ref).copyTo(directory.resolve("model.fzn"), overwrite = true)
-                    runner.compileOutput(ref).copyTo(directory.resolve("model.ozn"), overwrite = true)
-                }
+                        directory.mkdirs()
+                        val runner = MiniZincRunner()
+                        runner.compileFzn(ref).copyTo(directory.resolve("model.fzn"), overwrite = true)
+                        runner.compileOutput(ref).copyTo(directory.resolve("model.ozn"), overwrite = true)
+                    }
                 }
                 solve(entry, settings, budget, timestamp, sha)
             },
@@ -208,8 +208,10 @@ internal object SolveMetric {
             } to r.rawOutput
         }.getOrElse { failure ->
             val invocation = (failure as? SolverInvocation.Failure)?.result
-            val record = (invocation?.let { record(entry, settings, budget, kind, timestamp, sha, it) }
-                ?: errorRecord(entry, settings, budget, kind, timestamp, sha))
+            val record = (
+                invocation?.let { record(entry, settings, budget, kind, timestamp, sha, it) }
+                ?: errorRecord(entry, settings, budget, kind, timestamp, sha)
+            )
                 .copy(
                     stats = invocation?.stats.orEmpty() + SolveFailure.stats(failure),
                     compilerIdentity = compiler,
