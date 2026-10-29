@@ -99,6 +99,9 @@ Preparation stages the checksum-pinned MiniZinc 2.10.1 compiler for its host;
 prepared cases retain that host's platform and architecture requirements.
 Resource recordings require GNU time (`gtime` from Homebrew's `gnu-time` package on macOS).
 The status sweep and `klause-reference*` schedules use `tags: ["local"]` to stay on the Mac.
+Corpus files with names outside the lab's portable path contract are copied into
+`klause-bench/build/lab-inputs` under their content hash. Selection identities and
+input bytes stay fixed; private workspace cleanup removes these staged files.
 A minimal lab request is:
 
 ```json

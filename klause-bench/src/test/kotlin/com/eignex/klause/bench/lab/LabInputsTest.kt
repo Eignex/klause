@@ -8,10 +8,12 @@ import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.lab.bench.BenchRequest
 import com.eignex.lab.bench.BenchInputRoot
+import com.eignex.lab.bench.BenchContext
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.test.assertContentEquals
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 
@@ -63,8 +65,13 @@ class LabInputsTest {
         ))
     }
 
-    @Test
-    fun `corpus symlink resolves to a portable input`() {
+    @ParameterizedTest
+    @CsvSource(
+        "model with spaces.cnf,CORPUS",
+        "normalized-ppp:1-12.cnf.zst,SOURCE",
+        "directory:one/model.cnf,SOURCE",
+    )
+    fun `corpus symlink resolves to a portable input`(name: String, expectedRoot: BenchInputRoot) {
         val root = Files.createTempDirectory("lab-inputs-")
         val workspaceProperty = System.getProperty("klause.workspace.root")
         val corpusProperty = System.getProperty("klause.bench.corpusCache")
@@ -72,19 +79,31 @@ class LabInputsTest {
             val source = Files.createDirectory(root.resolve("source"))
             val corpus = Files.createDirectory(root.resolve("corpus"))
             val linked = Files.createSymbolicLink(root.resolve("linked corpus"), corpus)
-            Files.writeString(corpus.resolve("model with spaces.cnf"), "p cnf 1 1\n1 0\n")
+            val original = corpus.resolve(name)
+            Files.createDirectories(original.parent)
+            Files.writeString(original, "p cnf 1 1\n1 0\n")
             System.setProperty("klause.workspace.root", source.toString())
             System.setProperty("klause.bench.corpusCache", linked.toString())
             val ref = ProblemRef(
                 "model", Format.DIMACS,
-                ProblemSource.Prepared(linked.resolve("model with spaces.cnf").toFile()),
+                ProblemSource.Prepared(linked.resolve(name).toFile()),
                 Category.SAT, Expected.Unknown,
             )
 
             val inputs = LabInputs.resolve(ref)
 
-            assertEquals(BenchInputRoot.CORPUS, inputs.single().root)
-            assertEquals("model with spaces.cnf", inputs.single().path)
+            val input = inputs.single()
+            val context = BenchContext(root, worktree = source, corpusDirectory = corpus)
+            assertEquals(expectedRoot, input.root)
+            assertTrue(':' !in input.path)
+            assertTrue(input.path.endsWith(original.fileName.toString().replace(':', '_')))
+            assertContentEquals(Files.readAllBytes(original), Files.readAllBytes(LabInputs.path(input, context)))
+            assertEquals(inputs, LabInputs.resolve(ref))
+            if (input.root == BenchInputRoot.SOURCE) {
+                Files.writeString(LabInputs.path(input, context), "corrupt")
+                assertEquals(inputs, LabInputs.resolve(ref))
+                assertContentEquals(Files.readAllBytes(original), Files.readAllBytes(LabInputs.path(input, context)))
+            }
         } finally {
             if (workspaceProperty == null) {
                 System.clearProperty("klause.workspace.root")

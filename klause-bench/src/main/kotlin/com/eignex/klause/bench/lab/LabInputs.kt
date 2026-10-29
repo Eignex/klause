@@ -9,6 +9,8 @@ import com.eignex.lab.bench.BenchInput
 import com.eignex.lab.bench.BenchInputRoot
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption.ATOMIC_MOVE
+import java.nio.file.StandardCopyOption.REPLACE_EXISTING
 import java.security.MessageDigest
 import java.util.HexFormat
 
@@ -90,11 +92,34 @@ internal object LabInputs {
         val source = CorpusFetcher.workspaceRoot().toPath().toRealPath()
         val root = if (actual.startsWith(source)) source else CorpusFetcher.cacheRoot.toPath().toRealPath()
         require(actual.startsWith(root)) { "Input outside source and corpus: $actual" }
+        val relative = root.relativize(actual).toString()
+        val sha256 = if (Files.isRegularFile(actual)) hash(actual) else null
+        if (relative.any { it == ':' || it == '\\' || it.isISOControl() }) {
+            require(sha256 != null) { "Input directory requires a portable name: $relative" }
+            val name = actual.fileName.toString().map {
+                if (it in 'a'..'z' || it in 'A'..'Z' || it in '0'..'9' || it in "._-") it else '_'
+            }.joinToString("").takeLast(160)
+            val staged = source.resolve("klause-bench/build/lab-inputs/$sha256/input-$name")
+            Files.createDirectories(staged.parent)
+            require(staged.parent.toRealPath().startsWith(source)) { "Input staging escapes source" }
+            if (!Files.isRegularFile(staged) || hash(staged) != sha256) {
+                val pending = Files.createTempFile(staged.parent, ".input-", ".tmp")
+                try {
+                    Files.copy(actual, pending, REPLACE_EXISTING)
+                    require(hash(pending) == sha256) { "Input changed while staging: $relative" }
+                    Files.move(pending, staged, ATOMIC_MOVE, REPLACE_EXISTING)
+                } finally {
+                    Files.deleteIfExists(pending)
+                }
+            }
+            require(staged.toRealPath().startsWith(source)) { "Input staging escapes source" }
+            return BenchInput(source.relativize(staged).toString().replace('\\', '/'), BenchInputRoot.SOURCE, role, sha256)
+        }
         return BenchInput(
-            root.relativize(actual).toString().replace('\\', '/'),
+            relative.replace('\\', '/'),
             if (root == source) BenchInputRoot.SOURCE else BenchInputRoot.CORPUS,
             role,
-            if (Files.isRegularFile(actual)) hash(actual) else null,
+            sha256,
         )
     }
 
