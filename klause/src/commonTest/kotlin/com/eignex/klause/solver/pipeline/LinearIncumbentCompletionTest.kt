@@ -87,6 +87,20 @@ class LinearIncumbentCompletionTest {
     }
 
     @Test
+    fun `changed source rows should permit a previously refused discrete seed`() {
+        val restricted = SourceProofContext(scope, source.coordinates, mapOf(
+            "negative" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ONE), BigFraction.ZERO)),
+        ), source.objective, source.objectiveConstant)
+
+        LinearIncumbentCompletion(SourceLpBudget()) { _, _ -> }.use {
+            assertNull(it.complete(restricted, seed, Cancellation.Never))
+            val point = assertNotNull(it.complete(source, seed, Cancellation.Never))
+
+            assertEquals(listOf(third), point.exactReals)
+        }
+    }
+
+    @Test
     fun `failed completion identity should include source restrictions objective semantics and checker`() {
         val rejected = object : SourceSemanticsChecker {
             override fun witness(sample: Sample, scope: SourceScope, cancellation: Cancellation) =

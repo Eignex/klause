@@ -21,6 +21,7 @@ import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceValue
+import com.eignex.klause.solver.search.SearchInvocationResources
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
@@ -168,14 +169,15 @@ internal class LinearIncumbentCompletion(
     fun checking(cancellation: Cancellation): Cancellation = metered(cancellation, checking = true)
 
     private fun metered(cancellation: Cancellation, checking: Boolean): Cancellation = object : Cancellation {
+        private val meter = WorkMeter { units ->
+            if (checking) budget.observe(boundCertification = units) else budget.observe(preparation = units)
+        }
         override fun isCancelled(): Boolean {
             charge(1L)
             return closed || cancellation() || budget.funding?.paused == true
         }
         override fun deadline() = cancellation.deadline()
-        override fun workMeter(): WorkMeter = WorkMeter { units ->
-            if (checking) budget.observe(boundCertification = units) else budget.observe(preparation = units)
-        }
+        override fun workMeter(): WorkMeter = meter
     }
 
     private fun sameSource(left: SourceProofContext, right: SourceProofContext): Boolean = left === right ||
@@ -198,9 +200,14 @@ internal class LinearIncumbentCompletion(
     override fun close() {
         if (closed) return
         closed = true
-        for (attempt in attempts) attempt.residual?.close()
-        budget.observe(preparation = attempts.size.toLong())
-        attempts.clear()
+        val resources = SearchInvocationResources()
+        for (attempt in attempts) attempt.residual?.let(resources::own)
+        try {
+            resources.close()
+        } finally {
+            budget.observe(preparation = attempts.size.toLong())
+            attempts.clear()
+        }
     }
 
     private companion object {
