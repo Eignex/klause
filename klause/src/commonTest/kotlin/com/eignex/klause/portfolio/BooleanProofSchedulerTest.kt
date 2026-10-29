@@ -57,6 +57,10 @@ class BooleanProofSchedulerTest {
                 assertFalse(sample.boolValue(1))
                 assertEquals(1, scheduler.completed)
                 assertFalse(scheduler.nativeCoverageComplete)
+                val charged = scheduler.work
+                val repeated = scheduler.runSlice(0, Cancellation.Never, Long.MAX_VALUE, 5000L)
+                assertEquals(sample, repeated.sample)
+                assertEquals(charged, scheduler.work)
             }
     }
 
