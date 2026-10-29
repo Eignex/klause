@@ -693,6 +693,12 @@ counts source rows once; `MixedCandidates`, `MixedComplementaryAttempts` and
 `MixedComplementaryRetained` distinguish candidate work and retained alternatives.
 Bound-side alternatives and selected rows establish no useful bound or cost gain
 without subsequent checked support and actual frontier consumption.
+`numericalCutSelectionPointPrepared` counts one successful point-directed candidate
+preparation per immutable source template. It chooses each available continuous
+endpoint independently from the point. Its generation shares the original
+65,536-work allowance; point projection, failed preparation, fresh verification
+and any resulting owner replacement retain their containing source/recipe costs.
+`PointPreparationUnavailable` does not establish complete ineligibility.
 
 [9277](https://lab.eignex.com/jobs/9277) exercises both sources at `0af8492830`
 with ownership and root cuts toggled independently. With root cuts off, node
