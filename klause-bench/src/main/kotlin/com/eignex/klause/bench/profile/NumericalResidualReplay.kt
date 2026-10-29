@@ -129,8 +129,8 @@ internal object NumericalResidualReplay {
             null
         }
         val observer = recording.takeIf { observed }
-        val pricing = Class.forName(ENGINE + "LpPricingOptions").constructors.single { it.parameterCount == 2 }
-            .newInstance(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, 3L)
+        val pricing = Class.forName(ENGINE + "LpPricingOptions").constructors.single { it.parameterCount == 4 }
+            .newInstance(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, 3L, Long.MAX_VALUE, Long.MAX_VALUE)
         val session = entry != "scoped"
         val ownerType = Class.forName(ENGINE + if (session) "LpSolveSession" else "LpScopedSolver")
         val constructor = ownerType.constructors.single { it.parameterCount == if (session) 3 else 9 }

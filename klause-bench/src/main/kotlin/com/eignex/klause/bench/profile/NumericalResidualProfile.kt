@@ -256,6 +256,7 @@ internal object NumericalResidualProfile {
         }
 
         private fun wrapEngine(owner: Any, id: Int): Any {
+            if (observed) call(owner, "enableProgressTrace", true)
             set(owner, "syntheticWorkEnabled", syntheticWorkEnabled)
             set(field(field(owner, "refactorPolicy"), "config"), "syntheticWorkEnabled", syntheticWorkEnabled)
             val basisFactory: (Any) -> Any = letBackend@{ matrix ->
@@ -356,6 +357,7 @@ internal object NumericalResidualProfile {
                         put("elapsedNs", System.nanoTime() - started)
                         put("metrics", json(call(owner, "getLastMetrics")))
                         put("policy", json(call(owner, "getLastRefactorPolicyMetrics")))
+                        put("progress", json(call(owner, "getProgressTrace")))
                         put("policyMetricsScope", "owner lifetime; replaced on unscaled fallback")
                         put("result", json(result))
                     }

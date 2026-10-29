@@ -82,6 +82,22 @@ class SimplexProgressTraceTest {
     }
 
     @Test
+    fun `primal repair should report its feasibility scans`() {
+        val model = LpBuilder().apply {
+            addVar(0L, 3L, cost = 1L)
+            addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 1L)
+        }.build(Sense.MINIMIZE)
+        RevisedSimplex(model).use { solver ->
+            solver.enableProgressTrace(profile = true)
+
+            val result = assertNotNull(solver.solvePrimal())
+
+            assertEquals(1.0, result.objective, 1e-9)
+            assertTrue(assertNotNull(solver.progressTrace).phaseCalls.getValue(SimplexProfilePhase.FEASIBILITY_REPAIR) > 0L)
+        }
+    }
+
+    @Test
     fun `profiled retained bound and row edits should preserve cold certificates`() {
         val model = LpBuilder().apply {
             addVar(0L, 10L, cost = 1L)
