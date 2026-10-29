@@ -390,6 +390,10 @@ not be summed. Feasibility timing covers violation scans; transform, pricing and
 update costs during repair remain in their respective numerical phases. Query
 time less floating time includes certificate work and query scaffolding.
 Serialization follows each query and enters the containing lifecycle time.
+The separate active total excludes record serialization. Preparation and edit
+phase deltas include operations on retiring and replacement engines; invocation
+traces reset at the next solve. Scoped owner counters are cumulative gauges and
+must not be summed across queries.
 
 Original bytes, corpus manifest, revision, executable hashes, runtime, JFR and
 resource receipts accompany the records. These controlled LP edits establish no

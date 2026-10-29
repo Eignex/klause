@@ -59,7 +59,11 @@ internal fun main(args: Array<String>) {
     val projection = CpToLpRelaxation(compiled.model, objective)
         .build(PropagationSession(compiled.model, cancellation = stop), cancellation = stop)
     val initial = LpExactState(requireNotNull(projection.model.authoritativeModel()))
-    val column = (0 until initial.model.n).firstOrNull { initial.activeSide(it, false) != null }
+    val column = (0 until initial.model.n).firstOrNull {
+        val lo = initial.activeSide(it, false)?.side?.number?.value
+        val hi = initial.activeSide(it, true)?.side?.number?.value
+        lo != null && (hi == null || hi > lo)
+    }
     requireNotNull(column) { "a structural lower side is required for the edit control" }
     val lower = requireNotNull(initial.activeSide(column, false)).side.number.value
     val upper = initial.activeSide(column, true)?.side?.number?.value
@@ -103,6 +107,7 @@ private fun lifecycle(
     val started = Monotonic.markNow()
     val allocated = profileAllocatedBytes()
     var closeNs = 0L
+    var activeNs = 0L
     try {
         for ((index, stage) in listOf("cold", "bound", "bound-pop", "row", "row-pop").withIndex()) {
             val before = factory.floatingNanos
@@ -113,6 +118,9 @@ private fun lifecycle(
                 iterationLimit = 4096, workLimit = 50_000_000L)
             val current = requireNotNull(owner)
             val constructionNs = creationStart.elapsedNow().inWholeNanoseconds
+            val previousEngine = factory.lastEngine
+            val previousTrace = previousEngine?.progressTrace
+            val previousPhases = previousTrace?.phaseNanos?.toMap().orEmpty()
             val editStart = Monotonic.markNow()
             when (index) {
                 1 -> {
@@ -128,11 +136,23 @@ private fun lifecycle(
                 }
             }
             val editNs = editStart.elapsedNow().inWholeNanoseconds
+            val preparationStart = Monotonic.markNow()
+            val prepared = current.prepare()
+            val preparationNs = preparationStart.elapsedNow().inWholeNanoseconds
+            val editPhases = mutableMapOf<SimplexProfilePhase, Long>()
+            for (engine in listOfNotNull(previousEngine, factory.lastEngine).distinct()) {
+                val trace = engine.progressTrace ?: continue
+                for ((phase, nanos) in trace.phaseNanos) {
+                    val prior = if (trace === previousTrace) previousPhases[phase] ?: 0L else 0L
+                    editPhases[phase] = editPhases.getOrElse(phase) { 0L } + nanos - prior
+                }
+            }
             val observer = LifecycleCertificates()
             val queryStart = Monotonic.markNow()
             val result = current.solve(observer = observer.takeIf { observed })
             val queryNs = queryStart.elapsedNow().inWholeNanoseconds
             val stageNs = stageStart.elapsedNow().inWholeNanoseconds
+            activeNs += stageNs
             val stageBytes = stageAllocated?.let { start -> profileAllocatedBytes()?.minus(start) }
             state = current.state
             val numerical = factory.lastEngine
@@ -146,6 +166,9 @@ private fun lifecycle(
                 put("stageNs", stageNs)
                 put("constructionNs", constructionNs)
                 put("editNs", editNs)
+                put("preparationNs", preparationNs)
+                put("prepared", prepared)
+                put("editPreparationInclusivePhaseNs", numbers(editPhases))
                 put("queryNs", queryNs)
                 put("floatingNs", factory.floatingNanos - before)
                 put("queryNonFloatNs", queryNs - (factory.floatingNanos - before))
@@ -163,7 +186,12 @@ private fun lifecycle(
                 put("retainedRows", current.metrics.retainedRows)
                 put("activeRows", current.metrics.activeRows)
                 put("certificateWork", observer.work)
+                put("certificateAttempts", numbers(observer.attempts))
                 put("certificatePhases", numbers(observer.phases))
+                put("reconstructionDecline", result?.reconstruction?.decline?.name)
+                put("basisDecline", result?.basisVerification?.decline?.name)
+                put("continuationDecline", result?.continuation?.decline?.name)
+                put("refinementDecline", result?.refinement?.decline?.name)
                 put("sourceResidualNs", current.lastMetrics.sourceResidualNanos)
                 put("luMaxFill", result?.float?.luMaxFill?.let(::JsonPrimitive) ?: JsonNull)
                 put("luMaxDensity", result?.float?.luMaxDensity?.let(::JsonPrimitive) ?: JsonNull)
@@ -192,6 +220,7 @@ private fun lifecycle(
             put("retained", retained)
             put("observed", observed)
             put("elapsedNs", elapsed)
+            put("activeNs", activeNs + closeNs)
             put("closeNs", closeNs)
             put("allocatedBytes", bytes?.let(::JsonPrimitive) ?: JsonNull)
             put("nativeAllocationAvailable", false)
@@ -220,7 +249,10 @@ private fun traceJson(trace: SimplexProgressTrace): JsonElement = buildJsonObjec
 private class LifecycleCertificates : LpCertificationObserver {
     var work = 0L
     val phases = mutableMapOf<LpSolvePhase, Long>()
+    val attempts = mutableMapOf<String, Long>()
     override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
+        val key = "$certifier:$success"
+        attempts[key] = attempts.getOrElse(key) { 0L } + 1L
         if (cost is LpCertifierCost.Metered) work += cost.work
     }
     override fun observeExactInput(accepted: Boolean) = Unit
