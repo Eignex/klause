@@ -59,7 +59,7 @@ fun main(args: Array<String>) {
     val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
     require(options.keys - "mode" == setOf("source64", "source", "sha256", "repeats"))
     val mode = options["mode"] ?: "lifecycle"
-    val claims = mode == "claims" || mode == "precision"
+    val claims = mode == "claims" || mode == "precision" || mode == "checkpoint"
     require(claims || mode == "lifecycle" || mode == "consumers")
     val bytes = Base64.decode(options.getValue("source64"))
     require(bytes.size in 1..1_048_576)
@@ -113,7 +113,19 @@ fun main(args: Array<String>) {
             for (arbitrary in arms) {
                 for (claim in LpClaim.entries) {
                     if (profileExpired(stop)) return
-                    lifecycle(initial, column, side, round, true, true, stop, claim, true, arbitrary)
+                    lifecycle(initial, column, side, round, true, true, stop, claim, true, arbitrary,
+                        preserveOverflowCheckpoint = false)
+                }
+            }
+            continue
+        }
+        if (mode == "checkpoint") {
+            val arms = if (round % 2 == 0) listOf(false, true) else listOf(true, false)
+            for (preserve in arms) {
+                for (claim in LpClaim.entries) {
+                    if (profileExpired(stop)) return
+                    lifecycle(initial, column, side, round, true, true, stop, claim, true,
+                        preserveOverflowCheckpoint = preserve)
                 }
             }
             continue
@@ -132,10 +144,17 @@ fun main(args: Array<String>) {
             }
         }
     }
-    if (mode == "precision" || mode == "consumers") {
+    if (mode == "checkpoint") {
+        for (preserve in listOf(false, true)) {
+            if (profileExpired(stop)) return
+            sourceWorker(compiled.model, requireNotNull(objective), stop, timeoutSeconds = 5,
+                preserveOverflowCheckpoint = preserve)
+        }
+    } else if (mode == "precision" || mode == "consumers") {
         for (arbitrary in listOf(false, true)) {
             if (profileExpired(stop)) return
-            sourceWorker(compiled.model, requireNotNull(objective), stop, arbitrary, 5)
+            sourceWorker(compiled.model, requireNotNull(objective), stop, arbitrary, 5,
+                preserveOverflowCheckpoint = false)
         }
     } else if (!profileExpired(stop)) sourceWorker(compiled.model, requireNotNull(objective), stop)
 }
@@ -162,6 +181,7 @@ private fun lifecycle(
     claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
     claims: Boolean = false,
     arbitraryPrecision: Boolean = false,
+    preserveOverflowCheckpoint: Boolean = true,
 ) {
     val factory = LifecycleFactory(observed)
     val context = LpSolveContext(engineFactory = factory)
@@ -255,7 +275,10 @@ private fun lifecycle(
                 if (prepared) current.solve(
                     observer = observer.takeIf { observed },
                     claim = claim,
-                    continuationLimits = ExactContinuationLimits(startArbitraryPrecision = arbitraryPrecision),
+                    continuationLimits = ExactContinuationLimits(
+                        startArbitraryPrecision = arbitraryPrecision,
+                        preserveOverflowCheckpoint = preserveOverflowCheckpoint,
+                    ),
                 ) else null
             } finally {
                 factory.queryActive = false
@@ -277,6 +300,7 @@ private fun lifecycle(
                     put("stage", stage)
                     put("claim", claim.name)
                     put("startArbitraryPrecision", arbitraryPrecision)
+                    put("preserveOverflowCheckpoint", preserveOverflowCheckpoint)
                     put("sameAuthority", previousState?.let { JsonPrimitive(it === current.state) } ?: JsonNull)
                     put("matrixRevision", current.state.matrixRevision)
                     put("boundRevision", current.state.boundRevision)
@@ -399,6 +423,7 @@ private fun lifecycle(
                 put("kind", "lifecycle")
                 put("claim", claim.name)
                 put("startArbitraryPrecision", arbitraryPrecision)
+                put("preserveOverflowCheckpoint", preserveOverflowCheckpoint)
                 put("round", round)
                 put("retained", retained)
                 put("observed", observed)
@@ -547,6 +572,7 @@ private fun sourceWorker(
     containing: Cancellation,
     arbitraryPrecision: Boolean = false,
     timeoutSeconds: Int = 2,
+    preserveOverflowCheckpoint: Boolean = true,
 ) {
     val deadline = Cancellation.after(timeoutSeconds.seconds)
     val stop = Cancellation { containing() || deadline() }
@@ -555,6 +581,7 @@ private fun sourceWorker(
     val allocated = profileAllocatedBytes()
     val solver = BacktrackSolver(problem.bake(stop), LpSolveContext(
         engineFactory = factory, startArbitraryPrecision = arbitraryPrecision,
+        preserveOverflowCheckpoint = preserveOverflowCheckpoint,
     ))
     val controls = BacktrackPresets.satOptimized(randomSeed = 3L, cancellation = stop)
         .copy(maxInstructions = 1000L)
@@ -571,6 +598,7 @@ private fun sourceWorker(
         put("instructionLimit", 1000)
         put("containingMillis", timeoutSeconds * 1000)
         put("startArbitraryPrecision", arbitraryPrecision)
+        put("preserveOverflowCheckpoint", preserveOverflowCheckpoint)
         put("elapsedNs", elapsed)
         put("allocatedBytes", bytes?.let(::JsonPrimitive) ?: JsonNull)
         put("result", result::class.simpleName)

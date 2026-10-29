@@ -613,11 +613,16 @@ hold bound trails, active-row identity and verification caches.
 Checked packages retain accepted bounds and witnesses under the same exact state
 and production acceptance policy. Immutable exact-state identity admits reuse without
 serializing the source matrix; retained vectors and support share a 4,096-unit,
-64-KiB storage envelope. Mutable working models require a complete bounded value key.
+64-KiB modeled storage envelope. Mutable working models require a complete bounded value key.
 A distinct exact state invalidates the package even when it shares source definitions.
 A weaker checked bound cannot satisfy an
 attainment request. Continuation retains cumulative import and feasibility work;
 an unfinished import requires the same authority, ordered headings and statuses.
+A fixed-width overflow promotes the last complete tableau to arbitrary precision,
+retaining imported columns, basis order, statuses and strict-side infinitesimals.
+Promotion and abandoned arithmetic spend the same cumulative work and allocation
+allowance; interrupted conversion publishes no partial tableau. Compact cases keep
+fixed-width arithmetic. Fresh source verification still governs acceptance.
 A ready feasibility tableau can rebind compatible bounds under its remaining
 allowance, with publication checked against the current source. Refinement admits
 one unseeded and one exact-point-seeded attempt per state, limits and claim, while
