@@ -35,13 +35,15 @@ internal class LinearAuthorityCuts private constructor(
     val rows: List<LinearAuthorityCut>,
     val work: Long,
     val observations: Map<String, Long>,
+    val complementary: Boolean,
 ) {
     fun withAdditional(additional: List<LinearAuthorityCut>): LinearAuthorityCuts =
-        if (additional.isEmpty()) this else LinearAuthorityCuts(rows + additional, work, observations)
+        if (additional.isEmpty()) this else LinearAuthorityCuts(rows + additional, work, observations, complementary)
 
     companion object {
         fun prepare(
-            source: SourceProofContext, cancellation: Cancellation, onWork: (Long) -> Unit = {},
+            source: SourceProofContext, cancellation: Cancellation, complementary: Boolean = false,
+            onWork: (Long) -> Unit = {},
         ): LinearAuthorityCuts? {
             var work = 0L
             try {
@@ -123,31 +125,47 @@ internal class LinearAuthorityCuts private constructor(
                             observe("MixedMissingBounds")
                             continue
                         }
-                        val selected = sides.filterNotNull()
-                        val conclusion = try {
-                            mixedIntegerRounding(normalized, selected.map { it.first }, cancellation)
-                        } catch (_: SourceRoundingLimit) {
-                            observe("MixedWidthLimited")
-                            continue
+                        val preferred = sides.filterNotNull()
+                        val alternatives = if (complementary) coefficients
+                            .filterKeys { it.kind == SourceCoordinate.Kind.Real }.map { (id, value) ->
+                                bounds[id to (value < BigFraction.ZERO)] ?: bounds[id to (value > BigFraction.ZERO)]
+                            }.filterNotNull() else preferred
+                        val choices = if (alternatives == preferred) listOf(preferred)
+                            else listOf(preferred, alternatives)
+                        for ((choice, selected) in choices.withIndex()) {
+                            if (choice > 0) {
+                                if (cost > 65_536L - work) {
+                                    observe("RowScanLimited")
+                                    break
+                                }
+                                work += cost
+                            }
+                            val conclusion = try {
+                                mixedIntegerRounding(normalized, selected.map { it.first }, cancellation)
+                            } catch (_: SourceRoundingLimit) {
+                                observe("MixedWidthLimited")
+                                continue
+                            }
+                            if (cancellation()) return null
+                            if (conclusion == null) {
+                                observe("MixedIntegralShiftedRhs")
+                                continue
+                            }
+                            observe("MixedEligibleRows")
+                            if (mixedCount >= 64) {
+                                observe("MixedRetentionLimited")
+                                continue
+                            }
+                            if ((conclusion.coefficients.values + conclusion.rhs).any {
+                                    it.num.magnitudeBitLength() > 4096 || it.den.magnitudeBitLength() > 4096 }) {
+                                observe("MixedWidthLimited")
+                                continue
+                            }
+                            val proof = SourceDerivation.MixedIntegerRounding(combination, selected.map { it.second })
+                            cuts += LinearAuthorityCut(owner, conclusion, proof, mixed = true)
+                            mixedCount++
+                            if (choice > 0) observe("MixedComplementaryRetained")
                         }
-                        if (cancellation()) return null
-                        if (conclusion == null) {
-                            observe("MixedIntegralShiftedRhs")
-                            continue
-                        }
-                        observe("MixedEligibleRows")
-                        if (mixedCount >= 64) {
-                            observe("MixedRetentionLimited")
-                            continue
-                        }
-                        if ((conclusion.coefficients.values + conclusion.rhs).any {
-                                it.num.magnitudeBitLength() > 4096 || it.den.magnitudeBitLength() > 4096 }) {
-                            observe("MixedWidthLimited")
-                            continue
-                        }
-                        val proof = SourceDerivation.MixedIntegerRounding(combination, selected.map { it.second })
-                        cuts += LinearAuthorityCut(owner, conclusion, proof, mixed = true)
-                        mixedCount++
                         continue
                     }
                     val scaled = row.rhs * multiplier
@@ -158,7 +176,7 @@ internal class LinearAuthorityCuts private constructor(
                     val proof = SourceDerivation.IntegerRounding(combination)
                     cuts += LinearAuthorityCut(owner, conclusion, proof)
                 }
-                return LinearAuthorityCuts(cuts, work, observations)
+                return LinearAuthorityCuts(cuts, work, observations, complementary)
             } finally {
                 onWork(work)
             }
