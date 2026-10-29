@@ -60,7 +60,7 @@ fun main(args: Array<String>) {
     require(options.keys - "mode" == setOf("source64", "source", "sha256", "repeats"))
     val mode = options["mode"] ?: "lifecycle"
     val claims = mode == "claims" || mode == "precision"
-    require(claims || mode == "lifecycle")
+    require(claims || mode == "lifecycle" || mode == "consumers")
     val bytes = Base64.decode(options.getValue("source64"))
     require(bytes.size in 1..1_048_576)
     val repeats = options.getValue("repeats").toInt().also { require(it in 1..5) }
@@ -107,6 +107,7 @@ fun main(args: Array<String>) {
         },
     )
     for (round in -1 until repeats) {
+        if (mode == "consumers") break
         if (mode == "precision") {
             val arms = if (round % 2 == 0) listOf(false, true) else listOf(true, false)
             for (arbitrary in arms) {
@@ -131,7 +132,7 @@ fun main(args: Array<String>) {
             }
         }
     }
-    if (mode == "precision") {
+    if (mode == "precision" || mode == "consumers") {
         for (arbitrary in listOf(false, true)) {
             if (profileExpired(stop)) return
             sourceWorker(compiled.model, requireNotNull(objective), stop, arbitrary, 5)
