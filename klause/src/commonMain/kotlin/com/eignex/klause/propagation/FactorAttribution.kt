@@ -16,6 +16,19 @@ import com.eignex.klause.factor.table.TablePropagator
 
 internal enum class FactorFamily { Clause, Pb, Linear, Table, Mdd, Distinct, Scheduling, Integer, Other, Unattributed }
 
+internal fun Propagator.propagationFamily(): FactorFamily = when (this) {
+    is ClausePropagator -> FactorFamily.Clause
+    is PseudoBooleanPropagator -> FactorFamily.Pb
+    is LinearPropagator, is ReifiedLinearPropagator, is WideLinearPropagator,
+    is WideReifiedLinearPropagator -> FactorFamily.Linear
+    is TablePropagator -> FactorFamily.Table
+    is MddPropagator -> FactorFamily.Mdd
+    is AllDifferentPropagator, is AffineDistinctPropagator -> FactorFamily.Distinct
+    is CumulativePropagator, is DiffnPropagator, is DisjunctivePropagator -> FactorFamily.Scheduling
+    is LearnedIntegerPropagator -> FactorFamily.Integer
+    else -> FactorFamily.Other
+}
+
 internal class FactorAttribution(private val capacity: Int = 1024) {
     private val counts = Array(FactorFamily.entries.size) { LongArray(Metric.entries.size) }
     private val reasons = HashMap<IntArray, Int>()
@@ -45,18 +58,7 @@ internal class FactorAttribution(private val capacity: Int = 1024) {
         }
     }
 
-    fun family(propagator: Propagator): Int = learned[propagator] ?: (1 shl when (propagator) {
-        is ClausePropagator -> FactorFamily.Clause
-        is PseudoBooleanPropagator -> FactorFamily.Pb
-        is LinearPropagator, is ReifiedLinearPropagator, is WideLinearPropagator,
-        is WideReifiedLinearPropagator -> FactorFamily.Linear
-        is TablePropagator -> FactorFamily.Table
-        is MddPropagator -> FactorFamily.Mdd
-        is AllDifferentPropagator, is AffineDistinctPropagator -> FactorFamily.Distinct
-        is CumulativePropagator, is DiffnPropagator, is DisjunctivePropagator -> FactorFamily.Scheduling
-        is LearnedIntegerPropagator -> FactorFamily.Integer
-        else -> FactorFamily.Other
-    }.ordinal)
+    fun family(propagator: Propagator): Int = learned[propagator] ?: (1 shl propagator.propagationFamily().ordinal)
 
     fun remember(reason: IntArray?, mask: Int, eager: Boolean = false) {
         if (reason == null) return

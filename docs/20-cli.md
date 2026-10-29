@@ -176,6 +176,10 @@ and the historical Table retry. Both default to false. Attribution exports spars
 `nativeFactor<Family><Metric>` counters with the existing learning statistics; see
 [attribution ownership](09-learning.md#propagation-and-explanation-attribution).
 
+`cost-aware-propagation=true` independently enables the bounded finite worklist
+policy described in [finite propagation](08-search.md#finite-propagation). It
+defaults to false and does not require attribution or historical refinement.
+
 Learned-object counters use the `nativeLearning{Kind}{Stage}` and
 `sharedLearning{Kind}{Stage}` names for native and shared stores. Source refutation
 stages use `learningSourceRefutation{Stage}` in complete-search observations.

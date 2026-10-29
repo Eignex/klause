@@ -32,6 +32,7 @@ internal class PreparingMinimize(
         cumulativeUnarySubsets = solver.problem.numRealVars == 0 && params.useCumulativeUnarySubsets,
         attribution = params.propagationAttribution,
         historicalTables = params.historicalTableReasons,
+        costAware = params.costAwarePropagation,
     )
     private var search: ResumableMinimize? = null
     private var installing: ResumableMinimize? = null

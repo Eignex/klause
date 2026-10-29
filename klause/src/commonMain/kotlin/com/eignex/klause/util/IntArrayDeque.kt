@@ -16,6 +16,18 @@ internal class IntArrayDeque(initialCapacity: Int = 8) {
     fun isEmpty(): Boolean = count == 0
     fun isNotEmpty(): Boolean = count != 0
 
+    operator fun get(index: Int): Int {
+        require(index in 0 until count)
+        return buf[(head + index) and (buf.size - 1)]
+    }
+
+    fun removeAt(index: Int): Int {
+        val value = get(index)
+        for (i in index downTo 1) buf[(head + i) and (buf.size - 1)] = get(i - 1)
+        removeFirst()
+        return value
+    }
+
     fun addLast(value: Int) {
         if (count == buf.size) grow()
         buf[(head + count) and (buf.size - 1)] = value

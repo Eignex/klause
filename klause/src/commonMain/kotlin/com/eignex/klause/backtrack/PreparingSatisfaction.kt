@@ -29,6 +29,7 @@ internal class PreparingSatisfaction(
         cumulativeUnarySubsets = solver.problem.numRealVars == 0 && params.useCumulativeUnarySubsets,
         attribution = params.propagationAttribution,
         historicalTables = params.historicalTableReasons,
+        costAware = params.costAwarePropagation,
     )
     private var session: PropagationSession? = null
     private var seeding: Iterator<PropagationResult?>? = null

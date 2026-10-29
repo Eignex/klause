@@ -17,6 +17,28 @@ import kotlin.test.assertTrue
 
 class PropagationPreparationTest {
     @Test
+    fun `a paused cost aware root should retain pending work until preparation completes`() {
+        val problem = Problem(0, 2, arrayOf(IntDomain(0, 10), IntDomain(0, 10)), arrayOf(
+            Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+            Linear(intArrayOf(1), intArrayOf(1), LinearOp.LE, 3),
+        ))
+        var cancelled = false
+        val preparation = PropagationPreparation(problem, Cancellation { cancelled }, 0, false, costAware = true)
+        while (!preparation.rootStarted) preparation.advance()
+        cancelled = true
+
+        assertNull(preparation.advance())
+
+        cancelled = false
+        var session: PropagationSession? = null
+        while (session == null) session = preparation.advance()
+        assertNotNull(session.explanationState.propagationSchedule)
+        assertFalse(session.fixpointCancelled)
+        assertEquals(IntDomain(0, 3), session.intDomain(0))
+        assertEquals(IntDomain(0, 3), session.intDomain(1))
+    }
+
+    @Test
     fun `prepared root attribution survives publication without adding propagation work`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)),
             arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 3)))

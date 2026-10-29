@@ -27,6 +27,30 @@ import kotlin.test.assertTrue
 
 class ResumableSatisfactionTest {
     @Test
+    fun `ordinary and resumed cost aware search should retain a private schedule through learning`() {
+        val solver = BacktrackSolver(pigeonhole(3, 2).bake())
+        for (resumed in listOf(false, true)) {
+            var observed = false
+            val exchange = object : ClauseExchange {
+                override fun onSearchStart(session: PropagationSession) {
+                    assertNotNull(session.explanationState.propagationSchedule)
+                    assertNull(session.explanationState.factorAttribution)
+                    observed = true
+                }
+                override fun onRestart(session: PropagationSession) = Unit
+            }
+            val params = BacktrackParams(randomSeed = 1L, nativeSat = false, pbLearning = false,
+                costAwarePropagation = true, clauseExchange = exchange)
+
+            val result = if (resumed) solver.resumableSolve(params).use { runToVerdict(it, 1L) }
+            else solver.solve(params)
+
+            assertIs<SolveResult.Unsat>(result)
+            assertTrue(observed)
+        }
+    }
+
+    @Test
     fun `close should finish component cleanup before releasing its native generation`() {
         var native: PropagationSession? = null
         var closed = 0
