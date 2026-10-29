@@ -413,6 +413,7 @@ object LpAutoConfig {
                 rootBudgetFraction = base.rootBudgetFraction, rootBudgetMillis = base.rootBudgetMillis,
                 lpWorkBudgetFraction = base.lpWorkBudgetFraction, boundMaxPivots = base.boundMaxPivots,
                 boundEvery = base.boundEvery, warmStart = base.warmStart, branching = base.branching,
+                componentOwnership = base.componentOwnership,
             )
         }
         observe?.invoke(LpAdmission(rows, baseCols, cells, structApplicable,

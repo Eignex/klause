@@ -39,6 +39,10 @@ internal class ComponentLpSolver(
     private val certificationKey = if (model.exactState == null) exactLpStateKey(model) else null
     private var blockResults: List<FloatLpResult>? = null
     private var metrics = LpSolveMetrics()
+    override var lastDegenerateColumns: Int = 0
+        private set
+    override var lastColumns: Int = 0
+        private set
     private var closed = false
     private var continuationTarget: Basis? = null
     override var recessionDirection: DoubleArray? = null
@@ -54,8 +58,8 @@ internal class ComponentLpSolver(
     override val lastWorkOps: Long get() = lastMetrics.workOps
     override val lastRefactorizations: Int get() = lastMetrics.let {
         it.initialRefactorizations + it.warmStartRefactorizations + it.singularRecoveryRefactorizations +
-            it.updateLimitRefactorizations + it.backendRequestedRefactorizations + it.reconcileRecoveryRefactorizations +
-            it.numericalRecoveryRefactorizations + it.primalRefactorizations
+            it.updateLimitRefactorizations + it.backendRequestedRefactorizations +
+            it.reconcileRecoveryRefactorizations + it.numericalRecoveryRefactorizations + it.primalRefactorizations
     }
     override val currentWork: Long get() = metrics.workOps + when (val child = activeChild) {
         is ResumableLpSolver -> child.currentWork
@@ -183,6 +187,8 @@ internal class ComponentLpSolver(
             if (!closed) {
                 closed = true
                 clearEvidence()
+                reusable.fill(null)
+                checkedBounds.fill(null)
                 closeComponentSolvers(solvers, primary)
             }
             throw primary
@@ -204,6 +210,8 @@ internal class ComponentLpSolver(
 
     fun prepareLogicals(token: Cancellation, workLimit: Long): Basis? {
         metrics = LpSolveMetrics()
+        lastDegenerateColumns = 0
+        lastColumns = 0
         val stop = token or Cancellation { workLimit > 0L && currentWork >= workLimit }
         for (solver in solvers) {
             val persistent = solver as? PersistentLpSolver ?: return null
@@ -252,6 +260,8 @@ internal class ComponentLpSolver(
         continuationTarget = null
         recessionDirection = null
         metrics = LpSolveMetrics()
+        lastDegenerateColumns = 0
+        lastColumns = 0
         solvedExactState = model.exactState
         var objective = model.objConstantD
         val primal = DoubleArray(model.n)
@@ -305,6 +315,7 @@ internal class ComponentLpSolver(
                 }
                 if (lastTermination != null) return null
             }
+            metrics += if (reused == null) LpSolveMetrics(componentSolves = 1) else LpSolveMetrics(componentReuses = 1)
             val r = (reused ?: op(solvers[k])) ?: run {
                 metrics += solvers[k].lastMetrics
                 lastTermination = solvers[k].lastTermination
@@ -329,7 +340,11 @@ internal class ComponentLpSolver(
                 solvedExactState = null
                 return null
             }
-            if (reused == null) metrics += solvers[k].lastMetrics
+            if (reused == null) {
+                metrics += solvers[k].lastMetrics
+                lastDegenerateColumns += solvers[k].lastDegenerateColumns
+                lastColumns += solvers[k].lastColumns
+            }
             if (!r.optimal && lastTermination == null) lastTermination = solvers[k].lastTermination
             results.add(r)
             if (part.model.exactState != null && r.optimal) reusable[k] = r
@@ -347,8 +362,8 @@ internal class ComponentLpSolver(
                 basicVars[basicAt++] = if (b < sub.n) part.cols[b] else model.slackCol(part.rows[b - sub.n])
             }
             if (reused == null) pivots += r.pivots
-            if (r.luMaxFill > maxFill) maxFill = r.luMaxFill
-            if (r.luMaxDensity > maxDensity) {
+            if (reused == null && r.luMaxFill > maxFill) maxFill = r.luMaxFill
+            if (reused == null && r.luMaxDensity > maxDensity) {
                 maxDensity = r.luMaxDensity
                 maxDim = r.luMaxDim
             }
