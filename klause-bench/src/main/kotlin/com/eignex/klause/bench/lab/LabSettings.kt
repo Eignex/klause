@@ -84,7 +84,10 @@ internal data class LabSettings(val parameters: Map<String, String>) {
         )
 
     companion object {
-        internal fun runtimeTags(os: String = System.getProperty("os.name"), arch: String = System.getProperty("os.arch")): Set<String> {
+        internal fun runtimeTags(
+            os: String = System.getProperty("os.name"),
+            arch: String = System.getProperty("os.arch"),
+        ): Set<String> {
             val platform = when {
                 os.startsWith("Mac") -> "mac"
                 os == "Linux" -> "linux"
