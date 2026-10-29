@@ -236,13 +236,15 @@ Witnesses and stops leave coverage open; native refutations remain independently
 unverified. This diagnostic includes inline trace cost, uses no production task
 scheduler and establishes no equal-resource speed or heap benefit. Sampled heap and
 literal payload bytes are separate observations, not complete worker memory bounds.
-Optional `cost-repeats=1..12` adds two warmup pairs followed by alternating F1/cube
-pairs without branch or schedule trace I/O. Each pair captures inclusive private
+Optional `cost-repeats=1..12` adds two warmup cycles followed by balanced F1/cube/direct-pin
+cycles without branch or schedule trace I/O. The direct-pin control executes the same
+conditioned queries without a task board. Each control captures inclusive private
 preparation, native checking and retirement time, process CPU (including concurrent
 JIT/GC), thread allocation and root/total propagation work. Record storage has its
-own elapsed observation. Whole-invocation elapsed time and lab process resources
-contain warmup, tracing, failed attempts, source preparation and final retirement;
-these nested scopes must not be summed with their containers.
+own elapsed observation. Main elapsed time includes source identity capture,
+preparation, warmup, tracing, failed attempts and private retirement; lab process
+resources also contain startup and final process retirement. These nested scopes
+must not be summed with their containers.
 
 `lab/recipes/` contains the migrated lab recipes. `scripts/convert-lab-recipe.sh`
 translates legacy experiments or schedules from stdin without submitting them;
