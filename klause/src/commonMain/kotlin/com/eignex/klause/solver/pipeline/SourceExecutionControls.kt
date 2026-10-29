@@ -152,6 +152,7 @@ internal fun bindSourceExecutionControls(
             lbdGlue = reader[ExecutionOption.lbdGlue] ?: defaults.lbdGlue,
             openHintFlips = reader[ExecutionOption.openHintFlips],
             openBranching = reader[ExecutionOption.openBranching] ?: defaults.openBranching,
+            openLinearIncremental = reader[ExecutionOption.openLinearIncremental] ?: defaults.openLinearIncremental,
             openHintMinSplits = reader[ExecutionOption.openHintMinSplits] ?: defaults.openHintMinSplits,
             timeout = timeout, cancellation = cancellation, nodeBudget = budget,
             alnsIterations = iterations, randomSeed = seed, maxFlips = flips, maxInstructions = instructions,

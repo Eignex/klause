@@ -215,6 +215,7 @@ class ExactLiraSearchComponent private constructor(
     private val exactForms = preparedSource.exactForms
     private val preparedRows = preparedSource.preparedRows
     private val sourceAssertionLevels = IntArray(preparedRows.size) { -1 }
+    private val scopedSourceAssertions = ArrayList<Int>()
     private var incrementalSourceRows = false
     private var sourceRowsByBoolean: Map<Int, List<Int>>? = null
     private val changedSourceBooleans = LinkedHashSet<Int>()
@@ -529,6 +530,7 @@ class ExactLiraSearchComponent private constructor(
         var visited = 0
         var eligible = 0
         var unexplained = 0
+        val previousUnchanged = partialLinearUnchanged
         val deductions = ArrayList<PartialLinearDeduction>()
         partialLinearInvocations++
         try {
@@ -588,6 +590,11 @@ class ExactLiraSearchComponent private constructor(
             partialLinearVisited += visited
             partialLinearEligible += eligible
             partialLinearDeductions += deductions.size
+            if (completeTraversalObserved && partialLinearPropagation) {
+                smtStats?.observeCompleteSearchStage("PARTIAL_LINEAR_VISITED", visited.toLong())
+                smtStats?.observeCompleteSearchStage("PARTIAL_LINEAR_DECLINE_REUSE", partialLinearUnchanged - previousUnchanged)
+                smtStats?.observeCompleteSearchStage("PARTIAL_LINEAR_DEDUCTION", deductions.size.toLong())
+            }
         }
     }
 
@@ -1202,10 +1209,12 @@ class ExactLiraSearchComponent private constructor(
         val disequalities = ArrayList<Triple<RowAddress, ExactComparison, SearchAtomPremise>>()
         val comparisons = ArrayList<PremisedSmtComparison>()
         val indices = ArrayList<Int>()
+        var visited = 0L
         for (index in selected) {
             if (incrementalSourceRows) operationStop.charge(1)
             if (operationStop()) return false
             sourceRowVisits++
+            visited++
             val prepared = preparedRows[index]
             // Resolved source inputs stay fixed until the LP scope containing their assertion is popped.
             // Root checks still permit substitution through newly published root-fixed columns.
@@ -1228,9 +1237,14 @@ class ExactLiraSearchComponent private constructor(
             }
         }
         if (!system.assertComparisons(comparisons, operationStop) { index ->
-                sourceAssertionLevels[indices[index]] = context.decisionLevel
+                val source = indices[index]
+                if (sourceAssertionLevels[source] < 0 && context.decisionLevel > 0) scopedSourceAssertions += source
+                sourceAssertionLevels[source] = context.decisionLevel
             }
         ) return false
+        if (completeTraversalObserved && incrementalSourceRows) {
+            smtStats?.observeCompleteSearchStage("INCREMENTAL_SOURCE_ROW", visited)
+        }
         if (lp.state?.conflict != null) return true
         for (atom in node.sourceBranches) {
             val premise = SearchAtomPremise.Asserted(branchNames[atom] ?: return false)
@@ -1759,14 +1773,20 @@ class ExactLiraSearchComponent private constructor(
     }
 
     private fun retractSource(decisionLevel: Int) {
-        for (index in sourceAssertionLevels.indices) {
-            if (sourceAssertionLevels[index] > decisionLevel) {
-                sourceAssertionLevels[index] = -1
-                if (incrementalSourceRows) {
-                    pendingSourceRows += index
-                    sourceRowInvalidations++
-                }
+        var invalidated = 0L
+        while (scopedSourceAssertions.isNotEmpty()) {
+            val index = scopedSourceAssertions.last()
+            if (sourceAssertionLevels[index] <= decisionLevel) break
+            scopedSourceAssertions.removeAt(scopedSourceAssertions.lastIndex)
+            sourceAssertionLevels[index] = -1
+            if (incrementalSourceRows) {
+                pendingSourceRows += index
+                sourceRowInvalidations++
+                invalidated++
             }
+        }
+        if (completeTraversalObserved && incrementalSourceRows) {
+            smtStats?.observeCompleteSearchStage("INCREMENTAL_SOURCE_INVALIDATION", invalidated)
         }
         for (variable in bools.indices) {
             if (boolLevels[variable] > decisionLevel) {

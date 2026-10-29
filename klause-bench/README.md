@@ -559,6 +559,14 @@ no priority, refinement or attribution default change follows from these capture
 
 ## LP capture and replay
 
+Ordinary open-linear controls use `param.open-linear-incremental=true|false` with
+the same original sources, seeds, LP ceilings and containing solve allowance.
+This combines touched source rows, exact-input decline reuse and explained
+interval delivery before the numerical query. Traversal stage counters expose
+source visits and invalidations, interval visits, retained declines and deductions;
+LP work and certification counters and whole-process measurements retain the cost
+of numerical repair and final completion. The automatic default remains disabled.
+
 `LinearRootOpeningProfile` accepts `inspect=partial-row-activation` for a pinned
 SMT source. It compares the existing cached partial interval producer with the
 same producer plus literal-to-row assertion scheduling. Both arms use seed 1,
