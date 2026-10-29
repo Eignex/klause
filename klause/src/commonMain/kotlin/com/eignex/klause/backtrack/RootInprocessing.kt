@@ -25,23 +25,25 @@ internal class RootSimplificationPass : InprocessingPass {
         var visits = 0L
         var changed = false
         if (cursor !in 0 until count) cursor = 0
-        repeat(minOf(params.rootSimplifyBatch.coerceAtLeast(1), count)) {
-            if (session.cancelRequested || !session.canSimplifyRoot || visits >= ROOT_LITERAL_LIMIT) return@repeat
+        var examined = 0
+        while (examined++ < minOf(params.rootSimplifyBatch, count)) {
+            if (session.cancelRequested || !session.canSimplifyRoot || visits >= ROOT_LITERAL_LIMIT) break
+            visits++
             val factor = cursor
             cursor = (cursor + 1) % count
-            val literals = session.rootClauseLiterals(factor, ROOT_LITERAL_LIMIT - visits.toInt()) ?: return@repeat
+            val literals = session.rootClauseLiterals(factor, ROOT_LITERAL_LIMIT - visits.toInt()) ?: continue
             visits += literals.size
-            if (literals.size < 2) return@repeat
+            if (literals.size < 2) continue
             val satisfied = literals.any { session.litTruth(it) == true }
             val residual = if (satisfied) null else literals.filter { session.litTruth(it) != false }.toIntArray()
-            if (!satisfied && (residual == null || residual.isEmpty() || residual.size == literals.size)) return@repeat
+            if (!satisfied && (residual == null || residual.isEmpty() || residual.size == literals.size)) continue
             val source = factor < session.problem.numFactors
             if (residual != null) {
                 val index = factor - session.problem.numFactors
                 val origin = if (source) OWN_ORIGIN else session.learnedClauseOrigin(index)
                 val lbd = if (source) residual.size else minOf(session.learnedClauseLbd(index), residual.size)
                 session.addRootDerivedClause(Clause(residual), lbd, origin, source)
-                if (!session.canSimplifyRoot) return@repeat
+                if (!session.canSimplifyRoot) continue
             }
             if (source) session.retireRootSource(factor, literals)
             else dropped.add(factor - session.problem.numFactors)
