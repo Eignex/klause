@@ -544,27 +544,13 @@ internal class ComponentLpSolver(
     }
 
     override fun exactBound(observer: LpCertificationObserver?, policy: LpCertificationPolicy): CertifiedLpBound? {
-        if (!currentAuthority()) return null
-        val results = blockResults ?: return null
-        if (results.any { it == null }) {
-            if (model.exactState == null) return null
-            if (lastTermination != LpFloatTermination.WORK && lastTermination != LpFloatTermination.PIVOTS) return null
-            if (results.all { it == null } && checkedBounds.none { it?.policy === policy }) return null
-        }
+        val results = boundResults(policy) ?: return null
         var value = model.exactConstant()
         val citedRows = HashSet<Int>()
         val citedSides = ArrayList<LpExactCitedSide>()
         for (index in parts.indices) {
             val part = parts[index]
-            val result = results[index]
-            val bound = checkedBounds[index]?.takeIf { it.policy === policy }?.bound ?: if (result != null) {
-                certifyLpBound(part.model, result.duals, observer, policy)?.also {
-                    if (part.model.exactState != null) checkedBounds[index] = CheckedBound(policy, it)
-                }
-            } else {
-                certifyLpBound(part.model, DoubleArray(part.model.m), observer, policy)
-            }
-            if (bound == null) return null
+            val bound = checkedChildBound(index, results[index], observer, policy) ?: return null
             value += bound.value - part.model.exactConstant()
             model.exactState?.let { state ->
                 val support = bound.support ?: return null
@@ -597,6 +583,31 @@ internal class ComponentLpSolver(
                 LpExactSupport(state, citedRows.sorted().map { it to state.model.row(it) }, citedSides)
             },
         )
+    }
+
+    private fun boundResults(policy: LpCertificationPolicy): List<FloatLpResult?>? {
+        if (!currentAuthority()) return null
+        val results = blockResults ?: return null
+        if (results.any { it == null }) {
+            if (model.exactState == null) return null
+            if (lastTermination != LpFloatTermination.WORK && lastTermination != LpFloatTermination.PIVOTS) return null
+            if (results.all { it == null } && checkedBounds.none { it?.policy === policy }) return null
+        }
+        return results
+    }
+
+    private fun checkedChildBound(
+        index: Int,
+        result: FloatLpResult?,
+        observer: LpCertificationObserver?,
+        policy: LpCertificationPolicy,
+    ): CertifiedLpBound? {
+        checkedBounds[index]?.takeIf { it.policy === policy }?.let { return it.bound }
+        val part = parts[index]
+        if (result == null) return certifyLpBound(part.model, DoubleArray(part.model.m), observer, policy)
+        return certifyLpBound(part.model, result.duals, observer, policy)?.also {
+            if (part.model.exactState != null) checkedBounds[index] = CheckedBound(policy, it)
+        }
     }
 
     override fun exactWitness(
