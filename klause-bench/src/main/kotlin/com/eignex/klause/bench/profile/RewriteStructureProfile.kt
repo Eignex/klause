@@ -133,5 +133,5 @@ internal object RewriteStructureProfile {
     }
 
     private fun get(owner: Any, property: String): Any? =
-        LocalSearchTrajectory.getter(owner, "get$property")
+        owner.javaClass.getMethod("get$property").invoke(owner)
 }
