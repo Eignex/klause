@@ -9,6 +9,7 @@ import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.SharingMemoryObservation
+import kotlin.time.TimeSource
 
 /**
  * One scheduled in-search simplification pass over the live constraint database. Passes run
@@ -87,14 +88,16 @@ internal class Inprocessing(
 
     private fun <T> publishRoot(session: PropagationSession, operation: () -> T): T {
         val start = session.work
+        val elapsed = TimeSource.Monotonic.markNow()
         try {
             return operation()
         } finally {
             val used = (session.work - start).coerceAtLeast(0L)
             spent = saturatedWork(spent, used)
-            debt = saturatedWork(debt, (used - remaining).coerceAtLeast(0L))
+            addDebt((used - remaining).coerceAtLeast(0L))
             remaining = (remaining - used).coerceAtLeast(0L)
             stats?.noteInprocessing("inprocessPublicationWork", used)
+            stats.noteInprocessingDuration("inprocessPublication", elapsed.elapsedNow().inWholeNanoseconds)
         }
     }
 
@@ -129,8 +132,8 @@ internal class Inprocessing(
     private fun atRoot(session: PropagationSession, params: BacktrackParams, restart: Boolean): Boolean {
         val beforeResume = session.work
         if (pendingRoot != null) {
-            val limit = params.inprocessingWork - minOf(debt, params.inprocessingWork)
-            debt = (debt - params.inprocessingWork).coerceAtLeast(0L)
+            val elapsed = TimeSource.Monotonic.markNow()
+            val limit = params.inprocessingWork - repayDebt(params.inprocessingWork)
             val token = Cancellation { params.cancellation() || session.work - beforeResume >= limit }
             session.withCancellation(params.cancellation) {
                 session.withInprocessingCancellation(token) {
@@ -142,16 +145,16 @@ internal class Inprocessing(
             val used = (session.work - beforeResume).coerceAtLeast(0L)
             remaining = (limit - used).coerceAtLeast(0L)
             spent = saturatedWork(spent, used)
-            debt = saturatedWork(debt, (used - limit).coerceAtLeast(0L))
+            addDebt((used - limit).coerceAtLeast(0L))
             stats?.noteInprocessing("inprocessContinuationWork", used)
+            stats.noteInprocessingDuration("inprocessContinuation", elapsed.elapsedNow().inWholeNanoseconds)
             lastCount = session.learnedClauseCount
             if (!session.fixpointCancelled) pendingRoot = null
             needsPublication = true
             return true
         }
         if (needsPublication) {
-            val repaid = minOf(debt, params.inprocessingWork)
-            debt -= repaid
+            val repaid = repayDebt(params.inprocessingWork)
             remaining = params.inprocessingWork - repaid
             return true
         }
@@ -170,12 +173,12 @@ internal class Inprocessing(
         if ((!restartDue && !intervalDue && !growthDue) || elapsed < params.inprocessingCooldown) return false
         lastWork = work
         lastCount = session.learnedClauseCount
-        val repaid = minOf(debt, params.inprocessingWork)
-        debt -= repaid
+        val repaid = repayDebt(params.inprocessingWork)
         val offered = params.inprocessingWork - repaid
         if (offered == 0L || params.cancellation() || session.cancelRequested) return false
         stats?.noteInprocessing(if (restartDue) "inprocessRestartTriggers" else "inprocessWorkTriggers", 1L)
         val start = session.work
+        val duration = TimeSource.Monotonic.markNow()
         val rootMark = session.explanationState.undoTop
         val token = Cancellation { params.cancellation() || session.work - start >= offered }
         try {
@@ -196,12 +199,25 @@ internal class Inprocessing(
             val used = (session.work - start).coerceAtLeast(0L)
             remaining = (offered - used).coerceAtLeast(0L)
             spent = saturatedWork(spent, used)
-            debt = saturatedWork(debt, (used - offered).coerceAtLeast(0L))
+            addDebt((used - offered).coerceAtLeast(0L))
             lastCount = session.learnedClauseCount
+            stats.noteInprocessingDuration("inprocessSlice", duration.elapsedNow().inWholeNanoseconds)
         }
         needsPublication = session.fixpointCancelled || session.isUnsatAtRoot ||
             session.explanationState.undoTop != rootMark
         return needsPublication
+    }
+
+    private fun repayDebt(allowance: Long): Long {
+        val repaid = minOf(debt, allowance)
+        debt -= repaid
+        if (repaid > 0L) stats?.noteInprocessing("inprocessDebtRepaid", repaid)
+        return repaid
+    }
+
+    private fun addDebt(amount: Long) {
+        debt = saturatedWork(debt, amount)
+        if (amount > 0L) stats?.noteInprocessing("inprocessDebtAdded", amount)
     }
 
     fun reset() {

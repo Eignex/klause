@@ -500,7 +500,9 @@ the propagation-work ledger; diagnostic probe and visit counts add no second cha
 Each of the four classes has a separate work ceiling inside the scheduled slice's
 total ceiling. Zero withholds that class. Completed atomic copying, sorting and
 compaction can overspend; the class and scheduled loop repay their respective debt
-before admitting more work. Reseeding resets cursors without forgiving that debt.
+before admitting more work. Separate containing and per-class debt-added and
+debt-repaid counters retain those charges. Reseeding resets cursors without forgiving
+that debt.
 Time and work cancellation retain no partial probe.
 Attachment and root publication are required cleanup once a consequence is admitted:
 local ceilings stop later optional work and retain the cleanup's overspend as debt.
@@ -540,7 +542,10 @@ unlimited unless configured. Existing general off and SAT preset controls remain
 Per-class attempted, eligible, shortened, unit, stopped and work counters diagnose
 applicability. Attachment, retirement and continuation work are subsets of class
 work, which itself overlaps containing propagation work. Root publication has a
-separate containing charge and also cannot earn the next trigger. Learned lifecycle and S4
+separate containing charge and also cannot earn the next trigger. Per-class, scheduled
+slice, continuation and publication durations keep disjoint latency buckets below
+one, ten, one hundred and one thousand milliseconds, plus a bucket for at least
+one second. These nested spans overlap and provide observations, not a hard pause bound. Learned lifecycle and S4
 family attribution retain their own authority and completeness limits; missing
 attribution does not establish zero usefulness. These observations select no
 adaptive score or default threshold.

@@ -25,6 +25,7 @@ internal class InprocessingSpending(private val kind: InprocessingKind) {
         }
         val repaid = minOf(debt, limit)
         debt -= repaid
+        if (repaid > 0L) stats?.noteInprocessing("inprocess${kind.name}DebtRepaid", repaid)
         val budget = InprocessingBudget(session, params, stats, kind, if (resumingRoot) 0L else limit - repaid)
         if (!resumingRoot && budget.stopped()) return
         budget.note("Runs")
@@ -33,9 +34,11 @@ internal class InprocessingSpending(private val kind: InprocessingKind) {
             session.withInprocessingCancellation(budget.cancellation) { operation(budget) }
         } finally {
             val spent = budget.spent
-            debt = saturatedWork(debt, (spent - budget.limit).coerceAtLeast(0L))
+            val added = (spent - budget.limit).coerceAtLeast(0L)
+            debt = saturatedWork(debt, added)
+            if (added > 0L) budget.note("DebtAdded", added)
             budget.note("Work", spent)
-            budget.note("Nanos", start.elapsedNow().inWholeNanoseconds)
+            stats.noteInprocessingDuration("inprocess${kind.name}", start.elapsedNow().inWholeNanoseconds)
             if (budget.stopped()) budget.note("Stopped")
         }
     }
@@ -79,6 +82,19 @@ internal class InprocessingBudget(
     fun note(metric: String, count: Long = 1L) {
         stats?.noteInprocessing("inprocess${kind.name}$metric", count)
     }
+}
+
+internal fun SearchStatsSink?.noteInprocessingDuration(prefix: String, nanos: Long) {
+    this ?: return
+    noteInprocessing("${prefix}Nanos", nanos)
+    val bucket = when {
+        nanos < 1_000_000L -> "Under1ms"
+        nanos < 10_000_000L -> "Under10ms"
+        nanos < 100_000_000L -> "Under100ms"
+        nanos < 1_000_000_000L -> "Under1s"
+        else -> "AtLeast1s"
+    }
+    noteInprocessing("${prefix}Latency$bucket", 1L)
 }
 
 internal fun saturatedWork(left: Long, right: Long): Long =
