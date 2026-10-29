@@ -193,6 +193,13 @@ identified standard-list-index control.
 
 ## Corpus and build identity
 
+Compressed file inputs are staged with the existing corpus decoder before CLI
+launch. `sourceDecodeMs` is deducted from the CLI deadline, and
+`sourceInvocationMs` includes decoding, invocation and staged-file retirement.
+`elapsedMs` and process witness times retain their subprocess scope. A spent
+preparation allowance supplies no solver verdict. Plain source digests and frozen
+compressed input identities remain available for independent checking.
+
 `corpus status` lists cached collections, `corpus gc` applies the cache cap and
 `corpus compress [path]` compresses supported plain inputs with `zstd` on `PATH`.
 The cache defaults to `~/.cache/klause-bench/corpus/`, respecting `XDG_CACHE_HOME`
@@ -344,7 +351,7 @@ ordinary `engine=cp` or fixed-work single-lane portfolio runs. Compare
 seed, worker recipe and containing allowance. This exposes the existing historical
 Table retry; it changes neither priorities nor its disabled default.
 
-Retain `factor<Family><Metric>` alongside total propagation work, nodes, outcomes,
+Retain CLI `nativeFactor<Family><Metric>` counters alongside total propagation work, nodes, outcomes,
 witnesses and independent source-check receipts. `Work` and `ReasonWork` charge
 attempts including interruption; `Support`, `UipReasons`, `Learned`, `Consumed`
 and `LaterUseEvents` separate construction from downstream consumption. Eager
