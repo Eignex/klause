@@ -594,7 +594,8 @@ The optional fourth script argument claims selects retained, observed requests
 for each claim kind. It includes unchanged repeats, an equal-valued replacement
 authority, bound and row edits and pops, objective-constant changes and row
 deactivation, with one warmup and the requested measured rounds. Records expose
-state revisions, ordered-basis/status comparisons, checked-result reuse,
+state revisions, ordered-basis/status comparisons, checked-result reuse and storage
+declines,
 reconstruction work and rejection details, continuation import position and
 cumulative-limit behavior, and refinement phase and lifetime spending. These are
 diagnostic controls; unchanged requests and changed scopes are separate samples.
