@@ -622,6 +622,17 @@ These controls establish no throughput improvement or independent proof validati
 
 ### Numerical lifecycle profiles
 
+`scripts/lp-template-preparation-profile.sh cover-2x3|cover-3x3 [repeats] [steps]`
+compares disabled templates, selective object reuse and complete index reuse on the
+existing MPS component fixtures. Submit as a lab profile script with build task
+`:klause:stageLpProfileJvm`, Linux x86_64 placement and a 180-second runtime cap.
+It includes cold preparation and alternating unchanged views, bound, objective and
+row edits through actual relaxation assembly and native LP certification. Records
+retain source bytes/hash, total preparation/assembly/solve work, time, allocation,
+modeled retained units and negative results. One warmup precedes up to five measured
+rounds; mode order rotates. Equal native results across modes check consistency,
+without establishing independent source or optimality validation.
+
 `scripts/lp-lifecycle-profile.sh mps-afiro|mps-adlittle [repeats] [both|jvm|native]` runs one
 hash-pinned source from the existing basis corpus on JVM and Linux Native through
 the production source projection and scoped LP owner. Submit it as a lab profile

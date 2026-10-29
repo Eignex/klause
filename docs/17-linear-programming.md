@@ -67,6 +67,13 @@ remaps, changed dimensions or semantics and source-to-finite transitions reject 
 prior binding. A foreign source cannot use a prepared template index. Continuous,
 custom and unsupported projections retain their ordinary emission paths.
 
+An unchanged preparation validates ordered factor identities, integer endpoints,
+stated bound sides, the objective constant and every component cost before sharing
+the completed lookup collections. Component references retain the cost-coordinate
+order. A failed match uses selective reconstruction; a source revision alone cannot
+authorize reuse. The new source binding owns no predecessor snapshot, so repeated
+compatible preparations retain no generation chain.
+
 Template construction polls and charges the containing token, including failed
 attempts, and caps visits and retained storage at 262,144 modeled units each.
 An incomplete attempt publishes no snapshot. Compatible views share one atomic
