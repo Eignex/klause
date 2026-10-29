@@ -87,12 +87,13 @@ class RootInprocessingTest {
             session.addLearnedClause(Clause(intArrayOf(0, 4, 6)), 3)
             val pass = RootSimplificationPass()
             val params = BacktrackParams(rootSimplifyBatch = 2, inprocessingRootWork = work)
+            val stats = SearchStatsSink()
 
-            repeat(20) { pass.run(session, params, null) }
+            repeat(100) { pass.run(session, params, stats) }
 
             assertTrue((0 until session.learnedClauseCount).any {
                 session.learnedClauseLiterals(it).toSet() == setOf(4, 6)
-            })
+            }, "native=$native work=$work learning=${stats.snapshot().learning}")
         }
     }
 

@@ -89,7 +89,7 @@ class RootInprocessingSearchTest {
     }
 
     @Test
-    fun `optimization should consume growth triggered probing after source clause import`() {
+    fun `optimization should charge growth triggered probing after source clause import`() {
         for ((native, resumed) in listOf(false to false, false to true, true to false, true to true)) {
             val exchange = object : ClauseExchange {
                 override fun onSearchStart(session: PropagationSession) {
@@ -115,7 +115,10 @@ class RootInprocessingSearchTest {
 
             assertIs<MinimizeResult.Optimal>(result)
             assertEquals(0.0, result.stats.search.restarts.sum)
-            assertTrue(result.stats.search.learning.getValue("inprocessProbeUnits") > 0L)
+            val learning = result.stats.search.learning
+            val detail = "native=$native resumed=$resumed learning=$learning"
+            assertTrue((learning["inprocessWorkTriggers"] ?: 0L) > 0L, detail)
+            assertTrue((learning["inprocessProbeWork"] ?: 0L) > 0L, detail)
         }
     }
 
@@ -166,21 +169,28 @@ class RootInprocessingSearchTest {
     }
 
     @Test
-    fun `a probing unit should reach peer components at the shared root`() {
+    fun `a probing unit should reach peers without a private decision level`() {
         for (native in listOf(false, true)) {
-            var consumed = false
+            var retained: PropagationSession? = null
+            var observedLevel = -1
+            val exchange = object : ClauseExchange {
+                override fun onSearchStart(session: PropagationSession) { retained = session }
+                override fun onRestart(session: PropagationSession) = Unit
+            }
             val peer = object : SearchComponent {
                 override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
-                    if (decision == SearchDecision.Bool(4) && context.decisionLevel == 0) consumed = true
+                    if (decision == SearchDecision.Bool(4) && context.decisionLevel == 0) {
+                        observedLevel = assertNotNull(retained).decisionLevel
+                    }
                     return ComponentResult.Consistent
                 }
             }
-            val params = params(native).copy(componentFactory = { listOf(peer) })
+            val params = params(native, exchange).copy(componentFactory = { listOf(peer) })
 
             val result = BacktrackSolver(problem().bake()).solve(params)
 
             assertIs<SolveResult.Sat>(result)
-            assertTrue(consumed)
+            assertEquals(0, observedLevel)
         }
     }
 

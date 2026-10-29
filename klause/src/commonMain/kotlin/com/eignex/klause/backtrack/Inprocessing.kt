@@ -61,7 +61,6 @@ internal class Inprocessing(
     private var publication: Iterator<ComponentResult?>? = null
     private var publicationVisits = 0L
     private var needsPublication = false
-    private var publicationReady = false
 
     private fun <T> publishRoot(session: PropagationSession, operation: () -> T): T {
         val start = session.work
@@ -79,11 +78,14 @@ internal class Inprocessing(
     fun refreshRoot(cp: CpSearchComponent, context: SearchContext, params: BacktrackParams): ComponentResult? {
         val session = cp.session
         if (session.fixpointCancelled || params.cancellation() || session.cancelRequested) return null
-        if (publication == null && !publicationReady) {
-            publication = cp.prepareInitialization(context)
+        if (publication == null) {
+            publication = (context as SearchSession).prepareInitialization { component, shared ->
+                if (component === cp) cp.prepareInitialization(shared)
+                else sequenceOf(ComponentResult.Consistent).iterator()
+            }
             publicationVisits = session.problem.numBoolVars.toLong() + session.problem.numIntVars
         }
-        var result: ComponentResult? = if (publicationReady) ComponentResult.Consistent else null
+        var result: ComponentResult? = null
         while (result == null) {
             if (params.cancellation() || session.cancelRequested) return null
             val visits = minOf(publicationVisits, PROPAGATION_PREPARATION_BATCH_SIZE.toLong())
@@ -93,13 +95,7 @@ internal class Inprocessing(
             publicationVisits -= visits
         }
         publication = null
-        if (result == ComponentResult.Consistent) {
-            publicationReady = true
-            if (params.cancellation() || session.cancelRequested) return null
-            result = publishRoot(session) { (context as SearchSession).propagate() }
-        }
         needsPublication = result == ComponentResult.Indeterminate
-        if (!needsPublication) publicationReady = false
         return result
     }
 
@@ -125,6 +121,7 @@ internal class Inprocessing(
             spent = saturatedWork(spent, used)
             debt = saturatedWork(debt, (used - limit).coerceAtLeast(0L))
             stats?.noteInprocessing("inprocessContinuationWork", used)
+            lastCount = session.learnedClauseCount
             if (!session.fixpointCancelled) pendingRoot = null
             needsPublication = true
             return true
@@ -177,6 +174,7 @@ internal class Inprocessing(
             remaining = (offered - used).coerceAtLeast(0L)
             spent = saturatedWork(spent, used)
             debt = saturatedWork(debt, (used - offered).coerceAtLeast(0L))
+            lastCount = session.learnedClauseCount
         }
         needsPublication = session.fixpointCancelled || session.isUnsatAtRoot ||
             session.explanationState.undoTop != rootMark
@@ -193,7 +191,6 @@ internal class Inprocessing(
         publication = null
         publicationVisits = 0L
         needsPublication = false
-        publicationReady = false
         for (pass in passes) pass.reset()
     }
 
