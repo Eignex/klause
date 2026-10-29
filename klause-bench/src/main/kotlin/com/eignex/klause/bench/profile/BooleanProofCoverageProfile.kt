@@ -44,17 +44,24 @@ import kotlin.time.Duration.Companion.seconds
 
 /** Bounded Boolean attribution and scoped task protocol qualification through finite solver paths. */
 object BooleanProofCoverageProfile {
+    private data class WorkSlices(val base: Long, val maximum: Long) {
+        init { require(base > 0 && maximum >= base && maximum <= 150000) }
+    }
+
     /** Capture one pinned DIMACS source under `$OUT`; this is a protocol control, not a production scheduler. */
     @JvmStatic
     fun main(args: Array<String>) {
         val started = System.nanoTime()
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val required = setOf("suite", "problem", "sha256", "work", "seed", "splits")
-        require(options.keys.containsAll(required) && (options.keys - required).all { it == "cost-repeats" })
+        val optional = setOf("cost-repeats", "slice-work", "slice-max-work")
+        require(options.keys.containsAll(required) && (options.keys - required).all { it in optional })
         val work = options.getValue("work").toLong().also { require(it in 1..100000) }
         val seed = options.getValue("seed").toLong()
         val splits = options.getValue("splits").toInt().also { require(it in 0..4) }
         val costRepeats = (options["cost-repeats"]?.toInt() ?: 0).also { require(it in 0..12) }
+        val slices = WorkSlices(options["slice-work"]?.toLong() ?: 8L,
+            options["slice-max-work"]?.toLong() ?: 64L)
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         val stop = Cancellation.after(120.seconds)
         val reference = Catalog.uncapped(options.getValue("suite")).problems
@@ -101,7 +108,7 @@ object BooleanProofCoverageProfile {
                         capture.observer(worker, problem.numBoolVars)
                     } else null))
             }
-            val result = Portfolio.thompson(workers, baseSliceWork = 8, maxSliceWork = 64,
+            val result = Portfolio.thompson(workers, baseSliceWork = slices.base, maxSliceWork = slices.maximum,
                 sliceGrowth = 1.5, reseedStaleThreshold = 0,
                 diagnostics = PortfolioDiagnostics(work, seed) { trace.appendText("$it\n") }).use { it.solve(stop) }
             val record = resultRecord(result, begin, allocated, bean).toMutableMap()
@@ -118,7 +125,7 @@ object BooleanProofCoverageProfile {
         }
         independentReplicas(problem, context, seed, work, stop, bean, report)
         qualifyTasks(problem, context, splits, seed, work, stop, bean, report)
-        qualifyCosts(problem, context, splits, seed, work, costRepeats, stop, bean, report)
+        qualifyCosts(problem, context, splits, seed, work, costRepeats, stop, bean, report, slices)
         out.resolve("completed.json").writeText(buildJsonObject {
             put("sourceSha256", sha256(bytes))
             put("revision", Reports.readGitSha())
@@ -136,6 +143,7 @@ object BooleanProofCoverageProfile {
     private fun qualifyCosts(
         problem: BakedProblem, context: BooleanProofContext, splits: Int, seed: Long, work: Long,
         repeats: Int, stop: Cancellation, bean: ThreadMXBean, report: File,
+        slices: WorkSlices,
     ) {
         if (repeats == 0) return
         val process = ManagementFactory.getOperatingSystemMXBean() as OperatingSystemMXBean
@@ -149,7 +157,7 @@ object BooleanProofCoverageProfile {
                 val beforeCpu = process.processCpuTime
                 val beforeAllocated = bean.getThreadAllocatedBytes(Thread.currentThread().threadId())
                 val begin = System.nanoTime()
-                val (results, complete) = costQueries(mode, problem, context, splits, seed, work, stop)
+                val (results, complete) = costQueries(mode, problem, context, splits, seed, work, stop, slices)
                 val elapsed = System.nanoTime() - begin
                 val allocated = bean.getThreadAllocatedBytes(Thread.currentThread().threadId()) - beforeAllocated
                 val cpu = process.processCpuTime - beforeCpu
@@ -180,13 +188,13 @@ object BooleanProofCoverageProfile {
 
     private fun costQueries(
         mode: String, problem: BakedProblem, context: BooleanProofContext,
-        splits: Int, seed: Long, work: Long, stop: Cancellation,
+        splits: Int, seed: Long, work: Long, stop: Cancellation, slices: WorkSlices,
     ): Pair<List<SolveResult>, Boolean> {
         if (mode == "f1") {
             val workers = List(2) { worker ->
                 PortfolioWorker.of("bt/input-order", worker, BacktrackSolver(problem).session(), params(seed, stop))
             }
-            val result = Portfolio.thompson(workers, baseSliceWork = 8, maxSliceWork = 64,
+            val result = Portfolio.thompson(workers, baseSliceWork = slices.base, maxSliceWork = slices.maximum,
                 sliceGrowth = 1.5, reseedStaleThreshold = 0,
                 diagnostics = PortfolioDiagnostics(work, seed)).use { it.solve(stop) }
             return listOf(result) to (result is SolveResult.Unsat)
