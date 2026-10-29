@@ -16687,8 +16687,10 @@ final class com.eignex.klause.solver.result/OpenTheoryWorkStats { // com.eignex.
 }
 
 final class com.eignex.klause.solver.result/PortfolioLifecycleStats { // com.eignex.klause.solver.result/PortfolioLifecycleStats|null[0]
-    constructor <init>(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long? = ..., kotlin/Long? = ..., kotlin/Long? = ..., kotlin/Long? = ..., kotlin/Long? = ..., kotlin/Long? = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ...) // com.eignex.klause.solver.result/PortfolioLifecycleStats.<init>|<init>(kotlin.Long;kotlin.Long;kotlin.Long?;kotlin.Long?;kotlin.Long?;kotlin.Long?;kotlin.Long?;kotlin.Long?;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long){}[0]
+    constructor <init>(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long? = ..., kotlin/Long? = ..., kotlin/Long? = ..., kotlin/Long? = ..., kotlin/Long? = ..., kotlin/Long? = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ...) // com.eignex.klause.solver.result/PortfolioLifecycleStats.<init>|<init>(kotlin.Long;kotlin.Long;kotlin.Long?;kotlin.Long?;kotlin.Long?;kotlin.Long?;kotlin.Long?;kotlin.Long?;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long){}[0]
 
+    final val activeNanos // com.eignex.klause.solver.result/PortfolioLifecycleStats.activeNanos|{}activeNanos[0]
+        final fun <get-activeNanos>(): kotlin/Long // com.eignex.klause.solver.result/PortfolioLifecycleStats.activeNanos.<get-activeNanos>|<get-activeNanos>(){}[0]
     final val constructionNanos // com.eignex.klause.solver.result/PortfolioLifecycleStats.constructionNanos|{}constructionNanos[0]
         final fun <get-constructionNanos>(): kotlin/Long // com.eignex.klause.solver.result/PortfolioLifecycleStats.constructionNanos.<get-constructionNanos>|<get-constructionNanos>(){}[0]
     final val createdNanos // com.eignex.klause.solver.result/PortfolioLifecycleStats.createdNanos|{}createdNanos[0]
@@ -16718,6 +16720,7 @@ final class com.eignex.klause.solver.result/PortfolioLifecycleStats { // com.eig
     final fun component10(): kotlin/Long // com.eignex.klause.solver.result/PortfolioLifecycleStats.component10|component10(){}[0]
     final fun component11(): kotlin/Long // com.eignex.klause.solver.result/PortfolioLifecycleStats.component11|component11(){}[0]
     final fun component12(): kotlin/Long // com.eignex.klause.solver.result/PortfolioLifecycleStats.component12|component12(){}[0]
+    final fun component13(): kotlin/Long // com.eignex.klause.solver.result/PortfolioLifecycleStats.component13|component13(){}[0]
     final fun component2(): kotlin/Long // com.eignex.klause.solver.result/PortfolioLifecycleStats.component2|component2(){}[0]
     final fun component3(): kotlin/Long? // com.eignex.klause.solver.result/PortfolioLifecycleStats.component3|component3(){}[0]
     final fun component4(): kotlin/Long? // com.eignex.klause.solver.result/PortfolioLifecycleStats.component4|component4(){}[0]
@@ -16726,7 +16729,7 @@ final class com.eignex.klause.solver.result/PortfolioLifecycleStats { // com.eig
     final fun component7(): kotlin/Long? // com.eignex.klause.solver.result/PortfolioLifecycleStats.component7|component7(){}[0]
     final fun component8(): kotlin/Long? // com.eignex.klause.solver.result/PortfolioLifecycleStats.component8|component8(){}[0]
     final fun component9(): kotlin/Long // com.eignex.klause.solver.result/PortfolioLifecycleStats.component9|component9(){}[0]
-    final fun copy(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long? = ..., kotlin/Long? = ..., kotlin/Long? = ..., kotlin/Long? = ..., kotlin/Long? = ..., kotlin/Long? = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ...): com.eignex.klause.solver.result/PortfolioLifecycleStats // com.eignex.klause.solver.result/PortfolioLifecycleStats.copy|copy(kotlin.Long;kotlin.Long;kotlin.Long?;kotlin.Long?;kotlin.Long?;kotlin.Long?;kotlin.Long?;kotlin.Long?;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long){}[0]
+    final fun copy(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long? = ..., kotlin/Long? = ..., kotlin/Long? = ..., kotlin/Long? = ..., kotlin/Long? = ..., kotlin/Long? = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ...): com.eignex.klause.solver.result/PortfolioLifecycleStats // com.eignex.klause.solver.result/PortfolioLifecycleStats.copy|copy(kotlin.Long;kotlin.Long;kotlin.Long?;kotlin.Long?;kotlin.Long?;kotlin.Long?;kotlin.Long?;kotlin.Long?;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/PortfolioLifecycleStats.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/PortfolioLifecycleStats.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.solver.result/PortfolioLifecycleStats.toString|toString(){}[0]

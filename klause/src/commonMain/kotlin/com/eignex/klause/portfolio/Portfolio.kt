@@ -900,7 +900,7 @@ class Portfolio(
          * still open and rethrow the first failure a lane hit, a close failure suppressed into it.
          */
         fun execute(segment: (Claim) -> Unit) {
-            try {
+            val execution = runCatching {
                 for ((arm, worker) in workers.withIndex()) {
                     worker.onLifecycle = { kind, version ->
                         if (kind == PortfolioLifecycleKind.INCUMBENT_READ) incumbentRead(arm, version)
@@ -919,31 +919,30 @@ class Portfolio(
                 }
                 parallelRun(List(lanes) { index -> { lane(index, segment) } })
                 laneFailure?.let { throw it }
-            } catch (failure: Throwable) {
-                if (laneFailure == null) laneFailure = failure
-                throw failure
-            } finally {
-                try {
-                    closeAll(laneFailure)
-                } catch (failure: Throwable) {
-                    if (laneFailure == null) laneFailure = failure
-                    throw failure
-                } finally {
-                    for (worker in workers) {
-                        worker.sharingMeter?.onImport = null
-                        worker.onLifecycle = null
-                    }
-                    val finished = PortfolioEvent.Finished(when {
-                        laneFailure != null -> "failure"
-                        stopped.load() && remaining > 0 -> "completed"
-                        remaining == 0 -> "retired"
-                        workLimitReached -> "work-limit"
-                        else -> "external-stop"
-                    }, chargedWork)
-                    diagnostics?.onEvent?.invoke(finished)
-                    onProgress?.invoke(finished)
-                }
             }
+            val primary = execution.exceptionOrNull()
+            val cleanup = runCatching { closeAll(primary) }
+            val failure = primary ?: cleanup.exceptionOrNull()
+            for (worker in workers) {
+                worker.sharingMeter?.onImport = null
+                worker.onLifecycle = null
+            }
+            val finished = PortfolioEvent.Finished(when {
+                failure != null -> "failure"
+                stopped.load() && remaining > 0 -> "completed"
+                remaining == 0 -> "retired"
+                workLimitReached -> "work-limit"
+                else -> "external-stop"
+            }, chargedWork)
+            val notification = runCatching {
+                diagnostics?.onEvent?.invoke(finished)
+                onProgress?.invoke(finished)
+            }
+            if (failure != null) {
+                notification.exceptionOrNull()?.takeUnless { it === failure }?.let(failure::addSuppressed)
+                throw failure
+            }
+            notification.getOrThrow()
         }
 
         // The first failure any lane hit; it ends the run and is rethrown once every lane has joined.
