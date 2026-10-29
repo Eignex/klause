@@ -338,7 +338,7 @@ internal class CpSatisfactionTraversal(
                         when (component) {
                             is CpSearchComponent -> component.prepareInitialization(context)
                             is PreparingSearchComponent -> component.prepareInitialization(context)
-                            else -> sequenceOf(component.initialize(context)).iterator()
+                            else -> sequence { yield(component.initialize(context)) }.iterator()
                         }
                     }.also { initialization = it }
                     var initialized: ComponentResult? = null
