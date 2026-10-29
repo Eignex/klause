@@ -101,7 +101,6 @@ internal class VivificationPass(startCursor: Int = 0) : InprocessingPass {
     override fun reset() {
         cursor = 0
         clear()
-        spending.reset()
     }
 
     private fun clear() {

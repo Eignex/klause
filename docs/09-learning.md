@@ -417,9 +417,13 @@ the propagation-work ledger; diagnostic probe and visit counts add no second cha
 Each of the four classes has a separate work ceiling inside the scheduled slice's
 total ceiling. Zero withholds that class. Completed atomic copying, sorting and
 compaction can overspend; the class and scheduled loop repay their respective debt
-before admitting more work. Time and work cancellation retain no partial probe.
-An interrupted root attachment keeps its queued fixpoint and completes under the
-next invocation before publishing root facts or making a decision.
+before admitting more work. Reseeding resets cursors without forgiving that debt.
+Time and work cancellation retain no partial probe.
+Attachment and root publication are required cleanup once a consequence is admitted:
+local ceilings stop later optional work and retain the cleanup's overspend as debt.
+The containing invocation still cancels them. An interrupted root attachment keeps
+its queued fixpoint and completes under the next invocation before publishing root
+facts or making a decision. Root publication retains its bounded scan across slices.
 
 Root and probe cursors, vivification replacement batches and subsumption preparation
 survive suspension. The subsumption occurrence window retains at most 1,024 clauses
@@ -437,7 +441,8 @@ triggers and cooldown are disabled by default; the additional work ceilings are
 unlimited unless configured. Existing general off and SAT preset controls remain.
 Per-class attempted, eligible, shortened, unit, stopped and work counters diagnose
 applicability. Attachment, retirement and continuation work are subsets of class
-work, which itself overlaps containing propagation work. Learned lifecycle and S4
+work, which itself overlaps containing propagation work. Root publication has a
+separate containing charge and also cannot earn the next trigger. Learned lifecycle and S4
 family attribution retain their own authority and completeness limits; missing
 attribution does not establish zero usefulness. These observations select no
 adaptive score or default threshold.

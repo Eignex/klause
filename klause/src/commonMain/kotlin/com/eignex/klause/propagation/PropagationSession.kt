@@ -148,16 +148,16 @@ class PropagationSession private constructor(
     private var simplifiedRootSources: MutableSet<Int>? = null
     private var inprocessingRootPending = false
 
-    internal fun resumeInprocessingRoot(): Boolean {
-        if (!inprocessingRootPending) return false
+    internal fun resumeInprocessingRoot(): Boolean = withRequiredInprocessingCancellation {
+        if (!inprocessingRootPending) return@withRequiredInprocessingCancellation false
         check(decisionLevel == 0 && seededRestrictions.isEmpty && !scopedLearnedAssertion)
-        if (cancelRequested) return true
+        if (cancelRequested) return@withRequiredInprocessingCancellation true
         state.runCancelled = false
         val conflict = state.inprocessingFixpoint(-1, cancellation)
         if (conflict != null) bakedUnsat = PropagationResult.Unsat(conflictLevels = conflict)
         inprocessingRootPending = state.runCancelled
         if (!inprocessingRootPending) levelStates[levelTop - 1] = state.mark()
-        return true
+        true
     }
 
     internal val canSimplifyRoot: Boolean
@@ -181,14 +181,22 @@ class PropagationSession private constructor(
         if (factor < problem.numFactors) {
             val literals = if (usesNativeSat) (problem.factors[factor] as? Clause)?.literals
                 else (projection.propagators[factor] as? ClausePropagator)?.literals
-            return literals?.takeIf { it.size <= limit && it.all { lit -> Lit.variable(lit) < problem.numBoolVars } }
+            if (literals == null || literals.size > limit) return null
+            if (!literals.all { lit -> Lit.variable(lit) < problem.numBoolVars }) {
+                state.work += literals.size
+                return null
+            }
+            return literals
         }
         val index = factor - problem.numFactors
         if (!isLearnedClause(index) || learnedClausePermanent(index)) return null
         if (learnedClauseLiteralCount(index) > limit) return null
-        return learnedClauseLiterals(index).takeIf {
-            it.size <= limit && it.all { lit -> Lit.variable(lit) < problem.numBoolVars }
+        val literals = learnedClauseLiterals(index)
+        if (!literals.all { lit -> Lit.variable(lit) < problem.numBoolVars }) {
+            state.work += literals.size
+            return null
         }
+        return literals
     }
 
     internal fun addRootDerivedClause(
@@ -196,7 +204,7 @@ class PropagationSession private constructor(
         lbd: Int,
         origin: Int,
         sourceReplacement: Boolean,
-    ): PropagationResult {
+    ): PropagationResult = withRequiredInprocessingCancellation {
         check(canSimplifyRoot)
         val base = state.undoTop
         val fid = state.addLearnedClause(clause, lbd, permanent = sourceReplacement, origin = origin)
@@ -207,10 +215,10 @@ class PropagationSession private constructor(
         val conflict = state.inprocessingFixpoint(fid, cancellation)
         inprocessingRootPending = state.runCancelled
         if (conflict != null) {
-            return revertAndUnsat(conflict).also { bakedUnsat = it }
+            return@withRequiredInprocessingCancellation revertAndUnsat(conflict).also { bakedUnsat = it }
         }
         if (!inprocessingRootPending) levelStates[levelTop - 1] = state.mark()
-        return if (inprocessingRootPending) PropagationResult.Implied.EMPTY else impliedSince(base)
+        if (inprocessingRootPending) PropagationResult.Implied.EMPTY else impliedSince(base)
     }
 
     internal fun retireRootSource(factor: Int, literals: IntArray) {
@@ -314,10 +322,30 @@ class PropagationSession private constructor(
     }
     internal val propagationNanos: Long get() = state.propagationNanos
 
-    internal fun <T> withCancellation(token: Cancellation, operation: () -> T): T {
+    private var requiredInprocessingCancellation: Cancellation? = null
+
+    internal fun <T> withInprocessingCancellation(token: Cancellation, operation: () -> T): T {
+        val previous = requiredInprocessingCancellation
+        if (previous == null) requiredInprocessingCancellation = cancellation
+        return try {
+            withCancellation(token, operation)
+        } finally {
+            requiredInprocessingCancellation = previous
+        }
+    }
+
+    private fun <T> withRequiredInprocessingCancellation(operation: () -> T): T =
+        usingCancellation(requiredInprocessingCancellation ?: cancellation, operation)
+
+    internal fun <T> withCancellation(token: Cancellation, operation: () -> T): T = usingCancellation(
+        if (token === cancellation || token === Cancellation.Never) cancellation else cancellation or token,
+        operation,
+    )
+
+    private fun <T> usingCancellation(token: Cancellation, operation: () -> T): T {
         val previous = cancellation
         val finite = state.finiteWork.cancellation
-        cancellation = if (token === previous || token === Cancellation.Never) previous else previous or token
+        cancellation = token
         state.finiteWork.cancellation = cancellation
         return try {
             operation()

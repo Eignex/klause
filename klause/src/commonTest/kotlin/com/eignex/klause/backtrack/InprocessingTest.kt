@@ -16,7 +16,10 @@ import kotlin.test.assertNull
 
 class InprocessingTest {
 
-    private class CountingPass(override val preservesVariables: Boolean = true, private val work: Long = 0L) : InprocessingPass {
+    private class CountingPass(
+        override val preservesVariables: Boolean = true,
+        private val work: Long = 0L,
+    ) : InprocessingPass {
         var runs = 0
         var resets = 0
 
@@ -125,6 +128,20 @@ class InprocessingTest {
         repeat(3) { loop.onRestart(session, params) }
 
         assertEquals(listOf(1, 1, 0), passes.map { it.runs })
+    }
+
+    @Test
+    fun `resetting cursors should retain unpaid work debt`() {
+        val pass = CountingPass(work = 10L)
+        val loop = Inprocessing(listOf(pass), cadence = 1)
+        val session = session()
+        val params = BacktrackParams(inprocessingWork = 5L)
+
+        loop.onRestart(session, params)
+        loop.reset()
+        loop.onRestart(session, params)
+
+        assertEquals(1, pass.runs)
     }
 
     @Test

@@ -131,6 +131,21 @@ Use `param.root-simplification=true`, `param.root-simplify-batch=N`,
 batch disables probing. Keep the unchanged SAT preset and general backtrack controls
 in comparisons.
 
+`param.inprocessing-work=N` contains each scheduled slice; the `inprocessing-root-work`,
+`inprocessing-probe-work`, `inprocessing-subsume-work` and `inprocessing-vivify-work`
+parameters separately cap its classes in propagation-work units. Zero withholds work.
+`param.inprocessing-interval=N` and `param.inprocessing-growth=N` request work at
+natural roots; `param.inprocessing-cooldown=N` requires non-inprocessing work after
+an attempt, including restart requests. These triggers default to zero/off and
+the additional ceilings default to unlimited. Record class diagnostics alongside
+the containing propagation work and learned lifecycle; their work subsets and S4
+family credits must not be summed as independent benefit.
+
+Inside `bench.request.parameters`, a CLI setting is `param.NAME`. A lab `configs`
+override targets an adapter parameter with its own `param.` prefix, so overriding
+that setting uses `param.param.NAME`. Retain the actual CLI command as the consumed
+configuration; a problem-level case identity can be shared by several arms.
+
 Profile mains live in [bench/profile/](src/main/kotlin/com/eignex/klause/bench/profile/)
 and run as lab profile jobs; consult the selected main for its arguments and
 retain its output through `$OUT`.

@@ -194,6 +194,7 @@ meter and releases it before native execution; see
 | `NodeBudget` | CP decisions plus floor(5 × LS instructions / 4), per solve or worker quota | Exhaustion; completed evidence remains valid |
 | `BacktrackParams.maxDecisions` / `maxInstructions` | Decision attempts and native traversal operations | Incomplete result, never exhaustion |
 | `SliceBudget` | Search nodes plus policy-priced LP, propagation and inprocessing | Pause |
+| Inprocessing ceilings | Propagation-work units per scheduled slice and class, inside the worker allowance | Retained cursors, batches and unpaid atomic debt |
 | Portfolio base, maximum, growth | Shared schedule in node equivalents | Work or time pause |
 | LS `maxFlips` / `maxInstructions` | Native instructions per operation or handle | Exhaustion without proof |
 | ALNS instruction allowance | Outer repair allowance per handle | Anytime result |
@@ -221,9 +222,10 @@ exact point recovery, into LS instructions using the slice prices below. Retaine
 numerical traversal uses the same LP price for its scheduler work; cumulative
 source LP funding keeps raw numerical units.
 
-Slice pricing is solver policy: LP work costs one node per 600 units, propagation
-one per 4000 visits, inprocessing probes one per 12 and subsumption visits one per
-18000. Fractional marks survive slices and the preparation-to-search transition.
+Slice pricing is solver policy: LP work costs one node per 600 units and propagation
+one per 4000 visits. Inprocessing scans, probes, attachment and retirement enter
+that propagation ledger; probe and visit diagnostics add no separate price.
+Fractional marks survive slices and the preparation-to-search transition.
 Overspend debt is settled once and repaid by later slices; a nested private search
 leaves debt with its containing budget. Private LP rounding, pumps and proposal
 verification charge the same currency, including rejected proposals. Retained

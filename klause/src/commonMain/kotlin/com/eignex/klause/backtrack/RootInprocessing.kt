@@ -23,7 +23,6 @@ internal class RootSimplificationPass : InprocessingPass {
         dropped = IntHashSet()
         revision = -1L
         pendingSource = null
-        spending.reset()
     }
 
     override fun run(session: PropagationSession, params: BacktrackParams, stats: SearchStatsSink?) {
@@ -117,7 +116,6 @@ internal class RootProbingPass : InprocessingPass {
 
     override fun reset() {
         cursor = 0
-        spending.reset()
     }
 
     override fun run(session: PropagationSession, params: BacktrackParams, stats: SearchStatsSink?) {
@@ -144,7 +142,8 @@ internal class RootProbingPass : InprocessingPass {
             budget.probe()
             val start = session.work
             val token = Cancellation { session.work - start >= params.rootProbeWork }
-            when (val result = session.withCancellation(token) { session.probeBool(variable, Lit.isPositive(literal)) }) {
+            val result = session.withCancellation(token) { session.probeBool(variable, Lit.isPositive(literal)) }
+            when (result) {
                 null -> if (!params.cancellation()) session.probeCancelled = priorCancelled
                 is PropagationResult.Unsat -> {
                     if (!budget.visit(3)) break
