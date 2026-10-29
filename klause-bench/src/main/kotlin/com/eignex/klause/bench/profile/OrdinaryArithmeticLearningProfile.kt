@@ -76,7 +76,8 @@ internal object OrdinaryArithmeticLearningProfile {
                         val picked = delegate.pick(session, rng)
                         capture?.record("traversal.pick", session.decisionLevel.toLong(),
                             if (picked is VarRef.IntVar) picked.varId.toLong() else -1L)
-                        if (session.problem.numIntVars <= 64) capture?.record("traversal.bounds",
+                        if (capture?.accepting == true && session.problem.numIntVars <= 64) capture?.record(
+                            "traversal.bounds",
                             *LongArray(session.problem.numIntVars * 2) { index ->
                                 val domain = session.intDomain(index / 2)
                                 if (index % 2 == 0) domain.min else domain.max
@@ -115,6 +116,7 @@ internal object OrdinaryArithmeticLearningProfile {
                     }
                 }
                 val beforeRetirement = native?.learnedClauseCount
+                val beforeLifecycle = capture?.lifecycle()
                 capture?.record("traversal.finished")
                 native?.popToLevel(0)
                 native?.forgetLearnedClauses { _, _ -> false }
@@ -136,6 +138,8 @@ internal object OrdinaryArithmeticLearningProfile {
                     put("independentWitnessOrProofCheck", false)
                     put("presolve", prepared.presolve.toString())
                     put("stats", stats)
+                    put("lifecycleBeforeRetirement", beforeLifecycle ?: JsonNull)
+                    put("lifecycleAfterRetirement", capture?.lifecycle() ?: JsonNull)
                     put("storedBeforeRetirement", beforeRetirement)
                     put("storedAfterRetirement", native?.learnedClauseCount)
                     put("finiteWorkIncludingRetirement", capture?.work())
