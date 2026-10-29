@@ -481,6 +481,13 @@ not a useful deduction or objective gain. No trace is retained in the solver.
 Physical events do not make mixed numerical scheduling reproducible; finite
 single-lane work diagnostics keep their separate restrictions.
 
+Private numerical and repair admission retain bounded `numericalExternal*` and
+`jointRepairExternal*` stage counts for missing exact coordinates, rejected or
+unavailable native source checks, and non-improving points. Numerical admission also
+distinguishes cancellation and unavailable objective evaluation. An incumbent can be
+accepted by finite tolerance policy while lacking the exact source authority a
+private numerical cutoff requires; availability and reads do not bypass these guards.
+
 ### Reseeding and arm failures
 
 Optimization portfolios can reseed stale resumable arms after an incumbent;

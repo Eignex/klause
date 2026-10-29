@@ -174,7 +174,7 @@ internal class LinearAuthorityInvocation(
             }
             external()?.takeUnless { it === incumbent }?.let { sample ->
                 val before = incumbentRevision
-                offer(sample)
+                offer(sample, external = true)
                 if (incumbentRevision != before) {
                     importedIncumbents++
                     importedIncumbent = sample
@@ -228,23 +228,47 @@ internal class LinearAuthorityInvocation(
 
     private fun paused(): Boolean = work > startWork && (work >= endWork || sliceEnd?.hasPassedNow() == true)
 
-    private fun offer(sample: Sample) {
-        if (stop()) return
+    private fun offer(sample: Sample) = offer(sample, external = false)
+
+    private fun observeExternalOffer(external: Boolean, stage: String) {
+        if (external) state.smt.observeCompleteSearchStage("numericalExternal$stage")
+    }
+
+    private fun offer(sample: Sample, external: Boolean) {
+        if (stop()) {
+            observeExternalOffer(external, "Stopped")
+            return
+        }
         if (sample.exactReals == null && context.objective.keys.any {
                 it.kind == com.eignex.klause.solver.evidence.SourceCoordinate.Kind.Real
             }
-        ) return
+        ) {
+            observeExternalOffer(external, "MissingExactReals")
+            return
+        }
         val checked = SourceEvidenceVerifier(context.withLinearAuthority()).verify(SourceEvidence(context.scope,
             SourceClaim.Witness(sample), SourceDerivation.SourceWitness), stop)
-        if (checked != SourceEvidenceCheck.Checked) return
-        val exact = context.linearValue(sample, stop) ?: return
+        if (checked != SourceEvidenceCheck.Checked) {
+            observeExternalOffer(external, if (checked is SourceEvidenceCheck.Rejected) "PointRejected"
+                else "PointUnavailable")
+            return
+        }
+        val exact = context.linearValue(sample, stop)
+        if (exact == null) {
+            observeExternalOffer(external, "ObjectiveUnavailable")
+            return
+        }
         val standing = value
         val minimizes = context.scope.objective?.sense == ObjectiveSense.MINIMIZE
-        if (standing != null && if (minimizes) exact >= standing else exact <= standing) return
+        if (standing != null && if (minimizes) exact >= standing else exact <= standing) {
+            observeExternalOffer(external, "NotImproving")
+            return
+        }
         incumbent = sample
         importedIncumbent = null
         value = exact
         incumbentRevision++
+        observeExternalOffer(external, "Accepted")
         callback(sample, exact)
     }
 

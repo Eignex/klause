@@ -129,11 +129,25 @@ internal class JointLinearRepair(
             proposal = ExactNeighborhoodProposal { centers, bools, count, round, radius, cutoff ->
                 val pooled = external()?.takeIf { sample ->
                     val value = objective?.evaluateExact(sample)
-                    (model.numRealVars == 0 || sample.exactReals?.size == model.numRealVars) &&
-                        (cutoff == null || (value != null && value < cutoff)) &&
-                        SourceEvidenceVerifier(source.withLinearAuthority()).verify(SourceEvidence(source.scope,
-                            SourceClaim.Witness(sample), SourceDerivation.SourceWitness), stop) ==
-                        SourceEvidenceCheck.Checked
+                    when {
+                        model.numRealVars != 0 && sample.exactReals?.size != model.numRealVars -> {
+                            observe("jointRepairExternalMissingExactReals")
+                            false
+                        }
+                        cutoff != null && (value == null || value >= cutoff) -> {
+                            observe("jointRepairExternalNotImproving")
+                            false
+                        }
+                        else -> {
+                            val checked = SourceEvidenceVerifier(source.withLinearAuthority()).verify(
+                                SourceEvidence(source.scope, SourceClaim.Witness(sample),
+                                    SourceDerivation.SourceWitness), stop)
+                            if (checked != SourceEvidenceCheck.Checked) observe(
+                                if (checked is SourceEvidenceCheck.Rejected) "jointRepairExternalPointRejected"
+                                else "jointRepairExternalPointUnavailable")
+                            checked == SourceEvidenceCheck.Checked
+                        }
+                    }
                 }
                 val from = pooled?.let { sample ->
                     observe("jointRepairImportedCenters")
