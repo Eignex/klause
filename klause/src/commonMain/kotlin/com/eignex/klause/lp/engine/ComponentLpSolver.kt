@@ -18,9 +18,8 @@ import com.eignex.klause.util.IntArrayList
  * bounds its cost prefers; an isolated column that prefers an infinite bound makes the LP unbounded,
  * reported as a null result with an unbounded-candidate termination, as the monolithic engine does.
  *
- * The warm-start handle is not split across blocks — a decomposed solve cold-starts each block
- * (small by construction, which is the point); the warm contract permits this (it changes only the
- * pivot path, never the result).
+ * External warm-start handles are not split across blocks. Retained children keep their own bases;
+ * compatible unchanged blocks also keep their result authority.
  */
 internal class ComponentLpSolver(
     private var model: LpModel,
@@ -622,7 +621,7 @@ internal class ComponentLpSolver(
     override fun mirCuts(maxCuts: Int): List<Cut> = localCuts(maxCuts) { owner, count -> owner.mirCuts(count) }
 
     private fun localCuts(maxCuts: Int, separate: (TableauCutSolver, Int) -> List<Cut>): List<Cut> {
-        if (!currentAuthority() || blockResults == null || maxCuts <= 0) return emptyList()
+        if (!currentAuthority() || blockResults?.all { it.optimal } != true || maxCuts <= 0) return emptyList()
         val cuts = ArrayList<Cut>()
         for (index in parts.indices) {
             val owner = solvers[index] as? TableauCutSolver ?: continue
