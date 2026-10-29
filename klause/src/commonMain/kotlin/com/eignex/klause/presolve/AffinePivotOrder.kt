@@ -16,4 +16,8 @@ enum class AffinePivotOrder {
      *  inverse and its application to linear programming", Management Science 3(3), 1957,
      *  https://doi.org/10.1287/mnsc.3.3.255. */
     MARKOWITZ,
+
+    /** Markowitz ordering with two-column definitions oriented toward the smaller rewrite payload.
+     *  Factor payload sizes estimate construction cost; they do not predict search savings. */
+    REWRITE_COST,
 }
