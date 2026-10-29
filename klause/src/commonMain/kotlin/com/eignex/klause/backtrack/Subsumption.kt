@@ -39,9 +39,13 @@ internal fun subsume(
     stats: SearchStatsSink? = null,
 ): Int {
     if (!session.canSimplifyRoot || session.learnedClauseCount < 2) return startCursor
-    val slice = SubsumptionSlice(session, startCursor, params.subsumeBatch)
-    InprocessingSpending(InprocessingKind.Subsumption).run(session, params, stats) { slice.advance(session, it) }
-    return if (slice.revision == session.learnedClauseRevision) slice.nextCursor else 0
+    var next = startCursor
+    InprocessingSpending(InprocessingKind.Subsumption).run(session, params, stats) {
+        val slice = SubsumptionSlice(session, startCursor, params.subsumeBatch)
+        slice.advance(session, it)
+        next = if (slice.revision == session.learnedClauseRevision) slice.nextCursor else 0
+    }
+    return next
 }
 
 private class SubsumptionSlice(session: PropagationSession, start: Int, batch: Int) {
