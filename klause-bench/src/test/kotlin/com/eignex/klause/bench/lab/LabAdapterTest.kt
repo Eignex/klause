@@ -22,6 +22,27 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LabAdapterTest {
+    @Test
+    fun `paired propagation controls retain source identity and distinct case identities`() {
+        val cases = KlauseLabSuite.plan(BenchRequest(parameters = mapOf(
+            "suite" to "dimacs-core", "name" to "php4", "engines" to "cp", "propagation-controls" to "true",
+        )))
+
+        assertEquals(3, cases.map { it.id }.distinct().size)
+        assertEquals(1, cases.map { it.inputs }.distinct().size)
+        assertEquals(1, cases.map { it.attributes.getValue("pairKey") }.distinct().size)
+        assertEquals(listOf("false", "true", "true"), cases.map { it.parameters["param.propagation-attribution"] })
+        assertEquals(listOf("false", "false", "true"), cases.map { it.parameters["param.historical-table-reasons"] })
+    }
+
+    @Test
+    fun `paired propagation controls reject conflicting switch overrides`() {
+        assertFailsWith<IllegalArgumentException> {
+            LabSettings(mapOf("engines" to "cp", "propagation-controls" to "true",
+                "param.historical-table-reasons" to "false"))
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(strings = ["param.source-validation", "param.source-validation-gzip"])
     fun `source checks are requested from the lab instead of the solver`(key: String) {

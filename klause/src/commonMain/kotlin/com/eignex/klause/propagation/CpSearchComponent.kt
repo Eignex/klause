@@ -587,20 +587,20 @@ class CpSearchComponent(
                 this@CpSearchComponent.session.decisionLevel.toLong())
             val result = this@CpSearchComponent.session.withAttribution(factorFamilies) {
                 when (learned) {
-                is ConflictAnalyzer.AnalysisResult.Learned -> this@CpSearchComponent.session.addLearnedClause(
-                    Clause(learned.literals),
-                    learned.lbd,
-                )
+                    is ConflictAnalyzer.AnalysisResult.Learned -> this@CpSearchComponent.session.addLearnedClause(
+                        Clause(learned.literals),
+                        learned.lbd,
+                    )
 
-                is ConflictAnalyzer.AnalysisResult.LearnedPb -> this@CpSearchComponent.session.addLearnedPb(
-                    learned.weights,
-                    learned.literals,
-                    learned.degree,
-                    learned.lbd,
-                )
+                    is ConflictAnalyzer.AnalysisResult.LearnedPb -> this@CpSearchComponent.session.addLearnedPb(
+                        learned.weights,
+                        learned.literals,
+                        learned.degree,
+                        learned.lbd,
+                    )
 
-                is ConflictAnalyzer.AnalysisResult.LearnedIntegerRow ->
-                    this@CpSearchComponent.session.addLearnedIntegerRow(learned.row, learned.lbd)
+                    is ConflictAnalyzer.AnalysisResult.LearnedIntegerRow ->
+                        this@CpSearchComponent.session.addLearnedIntegerRow(learned.row, learned.lbd)
                 }
             }
             lastResult = result

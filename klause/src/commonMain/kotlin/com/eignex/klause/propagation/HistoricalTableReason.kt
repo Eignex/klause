@@ -39,7 +39,8 @@ internal class HistoricalTableReason(private val state: PropagationState) {
         } finally {
             attribution?.let {
                 it.note(family, FactorAttribution.Metric.RefinementWork, state.work - before)
-                it.note(family, FactorAttribution.Metric.RefinementNanos, requireNotNull(start).elapsedNow().inWholeNanoseconds)
+                it.note(family, FactorAttribution.Metric.RefinementNanos,
+                    requireNotNull(start).elapsedNow().inWholeNanoseconds)
             }
         }
         val alternate = replacement ?: return false

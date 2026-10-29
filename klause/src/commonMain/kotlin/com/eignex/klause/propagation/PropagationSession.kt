@@ -1015,7 +1015,7 @@ class PropagationSession private constructor(
         state.learned.lifecycle.snapshot() + (state.factorAttribution?.snapshot() ?: emptyMap())
 
     internal fun configureAttribution(enabled: Boolean, historicalTables: Boolean) {
-        if (enabled && state.factorAttribution == null) state.factorAttribution = FactorAttribution()
+        state.factorAttribution = if (enabled) state.factorAttribution ?: FactorAttribution() else null
         state.historicalTableReasons = historicalTables
     }
 
