@@ -724,7 +724,8 @@ the same cumulative numerical and verification limits. It also pairs real source
 workers through their internal consumer context, each with five seconds and the
 existing 1,000-instruction ceiling. Other modes keep the two-second worker control.
 Use complete query/certification time and actual allocation alongside import
-progress; whole-process RSS spans both arms.
+progress; whole-process RSS spans both arms. The `consumers` mode runs only the
+paired source workers for follow-up integration controls.
 
 Each owner runs cold, asserted-bound, bound-pop, appended-row and row-pop queries.
 Fresh owners at the same exact states control retained owners. One warmup precedes
