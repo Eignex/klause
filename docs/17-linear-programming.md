@@ -73,14 +73,11 @@ connected dominant component remains subject to the ordinary size and work guard
 
 ## Numerical authority
 
-The optional simplex progress trace owns bounded progress samples and per-invocation
-phase observations. Elapsed profiling is separately enabled; ordinary progress
-capture reads no phase clock. Pricing, basis transforms, updates, rebuilds,
-feasibility scans and output construction retain their numerical and cancellation
-semantics. Timing regions can nest and carry no work, admission or certificate
-authority. Repair timing excludes checkpoint wall time, including suspension in
-the caller. A retained invocation replaces its completed trace; compatible
-factors remain owned by the scoped solver.
+Optional simplex diagnostics retain bounded progress observations per numerical
+invocation. A retained invocation replaces its completed observations while
+compatible factors remain owned by the scoped solver. A paused invocation keeps
+its diagnostics alongside the cursor. Observations supply no admission, work
+allowance or certificate authority and do not select numerical policy.
 
 The exact matrix, costs, objective sense/scale/constant, bounds, strictness,
 integrality, origins, source premises, ordered basis and nonbasic statuses determine

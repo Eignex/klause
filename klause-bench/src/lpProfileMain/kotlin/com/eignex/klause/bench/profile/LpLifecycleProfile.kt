@@ -49,7 +49,8 @@ import kotlin.time.TimeSource.Monotonic
 
 internal expect fun profileAllocatedBytes(): Long?
 
-internal fun main(args: Array<String>) {
+/** Runs bounded cold and retained LP lifecycle observations for one hash-pinned source. */
+fun main(args: Array<String>) {
     val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
     require(options.keys == setOf("source64", "source", "sha256", "repeats"))
     val bytes = Base64.decode(options.getValue("source64"))
@@ -71,24 +72,32 @@ internal fun main(args: Array<String>) {
     requireNotNull(column) { "a structural lower side is required for the edit control" }
     val lower = requireNotNull(initial.activeSide(column, false)).side.number.value
     val upper = initial.activeSide(column, true)?.side?.number?.value
-    val edited = if (upper != null && upper > lower) (lower + upper) * BigFraction.ofLong(2L).reciprocal()
-        else lower + BigFraction.ONE
+    val edited = if (upper != null && upper > lower) {
+        (lower + upper) * BigFraction.ofLong(2L).reciprocal()
+    } else {
+        lower + BigFraction.ONE
+    }
     val side = ExactLpSide(ExactLpNumber.of(edited))
-    println(buildJsonObject {
-        put("kind", "source-preparation")
-        put("source", options.getValue("source"))
-        put("sha256", options.getValue("sha256"))
-        put("elapsedNs", start.elapsedNow().inWholeNanoseconds)
-        put("allocatedBytes", preparationAllocated?.let { allocated ->
-            profileAllocatedBytes()?.minus(allocated)?.let(::JsonPrimitive)
-        } ?: JsonNull)
-        put("rows", initial.model.m)
-        put("columns", initial.model.n)
-        put("editColumn", column)
-        put("editLower", edited.toString())
-        put("sourceVerdictClaim", false)
-        put("kotlinVersion", KotlinVersion.CURRENT.toString())
-    })
+    println(
+        buildJsonObject {
+            put("kind", "source-preparation")
+            put("source", options.getValue("source"))
+            put("sha256", options.getValue("sha256"))
+            put("elapsedNs", start.elapsedNow().inWholeNanoseconds)
+            put(
+                "allocatedBytes",
+                preparationAllocated?.let { allocated ->
+                    profileAllocatedBytes()?.minus(allocated)?.let(::JsonPrimitive)
+                } ?: JsonNull,
+            )
+            put("rows", initial.model.m)
+            put("columns", initial.model.n)
+            put("editColumn", column)
+            put("editLower", edited.toString())
+            put("sourceVerdictClaim", false)
+            put("kotlinVersion", KotlinVersion.CURRENT.toString())
+        },
+    )
     for (round in -1 until repeats) {
         for (retained in if (round % 2 == 0) listOf(true, false) else listOf(false, true)) {
             for (observed in listOf(false, true)) {
@@ -121,8 +130,15 @@ private fun lifecycle(
             val stageStart = Monotonic.markNow()
             val stageAllocated = profileAllocatedBytes()
             val creationStart = Monotonic.markNow()
-            if (owner == null) owner = LpScopedSolver(state, cancellation, context,
-                iterationLimit = 4096, workLimit = 50_000_000L)
+            if (owner == null) {
+                owner = LpScopedSolver(
+                    state,
+                    cancellation,
+                    context,
+                    iterationLimit = 4096,
+                    workLimit = 50_000_000L,
+                )
+            }
             val current = requireNotNull(owner)
             val constructionNs = creationStart.elapsedNow().inWholeNanoseconds
             val previousEngine = factory.lastEngine
@@ -134,12 +150,22 @@ private fun lifecycle(
                     check(current.push())
                     check(current.assertBound(column, false, side, 1L))
                 }
+
                 2, 4 -> check(current.pop(0))
+
                 3 -> {
                     check(current.push())
-                    check(current.append(LpScopedRow(current.state.rows.lastId + 1L,
-                        listOf(column to ExactLpNumber.of(-1L)), ExactLpNumber.of(side.number.value.negated()),
-                        ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L))))), scoped = true))
+                    check(
+                        current.append(
+                            LpScopedRow(
+                                current.state.rows.lastId + 1L,
+                                listOf(column to ExactLpNumber.of(-1L)),
+                                ExactLpNumber.of(side.number.value.negated()),
+                                ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L)))),
+                            ),
+                            scoped = true,
+                        ),
+                    )
                 }
             }
             val editNs = editStart.elapsedNow().inWholeNanoseconds
@@ -166,57 +192,67 @@ private fun lifecycle(
             val stageBytes = stageAllocated?.let { start -> profileAllocatedBytes()?.minus(start) }
             state = current.state
             val numerical = primaryEngine
-            println(buildJsonObject {
-                put("kind", "query")
-                put("round", round)
-                put("warmup", round < 0)
-                put("retained", retained)
-                put("observed", observed)
-                put("stage", stage)
-                put("stageNs", stageNs)
-                put("constructionNs", constructionNs)
-                put("editNs", editNs)
-                put("preparationNs", preparationNs)
-                put("prepared", prepared)
-                put("editPreparationInclusivePhaseNs", numbers(editPhases))
-                put("queryNs", queryNs)
-                put("floatingNs", factory.floatingNanos - before)
-                put("numericalInvocations", JsonArray(factory.invocations.drop(firstInvocation)))
-                put("droppedInvocations", factory.droppedInvocations)
-                put("queryNonFloatNs", queryNs - (factory.floatingNanos - before))
-                put("allocatedBytes", stageBytes?.let(::JsonPrimitive) ?: JsonNull)
-                put("cancelled", cancellation())
-                put("verdict", result?.verdict?.name)
-                put("bound", result?.lowerBound?.toString())
-                put("exactPoint", result?.exactPrimal?.toString())
-                put("termination", numerical?.lastTermination?.name)
-                put("pivots", current.lastMetrics.pivots)
-                put("work", current.lastMetrics.workOps)
-                put("preparationWork", current.metrics.preparationWork)
-                put("createdOwners", current.metrics.createdOwners)
-                put("closedOwners", current.metrics.closedOwners)
-                put("retainedRows", current.metrics.retainedRows)
-                put("activeRows", current.metrics.activeRows)
-                put("certificateWork", observer.work)
-                put("certificateAttempts", numbers(observer.attempts))
-                put("exactInputAttempts", observer.exactInputAttempts)
-                put("exactInputAccepted", observer.exactInputAccepted)
-                put("certificatePhases", numbers(observer.phases))
-                put("reconstructionDecline", result?.reconstruction?.decline?.name)
-                put("basisDecline", result?.basisVerification?.decline?.name)
-                put("continuationDecline", result?.continuation?.decline?.name)
-                put("refinementDecline", result?.refinement?.decline?.name)
-                put("sourceResidualNs", current.lastMetrics.sourceResidualNanos)
-                put("luMaxFill", result?.float?.luMaxFill?.let(::JsonPrimitive) ?: JsonNull)
-                put("luMaxDensity", result?.float?.luMaxDensity?.let(::JsonPrimitive) ?: JsonNull)
-                put("refactorTriggers", numerical?.lastRefactorPolicyMetrics?.triggers?.let { triggers ->
-                    numbers(triggers)
-                } ?: JsonNull)
-                put("qualitySamples",
-                    numerical?.lastRefactorPolicyMetrics?.qualitySamples?.let(::JsonPrimitive) ?: JsonNull)
-                put("pivotSpread", numerical?.lastRefactorPolicyMetrics?.pivotSpread?.let(::profileNumber) ?: JsonNull)
-                put("trace", numerical?.progressTrace?.let(::traceJson) ?: JsonNull)
-            })
+            println(
+                buildJsonObject {
+                    put("kind", "query")
+                    put("round", round)
+                    put("warmup", round < 0)
+                    put("retained", retained)
+                    put("observed", observed)
+                    put("stage", stage)
+                    put("stageNs", stageNs)
+                    put("constructionNs", constructionNs)
+                    put("editNs", editNs)
+                    put("preparationNs", preparationNs)
+                    put("prepared", prepared)
+                    put("editPreparationInclusivePhaseNs", numbers(editPhases))
+                    put("queryNs", queryNs)
+                    put("floatingNs", factory.floatingNanos - before)
+                    put("numericalInvocations", JsonArray(factory.invocations.drop(firstInvocation)))
+                    put("droppedInvocations", factory.droppedInvocations)
+                    put("queryNonFloatNs", queryNs - (factory.floatingNanos - before))
+                    put("allocatedBytes", stageBytes?.let(::JsonPrimitive) ?: JsonNull)
+                    put("cancelled", cancellation())
+                    put("verdict", result?.verdict?.name)
+                    put("bound", result?.lowerBound?.toString())
+                    put("exactPoint", result?.exactPrimal?.toString())
+                    put("termination", numerical?.lastTermination?.name)
+                    put("pivots", current.lastMetrics.pivots)
+                    put("work", current.lastMetrics.workOps)
+                    put("preparationWork", current.metrics.preparationWork)
+                    put("createdOwners", current.metrics.createdOwners)
+                    put("closedOwners", current.metrics.closedOwners)
+                    put("retainedRows", current.metrics.retainedRows)
+                    put("activeRows", current.metrics.activeRows)
+                    put("certificateWork", observer.work)
+                    put("certificateAttempts", numbers(observer.attempts))
+                    put("exactInputAttempts", observer.exactInputAttempts)
+                    put("exactInputAccepted", observer.exactInputAccepted)
+                    put("certificatePhases", numbers(observer.phases))
+                    put("reconstructionDecline", result?.reconstruction?.decline?.name)
+                    put("basisDecline", result?.basisVerification?.decline?.name)
+                    put("continuationDecline", result?.continuation?.decline?.name)
+                    put("refinementDecline", result?.refinement?.decline?.name)
+                    put("sourceResidualNs", current.lastMetrics.sourceResidualNanos)
+                    put("luMaxFill", result?.float?.luMaxFill?.let(::JsonPrimitive) ?: JsonNull)
+                    put("luMaxDensity", result?.float?.luMaxDensity?.let(::JsonPrimitive) ?: JsonNull)
+                    put(
+                        "refactorTriggers",
+                        numerical?.lastRefactorPolicyMetrics?.triggers?.let { triggers ->
+                            numbers(triggers)
+                        } ?: JsonNull,
+                    )
+                    put(
+                        "qualitySamples",
+                        numerical?.lastRefactorPolicyMetrics?.qualitySamples?.let(::JsonPrimitive) ?: JsonNull,
+                    )
+                    put(
+                        "pivotSpread",
+                        numerical?.lastRefactorPolicyMetrics?.pivotSpread?.let(::profileNumber) ?: JsonNull,
+                    )
+                    put("trace", numerical?.progressTrace?.let(::traceJson) ?: JsonNull)
+                },
+            )
             if (!retained) {
                 val closing = Monotonic.markNow()
                 current.close()
@@ -230,18 +266,20 @@ private fun lifecycle(
         closeNs += closing.elapsedNow().inWholeNanoseconds
         val elapsed = started.elapsedNow().inWholeNanoseconds
         val bytes = allocated?.let { start -> profileAllocatedBytes()?.minus(start) }
-        println(buildJsonObject {
-            put("kind", "lifecycle")
-            put("round", round)
-            put("retained", retained)
-            put("observed", observed)
-            put("elapsedNs", elapsed)
-            put("activeNs", activeNs + closeNs)
-            put("closeNs", closeNs)
-            put("allocatedBytes", bytes?.let(::JsonPrimitive) ?: JsonNull)
-            put("nativeAllocationAvailable", false)
-            put("cancelled", cancellation())
-        })
+        println(
+            buildJsonObject {
+                put("kind", "lifecycle")
+                put("round", round)
+                put("retained", retained)
+                put("observed", observed)
+                put("elapsedNs", elapsed)
+                put("activeNs", activeNs + closeNs)
+                put("closeNs", closeNs)
+                put("allocatedBytes", bytes?.let(::JsonPrimitive) ?: JsonNull)
+                put("nativeAllocationAvailable", false)
+                put("cancelled", cancellation())
+            },
+        )
     }
 }
 
@@ -260,15 +298,22 @@ private fun traceJson(trace: SimplexProgressTrace): JsonElement = buildJsonObjec
     put("basisWork", numbers(trace.basisWork))
     put("progressSamples", trace.samples.size)
     put("checkpointNs", trace.checkpointNanos)
-    put("samples", JsonArray(trace.samples.map { sample -> buildJsonObject {
-        put("phase", sample.phase.name)
-        put("pivots", sample.pivots)
-        put("work", sample.work)
-        put("scaledObjective", profileNumber(sample.scaledObjective))
-        put("scaledInfeasibility", profileNumber(sample.scaledInfeasibility))
-        put("scaledMaxViolation", profileNumber(sample.scaledMaxViolation))
-        put("violatedBasics", sample.violatedBasics)
-    } }))
+    put(
+        "samples",
+        JsonArray(
+            trace.samples.map { sample ->
+                buildJsonObject {
+                    put("phase", sample.phase.name)
+                    put("pivots", sample.pivots)
+                    put("work", sample.work)
+                    put("scaledObjective", profileNumber(sample.scaledObjective))
+                    put("scaledInfeasibility", profileNumber(sample.scaledInfeasibility))
+                    put("scaledMaxViolation", profileNumber(sample.scaledMaxViolation))
+                    put("violatedBasics", sample.violatedBasics)
+                }
+            },
+        ),
+    )
     put("primalFeasibilityIterations", trace.iterations[SimplexPhase.PRIMAL_FEASIBILITY] ?: 0)
     put("sourcePrimalResidual", trace.sourcePrimalResidual?.let(::profileNumber) ?: JsonNull)
     put("sourceBoundViolation", trace.sourceBoundViolation?.let(::profileNumber) ?: JsonNull)
@@ -291,8 +336,12 @@ private class LifecycleCertificates : LpCertificationObserver {
         if (accepted) exactInputAccepted++
     }
     override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
-    override fun observeBasisVerification(metrics: ExactBasisMetrics) { work += metrics.work }
-    override fun observeContinuation(metrics: ExactContinuationMetrics) { work += metrics.work }
+    override fun observeBasisVerification(metrics: ExactBasisMetrics) {
+        work += metrics.work
+    }
+    override fun observeContinuation(metrics: ExactContinuationMetrics) {
+        work += metrics.work
+    }
     override fun observePhase(metrics: LpPhaseMetrics) {
         phases[metrics.phase] = phases.getOrElse(metrics.phase) { 0L } + metrics.nanos
     }
@@ -303,8 +352,12 @@ private class LifecycleFactory(private val observed: Boolean) : LpEngineFactory 
     var floatingNanos = 0L
     val invocations = mutableListOf<JsonElement>()
     var droppedInvocations = 0
-    override fun newGeneralSolver(model: LpModel, cancellation: Cancellation, workLimit: Long,
-        pricing: LpPricingOptions): LpSolver {
+    override fun newGeneralSolver(
+        model: LpModel,
+        cancellation: Cancellation,
+        workLimit: Long,
+        pricing: LpPricingOptions,
+    ): LpSolver {
         val solver = RevisedSimplex(model, cancellation, workLimit = workLimit, pricing = pricing)
         if (observed) solver.enableProgressTrace(profile = true)
         return object : LpSolver by solver {
@@ -312,11 +365,24 @@ private class LifecycleFactory(private val observed: Boolean) : LpEngineFactory 
             override fun solvePrimal(warm: Basis?): FloatLpResult? = timed(solver) { solver.solvePrimal(warm) }
         }
     }
-    override fun newPersistentSolver(model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int,
-        iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions): PersistentLpSolver {
-        val solver = RevisedSimplex(model, cancellation, refactorUpdateLimit = refactorUpdateLimit,
-            iterationLimit = iterationLimit, workLimit = workLimit,
-            trackDegeneracy = trackDegeneracy, pricing = pricing)
+    override fun newPersistentSolver(
+        model: LpModel,
+        cancellation: Cancellation,
+        refactorUpdateLimit: Int,
+        iterationLimit: Int,
+        workLimit: Long,
+        trackDegeneracy: Boolean,
+        pricing: LpPricingOptions,
+    ): PersistentLpSolver {
+        val solver = RevisedSimplex(
+            model,
+            cancellation,
+            refactorUpdateLimit = refactorUpdateLimit,
+            iterationLimit = iterationLimit,
+            workLimit = workLimit,
+            trackDegeneracy = trackDegeneracy,
+            pricing = pricing,
+        )
         if (observed) solver.enableProgressTrace(profile = true)
         lastEngine = solver
         return object : PersistentLpSolver by solver {
@@ -336,12 +402,18 @@ private class LifecycleFactory(private val observed: Boolean) : LpEngineFactory 
             val elapsed = started.elapsedNow().inWholeNanoseconds
             floatingNanos += elapsed
             if (observed) {
-                if (invocations.size < 256) invocations.add(buildJsonObject {
-                    put("elapsedNs", elapsed)
-                    put("work", solver.lastMetrics.workOps)
-                    put("termination", solver.lastTermination?.name)
-                    put("trace", solver.progressTrace?.let(::traceJson) ?: JsonNull)
-                }) else droppedInvocations++
+                if (invocations.size < 256) {
+                    invocations.add(
+                        buildJsonObject {
+                            put("elapsedNs", elapsed)
+                            put("work", solver.lastMetrics.workOps)
+                            put("termination", solver.lastTermination?.name)
+                            put("trace", solver.progressTrace?.let(::traceJson) ?: JsonNull)
+                        },
+                    )
+                } else {
+                    droppedInvocations++
+                }
             }
         }
     }
