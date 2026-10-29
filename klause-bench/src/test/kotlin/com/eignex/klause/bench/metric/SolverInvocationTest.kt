@@ -658,6 +658,26 @@ class SolverInvocationTest {
         }
     }
 
+    @Test
+    fun `stdout capture failure after process exit does not claim a forced kill`() {
+        val directory = Files.createTempDirectory("cli-stderr-").toFile()
+        directory.resolve("cli.stdout").mkdir()
+        try {
+            val failure = assertFailsWith<SolverInvocation.Failure> {
+                SolverInvocation.invoke(listOf("fake"), SolverInvocation.Dialect.SMT_LIB,
+                    captureDirectory = directory,
+                    startProcess = { FakeProcess("complete\n".byteInputStream()) })
+            }
+
+            assertNull(failure.result.stats["killed"])
+            assertEquals("0", failure.result.stats["exit"])
+            assertFalse(assertNotNull(failure.result.stderrCapture).processKilled)
+            assertTrue(failure.result.stderrCapture.artifactComplete)
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
     private class FakeProcess(
         private val stderr: InputStream,
         stdout: String = "",

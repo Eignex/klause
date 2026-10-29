@@ -393,7 +393,7 @@ internal object SolverInvocation {
         } finally {
             runCatching { stdoutCapture?.close() }.onFailure { outputFailure = it }
         }
-        if (outputFailure != null) {
+        if (outputFailure != null && process.isAlive) {
             killed.set(true)
             process.descendants().forEach { it.destroyForcibly() }
             process.destroyForcibly()
