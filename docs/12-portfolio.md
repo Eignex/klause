@@ -281,7 +281,13 @@ probes have weight one. The shared half-run probe allowance is split by these we
 so a small numerical proof can complete before opening finite handles. Finite probes
 retain their order and seed positions.
 
-Each appended worker keeps at most four seconds of active search. Numerical segments
+Each appended worker keeps four seconds of active search by default. The opt-in
+`companion-active-ms` sets a positive lifetime of at most 60,000 milliseconds inside
+the unchanged containing solve deadline. `companion-after-incumbent=true` defers both
+companions' queries until the pool accepts a source incumbent. Factory construction
+still belongs to the invocation. These controls change neither fragment admission
+nor the finite recipes, coverage floors, work/allocation ceilings or reseeding rules.
+Numerical segments
 take at most one second and joint-repair segments 250 milliseconds, further limited
 by the containing offer. Each segment caps native work or counted instructions at
 5,000. Before the first incumbent, joint repair is owed 30% of scheduled search time
@@ -438,6 +444,38 @@ qualify; improvement-only workers, auxiliary proof workers and unproductive auxi
 incumbent trials keep their separate policies. Restarting workers and heuristics
 remain under reward selection. Scheduling grants no proof authority and does not
 change incumbent validation or terminal admission.
+
+### Phase progress and cost
+
+`PortfolioProgress` separates feasibility, strict incumbent improvement and accepted
+terminal closure. Segment phases follow selection, except an accepted terminal moves
+its segment to proof closure. Candidate construction and repeated proposals are not
+accepted progress. Closure credit describes the coordinator's source authority,
+not an independently checked proof. `PortfolioRewardPolicy` is an opt-in callback
+on the settled phase, accepted count, native work, inclusive time and contribution
+deltas. It can replace the rate reward while family priors, clause-use credit and
+complete-worker coverage retain their existing owners. The default reward formula
+does not score terminal closure; the callback can inspect that distinct signal.
+Idle downstream-use credit reaches the same callback with zero new work or time.
+
+Each arm retains at most three phase summaries and one lifecycle summary. They
+separate factory construction, handle initialization, pending preparation, verification
+requests (including refuted or indeterminate checks), accepted incumbents and handle
+retirement. Initialization and checking are included in segment time; retirement
+follows settlement. Invocation time includes all these scopes and coordinator costs.
+Source preparation precedes this scope and retains its own invocation accounting;
+source reconstruction, independent checking and process retirement belong to the
+containing source run. Nested times must not be added to invocation time.
+
+`portfolio-progress=true` streams physical lifecycle and settled progress through
+the existing portfolio event sink. A single invocation clock dates creation, first
+offered query (including preparation), retirement and incumbent availability. Reads
+record versions separately from private accepted imports. Numerical consumption
+means its bound supplier actually read the imported incumbent; repair consumption
+means a proposal used the checked imported center. These establish consumption,
+not a useful deduction or objective gain. No trace is retained in the solver.
+Physical events do not make mixed numerical scheduling reproducible; finite
+single-lane work diagnostics keep their separate restrictions.
 
 ### Reseeding and arm failures
 

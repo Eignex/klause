@@ -143,8 +143,13 @@ class Portfolio(
     private val minShares: DoubleArray = DoubleArray(0),
     /** Charged-work scheduling and streaming diagnostics; null preserves elapsed-time scheduling. */
     private val diagnostics: PortfolioDiagnostics? = null,
+    /** Opt-in reward experiment, independent of coverage and admission. Null retains ordinary rewards. */
+    private val rewardPolicy: PortfolioRewardPolicy? = null,
+    /** Physical progress stream; it grants no deterministic scheduling or proof authority. */
+    private val onProgress: ((PortfolioEvent) -> Unit)? = null,
 ) : PortfolioExecutor {
     internal var runTimeSource: TimeSource = TimeSource.Monotonic
+    internal var invocationStarted: TimeMark? = null
     internal var reserveBeforeIncumbentOnly: Boolean = false
     internal var incumbentProbeArms: Set<Int> = emptySet()
     internal var initialProbeWeights: IntArray = intArrayOf()
@@ -225,6 +230,8 @@ class Portfolio(
             val handle = opened.getOrNull()
             val openingFailure = opened.exceptionOrNull()
             if (opening && (handle != null || openingFailure != null)) {
+                claim.initializationNanos = setup.elapsedNow().inWholeNanoseconds
+                claim.initializationWork = handle?.initialWork ?: (openingFailure as? SearchInitializationCancelled)?.work ?: 0L
                 run.log.initialized(
                     arm,
                     setup.elapsedNow().inWholeMilliseconds,
@@ -233,6 +240,7 @@ class Portfolio(
                 )
             }
             val r: SolveResult?
+            if (openingFailure == null) run.locked { run.firstQuery(arm) }
             val failure: Throwable?
             val work: Long
             if (openingFailure != null) {
@@ -269,6 +277,7 @@ class Portfolio(
             val failed = failure != null && failure !is SearchInitializationCancelled
             // A failing arm leaves the others to answer; an unsound one answered wrongly, so it is quarantined too.
             if (failure is UnsoundnessException) claim.fault = failure.message
+            val checkingStarted = TimeSource.Monotonic.markNow()
             val verification = when (r) {
                 is SolveResult.Sat -> verifyWitness(worker, r.assignment, null)
                 is SolveResult.Unsat -> evidenceVerification?.let { verifier ->
@@ -279,6 +288,12 @@ class Portfolio(
                 else -> null
             }
             claim.verified(verification)
+            if (verification != null) claim.checkingNanos += checkingStarted.elapsedNow().inWholeNanoseconds
+            claim.closedProof = !claim.indeterminate && claim.fault == null && r is SolveResult.Unsat
+            if (!claim.indeterminate && claim.fault == null && r is SolveResult.Sat) {
+                claim.improved = true
+                claim.acceptedIncumbents = 1
+            }
             run.locked {
                 run.record(
                     claim,
@@ -365,6 +380,8 @@ class Portfolio(
         if (incumbent.current() != null) {
             run.endFeasibilityCoverage()
             run.incumbentImproved()
+            run.startImprovementPhase()
+            run.incumbentAvailable(incumbent.current()?.version ?: 0)
         }
         val pending = MutableList<Candidate<MinimizeResult.WithSample, V>?>(workers.size) { null }
         val start = TimeSource.Monotonic.markNow()
@@ -386,8 +403,10 @@ class Portfolio(
             if (!incumbents.isImproving(candidate.objective)) return
             val worker = workers[claim.arm]
             if (incumbent.offer(r.sample, candidate.objective) !is Publication.Installed) return
+            claim.acceptedIncumbents++
             run.endFeasibilityCoverage()
             run.incumbentImproved()
+            run.incumbentAvailable(incumbent.current()?.version ?: 0)
             try {
                 acceptedVersion++
                 onAccepted?.invoke(AcceptedPortfolioIncumbent(acceptedVersion, r.sample, candidate.objective))
@@ -419,6 +438,7 @@ class Portfolio(
             val started = TimeSource.Monotonic.markNow()
             val verification = verifyWitness(workers[claim.arm], r.sample, r.objective)
             claim.verified(verification)
+            claim.checkingNanos += started.elapsedNow().inWholeNanoseconds
             if (verification !is Verification.Accepted) return
             claim.checked(started.elapsedNow())
             run.locked { install(claim, candidate) }
@@ -449,6 +469,9 @@ class Portfolio(
             val workerBound = {
                 val cutoff = readBound()
                 observedCutoffs[arm] = cutoff.takeIf(Double::isFinite)
+                incumbent.current()?.let { current ->
+                    run.locked { run.lifecycle(arm, PortfolioLifecycleKind.INCUMBENT_READ, current.version) }
+                }
                 cutoff
             }
             val setup = TimeSource.Monotonic.markNow()
@@ -459,6 +482,8 @@ class Portfolio(
             val handle = opened.getOrNull()
             val openingFailure = opened.exceptionOrNull()
             if (opening && (handle != null || openingFailure != null)) {
+                claim.initializationNanos = setup.elapsedNow().inWholeNanoseconds
+                claim.initializationWork = handle?.initialWork ?: (openingFailure as? SearchInitializationCancelled)?.work ?: 0L
                 run.log.initialized(
                     arm,
                     setup.elapsedNow().inWholeMilliseconds,
@@ -467,6 +492,7 @@ class Portfolio(
                 )
             }
             claim.preparing = handle?.preparationPending == true
+            if (openingFailure == null) run.locked { run.firstQuery(arm) }
             var terminal: MinimizeResult? = null
             val failure: Throwable?
             val work: Long
@@ -546,6 +572,7 @@ class Portfolio(
                 else -> null
             }
             if (proofKind != null) {
+                val checkingStarted = TimeSource.Monotonic.markNow()
                 val completed = terminal?.let { actual -> worker.evidenceInvocation?.let { invocation ->
                     CompletedEngineResult.Minimize(invocation, actual, executionCutoff = observedCutoffs[arm])
                 } }
@@ -553,13 +580,19 @@ class Portfolio(
                     if (completed != null) verifier.proof(worker, proofKind, completed)
                     else Verification.Indeterminate("worker completion has no runtime invocation")
                 })
+                claim.checkingNanos += checkingStarted.elapsedNow().inWholeNanoseconds
             }
             claim.trialTime = evaluationStarted.elapsedNow()
             run.locked {
+                val checkingStarted = TimeSource.Monotonic.markNow()
                 val publication = if (!terminalPublished && !failed && claim.fault == null) {
                     terminalCheck?.check(worker, handle)
                 } else null
                 claim.verified(publication?.verification)
+                if (publication != null) claim.checkingNanos += checkingStarted.elapsedNow().inWholeNanoseconds
+                claim.closedProof = !claim.indeterminate && claim.fault == null && !failed &&
+                    (PortfolioReduction.isExhausted(terminal) || terminal is MinimizeResult.Unbounded ||
+                        publication?.verification is Verification.Accepted)
                 val stats = handle?.stats ?: (failure as? SearchInitializationCancelled)?.stats ?: terminal?.stats
                 run.record(
                     claim,
@@ -681,6 +714,12 @@ class Portfolio(
         var indeterminate = false
         var verificationWork = 0L
             private set
+        var checkingNanos = 0L
+        var closedProof = false
+        var acceptedIncumbents = 0L
+        var initializationNanos = 0L
+        var initializationWork = 0L
+        var selectedPhase = PortfolioPhase.FEASIBILITY
 
         fun verified(verdict: Verification<*, *>?) {
             if (verdict != null && verificationWork < Long.MAX_VALUE) verificationWork++
@@ -719,6 +758,7 @@ class Portfolio(
     @Suppress("TooGenericExceptionCaught")
     private inner class Schedule<H : AutoCloseable>(cancellation: Cancellation, val handles: Array<H?>) {
         private val started = runTimeSource.markNow()
+        private val epoch = invocationStarted ?: started
         private val lock = (if (lanes > 1) Concurrency.Strict else Concurrency.None).lock()
         private val stopped = AtomicBoolean(false)
 
@@ -741,6 +781,41 @@ class Portfolio(
         private val proofProgress = proofLedger?.let { ProgressCredit(workers.size) }
         private val progress = ProgressCredit(workers.size)
         val log = ScheduleLog(workers)
+        private val progressLog = PortfolioProgressLog(workers)
+        private val queried = BooleanArray(workers.size)
+        private val recorded = BooleanArray(workers.size)
+        private val readVersions = LongArray(workers.size) { -1L }
+        private var initialIncumbentVersion = 0L
+        private var executing = false
+
+        fun lifecycle(arm: Int, kind: PortfolioLifecycleKind, version: Long = 0) {
+            if (kind == PortfolioLifecycleKind.INCUMBENT_READ) {
+                if (version == readVersions[arm]) return
+                readVersions[arm] = version
+            }
+            val nanos = epoch.elapsedNow().inWholeNanoseconds
+            progressLog.observe(arm, kind, nanos)
+            val observedVersion = if (version == 0L &&
+                (kind == PortfolioLifecycleKind.INCUMBENT_IMPORTED || kind == PortfolioLifecycleKind.INCUMBENT_CONSUMED)
+            ) readVersions[arm].coerceAtLeast(0L) else version
+            onProgress?.invoke(PortfolioEvent.Lifecycle(arm, workers[arm].label, kind, nanos, observedVersion))
+        }
+
+        fun firstQuery(arm: Int) {
+            if (queried[arm]) return
+            queried[arm] = true
+            lifecycle(arm, PortfolioLifecycleKind.FIRST_QUERY)
+        }
+
+        fun incumbentAvailable(version: Long) {
+            if (!executing) {
+                initialIncumbentVersion = version
+                return
+            }
+            for (arm in workers.indices) if (!retired[arm]) {
+                lifecycle(arm, PortfolioLifecycleKind.INCUMBENT_AVAILABLE, version)
+            }
+        }
 
         private val completedStats = arrayOfNulls<SolveStats>(workers.size)
         private val liveStats = arrayOfNulls<SolveStats>(workers.size)
@@ -818,26 +893,39 @@ class Portfolio(
          * still open and rethrow the first failure a lane hit, a close failure suppressed into it.
          */
         fun execute(segment: (Claim) -> Unit) {
-            diagnostics?.onEvent?.invoke(PortfolioEvent.Started(diagnostics.seed, diagnostics.workLimit))
-            for ((arm, worker) in workers.withIndex()) if (diagnostics != null) {
-                worker.sharingMeter?.onImport = { channel, cursor, count ->
-                    diagnostics.onEvent(PortfolioEvent.Imported(arm, channel, cursor, count))
-                }
-            }
             try {
+                for ((arm, worker) in workers.withIndex()) {
+                    worker.onLifecycle = { kind, version -> locked { lifecycle(arm, kind, version) } }
+                    onProgress?.invoke(PortfolioEvent.Lifecycle(arm, worker.label, PortfolioLifecycleKind.CREATED,
+                        worker.createdNanos, 0))
+                }
+                executing = true
+                if (initialIncumbentVersion > 0) incumbentAvailable(initialIncumbentVersion)
+                diagnostics?.onEvent?.invoke(PortfolioEvent.Started(diagnostics.seed, diagnostics.workLimit))
+                for ((arm, worker) in workers.withIndex()) if (diagnostics != null) {
+                    worker.sharingMeter?.onImport = { channel, cursor, count ->
+                        diagnostics.onEvent(PortfolioEvent.Imported(arm, channel, cursor, count))
+                    }
+                }
                 parallelRun(List(lanes) { index -> { lane(index, segment) } })
-                closeAll(laneFailure)
                 laneFailure?.let { throw it }
             } finally {
-                for (worker in workers) worker.sharingMeter?.onImport = null
-                diagnostics?.let { diagnostic ->
-                    diagnostic.onEvent(PortfolioEvent.Finished(when {
+                try {
+                    closeAll(laneFailure)
+                } finally {
+                    for (worker in workers) {
+                        worker.sharingMeter?.onImport = null
+                        worker.onLifecycle = null
+                    }
+                    val finished = PortfolioEvent.Finished(when {
                         laneFailure != null -> "failure"
                         stopped.load() && remaining > 0 -> "completed"
                         remaining == 0 -> "retired"
-                        chargedWork >= diagnostic.workLimit -> "work-limit"
+                        workLimitReached -> "work-limit"
                         else -> "external-stop"
-                    }, chargedWork))
+                    }, chargedWork)
+                    diagnostics?.onEvent?.invoke(finished)
+                    onProgress?.invoke(finished)
                 }
             }
         }
@@ -882,7 +970,7 @@ class Portfolio(
                 for (arm in firstWitnessArms) if (!busy[arm]) retire(arm)
             }
             if (remaining == 0) return@locked null
-            val dedicated = diagnostics == null && lanes == workers.size
+            val dedicated = diagnostics == null && lanes == workers.size && workers.none { it.startAfterIncumbent }
             val eligible = eligibleArms()
             val probe = if (dedicated) null else eligible.filter { !probed[it] && !busy[it] && !retired[it] }
                 .minByOrNull { if (workers[it].auxiliaryProof) 1 else 0 }
@@ -933,14 +1021,16 @@ class Portfolio(
                 preparationRevisit = revisiting,
                 segment = segmentIndex++,
             ).also { claim ->
+                claim.selectedPhase = if (feasibilityComplete) PortfolioPhase.IMPROVEMENT else PortfolioPhase.FEASIBILITY
                 diagnostics?.onEvent?.invoke(PortfolioEvent.Selected(claim.segment, arm, workers[arm].label,
                     claim.sliceWork))
             }
         }
 
         private fun eligibleArms(): List<Int> {
-            val first = workers.indices.filter { !workers[it].improvementOnly }
-            val eligible = if (improving || first.all { retired[it] }) workers.indices.toList() else first
+            val available = workers.indices.filter { !workers[it].startAfterIncumbent || feasibilityComplete }
+            val first = available.filter { !workers[it].improvementOnly }
+            val eligible = if (improving || first.all { retired[it] }) available else first
             val complete = first.filter { workers[it].family == ArmFamily.Backtrack && !workers[it].auxiliaryProof }
             val covered = if (proofStarted) {
                 val active = complete.filter { !retired[it] }
@@ -1085,6 +1175,7 @@ class Portfolio(
         ) {
             val arm = claim.arm
             val account = ledgerFor(arm)
+            if (claim.closedProof) account.credit(arm, Signal.ProofClosure, 1.0)
             siblingWork[arm] += minOf(work.coerceAtLeast(0L), Long.MAX_VALUE - siblingWork[arm])
             val proofWork = workers[arm].auxiliaryProof && work > 0L
             if ((!proofStarted && claim.improved) || proofWork) siblingWork.fill(0L)
@@ -1108,8 +1199,21 @@ class Portfolio(
                 if (origin in workers.indices) ledgerFor(origin).credit(origin, kind.signal, amount)
             }
             val paidWork = if (diagnostics == null) work else charge
+            val credit = account.pendingCreditOf(arm)
             val earned = account.settle(arm, paidWork)
-            val reward = if (failed) 0.0 else earned
+            val settled = PortfolioProgress(arm,
+                if (claim.closedProof) PortfolioPhase.PROOF_CLOSURE else claim.selectedPhase,
+                work, claim.started.elapsedNow().inWholeNanoseconds, claim.verificationWork,
+                claim.improved, failed, credit, earned,
+                acceptedIncumbents = claim.acceptedIncumbents, refuted = claim.fault != null,
+                checkingNanos = claim.checkingNanos, initializationNanos = claim.initializationNanos,
+                initializationWork = claim.initializationWork,
+                constructionNanos = if (!recorded[arm]) workers[arm].constructionNanos else 0,
+                preparing = claim.preparing)
+            recorded[arm] = true
+            progressLog.record(settled, claim.checkingNanos)
+            onProgress?.invoke(PortfolioEvent.Progressed(settled))
+            val reward = if (failed || claim.fault != null) 0.0 else rewardFor(settled)
             if (reward > 0.0 || claim.improved) productive[arm] = true
             val unproductiveTrial = claim.hadIncumbent && arm in incumbentProbeArms && !productive[arm] &&
                 !failed && claim.fault == null
@@ -1139,7 +1243,10 @@ class Portfolio(
             for (other in workers.indices) {
                 val idleAccount = ledgerFor(other)
                 if (other == arm || busy[other] || retired[other] || !idleAccount.hasPending(other)) continue
-                val idleReward = idleAccount.settleIdle(other, claim.sliceWork)
+                val idleCredit = idleAccount.pendingCreditOf(other)
+                val idleReward = rewardFor(PortfolioProgress(other,
+                    if (feasibilityComplete) PortfolioPhase.IMPROVEMENT else PortfolioPhase.FEASIBILITY,
+                    0, 0, 0, false, false, idleCredit, idleAccount.settleIdle(other, claim.sliceWork)))
                 if (idleReward > 0.0) productive[other] = true
                 if (!workers[other].auxiliaryProof) {
                     bandit.update(other, idleReward, 1.0)
@@ -1176,6 +1283,7 @@ class Portfolio(
         fun retire(arm: Int) {
             if (retired[arm]) return
             retired[arm] = true
+            lifecycle(arm, PortfolioLifecycleKind.RETIRED)
             diagnostics?.onEvent?.invoke(PortfolioEvent.Retired(arm))
             remaining--
             closeHandle(arm)
@@ -1188,16 +1296,21 @@ class Portfolio(
                 .fold(SolveStats.EMPTY) { acc, snapshot -> acc.mergedWith(snapshot) }
             return stats.copy(
                 run = stats.run.copy(wallMs = started.elapsedNow().inWholeMilliseconds),
-                portfolio = log.stats(ledger, proofLedger ?: ledger).copy(
+                portfolio = log.stats(ledger, proofLedger ?: ledger).let { snapshot -> snapshot.copy(
+                    arms = snapshot.arms.mapIndexed { arm, value -> value.copy(
+                        phases = progressLog.phases(arm), lifecycle = progressLog.lifecycle(arm)) },
                     profile = profile, reseedStaleThreshold = reseedStaleThreshold,
                     baseSliceWork = baseSliceWork, maxSliceWork = maxSliceWork, sliceGrowth = sliceGrowth,
-                ),
+                    invocationNanos = epoch.elapsedNow().inWholeNanoseconds,
+                ) },
             )
         }
 
         fun closeHandle(arm: Int) {
             val handle = handles[arm] ?: return
+            val closingStarted = runTimeSource.markNow()
             val closed = runCatching { handle.close() }
+            progressLog.disposed(arm, closingStarted.elapsedNow().inWholeNanoseconds)
             val final = runCatching {
                 when (handle) {
                     is ResumableSearch -> handle.stats
@@ -1222,7 +1335,11 @@ class Portfolio(
             var closeFailure: Throwable? = null
             for (i in handles.indices) {
                 try {
-                    closeHandle(i)
+                    try {
+                        if (!retired[i]) lifecycle(i, PortfolioLifecycleKind.RETIRED)
+                    } finally {
+                        closeHandle(i)
+                    }
                 } catch (failure: Throwable) {
                     closeFailure?.addSuppressed(failure) ?: run { closeFailure = failure }
                 }
@@ -1230,6 +1347,11 @@ class Portfolio(
             }
             closeFailure?.let { failure -> primaryFailure?.addSuppressed(failure) ?: throw failure }
         }
+
+        private fun rewardFor(progress: PortfolioProgress): Double =
+            (rewardPolicy?.reward(progress) ?: progress.ordinaryReward).also {
+                require(it.isFinite() && it in 0.0..1.0) { "portfolio reward must be finite and in [0, 1]" }
+            }
     }
 
     /** The instruction allowance a counted local-search segment of [work] units receives. */
@@ -1347,6 +1469,8 @@ class Portfolio(
             minShares: DoubleArray = DoubleArray(0),
             maxSliceWork: Long = 150_000,
             diagnostics: PortfolioDiagnostics? = null,
+            rewardPolicy: PortfolioRewardPolicy? = null,
+            onProgress: ((PortfolioEvent) -> Unit)? = null,
         ): Portfolio = Portfolio(
             workers = workers,
             bandit = DiscountedThompson(workers.size, Random(diagnostics?.seed ?: seed), halfLife),
@@ -1364,6 +1488,8 @@ class Portfolio(
             onFault = onFault,
             minShares = minShares,
             diagnostics = diagnostics,
+            rewardPolicy = rewardPolicy,
+            onProgress = onProgress,
         )
     }
 }

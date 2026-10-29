@@ -31,7 +31,7 @@ sealed interface SearchEvent {
         val selected: Boolean = false,
     ) : SearchEvent
 
-    /** A logical event from opt-in single-lane portfolio diagnostics. */
+    /** An opt-in logical work-schedule event or physical phase/lifecycle observation. */
     data class PortfolioDiagnostic(
         /** Logical schedule event. */
         val event: PortfolioEvent,

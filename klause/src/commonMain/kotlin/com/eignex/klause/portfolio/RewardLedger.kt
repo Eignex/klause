@@ -61,6 +61,10 @@ internal class RewardLedger(
     /** Whether [arm] holds credit no settle has paid out yet. */
     fun hasPending(arm: Int): Boolean = pending.any { it[arm] > 0.0 }
 
+    fun pendingCreditOf(arm: Int): Map<String, Double> =
+        Signal.entries.filter { pending[it.ordinal][arm] > 0.0 }
+            .associate { it.name to pending[it.ordinal][arm] }
+
     /**
      * Settle the credit [arm] earned while it was not running, scored as if over [overWork] of its own work. No work
      * is charged: the credit came from other arms using what this one shared.
@@ -126,6 +130,9 @@ internal enum class Signal {
 
     /** Uses other arms made of this arm's shared root bounds. */
     BoundUses,
+
+    /** A source-authorized terminal accepted by the coordinator. */
+    ProofClosure,
 }
 
 /** What a counted arm, local search or ALNS, earns: it finds and improves solutions and lowers violation. */

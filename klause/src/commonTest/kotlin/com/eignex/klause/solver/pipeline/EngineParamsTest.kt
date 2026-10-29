@@ -16,6 +16,24 @@ import kotlin.test.assertTrue
 
 class EngineParamsTest {
     @Test
+    fun `companion timing controls should remain separate from admission`() {
+        val selected = scenario(1, listOf("companion-after-incumbent=true", "companion-active-ms=7000",
+            "portfolio-progress=true"))
+
+        assertTrue(selected.companionAfterIncumbent)
+        assertEquals(7_000L, selected.companionActiveMillis)
+        assertTrue(selected.reportPortfolioProgress)
+        assertEquals(false, selected.companionIntegers)
+    }
+
+    @Test
+    fun `companion lifetime should require a bounded positive value`() {
+        for (value in listOf("0", "-1", "60001")) {
+            assertFailsWith<PipelineConfigException> { scenario(1, listOf("companion-active-ms=$value")) }
+        }
+    }
+
+    @Test
     fun `companion trial should retain an explicitly selected default arm count`() {
         val selected = scenario(1, listOf("arms=6", "companion-integers=true"))
 

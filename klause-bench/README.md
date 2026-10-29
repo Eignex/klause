@@ -750,6 +750,20 @@ negatives remain in [9134](https://lab.eignex.com/jobs/9134) and
 
 ## Worker admission qualification
 
+For phase/lifetime diagnosis use `param.portfolio-progress=true` to retain physical
+creation/query/retirement, incumbent availability/read/import/consumption and settled
+phase/cost events in CLI stderr. `armPhase.*`, `armLifecycle.*` and
+`portfolioInvocationNs` statistics retain bounded summaries even without streaming.
+Compare `param.companion-after-incumbent=true` or a separately varied
+`param.companion-active-ms=N` with the same admission, rewards, coverage, source,
+seed, preparation and containing core-time allowance. The default lifetime is
+4,000 ms; changing it does not extend the outer deadline or LP allocation/work limits.
+Keep reward, coverage and admission experiments separate. A private incumbent read
+is not an accepted import, and consumption is not an improvement. F1's finite work
+schedule does not reproduce mixed numerical elapsed schedules. Full-trace claims
+require the capture's complete artifact marker; source outcome claims require the
+corresponding independent checker receipts.
+
 `param.companion-integers=true` trials bounded general-integer/continuous numerical
 companions on the ordinary finite route. `false` retains the binary-only gate.
 Both settings capture `admission` lines with fragment, objective, proof authority,

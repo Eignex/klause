@@ -73,6 +73,20 @@ class FiniteNumericalCompanionsTest {
     }
 
     @Test
+    fun `companion lifetime should reach admission costs without changing its fragment`() {
+        val model = Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val scenario = PortfolioScenario.sequential(Kind.COP).copy(
+            companionAfterIncumbent = true, companionActiveMillis = 7_000)
+
+        val eligibility = finiteNumericalCompanionEligibility(model, scenario, objective, TheoryParams())
+
+        assertEquals(listOf("binary-integers-required"), eligibility.declines)
+        assertEquals(7_000L, eligibility.requirements.construction.activeMillis)
+    }
+
+    @Test
     fun `integrated companions should report distinct proof authority and preserve finite workers`() {
         val model = Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyArray(), numRealVars = 1,
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()

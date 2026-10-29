@@ -38,6 +38,23 @@ class LinearAuthorityInvocationTest {
     )
 
     @Test
+    fun `an accepted external incumbent should reach the retained bound consumer`() {
+        val source = SourceProofContext(scope, setOf(real), mapOf(
+            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ofLong(2))),
+        ), mapOf(real to BigFraction.ONE))
+        val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0), exactReals = listOf(BigFraction.ONE))
+        val events = mutableListOf<String>()
+
+        LinearAuthorityInvocation(source, TheoryParams(), external = { point }, boundOrdered = true,
+            onIncumbentImport = { events += "import" }, onIncumbentUse = { events += "use" }).use {
+            it.run { _, _ -> }
+        }
+
+        assertEquals(listOf("import", "use"), events)
+    }
+
+    @Test
     fun `opt in active rows should close a contradiction before any Boolean decision`() {
         val source = SourceProofContext(scope, setOf(real, bool), mapOf(
             "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
