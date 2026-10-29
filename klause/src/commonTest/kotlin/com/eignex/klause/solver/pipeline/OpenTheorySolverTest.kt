@@ -4,6 +4,7 @@ import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
@@ -14,6 +15,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.Term
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.RebuildStep
@@ -47,6 +49,8 @@ class OpenTheorySolverTest {
     @Test
     fun `incremental ordinary linear traversal should publish a strict guard consequence`() {
         val model = Problem(2, 0, emptyArray(), arrayOf(
+            ExactLinear.of(intArrayOf(Term.real(0), Term.real(1)),
+                listOf(BigFraction.ofLong(2), BigFraction.ofLong(3)), LinearOp.LE, BigFraction.ONE),
             ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
                 doubleArrayOf(2.0, -3.0), LinearOp.LE, 0.0, strict = true),
         ), numRealVars = 2, realLower = DoubleArray(2), realUpper = DoubleArray(2))
