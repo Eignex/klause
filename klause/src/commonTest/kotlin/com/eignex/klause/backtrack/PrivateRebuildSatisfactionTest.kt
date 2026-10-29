@@ -82,4 +82,23 @@ class PrivateRebuildSatisfactionTest {
         assertEquals(false, accepted.assignment.boolValue(0))
         assertNull(result.stats.search.learning["privateRebuildAttempts"])
     }
+
+    @Test
+    fun `cancellation after private opening should release the generation without publishing a point`() {
+        val source = Problem(3, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(0, 2)), Clause(intArrayOf(1, 4)),
+        )).bake()
+        val search = BacktrackSolver(source).resumableSolve(BacktrackParams(privateRebuildWork = 65_536L))
+        val cancellation = Cancellation {
+            (search.stats.search.learning["privateRebuildConsumers"] ?: 0L) > 0L
+        }
+
+        val result = search.use { it.runSlice(cancellation, Long.MAX_VALUE, -1L) }
+
+        val stopped = assertIs<SolveResult.Unknown>(result)
+        assertEquals(1L, stopped.stats.search.learning["privateRebuildConsumers"])
+        assertEquals(1L, stopped.stats.search.learning["privateRebuildRetired"])
+        assertNull(stopped.stats.search.learning["privateRebuildSourceAccepted"])
+        assertEquals(stopped, search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L))
+    }
 }
