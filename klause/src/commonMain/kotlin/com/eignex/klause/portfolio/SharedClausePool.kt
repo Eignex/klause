@@ -151,6 +151,29 @@ internal class SharedClausePool(
         }
     }
 
+    internal fun drainSinceFunded(
+        cursor: Long,
+        cancelled: () -> Boolean,
+        charge: () -> Unit,
+    ): Drained? = lock.withLock {
+        val from = if (generationOf(cursor) == generation) indexOf(cursor) else 0
+        val size = store.size
+        val count = (size - from).coerceAtLeast(0)
+        if (count.toLong() * 4L + 3L > reclamationWork || count.toLong() * 2L > reclamationScratchEntries) {
+            return@withLock null
+        }
+        val budget = Budget(reclamationWork, reclamationScratchEntries, cancelled, charge)
+        try {
+            budget.reserve(count.toLong() * 2L)
+            val clauses = List(count) { budget.step(); store.clause(from + it) }
+            val origins = IntArray(count) { budget.step(); store.origins[from + it] }
+            budget.step()
+            Drained(clauses, origins, cursorOf(generation, size))
+        } catch (_: Stopped) {
+            null
+        }
+    }
+
     private fun exceedsLimit(clause: SharedClause, budget: Budget): Boolean {
         val limit = softLimitBytes ?: return false
         val capacity = if (store.size == store.capacity) nextCapacity() else store.capacity
@@ -454,7 +477,13 @@ internal class PoolClauseExchange(
 
     override fun onRestart(session: PropagationSession) = metered {
         retainSession(session)
-        val drained = pool.drainSince(cursor)
+        val drained = if (pool.softLimitBytes == null) pool.drainSince(cursor) else pool.drainSinceFunded(
+            cursor, { session.cancelRequested }, { session.chargeSharingWork(1L) },
+        )
+        if (drained == null) {
+            meter?.clauseCount("drainPreparationDeclined", 1L)
+            return@metered
+        }
         cursor = drained.cursor
         var imported = 0
         var duplicates = 0
@@ -548,7 +577,8 @@ internal class PoolClauseExchange(
     /** Publish this arm's not-yet-seen glue clauses; safe at any decision level (read-only on the
      *  trail). The `seen` set guards against re-export within a session; the pool de-dups globally. */
     private fun export(session: PropagationSession) {
-        val fresh = session.exportGlueClauses(maxLbd, maxLen, skipPermanent).filter { admit(it.key, session) == true }
+        val candidates = exportCandidates(session) ?: return
+        val fresh = candidates.filter { admit(it.key, session) == true }
         val published = if (fresh.isEmpty()) 0 else pool.publish(
             fresh,
             origin,
@@ -556,6 +586,28 @@ internal class PoolClauseExchange(
             charge = { session.chargeSharingWork(1L) },
         )
         meter?.exported(SharingChannel.Clauses, published)
+    }
+
+    private fun exportCandidates(session: PropagationSession): List<SharedClause>? {
+        if (pool.softLimitBytes == null) return session.exportGlueClauses(maxLbd, maxLen, skipPermanent)
+        val count = session.learnedClauseCount.toLong()
+        val width = maxLen.coerceAtLeast(0).toLong() + 1L
+        val workLimit = pool.reclamationWork
+        val scratchLimit = pool.reclamationScratchEntries.toLong()
+        val workFits = width <= workLimit / 32L / width
+        val perClause = if (workFits) width * width * 32L else Long.MAX_VALUE
+        if (!workFits || count > workLimit / perClause || count > scratchLimit / (width * 8L + 2L)) {
+            meter?.clauseCount("exportPreparationDeclined", 1L)
+            return null
+        }
+        session.chargeSharingWork(count * perClause)
+        if (session.cancelRequested) {
+            meter?.clauseCount("exportPreparationDeclined", 1L)
+            return null
+        }
+        val candidates = session.exportGlueClausesBounded(maxLbd, maxLen, skipPermanent) { session.cancelRequested }
+        if (candidates == null) meter?.clauseCount("exportPreparationDeclined", 1L)
+        return candidates
     }
 
     private inline fun metered(crossinline block: () -> Unit) {

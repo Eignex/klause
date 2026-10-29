@@ -421,6 +421,7 @@ internal class ResumableMinimize(
                     params.clauseExchange?.onSearchClose(it.session)
                 } finally {
                     it.session.sharedLearningMemory = null
+                    it.session.sharedLearningPosition = null
                 }
             })
             sink.search.propagationWork = { it.session.work }
@@ -472,6 +473,7 @@ internal class ResumableMinimize(
         )
         if (params.clauseExchange != null || params.learnedMemoryBytes != null) {
             session.sharedLearningMemory = searchSession::retainedLearningMemory
+            session.sharedLearningPosition = searchSession::retainedLearningPosition
         }
         yield(Unit)
         val seeded = if (deferredInstallation) {

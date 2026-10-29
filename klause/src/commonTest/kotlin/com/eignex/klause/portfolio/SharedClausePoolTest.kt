@@ -640,4 +640,75 @@ class SharedClausePoolTest {
         assertEquals(before.clauses, pool.drainSince(0).clauses)
         assertEquals(result.beforeBytes, result.afterBytes)
     }
+
+    @Test
+    fun `unfunded drain preparation leaves the private filter empty`() {
+        for ((work, scratch) in listOf(0L to 1000, 1000L to 0)) {
+            val pool = SharedClausePool(softLimitBytes = 1000L, reclamationWork = work,
+                reclamationScratchEntries = scratch, measureMemory = true)
+            pool.publish(listOf(boolClause(0, 1)), origin = 2, maxWork = 10_000L, maxScratchEntries = 1000)
+            val meter = SharingMeter()
+            val exchange = PoolClauseExchange(pool, origin = 1, meter = meter)
+            val session = PropagationSession(Problem(2, 0, emptyArray(), emptyList()))
+
+            exchange.onSearchStart(session)
+            exchange.onSearchEnd(session)
+
+            assertEquals(0, session.learnedClauseCount)
+            assertEquals(1L, meter.snapshot().clauses.getValue("drainPreparationDeclined"))
+            assertEquals(0L, meter.snapshot().clauses.getValue("seenKeys"))
+            assertEquals(0L, meter.snapshot().clauses.getValue("seenCapacityBytes"))
+        }
+    }
+
+    @Test
+    fun `cancelled drain preparation preserves the cursor for a resumed import`() {
+        val pool = SharedClausePool(softLimitBytes = 1000L)
+        pool.publish(listOf(boolClause(0, 1)), origin = 2)
+        var cancelled = false
+        val session = PropagationSession(Problem(2, 0, emptyArray(), emptyList()),
+            cancellation = Cancellation { cancelled })
+        val exchange = PoolClauseExchange(pool, origin = 1)
+        cancelled = true
+        exchange.onSearchStart(session)
+        assertEquals(0, session.learnedClauseCount)
+
+        cancelled = false
+        exchange.onSearchStart(session)
+
+        assertEquals(1, session.learnedClauseCount)
+    }
+
+    @Test
+    fun `unfunded export preparation retains no private publication keys`() {
+        for ((work, scratch) in listOf(1000L to 1000, 10_000L to 0)) {
+            val pool = SharedClausePool(softLimitBytes = 1000L, reclamationWork = work,
+                reclamationScratchEntries = scratch, measureMemory = true)
+            val meter = SharingMeter()
+            val exchange = PoolClauseExchange(pool, origin = 1, meter = meter)
+            val session = PropagationSession(Problem(2, 0, emptyArray(), emptyList()))
+            session.addLearnedClause(Clause(intArrayOf(0, 2)), 1)
+
+            exchange.onSearchEnd(session)
+
+            assertEquals(1L, meter.snapshot().clauses.getValue("exportPreparationDeclined"))
+            assertEquals(0L, meter.snapshot().clauses.getValue("seenKeys"))
+            assertEquals(0L, meter.snapshot().clauses.getValue("seenCapacityBytes"))
+            assertTrue(pool.drainSince(0).clauses.isEmpty())
+        }
+    }
+
+    @Test
+    fun `bounded export rejects oversized native clauses before portable publication`() {
+        val pool = SharedClausePool(softLimitBytes = 1000L, shareMaxLen = 2)
+        val exchange = PoolClauseExchange(pool)
+        val session = PropagationSession(Problem(128, 0, emptyArray(), emptyList()), nativeSat = true)
+        session.addLearnedClause(Clause(boolClause(0, 1, len = 128).boolLits), 1)
+        val before = session.work
+
+        exchange.onSearchEnd(session)
+
+        assertEquals(288L, session.work - before)
+        assertTrue(pool.drainSince(0).clauses.isEmpty())
+    }
 }

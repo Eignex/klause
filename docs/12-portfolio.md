@@ -201,6 +201,12 @@ insufficient bytes, work, scratch or cancellation declines the optional import o
 export and increments `seenDeclined`. Declines are separate from duplicates. A full
 filter keeps its existing keys through pool generation changes, preventing repeated
 imports into the retained native store. Close or a fresh session releases its arrays.
+Optional exchange preparation also funds the complete drain suffix before copying
+references or advancing its cursor. Export preparation admits the full candidate
+scan, portable payloads and content-key construction against conservative work and
+scratch bounds before constructing them. Length checks precede native literal
+copies. Unfunded or cancelled preparation declines that exchange attempt. A declined
+drain keeps its cursor; a declined export admits no publication keys.
 
 The pool's optional byte limit includes payload and private capacity. Its protected
 floor is zero: eviction removes optional shares while imported reasons and a

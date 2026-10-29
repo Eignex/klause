@@ -10,6 +10,35 @@ import kotlin.test.assertTrue
 
 class SearchLearningTest {
     @Test
+    fun `one work resumed slices should progress after cancelled optional reclamation`() {
+        var limited = false
+        var spent = 0L
+        val cancellation = object : Cancellation {
+            override fun isCancelled(): Boolean = limited && spent >= 1L
+            override fun workMeter(): WorkMeter = WorkMeter { spent += it }
+        }
+        val session = SearchSession(emptyList(), cancellation = cancellation,
+            learnedDb = SearchLearnedDbParams(glueLbd = 0, softLimitBytes = 0L))
+        session.initialize()
+        session.learn(SearchExplanation(intArrayOf(1)))
+        val run = session.openRun(1, lifecycle = object : SearchRunLifecycle {
+            override fun onCancellation(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Pause
+        })
+        limited = true
+        var event: SearchRunEvent = SearchRunEvent.Paused
+
+        repeat(4) {
+            if (event is SearchRunEvent.Paused) {
+                spent = 0L
+                event = run.next()
+            }
+        }
+
+        assertIs<SearchRunEvent.Satisfied>(event)
+        assertEquals(false, session.boolValue(0))
+    }
+
+    @Test
     fun `unchanged shared ownership should reuse its completed reclamation attempt`() {
         var charged = 0L
         val cancellation = object : Cancellation {

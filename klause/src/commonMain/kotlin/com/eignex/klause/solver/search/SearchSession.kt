@@ -65,6 +65,7 @@ class SearchSession(
     internal var learningReclamation: SharedLearningReclamation? = null
         private set
     private var learningReclamationPosition: LearningMemoryPosition? = null
+    private var deferAutomaticReclamation = false
 
     private data class LearningMemoryPosition(
         val learning: Long,
@@ -78,6 +79,7 @@ class SearchSession(
         learning.ownershipRevision, learning.storeOwnershipRevision, learning.watchPosition,
         trail.ownershipRevision, trail.pendingAssertions.ownershipRevision,
     )
+    internal fun retainedLearningPosition(): Any = learningMemoryPosition()
     private var selfPublicationsPending = false
     private var activeComponent: SearchComponent? = null
     private var conflictResolver: SearchConflictResolver? = null
@@ -857,6 +859,7 @@ class SearchSession(
         trail.releaseLearning()
         learningReclamation = null
         learningReclamationPosition = null
+        deferAutomaticReclamation = false
     }
 
     /** Retain a sound clause-form explanation for subsequent propagation. */
@@ -911,14 +914,18 @@ class SearchSession(
     private fun propagateLearnedClauses(): ComponentResult {
         conflictOwner = null
         if (learnedDbParams.softLimitBytes != null) {
-            reclaimLearningMemory()
+            reclaimLearningMemory(automatic = true)
             if (cancelled()) return ComponentResult.Indeterminate
         }
         return learning.propagate(this, trail.boolTrail)
     }
 
-    internal fun reclaimLearningMemory(): SharedLearningReclamation? {
+    internal fun reclaimLearningMemory(automatic: Boolean = false): SharedLearningReclamation? {
         val limit = learnedDbParams.softLimitBytes ?: return null
+        if (automatic && deferAutomaticReclamation) {
+            deferAutomaticReclamation = false
+            return learningReclamation
+        }
         if (learningReclamationPosition == learningMemoryPosition()) return learningReclamation
         val sample = SharingMemoryObservation(
             learnedDbParams.reclamationWork,
@@ -948,6 +955,10 @@ class SearchSession(
         learningReclamation = result
         if (result.status != SharedLearningReclamationStatus.Cancelled) {
             learningReclamationPosition = learningMemoryPosition()
+            deferAutomaticReclamation = false
+        } else if (automatic) {
+            // A failed decision retracts before retry; permit propagation before another optional scan.
+            deferAutomaticReclamation = true
         }
         return result
     }

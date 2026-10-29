@@ -253,6 +253,7 @@ internal class CpSatisfactionTraversal(
                     params.clauseExchange?.onSearchClose(cp.session)
                 } finally {
                     cp.session.sharedLearningMemory = null
+                    cp.session.sharedLearningPosition = null
                 }
             })
             cp.useEnforcingPeers(components.filterIsInstance<FiniteFactorEnforcer>()
@@ -271,6 +272,7 @@ internal class CpSatisfactionTraversal(
             learningSession = session
             if (params.clauseExchange != null || params.learnedMemoryBytes != null) {
                 cp.session.sharedLearningMemory = session::retainedLearningMemory
+                cp.session.sharedLearningPosition = session::retainedLearningPosition
             }
             val seed = preparedSeed ?: cp.session.seed(params.assumptions)
             val seeded = if (projectAssumptionCore && seed is PropagationResult.Unsat) {

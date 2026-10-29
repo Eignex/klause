@@ -55,12 +55,12 @@ internal class RootSimplificationPass : InprocessingPass {
 
     private fun simplify(session: PropagationSession, params: BacktrackParams, budget: InprocessingBudget) {
         val count = session.rootClauseCount
-        if (count == 0) return
         if (revision != session.learnedClauseRevision) {
             dropped = IntHashSet()
             pending = null
         }
         revision = session.learnedClauseRevision
+        if (count == 0) return
         pendingSource?.let { (factor, literals) ->
             if (!budget.visit(literals.size + 1)) return
             session.retireRootSource(factor, literals)

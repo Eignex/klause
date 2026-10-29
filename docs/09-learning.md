@@ -244,6 +244,8 @@ Reclamation runs at safe propagation/branch boundaries independently of restarts
 Unchanged ownership reuses its maintenance result across short resumed slices; store,
 trail, atom, pass and scope changes invalidate that decision rather than spending a
 whole slice repeatedly before search advances.
+An interrupted optional scan waits for ownership change before retrying; direct
+reclamation attempts remain retryable.
 `learned-memory-work` and `learned-memory-scratch-bytes` bound preparation and scratch.
 Native/general compaction requires a cancellable preflight of all arrays, watches, reasons,
 queues and event indexes, with a conservative envelope for indivisible publication.
@@ -406,6 +408,8 @@ the indexes releases obsolete capacity as well as clause payload. Insufficient
 allowance defers reclamation, and a protected floor above the limit reports that
 condition while preserving the search state. Root reseeding releases obsolete copied
 reasons; terminal release drops shared learning without rewriting lifetime counters.
+A cancelled automatic scan permits one propagation opportunity before another
+attempt, including when a suspended decision retracts and retries.
 
 ## Restarts, phases and inprocessing
 
