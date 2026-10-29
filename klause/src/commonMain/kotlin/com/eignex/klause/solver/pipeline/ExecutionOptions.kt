@@ -517,6 +517,9 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** The `phase-retention` execution setting. */
         val phaseRetention: ExecutionOption<Double> = ExecutionOption("phase-retention", ValueKind.DOUBLE)
 
+        /** Select ordinary rewards or the opt-in source-progress reward ablation. */
+        val portfolioReward: ExecutionOption<String> = ExecutionOption("portfolio-reward", ValueKind.STRING)
+
         /** The `reseed-stale-threshold` execution setting. */
         val reseedStaleThreshold: ExecutionOption<Int> = ExecutionOption("reseed-stale-threshold", ValueKind.INT)
 
@@ -563,7 +566,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 clauseShareLen, sliceWork, sliceMaxWork, sliceGrowth, portfolioWork, coreEarly, companionIntegers,
                 sharingMemory, sharingMemoryWork, sharingMemoryScratch, sharingMemoryBytes,
                 coreRefinement, companionAfterIncumbent, companionActiveMillis, portfolioProgress,
-                phaseRetention, reseedStaleThreshold, lsResiduals, lsPhaseTimes, backtrackArmsByLabel,
+                phaseRetention, portfolioReward, reseedStaleThreshold, lsResiduals, lsPhaseTimes, backtrackArmsByLabel,
             ).associateBy { it.id }
         }
     }

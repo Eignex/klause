@@ -962,6 +962,12 @@ schedule does not reproduce mixed numerical elapsed schedules. Full-trace claims
 require the capture's complete artifact marker; source outcome claims require the
 corresponding independent checker receipts.
 
+`param.portfolio-reward=ordinary|source` varies rewards independently of admission
+and coverage. `source` retains ordinary feasibility rewards, then rewards only
+accepted incumbent improvements and terminal closure. Retain phase/cost counters
+and source checks, including initialization, reseeding and retirement, when comparing
+it with ordinary rewards. Counter changes alone do not establish a benefit.
+
 `param.source-incumbent-completion=true` trials advisory discrete incumbent
 completion under the existing numerical and joint-repair companion allowances.
 The default is false. `numericalExternalCompletion*` and
