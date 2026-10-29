@@ -47,6 +47,29 @@ class SourcePresolveOptionsTest {
     }
 
     @Test
+    fun `rewrite controls should survive local search and pivot adaptations`() {
+        val options = ExecutionOptions.parse(listOf(
+            "presolve-preserve-structure=true", "presolve-structural-impact=128",
+        ))
+
+        val config = options.reader().presolve(PresolveConfig.DEFAULT).config
+            .forLocalSearch().withAffinePivotOrder(AffinePivotOrder.STABLE_ID).withEffort(maxRounds = 2)
+
+        assertEquals(true, config.preserveStructure)
+        assertEquals(128, config.structuralImpactLimit)
+        assertEquals(false, PresolveConfig.DEFAULT.preserveStructure)
+        assertEquals(0, PresolveConfig.DEFAULT.structuralImpactLimit)
+        assertEquals(null, options.withoutPresolve().reader()[ExecutionOption.presolvePreserveStructure])
+    }
+
+    @Test
+    fun `negative structural impact limits should be rejected`() {
+        assertFailsWith<PipelineConfigException> {
+            ExecutionOptions.parse(listOf("presolve-structural-impact=-1")).reader().presolve(PresolveConfig.DEFAULT)
+        }
+    }
+
+    @Test
     fun `nonfinite fractions should be rejected`() {
         assertFailsWith<PipelineConfigException> {
             ExecutionOptions.parse(listOf("presolve-abort-fraction=NaN")).reader().presolve(PresolveConfig.DEFAULT)

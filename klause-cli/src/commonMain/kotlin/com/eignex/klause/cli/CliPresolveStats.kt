@@ -58,6 +58,12 @@ private fun presolveLedgerStatPairs(effort: PresolveEffortStats): List<Pair<Stri
         add(prefix + "NativeWork" to "${calls.sumOf { it.nativeWork }}")
         add(prefix + "NarrowedColumns" to "${calls.sumOf { it.narrowedColumns.toLong() }}")
         add(prefix + "FixedColumns" to "${calls.sumOf { it.fixedColumns.toLong() }}")
+        for (key in calls.flatMap { it.structuralImpact.keys }.distinct().sorted()) {
+            val values = calls.mapNotNull { it.structuralImpact[key] }
+            val value = if (key.endsWith("MaxSupport") || key.endsWith("MaxDepth")) values.maxOrNull() ?: 0L
+            else values.sum()
+            add(prefix + "Impact" + key to "$value")
+        }
         addAll(presolveSizeStatPairs(prefix + "Input", calls.map { it.input }))
         addAll(presolveSizeStatPairs(prefix + "Output", calls.map { it.output }))
     }

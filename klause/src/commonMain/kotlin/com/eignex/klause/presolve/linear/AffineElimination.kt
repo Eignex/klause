@@ -20,6 +20,7 @@ import com.eignex.klause.presolve.SourceDelta
 import com.eignex.klause.presolve.SourceRebuilds
 import com.eignex.klause.presolve.asSampleLift
 import com.eignex.klause.presolve.equivalentLinear
+import com.eignex.klause.presolve.protectedStructureColumns
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
@@ -72,6 +73,7 @@ internal object AffineSingletons {
         maxFactors: Int = AFFINE_MAX_FACTORS,
         pivotOrder: AffinePivotOrder = AffinePivotOrder.MARKOWITZ,
         objective: LinearObjective? = null,
+        preserveStructure: Boolean = false,
     ): PassDelta {
         val domains = problem.rootIntDomains()
         val out = run(
@@ -86,6 +88,7 @@ internal object AffineSingletons {
             maxFactors,
             pivotOrder,
             objective,
+            preserveStructure,
         ) ?: return PassDelta()
         val rebuild = out.subs.asRebuilds()
         return PresolveShared.identityDelta(
@@ -115,6 +118,7 @@ internal object AffineSingletons {
         maxFactors: Int = AFFINE_MAX_FACTORS,
         pivotOrder: AffinePivotOrder = AffinePivotOrder.MARKOWITZ,
         objective: LinearObjective? = null,
+        preserveStructure: Boolean = false,
     ): SourceDelta {
         val out = run(
             problem,
@@ -128,6 +132,7 @@ internal object AffineSingletons {
             maxFactors = maxFactors,
             pivotOrder = pivotOrder,
             objective = objective,
+            preserveStructure = preserveStructure,
         ) ?: return SourceDelta()
         return PresolveShared.sourceIdentityDelta(problem.factors, out.factors, out.subs.asRebuilds())
             .also { it.objective = out.objective }
@@ -149,6 +154,7 @@ internal object AffineSingletons {
         maxFactors: Int,
         pivotOrder: AffinePivotOrder,
         objective: LinearObjective?,
+        preserveStructure: Boolean,
     ): Eliminated? {
         if (problem.numIntVars == 0) return null
         // The entry scan alone can dominate optional preparation on very large models.
@@ -163,6 +169,10 @@ internal object AffineSingletons {
                     if (objective.intCoefficientValues[v] != 0L) add(v)
                 }
             }
+        }
+        if (preserveStructure) {
+            val protected = protectedStructureColumns(problem, cancellation) ?: return null
+            for (variable in protected) objVars.add(variable)
         }
         val eliminated = BooleanArray(problem.numIntVars)
         // Once `x` is gone only its range survives, as the bound rows on its terms, so a pivot with interior

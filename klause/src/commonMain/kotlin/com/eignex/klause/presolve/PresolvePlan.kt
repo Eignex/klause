@@ -84,10 +84,15 @@ class PresolveConfig(
     val maxRounds: Int = if (emphasis == PresolveEmphasis.OFF &&
         overrides.any { (pass, enabled) -> enabled && pass.stage == PresolvePass.Stage.PROBLEM }
     ) PresolveEmphasis.DEFAULT.maxRounds else emphasis.maxRounds,
+    /** Keep structured readers and binary partitions in affine and structural passes. */
+    val preserveStructure: Boolean = false,
+    /** Maximum factor/entry visits per rewrite impact observation; zero disables it. */
+    val structuralImpactLimit: Int = 0,
 ) {
     init {
         require(abortFraction.isFinite() && abortFraction in 0.0..1.0)
         require(maxRounds >= 0)
+        require(structuralImpactLimit >= 0)
         require(probeBudgetPerVarOverride == null || probeBudgetPerVarOverride >= 0)
         require(probeTotalBudgetOverride == null || probeTotalBudgetOverride >= 0)
     }
@@ -108,6 +113,8 @@ class PresolveConfig(
             pivotOrder,
             abortFraction,
             maxRounds,
+            preserveStructure,
+            structuralImpactLimit,
         )
 
     /** Return a request-local effort plan, keeping unspecified limits. */
@@ -116,8 +123,11 @@ class PresolveConfig(
         maxRounds: Int = this.maxRounds,
         probeBudgetPerVar: Int? = probeBudgetPerVarOverride,
         probeTotalBudget: Int? = probeTotalBudgetOverride,
+        preserveStructure: Boolean = this.preserveStructure,
+        structuralImpactLimit: Int = this.structuralImpactLimit,
     ): PresolveConfig = PresolveConfig(
         emphasis, overrides, probeBudgetPerVar, probeTotalBudget, affinePivotOrder, abortFraction, maxRounds,
+        preserveStructure, structuralImpactLimit,
     )
 
     /** Whether [pass] runs under [context]. */
@@ -168,6 +178,8 @@ class PresolveConfig(
         affinePivotOrder,
         abortFraction,
         maxRounds,
+        preserveStructure,
+        structuralImpactLimit,
     )
 
     /** Predefined plans and parser. */

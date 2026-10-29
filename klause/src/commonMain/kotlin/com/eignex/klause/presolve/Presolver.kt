@@ -152,9 +152,10 @@ object Presolver {
     ): SourcePresolved {
         val passes = problemPasses(problem, config, context, PresolvePass.Capability.SOURCE)
         if (passes.isEmpty() || config.maxRounds == 0) return SourcePresolved(problem)
-        var ctx = context.withCancellation(cancellation)
+        var ctx = context.copy(preserveStructure = config.preserveStructure).withCancellation(cancellation)
             .withPresolveBudget(context.presolveBudget)
             .withSubsumeIncremental(SubsumeMemo())
+            .withAffinePivotOrder(config.affinePivotOrder)
         val host = object : PresolveRoundEngine.RoundHost {
             var current = problem
 
@@ -199,6 +200,8 @@ object Presolver {
                         return@observeRoundPass PassOutcome.UNCHANGED
                     }
                     invocation.recordDelta(current.factors, delta.droppedIndices, delta.addedFactors)
+                    invocation.recordStructuralImpact(current, delta.droppedIndices, delta.addedFactors,
+                        delta.rebuild, config.structuralImpactLimit, token)
                     val narrowed = delta.bounds?.let { narrowedColumns(current.intBounds, it, invocation) } ?: 0
                     invocation?.narrowedColumns = narrowed
                     // A proved range can empty a column whose declaration it intersects, which refutes the
@@ -317,7 +320,7 @@ object Presolver {
         // shrink the factor set, so a per-round ratio would spuriously read as underdetermined.
         val underdetermined = problem.factors.isNotEmpty() &&
             problem.numIntVars.toLong() > problem.factors.size.toLong() * UNDERDETERMINED_RATIO
-        var ctx = context.withCancellation(cancellation)
+        var ctx = context.copy(preserveStructure = config.preserveStructure).withCancellation(cancellation)
             .withAffineUnderdetermined(underdetermined)
             .withAffinePivotOrder(config.affinePivotOrder)
             .withPresolveBudget(context.presolveBudget)
@@ -326,7 +329,9 @@ object Presolver {
         // each pass's delta instead of rebuilding a `Problem` per firing pass. Scoped away from any
         // EXHAUSTIVE pass (probing, implication graph, BVE / BCE), which keeps the fresh-rebuild path.
         if (passes.none { it.timing == PresolveTiming.EXHAUSTIVE }) {
-            return runIncremental(problem, passes, maxRounds, ctx, cancellation, config.abortFraction)
+            return runIncremental(
+                problem, passes, maxRounds, ctx, cancellation, config.abortFraction, config.structuralImpactLimit,
+            )
         }
 
         val host = object : PresolveRoundEngine.RoundHost {
@@ -372,6 +377,8 @@ object Presolver {
                         return@observeRoundPass PassOutcome.UNCHANGED
                     }
                     invocation.recordDelta(current.factors, delta.droppedIndices, delta.addedFactors)
+                    invocation.recordStructuralImpact(current, delta.droppedIndices, delta.addedFactors,
+                        delta.rebuild, config.structuralImpactLimit, token)
                     delta.reconstruct?.let(reconstructs::add)
                     if (delta.reconstruct != null && delta.rebuild.isEmpty) liftDescribedByRebuild = false
                     if (!delta.rebuild.isEmpty) rebuilds.add(delta.rebuild)
@@ -429,6 +436,7 @@ object Presolver {
         initialContext: PresolveContext,
         cancellation: Cancellation,
         abortFraction: Double,
+        structuralImpactLimit: Int,
     ): Presolved {
         var ctx = initialContext
         val session = ctx.presolveBudget.observePreparation(
@@ -508,6 +516,8 @@ object Presolver {
                         return@observeRoundPass PassOutcome.UNCHANGED
                     }
                     invocation.recordDelta(input.factors, delta.droppedIndices, delta.addedFactors)
+                    invocation.recordStructuralImpact(input, delta.droppedIndices, delta.addedFactors,
+                        delta.rebuild, structuralImpactLimit, token)
                     delta.reconstruct?.let(reconstructs::add)
                     if (delta.reconstruct != null && delta.rebuild.isEmpty) liftDescribedByRebuild = false
                     if (!delta.rebuild.isEmpty) rebuilds.add(delta.rebuild)

@@ -224,6 +224,18 @@ input/output dimensions. Pass groups also report `RebuildWork` (included in
 empty analyses and interruptions retain their own groups, ordered by key. Output
 size depends on the pass/stage catalogue and outcomes, not the number of calls.
 
+`--param presolve-preserve-structure=true` retains structured factors and binary
+partitions in affine and structural reductions. `--param presolve-structural-impact=N`
+sets a nonnegative visit cap per productive rewrite observation; zero disables it.
+Both are request-local and survive local-search plan adaptation. The
+[presolve contract](07-presolve.md#rewrite-representation-controls) defines their
+scope and the limits of their representation proxies.
+Invocation groups add `ImpactCalls`, `ImpactComplete`, `ImpactVisits` and the
+observed representation counts. Missing impact fields mean unobserved. Completed
+observations count in `ImpactComplete`; it must equal `ImpactCalls` before treating
+aggregate deltas as complete. Width and depth maxima take the maximum across the
+group; other fields sum. Diagnostic work is included in `Work`.
+
 `presolveInvocationWork + presolveStageWork + presolveUnattributedWork` equals
 `presolveWork`. Native totals remain separate and must not be added to that sum.
 `dry-run-presolve` prints the same keys on stderr alongside its model summary.
