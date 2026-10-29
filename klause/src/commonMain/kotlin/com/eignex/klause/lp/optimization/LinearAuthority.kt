@@ -55,13 +55,11 @@ internal class LinearAuthority(
     }
     private val lp = LinearAuthorityLp(budget, onLpShape, retainLp, guidancePolicy,
         onCutMetric = { stage, count ->
-            for (family in cutLifecycle.families) cutLifecycle.observe(family, stage, count)
+            cutLifecycle.shared(stage, count)
         }) { metrics ->
-        for (family in cutLifecycle.families) {
-            cutLifecycle.observe(family, "${metrics.phase.name}_Calls")
-            cutLifecycle.observe(family, "${metrics.phase.name}_Work", metrics.work)
-            cutLifecycle.observe(family, "${metrics.phase.name}_${metrics.outcome}")
-        }
+        cutLifecycle.shared("${metrics.phase.name}_Calls", 1L)
+        cutLifecycle.shared("${metrics.phase.name}_Work", metrics.work)
+        cutLifecycle.shared("${metrics.phase.name}_${metrics.outcome}", 1L)
         if (metrics.phase.name.startsWith("CLAIM_")) {
             val key = "Certification" + metrics.phase.name
             observePrimal(key + "Calls")
@@ -130,7 +128,7 @@ internal class LinearAuthority(
         pointFamily = null
         pointMask = emptySet()
         primalAttempt = null
-        lp.close()
+        cutLifecycle.containing("RETIREMENT") { lp.close() }
     }
 
     fun advanceWithPointCuts(source: SourceProofContext, cancellation: Cancellation): LinearAuthorityResult {

@@ -191,10 +191,24 @@ internal class LpEngine(
         closed = true
         rootRoundingWarmStart = null
         rootRoundingInterrupted = false
+        val observed = sink.lp.cutLifecycle
+        val previousFamilies = observed.families
+        val previousRecipe = observed.recipe
+        val previousKind = observed.kind
+        beginCutAttribution(LpRoute.NODE)
+        observed.families = cutPool.cuts().mapTo(HashSet()) { it.family }
         try {
-            releasePersistentSolvers()
+            observed.measureShared("RETIREMENT") {
+                try {
+                    releasePersistentSolvers()
+                } finally {
+                    propagator.close()
+                }
+            }
         } finally {
-            propagator.close()
+            observed.families = previousFamilies
+            observed.recipe = previousRecipe
+            observed.kind = previousKind
         }
     }
 

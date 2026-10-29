@@ -35,7 +35,7 @@ internal class LpRetainedCuts(private val observe: (CutFamily, String) -> Unit =
         val numericKey: String = numeric.key()
         val proof: CutProvenance get() = requireNotNull(numeric.provenance)
         val storageUnits: Long = numeric.cols.size.toLong() * 2L + numericKey.length +
-            source.expression.storageUnits + proof.storageUnits + 3L
+            source.expression.storageUnits + proof.storageUnits + 5L
     }
     private class Change(val depth: Int, val previous: List<Binding>)
     private var bindings = emptyList<Binding>()

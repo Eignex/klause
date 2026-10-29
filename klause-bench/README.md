@@ -528,6 +528,7 @@ LP-free portfolio arm cannot finish the source before the component owner runs.
 
 Cut lifecycle controls retain `lpPhase_CUT_ROOT_*` and `lpPhase_CUT_NODE_*` phases
 alongside the ordinary LP totals. Family tags distinguish construction, mapping,
+admission recipe (`ORDINARY`, `STRUCTURAL` or `COMPONENT`),
 admission, selection, aging, retraction, checked support and actual deduction use.
 `*_SOLVE`, `*_OWNER_EDIT` and certificate phases are shared containing costs;
 families participating in one query overlap and must not be summed. `*_FILL`
