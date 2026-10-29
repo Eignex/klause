@@ -13,6 +13,7 @@ import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.formats.xcsp3.Xcsp3
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
@@ -118,6 +119,19 @@ class CompilerLiftTest {
 
             assertFailsWith<ArithmeticException> { schema.compile() }
         }
+    }
+
+    @Test
+    fun `wide integer sums should preserve cancellation before narrowing`() {
+        val lowering = Lowering(ProblemSettings(), schemaSemantics.resolve())
+        for ((name, value) in listOf("x" to Long.MAX_VALUE, "y" to 1L, "z" to -Long.MAX_VALUE)) {
+            lowering.bindIntName(name, lowering.newIntVar(IntDomain(value, value)))
+        }
+        val sum = IntSum(listOf(IntRef("x"), IntRef("y"), IntRef("z")))
+
+        val domain = lowering.domainOf(sum)
+
+        assertEquals(IntDomain(1, 1), domain)
     }
 
     @Test
