@@ -14,6 +14,7 @@ import com.eignex.klause.portfolio.PortfolioEvidence
 import com.eignex.klause.portfolio.PortfolioExecutor
 import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.portfolio.PortfolioWorker
+import com.eignex.klause.portfolio.WorkerProofAuthority
 import com.eignex.klause.portfolio.SourceWorkerBinding
 import com.eignex.klause.portfolio.binaryIntegers
 import com.eignex.klause.portfolio.continuousMajority
@@ -80,9 +81,25 @@ internal fun FinitePipeline.portfolioExecutor(
     val profile = ProblemProfile.of(problem, scenario.kind == Kind.COP)
     val identity = ModelIdentity.of(problem, objective)
     val binding = EngineInvocation(preparedPlan, identity, objective)
-    val companions = if (numericalCompanions != null && objective != null &&
-        finiteNumericalCompanionsAdmitted(problem, scenario)
-    ) FiniteNumericalCompanions.prepare(problem, objective, numericalCompanions, cancellation) else null
+    val companionEligibility = numericalCompanions?.let {
+        finiteNumericalCompanionEligibility(problem, scenario, objective, it)
+    }
+    val companions = if (companionEligibility?.admitted == true) {
+        FiniteNumericalCompanions.prepare(problem, requireNotNull(objective), requireNotNull(numericalCompanions),
+            cancellation, companionEligibility.requirements.construction)
+    } else null
+    companionEligibility?.let { eligibility ->
+        val declines = if (eligibility.admitted && companions == null) listOf("complete-affine-capture-unavailable")
+        else eligibility.declines
+        val frontier = eligibility.requirements
+        val repair = frontier.copy(authority = WorkerProofAuthority.WITNESS_ONLY,
+            construction = frontier.construction.copy(sliceMillis = 250))
+        for ((label, requirements) in listOf("numerical/finite-companion" to frontier,
+            "ls/finite-joint-companion" to repair)) {
+            onEvent?.invoke("portfolio", SearchEvent.WorkerAdmission(label, declines.isEmpty(),
+                requirements.toString(), declines))
+        }
+    }
     val finiteFactories = PortfolioBuilder.factories(
         problem, scenario, objective, lsObjective, definitionalSweep, onEvent,
         profile, numericalCompletion, sourceHints, objectiveCoordinates,

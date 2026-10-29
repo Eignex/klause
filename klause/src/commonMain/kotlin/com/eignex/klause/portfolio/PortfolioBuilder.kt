@@ -100,7 +100,11 @@ object PortfolioBuilder {
         sourceHints: ((Set<ExecutionStrategy>) -> PreparedSourceHints?)? = null,
         objectiveCoordinates: ObjectiveCoordinateView? = null,
     ): List<FinitePortfolioFactory> {
-        val plan = PortfolioComposition.plan(scenario, ProblemFacts.of(problem, profile, scenario.lpCeiling, objective))
+        val facts = ProblemFacts.of(problem, profile, scenario.lpCeiling, objective) { recipe, eligibility ->
+            onEvent?.invoke("portfolio", SearchEvent.WorkerAdmission(recipe, eligibility.admitted,
+                eligibility.requirements.toString(), eligibility.declines))
+        }
+        val plan = PortfolioComposition.plan(scenario, facts)
         val residuals = if (scenario.reportLsResiduals) plan.arms.map { it.withLsResiduals() } else plan.arms
         val configs = if (scenario.reportLsPhaseTimes) residuals.map { it.withLsPhaseTimes() } else residuals
         require(!scenario.earlyCoreAdmission || configs.any { it is CoreGuidedWorkerConfig }) {
@@ -162,6 +166,13 @@ object PortfolioBuilder {
                     problem, index, armId, seed, scenario.lsLambda, objective, selectedObjective,
                     selectedSweep, onEvent, pools,
                 )
+                val requirements = WorkerRequirements(WorkerFragment.FINITE,
+                    if (family == ArmFamily.Backtrack) WorkerObjectiveView.CANONICAL
+                    else WorkerObjectiveView.CANONICAL_WITH_GUIDANCE,
+                    if (worker.permitsSourceProofs) WorkerProofAuthority.CHECKED_TERMINALS
+                    else WorkerProofAuthority.WITNESS_ONLY, facts.construction)
+                onEvent?.invoke("portfolio", SearchEvent.WorkerAdmission(config.label, true,
+                    requirements.toString(), emptyList()))
                 worker.bindEvidence(ModelIdentity.of(problem, objective)).also {
                     it.improvementOnly = if (config is CoreGuidedWorkerConfig && deferCore) {
                         !scenario.earlyCoreAdmission

@@ -55,6 +55,8 @@ internal class ProblemFacts(
     val binaryPackingObjective: Boolean = false,
     val binaryEqualityObjective: Boolean = false,
     val extensionalSupports: Boolean = false,
+    val construction: WorkerConstructionCost = WorkerConstructionCost(0, 0),
+    private val observer: ((String, WorkerEligibility) -> Unit)? = null,
     private val relaxation: (LpEmphasis) -> Boolean,
 ) {
     private val relaxations = HashMap<LpEmphasis, Boolean>()
@@ -72,6 +74,14 @@ internal class ProblemFacts(
     /** Whether the model offers every one of [needs]. */
     fun offersAll(needs: Collection<ArmNeed>): Boolean = needs.all(::offers)
 
+    fun eligibility(label: String, needs: Set<ArmNeed>): WorkerEligibility {
+        val requirements = WorkerRequirements(WorkerFragment.FINITE, WorkerObjectiveView.CANONICAL,
+            WorkerProofAuthority.CHECKED_TERMINALS, construction, needs.toSet())
+        return WorkerEligibility(requirements, requirements.needs.filterNot(::offers).map { "missing:" + it }).also {
+            observer?.invoke(label, it)
+        }
+    }
+
     /** The two ways to learn a model's facts. */
     companion object {
         /** The facts of [problem], classified as [profile], with the arms' LP capped under [lpCeiling]. */
@@ -80,12 +90,16 @@ internal class ProblemFacts(
             profile: ProblemProfile,
             lpCeiling: LpConfig,
             objective: LinearObjective? = null,
+            observer: ((String, WorkerEligibility) -> Unit)? = null,
         ): ProblemFacts {
             val binary = problem.binaryIntegers
             val binarySource = objective?.binaryIntegerSource
             val binaryView = binarySource != null
             return ProblemFacts(
                 profile,
+                construction = WorkerConstructionCost(problem.numBoolVars.toLong() + problem.numIntVars +
+                    problem.numRealVars, problem.factors.size),
+                observer = observer,
                 binaryIntegers = binary,
                 binaryPackingObjective = (binary && problem.hasPackingObjective(objective)) ||
                     binarySource?.let {

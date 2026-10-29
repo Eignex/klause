@@ -150,6 +150,10 @@ data class PortfolioScenario(
     val earlyCoreAdmission: Boolean = false,
     /** Bounded private objective-core refinement; disabled by default. */
     val coreRefinement: CoreRefinementMode = CoreRefinementMode.NONE,
+    /** Trial bounded general-integer/continuous companions; preserves explicit finite recipes. */
+    val companionIntegers: Boolean = false,
+    /** Whether the caller selected arm counts, including the ordinary default count. */
+    val explicitArms: Boolean = false,
 ) {
     init {
         require(cores >= 1) { "cores must be ≥ 1" }

@@ -71,6 +71,28 @@ with the actual result, so a conditioned or foreign completion cannot finish a w
 invocation. Original-source derivation capture is the subject of
 [original-source derivations](13-evidence.md).
 
+Finite recipe and numerical companion admission uses `WorkerRequirements`: supported
+fragment, canonical objective or canonical objective with heuristic guidance, checked
+terminal or witness-only authority, working-coordinate publication mapping, private
+resumable state, and structural construction dimensions. Dimensions estimate setup
+size rather than elapsed time or retained bytes. Numerical requirements also carry
+the containing per-owner LP work/allocation ceilings, active-time limit and segment
+limits; construction uses those same ceilings. Candidate checks and typed terminal
+verification remain the authority boundary.
+
+`SearchEvent.WorkerAdmission` reports these requirements and explicit decline causes.
+Curated backtrack filtering reports unmet model needs; selected finite recipes report
+their actual worker authority. Explicit named recipes bypass automatic filtering.
+An explicit arm count, including the default-sized count, prevents automatic numerical
+companions. A missing complete affine capture declines both companions without
+removing finite workers.
+
+`companion-integers=true` trials the same bounded companion pair on finite general
+integer/continuous sources. It changes only the binary-fragment restriction; size,
+source capture, objective, LP ceiling, single-lane mixed pool and explicit-recipe
+checks remain required. The binary-only gate remains the default. Work-driven
+scheduling does not admit numerical companions.
+
 ## Statistics
 
 `SolveStats.run.wallMs` spans initialization, slices, verification and disposal for

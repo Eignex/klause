@@ -414,6 +414,9 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** Allow the curated bounded core worker before the first incumbent. Default false. */
         val coreEarly: ExecutionOption<Boolean> = ExecutionOption("core-early", ValueKind.BOOLEAN)
 
+        /** Opt-in general-integer/continuous admission for bounded numerical companions. */
+        val companionIntegers: ExecutionOption<Boolean> = ExecutionOption("companion-integers", ValueKind.BOOLEAN)
+
         /** Select bounded private objective-core refinement. Default [CoreRefinementMode.NONE]. */
         val coreRefinement: ExecutionOption<CoreRefinementMode> =
             ExecutionOption("core-refinement", ValueKind.CORE_REFINEMENT)
@@ -456,7 +459,8 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 minTemp, smoothProb, smoothFactor, tabuTenure, sources,
                 scoring, acceptance, restart, strategy, localSearchArm, objectiveGuidance,
                 lambda, arms, localSearchArms, backtrackArms, clauseShareLbd,
-                clauseShareLen, sliceWork, sliceMaxWork, sliceGrowth, portfolioWork, coreEarly, coreRefinement,
+                clauseShareLen, sliceWork, sliceMaxWork, sliceGrowth, portfolioWork, coreEarly, companionIntegers,
+                coreRefinement,
                 phaseRetention, reseedStaleThreshold, lsResiduals, lsPhaseTimes, backtrackArmsByLabel,
             ).associateBy { it.id }
         }

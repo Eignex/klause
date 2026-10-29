@@ -32,6 +32,19 @@ import kotlin.test.assertTrue
 
 class ArmNeedsTest {
     @Test
+    fun `curated eligibility should identify the missing objective without changing explicit recipes`() {
+        val facts = ProblemFacts.assumed(Kind.CSP)
+        val required = setOf(ArmNeed.Objective)
+
+        val eligibility = facts.eligibility("objective-guided", required)
+
+        assertFalse(eligibility.admitted)
+        assertEquals(listOf("missing:Objective"), eligibility.declines)
+        assertEquals(required, eligibility.requirements.needs)
+        assertEquals("objective-guided", BacktrackCatalog.byLabel("objective-guided").label)
+    }
+
+    @Test
     fun `small ground tables should offer support ordering`() {
         val model = Problem(
             0, 2, Array(2) { IntDomain(0, 1) },

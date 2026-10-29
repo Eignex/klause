@@ -17,6 +17,18 @@ import com.eignex.klause.portfolio.PortfolioEvent
  * stats summarize a finished solve, events narrate one in flight (e.g. the CLI's `-v`).
  */
 sealed interface SearchEvent {
+    /** Recipe eligibility and requirements; these descriptions confer no publication authority. */
+    data class WorkerAdmission(
+        /** Configured recipe or companion identity. */
+        val recipe: String,
+        /** Whether the automatic gate admitted the recipe. */
+        val admitted: Boolean,
+        /** Fragment, objective, authority, mapping, retained-state and construction requirements. */
+        val requirements: String,
+        /** Stable reasons for declining the automatic admission. */
+        val declines: List<String>,
+    ) : SearchEvent
+
     /** A logical event from opt-in single-lane portfolio diagnostics. */
     data class PortfolioDiagnostic(
         /** Logical schedule event. */

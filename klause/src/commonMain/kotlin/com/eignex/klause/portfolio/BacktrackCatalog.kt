@@ -282,7 +282,7 @@ object BacktrackCatalog {
         } else {
             order
         }
-        return catalog.ranked(ranked.filter { facts.offersAll(it.needs) })
+        return catalog.ranked(ranked.filter { facts.eligibility(it.label, it.needs).admitted })
     }
 
     /** Per-arm recipe factories for [kind], in credit order — each builds a fresh recipe (the factory
