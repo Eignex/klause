@@ -293,9 +293,15 @@ holds at both the native and mapped shared target. An inactive guard withholds
 arithmetic propagation, and its activation wakes the row through a literal watch.
 Guard negations remain premises of every retained-row deduction and conflict.
 
+Rows belong to the prepared session's coordinates and source factors. Assignment
+reconstruction does not authorize replaying a row in another preparation, assumption
+container or objective context. Only the owning store attaches the typed object.
+
 Rows share the learned store and integer bounds propagation. Eager reasons freeze
 the historical clause premises without a compactable lazy factor id. Integer bound
 event subscriptions wake rows after undo and are remapped or removed on forgetting.
+A live bound reason or a reason saved in undo protects its row from retirement;
+after those references retract, retirement removes its guard and endpoint subscriptions.
 Later conflicts use these retained rows' clause explanations. Arithmetic combination
 loads original mandatory or guarded linear rows; a selected Element equality can
 seed the conflict but cannot supply a numerical endpoint reason.
