@@ -615,7 +615,7 @@ internal class ComponentLpSolver(
         policy: LpCertificationPolicy,
         cancellation: Cancellation,
     ): ExactLpWitness? {
-        if (!currentAuthority() || cancellation()) return null
+        if (!currentAuthority() || recessionDirection != null || cancellation()) return null
         val results = blockResults ?: return null
         if (results.any { it == null }) return null
         val point = MutableList(model.n) { model.exactShift(it) }
@@ -657,7 +657,9 @@ internal class ComponentLpSolver(
     override fun mirCuts(maxCuts: Int): List<Cut> = localCuts(maxCuts) { owner, count -> owner.mirCuts(count) }
 
     private fun localCuts(maxCuts: Int, separate: (TableauCutSolver, Int) -> List<Cut>): List<Cut> {
-        if (!currentAuthority() || blockResults?.all { it?.optimal == true } != true || maxCuts <= 0) return emptyList()
+        if (!currentAuthority() || recessionDirection != null ||
+            blockResults?.all { it?.optimal == true } != true || maxCuts <= 0
+        ) return emptyList()
         val cuts = ArrayList<Cut>()
         for (index in parts.indices) {
             val owner = solvers[index] as? TableauCutSolver ?: continue
