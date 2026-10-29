@@ -132,6 +132,7 @@ internal class LinearAuthorityCuts private constructor(
                             }.filterNotNull() else preferred
                         val choices = if (alternatives == preferred) listOf(preferred)
                             else listOf(preferred, alternatives)
+                        var eligible = false
                         for ((choice, selected) in choices.withIndex()) {
                             if (choice > 0) {
                                 if (cost > 65_536L - work) {
@@ -139,6 +140,7 @@ internal class LinearAuthorityCuts private constructor(
                                     break
                                 }
                                 work += cost
+                                observe("MixedComplementaryAttempts")
                             }
                             val conclusion = try {
                                 mixedIntegerRounding(normalized, selected.map { it.first }, cancellation)
@@ -151,7 +153,9 @@ internal class LinearAuthorityCuts private constructor(
                                 observe("MixedIntegralShiftedRhs")
                                 continue
                             }
-                            observe("MixedEligibleRows")
+                            if (!eligible) observe("MixedEligibleRows")
+                            eligible = true
+                            observe("MixedCandidates")
                             if (mixedCount >= 64) {
                                 observe("MixedRetentionLimited")
                                 continue
