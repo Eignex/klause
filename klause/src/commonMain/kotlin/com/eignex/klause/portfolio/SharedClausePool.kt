@@ -190,6 +190,10 @@ internal class PoolClauseExchange(
     }
 
     override fun onRestart(session: PropagationSession) = metered {
+        if (sessionIdentity == null) {
+            sessionIdentity = session.sharingIdentity
+            meter?.clauseCount("sessions", 1L)
+        }
         val drained = pool.drainSince(cursor)
         cursor = drained.cursor
         var imported = 0
@@ -240,7 +244,7 @@ internal class PoolClauseExchange(
         countUses(session)
         export(session)
         observe(session)
-        if (sessionIdentity === session.sharingIdentity) {
+        if (sessionIdentity == null || sessionIdentity === session.sharingIdentity) {
             sessionIdentity = null
             cursor = 0L
             seen.release()
