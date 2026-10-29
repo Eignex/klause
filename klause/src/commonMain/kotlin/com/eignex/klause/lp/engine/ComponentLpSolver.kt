@@ -704,7 +704,8 @@ internal class ComponentLpSolver(
             }
             for (row in basis.basicVars.indices) {
                 val column = basis.basicVars[row]
-                basic[part.rows[row]] = if (column < sub.n) part.cols[column] else model.slackCol(part.rows[column - sub.n])
+                basic[part.rows[row]] = if (column < sub.n) part.cols[column] else
+                    model.slackCol(part.rows[column - sub.n])
             }
         }
         return Basis(basic, status, captureEligible = false)

@@ -496,6 +496,8 @@ additive objectives. Each block needs two selected columns but has a fractional
 LP optimum, admitting local tableau cuts without an objective-definition row that
 connects the blocks. Compare ownership and `param.lp-root-cuts` independently;
 retain prepared block counts, child reuses, cut consumption and ordinary outcomes.
+Pin `param.bt-arm=lp-aggressive` and `param.arms=1` for lifecycle controls so an
+LP-free portfolio arm cannot finish the source before the component owner runs.
 
 The opt-in basis tool uses the [basis corpus](../klause/src/jvmTest/resources/basis-corpus/README.md):
 

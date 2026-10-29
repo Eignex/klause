@@ -42,6 +42,7 @@ class MpsModeTest {
         val text = capture {
             assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", "-s", "--exact", "--presolve", "off",
                 "--lp", "aggressive,-cuts", "--param", "lp-component-ownership=true",
+                "--param", "bt-arm=lp-aggressive", "--param", "arms=1", "-r", "3",
                 "--param", "max-decisions=1000", source.absolutePath)))
         }
 
