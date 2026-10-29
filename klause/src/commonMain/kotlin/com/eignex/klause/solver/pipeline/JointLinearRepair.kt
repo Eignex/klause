@@ -57,6 +57,10 @@ internal class JointLinearRepair(
     private val budget = SourceLpBudget(maxOperations = params.sourceLpOperations,
         onWork = state.smt::observeSourceLp, funding = funding)
     private val stages = linkedMapOf<String, Long>()
+    private val completion = if (params.sourceIncumbentCompletion) LinearIncumbentCompletion(budget) { stage, count ->
+        val key = "jointRepairExternalCompletion$stage"
+        stages[key] = combine(key, stages[key] ?: 0L, count)
+    } else null
     private var importedCenter: Sample? = null
     private val authority = LinearAuthority(budget, onLpShape = { shape ->
         if (shape.sparse) observe(shape.phase?.let { "jointRepairLpPhase_$it" } ?: "jointRepairLpNoPhase")
@@ -96,6 +100,10 @@ internal class JointLinearRepair(
         if (observeExternalIncumbents) observe("jointRepairExternal$stage")
     }
 
+    private fun externalIncumbent(): Sample? = external()?.let { sample ->
+        if (sample.exactReals == null && completion != null) completion.complete(source, sample, stop) else sample
+    }
+
     private fun queryObservations(): Map<String, Long> =
         query?.stats?.smt?.completeSearchStages.orEmpty().mapKeys { (key, _) ->
             when (key) {
@@ -132,7 +140,7 @@ internal class JointLinearRepair(
             completionExhausted = { exhausted },
             centerPreparationPending = { rootPreparationPending },
             proposal = ExactNeighborhoodProposal { centers, bools, count, round, radius, cutoff ->
-                val pooled = external()?.takeIf { sample ->
+                val pooled = externalIncumbent()?.takeIf { sample ->
                     val value = objective?.evaluateExact(sample)
                     when {
                         model.numRealVars != 0 && sample.exactReals?.size != model.numRealVars -> {
@@ -144,9 +152,10 @@ internal class JointLinearRepair(
                             false
                         }
                         else -> {
+                            val checking = completion?.checking(stop) ?: stop
                             val checked = SourceEvidenceVerifier(source.withLinearAuthority()).verify(
                                 SourceEvidence(source.scope, SourceClaim.Witness(sample),
-                                    SourceDerivation.SourceWitness), stop)
+                                    SourceDerivation.SourceWitness), checking)
                             if (checked != SourceEvidenceCheck.Checked) observeExternal(
                                 if (checked is SourceEvidenceCheck.Rejected) "PointRejected" else "PointUnavailable")
                             checked == SourceEvidenceCheck.Checked
@@ -268,8 +277,9 @@ internal class JointLinearRepair(
                 }
             }
             pending = condition
-            query = LinearAuthorityInvocation(source.atScope(source.scope.copy(condition = bounds)), params,
-                external = { external() ?: anchor }, state = state, borrowedAuthority = authority,
+            query = LinearAuthorityInvocation(source.atScope(source.scope.copy(condition = bounds)),
+                params.copy(sourceIncumbentCompletion = false),
+                external = { externalIncumbent() ?: anchor }, state = state, borrowedAuthority = authority,
                 boundOrdered = boundOrdered, guidance = true, funding = funding)
             observe("jointRepairCandidates")
         }
@@ -346,6 +356,7 @@ internal class JointLinearRepair(
         closed = true
         val resources = SearchInvocationResources()
         resources.own(authority)
+        completion?.let(resources::own)
         resources.own(AutoCloseable { retire() })
         resources.close()
     }

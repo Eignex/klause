@@ -162,6 +162,10 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** Bounded numerical source-bound aggregation control. */
         val sourceAggregateCuts: ExecutionOption<Boolean> = ExecutionOption("source-aggregate-cuts", ValueKind.BOOLEAN)
 
+        /** Bounded advisory incumbent completion under the exact companion's existing allowance. */
+        val sourceIncumbentCompletion: ExecutionOption<Boolean> =
+            ExecutionOption("source-incumbent-completion", ValueKind.BOOLEAN)
+
         /** Invocation-local checked numerical refutation reuse control. */
         val sourceRefutationReuse: ExecutionOption<Boolean> =
             ExecutionOption("source-refutation-reuse", ValueKind.BOOLEAN)
@@ -515,7 +519,8 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 presolveAbortFraction, presolveMaxRounds,
                 presolveProbePerVar, presolveProbeTotal,
                 nodeLimit, openWorkLimit, sourceLpWorkLimit, sourceLpAllocationLimit, sourceLpOperations, sourceCuts,
-                sourcePointCuts, sourceAggregateCuts, sourceRefutationReuse, sourceRefutationPropagation,
+                sourcePointCuts, sourceAggregateCuts, sourceIncumbentCompletion, sourceRefutationReuse,
+                sourceRefutationPropagation,
                 sourceRefutationResolution,
                 nraWorkLimit, nraDenseCoefficients, nraMatrixCells, niaCandidates, niaMoves,
                 niaCellRefinement, niaCellReuse, niaCellSteering, niaIntegerRoots, niaResidues,

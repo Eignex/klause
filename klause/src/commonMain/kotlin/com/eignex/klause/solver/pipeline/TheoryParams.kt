@@ -113,6 +113,8 @@ data class TheoryParams(
     val sourceRefutationPropagation: Boolean = false,
     /** Resolve checked refutations across named integral source predicates within numerical traversal. */
     val sourceRefutationResolution: Boolean = false,
+    /** Complete advisory discrete incumbent coordinates before exact companion admission. */
+    val sourceIncumbentCompletion: Boolean = false,
 ) {
     init {
         require(sourceLpWorkLimit >= 0 && sourceLpAllocationLimit >= 0 && sourceLpOperations >= 0)

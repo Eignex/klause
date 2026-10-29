@@ -49,7 +49,8 @@ internal fun bindSourceExecutionControls(
     val companions = invocation.requestsFiniteNumericalCompanions
     val finiteOptions = options.withoutPresolve().without("node-limit", "dry-run-presolve").let {
         if (companions) it.without("source-lp-work-limit", "source-lp-allocation-limit", "source-lp-operations",
-            "source-refutation-reuse", "source-refutation-propagation", "source-refutation-resolution") else it
+            "source-refutation-reuse", "source-refutation-propagation", "source-refutation-resolution",
+            "source-incumbent-completion") else it
     }
         .overriddenBy(ExecutionOptions(ExecutionOption.seed(seed)))
     val finite: (FiniteSolveShape) -> FiniteSolveRequest = { shape ->
@@ -84,6 +85,8 @@ internal fun bindSourceExecutionControls(
             sourceLpAllocationLimit = reader.defaulted(ExecutionOption.sourceLpAllocationLimit,
                 defaults.sourceLpAllocationLimit) ?: Long.MAX_VALUE,
             sourceLpOperations = reader[ExecutionOption.sourceLpOperations] ?: defaults.sourceLpOperations,
+            sourceIncumbentCompletion = reader[ExecutionOption.sourceIncumbentCompletion]
+                ?: defaults.sourceIncumbentCompletion,
             sourceRefutationReuse = reader[ExecutionOption.sourceRefutationReuse] ?: defaults.sourceRefutationReuse,
             sourceRefutationPropagation = reader[ExecutionOption.sourceRefutationPropagation]
                 ?: defaults.sourceRefutationPropagation,
@@ -136,6 +139,8 @@ internal fun bindSourceExecutionControls(
             sourceCuts = reader[ExecutionOption.sourceCuts] ?: defaults.sourceCuts,
             sourcePointCuts = reader[ExecutionOption.sourcePointCuts] ?: defaults.sourcePointCuts,
             sourceAggregateCuts = reader[ExecutionOption.sourceAggregateCuts] ?: defaults.sourceAggregateCuts,
+            sourceIncumbentCompletion = reader[ExecutionOption.sourceIncumbentCompletion]
+                ?: defaults.sourceIncumbentCompletion,
             sourceRefutationReuse = reader[ExecutionOption.sourceRefutationReuse] ?: defaults.sourceRefutationReuse,
             sourceRefutationPropagation = reader[ExecutionOption.sourceRefutationPropagation]
                 ?: defaults.sourceRefutationPropagation,
@@ -246,7 +251,7 @@ private fun FiniteSolveRequest.withSourceControls(
             engine,
             executionOptions.withoutPresolve().without("node-limit", "dry-run-presolve").let {
                 if (numericalCompanions) it.without("source-lp-work-limit", "source-lp-allocation-limit",
-                    "source-lp-operations") else it
+                    "source-lp-operations", "source-incumbent-completion") else it
             }.overriddenBy(options),
         ),
         randomSeed = seed, defaultArms = policy.arms(engine, cores, defaultArms),

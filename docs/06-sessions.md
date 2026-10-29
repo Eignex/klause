@@ -221,6 +221,10 @@ Continuous candidate completion and joint linear repair convert LP work, plus
 exact point recovery, into LS instructions using the slice prices below. Retained
 numerical traversal uses the same LP price for its scheduler work; cumulative
 source LP funding keeps raw numerical units.
+Advisory incumbent completion uses that same companion funding for preparation,
+residual recovery and original-source/objective checking. A changed seed or source
+context consumes another retained attempt without replenishing the allowance;
+unchanged terminal failures do not restart recovery.
 
 Slice pricing is solver policy: LP work costs one node per 600 units and propagation
 one per 4000 visits. Inprocessing scans, probes, attachment and retirement enter

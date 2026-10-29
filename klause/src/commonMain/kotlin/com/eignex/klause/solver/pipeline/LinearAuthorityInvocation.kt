@@ -89,6 +89,12 @@ internal class LinearAuthorityInvocation(
     private var importedIncumbent: Sample? = null
     private var consumedIncumbent: Sample? = null
     private var result: LinearInvocationResult? = null
+    private val budget = SourceLpBudget(maxOperations = params.sourceLpOperations,
+        onWork = state.smt::observeSourceLp, funding = funding)
+    private val completion = if (params.sourceIncumbentCompletion) LinearIncumbentCompletion(budget) { stage, count ->
+        val key = "numericalExternalCompletion$stage"
+        externalOffers[key] = (externalOffers[key] ?: 0L) + count
+    } else null
     val isDone: Boolean get() = result != null
     fun captureTo(journal: LinearAuthorityCapture) = component.captureTo(journal)
     val work: Long get() = state.work.spent + funding.spent / LP_WORK_PER_NODE
@@ -105,8 +111,7 @@ internal class LinearAuthorityInvocation(
         openTheory = state.work.snapshot(),
         search = state.progress(if (closed) null else session))
     private val component = LinearAuthorityTraversal(context,
-        SourceLpBudget(maxOperations = params.sourceLpOperations, onWork = state.smt::observeSourceLp,
-            funding = funding), stop, ::paused, ::offer,
+        budget, stop, ::paused, ::offer,
         { incumbent?.let { sample -> value?.let {
             if (sample === importedIncumbent && sample !== consumedIncumbent) {
                 consumedIncumbent = sample
@@ -176,20 +181,22 @@ internal class LinearAuthorityInvocation(
             if (!context.affineObjectiveAvailable || !context.linearCoordinatesSupported()) {
                 return finish(null, TerminationReason.Unsupported)
             }
+            funding.grant(if (work < 0) 20_000_000L else maxOf(20_000_000L,
+                work.coerceIn(1L, 150_000L) * LP_WORK_PER_NODE))
             external()?.takeUnless { it === incumbent }?.let { sample ->
                 val before = incumbentRevision
-                offer(sample, external = true)
+                val completed = if (sample.exactReals == null && completion != null)
+                    completion.complete(context, sample, stop) else sample
+                if (completed != null) offer(completed, external = true)
                 if (incumbentRevision != before) {
                     importedIncumbents++
-                    importedIncumbent = sample
+                    importedIncumbent = incumbent
                     onIncumbentImport?.invoke()
                 }
             }
             if (stop()) return finish(null, if (params.timeout()) TerminationReason.Timeout
                 else TerminationReason.Cancelled)
             if (funding.exhausted) return finish(null, TerminationReason.BudgetExhausted)
-            funding.grant(if (work < 0) 20_000_000L else maxOf(20_000_000L,
-                work.coerceIn(1L, 150_000L) * LP_WORK_PER_NODE))
             if (!initialized) {
                 initialized = true
                 if (session.initialize() !is ComponentResult.Consistent) {
@@ -242,7 +249,8 @@ internal class LinearAuthorityInvocation(
     }
 
     private fun offer(sample: Sample, external: Boolean) {
-        if (stop()) {
+        val checking = if (external) completion?.checking(stop) ?: stop else stop
+        if (checking()) {
             observeExternalOffer(external, "Stopped")
             return
         }
@@ -254,13 +262,13 @@ internal class LinearAuthorityInvocation(
             return
         }
         val checked = SourceEvidenceVerifier(context.withLinearAuthority()).verify(SourceEvidence(context.scope,
-            SourceClaim.Witness(sample), SourceDerivation.SourceWitness), stop)
+            SourceClaim.Witness(sample), SourceDerivation.SourceWitness), checking)
         if (checked != SourceEvidenceCheck.Checked) {
             observeExternalOffer(external, if (checked is SourceEvidenceCheck.Rejected) "PointRejected"
                 else "PointUnavailable")
             return
         }
-        val exact = context.linearValue(sample, stop)
+        val exact = context.linearValue(sample, checking)
         if (exact == null) {
             observeExternalOffer(external, "ObjectiveUnavailable")
             return
@@ -299,8 +307,12 @@ internal class LinearAuthorityInvocation(
         try {
             session.popTo(0)
         } finally {
-            component.close()
-            callback = { _, _ -> }
+            try {
+                component.close()
+            } finally {
+                completion?.close()
+                callback = { _, _ -> }
+            }
         }
     }
 }
