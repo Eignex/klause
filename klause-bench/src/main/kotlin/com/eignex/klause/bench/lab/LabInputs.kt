@@ -95,7 +95,7 @@ internal object LabInputs {
         val relative = root.relativize(actual).toString()
         val sha256 = if (Files.isRegularFile(actual)) hash(actual) else null
         if (relative.any { it == ':' || it == '\\' || it.isISOControl() }) {
-            require(sha256 != null) { "Input directory requires a portable name: $relative" }
+            requireNotNull(sha256) { "Input directory requires a portable name: $relative" }
             val name = actual.fileName.toString().map {
                 if (it in 'a'..'z' || it in 'A'..'Z' || it in '0'..'9' || it in "._-") it else '_'
             }.joinToString("").takeLast(160)
@@ -113,7 +113,9 @@ internal object LabInputs {
                 }
             }
             require(staged.toRealPath().startsWith(source)) { "Input staging escapes source" }
-            return BenchInput(source.relativize(staged).toString().replace('\\', '/'), BenchInputRoot.SOURCE, role, sha256)
+            return BenchInput(
+                source.relativize(staged).toString().replace('\\', '/'), BenchInputRoot.SOURCE, role, sha256,
+            )
         }
         return BenchInput(
             relative.replace('\\', '/'),
