@@ -461,8 +461,12 @@ historical reasons and removes obsolete watches; attaching a shortened binary in
 both implication directions and evaluates facts already assigned at the root. There
 is no separate stale binary graph or whole-graph rebuild.
 
-Opt-in failed-literal probing tries a bounded rotating set of Boolean literals at
-scheduled restarts. Each attempt has a propagation-work ceiling within the invocation
+Opt-in failed-literal probing alternates a bounded rotating set of Boolean literals
+with Boolean coordinates from newly examined learned clauses of two to eight literals.
+The learned cursor advances without replaying an exhausted unchanged neighborhood;
+compaction invalidates its indices. Preparation and retained literal storage share the
+probe class allowance and memory observation. Funded probing precedes cheap root
+simplification so proved facts can refresh binaries in the same safe-root opportunity. Each attempt has a propagation-work ceiling within the invocation
 token. A completed root conflict proves the complementary unit, which is attached and
 propagated through ordinary search. Completed root facts are published to shared
 components before traversal resumes. Successful and interrupted probes retract to the

@@ -183,10 +183,54 @@ private class RootCandidate(val factor: Int, val literals: IntArray) {
 internal class RootProbingPass : InprocessingPass {
     override val preservesVariables: Boolean get() = true
     private var cursor = 0
+    private var learnedCursor = 0
+    private var revision = -1L
+    private var neighborhood: IntArray? = null
+    private var neighborhoodPosition = 0
+    private var preferNeighborhood = true
+    private var preparationLeft = 0
     override val spending = InprocessingSpending(InprocessingKind.Probe)
 
     override fun reset() {
         cursor = 0
+        learnedCursor = 0
+        revision = -1L
+        neighborhood = null
+        neighborhoodPosition = 0
+        preferNeighborhood = true
+    }
+
+    override fun retainedMemory(sample: SharingMemoryObservation, protected: Boolean) {
+        neighborhood?.let {
+            sample.ownedReferences(this, 1L, protected)
+            sample.owned(it, it.size.toLong() * Int.SIZE_BYTES, protected)
+        }
+    }
+
+    private fun neighborhoodLiteral(session: PropagationSession, budget: InprocessingBudget): Int? {
+        if (revision != session.learnedClauseRevision) {
+            learnedCursor = 0
+            neighborhood = null
+            revision = session.learnedClauseRevision
+        }
+        while (!budget.stopped()) {
+            val row = neighborhood
+            if (row != null && neighborhoodPosition < row.size) return Lit.negate(row[neighborhoodPosition])
+            neighborhood = null
+            if (learnedCursor >= session.learnedClauseCount || preparationLeft <= 0 || !budget.visit()) return null
+            preparationLeft--
+            val index = learnedCursor++
+            budget.note("NeighborhoodCandidates")
+            if (session.learnedClauseLiteralCount(index) !in 2..PROBE_NEIGHBORHOOD_LITERALS) continue
+            val literals = session.rootClauseLiterals(session.problem.numFactors + index,
+                PROBE_NEIGHBORHOOD_LITERALS) ?: continue
+            if (literals.size == 2 && literals[0] == Lit.negate(literals[1])) continue
+            if (literals.any { budget.truth(it) == true }) continue
+            neighborhood = literals
+            neighborhoodPosition = 0
+            budget.note("NeighborhoodEligible")
+        }
+        return null
     }
 
     override fun run(session: PropagationSession, params: BacktrackParams, stats: SearchStatsSink?) {
@@ -197,14 +241,19 @@ internal class RootProbingPass : InprocessingPass {
     private fun probe(session: PropagationSession, params: BacktrackParams, budget: InprocessingBudget) {
         val variables = session.problem.numBoolVars
         if (variables == 0) return
+        preparationLeft = PROBE_NEIGHBORHOOD_CLAUSES
         var attempted = 0
         var examined = 0
         val priorCancelled = session.probeCancelled
         while (attempted < params.rootProbeBatch && examined < minOf(2L * variables, ROOT_LITERAL_LIMIT.toLong())) {
             if (!session.canSimplifyRoot || !budget.visit()) break
-            val literal = cursor % (2 * variables)
+            val nearby = if (preferNeighborhood) neighborhoodLiteral(session, budget) else null
+            if (budget.stopped()) break
+            val literal = nearby ?: cursor
+            if (nearby == null) cursor = (cursor + 1) % (2 * variables)
+            else neighborhoodPosition++
+            preferNeighborhood = !preferNeighborhood
             val variable = Lit.variable(literal)
-            cursor = (literal + 1) % (2 * variables)
             examined++
             budget.note("Candidates")
             if (session.boolValue(variable) != null) continue
@@ -222,11 +271,15 @@ internal class RootProbingPass : InprocessingPass {
                     session.addRootDerivedClause(Clause(intArrayOf(Lit.negate(literal))), 1, OWN_ORIGIN, false)
                     budget.note("AttachmentWork", session.work - before + 3L)
                     budget.note("Units")
+                    if (nearby != null) neighborhood = null
                 }
                 else -> session.popLast()
             }
         }
     }
 }
+
+private const val PROBE_NEIGHBORHOOD_CLAUSES = 16
+private const val PROBE_NEIGHBORHOOD_LITERALS = 8
 
 internal const val ROOT_LITERAL_LIMIT = 8192

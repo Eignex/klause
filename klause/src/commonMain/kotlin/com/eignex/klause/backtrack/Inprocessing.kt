@@ -229,8 +229,8 @@ internal class Inprocessing(
             val passes = buildList {
                 // Subsumption first: it only shrinks the database, so vivification's probing works
                 // the surviving clauses instead of ones about to be dropped.
-                if (params.rootSimplification) add(RootSimplificationPass())
                 if (params.rootProbeBatch > 0) add(RootProbingPass())
+                if (params.rootSimplification) add(RootSimplificationPass())
                 if (params.subsumption) add(Subsumption())
                 if (params.vivification) add(VivificationPass())
             }
