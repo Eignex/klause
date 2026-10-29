@@ -1,8 +1,8 @@
 package com.eignex.klause.bench.lab
 
+import com.eignex.klause.bench.runner.MZN_RANDOM_SEED
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.presolve.PresolveConfig
-import com.eignex.klause.bench.runner.MZN_RANDOM_SEED
 import com.eignex.lab.bench.BenchResources
 
 internal data class LabSettings(val parameters: Map<String, String>) {
@@ -33,9 +33,11 @@ internal data class LabSettings(val parameters: Map<String, String>) {
         require(selections.isNotEmpty())
         require(comparisonSeries.matches(Regex("[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}")))
         if (propagationControls) {
-            require(!inputOnly && engines.all {
+            require(
+                !inputOnly && engines.all {
                 it in setOf("cp", "bt", "backtrack", "fixed", "mixed", "portfolio", "pf")
-            })
+            }
+            )
             require("param.propagation-attribution" !in parameters && "param.historical-table-reasons" !in parameters) {
                 "propagation-controls owns attribution and historical Table switches"
             }
@@ -86,10 +88,14 @@ internal data class LabSettings(val parameters: Map<String, String>) {
             "heap-mib" to heap.toString(),
             "gc" to gc,
             "complete-assignment" to (parameters["complete-assignment"] ?: "false"),
-        ) + if (control.isEmpty()) emptyMap() else mapOf(
+        ) + if (control.isEmpty()) {
+            emptyMap()
+        } else {
+            mapOf(
             "param.propagation-attribution" to (control != "ordinary").toString(),
             "param.historical-table-reasons" to (control == "historical-table").toString(),
         )
+        }
 
     companion object {
         internal fun runtimeTags(

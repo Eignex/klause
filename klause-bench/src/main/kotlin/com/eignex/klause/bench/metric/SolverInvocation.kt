@@ -73,12 +73,21 @@ internal object SolverInvocation {
 
     /** Run klause-cli over [entry] under [budget]. [optimize] selects intermediate-solution mode (`-a`). */
     fun run(entry: ResolvedProblem, settings: Settings, budget: Budget, optimize: Boolean): Result {
-        val file = if (entry.ref.format == Format.MINIZINC) MiniZincRunner().compileFzn(entry.ref)
-            else CorpusFetcher.resolve(entry.ref.source)
-        val compiled = if (entry.ref.format == Format.MINIZINC) SolveEvidence.fileHashes(mapOf(
+        val file = if (entry.ref.format == Format.MINIZINC) {
+            MiniZincRunner().compileFzn(entry.ref)
+        } else {
+            CorpusFetcher.resolve(entry.ref.source)
+        }
+        val compiled = if (entry.ref.format == Format.MINIZINC) {
+            SolveEvidence.fileHashes(
+                mapOf(
             "flatzinc" to file,
             "outputMapping" to MiniZincRunner().outputFile(file),
-        )) + ("flatzincContentV1" to SolveEvidence.flatZincContentHash(file)) else emptyMap()
+        )
+            ) + ("flatzincContentV1" to SolveEvidence.flatZincContentHash(file))
+        } else {
+            emptyMap()
+        }
         return withSourceInput(file, budget) { plain, remaining ->
             val cmd = klauseCommand(entry, settings, remaining, optimize, plain)
             try {
@@ -103,17 +112,26 @@ internal object SolverInvocation {
             preparationMs = (System.nanoTime() - start) / 1_000_000L
             val remaining = budget.timeoutMillis - preparationMs
             val result = if (remaining <= 0L) {
-                Result(null, null, null, proven = false, stats = mapOf("sourcePreparationBudgetExhausted" to "true"),
-                    rawOutput = "", command = "SOURCE_PREPARATION")
+                Result(
+                    null,
+                    null,
+                    null,
+                    proven = false,
+                    stats = mapOf("sourcePreparationBudgetExhausted" to "true"),
+                    rawOutput = "",
+                    command = "SOURCE_PREPARATION",
+                )
             } else {
                 solve(plain, Budget(remaining))
             }
             result
         }
-        return result.copy(stats = result.stats + mapOf(
+        return result.copy(
+            stats = result.stats + mapOf(
             "sourceDecodeMs" to preparationMs.toString(),
             "sourceInvocationMs" to ((System.nanoTime() - start) / 1_000_000L).toString(),
-        ))
+        )
+        )
     }
 
     /** The provisioned klause-cli launcher. */
@@ -153,7 +171,11 @@ internal object SolverInvocation {
 
     /** klause-cli on the model file (compiled `.fzn` for MiniZinc, else the original source). */
     private fun klauseCommand(
-        entry: ResolvedProblem, s: Settings, budget: Budget, optimize: Boolean, file: File,
+        entry: ResolvedProblem,
+        s: Settings,
+        budget: Budget,
+        optimize: Boolean,
+        file: File,
     ): List<String> {
         val bin = klauseCliBin()
         check(bin.canExecute()) { "klause-cli not installed at $bin (run :klause-cli:installJvmDist)" }
@@ -171,8 +193,13 @@ internal object SolverInvocation {
             add("-r")
             add(s.seed.toString())
             add("-s")
-            if (s.params.any { it.startsWith("portfolio-work=") || it.startsWith("companion-integers=") ||
-                    it == "portfolio-progress=true" }) add("-v")
+            if (s.params.any {
+                    it.startsWith("portfolio-work=") || it.startsWith("companion-integers=") ||
+                        it == "portfolio-progress=true"
+                }
+            ) {
+                    add("-v")
+                }
             if (s.exact) add("--exact")
             if (s.completeAssignment && entry.ref.format == Format.MINIZINC) add("--output-complete-assignment")
             if (optimize) {
@@ -264,9 +291,12 @@ internal object SolverInvocation {
             isDaemon = true
             start()
         }
-        val stderr = StderrCapture(process.errorStream, captureDirectory?.let { directory ->
+        val stderr = StderrCapture(
+            process.errorStream,
+            captureDirectory?.let { directory ->
             { directory.resolve("cli.stderr").outputStream() }
-        }).start()
+        }
+        ).start()
 
         val raw = StringBuilder()
         val stats = LinkedHashMap<String, String>()
@@ -468,9 +498,12 @@ internal object SolverInvocation {
             stderrCapture = diagnostics.status,
         )
         if ((outputFailure != null && killed.get() != "hard-timeout") || exit == null ||
-            (exit != 0 && !anySolution && !unsat && killed.get() == null && diagnostics.refusal == null)) {
+            (exit != 0 && !anySolution && !unsat && killed.get() == null && diagnostics.refusal == null)
+        ) {
             throw Failure(
-                result, "${cmd.first()} failed (exit $exit): ${diagnostics.text.take(STDERR_CAP)}", outputFailure,
+                result,
+                "${cmd.first()} failed (exit $exit): ${diagnostics.text.take(STDERR_CAP)}",
+                outputFailure,
             )
         }
         return result

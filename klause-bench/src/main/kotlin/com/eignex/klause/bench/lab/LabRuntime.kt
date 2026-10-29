@@ -51,7 +51,10 @@ internal object LabRuntime {
                 put("solverBudgetMs", p.getValue("timeout-ms"))
                 put("compilerSeed", p["compiler-seed"] ?: "1")
                 put("compilerTimeoutSeconds", p.getValue("compile-timeout-sec"))
-                put("deadlinePolicy", "cli-inclusive-v1; compiler/preflight/checking outside CLI deadline, inside case/job ceilings")
+                put(
+                    "deadlinePolicy",
+                    "cli-inclusive-v1; compiler/preflight/checking outside CLI deadline, inside case/job ceilings",
+                )
                 put("resourceScope", "GNU time CLI process tree; peak RSS in KiB")
                 put("validationPolicy", "reported-result-v1")
                 putJsonArray("javaOptions") { options.forEach { add(it) } }

@@ -52,11 +52,18 @@ class LabSelectionsTest {
 
                 assertEquals("Eignex/klause", recipe.getValue("repository").jsonPrimitive.content)
                 val name = recipe.getValue("name").jsonPrimitive.content
-                if (name == "status-sweep" || name.startsWith("klause-reference")) {
+                val sweep = name.startsWith("status-sweep")
+                if (sweep) {
+                    val tags = recipe.getValue("tags").toString()
+                    assertEquals("[\"platform:linux\",\"arch:x86_64\"]", tags)
+                    assertEquals("sdk-linux-v1", parameters["comparison-series"])
+                    assertEquals("1", parameters["compiler-seed"])
+                    assertEquals("1", parameters["cpus"])
+                } else if (name.startsWith("klause-reference")) {
                     assertEquals("[\"local\"]", recipe.getValue("tags").toString())
                 }
                 val reference = recipe["base"]?.jsonObject?.get("backend")?.jsonPrimitive?.content == "reference"
-                val manifest = if (reference) "reference" else "bench"
+                val manifest = if (reference) "reference" else if (sweep) "bench-linux" else "bench"
                 assertEquals("klause-bench/lab/$manifest.json", bench.getValue("manifest").jsonPrimitive.content)
                 LabSettings(parameters)
             }
