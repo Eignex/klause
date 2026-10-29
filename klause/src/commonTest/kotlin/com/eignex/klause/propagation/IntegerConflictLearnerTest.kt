@@ -44,9 +44,9 @@ class IntegerConflictLearnerTest {
     fun `a prepared enumeration should reuse and retire its guarded arithmetic consequence`() {
         val program = parseFlatZinc("""
             var bool: active;
-            var 0..8: z;
-            var 0..2: x;
-            var 0..4: y;
+            var 7..12: z;
+            var 0..3: x;
+            var 0..6: y;
             constraint int_lin_le_reif([2,1,-1],[x,y,z],0,active);
             constraint int_lin_le([2,-1],[x,y],0);
             solve :: seq_search([
@@ -96,6 +96,7 @@ class IntegerConflictLearnerTest {
         val retained = uses.entries.firstOrNull { it.value.size >= 2 }?.key?.first
         assertNotNull(retained, "prepared=" + ProblemJson().encodeToString(prepared.problem) +
             "; learning=" + session.learnedLifecycle() + "; uses=" + uses.values +
+            "; declines=" + trace.events.filter { "decline" in it.kind }.groupingBy { it.kind }.eachCount() +
             "; tail=" + trace.events.takeLast(20).map { it.kind })
         assertTrue(retained.row.guard != Lit.NONE)
         session.popToLevel(0)
