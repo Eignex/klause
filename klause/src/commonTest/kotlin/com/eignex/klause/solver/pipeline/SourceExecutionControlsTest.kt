@@ -21,6 +21,20 @@ import kotlin.test.assertTrue
 
 class SourceExecutionControlsTest {
     @Test
+    fun `incremental linear control should bind to ordinary source execution`() {
+        val parsed = SmtLib.parse("(declare-const x Real) (declare-const y Real) " +
+            "(assert (<= (+ (* 2 x) (* 3 y)) 1))")
+        val invocation = SourceSetup.prepare(SourceSetupRequest(parsed.source,
+            ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK))
+        for ((options, expected) in listOf(emptyList<String>() to false,
+            listOf("open-linear-incremental=true") to true, listOf("open-linear-incremental=false") to false)) {
+            val request = SourceExecutionRequest(invocation, ExecutionOptions.parse(options))
+
+            assertEquals(expected, request.theory.openLinearIncremental)
+        }
+    }
+
+    @Test
     fun `ordinary finite source execution should bind advisory completion to its companions`() {
         val source = LinearSourceProblem(listOf(
             LinearSourceVariable("i", true, SemanticRational.ZERO, SemanticRational.ONE),

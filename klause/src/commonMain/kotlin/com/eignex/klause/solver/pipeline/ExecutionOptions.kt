@@ -224,6 +224,9 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** Open traversal branch policy. */
         val openBranching: ExecutionOption<OpenBranching> = ExecutionOption("open-branching", ValueKind.OPEN_BRANCHING)
 
+        /** Incremental source assertions and explained interval propagation in open linear traversal. */
+        val openLinearIncremental: ExecutionOption<Boolean> = ExecutionOption("open-linear-incremental", ValueKind.BOOLEAN)
+
         /** Optional open Boolean hint producer allowance. */
         val openHintFlips: ExecutionOption<Long> = ExecutionOption("open-hint-flips", ValueKind.LONG)
 
@@ -538,7 +541,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 nraWorkLimit, nraDenseCoefficients, nraMatrixCells, niaCandidates, niaMoves,
                 niaCellRefinement, niaCellReuse, niaCellSteering, niaIntegerRoots, niaResidues,
                 maxFlips, maxInstructions, alnsIterations, sharedRestart, openBranching,
-                openHintFlips, openHintMinSplits,
+                openHintFlips, openHintMinSplits, openLinearIncremental,
                 maxDecisions, luby, adaptiveRestart, emaRestart, modeSwitchingRestart,
                 phaseSaving, targetPhasing, solutionPhasing, rephaseInterval, maxLearned,
                 learnedMemoryBytes, learnedMemoryWork, learnedMemoryScratchBytes,

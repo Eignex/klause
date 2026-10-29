@@ -139,7 +139,7 @@ has its own work currency, separate from `node-limit`:
 
 | Route | Parameters | Contract |
 |---|---|---|
-| Open linear | `open-work-limit`, `open-branching`, `open-hint-flips`, `open-hint-min-splits` | [Linear arithmetic](15-linear-arithmetic.md) |
+| Open linear | `open-work-limit`, `open-branching`, `open-linear-incremental`, `open-hint-flips`, `open-hint-min-splits` | [Linear arithmetic](15-linear-arithmetic.md) |
 | Polynomial real | `nra-work-limit`, `nra-dense-coefficients`, `nra-matrix-cells` | [Polynomial completion](16-nonlinear-arithmetic.md#polynomial-real-arithmetic) |
 | Nonlinear integer | `nia-candidates`, `nia-moves`, `nia-cell-refinement`, `nia-cell-reuse`, `nia-cell-steering`, `nia-integer-roots`, plus the polynomial limits | [Integer candidates](16-nonlinear-arithmetic.md#nonlinear-integer-arithmetic) |
 | Quadratic optimization | the polynomial limits; open integers also use `nia-*` | [Quadratic execution](16-nonlinear-arithmetic.md#quadratic-strategy-execution) |
