@@ -21,11 +21,11 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.difference.DifferenceSystem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ResumableSearch
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.incumbent.EngineInvocation
-import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
@@ -187,7 +187,8 @@ internal class FiniteNumericalCompanions private constructor(
         fun prepare(model: BakedProblem, objective: LinearObjective, params: TheoryParams,
             cancellation: Cancellation, cost: WorkerConstructionCost,
             afterIncumbent: Boolean = false,
-            incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)? = null): FiniteNumericalCompanions? {
+            incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)? = null,
+        ): FiniteNumericalCompanions? {
             // The propagated difference graph duplicates affine rows and bounds in these coordinates.
             val affine = model.withFactors(model.factors.filterNot { it is DifferenceSystem }.toTypedArray())
             val context = affine.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, cancellation,

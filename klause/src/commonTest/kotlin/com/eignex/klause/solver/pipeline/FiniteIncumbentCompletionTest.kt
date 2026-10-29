@@ -28,7 +28,7 @@ class FiniteIncumbentCompletionTest {
                 LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE)),
                     constant = SemanticRational.ONE, sense = sense))
             val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
-                ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED))
+                ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED, maximize = sense == ObjectiveSense.MAXIMIZE))
             val original = assertNotNull(invocation.linearSource)
             val model = original.view.model
             val half = BigFraction.ofLong(2).reciprocal()
