@@ -343,6 +343,11 @@ direct library diagnostics; they supply neither a default CLI throughput claim n
 independent whole-source proof validation. Run the main through lab with its
 explicit bench install task and classpath; retain pinned source bytes, preparation,
 build/runtime provenance and unsuccessful receipts beside the results.
+An optional `sourceGzip64` uses the existing 96 KiB encoded-input loader and the
+profile's 32 MiB source cap. Its decompressed bytes must match `sha256`; this lets
+a retained original source avoid a cold download of its entire catalog archive.
+`source-preparation.json` records that input mode and parsing cost. Packed source
+bytes and raw profile records belong in the external evidence directory.
 
 The opt-in basis tool uses the [basis corpus](../klause/src/jvmTest/resources/basis-corpus/README.md):
 

@@ -1,10 +1,7 @@
 package com.eignex.klause.bench.profile
 
-import com.eignex.klause.bench.catalog.Catalog
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.report.Reports
-import com.eignex.klause.bench.source.CorpusFetcher
-import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
@@ -56,7 +53,8 @@ internal object LinearRootOpeningProfile {
             argument.substringBefore('=') to argument.substringAfter('=')
         }
         val required = setOf("suite", "problem", "sha256")
-        require(options.keys == required || options.keys == required + "inspect")
+        require(options.keys.containsAll(required) &&
+            options.keys.all { it in required + setOf("inspect", "source64", "sourceGzip64") })
         val inspection = options["inspect"]
         val inspections = setOf("disjunction-names", "partial-arithmetic", "partial-implication",
             "partial-propagation", "partial-propagation-cache", "partial-propagation-cached",
@@ -64,10 +62,8 @@ internal object LinearRootOpeningProfile {
         require(inspection == null || inspection in inspections)
         val expected = options.getValue("sha256")
         require(expected.matches(Regex("[0-9a-f]{64}")))
-        val reference = Catalog.uncapped(options.getValue("suite")).problems
-            .single { it.name == options.getValue("problem") }
-        val file = CorpusFetcher.resolve(reference.source)
-        val bytes = CorpusFiles.open(file).use { it.readNBytes(MAX_SOURCE_BYTES + 1) }
+        val bytes = trajectorySourceBytes(options.getValue("suite"), options.getValue("problem"), expected,
+            options["source64"], options["sourceGzip64"])
         require(bytes.size <= MAX_SOURCE_BYTES)
         val actual = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes))
         require(actual == expected) { "original source identity differs" }
@@ -78,6 +74,16 @@ internal object LinearRootOpeningProfile {
         val admitted = SmtLib.parse(bytes.decodeToString(), cancellation = parsingStop)
         val compiled = admitted
         val parsingNs = System.nanoTime() - parsingStarted
+        out.resolve("source-preparation.json").writeText(buildJsonObject {
+            put("suite", options.getValue("suite"))
+            put("problem", options.getValue("problem"))
+            put("sourceSha256", actual)
+            put("sourceBytes", bytes.size)
+            put("sourceMode", if ("source64" in options || "sourceGzip64" in options) "frozen" else "catalog")
+            put("parsingNs", parsingNs)
+            put("parsingBudgetMs", OPENING_BUDGET_MS)
+            put("stopped", parsingStop())
+        }.toString() + "\n")
         require(compiled.objective == null) { "only satisfaction openings are supported" }
         if (inspection != null && inspection.startsWith("partial-")) {
             LinearPrefixInspection.inspect(compiled, out, actual, probe = inspection == "partial-implication",
