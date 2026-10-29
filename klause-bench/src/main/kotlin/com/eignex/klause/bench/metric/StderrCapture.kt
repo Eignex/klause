@@ -2,6 +2,7 @@ package com.eignex.klause.bench.metric
 
 import kotlinx.serialization.Serializable
 import java.io.InputStream
+import java.io.IOException
 import java.io.OutputStream
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
@@ -73,7 +74,9 @@ internal class StderrCapture(
                 readFailure = readFailure,
                 artifactFailure = artifactFailure,
             )
-            Result(diagnostics.text, diagnostics.refusal.takeIf { status.streamComplete }, diagnostics.quarantines, status)
+            Result(
+                diagnostics.text, diagnostics.refusal.takeIf { status.streamComplete }, diagnostics.quarantines, status,
+            )
         }
     }
 
@@ -93,7 +96,7 @@ internal class StderrCapture(
                                 write(buffer, offset, count)
                                 flush()
                             }
-                        } catch (failure: Exception) {
+                        } catch (failure: IOException) {
                             artifactFailure = describe(failure)
                             runCatching { artifact?.close() }
                             artifact = null
@@ -118,13 +121,13 @@ internal class StderrCapture(
                     synchronized(diagnostics) { for (i in 0 until count) diagnostics.accept(buffer[i]) }
                 }
             }
-        } catch (failure: Exception) {
+        } catch (failure: IOException) {
             readFailure = describe(failure)
         } finally {
             try {
                 artifact?.close()
                 artifactClosed = artifact != null
-            } catch (failure: Exception) {
+            } catch (failure: IOException) {
                 artifactFailure = describe(failure)
             }
         }

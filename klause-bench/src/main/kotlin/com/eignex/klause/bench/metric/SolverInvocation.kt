@@ -11,6 +11,7 @@ import com.eignex.klause.bench.tools.CliProfile
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import java.io.File
+import java.io.IOException
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -359,7 +360,8 @@ internal object SolverInvocation {
                         }
 
                         // `c <key>=<value>` statistics (same shape as `%%%mzn-stat:`, different prefix).
-                        line.startsWith(XCSP_COMMENT_PREFIX) -> recordStat(line.removePrefix(XCSP_COMMENT_PREFIX).trim())
+                        line.startsWith(XCSP_COMMENT_PREFIX) ->
+                            recordStat(line.removePrefix(XCSP_COMMENT_PREFIX).trim())
                     }
 
                     Dialect.SMT_LIB -> when {
@@ -388,7 +390,7 @@ internal object SolverInvocation {
                     }
                 }
             }
-        } catch (failure: Exception) {
+        } catch (failure: IOException) {
             outputFailure = failure
         } finally {
             runCatching { stdoutCapture?.close() }.onFailure { outputFailure = it }
@@ -410,7 +412,9 @@ internal object SolverInvocation {
             runCatching {
                 directory.resolve("cli.stderr.json").writeText(Reports.json.encodeToString(diagnostics.status))
             }.onFailure {
-                diagnostics = diagnostics.copy(status = diagnostics.status.copy(metadataFailure = StderrCapture.describe(it)))
+                diagnostics = diagnostics.copy(
+                    status = diagnostics.status.copy(metadataFailure = StderrCapture.describe(it)),
+                )
             }
         }
         val elapsedMs = (System.nanoTime() - startNanos) / NANOS_PER_MILLI
@@ -454,7 +458,9 @@ internal object SolverInvocation {
         )
         if (outputFailure != null || exit == null || (exit != 0 && !anySolution && !unsat &&
                 !killed.get() && diagnostics.refusal == null)) {
-            throw Failure(result, "${cmd.first()} failed (exit $exit): ${diagnostics.text.take(STDERR_CAP)}", outputFailure)
+            throw Failure(
+                result, "${cmd.first()} failed (exit $exit): ${diagnostics.text.take(STDERR_CAP)}", outputFailure,
+            )
         }
         return result
     }
