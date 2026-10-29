@@ -281,14 +281,6 @@ legacy start-index placement rejected by the independent checker; use
 `suite=rewrite-structure-canonical-v1 problem=element-cone` for its separately
 identified standard-list-index control.
 
-The LP lifecycle script accepts `precision` as its fourth argument. It pairs
-fixed-width-first and early arbitrary-precision continuation requests through the
-existing four claims and changed/unchanged authority controls, alternating arm
-order between warmup and measured rounds. Both arms keep the same cumulative
-import, work, allocation and verification limits. Use total query/certification
-cost and actual allocation/RSS alongside import progress; the real source-worker
-control retains production policy.
-
 ## Corpus and build identity
 
 Compressed file inputs are staged with the existing corpus decoder before CLI
@@ -701,6 +693,14 @@ cumulative-limit behavior, and refinement phase and lifetime spending. These are
 diagnostic controls; unchanged requests and changed scopes are separate samples.
 All work stays under the existing 120-second containing profile deadline. The
 ordinary source worker follows the controls under its own nested deadline.
+
+The fourth argument `precision` pairs fixed-width-first and early arbitrary precision
+through the same claim and authority controls, alternating arm order. Both keep
+the same cumulative numerical and verification limits. It also pairs real source
+workers through their internal consumer context, each with five seconds and the
+existing 1,000-instruction ceiling. Other modes keep the two-second worker control.
+Use complete query/certification time and actual allocation alongside import
+progress; whole-process RSS spans both arms.
 
 Each owner runs cold, asserted-bound, bound-pop, appended-row and row-pop queries.
 Fresh owners at the same exact states control retained owners. One warmup precedes

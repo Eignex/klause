@@ -122,7 +122,7 @@ internal class LpWorkingScope internal constructor(
     fun solve(
         warm: Basis? = null,
         token: Cancellation = cancellation,
-        continuationLimits: ExactContinuationLimits = ExactContinuationLimits(),
+        continuationLimits: ExactContinuationLimits = owner.continuationLimits,
         fullContinuation: Boolean = true,
         observer: LpCertificationObserver? = null,
         claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,

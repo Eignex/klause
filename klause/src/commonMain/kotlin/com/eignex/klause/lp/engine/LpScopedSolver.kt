@@ -211,6 +211,8 @@ internal class LpScopedSolver(
     fun compact(remap: LpLayoutRemap, token: Cancellation = cancellation): Boolean =
         edit(token, compaction = remap) { it.compact(remap, token) }
 
+    val continuationLimits get() = ExactContinuationLimits(startArbitraryPrecision = context.startArbitraryPrecision)
+
     val basisLifecycleWork: BasisOperationWork? get() = (solver as? PersistentLpSolver)?.basisLifecycleWork
 
     @Suppress("TooGenericExceptionCaught")
@@ -218,7 +220,7 @@ internal class LpScopedSolver(
         warm: Basis? = null,
         token: Cancellation = cancellation,
         counterResults: LpCounterResults? = null,
-        continuationLimits: ExactContinuationLimits = ExactContinuationLimits(),
+        continuationLimits: ExactContinuationLimits = this.continuationLimits,
         fullContinuation: Boolean = true,
         observer: LpCertificationObserver? = null,
         refinementLimits: LpRefinementLimits = LpRefinementLimits(),
