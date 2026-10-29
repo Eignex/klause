@@ -189,11 +189,15 @@ internal class PoolClauseExchange(
         ) + memory)
     }
 
-    override fun onRestart(session: PropagationSession) = metered {
+    private fun retainSession(session: PropagationSession) {
         if (sessionIdentity == null) {
             sessionIdentity = session.sharingIdentity
             meter?.clauseCount("sessions", 1L)
         }
+    }
+
+    override fun onRestart(session: PropagationSession) = metered {
+        retainSession(session)
         val drained = pool.drainSince(cursor)
         cursor = drained.cursor
         var imported = 0
@@ -235,12 +239,14 @@ internal class PoolClauseExchange(
     }
 
     override fun onSearchEnd(session: PropagationSession) = metered {
+        retainSession(session)
         countUses(session)
         export(session)
         observe(session)
     }
 
     override fun onSearchClose(session: PropagationSession) = metered {
+        retainSession(session)
         countUses(session)
         export(session)
         observe(session)

@@ -219,6 +219,21 @@ class SharedClausePoolTest {
     }
 
     @Test
+    fun `a preparation pause should preserve exports before the first search start`() {
+        val problem = Problem(4, 0, emptyArray(), emptyList())
+        val pool = SharedClausePool()
+        val exchange = PoolClauseExchange(pool)
+        val session = PropagationSession(problem)
+        session.addLearnedClause(Clause(intArrayOf(0, 2)), 1)
+        exchange.onSearchEnd(session)
+
+        exchange.onSearchStart(session)
+
+        assertEquals(1, session.learnedClauseCount)
+        assertEquals(1, pool.drainSince(0).clauses.size)
+    }
+
+    @Test
     fun `retiring a search should release its duplicate filter`() {
         val problem = Problem(4, 0, emptyArray(), emptyList())
         val pool = SharedClausePool(measureMemory = true)
