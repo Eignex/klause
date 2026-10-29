@@ -198,4 +198,26 @@ class RootInprocessingTest {
             assertEquals(0, session.learnedClauseCount)
         }
     }
+
+    @Test
+    fun `an empty learned generation should release an obsolete root candidate`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(problem(), nativeSat = native)
+            session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
+            val pass = RootSimplificationPass()
+            pass.run(session, BacktrackParams(inprocessingRootWork = 1L), null)
+            val before = SharingMemoryObservation(1024L, 128, { false }, {})
+            val retained = before.snapshot { pass.retainedMemory(before, false) }
+            assertTrue(assertNotNull(retained.completeValues).getValue("ownedPrimitiveBytes") > 0L)
+
+            session.forgetLearnedClauses { _, _ -> false }
+            pass.run(session, BacktrackParams(), null)
+            val after = SharingMemoryObservation(1024L, 128, { false }, {})
+            val released = after.snapshot { pass.retainedMemory(after, false) }
+
+            assertEquals(0, session.learnedClauseCount)
+            assertFalse(session.fixpointCancelled)
+            assertEquals(0L, assertNotNull(released.completeValues).getValue("ownedPrimitiveBytes"))
+        }
+    }
 }

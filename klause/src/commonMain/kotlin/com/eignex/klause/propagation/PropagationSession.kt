@@ -116,6 +116,7 @@ class PropagationSession private constructor(
         levelStates = emptyArray()
         levelTop = 0
         sharedLearningMemory = null
+        sharedLearningPosition = null
         retainedSharingMemory = null
         retainedSharingSize = null
         retainedInprocessingMemory = null
@@ -1089,6 +1090,7 @@ class PropagationSession private constructor(
     internal val sharingIdentity = Any()
 
     internal var sharedLearningMemory: ((SharingMemoryObservation) -> Unit)? = null
+    internal var sharedLearningPosition: (() -> Any)? = null
     internal var retainedSharingMemory: ((SharingMemoryObservation) -> Unit)? = null
     internal var retainedSharingSize: (() -> Long)? = null
     internal var retainedInprocessingMemory: ((SharingMemoryObservation) -> Unit)? = null
@@ -1235,9 +1237,18 @@ class PropagationSession private constructor(
      * literals are decoded to `(intVar, kind, threshold, sign)` via the atom registry; boolean
      * literals travel as-is. Cheap: the glue set is small by construction. (See [ClauseExchange].)
      */
-    fun exportGlueClauses(maxLbd: Int, maxLen: Int, skipPermanent: Boolean = false): List<SharedClause> {
+    fun exportGlueClauses(maxLbd: Int, maxLen: Int, skipPermanent: Boolean = false): List<SharedClause> =
+        checkNotNull(exportGlueClausesBounded(maxLbd, maxLen, skipPermanent) { false })
+
+    internal fun exportGlueClausesBounded(
+        maxLbd: Int,
+        maxLen: Int,
+        skipPermanent: Boolean,
+        cancelled: () -> Boolean,
+    ): List<SharedClause>? {
         val out = ArrayList<SharedClause>()
         for (i in 0 until learnedClauseCount) {
+            if (cancelled()) return null
             // Permanent clauses are the search-conditioned assertions — the incumbent objective bound
             // (assertObjectiveBound) and blocking nogoods — not globally-valid resolvents. A caller
             // learning under assumptions/incumbent (LNS repair) must skip them or it poisons peers.
@@ -1247,11 +1258,11 @@ class PropagationSession private constructor(
             if (learnedClauseOrigin(i) != OWN_ORIGIN) continue
             val lbd = learnedClauseLbd(i)
             if (lbd > maxLbd) continue
+            if (learnedClauseLiteralCount(i) > maxLen) continue
             val lits = learnedClauseLiterals(i)
-            if (lits.size > maxLen) continue
             out.add(asSharedClause(lits, lbd))
         }
-        return out
+        return out.takeUnless { cancelled() }
     }
 
     /**

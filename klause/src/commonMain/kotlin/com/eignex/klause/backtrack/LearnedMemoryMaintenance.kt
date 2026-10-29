@@ -13,6 +13,7 @@ internal class LearnedMemoryMaintenance {
         val atoms: Int,
         val ownershipWork: Long,
         val sharingBytes: Long,
+        val sharedLearning: Any?,
         val inprocessingWork: Long,
         val publication: Boolean,
     )
@@ -30,14 +31,13 @@ internal class LearnedMemoryMaintenance {
         fun position() = Position(session.sharingIdentity, session.learnedClauseCount, session.learnedClauseRevision,
             session.decisionLevel, session.explanationState.undoTop, session.explanationState.atoms.intVar.size,
             session.ownershipWork, session.retainedSharingSize?.invoke() ?: 0L,
+            session.sharedLearningPosition?.invoke(),
             inprocessing?.retainedRevision ?: 0L, inprocessing?.retainsPublication == true)
         if (observed == position()) return
         val result = session.reclaimLearnedMemory(limit, params.learnedMemoryWork, params.learnedMemoryScratchBytes,
             { inprocessing?.releaseRetainedBuffers() ?: false }, inprocessing?.retainsPublication == true)
-        // Repeating unchanged maintenance must not consume every short resumed slice before a branch.
-        observed = position().takeUnless {
-            result.status == com.eignex.klause.propagation.ReclamationStatus.CANCELLED
-        }
+        // This is an attempt cursor, not a valid snapshot: even cancelled scans must yield to search progress.
+        observed = position()
         stats?.noteInprocessing("learnedMemory${result.status.name}", 1L)
         stats?.noteInprocessing("learnedMemoryWork", result.work)
         if (result.protectedLimitExceeded) stats?.noteInprocessing("learnedMemoryProtectedLimit", 1L)
