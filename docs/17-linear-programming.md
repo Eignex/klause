@@ -260,6 +260,11 @@ selected row establishes no deduction. Nonzero exact certificate support is repo
 separately when a checked bound, conflict or reduced-cost deduction is consumed.
 Source traversal likewise distinguishes installed rows, checked combinations and
 actual bound or conflict closures.
+Finite observations count contributing row uses; source-frontier observations count
+participating families per closure. Several rows or families can support one
+deduction, without establishing its marginal benefit over a no-cut control. A
+stronger accepted safe bound cites its own dual support rather than a weaker
+integer certificate's rows.
 
 Per-family solve and certificate observations are inclusive containing costs:
 several participating families share the same solve, factor construction and exact
