@@ -363,6 +363,63 @@ native verdicts separately from independent checks. A priority trial additionall
 needs periodic opportunities preventing starvation and lower total cost or improved
 checked outcomes before activation.
 
+[9243](https://lab.eignex.com/jobs/9243) compares the three controls at
+`8250ff0af5`, seed 17, one Linux/amd64 processor, 2,000 decisions per worker and a
+10-second CLI ceiling, with presolve and LP disabled. Source digests and installed
+CLI/library/runtime hash maps match within each triple; path-sensitive build
+fingerprints differ. Ordinary and attributed controls retain the same logical
+work and outcomes on all five successfully loaded sources.
+
+On `cyclic-mod3-sat`, 1,376 units of Table propagation and 1,037 units of lazy
+reason work produce 16 completed explanations, eight Table first-UIP visits and
+two consumed learned objects. Historical refinement adds 76 work units to the
+3,013-unit solve without an accepted improvement, changed search or objective.
+`overlap-tables-unsat` similarly spends eight extra refinement units without a
+changed outcome. On `magic-square-3`, 41 Linear explanation builds cost 380 work
+units; 26 Linear and four AllDifferent first-UIP visits contribute to the same
+four consumed objects. These overlapping credits cannot be summed. The linear
+knapsack control has four explanations but no first-UIP or consumption credit.
+Packed SAT on `php4` records 27 consumed clauses and five later-use events.
+These observations locate learning consumers and unsuccessful explanation work;
+they establish no counterfactual speedup.
+
+The nine feasible XCSP witnesses have valid source-matched SolutionChecker
+receipts, version `2.5.1+ca58fc79a42374d080aac4d1410874e748cf0a05`.
+Witness hashes match within each source's triple. Checker platform and resource
+details are unrecorded. The receipts establish feasibility; native optimality and
+UNSAT reports remain independently unverified.
+
+Preparation is part of this evidence: [9226](https://lab.eignex.com/jobs/9226)
+spends 895 seconds, including 476 waiting for a compiler, 249 compiling,
+120 selecting and 23 uploading, then exhausts its 900-second whole-run deadline.
+Its normal retry retains the exhausted deadline. Job 9243 reuses verified
+artifacts in 23 seconds, executes all 18 cases, and exhausts its 1,200-second
+containing deadline after worker completion; three scheduling controls fail
+loading compressed input. Source checking takes about 100 milliseconds per
+accepted witness. Complete finalization/retirement time is unqualified, and these
+single, cache-dependent observations support no throughput or RSS claim.
+
+[9270](https://lab.eignex.com/jobs/9270) completes the three frozen RCPSP controls
+at `76a5438832` after compressed-source staging. Source and installed build/runtime
+hashes match within the triple. Decoding takes 2–3 ms inside the 10-second source
+allowance; invocation and staged-file retirement take 10,498–10,539 ms, including
+JVM startup and output. All three witnesses pass the source checker in 160–250 ms.
+Their objectives are 118, 117 and 121 in control order. Optimization selects the
+timed finite CP portfolio, so these different search traces establish no causal
+performance comparison. The attributed case spends 30,633,861 scheduling work
+units, with 25,425 completed explanations, 12,349 first-UIP visits, 524 consumed
+objects and 137 later-use events. It records 38 untracked scheduling observations;
+bounded provenance does not cover every reason. Scheduling reasoning dominates
+charged propagation and has downstream consumers, without an established net gain.
+
+The focused job finishes in 501 seconds, including 440 preparing: 245 compiling,
+128 selecting, 12 archiving and 39 uploading. Its workers commit and request stop.
+The earlier [9258](https://lab.eignex.com/jobs/9258) loses a preparation worker and
+exhausts its containing 1,200-second allowance during recovery without solver cases.
+[9269](https://lab.eignex.com/jobs/9269) is rejected before allocation because its
+revision is detached by rebase. Failed preparation and recovery remain charged;
+no priority, refinement or attribution default change follows from these captures.
+
 ## LP capture and replay
 
 The opt-in basis tool uses the [basis corpus](../klause/src/jvmTest/resources/basis-corpus/README.md):
