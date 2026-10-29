@@ -10,6 +10,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.SharingMemoryStatus
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -19,7 +20,9 @@ class LearnedReclamationTest {
     @Test
     fun `reclamation should release unused payload watches and primitive metadata on both stores`() {
         for (native in listOf(false, true)) {
-            val session = PropagationSession(Problem(4, 0, emptyArray(), emptyList()), nativeSat = native)
+            val session = PropagationSession(Problem(4, 0, emptyArray(),
+                arrayOf(Clause(intArrayOf(6, 7)))), nativeSat = native)
+            assertEquals(native, session.usesNativeSat)
             repeat(16) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 2) }
             val before = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
 
@@ -40,7 +43,9 @@ class LearnedReclamationTest {
     @Test
     fun `tiny work allowances should defer without changing either learned store`() {
         for (native in listOf(false, true)) for (allowance in listOf(0L, 1L, 7L)) {
-            val session = PropagationSession(Problem(4, 0, emptyArray(), emptyList()), nativeSat = native)
+            val session = PropagationSession(Problem(4, 0, emptyArray(),
+                arrayOf(Clause(intArrayOf(6, 7)))), nativeSat = native)
+            assertEquals(native, session.usesNativeSat)
             session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
             val revision = session.learnedClauseRevision
 
@@ -58,7 +63,9 @@ class LearnedReclamationTest {
     @Test
     fun `tiny scratch allowances should preserve the learned watches on both stores`() {
         for (native in listOf(false, true)) for (allowance in listOf(0L, 1L, 63L)) {
-            val session = PropagationSession(Problem(4, 0, emptyArray(), emptyList()), nativeSat = native)
+            val session = PropagationSession(Problem(4, 0, emptyArray(),
+                arrayOf(Clause(intArrayOf(6, 7)))), nativeSat = native)
+            assertEquals(native, session.usesNativeSat)
             session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
 
             val reclaimed = session.reclaimLearnedMemory(0L, maxWork = 1_000_000L,
@@ -74,7 +81,9 @@ class LearnedReclamationTest {
     @Test
     fun `an exhausted preparation allowance should defer before publication on both stores`() {
         for (native in listOf(false, true)) {
-            val session = PropagationSession(Problem(4, 0, emptyArray(), emptyList()), nativeSat = native)
+            val session = PropagationSession(Problem(4, 0, emptyArray(),
+                arrayOf(Clause(intArrayOf(6, 7)))), nativeSat = native)
+            assertEquals(native, session.usesNativeSat)
             session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
             val allowance = session.sharingMemory(maxWork = 1_000_000L).work + 2L
             val revision = session.learnedClauseRevision
@@ -92,17 +101,23 @@ class LearnedReclamationTest {
     }
 
     @Test
-    fun `insufficient native arena scratch should defer after completing the observation`() {
-        val session = PropagationSession(Problem(4096, 0, emptyArray(), emptyList()), nativeSat = true)
+    fun `insufficient native arena scratch should preserve the store before publication`() {
+        val session = PropagationSession(Problem(4096, 0, emptyArray(),
+            arrayOf(Clause(intArrayOf(0, 1)))), nativeSat = true)
+        assertTrue(session.usesNativeSat)
         session.addLearnedClause(Clause(IntArray(4096) { it * 2 }), 2)
         assertEquals(4096, session.learnedClauseLiteralCount(0))
+        val before = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
 
-        val reclaimed = session.reclaimLearnedMemory(0L, maxWork = 1_000_000L, maxScratchBytes = 8192L)
+        val published = session.explanationState.forgetLearnedClauses(
+            maxWork = 1_000_000L, maxScratchBytes = 8192L) { _, _ -> false }
+        val after = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
 
-        assertEquals(ReclamationStatus.DEFERRED, reclaimed.status)
-        assertNotNull(reclaimed.beforeBytes)
+        assertFalse(published)
         assertEquals(1, session.learnedClauseCount)
         assertEquals(4096, session.learnedClauseLiteralCount(0))
+        assertEquals(before.getValue("learnedArenaCapacityBytes"), after.getValue("learnedArenaCapacityBytes"))
+        assertEquals(before.getValue("ownedPrimitiveBytes"), after.getValue("ownedPrimitiveBytes"))
     }
 
     @Test
@@ -110,8 +125,10 @@ class LearnedReclamationTest {
         for (native in listOf(false, true)) {
             var limit = Long.MAX_VALUE
             lateinit var session: PropagationSession
-            session = PropagationSession(Problem(4, 0, emptyArray(), emptyList()), nativeSat = native,
+            session = PropagationSession(Problem(4, 0, emptyArray(),
+                arrayOf(Clause(intArrayOf(6, 7)))), nativeSat = native,
                 cancellation = Cancellation { limit != Long.MAX_VALUE && session.work >= limit })
+            assertEquals(native, session.usesNativeSat)
             repeat(3) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 2) }
             val observationWork = session.sharingMemory(maxWork = 1_000_000L).work
             val revision = session.learnedClauseRevision
@@ -133,7 +150,9 @@ class LearnedReclamationTest {
     @Test
     fun `reclamation should keep the live reason usable after sibling undo`() {
         for (native in listOf(false, true)) {
-            val session = PropagationSession(Problem(3, 0, emptyArray(), emptyList()), nativeSat = native)
+            val session = PropagationSession(Problem(3, 0, emptyArray(),
+                arrayOf(Clause(intArrayOf(4, 5)))), nativeSat = native)
+            assertEquals(native, session.usesNativeSat)
             session.addLearnedClause(Clause(intArrayOf(4, 5)), 4)
             session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
             session.pinBool(0, false)
@@ -156,6 +175,7 @@ class LearnedReclamationTest {
         for (native in listOf(false, true)) {
             val source = Problem(2, 0, emptyArray(), arrayOf(Clause(intArrayOf(1))))
             val session = PropagationSession(source, nativeSat = native)
+            assertEquals(native, session.usesNativeSat)
             session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
             val reason = assertNotNull(session.boolReasonClause(1)).toList()
 
@@ -223,7 +243,9 @@ class LearnedReclamationTest {
     @Test
     fun `releasing a session should make retained memory stale on both stores`() {
         for (native in listOf(false, true)) {
-            val session = PropagationSession(Problem(4, 0, emptyArray(), emptyList()), nativeSat = native)
+            val session = PropagationSession(Problem(4, 0, emptyArray(),
+                arrayOf(Clause(intArrayOf(6, 7)))), nativeSat = native)
+            assertEquals(native, session.usesNativeSat)
             session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
             val work = session.work
 

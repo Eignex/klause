@@ -160,11 +160,12 @@ class SharedClausePoolTest {
     @Test
     fun `slow consumers should suppress retained and evicted keys across generations`() {
         for (native in listOf(false, true)) {
-            val problem = Problem(128, 0, emptyArray(), emptyList())
+            val problem = Problem(128, 0, emptyArray(), listOf(Clause(intArrayOf(0, 1))))
             val pool = SharedClausePool(cap = 4, measureMemory = true)
             val meter = SharingMeter()
             val exchange = PoolClauseExchange(pool, origin = 1, meter = meter)
             val session = PropagationSession(problem, nativeSat = native)
+            assertEquals(native, session.usesNativeSat)
             val retained = boolClause(0, 1)
             val evicted = boolClause(2, 9)
             pool.publish(listOf(retained, evicted), origin = 2)
@@ -189,24 +190,30 @@ class SharedClausePoolTest {
 
     @Test
     fun `suspension should retain the filter while a fresh session releases its capacity`() {
-        val problem = Problem(128, 0, emptyArray(), emptyList())
-        val pool = SharedClausePool(cap = 4, measureMemory = true, memorySampleWork = 262_144L)
+        val retained = 24
+        val boolVars = retained * 2 + 1
+        // Watch arrays, learned payloads and fixed columns bound repeated owner-identity scans.
+        val ownerBound = boolVars * 4L + retained * 8L + 128L
+        val sampleWork = ownerBound * ownerBound * 4L
+        val problem = Problem(boolVars, 0, emptyArray(), emptyList())
+        val pool = SharedClausePool(cap = 4, measureMemory = true, memorySampleWork = sampleWork)
         val meter = SharingMeter()
         val exchange = PoolClauseExchange(pool, origin = 1, meter = meter)
         val session = PropagationSession(problem)
         exchange.onSearchStart(session)
-        repeat(24) { i ->
+        repeat(retained) { i ->
             pool.publish(listOf(boolClause(i * 2, 1)), origin = 2)
             exchange.onRestart(session)
         }
         exchange.onSearchEnd(session)
         val suspended = meter.snapshot().clauses
-        assertEquals(1L, suspended.getValue("memorySampleComplete"))
+        assertEquals(1L, suspended.getValue("memorySampleComplete"),
+            "work=${suspended["memorySampleWork"]}/$sampleWork scratch=${suspended["memorySampleScratchEntries"]}/4096")
         assertEquals(24L, suspended.getValue("seenKeys"))
         assertEquals(24L, suspended.getValue("learnedObjects"))
         assertTrue(suspended.getValue("seenKeys") > suspended.getValue("poolClauses"))
         val count = session.learnedClauseCount
-        session.reseedFrom(com.eignex.klause.propagation.Assumptions.None.withBool(100, true))
+        session.reseedFrom(com.eignex.klause.propagation.Assumptions.None.withBool(boolVars - 1, true))
         exchange.onSearchStart(session)
         assertEquals(count, session.learnedClauseCount)
         assertEquals(suspended.getValue("seenCapacityBytes"), meter.snapshot().clauses.getValue("seenCapacityBytes"))
@@ -254,11 +261,12 @@ class SharedClausePoolTest {
     @Test
     fun `shared consumption should retain accounted reasons through native compaction`() {
         for (native in listOf(false, true)) {
-            val problem = Problem(4, 0, emptyArray(), emptyList())
+            val problem = Problem(4, 0, emptyArray(), listOf(Clause(intArrayOf(0, 1))))
             val pool = SharedClausePool(measureMemory = true)
             val meter = SharingMeter()
             val exchange = PoolClauseExchange(pool, origin = 1, meter = meter)
             val session = PropagationSession(problem, nativeSat = native)
+            assertEquals(native, session.usesNativeSat)
             pool.publish(listOf(boolClause(0, 1)), origin = 2)
             exchange.onSearchStart(session)
             session.pinBool(0, false)
@@ -281,11 +289,12 @@ class SharedClausePoolTest {
     fun `cancelled close releases the filter without observing or exporting the store`() {
         for (native in listOf(false, true)) {
             var cancelled = false
-            val problem = Problem(8, 0, emptyArray(), emptyList())
+            val problem = Problem(8, 0, emptyArray(), listOf(Clause(intArrayOf(0, 1))))
             val pool = SharedClausePool(measureMemory = true)
             val meter = SharingMeter()
             val exchange = PoolClauseExchange(pool, origin = 1, meter = meter)
             val session = PropagationSession(problem, nativeSat = native, cancellation = Cancellation { cancelled })
+            assertEquals(native, session.usesNativeSat)
             pool.publish(listOf(boolClause(0, 1)), origin = 2)
             exchange.onSearchStart(session)
             session.addLearnedClause(Clause(intArrayOf(4, 6)), 1)
@@ -531,8 +540,9 @@ class SharedClausePoolTest {
             val pool = SharedClausePool(cap = 100, softLimitBytes = 500L, measureMemory = true)
             val meter = SharingMeter()
             val exchange = PoolClauseExchange(pool, origin = 1, meter = meter)
-            val problem = Problem(128, 0, emptyArray(), emptyList())
+            val problem = Problem(128, 0, emptyArray(), listOf(Clause(intArrayOf(0, 1))))
             val session = PropagationSession(problem, nativeSat = native)
+            assertEquals(native, session.usesNativeSat)
             exchange.onSearchStart(session)
             repeat(12) {
                 pool.publish(listOf(boolClause(it * 4, 1)), origin = 2)
@@ -575,8 +585,9 @@ class SharedClausePoolTest {
             val pool = SharedClausePool(cap = 100, softLimitBytes = 200L, measureMemory = true)
             val meter = SharingMeter()
             val exchange = PoolClauseExchange(pool, origin = 1, meter = meter)
-            val problem = Problem(128, 0, emptyArray(), emptyList())
+            val problem = Problem(128, 0, emptyArray(), listOf(Clause(intArrayOf(0, 1))))
             val session = PropagationSession(problem, nativeSat = native)
+            assertEquals(native, session.usesNativeSat)
             exchange.onSearchStart(session)
             repeat(24) {
                 pool.publish(listOf(boolClause(it * 4, 1)), origin = 2)
@@ -703,7 +714,9 @@ class SharedClausePoolTest {
         val allowance = 512L
         val pool = SharedClausePool(softLimitBytes = 1000L, shareMaxLen = 2, reclamationWork = allowance)
         val exchange = PoolClauseExchange(pool)
-        val session = PropagationSession(Problem(128, 0, emptyArray(), emptyList()), nativeSat = true)
+        val problem = Problem(128, 0, emptyArray(), listOf(Clause(intArrayOf(0, 1))))
+        val session = PropagationSession(problem, nativeSat = true)
+        assertTrue(session.usesNativeSat)
         session.addLearnedClause(Clause(boolClause(0, 1, len = 128).boolLits), 1)
         val before = session.work
 
