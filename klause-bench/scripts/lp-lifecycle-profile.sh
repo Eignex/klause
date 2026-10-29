@@ -2,10 +2,12 @@
 set -euo pipefail
 : "${LAB_WORKTREE:?lab source root is required}"
 : "${OUT:?lab output directory is required}"
-trace="${1:?usage: lp-lifecycle-profile.sh mps-afiro|mps-adlittle [repeats]}"
+trace="${1:?usage: lp-lifecycle-profile.sh mps-afiro|mps-adlittle [repeats] [both|jvm|native]}"
 repeats="${2:-3}"
+runtime="${3:-both}"
 [[ "$trace" == mps-afiro || "$trace" == mps-adlittle ]] || exit 2
 [[ "$repeats" =~ ^[1-5]$ ]] || exit 2
+[[ "$runtime" == both || "$runtime" == jvm || "$runtime" == native ]] || exit 2
 [[ "$(uname -s)/$(uname -m)" == Linux/x86_64 ]] || exit 2
 manifest="$LAB_WORKTREE/klause/src/jvmTest/resources/basis-corpus/manifest.json"
 source_identity="$(jq -er --arg id "$trace" '.fixtures[] | select(.id == $id) | .source' "$manifest")"
@@ -22,15 +24,19 @@ git -C "$LAB_WORKTREE" rev-parse HEAD > "$OUT/revision.txt"
 uname -a > "$OUT/platform.txt"
 if command -v lscpu >/dev/null; then lscpu > "$OUT/cpu.txt"; fi
 "${JAVA_HOME:+$JAVA_HOME/bin/}java" -version > "$OUT/java-version.txt" 2>&1
-native="$LAB_WORKTREE/klause/build/bin/linuxX64/lpProfileReleaseExecutable/klause-lp-profile.kexe"
-sha256sum "$native" > "$OUT/native-sha256.txt"
-find "$LAB_WORKTREE/klause/build/lp-profile/jvm" -type f -print0 | sort -z | xargs -0 sha256sum > "$OUT/jvm-sha256.txt"
-/usr/bin/time -v -o "$OUT/jvm-resources.txt" \
+if [[ "$runtime" != native ]]; then
+  find "$LAB_WORKTREE/klause/build/lp-profile/jvm" -type f -print0 | sort -z | xargs -0 sha256sum > "$OUT/jvm-sha256.txt"
+  /usr/bin/time -v -o "$OUT/jvm-resources.txt" \
   "${JAVA_HOME:+$JAVA_HOME/bin/}java" -Xmx1536m -XX:ActiveProcessorCount=1 -XX:+UseSerialGC \
   -Xlog:jfr+startup=off \
   --enable-native-access=ALL-UNNAMED --add-modules=jdk.incubator.vector \
   "-XX:StartFlightRecording=filename=$OUT/lifecycle.jfr,settings=profile,dumponexit=true" \
   -cp "$LAB_WORKTREE/klause/build/lp-profile/jvm/classes:$LAB_WORKTREE/klause/build/lp-profile/jvm/lib/*" \
   com.eignex.klause.bench.profile.LpLifecycleProfileKt "${args[@]}" > "$OUT/jvm.ndjson"
-"${JAVA_HOME:+$JAVA_HOME/bin/}jfr" print --json --events jdk.ObjectAllocationSample "$OUT/lifecycle.jfr" > "$OUT/allocations.json"
-/usr/bin/time -v -o "$OUT/native-resources.txt" "$native" "${args[@]}" > "$OUT/native.ndjson"
+  "${JAVA_HOME:+$JAVA_HOME/bin/}jfr" print --json --events jdk.ObjectAllocationSample "$OUT/lifecycle.jfr" > "$OUT/allocations.json"
+fi
+if [[ "$runtime" != jvm ]]; then
+  native="$LAB_WORKTREE/klause/build/bin/linuxX64/lpProfileReleaseExecutable/klause-lp-profile.kexe"
+  sha256sum "$native" > "$OUT/native-sha256.txt"
+  /usr/bin/time -v -o "$OUT/native-resources.txt" "$native" "${args[@]}" > "$OUT/native.ndjson"
+fi
