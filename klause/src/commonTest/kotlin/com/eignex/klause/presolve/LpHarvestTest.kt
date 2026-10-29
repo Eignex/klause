@@ -6,10 +6,15 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.lp.bounding.LpEngine
+import com.eignex.klause.lp.bounding.LpParams
 import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.baked
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.FactorProjectionProviders
+import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -20,6 +25,36 @@ import kotlin.test.assertTrue
 class LpHarvestTest {
     private val shavingParams = LpPlan(bounding = true, variableShaving = true)
     private val objShavingParams = LpPlan(bounding = true, objectiveShaving = true)
+
+    @Test
+    fun `a consuming LP should reuse templates across incremental presolve preparation`() {
+        val source = Problem(0, 4, Array(4) { IntDomain(0, 10) }, arrayOf<Factor>(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 3),
+            Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 3),
+        ))
+        val problem = source.bake(FactorProjectionProviders.Default.prepare(source))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1, 1))
+        val plan = LpPlan(bounding = true, componentOwnership = true)
+        val first = lpHarvestReporting(problem, objective, plan)
+        val session = PresolveSession(first.problem)
+        session.apply(PresolveDelta(domains = arrayOf(IntDomain(1, 10), IntDomain(0, 10),
+            IntDomain(0, 10), IntDomain(0, 10))))
+        val prepared = session.materialize()
+        val second = lpHarvestReporting(prepared, objective, plan)
+        val sink = SolveStatsSink("template-consumer")
+
+        val pruned = LpEngine(second.problem, objective, LpParams(lpPlan = plan), sink).use { engine ->
+            engine.pruneNode(PropagationSession(second.problem), 5.0, -1, true)
+        }
+
+        assertTrue(pruned)
+        assertTrue(second.stats.phases.filterKeys { it.startsWith("TEMPLATE_PREPARATION_") }.values
+            .sumOf { it.outcomes["FACTORS_REUSED"] ?: 0L } > 0L)
+        assertTrue(sink.snapshot().lp.phases.filterKeys { it.startsWith("TEMPLATE_PREPARATION_") }.values
+            .sumOf { it.outcomes["FACTORS_REUSED"] ?: 0L } > 0L)
+        assertTrue(sink.snapshot().lp.phases.filterKeys { it.startsWith("TEMPLATE_ASSEMBLY_") }.values
+            .sumOf { it.outcomes["ROWS"] ?: 0L } > 0L)
+    }
 
     @Test
     fun `objective shaving should raise the objective variable lower bound`() {

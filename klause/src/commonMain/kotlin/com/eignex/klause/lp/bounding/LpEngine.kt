@@ -342,6 +342,8 @@ internal class LpEngine(
                 deferred = deferred,
                 projections = projections,
                 elementIndexes = elementIndexes,
+                templateStats = sink.lp,
+                preparationCancellation = params.cancellation,
             )
         } else {
             null

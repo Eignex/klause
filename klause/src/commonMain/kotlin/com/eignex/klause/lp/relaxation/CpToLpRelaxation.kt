@@ -86,6 +86,7 @@ import com.eignex.klause.util.MutableIntIntMap
 import com.eignex.klause.util.MutableIntLongMap
 import com.eignex.klause.util.addExact
 import com.eignex.klause.util.subExact
+import kotlin.time.TimeSource
 
 internal class LpAssemblyCancelled : RuntimeException()
 
@@ -676,9 +677,35 @@ internal class CpToLpRelaxation(
     deferred: Boolean = false,
     private val projections: PreparedFactorProjections? = (problem as? BakedProblem)?.factorProjections,
     elementIndexes: Set<Int>? = null,
+    private val templateStats: LpStatsSink? = null,
+    private val reuseSourceTemplates: Boolean = true,
+    private val preparationCancellation: Cancellation = Cancellation.Never,
 ) {
     private val elementIndexes = elementIndexes?.toSet()
     private val linearProjection = LinearLpProjection()
+    internal var preparationTemplates: LpPreparationTemplates? = null
+        private set
+
+    private fun prepareTemplates(cancellation: Cancellation) {
+        if (!reuseSourceTemplates || projections == null) return
+        preparationTemplates = null
+        val start = TimeSource.Monotonic.markNow()
+        var work = 0L
+        try {
+            preparationTemplates = projections.prepareLpTemplates(objective, cancellation) { work = it }
+        } finally {
+            val templates = preparationTemplates
+            templateStats?.observeTemplatePreparation(start.elapsedNow().inWholeNanoseconds, work,
+                if (templates == null) mapOf("DECLINED" to 1L) else mapOf(
+                    "PREPARED" to 1L, "FACTORS_REUSED" to templates.reusedFactors.toLong(),
+                    "BOUNDS_REUSED" to templates.reusedBounds.toLong(),
+                    "COMPONENTS_REUSED" to templates.reusedComponents.toLong(),
+                    "COMPONENTS_DIRTY" to (templates.components.size - templates.reusedComponents).toLong(),
+                    "RETAINED_UNITS_SUM" to templates.storageUnits,
+                ))
+        }
+        if (cancellation()) throw LpAssemblyCancelled()
+    }
 
     /** Verified makespan plans for the scheduling globals; null when disabled or none applicable. */
     private var cumulativeRelaxation: CumulativeRelaxation? = null
@@ -765,7 +792,11 @@ internal class CpToLpRelaxation(
         domains: RelaxationDomains,
         extraCuts: List<Cut> = emptyList(),
         cancellation: Cancellation = Cancellation.Never,
-    ): LpRelaxation = Assembler(domains, cancellation = cancellation).assemble(extraCuts)
+    ): LpRelaxation {
+        val token = cancellation or preparationCancellation
+        prepareTemplates(token)
+        return Assembler(domains, cancellation = token).assemble(extraCuts)
+    }
 
     private val timeIndexedViews by lazy {
         if (cumulativeTimeIndexed && !objectiveCone) schedulingViews(builtInFamilySource) else emptyList()
@@ -803,6 +834,7 @@ internal class CpToLpRelaxation(
         domains: RelaxationDomains,
         cancellation: Cancellation = Cancellation.Never,
     ): LpEmission {
+        if (preparationTemplates == null) prepareTemplates(cancellation or preparationCancellation)
         val tracked = LpEmissionDomains(domains)
         val relaxation = Assembler(
             tracked,
@@ -1078,10 +1110,17 @@ internal class CpToLpRelaxation(
                 val dom = columnDomains.intDomain(intVar)
                 val intBounds = problem.intBounds
                 val openHi = columnDomains.honorsOpenSides && !intBounds.hasUpper(intVar) && intBounds.hasLower(intVar)
+                val template = preparationTemplates?.bounds?.get(intVar)?.takeIf {
+                    it.lower == dom.min && it.upper == dom.max &&
+                        it.statedLower == intBounds.hasLower(intVar) && it.statedUpper == intBounds.hasUpper(intVar)
+                }
+                if (template != null) templateStats?.observeTemplateUse(bounds = 1)
                 c = if (openHi) {
-                    builder.addOpenAboveVar(intBounds.lower(intVar), intCost(intVar), tag = intVar)
+                    builder.addOpenAboveVar(template?.lower?.takeIf { it == intBounds.lower(intVar) }
+                        ?: intBounds.lower(intVar), intCost(intVar), tag = intVar)
                 } else {
-                    builder.addVar(dom.min, dom.max, intCost(intVar), tag = intVar)
+                    builder.addVar(template?.lower ?: dom.min, template?.upper ?: dom.max,
+                        intCost(intVar), tag = intVar)
                 }
                 if (region == null) intCol[intVar] = c else sparseIntCol.put(intVar, c)
                 colVarId.add(intVar)
@@ -1277,7 +1316,11 @@ internal class CpToLpRelaxation(
                 // contribute nothing here — they are handled by the separators and the blocks above.
                 currentHullEnabled = factorId !in suppressedHullFactors && !objectiveCone &&
                     factor.lpHullEnabled(hullFlags, elementIndexes)
-                if (projections == null) {
+                if (preparationTemplates?.emit(problem, factorId, this, linearProjection) == true) {
+                    templateStats?.observeTemplateUse(rows = preparationTemplates?.factors?.get(factorId)?.rows?.size ?: 0)
+                    attributeRows(factorId)
+                    continue
+                } else if (projections == null) {
                     factor.emitLpRelaxation(this, linearProjection)
                 } else {
                     projections.emitRelaxation(factorId, this, linearProjection)
