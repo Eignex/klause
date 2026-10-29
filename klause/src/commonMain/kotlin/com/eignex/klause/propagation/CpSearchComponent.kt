@@ -58,6 +58,13 @@ class CpSearchComponent(
     internal var propagationObserver: ((PropagationResult.Implied) -> Unit)? = null
     internal var cascadeConflictObserver: ((PropagationResult.Unsat) -> Unit)? = null
     private var sharedContext: com.eignex.klause.solver.search.SearchContext? = null
+    internal fun releaseRetainedState() {
+        sharedContext = null
+        lastResult = null
+        propagationObserver = null
+        cascadeConflictObserver = null
+        session.releaseRetainedState()
+    }
     private var sourceChecks = session.projection.selection?.originalChecks
 
     internal fun useEnforcingPeers(factorIds: Set<Int>) {

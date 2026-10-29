@@ -29,6 +29,47 @@ internal class SharingMemoryObservation(
         private set
     private var scratchEntries = 0
     private val values = HashMap<String, Long>()
+    private var owners: Owner? = null
+    private var ownedBytes = 0L
+    private var protectedBytes = 0L
+    private var ownedSlots = 0L
+    private var protectedSlots = 0L
+    private var sharedBytes = 0L
+
+    private class Owner(val identity: Any, val bytes: Long, val slots: Long, var protected: Boolean,
+        var shared: Boolean, val next: Owner?)
+
+    fun owned(identity: Any, bytes: Long, protected: Boolean = false, shared: Boolean = false) =
+        own(identity, bytes, 0L, protected, shared)
+
+    fun ownedReferences(identity: Any, slots: Long, protected: Boolean = false) = own(identity, 0L, slots, protected, false)
+
+    private fun own(identity: Any, bytes: Long, slots: Long, protected: Boolean, shared: Boolean) {
+        require(bytes >= 0L && slots >= 0L)
+        if (bytes == 0L && slots == 0L) return
+        step()
+        var owner = owners
+        while (owner != null) {
+            step()
+            if (owner.identity === identity && (owner.slots == 0L) == (slots == 0L)) {
+                if (shared && !owner.shared) { owner.shared = true; sharedBytes += owner.bytes }
+                if (protected && !owner.protected) {
+                    owner.protected = true
+                    protectedBytes += owner.bytes
+                    protectedSlots += owner.slots
+                }
+                return
+            }
+            owner = owner.next
+        }
+        if (scratchEntries >= maxScratchEntries) throw Stopped()
+        scratchEntries++
+        owners = Owner(identity, bytes, slots, protected, shared, owners)
+        ownedBytes += bytes
+        ownedSlots += slots
+        if (protected) { protectedBytes += bytes; protectedSlots += slots }
+        if (shared) sharedBytes += bytes
+    }
 
     init {
         require(maxWork >= 0L && maxScratchEntries >= 0)
@@ -74,6 +115,14 @@ internal class SharingMemoryObservation(
         } catch (_: Stopped) {
             SharingMemoryStatus.PARTIAL
         }
+        if (status == SharingMemoryStatus.COMPLETE) record(mapOf(
+            "ownedPrimitiveBytes" to ownedBytes,
+            "sharedPrimitiveBytes" to sharedBytes,
+            "privatePrimitiveBytes" to ownedBytes - sharedBytes,
+            "protectedPrimitiveBytes" to protectedBytes,
+            "ownedReferenceSlots" to ownedSlots,
+            "protectedReferenceSlots" to protectedSlots,
+        ))
         return SharingMemorySnapshot(status, values.toMap(), work, scratchEntries)
     }
 

@@ -168,9 +168,12 @@ data class PortfolioScenario(
     val sharingMemoryWork: Long = 32_768L,
     /** Maximum deduplication entries across one sharing-memory observation. */
     val sharingMemoryScratch: Int = 4_096,
+    /** Optional modeled byte limit per shared learned-clause pool. */
+    val sharingMemoryBytes: Long? = null,
 ) {
     init {
         require(sharingMemoryWork >= 0L && sharingMemoryScratch >= 0) { "sharing memory limits must be nonnegative" }
+        require(sharingMemoryBytes == null || sharingMemoryBytes >= 0L) { "sharing memory bytes must be nonnegative" }
         require(cores >= 1) { "cores must be ≥ 1" }
         require(!earlyCoreAdmission ||
             (cores == 1 && kind == Kind.COP && engine == EngineMix.MIXED && btPool == null)) {

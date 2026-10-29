@@ -43,6 +43,26 @@ import kotlin.test.assertTrue
 
 class PortfolioBuilderTest {
     @Test
+    fun `materialized workers enforce the configured shared byte limit`() {
+        val problem = Problem(2, 0, emptyArray(), listOf(
+            Clause(intArrayOf(0, 2)), Clause(intArrayOf(0, 3)),
+            Clause(intArrayOf(1, 2)), Clause(intArrayOf(1, 3)),
+        )).bake()
+        val scenario = PortfolioScenario(1, 2, Kind.CSP, EngineMix.BACKTRACK,
+            sharingMemory = true, sharingMemoryBytes = 0L)
+        val workers = PortfolioBuilder.build(problem, scenario)
+
+        try {
+            workers.forEach { it.solve(Cancellation.Never) }
+            val samples = workers.map { requireNotNull(it.sharingMeter).snapshot().clauses }
+            assertTrue(samples.any { it.getValue("poolDeclined") > 0L })
+            assertTrue(samples.all { it.getValue("poolOwnedBytes") == 0L })
+        } finally {
+            workers.forEach { it.close() }
+        }
+    }
+
+    @Test
     fun `memory observation is independently controlled through materialized workers`() {
         for (enabled in listOf(false, true)) {
             val problem = Problem(2, 0, emptyArray(), listOf(Clause(intArrayOf(0, 2)))).bake()

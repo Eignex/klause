@@ -160,6 +160,7 @@ class EngineParams(pairs: List<String>) {
 val BACKTRACK_OVERRIDE_KEYS = listOf(
     "max-decisions", "luby", "adaptive-restart", "ema-restart", "mode-switching-restart", "phase-saving",
     "target-phasing", "solution-phasing", "rephase-interval", "max-learned", "lbd-glue", "tiered-db",
+    "learned-memory-bytes", "learned-memory-work", "learned-memory-scratch-bytes",
     "mid-lbd", "vivification", "vivify-batch", "subsumption", "subsume-batch", "inprocessing-cadence",
     "root-simplification", "root-simplify-batch", "root-probe-batch", "root-probe-work",
     "root-rebuild-capture-visits",
@@ -198,6 +199,9 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
     val solutionPhasing = p[ExecutionOption.solutionPhasing]
     val rephaseInterval = p[ExecutionOption.rephaseInterval]
     val maxLearned = p[ExecutionOption.maxLearned]
+    val learnedMemoryBytes = p[ExecutionOption.learnedMemoryBytes]
+    val learnedMemoryWork = p[ExecutionOption.learnedMemoryWork]
+    val learnedMemoryScratchBytes = p[ExecutionOption.learnedMemoryScratchBytes]
     val lbdGlue = p[ExecutionOption.lbdGlue]
     val tieredDb = p[ExecutionOption.tieredDb]
     val midLbd = p[ExecutionOption.midLbd]
@@ -242,6 +246,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
     val scalars = listOf(
         maxDecisions, luby, adaptiveRestart, emaRestart, modeSwitchingRestart, phaseSaving, targetPhasing,
         solutionPhasing, rephaseInterval, maxLearned, lbdGlue, tieredDb, midLbd, vivification, vivifyBatch,
+        learnedMemoryBytes, learnedMemoryWork, learnedMemoryScratchBytes,
         subsumption, subsumeBatch, inprocessingCadence, rootSimplification, rootSimplifyBatch, rootProbeBatch, rootProbeWork,
         rootRebuildCaptureVisits,
         inprocessingWork, inprocessingRootWork, inprocessingProbeWork, inprocessingSubsumeWork,
@@ -264,6 +269,9 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
         solutionPhasing?.let { out = out.copy(solutionPhasing = it) }
         rephaseInterval?.let { out = out.copy(rephaseInterval = it) }
         maxLearned?.let { out = out.copy(maxLearnedClauses = it) }
+        learnedMemoryBytes?.let { out = out.copy(learnedMemoryBytes = it) }
+        learnedMemoryWork?.let { out = out.copy(learnedMemoryWork = it) }
+        learnedMemoryScratchBytes?.let { out = out.copy(learnedMemoryScratchBytes = it) }
         lbdGlue?.let { out = out.copy(lbdGlueThreshold = it) }
         tieredDb?.let { out = out.copy(tieredLearnedDb = it) }
         midLbd?.let { out = out.copy(midLbdThreshold = it) }
@@ -686,6 +694,8 @@ internal fun buildPortfolioScenario(
     val sliceGrowth = p[ExecutionOption.sliceGrowth]
     val diagnosticWorkLimit = p[ExecutionOption.portfolioWork]
     val sharingMemory = p[ExecutionOption.sharingMemory] ?: false
+    val sharingMemoryBytes = p[ExecutionOption.sharingMemoryBytes]
+    if (sharingMemoryBytes != null && sharingMemoryBytes < 0L) pipelineConfigError("sharing memory bytes must be nonnegative")
     val sharingMemoryWork = p[ExecutionOption.sharingMemoryWork] ?: 32_768L
     val sharingMemoryScratch = p[ExecutionOption.sharingMemoryScratch] ?: 4_096
     if (sharingMemoryWork < 0L || sharingMemoryScratch < 0) pipelineConfigError("sharing memory limits must be nonnegative")
@@ -713,7 +723,7 @@ internal fun buildPortfolioScenario(
     if (sliceGrowth != null && (!sliceGrowth.isFinite() || sliceGrowth < 1.0)) {
         pipelineConfigError("slice-growth must be finite and >= 1")
     }
-    p.finish("portfolio", "arms, ls, bt, seed, lambda, clause-share-lbd, clause-share-len, slice-work, slice-max-work, slice-growth, portfolio-work, sharing-memory, sharing-memory-work, sharing-memory-scratch, portfolio-progress, core-early, companion-integers, companion-after-incumbent, companion-active-ms, core-refinement, phase-retention, reseed-stale-threshold, ls-residuals, ls-phase-times")
+    p.finish("portfolio", "arms, ls, bt, seed, lambda, clause-share-lbd, clause-share-len, slice-work, slice-max-work, slice-growth, portfolio-work, sharing-memory, sharing-memory-bytes, sharing-memory-work, sharing-memory-scratch, portfolio-progress, core-early, companion-integers, companion-after-incumbent, companion-active-ms, core-refinement, phase-retention, reseed-stale-threshold, ls-residuals, ls-phase-times")
     if (armsParam != null && (ls != null || bt != null)) {
         pipelineConfigError("portfolio: set either `arms=N` or `ls=/bt=`, not both")
     }
@@ -755,6 +765,7 @@ internal fun buildPortfolioScenario(
         sliceGrowth = sliceGrowth ?: 1.5,
         diagnosticWorkLimit = diagnosticWorkLimit,
         sharingMemory = sharingMemory,
+        sharingMemoryBytes = sharingMemoryBytes,
         sharingMemoryWork = sharingMemoryWork,
         sharingMemoryScratch = sharingMemoryScratch,
         earlyCoreAdmission = earlyCoreAdmission,

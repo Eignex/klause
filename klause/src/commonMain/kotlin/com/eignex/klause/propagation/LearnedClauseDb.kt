@@ -31,7 +31,7 @@ internal class LearnedClauseDb(
      *  [Propagator] via `factorAt`; they participate in propagation through the per-literal watcher index
      *  just like static factors. Survives `restore` (learned constraints are facts about the original
      *  problem, not trail state); pruned by `forgetLearnedClauses`. */
-    val store = ArrayList<LearnedPropagator>()
+    var store = ArrayList<LearnedPropagator>()
 
     internal var integerRows: ArrayList<LearnedIntegerPropagator>? = null
 

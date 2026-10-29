@@ -1,11 +1,124 @@
 package com.eignex.klause.solver.search
 
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.SharingMemoryObservation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class SearchLearningTest {
+    @Test
+    fun `soft memory reclamation should release shared payload and capacity without a restart`() {
+        val session = SearchSession(emptyList(), learnedDb = SearchLearnedDbParams(glueLbd = 0, softLimitBytes = 0L))
+        repeat(12) { session.learn(SearchExplanation(intArrayOf(it * 4, it * 4 + 2))) }
+        assertIs<ComponentResult.Consistent>(session.propagate())
+
+        val result = requireNotNull(session.reclaimLearningMemory())
+
+        assertEquals(SharedLearningReclamationStatus.ProtectedFloor, result.status)
+        assertEquals(0, session.learnedClauseCount)
+        assertTrue(requireNotNull(result.afterBytes) < requireNotNull(result.beforeBytes))
+        assertEquals(0L, session.learnedClauseStats().restarts)
+        assertEquals(12L, session.learnedClauseStats().dropped)
+        val sample = SharingMemoryObservation(100_000L, 1024, { false }, {})
+        val values = requireNotNull(sample.snapshot { session.retainedLearningMemory(sample) }.completeValues)
+        assertEquals(result.afterBytes, values.getValue("ownedPrimitiveBytes") + values.getValue("ownedReferenceSlots") * 8L)
+    }
+
+    @Test
+    fun `tiny reclamation allowances should defer without losing a pending assertion`() {
+        listOf(0L to 1_048_576L, 65_536L to 0L).forEach { (work, scratch) ->
+            val session = SearchSession(emptyList(), learnedDb = SearchLearnedDbParams(
+                glueLbd = 0, softLimitBytes = 0L, reclamationWork = work, reclamationScratchBytes = scratch,
+            ))
+            session.learn(SearchExplanation(intArrayOf(0)))
+
+            val result = requireNotNull(session.reclaimLearningMemory())
+            assertIs<ComponentResult.Consistent>(session.propagate())
+
+            assertEquals(SharedLearningReclamationStatus.Deferred, result.status)
+            assertEquals(true, session.boolValue(0))
+        }
+    }
+
+    @Test
+    fun `soft reclamation should protect pending attachments through suspension and resume`() {
+        val session = SearchSession(emptyList(), learnedDb = SearchLearnedDbParams(glueLbd = 0, softLimitBytes = 0L))
+        session.initialize()
+        val run = session.openRun(2)
+        run.pauseBeforeDecision = { true }
+        assertIs<SearchRunEvent.Paused>(run.next())
+        session.learn(SearchExplanation(intArrayOf(0, 2)))
+        session.learn(SearchExplanation(intArrayOf(1)))
+
+        session.reclaimLearningMemory()
+        run.pauseBeforeDecision = { false }
+        assertIs<SearchRunEvent.Satisfied>(run.next())
+
+        assertEquals(false, session.boolValue(0))
+        assertEquals(true, session.boolValue(1))
+    }
+
+    @Test
+    fun `soft reclamation should preserve a live reason and allow its sibling undo`() {
+        val session = SearchSession(emptyList(), learnedDb = SearchLearnedDbParams(glueLbd = 0, softLimitBytes = 0L))
+        session.learn(SearchExplanation(intArrayOf(0, 2)))
+        session.push(SearchDecision.Bool(1))
+        val reason = requireNotNull(session.reasonFor(1))
+
+        val retained = requireNotNull(session.reclaimLearningMemory())
+        session.popTo(0)
+        val retired = requireNotNull(session.reclaimLearningMemory())
+        session.push(SearchDecision.Bool(3))
+
+        assertTrue(requireNotNull(retained.protectedBytes) >= reason.literals.size.toLong() * Int.SIZE_BYTES)
+        assertTrue(requireNotNull(retired.afterBytes) < requireNotNull(retired.beforeBytes))
+        assertEquals(0, session.learnedClauseCount)
+        assertEquals(setOf(0, 2), reason.literals.toSet())
+        assertEquals(null, session.boolValue(0))
+    }
+
+    @Test
+    fun `cancelled reclamation preparation should publish no replacement generation`() {
+        var cancelAfter = Int.MAX_VALUE
+        var polls = 0
+        val session = SearchSession(emptyList(), cancellation = Cancellation { ++polls > cancelAfter },
+            learnedDb = SearchLearnedDbParams(glueLbd = 0, softLimitBytes = 0L))
+        repeat(3) { session.learn(SearchExplanation(intArrayOf(it * 4, it * 4 + 2))) }
+        polls = 0
+        cancelAfter = 75
+
+        val result = requireNotNull(session.reclaimLearningMemory())
+
+        assertEquals(SharedLearningReclamationStatus.Cancelled, result.status)
+        assertEquals(3, session.learnedClauseCount)
+        assertEquals(null, session.learnedLifecycle()["learningClauseRetired"])
+        cancelAfter = Int.MAX_VALUE
+        session.push(SearchDecision.Bool(1))
+        assertEquals(true, session.boolValue(1))
+    }
+
+    @Test
+    fun `release should drop shared payload and copied reasons while preserving lifecycle counts`() {
+        val session = SearchSession(emptyList())
+        session.learn(SearchExplanation(intArrayOf(0, 2)))
+        session.push(SearchDecision.Bool(1))
+        val lifecycle = session.learnedLifecycle()
+        val watchVisits = session.learnedClauseStats().watchVisits
+
+        session.releaseLearning()
+
+        assertEquals(0, session.learnedClauseCount)
+        assertEquals(null, session.reasonFor(1))
+        assertEquals(lifecycle, session.learnedLifecycle())
+        assertEquals(watchVisits, session.learnedClauseStats().watchVisits)
+        val sample = SharingMemoryObservation(100_000L, 1024, { false }, {})
+        val values = requireNotNull(sample.snapshot { session.retainedLearningMemory(sample) }.completeValues)
+        assertEquals(0L, values.getValue("sharedLearnedPayloadBytes"))
+        assertEquals(0L, values.getValue("sharedReasonPayloadBytes"))
+    }
+
     @Test
     fun `cancellation should preserve pending learning until the search resumes`() {
         var cancelled = false

@@ -10,6 +10,7 @@ import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SearchStatsSink
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.SharingMemoryObservation
 
 /** Reduce the learned-clause database at a restart without discarding permanent or glue clauses. */
 internal fun forgetIfOverCap(session: PropagationSession, params: BacktrackParams) {
@@ -91,12 +92,25 @@ internal class VivificationPass(startCursor: Int = 0) : InprocessingPass {
     var cursor = startCursor
         private set
     private var revision = -1L
-    private val rows = ArrayList<IntArray>()
-    private val lbds = IntArrayList()
-    private val origins = IntArrayList()
+    private var rows = ArrayList<IntArray>()
+    private var lbds = IntArrayList()
+    private var origins = IntArrayList()
     private var dropped = IntHashSet()
     private var attached = 0
     private var preparing = true
+
+    override fun retainedMemory(sample: SharingMemoryObservation, protected: Boolean) {
+        sample.ownedReferences(rows, rows.size.toLong(), protected)
+        for (row in rows) {
+            sample.step()
+            sample.owned(row, row.size.toLong() * Int.SIZE_BYTES, protected)
+        }
+        val lbdData = lbds.backingData
+        val originData = origins.backingData
+        sample.owned(lbdData, lbdData.size.toLong() * Int.SIZE_BYTES, protected)
+        sample.owned(originData, originData.size.toLong() * Int.SIZE_BYTES, protected)
+        sample.owned(dropped, dropped.allocatedBytes, protected)
+    }
 
     override fun reset() {
         cursor = 0
@@ -104,9 +118,9 @@ internal class VivificationPass(startCursor: Int = 0) : InprocessingPass {
     }
 
     private fun clear() {
-        rows.clear()
-        lbds.clear()
-        origins.clear()
+        rows = ArrayList()
+        lbds = IntArrayList()
+        origins = IntArrayList()
         dropped = IntHashSet()
         attached = 0
         preparing = true

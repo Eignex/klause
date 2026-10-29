@@ -217,9 +217,39 @@ and explicit completeness; see [sharing accounting](12-portfolio.md#shared-chann
 Observation never invokes retirement or materializes a reason. Partial data and
 historical peaks cannot authorize a byte-limit decision.
 Payload counts and index capacity have separate ownership;
-reference counts exclude platform object layout. Neither surface establishes a
-global learned-memory bound, and active and historical reason protection retains
-its ordinary authority through compaction.
+reference counts exclude platform object layout. An owner-aware aggregate counts
+each primitive payload or allocated index once, including aliased reasons; modeled
+references use eight bytes per slot for byte-limit policy. Completeness covers the
+enumerated owners, rather than the worker's entire heap. Active and historical
+reason protection retains its ordinary authority through compaction.
+
+The opt-in `learned-memory-bytes` soft limit consults identity-deduplicated ownership,
+including native/general clauses, arithmetic rows, private index capacity, copied reasons,
+pending attachments and retained inprocessing buffers. `ownedPrimitiveBytes` partitions
+into `sharedPrimitiveBytes` and `privatePrimitiveBytes`; source arenas shared by workers
+count once when visited by one observation. `ownedReferenceSlots` counts modeled live
+references, priced at eight bytes per slot. Platform headers, generic collection spare
+reference slots and allocator overhead remain excluded. Diagnostic payload categories
+can alias and cannot be summed to reconstruct these ownership fields.
+
+Protected ownership includes permanent assertions, live and saved reasons, pending first
+assertions and interrupted root publication. Native packed arenas are protected at
+allocation granularity while a retained reason needs them. This floor is conservative,
+rather than a minimum compacted representation. Pressure may release optional pass
+buffers, while interrupted propagation/publication retains them. Close detaches the
+native generation; reseeding preserves compatible learning and invalidates obsolete pass
+snapshots.
+
+Reclamation runs at safe propagation/branch boundaries independently of restarts.
+`learned-memory-work` and `learned-memory-scratch-bytes` bound preparation and scratch.
+Native/general compaction requires a cancellable preflight of all arrays, watches, reasons,
+queues and event indexes, with a conservative envelope for indivisible publication.
+Cancellation or an oversized envelope defers without mutation; accepted publication
+remaps the whole generation and trims retained primitive capacity. Shared search prepares
+a replacement generation and polls before swapping its stores and indexes. Protected
+state or an unfunded preparation permits continued search above the soft limit, with an
+explicit protected/deferred observation. Work debt supplies no hard pause-latency
+guarantee. Thresholds and default retention remain separate policy decisions.
 
 ## Native SAT lane
 
@@ -355,6 +385,18 @@ ranking by LBD. [ClauseDb](../klause/src/commonMain/kotlin/com/eignex/klause/bac
 and [SearchLearning](../klause/src/commonMain/kotlin/com/eignex/klause/solver/search/SearchLearning.kt)
 own the respective stores.
 
+Shared learning also accepts an optional modeled-byte soft limit checked at
+propagation boundaries independently of restarts. Units, glue clauses, live reason
+owners and pending first attachments form its protected floor; copied trail reasons
+and queued component publications remain privately protected. Reclamation prepares
+replacement stores, signatures, watches, stages, reason IDs and queues within a
+conservative work and scratch bound. Cancellation before publication discards the
+replacement; publication swaps the complete generation without callbacks. Rebuilding
+the indexes releases obsolete capacity as well as clause payload. Insufficient
+allowance defers reclamation, and a protected floor above the limit reports that
+condition while preserving the search state. Root reseeding releases obsolete copied
+reasons; terminal release drops shared learning without rewriting lifetime counters.
+
 ## Restarts, phases and inprocessing
 
 A `RestartSchedule` decides when a run pops back to its root; the restart action
@@ -438,6 +480,13 @@ and 8,192 literals, advances round-robin, and declines a clause exceeding its re
 literal space. Compaction invalidates snapshots by a session-local revision, without
 changing source variable IDs. Replacement attachment precedes retirement; active and
 historical reasons retain their ordinary protection.
+The retained-memory observation counts each primitive buffer once by identity,
+including residual capacity, occurrence postings and replacement metadata, and models
+live reference slots separately. These are modeled owners rather than a whole-worker
+heap measurement. Optional preparation can be discarded under memory pressure;
+an interrupted root attachment or pending peer publication protects the retained
+buffers until that consequence is complete. Reseeding and closing detach pass buffers,
+and vivification resets replace their containers so empty capacity is released.
 
 Restart cadence remains a trigger. Optional propagation-work intervals and learned
 clause growth also request work at natural roots, without forcing a restart. The

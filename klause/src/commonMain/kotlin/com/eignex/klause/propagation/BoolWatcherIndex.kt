@@ -53,7 +53,7 @@ internal class BoolWatcherIndex(
      * falls back to the linear scan on any mismatch — a desynced index can never silently remove
      * the wrong watcher.
      */
-    val pos: MutableLongIntMap = preparedPositions ?: MutableLongIntMap()
+    var pos: MutableLongIntMap = preparedPositions ?: MutableLongIntMap()
     companion object {
         fun preparation(numBoolVars: Int, watcherCount: Int): Sequence<BoolWatcherIndex?> = sequence {
             val watches = arrayOfNulls<IntArrayList>(2 * numBoolVars)
