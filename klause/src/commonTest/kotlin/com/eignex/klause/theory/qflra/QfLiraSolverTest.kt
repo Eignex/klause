@@ -102,6 +102,32 @@ class QfLiraSolverTest {
     }
 
     @Test
+    fun `incremental prepared rows should reuse a compatible strict comparison decline`() {
+        val source = Problem(4, 0, emptyArray(), arrayOf(
+            ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                LinearOp.LE, 1.0),
+            ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                LinearOp.LE, 1.0, strict = true),
+            ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(1), doubleArrayOf(1.0),
+                LinearOp.LE, 1.0),
+        ), numRealVars = 2, realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY })
+        val prepared = assertNotNull(prepareExactLiraSource(source, Cancellation.Never))
+        prepared.open().use { component ->
+            component.useIncrementalLinearPropagation()
+            val session = SearchSession(listOf(component))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            val reused = component.partialLinearPropagationStats.unchangedDeclines
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, true))))
+
+            assertNull(session.boolValue(1))
+            assertTrue(component.partialLinearPropagationStats.unchangedDeclines > reused)
+        }
+    }
+
+    @Test
     fun `a strict bound should enable a guard after a closed endpoint declined`() {
         val model = Problem(4, 0, emptyArray(), arrayOf(
             ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
