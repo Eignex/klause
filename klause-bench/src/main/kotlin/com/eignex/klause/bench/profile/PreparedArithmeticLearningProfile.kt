@@ -265,7 +265,9 @@ internal object PreparedArithmeticLearningProfile {
             for ((key, value) in counts) put(key as String, (value as Number).toLong())
         }
 
-        fun work(): Long = native.work
+        fun work(): Long = native.javaClass.declaredMethods.single {
+            it.name.startsWith("getWork") && it.parameterCount == 0
+        }.invoke(native) as Long
 
         fun export(): JsonObject = buildJsonObject {
             put("schemaVersion", 1)
