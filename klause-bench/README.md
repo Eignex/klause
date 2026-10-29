@@ -94,6 +94,12 @@ Lab parameters use `timeout-ms`; direct `solve-one` uses `timeout`.
 `engines`, `solver-seeds` and `repeats` expand cases. Use `param.NAME` for CLI
 parameters, `bench.sourceValidation` for independent source checks and
 `bench.runTimeoutSec` for the whole job's active-time limit.
+Use `param.root-simplification=true`, `param.root-simplify-batch=N`,
+`param.root-probe-batch=N` and `param.root-probe-work=N` with the existing
+`param.inprocessing-cadence=N` for opt-in stable-ID root controls. Zero probe
+batch disables probing. Keep the unchanged SAT preset and general backtrack controls
+in comparisons.
+
 Profile mains live in [bench/profile/](src/main/kotlin/com/eignex/klause/bench/profile/)
 and run as lab profile jobs; consult the selected main for its arguments and
 retain its output through `$OUT`.

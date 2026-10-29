@@ -225,6 +225,14 @@ data class BacktrackParams(
      * meaningful when at least one pass (e.g. [vivification]) is enabled. Must be positive.
      */
     val inprocessingCadence: Int = 1,
+    /** Simplify Boolean clauses against unconditional root facts at scheduled restarts. Opt-in. */
+    val rootSimplification: Boolean = false,
+    /** Maximum source and learned clauses examined by one root simplification slice. */
+    val rootSimplifyBatch: Int = 256,
+    /** Maximum failed-literal probes per scheduled restart; zero disables probing. */
+    val rootProbeBatch: Int = 0,
+    /** Propagation work ceiling per root probe, in addition to the containing invocation token. */
+    val rootProbeWork: Long = 8192L,
     /**
      * Externally-supplied objective upper bound for branch-and-bound minimisation. When
      * non-null, the [com.eignex.klause.solver.Optimizer.improvements] / `minimize`
@@ -411,6 +419,9 @@ data class BacktrackParams(
     val objectiveGuidedValues: Boolean = false,
 ) : SolverParams {
     init {
+        require(rootSimplifyBatch > 0) { "root simplification batch must be positive" }
+        require(rootProbeBatch >= 0) { "root probe batch must be nonnegative" }
+        require(rootProbeWork > 0L) { "root probe work must be positive" }
         require(lubyRestartBase == null || lubyRestartBase > 0L) {
             "lubyRestartBase must be positive or null (off)"
         }
