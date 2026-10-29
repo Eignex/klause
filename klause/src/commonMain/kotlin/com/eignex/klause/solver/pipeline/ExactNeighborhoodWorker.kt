@@ -19,6 +19,7 @@ internal fun exactNeighborhoodWorker(
     lifetime: Cancellation,
     timeout: Cancellation = Cancellation.Never,
     exhausted: () -> Boolean,
+    pendingIncumbentTrial: () -> Boolean = { false },
     open: () -> ExactNeighborhood,
 ): PortfolioWorker {
     fun stop(global: Cancellation) = lifetime or global or Cancellation(exhausted)
@@ -65,6 +66,7 @@ internal fun exactNeighborhoodWorker(
         resumable = {
             object : InstructionSlicedSearch, ReseedGuard {
                 override val canReseed: Boolean get() = false
+                override val incumbentTrialPending: Boolean get() = pendingIncumbentTrial()
                 private val search = open()
                 private var closed = false
                 private var result: MinimizeResult? = null

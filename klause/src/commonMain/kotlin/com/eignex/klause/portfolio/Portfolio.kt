@@ -626,6 +626,9 @@ class Portfolio(
                 if (claim.improved && (handle as? ReseedGuard)?.canContinuePreparation == true) {
                     run.continuePreparation(arm)
                 }
+                if (terminal == null && !failed && (handle as? ReseedGuard)?.incumbentTrialPending == true) {
+                    run.continuePreparation(arm)
+                }
                 if (handle != null && terminal == null && !failed &&
                     (handle.preparationPending ||
                         (worker.family == ArmFamily.LocalSearch && stats?.ls?.moves?.sum == 0.0))
@@ -1076,7 +1079,9 @@ class Portfolio(
             val preparing = continuingPreparation
             if (preparing >= 0 && !busy[preparing]) {
                 if (!retired[preparing] && preparing in eligibleArms &&
-                    (handles[preparing] as? ReseedGuard)?.canContinuePreparation == true
+                    (handles[preparing] as? ReseedGuard)?.let {
+                        it.canContinuePreparation || it.incumbentTrialPending
+                    } == true
                 ) return preparing
                 continuingPreparation = -1
             }

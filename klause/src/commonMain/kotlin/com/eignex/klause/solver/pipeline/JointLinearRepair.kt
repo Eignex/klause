@@ -77,6 +77,8 @@ internal class JointLinearRepair(
     private var query: LinearAuthorityInvocation? = null
     private var anchor: Sample? = null
     private var pending: ExactNeighborhoodCondition? = null
+    var incumbentTrialPending = false
+        private set
     private var closed = false
     private var declined = false
     private var preparationWork = 0L
@@ -188,6 +190,7 @@ internal class JointLinearRepair(
                 }
                 val checkedStart = pooled != null && completion != null && round == 0L
                 val width = if (checkedStart) {
+                    incumbentTrialPending = true
                     observe("jointRepairCheckedCenterStarts")
                     minOf(count, 2)
                 } else if (sourceInputPass && !adaptive && round > 0L && focusedRemaining > 0) {
@@ -274,6 +277,12 @@ internal class JointLinearRepair(
         attempt(condition, cancellation).result
 
     fun attempt(condition: ExactNeighborhoodCondition, cancellation: Cancellation): JointRepairAttempt {
+        val result = advanceAttempt(condition, cancellation)
+        if (result.result != ExactNeighborhoodResult.Paused) incumbentTrialPending = false
+        return result
+    }
+
+    private fun advanceAttempt(condition: ExactNeighborhoodCondition, cancellation: Cancellation): JointRepairAttempt {
         check(!closed)
         if (stop() || exhausted) return JointRepairAttempt(ExactNeighborhoodResult.Undecided, when {
             params.timeout() -> TerminationReason.Timeout
@@ -370,6 +379,7 @@ internal class JointLinearRepair(
     override fun close() {
         if (closed) return
         closed = true
+        incumbentTrialPending = false
         val resources = SearchInvocationResources()
         resources.own(authority)
         completion?.let(resources::own)

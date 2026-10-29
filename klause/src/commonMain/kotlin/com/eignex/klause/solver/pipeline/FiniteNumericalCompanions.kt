@@ -132,6 +132,7 @@ internal class FiniteNumericalCompanions private constructor(
                     incumbentCompletionCheck = incumbentCompletionCheck))
                 val worker = exactNeighborhoodWorker("ls/finite-joint-companion", firstArm + 1, objective,
                     limits.cancellation, limits.timeout, { repair.exhausted },
+                    pendingIncumbentTrial = { repair.incumbentTrialPending },
                     open = { repair.search(adaptive = false, seed = slot.seed) })
                 companion = PortfolioWorker.ofMinimize("ls/finite-joint-companion", firstArm + 1,
                     countsInstructions = true,

@@ -21,6 +21,8 @@ internal class BoundedCompanionSearch(
     private var terminal: MinimizeResult? = null
     private var retired = false
     override val canReseed: Boolean get() = false
+    override val incumbentTrialPending: Boolean get() =
+        !isDone && (search as? ReseedGuard)?.incumbentTrialPending == true
     override val isDone: Boolean get() = terminal != null
     override val chargedInstructions: Long get() =
         (search as? InstructionSlicedSearch)?.chargedInstructions ?: search.work

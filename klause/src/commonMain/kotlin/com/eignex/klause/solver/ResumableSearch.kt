@@ -94,6 +94,7 @@ interface ResumableSearch : AutoCloseable {
 internal interface ReseedGuard {
     val canReseed: Boolean
     val canContinuePreparation: Boolean get() = false
+    val incumbentTrialPending: Boolean get() = false
 }
 
 /**
