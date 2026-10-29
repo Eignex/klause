@@ -450,7 +450,7 @@ data class BacktrackParams(
     val reasonPreflight: Boolean = false,
     /** Bounded propositional rebuild diagnostics within root simplification; zero disables capture. */
     val rootRebuildCaptureVisits: Int = 0,
-    /** Total preparation and trial work for one private Boolean generation; zero disables rebuilding. */
+    /** Total preparation and trial work across private Boolean generations; zero disables rebuilding. */
     val privateRebuildWork: Long = 0L,
     /**
      * Inline diagnostic observer for attempted shared decisions, before propagation can refute them.
