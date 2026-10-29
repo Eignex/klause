@@ -842,7 +842,7 @@ stall heuristics only schedule work; they never authorize proofs.
 
 Rational work escalates from `Frac128` to `BigFraction`; fixed-width overflow
 restarts the operation from authority, and every attempt is charged. An internal
-continuation request can opt into arbitrary precision before building its first
+consumer context or continuation request can opt into arbitrary precision before building its first
 tableau; this selects arithmetic without changing cumulative limits, import identity
 or the current-source verification required for publication. A retained tableau
 keeps its arithmetic across requests. Owner-local

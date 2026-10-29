@@ -199,28 +199,31 @@ class LpClaimTest {
 
     @Test
     fun `unchanged real leaves should consume a compatible checked optimum`() {
-        val compiled = Mps.parse(
-            "NAME CLAIM\nROWS\n N COST\n E ROW\nCOLUMNS\n X COST 1 ROW 2\n" +
-                "RHS\n R ROW 3\nBOUNDS\n UP B X 10\nENDATA",
-        ).toProblem()
-        val problem = compiled.model
-        val objective = assertNotNull(compiled.objective).toLinearObjective()
-        val sink = LpStatsSink(LpRoute.STANDALONE)
-        val sample = Sample(booleanArrayOf(), longArrayOf())
+        for (arbitrary in listOf(false, true)) {
+            val compiled = Mps.parse(
+                "NAME CLAIM\nROWS\n N COST\n E ROW\nCOLUMNS\n X COST 1 ROW 2\n" +
+                    "RHS\n R ROW 3\nBOUNDS\n UP B X 10\nENDATA",
+            ).toProblem()
+            val problem = compiled.model
+            val objective = assertNotNull(compiled.objective).toLinearObjective()
+            val sink = LpStatsSink(LpRoute.STANDALONE)
+            val sample = Sample(booleanArrayOf(), longArrayOf())
 
-        LeafRealSolver(problem, objective, sink = sink).use { owner ->
-            repeat(2) {
-                val result = owner.solve(sample)
-                assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
-                assertEquals(BigFraction.ofLong(3L) * BigFraction.ofLong(2L).reciprocal(),
-                    compiled.sourceWitness(sample.ints, assertNotNull(result.exactReals)).values.single())
+            val context = LpSolveContext(startArbitraryPrecision = arbitrary)
+            LeafRealSolver(problem, objective, context = context, sink = sink).use { owner ->
+                repeat(2) {
+                    val result = owner.solve(sample)
+                    assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
+                    assertEquals(BigFraction.ofLong(3L) * BigFraction.ofLong(2L).reciprocal(),
+                        compiled.sourceWitness(sample.ints, assertNotNull(result.exactReals)).values.single())
+                }
             }
-        }
 
-        val phases = sink.snapshot().phases
-        assertEquals(1L, assertNotNull(phases["CLAIM_ATTAINED_OPTIMUM_STANDALONE"]).outcomes["REUSED"])
-        assertEquals(mapOf("ATTAINED_OPTIMUM" to 2L),
-            assertNotNull(phases["CLAIM_CONSUMPTION_STANDALONE"]).outcomes)
+            val phases = sink.snapshot().phases
+            assertEquals(1L, assertNotNull(phases["CLAIM_ATTAINED_OPTIMUM_STANDALONE"]).outcomes["REUSED"])
+            assertEquals(mapOf("ATTAINED_OPTIMUM" to 2L),
+                assertNotNull(phases["CLAIM_CONSUMPTION_STANDALONE"]).outcomes)
+        }
     }
 
     @Test

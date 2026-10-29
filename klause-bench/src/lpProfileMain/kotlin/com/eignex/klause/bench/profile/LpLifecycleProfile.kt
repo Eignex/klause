@@ -131,7 +131,12 @@ fun main(args: Array<String>) {
             }
         }
     }
-    if (!profileExpired(stop)) sourceWorker(compiled.model, requireNotNull(objective), stop)
+    if (mode == "precision") {
+        for (arbitrary in listOf(false, true)) {
+            if (profileExpired(stop)) return
+            sourceWorker(compiled.model, requireNotNull(objective), stop, arbitrary, 5)
+        }
+    } else if (!profileExpired(stop)) sourceWorker(compiled.model, requireNotNull(objective), stop)
 }
 
 private fun profileExpired(cancellation: Cancellation): Boolean {
@@ -535,13 +540,21 @@ private class LifecycleFactory(
     }
 }
 
-private fun sourceWorker(problem: Problem, objective: LinearObjective, containing: Cancellation) {
-    val deadline = Cancellation.after(2.seconds)
+private fun sourceWorker(
+    problem: Problem,
+    objective: LinearObjective,
+    containing: Cancellation,
+    arbitraryPrecision: Boolean = false,
+    timeoutSeconds: Int = 2,
+) {
+    val deadline = Cancellation.after(timeoutSeconds.seconds)
     val stop = Cancellation { containing() || deadline() }
     val factory = LifecycleFactory(observed = true, classifyOwners = false)
     val started = Monotonic.markNow()
     val allocated = profileAllocatedBytes()
-    val solver = BacktrackSolver(problem.bake(stop), LpSolveContext(engineFactory = factory))
+    val solver = BacktrackSolver(problem.bake(stop), LpSolveContext(
+        engineFactory = factory, startArbitraryPrecision = arbitraryPrecision,
+    ))
     val controls = BacktrackPresets.satOptimized(randomSeed = 3L, cancellation = stop)
         .copy(maxInstructions = 1000L)
     val result = solver.minimize(objective, controls)
@@ -555,7 +568,8 @@ private fun sourceWorker(problem: Problem, objective: LinearObjective, containin
         put("cliRoutingEquivalence", false)
         put("seed", 3)
         put("instructionLimit", 1000)
-        put("containingMillis", 2000)
+        put("containingMillis", timeoutSeconds * 1000)
+        put("startArbitraryPrecision", arbitraryPrecision)
         put("elapsedNs", elapsed)
         put("allocatedBytes", bytes?.let(::JsonPrimitive) ?: JsonNull)
         put("result", result::class.simpleName)
