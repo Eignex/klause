@@ -833,6 +833,15 @@ class SearchSession(
         if (measureLearnedMemory) it.copy(learning = it.learning + trail.reasonMemory()) else it
     }
 
+    internal fun retainedLearningMemory(): Map<String, Long> {
+        val store = learning.retainedMemory()
+        val reasons = trail.reasonMemory()
+        return store + reasons + mapOf(
+            "sharedMemorySampleWork" to store.getValue("sharedMemorySampleWork") +
+                reasons.getValue("sharedReasonMemorySampleWork"),
+        )
+    }
+
     /** Retain a sound clause-form explanation for subsequent propagation. */
     fun learn(explanation: SearchExplanation?) {
         val literals = namedExplanation(explanation)?.literals ?: return

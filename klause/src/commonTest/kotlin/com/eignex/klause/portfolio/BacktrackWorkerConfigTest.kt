@@ -143,6 +143,9 @@ class BacktrackWorkerConfigTest {
             assertTrue(stats.channels.getValue(SharingChannel.Clauses).imported > 0L)
             assertTrue(stats.clauses.getValue("uses") > 0L)
             assertTrue(stats.clauses.getValue("peakLearnedPayloadBytes") > 0L)
+            assertEquals(1L, stats.clauses.getValue("sharedLearningObserved"))
+            assertTrue(stats.clauses.getValue("peakSharedLearnedIndexCapacityBytes") > 0L)
+            assertTrue(stats.clauses.getValue("peakSharedReasonIndexCapacityBytes") > 0L)
             assertEquals(0L, stats.clauses.getValue("seenCapacityBytes"))
         }
     }

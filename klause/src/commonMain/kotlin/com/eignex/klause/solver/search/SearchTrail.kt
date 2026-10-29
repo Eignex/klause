@@ -35,6 +35,7 @@ internal class SearchTrail {
         val arrays = HashSet<IntArray>()
         boolReasons.forEach { _, reason -> arrays.add(reason.literals) }
         return mapOf(
+            "sharedReasonMemorySampleWork" to boolReasons.referenceCapacity.toLong() + arrays.size,
             "sharedReasonPayloadBytes" to arrays.sumOf { it.size.toLong() * Int.SIZE_BYTES },
             "sharedReasonIndexCapacityBytes" to boolReasons.primitiveCapacityBytes,
             "sharedReasonReferenceSlots" to boolReasons.referenceCapacity.toLong(),
