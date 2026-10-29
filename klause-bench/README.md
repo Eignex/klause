@@ -561,6 +561,8 @@ no priority, refinement or attribution default change follows from these capture
 
 Ordinary open-linear controls use `param.open-linear-incremental=true|false` with
 the same original sources, seeds, LP ceilings and containing solve allowance.
+An arm override uses `param.param.open-linear-incremental`: the outer prefix
+selects the adapter parameter.
 This combines touched source rows, exact-input decline reuse and explained
 interval delivery before the numerical query. Traversal stage counters expose
 source visits and invalidations, interval visits, retained declines and deductions;
