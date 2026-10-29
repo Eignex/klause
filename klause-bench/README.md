@@ -348,6 +348,8 @@ profile's 32 MiB source cap. Its decompressed bytes must match `sha256`; this le
 a retained original source avoid a cold download of its entire catalog archive.
 `source-preparation.json` records that input mode and parsing cost. Packed source
 bytes and raw profile records belong in the external evidence directory.
+Failed child runs forward at most 16 KiB of their error stream to the parent log,
+so an unavailable artifact receipt does not hide the diagnostic exception.
 
 The opt-in basis tool uses the [basis corpus](../klause/src/jvmTest/resources/basis-corpus/README.md):
 

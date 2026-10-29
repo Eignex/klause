@@ -214,6 +214,9 @@ internal object LinearRootOpeningProfile {
                 put("exit", process.exitValue())
             }.toString() + "\n")
         }
+        if (process.exitValue() != 0) {
+            System.err.write(out.resolve("measured.stderr").inputStream().use { it.readNBytes(16 * 1024) })
+        }
         check(!transportTimeout) { "measured root JVM transport timed out" }
         check(process.exitValue() == 0) { "measured root JVM failed" }
     }
