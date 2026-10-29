@@ -13,7 +13,7 @@ import kotlinx.serialization.encodeToString
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Runs `klause-cli` as a subprocess on the model: the compiled `.fzn` for a MiniZinc instance, or the
@@ -241,11 +241,11 @@ internal object SolverInvocation {
         // Watchdog: force-kill a runaway that blew past [hardTimeoutMs] so the read loop below (which
         // blocks until the child's stdout closes) can't hang forever on a child that never exits. A
         // killed child's stream closes, the loop returns, and the partial output is scored as usual.
-        val killed = AtomicBoolean(false)
+        val killed = AtomicReference<String?>(null)
         val watchdog = Thread {
             runCatching {
                 if (!process.waitFor(hardTimeoutMs, TimeUnit.MILLISECONDS) && process.isAlive) {
-                    killed.set(true)
+                    killed.compareAndSet(null, "hard-timeout")
                     process.descendants().forEach { it.destroyForcibly() }
                     process.destroyForcibly()
                 }
@@ -396,18 +396,18 @@ internal object SolverInvocation {
             runCatching { stdoutCapture?.close() }.onFailure { outputFailure = it }
         }
         if (outputFailure != null && process.isAlive) {
-            killed.set(true)
+            killed.compareAndSet(null, "output-capture-failure")
             process.descendants().forEach { it.destroyForcibly() }
             process.destroyForcibly()
         }
         if (!process.waitFor(GRACE_MILLIS, TimeUnit.MILLISECONDS)) {
-            killed.set(true)
+            killed.compareAndSet(null, "hard-timeout")
             process.descendants().forEach { it.destroyForcibly() }
             process.destroyForcibly()
             process.waitFor(STDERR_DRAIN_WAIT_MS, TimeUnit.MILLISECONDS)
         }
         watchdog.interrupt()
-        var diagnostics = stderr.await(stderrDrainWaitMs, killed.get())
+        var diagnostics = stderr.await(stderrDrainWaitMs, killed.get() != null)
         captureDirectory?.let { directory ->
             runCatching {
                 directory.resolve("cli.stderr.json").writeText(Reports.json.encodeToString(diagnostics.status))
@@ -422,7 +422,8 @@ internal object SolverInvocation {
         if (exit != null && exit != 0 && !anySolution && !unsat && diagnostics.refusal != null) {
             stats["unsupported"] = requireNotNull(diagnostics.refusal)
         }
-        if (killed.get()) stats["killed"] = if (outputFailure == null) "hard-timeout" else "output-capture-failure"
+        killed.get()?.let { stats["killed"] = it }
+        outputFailure?.let { stats["outputCaptureFailure"] = StderrCapture.describe(it) }
         stats["exit"] = exit?.toString() ?: "unavailable"
         diagnostics.quarantines?.let { stats[QUARANTINED] = it }
         if (cmd.first().substringAfterLast('/') == "klause-cli") {
@@ -456,8 +457,8 @@ internal object SolverInvocation {
             stderrComplete = diagnostics.complete,
             stderrCapture = diagnostics.status,
         )
-        if (outputFailure != null || exit == null || (exit != 0 && !anySolution && !unsat &&
-                !killed.get() && diagnostics.refusal == null)) {
+        if ((outputFailure != null && killed.get() != "hard-timeout") || exit == null ||
+            (exit != 0 && !anySolution && !unsat && killed.get() == null && diagnostics.refusal == null)) {
             throw Failure(
                 result, "${cmd.first()} failed (exit $exit): ${diagnostics.text.take(STDERR_CAP)}", outputFailure,
             )

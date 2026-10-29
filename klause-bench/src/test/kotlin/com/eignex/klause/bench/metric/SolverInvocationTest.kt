@@ -14,6 +14,7 @@ import java.io.File
 import java.io.IOException
 import java.io.InputStream
 import java.nio.file.Files
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.stream.Stream
 import kotlin.test.Test
@@ -682,15 +683,39 @@ class SolverInvocationTest {
         }
     }
 
+    @Test
+    fun `stdout closed by a hard timeout preserves the kill reason and partial result`() {
+        val killed = CountDownLatch(1)
+        val stdout = object : InputStream() {
+            override fun read(): Int {
+                check(killed.await(100, TimeUnit.MILLISECONDS))
+                throw IOException("pipe closed by kill")
+            }
+        }
+
+        val result = SolverInvocation.invoke(listOf("fake"), SolverInvocation.Dialect.SMT_LIB,
+            startProcess = {
+                FakeProcess("partial\n".byteInputStream(), timeout = true,
+                    stdoutStream = stdout, onDestroy = { killed.countDown() })
+            })
+
+        assertEquals("hard-timeout", result.stats["killed"])
+        assertTrue(assertNotNull(result.stats["outputCaptureFailure"]).contains("pipe closed by kill"))
+        assertNull(result.feasible)
+        assertFalse(result.stderrComplete)
+        assertTrue(assertNotNull(result.stderrCapture).processKilled)
+    }
+
     private class FakeProcess(
         private val stderr: InputStream,
         stdout: String = "",
         private val exit: Int = 0,
         private val timeout: Boolean = false,
+        private val stdoutStream: InputStream = ByteArrayInputStream(stdout.toByteArray()),
+        private val onDestroy: () -> Unit = {},
     ) : Process() {
-        private val stdout = ByteArrayInputStream(stdout.toByteArray())
         @Volatile private var destroyed = false
-        override fun getInputStream(): InputStream = stdout
+        override fun getInputStream(): InputStream = stdoutStream
         override fun getErrorStream(): InputStream = stderr
         override fun getOutputStream(): ByteArrayOutputStream = ByteArrayOutputStream()
         override fun waitFor(): Int = exit
@@ -698,7 +723,10 @@ class SolverInvocationTest {
         override fun exitValue(): Int = if (isAlive()) throw IllegalThreadStateException() else exit
         override fun isAlive(): Boolean = timeout && !destroyed
         override fun descendants(): Stream<ProcessHandle> = Stream.empty()
-        override fun destroy() { destroyed = true }
+        override fun destroy() {
+            destroyed = true
+            onDestroy()
+        }
         override fun destroyForcibly(): Process = apply { destroy() }
     }
 }
