@@ -223,7 +223,7 @@ An unsupported or partial observation cannot establish absence of opportunities.
 Qualification of a replacement worker requires the following authority and ownership
 contract. The diagnostic itself creates no replacement or publication authority.
 
-`privateRebuildWork` enables one bounded private Boolean satisfaction trial. An
+`privateRebuildWork` funds bounded private Boolean satisfaction trials. An
 unconditional consistent root pauses its canonical traversal, simplifies a private
 copy with the root's global pins and runs source BVE with typed reconstruction.
 The new baked model has a fresh identity; mappings compose through the pinned,
@@ -231,6 +231,9 @@ eliminated and baked objects. Column slots remain stable. Only an actual elimina
 opens a consumer. Assumptions, external components, arithmetic and LP-enabled
 workers retain their canonical traversal. Enumeration and optimization do not use
 this trial.
+
+An unchanged root trail retains a completed miss. New root deductions release it;
+all attempts share one cumulative preparation, trial and checking allowance.
 
 The private worker owns fresh watches, learning and search state. Canonical exchange
 cursors and pooled incumbent guidance stay with the retained canonical worker;

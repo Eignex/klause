@@ -27,12 +27,17 @@ internal class PrivateRebuildSatisfaction(
     private val params: BacktrackParams,
 ) : ResumableSolve {
     private val lifetime = params.cancellation.lifetimeCancellation()
+    private val sharedParams = params.copy(nodeBudget = params.nodeBudget ?: NodeBudget(
+        minOf(params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE),
+    ))
     private var root: PropagationSession? = null
-    private var attempted = false
-    private val canonical = ResumableSatisfaction(solver, params, ownsWorkDebt = false, atRoot = {
-        if (attempted || !it.canSimplifyRoot) false
+    private var rootMark = -1
+    private var chargedPrivateWork = 0L
+    private val canonical = ResumableSatisfaction(solver, sharedParams, ownsWorkDebt = false, atRoot = {
+        val mark = it.explanationState.undoTop
+        if (mark == rootMark || !it.canSimplifyRoot || trialSpent() >= params.privateRebuildWork) false
         else {
-            attempted = true
+            rootMark = mark
             root = it
             true
         }
@@ -41,7 +46,6 @@ internal class PrivateRebuildSatisfaction(
     private var consumer: ResumableSatisfaction? = null
     private var retiredStats = SolveStats.EMPTY
     private var retiredWork = 0L
-    private var preparationStart = 0L
     private var debt = 0L
     private var done: SolveResult? = null
     private var closed = false
@@ -95,7 +99,7 @@ internal class PrivateRebuildSatisfaction(
                 }, millis(), nodes())
                 if (result is SolveResult.Sat) {
                     val mapped = candidate ?: checkNotNull(generation).let {
-                        checkNotNull(root).chargeInprocessingWork(it.reconstructionWork)
+                        charge(it.reconstructionWork)
                         note("ReconstructionWork", it.reconstructionWork)
                         val startMapping = TimeSource.Monotonic.markNow()
                         it.reconstruct(result.assignment).also { lifted ->
@@ -133,15 +137,22 @@ internal class PrivateRebuildSatisfaction(
         }
     }
 
-    private fun trialSpent(): Long = (checkNotNull(root).work - preparationStart).coerceAtLeast(0L) +
-        (consumer?.work ?: 0L) * PROPAGATION_WORK_PER_NODE
+    private fun trialSpent(): Long = saturatedWork(chargedPrivateWork,
+        saturatedWork(retiredWork, consumer?.work ?: 0L).coerceAtMost(
+            Long.MAX_VALUE / PROPAGATION_WORK_PER_NODE,
+        ) * PROPAGATION_WORK_PER_NODE)
+
+    private fun charge(work: Long) {
+        checkNotNull(root).chargeInprocessingWork(work)
+        chargedPrivateWork = saturatedWork(chargedPrivateWork, work)
+    }
 
     private fun prepare(session: PropagationSession, containing: Cancellation) {
-        preparationStart = session.work
+        val preparationStart = session.work
         note("Attempts")
-        val meter = WorkMeter(session::chargeInprocessingWork)
+        val meter = WorkMeter(::charge)
         val token = object : Cancellation {
-            override fun isCancelled(): Boolean = containing() || session.work - preparationStart >= params.privateRebuildWork
+            override fun isCancelled(): Boolean = containing() || trialSpent() >= params.privateRebuildWork
             override fun deadline() = containing.deadline()
             override fun workMeter(): WorkMeter = meter
         }
@@ -160,11 +171,11 @@ internal class PrivateRebuildSatisfaction(
         note("WarmClausesRetained", session.learnedClauseCount.toLong())
         // The new model identity owns all imports and propagation indexes. A canonical exchange
         // cannot attach to it without a supported translation, so its cursor stays with canonical.
-        val privateParams = params.copy(
+        val privateParams = sharedParams.copy(
             privateRebuildWork = 0L, clauseExchange = null, cutExchange = null, pooledIncumbents = null,
             cancellation = params.cancellation or Cancellation { trialSpent() >= params.privateRebuildWork },
             onEvent = null, branchObserver = null, maxDecisions = params.maxDecisions.coerceAtMost(
-                params.privateRebuildWork / PROPAGATION_WORK_PER_NODE,
+                (params.privateRebuildWork - trialSpent()).coerceAtLeast(0L) / PROPAGATION_WORK_PER_NODE,
             ),
             maxLearnedClauses = minOf(params.maxLearnedClauses ?: 256, 256),
         )
@@ -182,14 +193,13 @@ internal class PrivateRebuildSatisfaction(
     }
 
     private fun validate(sample: Sample, token: Cancellation): Boolean {
-        val session = checkNotNull(root)
         val start = TimeSource.Monotonic.markNow()
         try {
             while (checkedFactors < solver.problem.numFactors) {
                 if (token()) return false
                 val factor = solver.problem.factors[checkedFactors]
                 val literals = (factor as Clause).literals
-                session.chargeInprocessingWork(literals.size + 1L)
+                charge(literals.size + 1L)
                 if (literals.none { Lit.evaluate(it, sample.boolValue(Lit.variable(it))) }) return false
                 checkedFactors++
             }
