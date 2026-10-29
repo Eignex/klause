@@ -225,7 +225,7 @@ internal object PreparedArithmeticLearningProfile {
         }
     }
 
-    private fun checkPoint(problem: Problem, sample: Sample, stop: Cancellation): Boolean {
+    internal fun checkPoint(problem: Problem, sample: Sample, stop: Cancellation): Boolean {
         val pinned = problem.withIntDomains(Array(problem.numIntVars) {
             val value = sample.intValue(it)
             check(value in requireNotNull(problem.intDomainOrNull(it)))
@@ -239,11 +239,15 @@ internal object PreparedArithmeticLearningProfile {
         return !checker.fixpointCancelled && !stop()
     }
 
-    private class Capture(native: PropagationSession) {
+    internal class Capture(
+        native: PropagationSession,
+        private val maxEvents: Int = 128,
+        private val maxWords: Int = 8192,
+    ) {
         private val state = native.javaClass.getDeclaredField("state").apply { isAccessible = true }.get(native)
         private val field = state.javaClass.getDeclaredField("arithmeticLearningTrace").apply { isAccessible = true }
         private val trace = Class.forName("com.eignex.klause.propagation.ArithmeticLearningTrace")
-            .getConstructor().newInstance()
+            .getConstructor(Int::class.javaPrimitiveType, Int::class.javaPrimitiveType).newInstance(maxEvents, maxWords)
 
         init { field.set(state, trace) }
 
@@ -253,8 +257,8 @@ internal object PreparedArithmeticLearningProfile {
 
         fun export(): JsonObject = buildJsonObject {
             put("schemaVersion", 1)
-            put("eventLimit", 128)
-            put("wordLimit", 8192)
+            put("eventLimit", maxEvents)
+            put("wordLimit", maxWords)
             put("truncated", trace.javaClass.getMethod("getTruncated").invoke(trace) as Boolean)
             put("words", trace.javaClass.getMethod("getWords").invoke(trace) as Int)
             put("events", buildJsonArray {
@@ -267,6 +271,10 @@ internal object PreparedArithmeticLearningProfile {
                     })
                 }
             })
+        }
+
+        fun record(kind: String, vararg data: Long) {
+            trace.javaClass.getMethod("record", String::class.java, LongArray::class.java).invoke(trace, kind, data)
         }
 
         fun release() { field.set(state, null) }

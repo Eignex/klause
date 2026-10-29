@@ -768,3 +768,20 @@ after lease losses. Neither produces source outcomes. The successful runs retain
 about 397 seconds of cold preparation and nine seconds with reused artifacts,
 plus about 2.57 seconds of independent checking; failed preparation stays part of
 the investigation cost rather than becoming a solver regression.
+
+## Prepared arithmetic learning
+
+`bench.profile.OrdinaryArithmeticLearningProfile` takes `suite=ID problem=NAME
+sha256=HEX timeout-ms=10000 nodes=4096 lp=auto|off`. It runs clause and opt-in
+integer-row arms through ordinary finite preparation and backtrack traversal,
+without a decision replay. The existing bounded arithmetic trace records source
+conflicts, historical endpoint rows, mapped admission, retained consumers and
+retirement. The selector wrapper delegates all decisions and notifications.
+
+Original source bytes, canonical original/prepared models and installed provenance
+remain in the capture. Each arm's deadline contains loading, preparation, solving,
+reconstruction, native point checking and retirement. Native propagation work is a
+subset of invocation cost. The instrumented capture supplies neither independent
+source checking nor a throughput claim. Use an ordinary lab adapter comparison
+with source validation for whole-source outcomes; a missing consumer requires
+further source or integration diagnosis. Defaults and export scope remain separate.
