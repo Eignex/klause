@@ -421,6 +421,31 @@ using independent source validation, deterministic work scheduling where applica
 and the same semantics and preparation controls. Kernel timings, pivot counts and
 modeled work alone establish no numerical policy improvement.
 
+[9279](https://lab.eignex.com/jobs/9279) repeats the ordinary `pure-real-min`
+source at `ec38f24632` and `f633ad442c`, with exact mode, presolve off, seed 3
+and one processor. All six native results retain objective `1/3`, three standalone
+pivots and 220 LP work units. Independent checking is unsupported because the
+checker accepts decimal witness coordinates only. The requested `gr4x6` selector
+matches no `miplib3` input. [9285](https://lab.eignex.com/jobs/9285) retains matching
+objective `3/2` on `open-real-min`; its independent checker rejects the MPS layout
+before checking the witness. Neither control establishes independent feasibility.
+
+[9286](https://lab.eignex.com/jobs/9286) repeats `blend-tiny` on the same revisions
+and runtime with 1,000 finite work units and fixed 200-unit slices. All six original
+witnesses at objective 9 pass the external solchecker with zero violations. The
+seven complete scheduling events match across all cases, ending after 29 charged
+work units without an emergency stop. Installed distributions match within each
+revision's repeats; the source and CLI hashes match across revisions. These are
+source and scheduling controls, not a throughput result or independently checked
+optimality proof.
+
+Profile [9276](https://lab.eignex.com/jobs/9276) reaches preparation but exhausts
+the heap while compiling both targets concurrently. The ordered build in
+[9282](https://lab.eignex.com/jobs/9282) loses its first infrastructure allocation
+before numerical execution. These preparation failures establish no dominant
+numerical cost or policy disposition. JVM and Linux Native regressions and profile
+linking pass CI at `d3402479af`; the build-order change passes at `0b37e89770`.
+
 ### Bounded sparse admission trials
 
 `lp=default,+sparse-trial` selects the ordinary model-facing LP route's bounded
