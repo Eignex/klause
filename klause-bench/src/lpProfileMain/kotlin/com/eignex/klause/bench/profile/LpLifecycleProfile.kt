@@ -104,12 +104,23 @@ fun main(args: Array<String>) {
     for (round in -1 until repeats) {
         for (retained in if (round % 2 == 0) listOf(true, false) else listOf(false, true)) {
             for (observed in listOf(false, true)) {
-                check(!stop()) { "containing profile allowance exhausted" }
+                if (profileExpired(stop)) return
                 lifecycle(initial, column, side, round, retained, observed, stop)
             }
         }
     }
-    sourceWorker(compiled.model, requireNotNull(objective), stop)
+    if (!profileExpired(stop)) sourceWorker(compiled.model, requireNotNull(objective), stop)
+}
+
+private fun profileExpired(cancellation: Cancellation): Boolean {
+    if (!cancellation()) return false
+    println(buildJsonObject {
+        put("kind", "profile-stop")
+        put("complete", false)
+        put("reason", "containing-allowance")
+        put("cancelled", true)
+    })
+    return true
 }
 
 private fun lifecycle(
@@ -131,6 +142,7 @@ private fun lifecycle(
     var activeNs = 0L
     try {
         for ((index, stage) in listOf("cold", "bound", "bound-pop", "row", "row-pop").withIndex()) {
+            if (cancellation()) return
             val stageStart = Monotonic.markNow()
             val stageAllocated = profileAllocatedBytes()
             val creationStart = Monotonic.markNow()
@@ -151,14 +163,14 @@ private fun lifecycle(
             val editStart = Monotonic.markNow()
             when (index) {
                 1 -> {
-                    check(current.push())
-                    check(current.assertBound(column, false, side, 1L))
+                    check(current.push() || cancellation())
+                    check(current.assertBound(column, false, side, 1L) || cancellation())
                 }
 
-                2, 4 -> check(current.pop(0))
+                2, 4 -> check(current.pop(0) || cancellation())
 
                 3 -> {
-                    check(current.push())
+                    check(current.push() || cancellation())
                     check(
                         current.append(
                             LpScopedRow(
@@ -168,7 +180,7 @@ private fun lifecycle(
                                 ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L)))),
                             ),
                             scoped = true,
-                        ),
+                        ) || cancellation(),
                     )
                 }
             }
