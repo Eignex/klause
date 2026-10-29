@@ -3,6 +3,7 @@ package com.eignex.klause.propagation
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
+import kotlin.time.TimeSource
 
 /**
  * First-UIP (Unique Implication Point) conflict analyzer — the classical CDCL clause-learning
@@ -188,12 +189,25 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         beginAnalysis()
         val factor = state.factorAt(conflictFactorId)
         state.arithmeticLearningTrace?.seedEndpoints(state.factorIntVars(conflictFactorId), state)
+        val attribution = state.factorAttribution
+        val family = if (attribution == null) 0 else state.attributionFamily(conflictFactorId)
         val before = state.work
-        val seedReason = factor.conflictReason(state, conflictFactorId)
-            ?: return@boundedAnalysis AnalysisResult.NotApplicable
-        state.factorAttribution?.let {
-            val family = state.attributionFamily(conflictFactorId)
-            it.note(family, FactorAttribution.Metric.ReasonWork, state.work - before)
+        val start = if (attribution == null) null else TimeSource.Monotonic.markNow()
+        attribution?.note(family, FactorAttribution.Metric.ConflictReasonAttempts)
+        val seedReason = try {
+            factor.conflictReason(state, conflictFactorId)
+        } finally {
+            attribution?.let {
+                it.note(family, FactorAttribution.Metric.ReasonWork, state.work - before)
+                it.note(family, FactorAttribution.Metric.ReasonNanos,
+                    requireNotNull(start).elapsedNow().inWholeNanoseconds)
+            }
+        }
+        if (seedReason == null) {
+            attribution?.note(family, FactorAttribution.Metric.ConflictReasonUnavailable)
+            return@boundedAnalysis AnalysisResult.NotApplicable
+        }
+        attribution?.let {
             it.support(family, FactorAttribution.Metric.EagerReasons, seedReason.size)
             it.remember(seedReason, family)
         }
@@ -370,9 +384,11 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         }
         val choice = HistoricalTableReason(state)
         state.historicalTableReason = choice
+        var selectedFamilies = 0
         try {
             state.finiteWork.checkNow()
             val fallback = runResolution(clauseResolvent, seedReason, currentLevel)
+            selectedFamilies = state.factorAttribution?.analysisFamilies ?: 0
             if (fallback !is AnalysisResult.Learned || !fallback.asserting || state.runCancelled ||
                 fallback.literals.size > 64
             ) return fallback
@@ -396,8 +412,10 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
             state.arithmeticLearningTrace?.record("table.accepted", fallback.backjumpLevel.toLong(),
                 alternate.backjumpLevel.toLong(), fallback.literals.size.toLong(), alternate.literals.size.toLong())
             lastResolvent = alternateResolvent
+            selectedFamilies = state.factorAttribution?.analysisFamilies ?: 0
             return alternate
         } finally {
+            state.factorAttribution?.selectFamilies(selectedFamilies)
             state.historicalTableReason = null
         }
     }
@@ -412,6 +430,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
     private fun runResolution(resolvent: ConflictResolvent, seedReason: IntArray, currentLevel: Int): AnalysisResult {
         val numBoolVars = state.problem.numBoolVars
         resolvent.reset(universe)
+        state.factorAttribution?.beginAnalysis()
 
         state.factorAttribution?.let { it.participate(it.reasonFamily(seedReason), seedReason.size) }
         resolvent.resolve(seedReason, currentLevel)
