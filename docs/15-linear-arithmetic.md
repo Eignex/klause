@@ -103,7 +103,7 @@ the explained interval producer before the numerical query. A compatible decline
 retains no reason or numerical authority. A successful implication rebuilds its
 premises from the current trail, publishes through shared search and yields before
 the LP solve. Dependency preparation, row selection and sorting charge the current
-operation; the component owns the index and pending set for its lifetime. Row
+operation; the component owns the index and pending set for its lifetime. Index
 storage is bounded by the prepared rows and their Boolean incidences. Row
 visits, literal touches and retracted assertions distinguish avoided scanning from
 consumed consequences.

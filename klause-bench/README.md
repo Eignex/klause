@@ -340,8 +340,8 @@ arm; exact prefix and continuation snapshots must agree. The profile reports row
 visits, literal touches, retracted assertions, compatible decline reuse, consumed
 guard implications and producer/assertion/numerical time separately. These are
 direct library diagnostics; they supply neither a default CLI throughput claim nor
-independent whole-source proof validation. Run the main through lab with its
-explicit bench install task and classpath; retain pinned source bytes, preparation,
+independent whole-source proof validation. Run the main through the committed lab
+profile wrapper with CLI and bench installation tasks; retain pinned source bytes, preparation,
 build/runtime provenance and unsuccessful receipts beside the results.
 An optional `sourceGzip64` uses the existing 96 KiB encoded-input loader and the
 profile's 32 MiB source cap. Its decompressed bytes must match `sha256`; this lets
@@ -350,6 +350,17 @@ a retained original source avoid a cold download of its entire catalog archive.
 bytes and raw profile records belong in the external evidence directory.
 Failed child runs forward at most 16 KiB of their error stream to the parent log,
 so an unavailable artifact receipt does not hide the diagnostic exception.
+
+The prepared-factory strict-bound, backtrack and compatible-decline controls pass
+on JVM and Linux native at `2337dbd102`; the new JVM cases take at most 5 ms.
+Original PWD [9192](https://lab.eignex.com/jobs/9192) stops during cold corpus
+acquisition, and [9215](https://lab.eignex.com/jobs/9215) exposes the required CLI
+provenance installation. Frozen-source [9230](https://lab.eignex.com/jobs/9230)
+and diagnostic [9244](https://lab.eignex.com/jobs/9244) report failed commands with
+committed child artifacts unavailable through the maintained interface. These
+attempts establish no original-source consumption, throughput or terminal claim.
+Admission stays opt-in; [#3844](https://github.com/Eignex/klause/issues/3844)
+retains its required original-source consumption criterion.
 
 The opt-in basis tool uses the [basis corpus](../klause/src/jvmTest/resources/basis-corpus/README.md):
 
