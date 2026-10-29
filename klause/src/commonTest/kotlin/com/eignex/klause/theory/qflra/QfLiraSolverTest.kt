@@ -51,28 +51,31 @@ import kotlin.test.assertTrue
 class QfLiraSolverTest {
     @Test
     fun `incremental prepared rows should consume a strict consequence before Boolean completion`() {
-        val source = Problem(4, 0, emptyArray(), arrayOf(
+        val source = Problem(5, 0, emptyArray(), arrayOf(
             ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
                 LinearOp.LE, 1.0),
-            ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
-                LinearOp.LE, 1.0, strict = true),
-            ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(2.0),
-                LinearOp.LE, 2.0, strict = true),
-        ), numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
-            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+            ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(1), doubleArrayOf(1.0),
+                LinearOp.GE, 2.0),
+            ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(2.0, -3.0),
+                LinearOp.LE, -4.0, strict = true),
+            ReifiedRealLinear(3, intArrayOf(), doubleArrayOf(), intArrayOf(1), doubleArrayOf(1.0),
+                LinearOp.GE, 2.0, strict = true),
+        ), numRealVars = 2, realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY })
         val prepared = assertNotNull(prepareExactLiraSource(source, Cancellation.Never))
         prepared.open().use { component ->
             component.useIncrementalLinearPropagation()
             val session = SearchSession(listOf(component))
             assertIs<ComponentResult.Consistent>(session.initialize())
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
             assertNull(session.boolValue(2))
 
-            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(3, true))))
 
             assertEquals(true, session.boolValue(2))
-            assertNull(session.boolValue(3))
-            assertEquals(setOf(Lit.make(1, false), Lit.make(2, true)),
+            assertNull(session.boolValue(4))
+            assertEquals(setOf(Lit.make(0, false), Lit.make(3, false), Lit.make(2, true)),
                 assertNotNull(session.reasonFor(2)).literals.toSet())
         }
     }
@@ -103,26 +106,29 @@ class QfLiraSolverTest {
 
     @Test
     fun `incremental prepared rows should reuse a compatible strict comparison decline`() {
-        val source = Problem(4, 0, emptyArray(), arrayOf(
+        val source = Problem(5, 0, emptyArray(), arrayOf(
             ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
                 LinearOp.LE, 1.0),
-            ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
-                LinearOp.LE, 1.0, strict = true),
-            ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(1), doubleArrayOf(1.0),
+            ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(1), doubleArrayOf(1.0),
+                LinearOp.GE, 2.0),
+            ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(2.0, -3.0),
+                LinearOp.LE, -4.0, strict = true),
+            ReifiedRealLinear(3, intArrayOf(), doubleArrayOf(), intArrayOf(2), doubleArrayOf(1.0),
                 LinearOp.LE, 1.0),
-        ), numRealVars = 2, realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
-            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY })
+        ), numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
         val prepared = assertNotNull(prepareExactLiraSource(source, Cancellation.Never))
         prepared.open().use { component ->
             component.useIncrementalLinearPropagation()
             val session = SearchSession(listOf(component))
             assertIs<ComponentResult.Consistent>(session.initialize())
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
             val reused = component.partialLinearPropagationStats.unchangedDeclines
 
-            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, true))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(3, true))))
 
-            assertNull(session.boolValue(1))
+            assertNull(session.boolValue(2))
             assertTrue(component.partialLinearPropagationStats.unchangedDeclines > reused)
         }
     }
