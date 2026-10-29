@@ -37,10 +37,11 @@ internal object LinearPrefixInspection {
     fun inspect(
         compiled: SmtLibProblem, out: File, sourceSha256: String, probe: Boolean = false,
         integrated: Boolean = false, cached: Boolean = false, reuse: Boolean = false, batching: Boolean = false,
-        incremental: Boolean = false,
+        incremental: Boolean = false, incrementalControl: Boolean = false,
     ) {
         val emergencySeconds = if (incremental) 30 else 10
         val captures = (0..1).map { replay ->
+            val incrementalRows = incremental && !incrementalControl && replay == 1
             val stop = Cancellation.after(emergencySeconds.seconds)
             val started = System.nanoTime()
             val invocation = SourceSetup.prepare(SourceSetupRequest(
@@ -76,7 +77,7 @@ internal object LinearPrefixInspection {
                     if (cachedProducer) {
                         call(requireNotNull(planned.theory), "reusePartialLinearDeclines")
                     }
-                    if (incremental && replay == 1) {
+                    if (incrementalRows) {
                         call(requireNotNull(planned.theory), "useIncrementalLinearPropagation")
                     }
                 }
@@ -92,7 +93,7 @@ internal object LinearPrefixInspection {
                     put("sourceVerdictClaim", false)
                     put("integrated", automatic)
                     put("cached", cachedProducer)
-                    put("incrementalRows", incremental && replay == 1)
+                    put("incrementalRows", incrementalRows)
                     put("openWorkLimit", params.openWorkLimit)
                     put("emergencySeconds", emergencySeconds)
                     put("sourceBoundBatching", !batching || replay == 1)
@@ -134,7 +135,7 @@ internal object LinearPrefixInspection {
                         put("treated", replay == 1)
                         put("integrated", automatic)
                         put("cached", cachedProducer)
-                        put("incrementalRows", incremental && replay == 1)
+                        put("incrementalRows", incrementalRows)
                         put("openWorkLimit", params.openWorkLimit)
                         put("sourceBoundBatching", !batching || replay == 1)
                         put("probeNs", probeElapsed)
@@ -184,6 +185,7 @@ internal object LinearPrefixInspection {
             put("snapshotSha256", sha256(captures[0]))
             put("replaySha256", sha256(captures[1]))
             put("experiment", when {
+                incrementalControl -> "cached-producer-self-replay"
                 incremental -> "cached-producer-versus-incremental-source-rows"
                 batching -> "individual-versus-batched-source-bounds"
                 cached -> "integrated-versus-cached"
