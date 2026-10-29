@@ -78,6 +78,7 @@ class LinearAuthorityCutsTest {
 
         LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
             val baseline = authority.advance(source, Cancellation.Never)
+            val baselineObservations = authority.cutObservations()
             val result = authority.advance(source, Cancellation.Never, cuts = true)
 
             assertEquals(SourceValue.Rational(BigFraction.ofLong(3) * BigFraction.ofLong(2).reciprocal()),
@@ -269,6 +270,8 @@ class LinearAuthorityCutsTest {
             assertTrue((authority.cutObservations()["numericalCutLifecycleSOURCE_MIXED_ROUNDING_CHECKED_BOUND"]
                 ?: 0L) > 0L)
             assertEquals(null, authority.cutObservations()["numericalCutLifecycleSOURCE_MIXED_ROUNDING_BOUND_PRUNE"])
+            assertTrue((baselineObservations["numericalCutLifecycleRECIPE_NO_CUT_FloatWork"] ?: 0L) > 0L)
+            assertEquals(null, baselineObservations["numericalCutLifecycleSOURCE_MIXED_ROUNDING_FloatWork"])
         }
     }
 
