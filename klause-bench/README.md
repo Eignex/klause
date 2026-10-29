@@ -245,6 +245,8 @@ own elapsed observation. Main elapsed time includes source identity capture,
 preparation, warmup, tracing, failed attempts and private retirement; lab process
 resources also contain startup and final process retirement. These nested scopes
 must not be summed with their containers.
+`slice-work` and `slice-max-work` default to 8 and 64 for diagnostic overlap;
+set them to the configured invocation values when evaluating applicability.
 
 `lab/recipes/` contains the migrated lab recipes. `scripts/convert-lab-recipe.sh`
 translates legacy experiments or schedules from stdin without submitting them;
