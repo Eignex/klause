@@ -698,6 +698,22 @@ These controls establish no throughput improvement or independent proof validati
 
 ### Numerical lifecycle profiles
 
+`lp-lifecycle-v1` selects Afiro, Adlittle, Atwood0 and Avgas from the immutable
+HiGHS revision `73cac48c5340d775a477087198611862559be250`, under its MIT license.
+Selection retains original MPS bytes; the lab planner records each source SHA-256.
+Afiro and Adlittle share the source identities in the basis-corpus manifest.
+The other two inputs provide separate original-source controls.
+
+`scripts/lp-lifecycle-profile.sh mps-NAME 1 both checkpoint` compares complete
+tableau promotion on actual overflow with fixed-width replay under the same
+limits. `precision` compares early arbitrary precision with replay. Runtime can
+be `jvm`, `native` or `both`; build `:klause:stageLpProfileJvm` and/or
+`:klause:linkLpProfileReleaseExecutableLinuxX64` accordingly. For a source outside
+the basis manifest, append its original SHA-256 and full HiGHS revision.
+The profile retains cold and unchanged requests, authority/bound/row/objective
+edits, retirement, failed work and conversion charges separately. Its worker
+observations require ordinary source-checked CLI controls for source claims.
+
 `scripts/lp-template-preparation-profile.sh cover-2x3|cover-3x3 [repeats] [steps]`
 compares disabled templates, selective object reuse and complete index reuse on the
 existing MPS component fixtures. Submit as a lab profile script with build task
