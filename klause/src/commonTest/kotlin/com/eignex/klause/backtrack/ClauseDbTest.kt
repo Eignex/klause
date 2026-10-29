@@ -6,6 +6,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SearchStatsSink
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.SharingMemoryObservation
@@ -16,6 +17,66 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class ClauseDbTest {
+
+    @Test
+    fun `unavailable cap preparation preserves clauses and tier policy`() {
+        for (native in listOf(false, true)) {
+            for (tiered in listOf(false, true)) {
+                for (mode in listOf("work", "scratch", "cancelled", "scan")) {
+                    val session = PropagationSession(chainProblem().bake(), nativeSat = native)
+                    repeat(9) { session.addLearnedClause(Clause(intArrayOf(1, 3, 4)), 9) }
+                    val before = session.work
+                    val tiers = List(9) { session.learnedClauseTier(it) }
+                    val events = ArrayList<SearchEvent>()
+                    val params = BacktrackParams(
+                        maxLearnedClauses = 1,
+                        tieredLearnedDb = tiered,
+                        learnedMemoryWork = if (mode == "work") 0L else 10_000L,
+                        learnedMemoryScratchBytes = if (mode == "scratch") 0L else 10_000L,
+                        cancellation = Cancellation { mode == "cancelled" || (mode == "scan" && session.work - before >= 28L) },
+                        onEvent = { events.add(it) },
+                    )
+
+                    forgetIfOverCap(session, params)
+
+                    assertEquals(9, session.learnedClauseCount)
+                    assertEquals(tiers, List(9) { session.learnedClauseTier(it) })
+                    assertTrue(events.isEmpty())
+                    assertTrue(session.work - before <= 28L)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `bounded cap selection preserves lower LBD and glue priority`() {
+        for (native in listOf(false, true)) {
+            for (tiered in listOf(false, true)) {
+                val session = PropagationSession(chainProblem().bake(), nativeSat = native)
+                for (lbd in listOf(9, 8, 7, 1)) session.addLearnedClause(Clause(intArrayOf(1, 3, 4)), lbd)
+
+                forgetIfOverCap(session, BacktrackParams(maxLearnedClauses = 2, tieredLearnedDb = tiered))
+
+                assertEquals(listOf(7, 1), List(session.learnedClauseCount) { session.learnedClauseLbd(it) })
+            }
+        }
+    }
+
+    @Test
+    fun `a demoted mid tier survives until the following reduction`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(chainProblem().bake(), nativeSat = native)
+            for (lbd in listOf(5, 6, 7, 8)) session.addLearnedClause(Clause(intArrayOf(1, 3, 4)), lbd)
+            val params = BacktrackParams(maxLearnedClauses = 1, tieredLearnedDb = true)
+
+            forgetIfOverCap(session, params)
+
+            assertEquals(listOf(5, 6), List(session.learnedClauseCount) { session.learnedClauseLbd(it) })
+            forgetIfOverCap(session, params)
+            assertEquals(5, session.learnedClauseLbd(0))
+            assertEquals(1, session.learnedClauseCount)
+        }
+    }
 
     // Implication chain a -> b -> c, so a learned (!a | !b | c) vivifies to (!a | c): probing a=true
     // propagates b and c, falsifying !b (dropped) and satisfying c (prefix proven implied).

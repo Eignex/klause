@@ -25,7 +25,15 @@ internal fun PropagationState.sharingMemory(sample: SharingMemoryObservation) {
     atoms.undoAnt.forEach(::add)
     undo.minAnt.forEach(::add)
     undo.maxAnt.forEach(::add)
-    holeHistAnt.forEach { sample.step(); it?.forEach(::add) }
+    sample.ownedReferences(holeHistAnt, holeHistAnt.size.toLong(), true)
+    holeHistAnt.forEach {
+        sample.step()
+        if (it != null) {
+            sample.ownedReferences(it, it.size.toLong(), true)
+            it.forEach(::add)
+        }
+    }
+    sample.ownedReferences(lazyReasonMemo, lazyReasonMemo.size.toLong() * 2L, true)
     lazyReasonMemo.forEach { (marker, reason) -> sample.step(); add(marker); add(reason) }
     add(nativeConflictReason)
     add(atoms.pendingMoveAnt)
@@ -78,6 +86,10 @@ internal fun PropagationState.sharingMemory(sample: SharingMemoryObservation) {
             sample.owned(run.pendIds.backingData, run.pendIds.backingData.size.toLong() * Int.SIZE_BYTES, true)
         }
     }
+    sample.ownedReferences(atoms.byIntVar, atoms.byIntVar.size.toLong(), true)
+    sample.ownedReferences(atoms.watchedByVar, atoms.watchedByVar.size.toLong(), true)
+    sample.ownedReferences(atoms.kind, atoms.kind.size.toLong(), true)
+    sample.ownedReferences(atoms.watchersByLit, atoms.watchersByLit.size.toLong(), true)
     var channelBytes = 0L
     for (pending in pendingChanneling) {
         sample.step(); channelBytes += pending.size.toLong() * Int.SIZE_BYTES
@@ -149,6 +161,8 @@ private fun PropagationState.learnedSharingMemory(sample: SharingMemoryObservati
     learned.integerRows?.let { sample.ownedReferences(it, it.size.toLong()) }
     var watchers = watches.pos.primitiveCapacityBytes
     sample.owned(watches.pos, watches.pos.primitiveCapacityBytes)
+    sample.ownedReferences(watches.byLit, watches.byLit.size.toLong(), true)
+    sample.ownedReferences(watches.blockersByLit, watches.blockersByLit.size.toLong(), true)
     for (lists in listOf(watches.byLit.asList(), watches.blockersByLit.asList(), atoms.watchersByLit)) {
         for (list in lists) {
             sample.step(); watchers += (list?.backingData?.size?.toLong() ?: 0L) * Int.SIZE_BYTES
@@ -183,6 +197,8 @@ private fun PropagationState.learnedSharingMemory(sample: SharingMemoryObservati
         sample.step(); eventBytes += mark?.allocatedBytes ?: 0L
         if (mark != null) sample.owned(mark, mark.allocatedBytes, true)
     }
+    sample.ownedReferences(events.dirtyVars, events.dirtyVars.size.toLong(), true)
+    sample.ownedReferences(events.dirtyMark, events.dirtyMark.size.toLong(), true)
     sample.owned(propQueue, propQueue.allocatedBytes, true)
     sample.owned(atoms.dirtyFactors, atoms.dirtyFactors.allocatedBytes, true)
     sample.owned(learned.importUses, learned.importUses.allocatedBytes)
@@ -231,8 +247,21 @@ private fun PropagationState.reasonIndexMemory(sample: SharingMemoryObservation)
     for (array in listOf(boolReason, intMinReason, intMaxReason, boolPinPos)) {
         sample.owned(array, array.size.toLong() * Int.SIZE_BYTES, true)
     }
-    for (refs in listOf(boolAntecedents.asList(), intMinAntecedents.asList(), intMaxAntecedents.asList(),
-        atoms.ant, atoms.undoAnt, undo.minAnt, undo.maxAnt)) sample.ownedReferences(refs, refs.size.toLong(), true)
+    for (refs in listOf(boolAntecedents, intMinAntecedents, intMaxAntecedents)) {
+        sample.ownedReferences(refs, refs.size.toLong(), true)
+    }
+    for (refs in listOf(atoms.ant, atoms.undoAnt, undo.minAnt, undo.maxAnt)) {
+        sample.ownedReferences(refs, refs.size.toLong(), true)
+    }
+    for (refs in listOf(boundMoves, holeHistLvl, holeHistPos)) {
+        sample.ownedReferences(refs, refs.size.toLong(), true)
+    }
+    for (refs in listOf(boundMovePriorMin, boundMovePriorMax, holeHistVal)) {
+        sample.ownedReferences(refs, refs.size.toLong(), true)
+    }
+    sample.ownedReferences(holeHistIndex, holeHistIndex.size.toLong(), true)
+    sample.ownedReferences(undo.domain, undo.domain.size.toLong(), true)
+    sample.ownedReferences(undo.revTrail, undo.revTrail.size.toLong(), true)
     sample.record(mapOf(
         "reasonIndexCapacityBytes" to
             (boolReason.size.toLong() + intMinReason.size + intMaxReason.size + boolPinPos.size) * Int.SIZE_BYTES,

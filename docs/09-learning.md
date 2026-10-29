@@ -385,6 +385,13 @@ ranking by LBD. [ClauseDb](../klause/src/commonMain/kotlin/com/eignex/klause/bac
 and [SearchLearning](../klause/src/commonMain/kotlin/com/eignex/klause/solver/search/SearchLearning.kt)
 own the respective stores.
 
+Restart-cap candidate preparation admits its complete candidate arrays, tier columns
+and worst-case ranking work against `learnedMemoryWork` and
+`learnedMemoryScratchBytes` before allocating. Candidate scans and heap ranking
+poll cancellation; unfinished preparation publishes no tier changes or sweep event.
+Insufficient work or scratch safely defers the cap sweep. Completed selection keeps
+the same LBD priorities and tier lifetimes; a sweep event requires actual retirement.
+
 Shared learning also accepts an optional modeled-byte soft limit checked at
 propagation boundaries independently of restarts. Units, glue clauses, live reason
 owners and pending first attachments form its protected floor; copied trail reasons

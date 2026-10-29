@@ -12,6 +12,7 @@ internal data class LearnedReclamation(
     val afterBytes: Long? = null,
     val protectedBytes: Long? = null,
     val work: Long = 0L,
+    val protectedLimitExceeded: Boolean = false,
 )
 
 internal class ReclamationPreparation(
@@ -55,7 +56,8 @@ internal fun PropagationState.prepareReclamation(
     keep: (Int, Int) -> Boolean,
 ): BooleanArray {
     val count = nativeEngine?.count ?: learned.size
-    budget.visit(scratchBytes = count.toLong() * 13L)
+    budget.visit(scratchBytes = count.toLong() * 29L + baseFactorCount.toLong() * Long.SIZE_BYTES)
+    budget.atomic(baseFactorCount.toLong())
     budget.atomic(count.toLong() * 16L)
     val retained = BooleanArray(count)
     fun protect(fid: Int) {
@@ -84,6 +86,7 @@ internal fun PropagationState.prepareReclamation(
     budget.atomic(propQueue.size.toLong() * 3L + atoms.dirtyFactors.size * 3L + learned.pendingAttach.size,
         (propQueue.size.toLong() + atoms.dirtyFactors.size) * Int.SIZE_BYTES)
     budget.atomic(watches.pos.primitiveCapacityBytes, watches.pos.primitiveCapacityBytes * 2L)
+    budget.atomic(watches.pos.size.toLong() * watches.pos.size)
     for (lists in listOf(watches.byLit.asList(), watches.blockersByLit.asList(), atoms.watchersByLit)) {
         for (list in lists) {
             budget.visit()
@@ -92,7 +95,8 @@ internal fun PropagationState.prepareReclamation(
     }
     if (learned.integerRows != null) {
         intEvents.overflow?.let { overflow ->
-            budget.atomic(overflow.primitiveCapacityBytes)
+            budget.atomic(overflow.primitiveCapacityBytes + overflow.size.toLong() * overflow.size,
+                overflow.primitiveCapacityBytes * 2L + overflow.referenceCapacity.toLong() * Long.SIZE_BYTES)
             for (value in overflow.valuesInternal) {
                 budget.visit()
                 if (value != null) {
@@ -106,8 +110,10 @@ internal fun PropagationState.prepareReclamation(
         learned.usedFlags, learned.origins, learned.units, learned.pendingAttach)) {
         budget.atomic(column.backingData.size.toLong(), column.backingData.size.toLong() * Int.SIZE_BYTES)
     }
-    // Diagnostic trace publication has its own opaque retained map and is outside this atomic envelope.
-    if (arithmeticLearningTrace != null) throw ReclamationPreparation.Deferred()
+    arithmeticLearningTrace?.let { trace ->
+        val entries = trace.reclamationEntries.toLong()
+        budget.atomic(entries * (entries + 16L), entries * 128L)
+    }
     budget.ready()
     return retained
 }
