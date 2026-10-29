@@ -15,6 +15,23 @@ import kotlin.test.assertTrue
 
 class ComponentLpSolverTest {
     @Test
+    fun `tableau component queries should share their pivot allowance`() {
+        val builder = LpBuilder()
+        repeat(2) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        newComponentTableauCutSolver(builder.build(Sense.MINIMIZE), iterationLimit = 1).use { owner ->
+            val result = owner.solve()
+
+            assertNull(result)
+            assertEquals(LpFloatTermination.PIVOTS, owner.lastTermination)
+            assertEquals(1, owner.lastPivots)
+            assertEquals(1, owner.lastMetrics.componentSolves)
+        }
+    }
+
+    @Test
     fun `a bound edit should solve only its owning component`() {
         val builder = LpBuilder()
         repeat(2) {
