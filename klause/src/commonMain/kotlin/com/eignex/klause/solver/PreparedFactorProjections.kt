@@ -27,12 +27,12 @@ import com.eignex.klause.propagation.FactorProjectionPreparation
 import com.eignex.klause.propagation.PropagationProjection
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.SelectedProjectionChecks
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.theory.Encoder
 import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
@@ -57,6 +57,7 @@ class PreparedFactorProjections internal constructor(
     },
 ) {
     private var lpTemplateNamespace: Any = Any()
+    private var lpTemplateRows: Any = Any()
     private var lpSourceTemplateCache = AtomicReference<LpPreparationTemplates?>(null)
     private var lpFiniteTemplateCache = AtomicReference<LpPreparationTemplates?>(null)
 
@@ -67,7 +68,8 @@ class PreparedFactorProjections internal constructor(
     ): LpPreparationTemplates? {
         val cache = if (problem is BakedProblem) lpFiniteTemplateCache else lpSourceTemplateCache
         val previous = cache.load()
-        val next = LpPreparationTemplates.prepare(this, lpTemplateNamespace, objective, previous, token, onWork,
+        val next = LpPreparationTemplates.prepare(this, lpTemplateNamespace, lpTemplateRows, objective,
+            previous, token, onWork,
             reuseIndexes, reuseMetadata)
             ?: return null
         cache.compareAndSet(previous, next)
@@ -138,7 +140,9 @@ class PreparedFactorProjections internal constructor(
         view.numBoolVars == problem.numBoolVars && view.numIntVars == problem.numIntVars &&
         view.numRealVars == problem.numRealVars && view.numFactors == problem.numFactors &&
         view.factors.indices.all { view.factors[it] === problem.factors[it] }
-    ) projected(view, IntArray(view.numFactors) { it }) else forProblem(view).inheritLpTemplates(this)
+    ) projected(view, IntArray(view.numFactors) { it }).also {
+        it.lpTemplateRows = lpTemplateRows
+    } else forProblem(view).inheritLpTemplates(this)
 
     internal fun projected(view: Problem, factorIndices: IntArray, remap: VarRemap? = null): PreparedFactorProjections {
         require(factorIndices.size == view.numFactors && factorIndices.all { it in problem.factors.indices }) {

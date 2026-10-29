@@ -102,7 +102,8 @@ class LpPreparationTemplatesTest {
         val revised = objective.copy(constant = 7L)
         val consumer = CpToLpRelaxation(source, revised, projections = selection, reuseTemplateMetadata = true)
 
-        val reused = assertNotNull(consumer.build(RootDomains(source)).model.authoritativeModel())
+        val relaxation = consumer.build(RootDomains(source))
+        val reused = assertNotNull(relaxation.model.authoritativeModel())
         val after = assertNotNull(consumer.preparationTemplates)
         val fresh = assertNotNull(CpToLpRelaxation(source, revised, projections = null)
             .build(RootDomains(source)).model.authoritativeModel())
@@ -110,6 +111,7 @@ class LpPreparationTemplatesTest {
         assertSame(before.components, after.components)
         assertSame(before.factors, after.factors)
         assertSame(before.bounds, after.bounds)
+        assertEquals(7L, relaxation.objectiveConstant)
         assertTrue(reused.sameAuthority(fresh))
     }
 
@@ -161,6 +163,18 @@ class LpPreparationTemplatesTest {
 
         assertNull(result)
         assertEquals(2L, work)
+    }
+
+    @Test
+    fun `cancelled empty candidate import should withhold exact authority`() {
+        val problem = source.withFactors(emptyArray())
+        val captured = FactorProjectionProviders.Default.prepare(problem)
+        val consumer = CpToLpRelaxation(problem, null, projections = captured, reuseTemplateMetadata = true)
+        val relaxation = consumer.build(RootDomains(problem))
+
+        val result = relaxation.authoritativeWithTemplates(Cancellation { true })
+
+        assertNull(result)
     }
 
     @Test
@@ -415,12 +429,13 @@ class LpPreparationTemplatesTest {
 
     @Test
     fun `affine row replacement should match fresh authority and retain unrelated rows`() {
-        val first = CpToLpRelaxation(source, objective, projections = selection)
+        val first = CpToLpRelaxation(source, objective, projections = selection, reuseTemplateMetadata = true)
         first.build(RootDomains(source))
         val before = assertNotNull(first.preparationTemplates)
         val replacement = Linear(intArrayOf(2), intArrayOf(1), LinearOp.GE, 1)
         val view = source.withFactors(arrayOf(replacement, source.factors[1], source.factors[2]))
-        val changed = CpToLpRelaxation(view, objective, projections = selection.forEngineView(view))
+        val changed = CpToLpRelaxation(view, objective, projections = selection.forEngineView(view),
+            reuseTemplateMetadata = true)
 
         val reused = assertNotNull(changed.build(RootDomains(view)).model.authoritativeModel())
         val fresh = assertNotNull(CpToLpRelaxation(view, objective, projections = null)
