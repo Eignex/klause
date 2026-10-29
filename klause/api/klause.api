@@ -9576,21 +9576,23 @@ public final class com/eignex/klause/presolve/PresolveBudget : com/eignex/klause
 public final class com/eignex/klause/presolve/PresolveConfig {
 	public static final field Companion Lcom/eignex/klause/presolve/PresolveConfig$Companion;
 	public fun <init> ()V
-	public fun <init> (Lcom/eignex/klause/presolve/PresolveEmphasis;Ljava/util/Map;Ljava/lang/Integer;Ljava/lang/Integer;Lcom/eignex/klause/presolve/AffinePivotOrder;DI)V
-	public synthetic fun <init> (Lcom/eignex/klause/presolve/PresolveEmphasis;Ljava/util/Map;Ljava/lang/Integer;Ljava/lang/Integer;Lcom/eignex/klause/presolve/AffinePivotOrder;DIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/presolve/PresolveEmphasis;Ljava/util/Map;Ljava/lang/Integer;Ljava/lang/Integer;Lcom/eignex/klause/presolve/AffinePivotOrder;DIZI)V
+	public synthetic fun <init> (Lcom/eignex/klause/presolve/PresolveEmphasis;Ljava/util/Map;Ljava/lang/Integer;Ljava/lang/Integer;Lcom/eignex/klause/presolve/AffinePivotOrder;DIZIILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun forLocalSearch ()Lcom/eignex/klause/presolve/PresolveConfig;
 	public final fun getAbortFraction ()D
 	public final fun getAffinePivotOrder ()Lcom/eignex/klause/presolve/AffinePivotOrder;
 	public final fun getEmphasis ()Lcom/eignex/klause/presolve/PresolveEmphasis;
 	public final fun getMaxRounds ()I
 	public final fun getOverrides ()Ljava/util/Map;
+	public final fun getPreserveStructure ()Z
+	public final fun getStructuralImpactLimit ()I
 	public final fun probeBudgetPerVar ()I
 	public final fun probeTotalBudget ()I
 	public final fun problemPasses (Lcom/eignex/klause/presolve/PresolveContext;)Ljava/util/List;
 	public final fun resolved (Lcom/eignex/klause/presolve/PresolvePass;Lcom/eignex/klause/presolve/PresolveContext;)Z
 	public final fun withAffinePivotOrder (Lcom/eignex/klause/presolve/AffinePivotOrder;)Lcom/eignex/klause/presolve/PresolveConfig;
-	public final fun withEffort (DILjava/lang/Integer;Ljava/lang/Integer;)Lcom/eignex/klause/presolve/PresolveConfig;
-	public static synthetic fun withEffort$default (Lcom/eignex/klause/presolve/PresolveConfig;DILjava/lang/Integer;Ljava/lang/Integer;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PresolveConfig;
+	public final fun withEffort (DILjava/lang/Integer;Ljava/lang/Integer;ZI)Lcom/eignex/klause/presolve/PresolveConfig;
+	public static synthetic fun withEffort$default (Lcom/eignex/klause/presolve/PresolveConfig;DILjava/lang/Integer;Ljava/lang/Integer;ZIILjava/lang/Object;)Lcom/eignex/klause/presolve/PresolveConfig;
 }
 
 public final class com/eignex/klause/presolve/PresolveConfig$Companion {
@@ -9603,8 +9605,8 @@ public final class com/eignex/klause/presolve/PresolveConfig$Companion {
 public final class com/eignex/klause/presolve/PresolveContext {
 	public static final field Companion Lcom/eignex/klause/presolve/PresolveContext$Companion;
 	public fun <init> ()V
-	public fun <init> (ZLjava/util/Map;Ljava/util/Map;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/BakeConfig;Lcom/eignex/klause/presolve/SharedIntOccurrence;ZLcom/eignex/klause/presolve/AffinePivotOrder;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/presolve/SubsumeState;[I[IZLcom/eignex/klause/solver/objective/LinearObjective;)V
-	public synthetic fun <init> (ZLjava/util/Map;Ljava/util/Map;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/BakeConfig;Lcom/eignex/klause/presolve/SharedIntOccurrence;ZLcom/eignex/klause/presolve/AffinePivotOrder;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/presolve/SubsumeState;[I[IZLcom/eignex/klause/solver/objective/LinearObjective;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (ZLjava/util/Map;Ljava/util/Map;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/BakeConfig;Lcom/eignex/klause/presolve/SharedIntOccurrence;ZLcom/eignex/klause/presolve/AffinePivotOrder;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/presolve/SubsumeState;[I[IZLcom/eignex/klause/solver/objective/LinearObjective;Z)V
+	public synthetic fun <init> (ZLjava/util/Map;Ljava/util/Map;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/BakeConfig;Lcom/eignex/klause/presolve/SharedIntOccurrence;ZLcom/eignex/klause/presolve/AffinePivotOrder;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/presolve/SubsumeState;[I[IZLcom/eignex/klause/solver/objective/LinearObjective;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Z
 	public final fun component10 ()Lcom/eignex/klause/presolve/PresolveBudget;
 	public final fun component11 ()Lcom/eignex/klause/presolve/SubsumeState;
@@ -9612,6 +9614,7 @@ public final class com/eignex/klause/presolve/PresolveContext {
 	public final fun component13 ()[I
 	public final fun component14 ()Z
 	public final fun component15 ()Lcom/eignex/klause/solver/objective/LinearObjective;
+	public final fun component16 ()Z
 	public final fun component2 ()Ljava/util/Map;
 	public final fun component3 ()Ljava/util/Map;
 	public final fun component4 ()Z
@@ -9620,8 +9623,8 @@ public final class com/eignex/klause/presolve/PresolveContext {
 	public final fun component7 ()Lcom/eignex/klause/presolve/SharedIntOccurrence;
 	public final fun component8 ()Z
 	public final fun component9 ()Lcom/eignex/klause/presolve/AffinePivotOrder;
-	public final fun copy (ZLjava/util/Map;Ljava/util/Map;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/BakeConfig;Lcom/eignex/klause/presolve/SharedIntOccurrence;ZLcom/eignex/klause/presolve/AffinePivotOrder;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/presolve/SubsumeState;[I[IZLcom/eignex/klause/solver/objective/LinearObjective;)Lcom/eignex/klause/presolve/PresolveContext;
-	public static synthetic fun copy$default (Lcom/eignex/klause/presolve/PresolveContext;ZLjava/util/Map;Ljava/util/Map;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/BakeConfig;Lcom/eignex/klause/presolve/SharedIntOccurrence;ZLcom/eignex/klause/presolve/AffinePivotOrder;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/presolve/SubsumeState;[I[IZLcom/eignex/klause/solver/objective/LinearObjective;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PresolveContext;
+	public final fun copy (ZLjava/util/Map;Ljava/util/Map;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/BakeConfig;Lcom/eignex/klause/presolve/SharedIntOccurrence;ZLcom/eignex/klause/presolve/AffinePivotOrder;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/presolve/SubsumeState;[I[IZLcom/eignex/klause/solver/objective/LinearObjective;Z)Lcom/eignex/klause/presolve/PresolveContext;
+	public static synthetic fun copy$default (Lcom/eignex/klause/presolve/PresolveContext;ZLjava/util/Map;Ljava/util/Map;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/BakeConfig;Lcom/eignex/klause/presolve/SharedIntOccurrence;ZLcom/eignex/klause/presolve/AffinePivotOrder;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/presolve/SubsumeState;[I[IZLcom/eignex/klause/solver/objective/LinearObjective;ZILjava/lang/Object;)Lcom/eignex/klause/presolve/PresolveContext;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAffinePivotOrder ()Lcom/eignex/klause/presolve/AffinePivotOrder;
 	public final fun getAffineTouchedVars ()[I
@@ -9636,6 +9639,7 @@ public final class com/eignex/klause/presolve/PresolveContext {
 	public final fun getObjectiveBoolVars ()Ljava/util/Set;
 	public final fun getObjectiveIntCoeffs ()Ljava/util/Map;
 	public final fun getObjectiveIntVars ()Ljava/util/Set;
+	public final fun getPreserveStructure ()Z
 	public final fun getPresolveBudget ()Lcom/eignex/klause/presolve/PresolveBudget;
 	public final fun getSharedIntOcc ()Lcom/eignex/klause/presolve/SharedIntOccurrence;
 	public final fun getSolutionSetSensitive ()Z
@@ -12142,8 +12146,10 @@ public final class com/eignex/klause/solver/pipeline/ExecutionOption$Companion {
 	public final fun getPortfolioWork ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getPresolveAbortFraction ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getPresolveMaxRounds ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getPresolvePreserveStructure ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getPresolveProbePerVar ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getPresolveProbeTotal ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getPresolveStructuralImpact ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getRephaseInterval ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getReseedStaleThreshold ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getRestart ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
@@ -14811,7 +14817,7 @@ public final class com/eignex/klause/solver/result/PresolveInvocationOutcome : j
 }
 
 public final class com/eignex/klause/solver/result/PresolveInvocationStats {
-	public synthetic fun <init> (Ljava/lang/String;Lcom/eignex/klause/solver/result/PresolveLane;Lcom/eignex/klause/solver/result/PresolveInvocationOutcome;JJJLcom/eignex/klause/solver/result/PresolveSizeStats;Lcom/eignex/klause/solver/result/PresolveSizeStats;IIJILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Lcom/eignex/klause/solver/result/PresolveLane;Lcom/eignex/klause/solver/result/PresolveInvocationOutcome;JJJLcom/eignex/klause/solver/result/PresolveSizeStats;Lcom/eignex/klause/solver/result/PresolveSizeStats;IIJLjava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getElapsed-UwyO8pc ()J
 	public final fun getFixedColumns ()I
 	public final fun getInput ()Lcom/eignex/klause/solver/result/PresolveSizeStats;
@@ -14822,6 +14828,7 @@ public final class com/eignex/klause/solver/result/PresolveInvocationStats {
 	public final fun getOutput ()Lcom/eignex/klause/solver/result/PresolveSizeStats;
 	public final fun getPass ()Ljava/lang/String;
 	public final fun getRebuildWork ()J
+	public final fun getStructuralImpact ()Ljava/util/Map;
 	public final fun getWork ()J
 }
 

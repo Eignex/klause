@@ -176,7 +176,19 @@ separately from affine Table-column substitution and structural Table reduction.
 Use `portfolio-work` only for compatible mixed/LS worker comparisons, retain its
 logical trace, and distinguish emergency interruption from completed work.
 
-`bench.profile.RewriteStructureProfile` takes `suite=ID problem=NAME sha256=HEXpresolve=CONFIG`. It captures each structure-control arm through production sourceand finite preparation, then reuses projected source hints, maintained definitionnetworks and core/Table-hull LP assembly. Each arm has a 30-second containingdeadline, five million preparation work units and one million consumer-diagnosticunits; the whole capture has 120 seconds. Sources, lowered coordinates and factorsare capped before consumer preparation. The report retains actual maintaineddefinitions/input edges/depth and emitted rows/columns/nonzeros. The forced LPviews establish representation effects; ordinary worker admission and whole-sourceoutcomes require separate adapter runs. Use `suite=rewrite-structure-v1` for thesmall affine Table and Element applicability controls.## Corpus and build identity
+`bench.profile.RewriteStructureProfile` takes `suite=ID problem=NAME sha256=HEX
+presolve=CONFIG`. It captures each structure-control arm through production source
+and finite preparation, then reuses projected source hints, maintained definition
+networks and core/Table-hull LP assembly. Each arm has a 30-second containing
+deadline, five million preparation work units and one million consumer-diagnostic
+units; the whole capture has 120 seconds. Sources, lowered coordinates and factors
+are capped before consumer preparation. The report retains actual maintained
+definitions/input edges/depth and emitted rows/columns/nonzeros. The forced LP
+views establish representation effects; ordinary worker admission and whole-source
+outcomes require separate adapter runs. Use `suite=rewrite-structure-v1` for the
+small affine Table and Element applicability controls.
+
+## Corpus and build identity
 
 `corpus status` lists cached collections, `corpus gc` applies the cache cap and
 `corpus compress [path]` compresses supported plain inputs with `zstd` on `PATH`.

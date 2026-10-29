@@ -131,26 +131,28 @@ enum class PresolvePass(
         // The source form states a bound row only for a side the model bounds and leaves the
         // residue-class doubletons alone, since restricting a partner to a residue class is a value set
         // a range cannot state. The finite form below keeps both.
-        override fun applySource(problem: Problem, ctx: PresolveContext) = AffineSingletons.eliminateSourceAffineSingletons(
-            problem,
-            ctx.objectiveIntVars,
-            ctx.cancellation,
-            pivotOrder = ctx.affinePivotOrder,
-            objective = ctx.linearObjective,
-            preserveStructure = ctx.preserveStructure,
-        )
+        override fun applySource(problem: Problem, ctx: PresolveContext) =
+            AffineSingletons.eliminateSourceAffineSingletons(
+                problem,
+                ctx.objectiveIntVars,
+                ctx.cancellation,
+                pivotOrder = ctx.affinePivotOrder,
+                objective = ctx.linearObjective,
+                preserveStructure = ctx.preserveStructure,
+            )
 
-        override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) = AffineSingletons.eliminateAffineSingletons(
-            problem,
-            ctx.objectiveIntVars,
-            ctx.cancellation,
-            ctx.sharedIntOcc,
-            ctx.affineUnderdetermined,
-            ctx.affineTouchedVars,
-            pivotOrder = ctx.affinePivotOrder,
-            objective = ctx.linearObjective,
-            preserveStructure = ctx.preserveStructure,
-        )
+        override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) =
+            AffineSingletons.eliminateAffineSingletons(
+                problem,
+                ctx.objectiveIntVars,
+                ctx.cancellation,
+                ctx.sharedIntOcc,
+                ctx.affineUnderdetermined,
+                ctx.affineTouchedVars,
+                pivotOrder = ctx.affinePivotOrder,
+                objective = ctx.linearObjective,
+                preserveStructure = ctx.preserveStructure,
+            )
     },
 
     /** Common linear sub-sum extraction — the contract-direction mirror of [ELIMINATE_AFFINE_SINGLETONS].
