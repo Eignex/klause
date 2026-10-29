@@ -778,6 +778,8 @@ without a decision replay. The existing bounded arithmetic trace records source
 conflicts, historical endpoint rows, mapped admission, retained consumers and
 retirement. The selector wrapper delegates all decisions and notifications.
 
+Plain source bytes are hashed after corpus decompression with a 1 MiB input limit.
+A hash mismatch retains the bytes and observed digest and stops before solving.
 Original source bytes, canonical original/prepared models and installed provenance
 remain in the capture. Bounded records also go to stdout, including both canonical
 models, so retained live output can expose a capture awaiting file publication.
