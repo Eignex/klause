@@ -144,10 +144,10 @@ internal class BooleanProofScheduler(
         var allowance = baseSliceWork
         var cursor = 0
         while (!cancellation() && chargedWork < workLimit && !nativeCoverageComplete) {
-            if (stopped.all { it }) break
+            if (workers.indices.none { !stopped[it] && (workers[it].lease != null || pending > 0) }) break
             val worker = cursor
             cursor = (cursor + 1) % workers.size
-            if (stopped[worker]) continue
+            if (stopped[worker] || (workers[worker].lease == null && pending == 0)) continue
             val offered = minOf(allowance, workLimit - chargedWork)
             val before = work
             val step = runSlice(worker, cancellation, Long.MAX_VALUE, offered)
