@@ -3,6 +3,7 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -78,6 +79,36 @@ class SimplexProgressTraceTest {
             assertNotNull(solver.solve())
 
             assertTrue(assertNotNull(solver.progressTrace).phaseNanos.isEmpty())
+        }
+    }
+
+    @Test
+    fun `completion observation should retain the resumable numerical path`() {
+        val model = LpBuilder().apply {
+            addVar(0L, 10L, cost = 1L)
+            addVar(0L, 10L, cost = 2L)
+            addRow(intArrayOf(0, 1), longArrayOf(1L, 1L), Relation.GE, 4L)
+        }.build(Sense.MINIMIZE)
+        val expected = RevisedSimplex(model).use { solver ->
+            assertNotNull(solver.solve()) to solver.lastMetrics.workOps
+        }
+        val completions = mutableListOf<LpSolveMetrics>()
+        RevisedSimplex(model).use { solver ->
+            solver.profileTo { metrics, _ -> completions.add(metrics) }
+            solver.openSolve().use { cursor ->
+                var step = cursor.advance(1L)
+                assertIs<LpSolveStep.Paused>(step)
+                while (step is LpSolveStep.Paused) {
+                    assertTrue(completions.isEmpty())
+                    step = cursor.advance(1L)
+                }
+
+                val result = assertNotNull((step as LpSolveStep.Completed<FloatLpResult?>).value)
+
+                assertEquals(expected.first.objective, result.objective)
+                assertEquals(expected.second, completions.single().workOps)
+                assertTrue(assertNotNull(solver.progressTrace).phaseNanos.containsKey(SimplexProfilePhase.SOLVE))
+            }
         }
     }
 

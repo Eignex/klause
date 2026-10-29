@@ -398,6 +398,17 @@ phase deltas include operations on retiring and replacement engines; invocation
 traces reset at the next solve. Scoped owner counters are cumulative gauges and
 must not be summed across queries.
 
+The same executable runs a fresh direct `satOptimized` worker on each runtime,
+with seed 3, 1,000 decision instructions and a two-second containing deadline.
+Its factory returns the production numerical owners with their resumable
+capabilities intact. Completion observers retain active numerical time, work,
+bounded traces and existing claim/certificate phases; pauses publish no completion.
+The worker record includes consumed LP prunes/fixings, its native result and full
+worker-coordinate sample. It establishes no CLI routing equivalence or independent
+source validation. Preparation, failed work and retirement remain in the worker
+allowance. Whole-process RSS spans the controlled lifecycles and this worker;
+it is separate from JVM per-lifecycle allocation.
+
 Original bytes, corpus manifest, revision, executable hashes, runtime, JFR and
 resource receipts accompany the records, including the official JFR allocation
 sample export. Numerical invocations retain the bounded progress samples and
