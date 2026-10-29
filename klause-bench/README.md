@@ -776,7 +776,10 @@ sha256=HEX timeout-ms=10000 nodes=4096 lp=auto|off`. It runs clause and opt-in
 integer-row arms through ordinary finite preparation and backtrack traversal,
 without a decision replay. The existing bounded arithmetic trace records source
 conflicts, historical endpoint rows, mapped admission, retained consumers and
-retirement. The selector wrapper delegates all decisions and notifications.
+retirement. Oversized clause payloads produce explicit omission events and a
+payload-omission count; later events retain the same event and word limits. A
+trace with omissions cannot establish the omitted premises. The selector wrapper
+delegates all decisions and notifications.
 
 Plain source bytes are hashed after corpus decompression with a 1 MiB input limit.
 A hash mismatch retains the bytes and observed digest and stops before solving.
@@ -796,3 +799,11 @@ instrumented capture supplies neither independent
 source checking nor a throughput claim. Use an ordinary lab adapter comparison
 with source validation for whole-source outcomes; a missing consumer requires
 further source or integration diagnosis. Defaults and export scope remain separate.
+
+The [prepared-source regression](https://github.com/Eignex/klause/pull/3856) parses
+FlatZinc search annotations and uses ordinary solution-preserving preparation and
+production enumeration. The same guarded retained object owns different later
+upper bounds, then retires after its guard is negated. Twenty reconstructed source
+points satisfy both original relations. At `1a9a2cb15a`,
+[CI](https://github.com/Eignex/klause/actions/runs/40863068552) passes JVM, native
+and lint/docs; the prepared-source JVM test takes 62 ms.

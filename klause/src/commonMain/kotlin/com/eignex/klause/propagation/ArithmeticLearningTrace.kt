@@ -13,6 +13,8 @@ internal class ArithmeticLearningTrace(
         private set
     var words = 0
         private set
+    var omittedPayloads = 0
+        private set
     private val storedIds = mutableMapOf<Int, Int>()
     private var nextId = 0
     val accepting: Boolean get() = !truncated
@@ -34,7 +36,8 @@ internal class ArithmeticLearningTrace(
     fun clause(kind: String, literals: IntArray, state: PropagationState) {
         if (!accepting) return
         if (literals.size > 64) {
-            truncated = true
+            omittedPayloads++
+            record("$kind.omitted", literals.size.toLong())
             return
         }
         record(kind, *LongArray(literals.size * 5) { index ->
