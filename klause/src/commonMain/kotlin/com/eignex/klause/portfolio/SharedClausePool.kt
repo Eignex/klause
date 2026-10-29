@@ -55,8 +55,9 @@ internal class SharedClausePool(
     internal val softLimitBytes: Long? = null,
     internal val reclamationWork: Long = DEFAULT_RECLAMATION_WORK,
     internal val reclamationScratchEntries: Int = DEFAULT_RECLAMATION_SCRATCH,
+    private val booleanOnly: Boolean = false,
 ) {
-    private var store = Store(0)
+    private var store = Store(0, booleanOnly)
     private var generation = 0
     private var compactions = 0L
     private var declined = 0L
@@ -76,6 +77,8 @@ internal class SharedClausePool(
             "poolOriginCapacityBytes" to store.capacity.toLong() * Int.SIZE_BYTES,
             "poolReferenceSlots" to store.capacity.toLong(),
             "poolPrivateIndexBytes" to store.indexBytes,
+            "poolPayloadOwnerCapacityBytes" to store.ownerCapacityBytes,
+            "poolBooleanOnly" to if (booleanOnly) 1L else 0L,
             "poolOwnedBytes" to store.ownedBytes,
             "poolProtectedBytes" to 0L,
             "poolGeneration" to generation.toLong(),
@@ -102,6 +105,10 @@ internal class SharedClausePool(
         try {
             for (c in batch) {
                 budget.step()
+                if (booleanOnly && c.atomQuads.isNotEmpty()) {
+                    declined++
+                    continue
+                }
                 if (store.contains(c.key, budget)) continue
                 if (store.size >= cap || exceedsLimit(c, budget)) compact(budget)
                 if (store.size >= cap || exceedsLimit(c, budget)) {
@@ -178,13 +185,13 @@ internal class SharedClausePool(
     private fun exceedsLimit(clause: SharedClause, budget: Budget): Boolean {
         val limit = softLimitBytes ?: return false
         val capacity = if (store.size == store.capacity) nextCapacity() else store.capacity
-        return Store.indexBytes(capacity) + store.payloadBytes + store.additionalPayload(clause, budget) > limit
+        return Store.indexBytes(capacity, booleanOnly) + store.payloadBytes + store.additionalPayload(clause, budget) > limit
     }
 
     private fun nextCapacity(): Int {
         val desired = minOf(cap, maxOf(1, store.capacity * 2))
         val limit = softLimitBytes ?: return desired
-        return if (Store.indexBytes(desired) + store.payloadBytes <= limit) desired else store.size + 1
+        return if (Store.indexBytes(desired, booleanOnly) + store.payloadBytes <= limit) desired else store.size + 1
     }
 
     private fun grow(budget: Budget) {
@@ -203,7 +210,7 @@ internal class SharedClausePool(
         sort(order, budget)
         val limit = softLimitBytes?.div(2L) ?: Long.MAX_VALUE
         var target = minOf(cap / 2, store.size / 2)
-        while (Store.indexBytes(target) > limit) {
+        while (Store.indexBytes(target, booleanOnly) > limit) {
             budget.step()
             target /= 2
         }
@@ -230,8 +237,8 @@ internal class SharedClausePool(
     }
 
     private fun preparedStore(capacity: Int, budget: Budget): Store {
-        budget.reserve(Store.scratchEntries(capacity))
-        return Store(capacity)
+        budget.reserve(Store.scratchEntries(capacity, booleanOnly))
+        return Store(capacity, booleanOnly)
     }
 
     private fun sort(order: IntArray, budget: Budget) {
@@ -269,19 +276,20 @@ internal class SharedClausePool(
         }
     }
 
-    private class Store(val capacity: Int) {
+    private class Store(val capacity: Int, private val booleanOnly: Boolean) {
         val clauses = arrayOfNulls<SharedClause>(capacity)
         val global = BooleanArray(capacity)
         val origins = IntArray(capacity)
         private val keyCapacity = if (capacity == 0) 0 else openAddressingCapacity(capacity)
-        private val ownerCapacity = if (capacity == 0) 0 else openAddressingCapacity(capacity * 2)
+        private val ownerCapacity = if (capacity == 0) 0 else payloadOwnerCapacity(capacity, booleanOnly)
         private val keys = LongArray(keyCapacity)
         private val used = BooleanArray(keyCapacity)
         private val owners = arrayOfNulls<Any>(ownerCapacity)
         var size = 0
         var payloadBytes = 0L
         val keyCapacityBytes: Long get() = keyCapacity.toLong() * 9L
-        val indexBytes: Long get() = indexBytes(capacity)
+        val ownerCapacityBytes: Long get() = ownerCapacity.toLong() * 8L
+        val indexBytes: Long get() = indexBytes(capacity, booleanOnly)
         val ownedBytes: Long get() = indexBytes + payloadBytes
 
         fun clause(index: Int): SharedClause = checkNotNull(clauses[index])
@@ -309,10 +317,10 @@ internal class SharedClausePool(
         fun additionalPayload(clause: SharedClause, budget: Budget): Long {
             if (size == 0) return clause.payloadBytes
             var bytes = 0L
-            if (owners[ownerSlot(clause.boolLits, budget)] == null) {
+            if ((!booleanOnly || clause.boolLits.isNotEmpty()) && owners[ownerSlot(clause.boolLits, budget)] == null) {
                 bytes += clause.boolLits.size.toLong() * Int.SIZE_BYTES
             }
-            if (owners[ownerSlot(clause.atomQuads, budget)] == null) {
+            if (!booleanOnly && owners[ownerSlot(clause.atomQuads, budget)] == null) {
                 bytes += clause.atomQuads.size.toLong() * Long.SIZE_BYTES
             }
             return bytes
@@ -326,16 +334,17 @@ internal class SharedClausePool(
             limit: Long = Long.MAX_VALUE,
         ): Boolean {
             val key = keySlot(clause.key, budget)
-            val boolOwner = ownerSlot(clause.boolLits, budget)
-            val atomOwner = ownerSlot(clause.atomQuads, budget, if (owners[boolOwner] == null) boolOwner else -1)
-            val boolBytes = if (owners[boolOwner] == null) clause.boolLits.size.toLong() * Int.SIZE_BYTES else 0L
-            val atomBytes = if (owners[atomOwner] == null) clause.atomQuads.size.toLong() * Long.SIZE_BYTES else 0L
+            val boolOwner = if (booleanOnly && clause.boolLits.isEmpty()) -1 else ownerSlot(clause.boolLits, budget)
+            val atomOwner = if (booleanOnly) -1 else
+                ownerSlot(clause.atomQuads, budget, if (owners[boolOwner] == null) boolOwner else -1)
+            val boolBytes = if (boolOwner >= 0 && owners[boolOwner] == null) clause.boolLits.size.toLong() * Int.SIZE_BYTES else 0L
+            val atomBytes = if (atomOwner >= 0 && owners[atomOwner] == null) clause.atomQuads.size.toLong() * Long.SIZE_BYTES else 0L
             if (ownedBytes + boolBytes + atomBytes > limit) return false
             budget.step()
             keys[key] = clause.key
             used[key] = true
-            owners[boolOwner] = clause.boolLits
-            owners[atomOwner] = clause.atomQuads
+            if (boolOwner >= 0) owners[boolOwner] = clause.boolLits
+            if (atomOwner >= 0) owners[atomOwner] = clause.atomQuads
             payloadBytes += boolBytes + atomBytes
             clauses[size] = clause
             global[size] = isGlobal
@@ -344,13 +353,16 @@ internal class SharedClausePool(
         }
 
         companion object {
-            fun indexBytes(capacity: Int): Long = if (capacity == 0) 0L else
-                capacity.toLong() * 13L + openAddressingCapacity(capacity).toLong() * 9L +
-                    openAddressingCapacity(capacity * 2).toLong() * 8L
+            private fun payloadOwnerCapacity(capacity: Int, booleanOnly: Boolean): Int =
+                openAddressingCapacity(if (booleanOnly) capacity else capacity * 2)
 
-            fun scratchEntries(capacity: Int): Long = if (capacity == 0) 0L else
+            fun indexBytes(capacity: Int, booleanOnly: Boolean): Long = if (capacity == 0) 0L else
+                capacity.toLong() * 13L + openAddressingCapacity(capacity).toLong() * 9L +
+                    payloadOwnerCapacity(capacity, booleanOnly).toLong() * 8L
+
+            fun scratchEntries(capacity: Int, booleanOnly: Boolean): Long = if (capacity == 0) 0L else
                 capacity.toLong() * 3L + openAddressingCapacity(capacity).toLong() * 2L +
-                    openAddressingCapacity(capacity * 2).toLong()
+                    payloadOwnerCapacity(capacity, booleanOnly).toLong()
         }
     }
 
