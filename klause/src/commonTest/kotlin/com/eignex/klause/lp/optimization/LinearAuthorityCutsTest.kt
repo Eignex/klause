@@ -312,6 +312,29 @@ class LinearAuthorityCutsTest {
     }
 
     @Test
+    fun `point directed rounding should combine established sides from different endpoints`() {
+        val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val source = SourceProofContext(scope, setOf(x, real, other), mapOf(
+            "mixed" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                real to BigFraction.MINUS_ONE, other to BigFraction.MINUS_ONE), BigFraction.ofLong(3))),
+            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ofLong(2))),
+            "other lower" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "other upper" to SourcePremise(SourceInequality(mapOf(other to BigFraction.ONE), BigFraction.ofLong(2))),
+        ))
+
+        val cuts = assertNotNull(LinearAuthorityCuts.prepareAtPoint(source, Cancellation.Never,
+            mapOf(real to 2.0, other to 0.0), 65_536L))
+        val directed = cuts.rows.single { it.inequality.coefficients ==
+            mapOf(x to BigFraction.ONE, other to BigFraction.MINUS_ONE) }
+
+        assertEquals(BigFraction.ofLong(2), directed.inequality.rhs)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(SourceEvidence(scope,
+            SourceClaim.Consequence(directed.inequality), directed.derivation)))
+    }
+
+    @Test
     fun `mixed side variants should share the retained row and preparation limits`() {
         val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
         val premises = (0 until 100).associate { index ->

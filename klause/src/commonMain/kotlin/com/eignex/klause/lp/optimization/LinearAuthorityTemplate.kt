@@ -5,6 +5,7 @@ import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.magnitudeBitLength
 
 internal class LinearAuthorityTemplate private constructor(
     private val source: SourceProofContext,
@@ -14,6 +15,23 @@ internal class LinearAuthorityTemplate private constructor(
     val rows: List<ExactRationalInequality>,
     val cuts: LinearAuthorityCuts?,
 ) {
+    fun atPoint(
+        point: Map<SourceCoordinate, Double>, cancellation: Cancellation,
+        onWork: (Long) -> Unit, onCost: (Long, Long) -> Unit,
+    ): LinearAuthorityTemplate? {
+        val original = cuts ?: return null
+        val directed = LinearAuthorityCuts.prepareAtPoint(numeric, cancellation, point,
+            65_536L - original.work, onWork) ?: return null
+        if (cancellation() || (directed.rows.isEmpty() && original.rows.isNotEmpty())) return null
+        onCost(directed.rows.size.toLong(), 128L + directed.rows.sumOf {
+            128L + it.owners.size * 32L + (it.inequality.coefficients.values + it.inequality.rhs).sumOf { value ->
+                64L + (value.num.magnitudeBitLength().toLong() + value.den.magnitudeBitLength() + 7L) / 8L
+            }
+        })
+        if (cancellation()) return null
+        return LinearAuthorityTemplate(source, numeric, coordinates, indices, rows, directed)
+    }
+
     fun withAdditional(
         additional: List<LinearAuthorityCut>, cancellation: Cancellation,
         onCost: (Long, Long) -> Unit = { _, _ -> },
