@@ -77,7 +77,11 @@ authorize reuse. The new source binding owns no predecessor snapshot, so repeate
 compatible preparations retain no generation chain.
 
 An internal selective-metadata preparation mode validates row identity and exact
-bound sides before retaining the row index. Bound changes replace their exact
+bound sides before retaining the row index. A selected view whose handoff checked
+ordered factor identities carries the same immutable layout token, so subsequent
+template preparations need no duplicate row scan. Other rewrites and explicit
+namespace remaps carry fresh tokens and validate their actual factor identities.
+Bound changes replace their exact
 objects and component metadata. Its source definitions carry no objective authority:
 every assembly reads costs and the objective constant from its current objective,
 so changing that objective requires no source-template cost scan or replacement.

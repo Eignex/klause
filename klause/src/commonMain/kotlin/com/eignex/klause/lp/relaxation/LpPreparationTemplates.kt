@@ -35,6 +35,7 @@ internal fun LpRelaxation.authoritativeWithTemplates(
     cancellation: Cancellation,
     onReuse: (Int) -> Unit = {},
 ): ExactLpModel? {
+    if (cancellation()) return null
     val templates = preparationTemplates ?: return model.authoritativeModel()
     var reused = 0
     fun prepared(index: Int): LpIntegerBoundTemplate? = if (index < model.n && colVarId[index] >= 0 &&
@@ -50,6 +51,7 @@ internal fun LpRelaxation.authoritativeWithTemplates(
         } catch (_: LpTemplateImportCancelled) {
             return null
         }
+        if (cancellation()) return null
         onReuse(reused)
         return imported
     }
@@ -146,9 +148,9 @@ internal class LpTemplateComponent(
 internal class LpPreparationTemplates private constructor(
     private val source: Problem,
     private val namespace: Any,
+    private val rowScope: Any,
     private val semantics: Any,
     private val finite: Boolean,
-    private val dimensions: List<Int>,
     private val objectiveConstant: Long,
     val objectiveIndependent: Boolean,
     val factors: List<LpFactorTemplate>,
@@ -176,6 +178,7 @@ internal class LpPreparationTemplates private constructor(
         fun prepare(
             selection: PreparedFactorProjections,
             namespace: Any,
+            rowScope: Any,
             objective: LinearObjective?,
             previous: LpPreparationTemplates?,
             token: Cancellation,
@@ -186,10 +189,10 @@ internal class LpPreparationTemplates private constructor(
             val problem = selection.problem
             // Continuous and custom projections keep their own authority and preparation path.
             if (problem.numRealVars != 0 || !selection.builtInRelaxation) return null
-            val dimensions = listOf(problem.numBoolVars, problem.numIntVars, problem.numRealVars)
             val old = previous?.takeIf {
                 it.namespace === namespace && it.semantics == problem.semantics &&
-                    it.finite == (problem is BakedProblem) && it.dimensions == dimensions
+                    it.finite == (problem is BakedProblem) && it.source.numBoolVars == problem.numBoolVars &&
+                    it.source.numIntVars == problem.numIntVars && it.source.numRealVars == problem.numRealVars
             }
             var units = 0L
             try {
@@ -227,7 +230,7 @@ internal class LpPreparationTemplates private constructor(
                 }
                 fun rebind(): LpPreparationTemplates? {
                     if (old == null || old.factors.size != problem.numFactors) return null
-                    for (index in old.factors.indices) {
+                    if (old.rowScope !== rowScope) for (index in old.factors.indices) {
                         if (!visit() || old.factors[index].factor !== problem.factors[index]) return null
                     }
                     var changedBounds: MutableMap<Int, LpIntegerBoundTemplate>? = null
@@ -274,8 +277,8 @@ internal class LpPreparationTemplates private constructor(
                         reusedComponents--
                     }
                     if (!visit()) return null
-                    return LpPreparationTemplates(problem, namespace, problem.semantics, problem is BakedProblem,
-                        dimensions, 0L, true, old.factors, changedBounds ?: old.bounds,
+                    return LpPreparationTemplates(problem, namespace, rowScope, problem.semantics, problem is BakedProblem,
+                        0L, true, old.factors, changedBounds ?: old.bounds,
                         changedComponents ?: old.components, old.source !== problem, old.factors.size, reusedBounds,
                         reusedComponents, old.storageUnits, changedBounds == null && changedComponents == null)
                 }
@@ -286,8 +289,8 @@ internal class LpPreparationTemplates private constructor(
                 if (!reuseMetadata && reuseIndexes && unchanged()) {
                     if (!visit()) return null
                     return requireNotNull(old).let {
-                        LpPreparationTemplates(problem, namespace, problem.semantics, problem is BakedProblem,
-                            dimensions, it.objectiveConstant, false, it.factors, it.bounds, it.components,
+                        LpPreparationTemplates(problem, namespace, rowScope, problem.semantics, problem is BakedProblem,
+                            it.objectiveConstant, false, it.factors, it.bounds, it.components,
                             it.source !== problem, it.factors.size, it.bounds.size, it.components.size,
                             it.storageUnits, true)
                     }
@@ -419,8 +422,7 @@ internal class LpPreparationTemplates private constructor(
                     }
                 }
                 if (!visit()) return null
-                return LpPreparationTemplates(problem, namespace, problem.semantics, problem is BakedProblem,
-                    dimensions,
+                return LpPreparationTemplates(problem, namespace, rowScope, problem.semantics, problem is BakedProblem,
                     if (reuseMetadata) 0L else objective?.constant ?: 0L, reuseMetadata,
                     factors, bounds, components, old != null && old.source !== problem,
                     reusedFactors, reusedBounds,
