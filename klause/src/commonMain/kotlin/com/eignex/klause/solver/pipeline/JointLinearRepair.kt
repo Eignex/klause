@@ -142,8 +142,15 @@ internal class JointLinearRepair(
             completionExhausted = { exhausted },
             centerPreparationPending = { rootPreparationPending },
             proposal = ExactNeighborhoodProposal { centers, bools, count, round, radius, cutoff ->
+                var pooledValue: BigFraction? = null
                 val pooled = externalIncumbent()?.takeIf { sample ->
+                    if (completion != null) {
+                        budget.observe(boundCertification =
+                            1L + model.numBoolVars + model.numIntVars + model.numRealVars)
+                        if (completion.checking(stop)()) return@takeIf false
+                    }
                     val value = objective?.evaluateExact(sample)
+                    pooledValue = value
                     when {
                         model.numRealVars != 0 && sample.exactReals?.size != model.numRealVars -> {
                             observeExternal("MissingExactReals")
@@ -173,7 +180,7 @@ internal class JointLinearRepair(
                     List(model.numIntVars) { BigFraction.of(sample.exactIntValue(it), BIG_ONE) } +
                         sample.exactReals.orEmpty()
                 } ?: centers
-                val limit = pooled?.let { objective?.evaluateExact(it) } ?: cutoff
+                val limit = pooled?.let { pooledValue } ?: cutoff
                 if (sourceInputPass && !adaptive && limit != null && limit != focusedCutoff) {
                     focusedCutoff = limit
                     focusedRemaining = sourceIntegers?.size ?: model.numIntVars
