@@ -42,7 +42,8 @@ data class SharingStats(
     constructor(channels: Map<SharingChannel, ChannelTraffic> = emptyMap()) : this(channels, emptyMap())
 
     /** Copy channel traffic while retaining clause observations. */
-    fun copy(channels: Map<SharingChannel, ChannelTraffic> = this.channels): SharingStats = SharingStats(channels, clauses)
+    fun copy(channels: Map<SharingChannel, ChannelTraffic> = this.channels): SharingStats =
+        SharingStats(channels, clauses)
 
     /** Nanoseconds spent across every channel. */
     val nanos: Long get() = channels.values.sumOf { it.nanos }

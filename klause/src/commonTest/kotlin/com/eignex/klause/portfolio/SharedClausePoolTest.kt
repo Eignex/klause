@@ -5,6 +5,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.SharedClause
+import com.eignex.klause.solver.result.SharingChannel
 import com.eignex.klause.propagation.addLearnedClause
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -180,7 +181,7 @@ class SharedClausePoolTest {
             assertEquals(1, (0 until count).count {
                 session.learnedClauseLiterals(it).contentEquals(evicted.boolLits)
             })
-            assertTrue(meter.snapshot().channels.getValue(com.eignex.klause.solver.result.SharingChannel.Clauses).duplicates > 0)
+            assertTrue(meter.snapshot().channels.getValue(SharingChannel.Clauses).duplicates > 0)
             assertTrue(meter.snapshot().clauses.getValue("poolCompactions") > 1)
         }
     }
@@ -199,6 +200,9 @@ class SharedClausePoolTest {
         }
         exchange.onSearchEnd(session)
         val suspended = meter.snapshot().clauses
+        assertEquals(24L, suspended.getValue("seenKeys"))
+        assertEquals(24L, suspended.getValue("learnedObjects"))
+        assertTrue(suspended.getValue("seenKeys") > suspended.getValue("poolClauses"))
         val count = session.learnedClauseCount
         session.reseedFrom(com.eignex.klause.propagation.Assumptions.None.withBool(100, true))
         exchange.onSearchStart(session)
@@ -210,7 +214,8 @@ class SharedClausePoolTest {
 
         assertEquals(pool.drainSince(0).clauses.size, fresh.learnedClauseCount)
         assertTrue(meter.snapshot().clauses.getValue("seenCapacityBytes") < suspended.getValue("seenCapacityBytes"))
-        assertEquals(suspended.getValue("seenCapacityBytes"), meter.snapshot().clauses.getValue("peakSeenCapacityBytes"))
+        assertEquals(suspended.getValue("seenCapacityBytes"),
+            meter.snapshot().clauses.getValue("peakSeenCapacityBytes"))
     }
 
     @Test

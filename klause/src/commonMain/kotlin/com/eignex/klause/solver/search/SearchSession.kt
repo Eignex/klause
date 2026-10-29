@@ -2,6 +2,7 @@ package com.eignex.klause.solver.search
 
 import com.eignex.klause.solver.result.OpenTheoryClauseStats
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.workScheduled
 
 /**
  * Shared trailed coordination for finite-domain and theory components.
@@ -58,6 +59,7 @@ class SearchSession(
     }
 
     private val singleComponent = components.singleOrNull()
+    private val measureLearnedMemory = cancellation.workScheduled()
     private val trail = SearchTrail()
     private val learning = SearchLearning(learnedDb)
     private var selfPublicationsPending = false
@@ -827,8 +829,8 @@ class SearchSession(
     internal fun learnedLifecycle(): Map<String, Long> = learning.lifecycle.snapshot()
 
     /** Snapshot learned-clause telemetry for a completed open-theory solve. */
-    fun learnedClauseStats(): OpenTheoryClauseStats = learning.snapshot().let {
-        it.copy(learning = it.learning + trail.reasonMemory())
+    fun learnedClauseStats(): OpenTheoryClauseStats = learning.snapshot(measureLearnedMemory).let {
+        if (measureLearnedMemory) it.copy(learning = it.learning + trail.reasonMemory()) else it
     }
 
     /** Retain a sound clause-form explanation for subsequent propagation. */
