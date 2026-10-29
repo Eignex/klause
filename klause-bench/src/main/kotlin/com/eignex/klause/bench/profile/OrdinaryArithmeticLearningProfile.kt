@@ -10,6 +10,7 @@ import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Runners
 import com.eignex.klause.bench.source.CorpusFetcher
+import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.formats.json.ProblemJson
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.propagation.BakedProblem
@@ -59,7 +60,7 @@ internal object OrdinaryArithmeticLearningProfile {
             put("javaVmName", System.getProperty("java.vm.name"))
         }.toString())
         val ref = Catalog.uncapped(suite).problems.single { it.name == name }
-        val bytes = CorpusFetcher.resolve(ref.source).readBytes()
+        val bytes = CorpusFiles.open(CorpusFetcher.resolve(ref.source)).use { it.readNBytes(1_048_577) }
         require(bytes.size <= 1_048_576)
         out.resolve("source.${ref.format.name.lowercase()}").writeBytes(bytes)
         val observedHash = sha256(bytes)
