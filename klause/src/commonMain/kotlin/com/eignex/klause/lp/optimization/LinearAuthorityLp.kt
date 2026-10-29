@@ -16,6 +16,8 @@ import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpCertifierCost
+import com.eignex.klause.lp.engine.LpClaim
+import com.eignex.klause.lp.engine.LpPhaseMetrics
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpScopedSolver
 import com.eignex.klause.lp.engine.LpSolveMetrics
@@ -51,6 +53,7 @@ internal class LinearAuthorityLp(
     private val onShape: (LinearAuthorityLpShape) -> Unit = {},
     retain: Boolean = false,
     private val guidancePolicy: SparseSourceLpPolicy = SparseSourceLpPolicy(),
+    private val onPhase: (LpPhaseMetrics) -> Unit = {},
 ) : AutoCloseable {
     private var session = if (retain) LinearAuthoritySession(budget) else null
     private var guidanceRows: List<ExactRationalInequality>? = null
@@ -63,6 +66,7 @@ internal class LinearAuthorityLp(
     fun invalidateGuidance() = session?.invalidateGuidance() ?: Unit
     private val observer = object : LpCertificationObserver {
         override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
+        override fun observePhase(metrics: LpPhaseMetrics) = onPhase(metrics)
         override fun observeExactInput(accepted: Boolean) = Unit
         override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
         override fun observeContinuation(metrics: ExactContinuationMetrics) {
@@ -76,6 +80,7 @@ internal class LinearAuthorityLp(
         cancellation: Cancellation,
         inactive: Set<Int> = emptySet(),
         onDecline: (String) -> Unit = {},
+        claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
     ): LinearAuthorityLpResult? {
         val retained = session
         var prepared: LinearAuthorityModel? = null
@@ -111,7 +116,7 @@ internal class LinearAuthorityLp(
             val preparation = owner.metrics.preparationWork
             val refinement = owner.refinementCache.work
             try {
-                val solved = owner.solve(token = token, observer = observer)
+                val solved = owner.solve(token = token, observer = observer, claim = claim)
                 val result = solved?.takeIf { result -> result.exactPrimal?.admittedSourcePoint() != false &&
                     result.lowerBound?.let { listOf(it).admittedSourcePoint() } != false } ?: return@runPrepared null
                 val boundWeights = result.bound?.dualMultipliers?.map { it.negated() }
@@ -238,7 +243,8 @@ internal class LinearAuthorityLp(
                     }
                 }).use { completion ->
                     completion.solve(residual, List(columns) { BigFraction.ZERO }, BigFraction.ZERO, active,
-                        onDecline = { observe("PrimalRecoveryExactAdmission$it", 1L) })
+                        onDecline = { observe("PrimalRecoveryExactAdmission$it", 1L) },
+                        claim = LpClaim.FEASIBLE_COMPLETION)
                         ?.result?.exactPrimal?.take(columns)
                 }
             }.also { progress.pending = retained.paused }
@@ -273,7 +279,7 @@ internal class LinearAuthorityLp(
         strict: Boolean,
         cancellation: Cancellation,
     ): List<BigFraction>? {
-        if (session != null) return LinearAuthorityLp(budget, onShape).use {
+        if (session != null) return LinearAuthorityLp(budget, onShape, onPhase = onPhase).use {
             it.combination(rows, coefficients, rhs, strict, cancellation)
         }
         val count = rows.size
@@ -301,7 +307,8 @@ internal class LinearAuthorityLp(
         }
         val result = solve(constraints, List(variables) {
             if (strict && it == count) BigFraction.MINUS_ONE else BigFraction.ZERO
-        }, BigFraction.ZERO, cancellation) ?: return null
+        }, BigFraction.ZERO, cancellation,
+            claim = if (strict) LpClaim.ATTAINED_OPTIMUM else LpClaim.FEASIBLE_COMPLETION) ?: return null
         val point = result.result.exactPrimal ?: return null
         if (strict && point[count] <= BigFraction.ZERO) return null
         return point.take(count)

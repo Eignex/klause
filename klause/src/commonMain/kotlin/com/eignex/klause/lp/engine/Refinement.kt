@@ -130,6 +130,7 @@ internal class LpRefinementCache {
     internal var elapsed = Duration.ZERO
     internal var attempted: LpExactState? = null
     internal var lastLimits: LpRefinementLimits? = null
+    internal var lastClaim: LpClaim? = null
 
     // An attempt seeded by a known exact point differs from one without: that point is the only start an optimality
     // pass has when the float solve refused the model. One of each per state and limits keeps the spending bounded.
@@ -700,18 +701,25 @@ private class RefinementRun(
         hint: DoubleArray?,
         reconstructInitial: Boolean,
         preferBasis: Boolean,
+        feasibleOnly: Boolean,
     ) {
         candidate.basis = basis
         if (preferBasis && basis != null && sourceModel.m <= meter.basisLimits().factor.dimension) {
             meter.diagnostic?.stage = LpRefinementStage.SOURCE_BASIS
-            checkBasis(sourceModel, basis, sourceFactors, candidate)
+            checkBasis(sourceModel, basis, sourceFactors, candidate, primalOnly = feasibleOnly)
             meter.diagnostic?.stage = LpRefinementStage.RUN
-            if (candidate.attained || candidate.conflict != null) return
+            if (candidate.attained || candidate.conflict != null || (feasibleOnly && candidate.point != null)) return
         }
         if (known != null) {
             meter.diagnostic?.stage = LpRefinementStage.KNOWN_POINT
             candidate.accept(check(source, known.primal, null, null, false))
             meter.diagnostic?.stage = LpRefinementStage.RUN
+        }
+        if (feasibleOnly) {
+            if (candidate.point == null && needPoint && meter.limits.maxAuxiliaries > 0) {
+                if (sourceModel.hasStrictSides(meter)) strictFeasibility() else feasibility()
+            }
+            return
         }
         if (candidate.point == null && needPoint && meter.limits.maxAuxiliaries > 0 &&
             sourceModel.hasStrictSides(meter)
@@ -935,7 +943,13 @@ private class RefinementRun(
         }
     }
 
-    private fun checkBasis(model: LpModel, basis: Basis, cache: ExactBasisCache, output: RefinedCandidate) {
+    private fun checkBasis(
+        model: LpModel,
+        basis: Basis,
+        cache: ExactBasisCache,
+        output: RefinedCandidate,
+        primalOnly: Boolean = false,
+    ) {
         output.luAttempted = true
         val checked = verifyExactBasis(
             model,
@@ -943,6 +957,7 @@ private class RefinementRun(
             cache = cache,
             cancellation = meter.token,
             limits = meter.basisLimits(),
+            primalOnly = primalOnly,
         )
         meter.record(checked.metrics)
         if (checked.singularRank != null) {
@@ -1333,6 +1348,7 @@ internal fun refineLp(
     preferredBasisCache: ExactBasisCache? = null,
     additionalSourceWork: Long = 0L,
     diagnostic: LpRefinementPath? = null,
+    claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
 ): LpRefinementResult {
     val state = model.exactState
     val limits = request.effectiveLimits(additionalSourceWork)
@@ -1344,7 +1360,7 @@ internal fun refineLp(
     try {
         if (state == null || request.source.state !== state) meter.stop(LpRefinementDecline.AUTHORITY)
         if (limits.maxRounds == 0 && limits.maxAuxiliaries == 0) meter.stop(LpRefinementDecline.DISABLED)
-        if (cache.attempted !== state || limits != cache.lastLimits) {
+        if (cache.attempted !== state || limits != cache.lastLimits || claim != cache.lastClaim) {
             cache.attemptedUnseeded = false
             cache.attemptedSeeded = false
         }
@@ -1353,6 +1369,7 @@ internal fun refineLp(
         }
         cache.attempted = state
         cache.lastLimits = limits
+        cache.lastClaim = claim
         if (witness == null) cache.attemptedUnseeded = true else cache.attemptedSeeded = true
         diagnostic?.beforePrior = meter.diagnosticBudget()
         diagnostic?.stage = LpRefinementStage.PRIOR
@@ -1366,11 +1383,14 @@ internal fun refineLp(
         val factors = preferredBasisCache?.takeIf { preferBasis && basis != null } ?: ExactBasisCache()
         val current = RefinementRun(request, meter, model, factors)
         run = current
-        current.run(primal, duals, basis, witness, needPoint, direction, reconstructInitial, preferBasis)
+        current.run(primal, duals, basis, witness, needPoint, direction, reconstructInitial, preferBasis,
+            claim == LpClaim.FEASIBLE_COMPLETION || claim == LpClaim.CONTRADICTION)
         diagnostic?.stage = LpRefinementStage.COMPLETION
         meter.poll()
         reason = if (current.candidate.attained || current.candidate.conflict != null ||
-            current.unboundedness != null || meter.metrics.strictWitnesses > 0
+            current.unboundedness != null || meter.metrics.strictWitnesses > 0 ||
+            ((claim == LpClaim.FEASIBLE_COMPLETION || claim == LpClaim.CONTRADICTION) &&
+                current.candidate.point != null)
         ) {
             null
         } else {

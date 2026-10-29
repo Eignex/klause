@@ -11,6 +11,7 @@ import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.Relation
@@ -872,10 +873,11 @@ class LpBoundingMixedRowTest {
     }
 
     @Test
-    fun `cancellation during strict auxiliary preparation should withhold deductions and close owners`() {
+    fun `cancellation during strict leaf auxiliary preparation should withhold completion and close owners`() {
         val problem = strictMixedProblem()
         val sink = SolveStatsSink(backend = "strict-precheck")
         val session = PropagationSession(problem)
+        session.pinInt(0, 2L)
         var cancelled = false
         var created = 0
         var closed = 0
@@ -910,22 +912,14 @@ class LpBoundingMixedRowTest {
                 }
             }
         }
-        val params = LpParams(lpPlan = LpPlan(bounding = true))
+        val params = LpParams(lpPlan = LpPlan(bounding = true), cancellation = Cancellation { cancelled })
         val objective = LinearObjective(intCoefficients = longArrayOf(1L))
         LpEngine(problem, objective, params, sink, LpSolveContext(factory)).use { engine ->
-            val result = engine.sparseSafePrune(
-                assertNotNull(engine.lpRelaxer),
-                session,
-                Double.POSITIVE_INFINITY,
-                sink,
-                Cancellation { cancelled },
-                0,
-                true,
-            )
+            val result = engine.leafCertify(session)
 
             assertTrue(cancelled)
-            assertFalse(result.prune)
-            assertEquals(0L, session.intDomain(0).min)
+            assertEquals(LpVerdict.INDETERMINATE, result.verdict)
+            assertEquals(2L, session.intDomain(0).min)
         }
         assertEquals(created, closed)
     }

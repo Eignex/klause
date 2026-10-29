@@ -42,6 +42,7 @@ import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.CutAuxiliaryDefinition
 import com.eignex.klause.lp.engine.CutProvenance
 import com.eignex.klause.lp.engine.LpBuilder
+import com.eignex.klause.lp.engine.LpClaim
 import com.eignex.klause.lp.engine.LpColumnId
 import com.eignex.klause.lp.engine.LpLayoutRemap
 import com.eignex.klause.lp.engine.LpModel
@@ -414,9 +415,11 @@ internal fun leafRealFeasibility(
             { result -> check(sample.copy(reals = relaxation.floatReals(result.primal, problem))) }
         },
         floatOffset = relaxation.objectiveConstant.toDouble(),
+        claim = if (objective == null) LpClaim.FEASIBLE_COMPLETION else LpClaim.ATTAINED_OPTIMUM,
     )
     return relaxation.leafResult(certified, problem, objective, sample, sink)
         .checkedEncoding(encoded, sample, cancellation)
+        .also { it.observeConsumption(sink) }
 }
 
 internal fun LpRelaxation.leafResult(
@@ -1717,4 +1720,14 @@ internal fun LeafRealResult.checkedEncoding(
     val checked = verifyRealCoordinates(encoded, point)
     return if (!cancellation() && checked is Verification.Accepted) this
     else LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray, uncertifiedReals = reals)
+}
+
+internal fun LeafRealResult.observeConsumption(sink: LpStatsSink?) {
+    val claim = when (verdict) {
+        LpVerdict.INFEASIBLE -> LpClaim.CONTRADICTION
+        LpVerdict.FEASIBLE, LpVerdict.UNBOUNDED -> LpClaim.FEASIBLE_COMPLETION
+        LpVerdict.ATTAINED_OPTIMUM -> LpClaim.ATTAINED_OPTIMUM
+        else -> null
+    }
+    claim?.consumed(sink?.certificationObserver(LpRoute.STANDALONE))
 }

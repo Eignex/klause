@@ -4,6 +4,7 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.SparseSourceLpPolicy
+import com.eignex.klause.lp.engine.LpClaim
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
@@ -45,7 +46,14 @@ internal class LinearAuthority(
 ) : AutoCloseable {
     init { require(additionalCuts.size <= 64) }
     private val additionalCuts = additionalCuts.toList()
-    private val lp = LinearAuthorityLp(budget, onLpShape, retainLp, guidancePolicy)
+    private val lp = LinearAuthorityLp(budget, onLpShape, retainLp, guidancePolicy) { metrics ->
+        if (metrics.phase.name.startsWith("CLAIM_")) {
+            val key = "Certification" + metrics.phase.name
+            observePrimal(key + "Calls")
+            observePrimal(key + "Work", metrics.work)
+            observePrimal(key + "_" + metrics.outcome)
+        }
+    }
     val funding: SourceLpFunding? get() = budget.funding
     val preparations: Long get() = lp.preparations
     val reuses: Long get() = lp.reuses
@@ -386,7 +394,8 @@ internal class LinearAuthority(
             val evidence = checked(SourceClaim.Refutation, LinearPinnedRefutation(derivation(weights)))
             return LinearAuthorityResult(evidence = evidence, coordinateConflict = evidence != null)
         }
-        val solved = guide?.result ?: lp.solve(closureRows, costs, constant, cancellation, inactive)
+        val solved = guide?.result ?: lp.solve(closureRows, costs, constant, cancellation, inactive,
+            claim = LpClaim.ATTAINED_OPTIMUM)
             ?: return LinearAuthorityResult(paused = budget.funding?.paused == true)
         pointListener?.let { listener ->
             val point = guide?.point ?: solved.result.exactPrimal?.take(coordinates.size)
@@ -522,7 +531,7 @@ internal class LinearAuthority(
         }
         val feasible = if (endpointAccepted != null) endpointAccepted else {
             val original = lp.solve(rows, List(costs.size) { BigFraction.ZERO }, BigFraction.ZERO,
-                cancellation, inactive)
+                cancellation, inactive, claim = LpClaim.FEASIBLE_COMPLETION)
             original?.let { refutation(it) }?.let { return LinearAuthorityResult(it, bound) }
             val primal = original?.result?.exactPrimal?.take(coordinates.size)
             fractional(coordinates, primal).takeIf { it.isNotEmpty() }?.let {

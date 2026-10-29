@@ -16,6 +16,7 @@ import com.eignex.klause.lp.engine.FarkasRoute
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertifier
+import com.eignex.klause.lp.engine.LpClaim
 import com.eignex.klause.lp.engine.LpDeductionCertificate
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPhaseTimer
@@ -345,6 +346,7 @@ private fun LpEngine.solveSelectedCuts(
         }, observer = sink.lp.certificationObserver(LpRoute.NODE)),
     ) ?: return previous
     sink.lp.observeInfeasiblePrune()
+    LpClaim.CONTRADICTION.consumed(sink.lp.certificationObserver(LpRoute.NODE))
     return LpCutOutcome.Pruned(if (learn) LpExplanation.infeasibilityClause(tightened, ray, session) else null)
 }
 
@@ -436,6 +438,7 @@ internal fun LpEngine.sparseSafePrune(
                 )
                 if (ray != null) {
                     sink.lp.observeInfeasiblePrune()
+                    LpClaim.CONTRADICTION.consumed(sink.lp.certificationObserver(LpRoute.NODE))
                     hints?.recordInfeasible()
                     val clause = if (learn) {
                         LpExplanation.infeasibilityClause(filter.relaxation, ray, session)
@@ -515,6 +518,7 @@ internal fun LpEngine.sparseSafePrune(
         }
         if (ray != null) {
             sink.lp.observeInfeasiblePrune()
+            LpClaim.CONTRADICTION.consumed(sink.lp.certificationObserver(LpRoute.NODE))
             hints?.recordInfeasible()
             // With learning, the Farkas ray becomes a bound-atom nogood for a 1UIP backjump;
             // null (auxiliary column / unbacked non-global row / constraint-only) prunes reason-less.
@@ -652,6 +656,7 @@ internal fun LpEngine.sparseSafePrune(
             full >= rationalCutoff
         ) {
             sink.lp.observePrune()
+            LpClaim.BOUND.consumed(sink.lp.certificationObserver(LpRoute.NODE))
             return LpNodeOutcome(true, null)
         }
     }
@@ -673,6 +678,7 @@ internal fun LpEngine.sparseSafePrune(
     val cutoff = if (canPrune) sourceObjectiveCutoff(boundRel, bound, sourceRange) else null
     if (cutoff != null && full >= cutoff) {
         sink.lp.observePrune()
+        LpClaim.BOUND.consumed(sink.lp.certificationObserver(LpRoute.NODE))
         return LpNodeOutcome(true, null)
     }
     // Objective-bound propagation: the integer objective is ≥ ceil(LP lower bound). With learning,
@@ -711,6 +717,7 @@ internal fun LpEngine.sparseSafePrune(
             }
             if (res is PropagationResult.Unsat) {
                 sink.lp.observePrune()
+                LpClaim.BOUND.consumed(sink.lp.certificationObserver(LpRoute.NODE))
                 return LpNodeOutcome(true, null)
             }
         }
@@ -840,6 +847,7 @@ private fun LpEngine.applyRowBounds(
             bool && ((threshold < minimum && certificate.upper) ||
                 (threshold > maximum && !certificate.upper)) -> {
                 sink.lp.observePrune()
+                LpClaim.BOUND.consumed(sink.lp.certificationObserver(LpRoute.NODE))
                 return true
             }
             bool -> session.implyBool(variable, !certificate.upper)
@@ -850,6 +858,7 @@ private fun LpEngine.applyRowBounds(
         }
         if (result is PropagationResult.Unsat) {
             sink.lp.observePrune()
+            LpClaim.BOUND.consumed(sink.lp.certificationObserver(LpRoute.NODE))
             return true
         }
         if (learn) lpNogoods?.let { pool ->
@@ -864,6 +873,7 @@ private fun LpEngine.applyRowBounds(
                 session.addLearnedClause(Clause(clause), lbd = clause.size, permanent = true) is PropagationResult.Unsat
             ) {
                 sink.lp.observePrune()
+                LpClaim.BOUND.consumed(sink.lp.certificationObserver(LpRoute.NODE))
                 return true
             }
         }
@@ -1038,6 +1048,7 @@ internal fun LpEngine.applySparseReducedCostFixing(
         }
         if (res is PropagationResult.Unsat) {
             sink.lp.observePrune()
+            LpClaim.BOUND.consumed(sink.lp.certificationObserver(LpRoute.NODE))
             return true
         }
         sink.lp.observeFix()
@@ -1286,6 +1297,7 @@ internal fun LpEngine.sparseCertifiedPrune(
     val full = checkNotNull(BigFraction.ofDouble(lb)) + BigFraction.ofLong(relaxation.objectiveConstant)
     return if (full >= cutoff) {
         sink.lp.observePrune()
+        LpClaim.BOUND.consumed(sink.lp.certificationObserver(LpRoute.NODE))
         LpNodeOutcome(true, null)
     } else {
         LpNodeOutcome(false, null)
@@ -1586,7 +1598,7 @@ private fun LpEngine.strictSourcePrune(
         cpAdapter.localModel()
     }
     val result = try {
-        propagator.solve(cancellation)
+        propagator.solve(cancellation, claim = LpClaim.BOUND)
     } finally {
         sink.lp.observeEngineCost(LpRoute.NODE, propagator.lastMetrics)
         noteSolveOps(propagator.lastMetrics.workOps)
@@ -1606,6 +1618,7 @@ private fun LpEngine.strictSourcePrune(
         val conflict = result.rationalConflict
         if (conflict != null && !checkedLpConflict(model, conflict)) return null
         sink.lp.observeInfeasiblePrune()
+        LpClaim.CONTRADICTION.consumed(sink.lp.certificationObserver(LpRoute.NODE))
         return LpNodeOutcome(
             true,
             null,
@@ -1620,6 +1633,7 @@ private fun LpEngine.strictSourcePrune(
     val cutoff = if (sourceObjectiveRange(relaxation) != null) enclosingCutoff(bound) else null
     if (lower != null && cutoff != null && lower + BigFraction.ofLong(relaxation.objectiveConstant) >= cutoff) {
         sink.lp.observePrune()
+        LpClaim.BOUND.consumed(sink.lp.certificationObserver(LpRoute.NODE))
         return LpNodeOutcome(true, null)
     }
     return null

@@ -3,6 +3,11 @@ package com.eignex.klause.lp.engine
 import kotlin.time.TimeSource
 
 internal enum class LpSolvePhase {
+    CLAIM_CONSUMPTION,
+    CLAIM_BOUND,
+    CLAIM_CONTRADICTION,
+    CLAIM_FEASIBLE_COMPLETION,
+    CLAIM_ATTAINED_OPTIMUM,
     AUTHORITATIVE_IMPORT,
     SOURCE_FLOAT_ACCEPTANCE,
     FLOAT_ACCEPTANCE,

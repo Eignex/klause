@@ -125,6 +125,7 @@ internal class LpWorkingScope internal constructor(
         continuationLimits: ExactContinuationLimits = ExactContinuationLimits(),
         fullContinuation: Boolean = true,
         observer: LpCertificationObserver? = null,
+        claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
     ): CertifiedLpResult? {
         check(!closed) { "working scope is closed" }
         owner.requireAvailable()
@@ -147,6 +148,10 @@ internal class LpWorkingScope internal constructor(
                 observer?.observeSolve(metrics, component)
             }
 
+            override fun observePhase(metrics: LpPhaseMetrics) {
+                observer?.observePhase(metrics)
+            }
+
             override fun observeBasisVerification(metrics: ExactBasisMetrics) {
                 basisWork += metrics.work
                 observer?.observeBasisVerification(metrics)
@@ -165,6 +170,7 @@ internal class LpWorkingScope internal constructor(
                 continuationLimits = continuationLimits,
                 fullContinuation = fullContinuation,
                 observer = accounting,
+                claim = claim,
             )
         } finally {
             solves += owner.lastMetrics

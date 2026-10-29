@@ -2,7 +2,7 @@ package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.lp.engine.solveAndCertify
+import com.eignex.klause.lp.engine.newLpSolver
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.CheckedLongOverflowException
@@ -28,7 +28,7 @@ internal fun Problem.lpSeed(domains: Array<IntDomain>, cancellation: Cancellatio
         // A row the 64-bit LP cannot state over this box, which leaves the search its own starts.
         return null
     }
-    val primal = solveAndCertify(relaxation.model, cancellation = cancellation).float?.primal ?: return null
+    val primal = newLpSolver(relaxation.model, cancellation).use { it.solve()?.primal } ?: return null
     val ints = LongArray(numIntVars) { v ->
         val column = relaxation.intColOf.getOrElse(v) { -1 }
         val value = if (column in primal.indices) primal[column] else 0.0

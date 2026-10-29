@@ -2,6 +2,7 @@ package com.eignex.klause.lp.optimization
 
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SparseSourceLpPolicy
+import com.eignex.klause.lp.engine.LpClaim
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.IntegerPinStatus
 import com.eignex.klause.solver.evidence.SourceClaim
@@ -156,7 +157,8 @@ internal class LinearActiveRows(
         var evidence = checked(guidance?.coordinateConflictWeights ?: guidance?.result?.conflictWeights)
         if (evidence == null && query.rows.any { it.strict } &&
             budget.admitsDimensions(costs.size, query.rows.size.toLong())) {
-            evidence = checked(lp.solve(query.rows, costs, zero, cancellation, query.inactive)?.conflictWeights)
+            evidence = checked(lp.solve(query.rows, costs, zero, cancellation, query.inactive,
+                claim = LpClaim.CONTRADICTION)?.conflictWeights)
         }
         if (cancellation()) {
             invalidate()

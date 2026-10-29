@@ -15,6 +15,7 @@ import com.eignex.klause.lp.engine.LpBoundBatchResult
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpCertifierCost
+import com.eignex.klause.lp.engine.LpClaim
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpScopedRow
 import com.eignex.klause.lp.engine.LpScopedSolver
@@ -483,7 +484,8 @@ internal class SourceLp(
                     if (current.assertBounds(assertions, token) is LpBoundBatchResult.Declined) return@run null
                     val refinementBefore = current.refinementCache.work
                     val solved = try {
-                        current.solve(token = token, observer = observer)
+                        current.solve(token = token, observer = observer,
+                            claim = if (activity == null) LpClaim.FEASIBLE_COMPLETION else LpClaim.ATTAINED_OPTIMUM)
                     } finally {
                         budget.observe(
                             floatWork = current.lastMetrics.workOps,

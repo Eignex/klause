@@ -276,6 +276,33 @@ The opt-in basis tool uses the [basis corpus](../klause/src/jvmTest/resources/ba
 Run captures, timing comparisons and profiles through the lab. Harness unit tests
 use `./gradlew :klause-bench:test`; they do not run benchmark campaigns.
 
+### Claim-specific LP certification
+
+Certification diagnostics use the existing `lp.phases` map. `CLAIM_BOUND`,
+`CLAIM_CONTRADICTION`, `CLAIM_FEASIBLE_COMPLETION` and `CLAIM_ATTAINED_OPTIMUM`
+are keyed by consumer route, with inclusive nanoseconds, charged certificate work,
+and satisfied, reused or refusal outcomes. `CLAIM_CONSUMPTION` records accepted
+leaf packages and pruning consequences separately. Nested phase time and claim work
+overlap the existing certification counters; do not sum them. Source optimization
+exports deterministic claim work and outcomes under `CertificationCLAIM_*` in its existing stage map.
+Source active time stays in its containing budget rather than its logical trace.
+Compare costs with consumed claims and preserve unsuccessful requests. A cached bound
+without a point cannot satisfy attainment. Reconstruction attempts, cache admission,
+exact acceptance and resource ceilings retain their production settings.
+
+[Claim regression controls](https://github.com/Eignex/klause/pull/3865) cover
+production open refutation, real-leaf completion and repeated unchanged-leaf
+consumption, plus stronger requests, scoped invalidation and policy refusal.
+The nine initial JVM claim tests on `a8ba2a4a8f` take 0–11 ms each; JVM, Linux
+native and lint/docs CI pass at that revision.
+[9239](https://lab.eignex.com/jobs/9239) retains a failed applicability control:
+finite-only portfolio-work flags reject all six mixed numerical cases before solving.
+[9251](https://lab.eignex.com/jobs/9251) removes those flags and pins the same
+three vendored MPS sources, `d43182fe77`/`a8ba2a4a8f`, exact mode, presolve off,
+one lane and seed 17 under a 600-second containing allowance with source validation.
+Its receipts distinguish preparation, solve, witness checks and native proof flags.
+These controls establish no throughput improvement or independent proof validation.
+
 ### Bounded sparse admission trials
 
 `lp=default,+sparse-trial` selects the ordinary model-facing LP route's bounded

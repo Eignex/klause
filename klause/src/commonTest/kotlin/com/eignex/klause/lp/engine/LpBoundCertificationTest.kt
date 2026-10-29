@@ -301,7 +301,9 @@ class LpBoundCertificationTest {
             }
             override fun observeExactInput(accepted: Boolean) = Unit
             override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
-            override fun observePhase(metrics: LpPhaseMetrics) { phase = metrics }
+            override fun observePhase(metrics: LpPhaseMetrics) {
+                if (metrics.phase == LpSolvePhase.BOUND_CERTIFICATE) phase = metrics
+            }
         }
 
         val result = certifyLpBoundOnly(model(), doubleArrayOf(-1.0), ReconstructionLimits(), observer = observer,

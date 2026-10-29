@@ -72,6 +72,7 @@ internal class CertifiedLpResult(
     val exactPoint: ExactPointRecovery? = null,
     // A float optimum accepted under tolerance semantics in place of exact evidence; its primal is not exact.
     val floatOptimum: FloatLpResult? = null,
+    val certificationReused: Boolean = false,
 ) {
     val verdict: LpVerdict = when {
         floatOptimum != null -> LpVerdict.TOLERANCE_OPTIMUM
@@ -101,6 +102,7 @@ internal fun solveAndCertify(
     pricing: LpPricingOptions = LpPricingOptions(),
     observer: LpCertificationObserver? = null,
     refinementLimits: LpRefinementLimits = LpRefinementLimits(),
+    claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
 ): CertifiedLpResult {
     val state = LpExactState(model)
     val working = state.toWorkingModel()
@@ -124,6 +126,7 @@ internal fun solveAndCertify(
         counterResults = counterResults,
         pricing = pricing,
         refinementLimits = refinementLimits,
+        claim = claim,
     )
 }
 
@@ -142,11 +145,14 @@ internal fun solveAndCertify(
     refinementLimits: LpRefinementLimits = LpRefinementLimits(),
     floatAccept: ((FloatLpResult) -> Boolean)? = null,
     floatOffset: Double = 0.0,
+    claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
 ): CertifiedLpResult {
-    if (floatAccept != null && workLimit == 0L && model.exactState == null && model.floatProjectionAuthoritative()) {
+    if (claim == LpClaim.ATTAINED_OPTIMUM && floatAccept != null && workLimit == 0L &&
+        model.exactState == null && model.floatProjectionAuthoritative()
+    ) {
         return solveProjectedAndCertify(
             model, warm, cancellation, workLimit, componentSplit, observer, context, counterResults,
-            pricing, refinementLimits, floatAccept, floatOffset,
+            pricing, refinementLimits, floatAccept, floatOffset, claim,
         )
     }
     val authoritative = if (model.exactState != null) {
@@ -171,7 +177,7 @@ internal fun solveAndCertify(
     val result = certifyAuthoritativeSolve(
         authoritative, warm, cancellation, workLimit, componentSplit, observer, context, counters, pricing,
         refinementLimits, floatAccept,
-        floatOffset,
+        floatOffset, claim,
     )
     return sourceCertifiedResult(
         model,
@@ -219,6 +225,7 @@ private fun solveProjectedAndCertify(
     refinementLimits: LpRefinementLimits,
     floatAccept: (FloatLpResult) -> Boolean,
     floatOffset: Double,
+    claim: LpClaim,
 ): CertifiedLpResult = newLpSolver(
     model,
     cancellation,
@@ -259,7 +266,7 @@ private fun solveProjectedAndCertify(
     }
     val certified = certifyAuthoritativeSolve(
         authoritative, result?.basis ?: warm, cancellation, workLimit, componentSplit, observer, context, counters,
-        pricing, refinementLimits, floatAccept.takeUnless { sourceRefused }, floatOffset,
+        pricing, refinementLimits, floatAccept.takeUnless { sourceRefused }, floatOffset, claim,
     )
     sourceCertifiedResult(model, authoritative, certified, cancellation, counterResults, context.certificationPolicy)
 }
@@ -277,6 +284,7 @@ private fun certifyAuthoritativeSolve(
     refinementLimits: LpRefinementLimits,
     floatAccept: ((FloatLpResult) -> Boolean)?,
     floatOffset: Double,
+    claim: LpClaim,
 ): CertifiedLpResult = newLpSolver(
     model,
     cancellation,
@@ -294,7 +302,7 @@ private fun certifyAuthoritativeSolve(
     LpCertificationSession(context, pricing).use { certification ->
         certification.certify(
             model, solver, result, cancellation, observer, counterResults,
-            refinementLimits, floatAccept, floatOffset,
+            refinementLimits, floatAccept, floatOffset, claim,
         )
     }
 }
@@ -302,6 +310,7 @@ private fun certifyAuthoritativeSolve(
 internal class LpCertificationSession(private val context: LpSolveContext, private val pricing: LpPricingOptions) :
     AutoCloseable {
     private val continuation = LpExactContinuationCache()
+    private val checked = LpCounterResults()
     private var anchor: LpScopedSolver? = null
 
     fun certify(
@@ -314,9 +323,32 @@ internal class LpCertificationSession(private val context: LpSolveContext, priva
         refinementLimits: LpRefinementLimits = LpRefinementLimits(),
         floatAccept: ((FloatLpResult) -> Boolean)? = null,
         floatOffset: Double = 0.0,
+        claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
+    ): CertifiedLpResult {
+        val observation = observer?.let { LpClaimObservation(claim, it) }
+        return certifyWithin(model, solver, result, cancellation, observation, counterResults,
+            refinementLimits, floatAccept, floatOffset, claim).also {
+            observation?.finish(it, it.certificationReused)
+        }
+    }
+
+    private fun certifyWithin(
+        model: LpModel,
+        solver: LpSolver,
+        result: FloatLpResult?,
+        cancellation: Cancellation,
+        observer: LpCertificationObserver?,
+        counterResults: LpCounterResults?,
+        refinementLimits: LpRefinementLimits,
+        floatAccept: ((FloatLpResult) -> Boolean)?,
+        floatOffset: Double,
+        claim: LpClaim,
     ): CertifiedLpResult {
         // Tolerance semantics accept a float optimum before any exact work; a rejected one falls through to it.
-        if (floatAccept != null && result != null && result.optimal && !cancellation()) {
+        if ((claim == LpClaim.ATTAINED_OPTIMUM || claim == LpClaim.FEASIBLE_COMPLETION) &&
+            floatAccept != null && result != null && result.optimal &&
+            !cancellation()
+        ) {
             val timer = LpPhaseTimer(observer, LpSolvePhase.FLOAT_ACCEPTANCE)
             val float = floatOptimum(model, result, floatAccept, floatOffset, cancellation, observer)
             timer.finish(if (float != null) "ACCEPTED" else "REFUSED")
@@ -326,7 +358,9 @@ internal class LpCertificationSession(private val context: LpSolveContext, priva
         }
         val ladderTimer = LpPhaseTimer(observer, LpSolvePhase.EXACT_LADDER)
         val state = model.exactState
-        val refinement = if (state != null && solver !is ComponentLpSolverCapability && !cancellation()) {
+        val refinement = if (claim != LpClaim.BOUND &&
+            state != null && solver !is ComponentLpSolverCapability && !cancellation()
+        ) {
             val previous = anchor
             val current = if (previous != null && previous.adopt(state, cancellation)) {
                 previous
@@ -341,8 +375,8 @@ internal class LpCertificationSession(private val context: LpSolveContext, priva
         }
         val certified = certifyLpResult(
             model, solver, result, cancellation, observer, context.certificationPolicy,
-            counterResults, continuationCache = continuation, refinement = refinement,
-            sparsePointRecovery = context.sparsePointRecovery,
+            counterResults ?: checked, continuationCache = continuation, refinement = refinement,
+            sparsePointRecovery = context.sparsePointRecovery, claim = claim,
         )
         ladderTimer.finish(certified.verdict.name)
         return certified
@@ -352,6 +386,7 @@ internal class LpCertificationSession(private val context: LpSolveContext, priva
         val previous = anchor
         anchor = null
         continuation.clear()
+        checked.declineStorage()
         previous?.close()
     }
 }
@@ -372,16 +407,19 @@ internal fun certifyLpResult(
     fullContinuation: Boolean = true,
     refinement: LpRefinementRequest? = null,
     sparsePointRecovery: Boolean = false,
+    claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
 ): CertifiedLpResult {
+    val observation = observer as? LpClaimObservation ?: observer?.let { LpClaimObservation(claim, it) }
     val pairing = observer?.let { LpRejectionPairing() }
     var completed = false
     var failure: Throwable? = null
     try {
         val certified = certifyLpResultWithin(
-            model, solver, result, cancellation, observer, policy, counterResults, continuationCache,
-            continuationLimits, fullContinuation, refinement, sparsePointRecovery, pairing,
+            model, solver, result, cancellation, observation, policy, counterResults, continuationCache,
+            continuationLimits, fullContinuation, refinement, sparsePointRecovery, claim, pairing,
         )
         completed = true
+        if (observer !is LpClaimObservation) observation?.finish(certified, certified.certificationReused)
         return certified
     } catch (primary: Throwable) {
         failure = primary
@@ -413,13 +451,20 @@ private fun certifyLpResultWithin(
     fullContinuation: Boolean = true,
     refinement: LpRefinementRequest? = null,
     sparsePointRecovery: Boolean = false,
+    claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
     pairing: LpRejectionPairing? = null,
 ): CertifiedLpResult {
     fun stopped(): Boolean = cancellation().also {
-        if (it) pairing?.stopObserved = true
+        if (it) {
+            pairing?.stopObserved = true
+            (observer as? LpClaimObservation)?.refuse("CANCELLED")
+        }
     }
     val certificationStarted = refinement?.let { TimeSource.Monotonic.markNow() }
-    if (!model.finiteExactInput()) return CertifiedLpResult(null, null, null, null, null, false, { null })
+    if (!model.finiteExactInput()) {
+        (observer as? LpClaimObservation)?.refuse("UNSUPPORTED_INPUT")
+        return CertifiedLpResult(null, null, null, null, null, false, { null })
+    }
     val state = model.exactState
     var capturedTarget: LpContinuationTarget? = null
     var earlyContinuation: LpContinuationVerification? = null
@@ -436,6 +481,7 @@ private fun certifyLpResultWithin(
         state.conflict?.let {
             observer?.observe(LpCertifier.EXACT_FARKAS, true, LpCertifierCost.Reported)
             val accepted = policy.acceptNullable(LpCertifier.EXACT_FARKAS, it)?.takeUnless { stopped() }
+            if (accepted == null && !stopped()) (observer as? LpClaimObservation)?.refuse("POLICY_REFUSED")
             val support = accepted?.let { conflict ->
                 LpExactSupport(
                     state,
@@ -464,7 +510,25 @@ private fun certifyLpResultWithin(
             )
         }
         if (result != null && (solver.solvedExactState !== state || result.exactState !== state)) {
+            (observer as? LpClaimObservation)?.refuse("UNSUPPORTED_SCOPE")
             return CertifiedLpResult(null, null, null, null, null, false, { null })
+        }
+        val remembered = counterResults?.read(model, policy)
+        if (remembered != null && claim.satisfiedBy(remembered) && !stopped()) {
+            return CertifiedLpResult(result, remembered.bound, remembered.witness, null, null,
+                model.hasIntegralObjective(), { null }, certificationReused = true)
+        }
+        if (result != null && claim == LpClaim.BOUND) {
+            val direct = certifyLpBound(model, result.duals, observer, policy)
+                ?: (solver as? ComponentLpSolverCapability)?.exactBound(observer, policy)
+            val checked = if (direct == null && !stopped()) {
+                certifyLpBoundOnly(model, result.duals, ReconstructionLimits(), cancellation,
+                    observer, policy, result.basis)
+            } else null
+            val certified = CertifiedLpResult(result, direct ?: checked?.bound, null, null, null,
+                model.hasIntegralObjective(), { null }, reconstruction = checked?.metrics)
+            if (!stopped()) counterResults?.remember(model, certified, policy)
+            return if (stopped()) CertifiedLpResult(null, null, null, null, null, false, { null }) else certified
         }
         if (solver.solvedExactState !== state &&
             (
@@ -515,8 +579,10 @@ private fun certifyLpResultWithin(
     }
     val remembered = counterResults?.read(model, policy)
     val component = solver as? ComponentLpSolverCapability
-    var bound = result?.let { certifyLpBound(model, it.duals, observer, policy) }
-        ?: result?.let { component?.exactBound(observer, policy) }
+    var bound = result?.takeUnless { claim == LpClaim.FEASIBLE_COMPLETION || claim == LpClaim.CONTRADICTION }
+        ?.let { certifyLpBound(model, it.duals, observer, policy) }
+        ?: result?.takeUnless { claim == LpClaim.FEASIBLE_COMPLETION || claim == LpClaim.CONTRADICTION }
+            ?.let { component?.exactBound(observer, policy) }
         ?: remembered?.bound
     var witness = remembered?.witness ?: earlyWitness
     var ray: LongArray? = null
@@ -565,6 +631,7 @@ private fun certifyLpResultWithin(
             },
             additionalSourceWork = pointRecovery?.work ?: 0L,
             diagnostic = pairing?.newRefinement(result != null && policy === ProductionLpCertificationPolicy),
+            claim = claim,
         )
         refined = recovered
         refinementMetrics = refinementMetrics?.plus(recovered.metrics) ?: recovered.metrics
@@ -573,6 +640,7 @@ private fun certifyLpResultWithin(
         chargedAllocation = directAllocation
         chargedElapsed = directElapsed()
         recovered.sourceSingularBasis?.let { rejected ->
+            (observer as? LpClaimObservation)?.refuse("SINGULAR")
             continuationTarget()
             solver.rejectSingularBasis(model, rejected)
         }
@@ -615,13 +683,14 @@ private fun certifyLpResultWithin(
             withheldConflict = conflict == null
         }
     }
-    if (result != null && (bound?.value != witness?.objective || witness == null) && !stopped()) {
+    if (result != null && claim.needsMore(bound, witness) && !stopped()) {
         reconstruction = reconstructCertificate(
             model,
             result.primal,
-            result.duals,
+            result.duals.takeUnless { claim == LpClaim.FEASIBLE_COMPLETION || claim == LpClaim.CONTRADICTION },
             result.basis,
             cancellation = cancellation,
+            claim = claim,
         )
         observer?.observe(
             LpCertifier.RATIONAL,
@@ -671,7 +740,7 @@ private fun certifyLpResultWithin(
         numericalWitness = point
         witness = policy.acceptNullable(LpCertifier.EXACT_POINT, point)
     }
-    if (result != null && (numericalWitness == null || numericalBound?.value != numericalWitness?.objective) &&
+    if (result != null && claim.needsMore(numericalBound, numericalWitness) &&
         !stopped()
     ) {
         refine()
@@ -679,7 +748,7 @@ private fun certifyLpResultWithin(
     val legacyBasis = refined == null || refined.metrics.decline == LpRefinementDecline.DISABLED ||
         refined.metrics.decline == LpRefinementDecline.AUTHORITY
     if (result != null && legacyBasis &&
-        (witness == null || bound?.value != witness.objective) && !stopped()
+        claim.needsMore(bound, witness) && !stopped()
     ) {
         val checked = verifyExactBasis(
             model,
@@ -687,6 +756,7 @@ private fun certifyLpResultWithin(
             cache = solver.exactBasisCache ?: ExactBasisCache(),
             cancellation = cancellation,
             observer = observer,
+            primalOnly = claim == LpClaim.FEASIBLE_COMPLETION || claim == LpClaim.CONTRADICTION,
         )
         exactBasis = checked
         if (checked.singularRank != null) {
@@ -763,7 +833,9 @@ private fun certifyLpResultWithin(
             if (conflict != null && state == null) ray = checked.integerRay
         }
     }
-    if (result == null && (numericalWitness == null || numericalBound == null) &&
+    if (result == null &&
+        (if (claim == LpClaim.ATTAINED_OPTIMUM) numericalWitness == null || numericalBound == null
+        else claim.needsMore(numericalBound, numericalWitness)) &&
         ray == null && numericalConflict == null && conflict == null && !stopped()
     ) {
         refine()
@@ -790,15 +862,30 @@ private fun certifyLpResultWithin(
         conflict = accepted?.conflict?.let { policy.acceptNullable(LpCertifier.EXACT_FARKAS, it) }
         // Continuation proves feasibility only. Its point, found after refinement ran without one, seeds the
         // refinement that can prove the optimum.
-        if (witness != null && bound?.value != witness.objective && !stopped()) refine()
+        if (claim == LpClaim.ATTAINED_OPTIMUM && witness != null && bound?.value != witness.objective &&
+            !stopped()
+        ) refine()
     }
     if (continued == null) {
         capturedTarget?.let {
             observer?.observeContinuation(it.metrics)
         }
     }
+    if ((claim == LpClaim.FEASIBLE_COMPLETION || claim == LpClaim.CONTRADICTION) &&
+        witness != null && bound == null && ray == null && conflict == null &&
+        (0 until model.numVars).all { model.exactCost(it).isZero } && !stopped()
+    ) {
+        bound = certifyLpBound(model, DoubleArray(model.m), observer, policy).takeUnless { stopped() }
+    }
+    if ((numericalWitness != null && witness == null) || (numericalBound != null && bound == null) ||
+        (numericalConflict != null && conflict == null)
+    ) {
+        (observer as? LpClaimObservation)?.refuse("POLICY_REFUSED")
+    }
     if (ray != null || conflict != null) bound = null
-    val unboundedness = if (bound == null && witness != null && !withheldWitness) {
+    val unboundedness = if (claim == LpClaim.ATTAINED_OPTIMUM && bound == null && witness != null &&
+        !withheldWitness
+    ) {
         if (refined?.unboundedness != null) {
             policy.acceptNullable(LpCertifier.RATIONAL, refined.unboundedness)?.let {
                 if (refined.unboundednessUsesBasis) policy.acceptNullable(LpCertifier.EXACT_BASIS, it) else it
@@ -985,30 +1072,32 @@ internal fun certifyLpFarkas(
     onRoute: ((FarkasRoute) -> Unit)? = null,
     observer: LpCertificationObserver? = null,
 ): LongArray? {
-    var route = FarkasRoute.NONE
-    val scans = LpScanCount(model)
-    val mechanismObserver = observer?.let { target ->
-        object : LpCertificationObserver by target {
-            override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
-                if (certifier != LpCertifier.EXACT_FARKAS) target.observe(certifier, success, cost)
+    return observeLpClaim(LpClaim.CONTRADICTION, observer) { observation ->
+        var route = FarkasRoute.NONE
+        val scans = LpScanCount(model)
+        val mechanismObserver = observation?.let { target ->
+            object : LpCertificationObserver by target {
+                override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
+                    if (certifier != LpCertifier.EXACT_FARKAS) target.observe(certifier, success, cost)
+                }
             }
         }
+        val ray = integerFarkasRay(
+            model,
+            candidate,
+            basis = basis,
+            basisRow = basisRow,
+            onRoute = { route = it },
+            observer = mechanismObserver,
+            scans = scans,
+        )?.takeIf {
+            scans.scan()
+            sourceFarkasValid(model, it)
+        }
+        observation?.observe(LpCertifier.EXACT_FARKAS, ray != null, scans.cost())
+        onRoute?.invoke(if (ray != null) route else FarkasRoute.NONE)
+        return@observeLpClaim ray
     }
-    val ray = integerFarkasRay(
-        model,
-        candidate,
-        basis = basis,
-        basisRow = basisRow,
-        onRoute = { route = it },
-        observer = mechanismObserver,
-        scans = scans,
-    )?.takeIf {
-        scans.scan()
-        sourceFarkasValid(model, it)
-    }
-    observer?.observe(LpCertifier.EXACT_FARKAS, ray != null, scans.cost())
-    onRoute?.invoke(if (ray != null) route else FarkasRoute.NONE)
-    return ray
 }
 
 private fun exactStateConflict(model: LpModel, candidate: DoubleArray, scans: LpScanCount): BigRationalConflict? {

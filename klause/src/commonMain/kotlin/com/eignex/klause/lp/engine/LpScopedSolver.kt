@@ -42,6 +42,7 @@ internal class LpScopedSolver(
     private val pricing: LpPricingOptions = LpPricingOptions(),
 ) : AutoCloseable {
     private val continuationCache = LpExactContinuationCache()
+    private val checkedResults = LpCounterResults()
     internal val refinementCache = LpRefinementCache()
     internal val pointRecoveryCache = LpRefinementCache()
     private var trail = LpBoundTrail(initial)
@@ -220,6 +221,7 @@ internal class LpScopedSolver(
         observer: LpCertificationObserver? = null,
         refinementLimits: LpRefinementLimits = LpRefinementLimits(),
         sparsePointRecovery: Boolean = false,
+        claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
     ): CertifiedLpResult? {
         val attempt = solveFloat(warm, token) ?: return null
         val certified = certifyLpResult(
@@ -228,12 +230,13 @@ internal class LpScopedSolver(
             attempt.second,
             token,
             policy = context.certificationPolicy,
-            counterResults = counterResults,
+            counterResults = counterResults ?: checkedResults,
             continuationCache = continuationCache,
             continuationLimits = continuationLimits,
             fullContinuation = fullContinuation,
             observer = observer,
             sparsePointRecovery = sparsePointRecovery,
+            claim = claim,
             refinement = LpRefinementRequest(
                 this,
                 refinementCache,
@@ -750,6 +753,7 @@ internal class LpScopedSolver(
         discardFloatProgress()
         closed = true
         continuationCache.clear()
+        checkedResults.declineStorage()
         lastResult = null
         val current = solver
         solver = null

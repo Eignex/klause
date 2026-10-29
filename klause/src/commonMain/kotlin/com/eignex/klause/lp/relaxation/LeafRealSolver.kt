@@ -4,6 +4,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.CertifiedLpResult
 import com.eignex.klause.lp.engine.LpBoundTrail
+import com.eignex.klause.lp.engine.LpClaim
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolveCursor
@@ -64,9 +65,11 @@ internal class LeafRealSolver(
                 { result -> check(sample.copy(reals = relaxation.floatReals(result.primal, problem))) }
             },
             floatOffset = relaxation.objectiveConstant.toDouble(),
+            claim = if (objective == null) LpClaim.FEASIBLE_COMPLETION else LpClaim.ATTAINED_OPTIMUM,
         )
         return relaxation.leafResult(certified, problem, objective, sample, sink)
             .checkedEncoding(encoded, sample, cancellation)
+            .also { it.observeConsumption(sink) }
     }
 
     fun openSolve(
@@ -93,6 +96,7 @@ internal class LeafRealSolver(
                     { result -> check(sample.copy(reals = relaxation.floatReals(result.primal, problem))) }
                 },
                 floatOffset = relaxation.objectiveConstant.toDouble(),
+                claim = if (objective == null) LpClaim.FEASIBLE_COMPLETION else LpClaim.ATTAINED_OPTIMUM,
             ).use { cursor ->
                 var step = cursor.advance(shouldPause = { shouldPause(cursor.work) })
                 while (step is LpSolveStep.Paused) {
@@ -103,7 +107,8 @@ internal class LeafRealSolver(
             }
             val result = relaxation.leafResult(certified, problem, objective, sample, sink)
                 .checkedEncoding(encoded, sample, cancellation)
-            if (cancellation()) LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray) else result
+            if (cancellation()) LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+            else result.also { it.observeConsumption(sink) }
         }.also { activeSolve = it }
     }
 

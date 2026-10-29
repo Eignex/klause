@@ -66,9 +66,12 @@ internal object MpsLpCheckpoint {
         }.newInstance(routeType.enumConstants.single { it.toString() == "STANDALONE" })
         val observer = requireNotNull(call(sink, "certificationObserver",
             routeType.enumConstants.single { it.toString() == "STANDALONE" }))
-        val defaultSolve = type.methods.single { it.name == "solve\$default" && it.parameterCount == 11 }
+        val claim = Class.forName(ENGINE + "LpClaim").enumConstants.single {
+            it.toString() == "ATTAINED_OPTIMUM"
+        }
+        val defaultSolve = type.methods.single { it.name == "solve\$default" && it.parameterCount == 12 }
         val cursor = if (mode == "checkpointed") {
-            requireNotNull(call(owner, "openSolve", model, stop, TOTAL_WORK, observer, null, 0.0))
+            requireNotNull(call(owner, "openSolve", model, stop, TOTAL_WORK, observer, null, 0.0, claim))
         } else null
         var floatingWork = 0L
         var preparationWork = 0L
@@ -89,7 +92,8 @@ internal object MpsLpCheckpoint {
                 val step = cursor?.let { call(it, "advance", quantum, { false }) }
                 val completed = cursor == null || step?.javaClass?.simpleName == "Completed"
                 val result = if (cursor == null) {
-                    defaultSolve.invoke(null, owner, model, stop, quantum, observer, null, null, 0.0, null, 240, null)
+                    defaultSolve.invoke(null, owner, model, stop, quantum, observer, null, null, 0.0,
+                        null, claim, 240, null)
                 } else if (completed) call(requireNotNull(step), "getValue") else null
                 val elapsed = System.nanoTime() - started
                 val bytes = bean.getThreadAllocatedBytes(thread) - allocated

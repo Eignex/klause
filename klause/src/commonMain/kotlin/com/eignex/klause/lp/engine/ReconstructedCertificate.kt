@@ -672,12 +672,16 @@ internal fun reconstructCertificate(
     ray: DoubleArray? = null,
     cancellation: Cancellation = Cancellation.Never,
     limits: ReconstructionLimits = ReconstructionLimits(),
+    claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
 ): ReconstructedCertificate = reconstructCandidates(
     model, primal?.size ?: 0, duals?.size ?: 0, ray?.size ?: 0,
     primal?.let { values -> { meter -> reconstructIeee(values, meter) } },
     duals?.let { values -> { meter -> reconstructIeee(values, meter) } },
     ray?.let { values -> { meter -> reconstructIeee(values, meter) } },
     basis, cancellation, limits,
+    goal = if (claim == LpClaim.FEASIBLE_COMPLETION || claim == LpClaim.CONTRADICTION) {
+        ReconstructionGoal.POINT
+    } else ReconstructionGoal.ATTAINMENT,
     validate = { meter ->
         for (vector in listOfNotNull(primal, duals, ray)) {
             meter.step(vector.size.toLong())
@@ -706,7 +710,7 @@ private fun reconstructIeee(values: DoubleArray, meter: ReconstructionMeter): Li
     meter.fraction(exactDouble(it))
 }
 
-private enum class ReconstructionGoal { ATTAINMENT, BOUND }
+private enum class ReconstructionGoal { ATTAINMENT, BOUND, POINT }
 
 private fun repairBoundMultipliers(
     authority: ReconstructionAuthority,
@@ -777,6 +781,7 @@ private fun reconstructCandidates(
             if (current.conflict == null) current.dual(rho.map { meter.fraction(it.negated()) }, ray = true)
         }
         if (!current.attained() && current.conflict == null &&
+            (goal != ReconstructionGoal.POINT || current.point == null) &&
             (goal != ReconstructionGoal.BOUND || (current.bound == null && limits.maxAttempts > 0))
         ) {
             val violation = reconstructionViolation(authority, x, y ?: rho, ray = y == null && rho != null, meter)
@@ -832,7 +837,8 @@ private fun reconstructCandidates(
                     }
                 }
                 if (current.attained() || current.conflict != null ||
-                    (goal == ReconstructionGoal.BOUND && current.bound != null)
+                    (goal == ReconstructionGoal.BOUND && current.bound != null) ||
+                    (goal == ReconstructionGoal.POINT && current.point != null)
                 ) break
                 val next = nextReconstructionRound(round)
                 repeat(
@@ -1014,11 +1020,29 @@ internal fun certifyLpConflictOnly(
     observer: LpCertificationObserver? = null,
     policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
 ): ReconstructedCertificate {
+    val observation = observer?.takeUnless { it is LpClaimObservation }?.let {
+        LpClaimObservation(LpClaim.CONTRADICTION, it)
+    }
+    val checked = certifyLpConflictOnlyWithin(model, ray, limits, cancellation, observation ?: observer, policy)
+    observation?.finish(CertifiedLpResult(null, checked.bound, null, null, checked.conflict,
+        false, { null }, reconstruction = checked.metrics))
+    return checked
+}
+
+private fun certifyLpConflictOnlyWithin(
+    model: LpModel,
+    ray: DoubleArray,
+    limits: ReconstructionLimits,
+    cancellation: Cancellation = Cancellation.Never,
+    observer: LpCertificationObserver? = null,
+    policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
+): ReconstructedCertificate {
     val timer = LpPhaseTimer(observer, LpSolvePhase.CONFLICT_CERTIFICATE)
     val checked = reconstructCertificate(model, ray = ray, cancellation = cancellation, limits = limits)
     val metrics = checked.metrics
     val conflict = checked.conflict
     val accepted = policy.acceptNullable(LpCertifier.RATIONAL, conflict)
+    if (conflict != null && accepted == null) (observer as? LpClaimObservation)?.refuse("POLICY_REFUSED")
     observer?.observe(LpCertifier.RATIONAL, conflict != null, LpCertifierCost.Metered(metrics.work))
     timer.finish(metrics.decline?.name ?: if (accepted != null) "CONFLICT" else "REFUSED", metrics.work)
     return ReconstructedCertificate(null, null, accepted, checked.conflictSupport.takeIf { accepted != null },
@@ -1027,6 +1051,24 @@ internal fun certifyLpConflictOnly(
 
 // Dual evidence has its own admission and spending; exact-primal reconstruction is not a prerequisite.
 internal fun certifyLpBoundOnly(
+    model: LpModel,
+    duals: DoubleArray,
+    limits: ReconstructionLimits,
+    cancellation: Cancellation = Cancellation.Never,
+    observer: LpCertificationObserver? = null,
+    policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
+    basis: Basis? = null,
+): ReconstructedCertificate {
+    val observation = observer?.takeUnless { it is LpClaimObservation }?.let {
+        LpClaimObservation(LpClaim.BOUND, it)
+    }
+    val checked = certifyLpBoundOnlyWithin(model, duals, limits, cancellation, observation ?: observer, policy, basis)
+    observation?.finish(CertifiedLpResult(null, checked.bound, null, null, checked.conflict,
+        false, { null }, reconstruction = checked.metrics))
+    return checked
+}
+
+private fun certifyLpBoundOnlyWithin(
     model: LpModel,
     duals: DoubleArray,
     limits: ReconstructionLimits,
@@ -1050,6 +1092,7 @@ internal fun certifyLpBoundOnly(
     val bound = checked.bound
     val rational = policy.acceptNullable(LpCertifier.RATIONAL, bound)
     val accepted = if (checked.boundUsesBasis) policy.acceptNullable(LpCertifier.EXACT_BASIS, rational) else rational
+    if (bound != null && accepted == null) (observer as? LpClaimObservation)?.refuse("POLICY_REFUSED")
     observer?.observe(LpCertifier.RATIONAL, bound != null, LpCertifierCost.Metered(metrics.work - metrics.basisWork))
     if (metrics.basisWork > 0L) {
         observer?.observe(LpCertifier.EXACT_BASIS, bound != null && checked.boundUsesBasis,

@@ -28,9 +28,11 @@ internal fun certifiedTightObjectiveLowerBound(
     observer: LpCertificationObserver?,
     policy: LpCertificationPolicy,
 ): Double? {
-    val safe = policy.acceptNullable(LpCertifier.SAFE_OBJECTIVE, safeObjectiveLowerBound(model, y, observer))
-    val exact = policy.acceptNullable(LpCertifier.INTEGER, model.exactObjectiveLowerBoundCeil(y, observer))
-    return tighterAcceptedLowerBound(safe, exact)
+    return observeLpClaim(LpClaim.BOUND, observer) { observation ->
+        val safe = policy.acceptNullable(LpCertifier.SAFE_OBJECTIVE, safeObjectiveLowerBound(model, y, observation))
+        val exact = policy.acceptNullable(LpCertifier.INTEGER, model.exactObjectiveLowerBoundCeil(y, observation))
+        return@observeLpClaim tighterAcceptedLowerBound(safe, exact)
+    }
 }
 
 internal fun certifiedTightObjectiveLowerBound(
@@ -40,17 +42,19 @@ internal fun certifiedTightObjectiveLowerBound(
     observer: LpCertificationObserver?,
     policy: LpCertificationPolicy,
 ): Double? {
-    val safe = policy.acceptNullable(LpCertifier.SAFE_OBJECTIVE, safeObjectiveLowerBound(model, y, observer))
-    return tighterAcceptedLowerBound(
-        safe,
-        policy.acceptNullable(
-            LpCertifier.INTEGER,
-            certificate?.takeIf { it.belongsTo(
-                model,
-                observer,
-            ) && model.hasIntegralObjective() }?.objectiveBoundCeil(0L),
-        ),
-    )
+    return observeLpClaim(LpClaim.BOUND, observer) { observation ->
+        val safe = policy.acceptNullable(LpCertifier.SAFE_OBJECTIVE, safeObjectiveLowerBound(model, y, observation))
+        return@observeLpClaim tighterAcceptedLowerBound(
+            safe,
+            policy.acceptNullable(
+                LpCertifier.INTEGER,
+                certificate?.takeIf { it.belongsTo(
+                    model,
+                    observation,
+                ) && model.hasIntegralObjective() }?.objectiveBoundCeil(0L),
+            ),
+        )
+    }
 }
 
 internal fun certifiedTightObjectiveLowerBound(
@@ -60,21 +64,23 @@ internal fun certifiedTightObjectiveLowerBound(
     observer: LpCertificationObserver?,
     policy: LpCertificationPolicy,
 ): Double? {
-    val safe = policy.acceptNullable(LpCertifier.SAFE_OBJECTIVE, safeObjectiveLowerBound(model, y, observer))
-    val exact = policy.acceptNullable(
-        LpCertifier.INTEGER,
-        certificate?.takeIf { it.belongsTo(model, observer) }?.let {
-            if (model.hasIntegralObjective()) {
-                it.objectiveBoundCeil(0L)?.let(::acceptedLowerBoundAsDouble)
-            } else {
-                it.exactObjectiveBound().lowerBoundDouble()
-            }
-        },
-    )
-    return when {
-        safe == null -> exact
-        exact == null -> safe
-        else -> maxOf(safe, exact)
+    return observeLpClaim(LpClaim.BOUND, observer) { observation ->
+        val safe = policy.acceptNullable(LpCertifier.SAFE_OBJECTIVE, safeObjectiveLowerBound(model, y, observation))
+        val exact = policy.acceptNullable(
+            LpCertifier.INTEGER,
+            certificate?.takeIf { it.belongsTo(model, observation) }?.let {
+                if (model.hasIntegralObjective()) {
+                    it.objectiveBoundCeil(0L)?.let(::acceptedLowerBoundAsDouble)
+                } else {
+                    it.exactObjectiveBound().lowerBoundDouble()
+                }
+            },
+        )
+        return@observeLpClaim when {
+            safe == null -> exact
+            exact == null -> safe
+            else -> maxOf(safe, exact)
+        }
     }
 }
 
@@ -86,19 +92,21 @@ internal fun LpModel.certifiedTightVariableBound(
     observer: LpCertificationObserver?,
     policy: LpCertificationPolicy,
 ): Long? {
-    val safe = policy.acceptNullable(
-        LpCertifier.SAFE_OBJECTIVE,
-        safeVariableBound(result, objectiveCol, maximize, clamped, observer),
-    )
-    val exact = policy.acceptNullable(
-        LpCertifier.INTEGER,
-        exactVariableBound(result, objectiveCol, maximize, clamped, observer),
-    )
-    return when {
-        safe == null -> exact
-        exact == null -> safe
-        maximize -> minOf(safe, exact)
-        else -> maxOf(safe, exact)
+    return observeLpClaim(LpClaim.BOUND, observer) { observation ->
+        val safe = policy.acceptNullable(
+            LpCertifier.SAFE_OBJECTIVE,
+            safeVariableBound(result, objectiveCol, maximize, clamped, observation),
+        )
+        val exact = policy.acceptNullable(
+            LpCertifier.INTEGER,
+            exactVariableBound(result, objectiveCol, maximize, clamped, observation),
+        )
+        return@observeLpClaim when {
+            safe == null -> exact
+            exact == null -> safe
+            maximize -> minOf(safe, exact)
+            else -> maxOf(safe, exact)
+        }
     }
 }
 
