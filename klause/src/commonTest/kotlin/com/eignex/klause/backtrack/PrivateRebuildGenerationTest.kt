@@ -46,13 +46,16 @@ class PrivateRebuildGenerationTest {
 
     @Test
     fun `conditional roots should withhold a globally reusable generation`() {
-        val source = Problem(2, 0, emptyArray(), arrayOf(Clause(intArrayOf(0, 2)))).bake()
-        val session = PropagationSession(source)
-        session.seed(Assumptions.None.withBool(0, false))
+        for (scoped in listOf(false, true)) {
+            val source = Problem(2, 0, emptyArray(), arrayOf(Clause(intArrayOf(0, 2)))).bake()
+            val session = PropagationSession(source)
+            if (scoped) session.addLearnedClause(Clause(intArrayOf(1)), 1, permanent = true)
+            else session.seed(Assumptions.None.withBool(0, false))
 
-        val generation = PrivateRebuildGeneration.prepare(session, 1_048_576L, Cancellation.Never)
+            val generation = PrivateRebuildGeneration.prepare(session, 1_048_576L, Cancellation.Never)
 
-        assertNull(generation)
+            assertNull(generation)
+        }
     }
 
     @Test

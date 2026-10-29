@@ -7,7 +7,9 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.ClauseExchange
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.withLifetime
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -85,20 +87,28 @@ class PrivateRebuildSatisfactionTest {
 
     @Test
     fun `cancellation after private opening should release the generation without publishing a point`() {
-        val source = Problem(3, 0, emptyArray(), arrayOf(
-            Clause(intArrayOf(0, 2)), Clause(intArrayOf(1, 4)),
-        )).bake()
-        val search = BacktrackSolver(source).resumableSolve(BacktrackParams(privateRebuildWork = 65_536L))
-        val cancellation = Cancellation {
-            (search.stats.search.learning["privateRebuildConsumers"] ?: 0L) > 0L
+        for (lifetime in listOf(false, true)) {
+            val source = Problem(3, 0, emptyArray(), arrayOf(
+                Clause(intArrayOf(0, 2)), Clause(intArrayOf(1, 4)),
+            )).bake()
+            var live: ResumableSolve? = null
+            val cancellation = Cancellation {
+                (live?.stats?.search?.learning?.get("privateRebuildConsumers") ?: 0L) > 0L
+            }
+            val params = BacktrackParams(privateRebuildWork = 65_536L,
+                cancellation = if (lifetime) Cancellation.Never.withLifetime(cancellation) else Cancellation.Never)
+            val search = BacktrackSolver(source).resumableSolve(params)
+            live = search
+
+            val result = search.use {
+                it.runSlice(if (lifetime) Cancellation.Never else cancellation, Long.MAX_VALUE, -1L)
+            }
+
+            val stopped = assertIs<SolveResult.Unknown>(result)
+            assertEquals(1L, stopped.stats.search.learning["privateRebuildConsumers"])
+            assertEquals(1L, stopped.stats.search.learning["privateRebuildRetired"])
+            assertNull(stopped.stats.search.learning["privateRebuildSourceAccepted"])
+            assertEquals(stopped, search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L))
         }
-
-        val result = search.use { it.runSlice(cancellation, Long.MAX_VALUE, -1L) }
-
-        val stopped = assertIs<SolveResult.Unknown>(result)
-        assertEquals(1L, stopped.stats.search.learning["privateRebuildConsumers"])
-        assertEquals(1L, stopped.stats.search.learning["privateRebuildRetired"])
-        assertNull(stopped.stats.search.learning["privateRebuildSourceAccepted"])
-        assertEquals(stopped, search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L))
     }
 }

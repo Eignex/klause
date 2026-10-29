@@ -11,7 +11,6 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.lifetimeCancellation
-import com.eignex.klause.solver.pipeline.withStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.UnsoundnessException
@@ -45,7 +44,7 @@ internal class PrivateRebuildSatisfaction(
     private var generation: PrivateRebuildGeneration? = null
     private var consumer: ResumableSatisfaction? = null
     private var retiredStats = SolveStats.EMPTY
-    private var retiredWork = 0L
+    private var retiredClauseWork = 0L
     private var debt = 0L
     private var done: SolveResult? = null
     private var closed = false
@@ -56,7 +55,8 @@ internal class PrivateRebuildSatisfaction(
 
     override val isDone: Boolean get() = done != null
     override val initialWork: Long = canonical.initialWork
-    override val work: Long get() = canonical.work + retiredWork + (consumer?.work ?: 0L)
+    override val work: Long get() = saturatedWork(canonical.work,
+        saturatedWork(retiredClauseWork, consumer?.clauseWork ?: 0L) / PROPAGATION_WORK_PER_NODE)
     override val stats: SolveStats
         get() {
             if (closed) return retainedStats
@@ -94,9 +94,14 @@ internal class PrivateRebuildSatisfaction(
                 val trialToken = token or Cancellation {
                     trialSpent() >= params.privateRebuildWork
                 }
-                val result = search.runSlice(global or Cancellation {
-                    trialSpent() >= params.privateRebuildWork
-                }, millis(), nodes())
+                val trialStart = TimeSource.Monotonic.markNow()
+                val result = try {
+                    search.runSlice(lifetime or global or Cancellation {
+                        trialSpent() >= params.privateRebuildWork
+                    }, millis(), nodes())
+                } finally {
+                    note("TrialNanos", trialStart.elapsedNow().inWholeNanoseconds)
+                }
                 if (result is SolveResult.Sat) {
                     val mapped = candidate ?: checkNotNull(generation).let {
                         charge(it.reconstructionWork)
@@ -113,7 +118,9 @@ internal class PrivateRebuildSatisfaction(
                     }
                     // A partial source check grants no publication authority; the retained canonical
                     // traversal still owns its complete proof search and warm state.
-                    if (!trialToken()) throw UnsoundnessException("private rebuild witness failed its canonical clauses")
+                    if (!trialToken()) {
+                        throw UnsoundnessException("private rebuild witness failed its canonical clauses")
+                    }
                     note("SourceUnavailable")
                     if (trialSpent() >= params.privateRebuildWork) retire()
                 } else if (result != null || trialSpent() >= params.privateRebuildWork) {
@@ -138,9 +145,7 @@ internal class PrivateRebuildSatisfaction(
     }
 
     private fun trialSpent(): Long = saturatedWork(chargedPrivateWork,
-        saturatedWork(retiredWork, consumer?.work ?: 0L).coerceAtMost(
-            Long.MAX_VALUE / PROPAGATION_WORK_PER_NODE,
-        ) * PROPAGATION_WORK_PER_NODE)
+        saturatedWork(retiredClauseWork, consumer?.clauseWork ?: 0L))
 
     private fun charge(work: Long) {
         checkNotNull(root).chargeInprocessingWork(work)
@@ -179,15 +184,21 @@ internal class PrivateRebuildSatisfaction(
             ),
             maxLearnedClauses = minOf(params.maxLearnedClauses ?: 256, 256),
         )
+        val openingStart = TimeSource.Monotonic.markNow()
         try {
             consumer = ResumableSatisfaction(BacktrackSolver(prepared.problem), privateParams, ownsWorkDebt = false)
         } catch (stopped: SearchInitializationCancelled) {
-            retiredWork += stopped.work
+            val decisions = stopped.stats.search.nodes.sum.toLong()
+                .coerceAtMost(Long.MAX_VALUE / PROPAGATION_WORK_PER_NODE) * PROPAGATION_WORK_PER_NODE
+            retiredClauseWork = saturatedWork(retiredClauseWork,
+                saturatedWork(decisions, stopped.stats.search.propagationWork.sum.toLong()))
             retiredStats = retiredStats.mergedWith(stopped.stats)
             generation = null
             root = null
             note("OpeningStopped")
             return
+        } finally {
+            note("OpeningNanos", openingStart.elapsedNow().inWholeNanoseconds)
         }
         note("Consumers")
     }
@@ -200,6 +211,7 @@ internal class PrivateRebuildSatisfaction(
                 val factor = solver.problem.factors[checkedFactors]
                 val literals = (factor as Clause).literals
                 charge(literals.size + 1L)
+                note("SourceCheckWork", literals.size + 1L)
                 if (literals.none { Lit.evaluate(it, sample.boolValue(Lit.variable(it))) }) return false
                 checkedFactors++
             }
@@ -215,7 +227,7 @@ internal class PrivateRebuildSatisfaction(
         try {
             search.close()
         } finally {
-            retiredWork = saturatedWork(retiredWork, search.work)
+            retiredClauseWork = saturatedWork(retiredClauseWork, search.clauseWork)
             retiredStats = retiredStats.mergedWith(search.stats)
             consumer = null
             generation = null
@@ -229,7 +241,12 @@ internal class PrivateRebuildSatisfaction(
 
     private fun finish(result: SolveResult): SolveResult {
         close()
-        return result.withStats(stats).withSourceSemantics(solver.problem.semantics).also { done = it }
+        val merged = when (result) {
+            is SolveResult.Sat -> result.copy(stats = stats)
+            is SolveResult.Unsat -> result.copy(stats = stats)
+            is SolveResult.Unknown -> result.copy(stats = stats)
+        }
+        return merged.withSourceSemantics(solver.problem.semantics).also { done = it }
     }
 
     override fun close() {
@@ -253,6 +270,6 @@ internal class PrivateRebuildSatisfaction(
             params.privateRebuildWork > 0L && problem.numIntVars == 0 && problem.numRealVars == 0 &&
                 params.assumptions.isEmpty && params.assumptions.deductions.isEmpty &&
                 params.componentFactory == null && params.lpConfig in listOf(null, LpConfig.OFF) &&
-                params.lpPlan == LpPlan() && problem.factors.all { it is Clause }
+                params.lpPlan == LpPlan()
     }
 }
