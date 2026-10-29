@@ -243,13 +243,16 @@ internal object PreparedArithmeticLearningProfile {
         private val native: PropagationSession,
         private val maxEvents: Int = 128,
         private val maxWords: Int = 8192,
+        attachImmediately: Boolean = true,
     ) {
         private val state = native.javaClass.getDeclaredField("state").apply { isAccessible = true }.get(native)
         private val field = state.javaClass.getDeclaredField("arithmeticLearningTrace").apply { isAccessible = true }
         private val trace = Class.forName("com.eignex.klause.propagation.ArithmeticLearningTrace")
             .getConstructor(Int::class.javaPrimitiveType, Int::class.javaPrimitiveType).newInstance(maxEvents, maxWords)
 
-        init { field.set(state, trace) }
+        init { if (attachImmediately) attach() }
+
+        fun attach() { field.set(state, trace) }
 
         val accepting: Boolean get() = trace.javaClass.getMethod("getAccepting").invoke(trace) as Boolean
 
