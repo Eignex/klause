@@ -42,6 +42,20 @@ class LinearOptimizationExecutionTest {
     )
 
     @Test
+    fun `a standalone linear result should include numerical owner retirement`() {
+        val context = SourceProofContext(scope, setOf(real), mapOf(
+            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE),
+                BigFraction.MINUS_ONE)),
+        ), mapOf(real to BigFraction.ONE))
+
+        val result = OpenTheoryPipeline.optimizeLinear(context)
+
+        assertTrue(result.stats.smt.sourceLp.operations > 0L)
+        assertEquals(1L, assertNotNull(result.stats.smt.completeSearchStages)[
+            "numericalCutLifecycleRECIPE_RETIREMENT_OwnerClosed"])
+    }
+
+    @Test
     fun `cancelling a scoped portfolio should keep its checked incumbent and conditional root bound`() {
         val model = Problem(
             0,

@@ -275,6 +275,9 @@ their existing charges and decline reasons. Assembly and factor-fill observation
 include replacement owners; compatible component reuse is distinct from another
 solve. Telemetry retains aggregate counters by the fixed family and recipe set,
 without retaining cut histories or granting additional numerical allowances.
+Terminal finite results and standalone linear results take their final lifecycle
+snapshot after releasing numerical owners. Rebindable handles remain live until
+their caller retires them; portfolios read the final handle snapshot after close.
 
 Explicit bound-ordered sparse frontiers consume single-row Chvatal–Gomory rounding
 and bounded mixed-integer residual rounding.

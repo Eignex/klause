@@ -789,8 +789,18 @@ internal class ResumableMinimize(
     private fun terminal(result: MinimizeResult): StepEvent {
         val qualified = result.withSourceSemantics(problem.semantics)
         done = qualified
-        if (!rebindable) close()
-        return StepEvent.Terminal(qualified)
+        if (!rebindable) {
+            close()
+            val finalStats = qualified.stats.copy(lp = sink.lp.snapshot())
+            done = when (qualified) {
+                is MinimizeResult.Optimal -> qualified.copy(stats = finalStats)
+                is MinimizeResult.BestFound -> qualified.copy(stats = finalStats)
+                is MinimizeResult.Infeasible -> qualified.copy(stats = finalStats)
+                is MinimizeResult.Unknown -> qualified.copy(stats = finalStats)
+                is MinimizeResult.Unbounded -> qualified.copy(stats = finalStats)
+            }
+        }
+        return StepEvent.Terminal(checkNotNull(done))
     }
 
     private fun terminalExhausted(core: UnsatCore?): MinimizeResult {
