@@ -490,6 +490,7 @@ reuse or zero-cut result. Component count alone establishes no saved work or
 whole-source improvement.
 `lpPhase_COMPONENT_LIFECYCLE_*` records child `SOLVED` and `REUSED` counts through
 the existing route ledger; numerical work, pivots and factors count actual solves.
+`SOLVED` counts invocations, including attempts that stop without a result.
 `set=lp-component-lifecycle-v1` selects two binary covering MPS sources with direct
 additive objectives. Each block needs two selected columns but has a fractional
 LP optimum, admitting local tableau cuts without an objective-definition row that
