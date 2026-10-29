@@ -52,7 +52,7 @@ class PresolveStructuralImpactTest {
                     reduced = result.problem
                     reconstruct = result.reconstruct
                 }
-                assertEquals(preserve, reduced.factors.any { it === source.factors[1] }, "$lane $preserve")
+                assertEquals(preserve, reduced.factors.filterIsInstance<Table>().any { 0 in it.xs }, "$lane $preserve")
                 val solved = assertIs<SolveResult.Sat>(BacktrackSolver(reduced.bake()).solve(BacktrackParams()))
                 val point = reconstruct(solved.assignment)
                 var pins = Assumptions.None
@@ -81,8 +81,8 @@ class PresolveStructuralImpactTest {
 
         val result = Presolver.runSource(source, config)
 
-        assertTrue(result.problem.factors.any { it === source.factors[0] })
-        assertFalse(result.problem.factors.any { it === source.factors[1] })
+        assertTrue(result.problem.factors.any { it.structuralKey() == source.factors[0].structuralKey() })
+        assertFalse(result.problem.factors.any { it.structuralKey() == source.factors[1].structuralKey() })
     }
 
     @Test
@@ -131,7 +131,7 @@ class PresolveStructuralImpactTest {
         val result = Presolver.runSource(source, config, context)
 
         assertTrue(result.rebuild.isEmpty)
-        assertTrue(result.problem === source)
+        assertEquals(source.factors.map { it.structuralKey() }, result.problem.factors.map { it.structuralKey() })
     }
 
     @Test

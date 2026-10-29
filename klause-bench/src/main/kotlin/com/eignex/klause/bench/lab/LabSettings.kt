@@ -1,7 +1,7 @@
 package com.eignex.klause.bench.lab
 
 import com.eignex.klause.lp.bounding.LpConfig
-import com.eignex.klause.presolve.PresolveEmphasis
+import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.lab.bench.BenchResources
 
 internal data class LabSettings(val parameters: Map<String, String>) {
@@ -35,7 +35,9 @@ internal data class LabSettings(val parameters: Map<String, String>) {
         parameters["exact"]?.toBooleanStrict()
         parameters["complete-assignment"]?.toBooleanStrict()
         parameters["lp"]?.let { require(runCatching { LpConfig.parse(it) }.isSuccess) { "Invalid LP configuration" } }
-        parameters["presolve"]?.let { requireNotNull(PresolveEmphasis.fromId(it)) { "Unknown presolve emphasis" } }
+        parameters["presolve"]?.let {
+            require(runCatching { PresolveConfig.parse(it) }.isSuccess) { "Invalid presolve configuration" }
+        }
         for (key in listOf("max", "per-family")) parameters[key]?.let { require(it.toInt() > 0) }
         parameters["seed"]?.toLong()
         parameters.filterKeys { it.startsWith("param.") }.forEach { (key, value) ->
