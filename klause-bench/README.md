@@ -169,14 +169,14 @@ independent source checks. The counts describe representation rather than benefi
 partial impact observations cannot establish full deltas. Disable the impact scan
 in timing controls to separate diagnostic cost.
 
-The existing `xcsp3-smoke/table-substitution-interior`, `-hole` and
+The existing `xcsp3-core/table-substitution-interior`, `-hole` and
 `-outside-reader` controls exercise `presolve=default,+table-substitution`
 against the default. They qualify exact optimization-scoped value exclusion,
 separately from affine Table-column substitution and structural Table reduction.
 Use `portfolio-work` only for compatible mixed/LS worker comparisons, retain its
 logical trace, and distinguish emergency interruption from completed work.
 
-## Corpus and build identity
+`bench.profile.RewriteStructureProfile` takes `suite=ID problem=NAME sha256=HEXpresolve=CONFIG`. It captures each structure-control arm through production sourceand finite preparation, then reuses projected source hints, maintained definitionnetworks and core/Table-hull LP assembly. Each arm has a 30-second containingdeadline, five million preparation work units and one million consumer-diagnosticunits; the whole capture has 120 seconds. Sources, lowered coordinates and factorsare capped before consumer preparation. The report retains actual maintaineddefinitions/input edges/depth and emitted rows/columns/nonzeros. The forced LPviews establish representation effects; ordinary worker admission and whole-sourceoutcomes require separate adapter runs. Use `suite=rewrite-structure-v1` for thesmall affine Table and Element applicability controls.## Corpus and build identity
 
 `corpus status` lists cached collections, `corpus gc` applies the cache cap and
 `corpus compress [path]` compresses supported plain inputs with `zstd` on `PATH`.

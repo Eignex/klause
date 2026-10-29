@@ -206,6 +206,7 @@ internal object MpsLpAdmission {
         stop: Cancellation,
         element: Boolean = false,
         elementIndexes: Set<Int>? = null,
+        table: Boolean = false,
     ): Any {
         check(!stop())
         // Reflection keeps diagnostic access to internal assembly out of the published API.
@@ -219,9 +220,10 @@ internal object MpsLpAdmission {
         values[0] = problem
         values[1] = objective
         values[2] = element
+        values[3] = table
         values[11] = cone
         values[21] = elementIndexes
-        values[22] = (1 or (1 shl 1) or (1 shl 2) or (1 shl 11) or (1 shl 21)).inv()
+        values[22] = (1 or (1 shl 1) or (1 shl 2) or (1 shl 3) or (1 shl 11) or (1 shl 21)).inv()
         val relaxer = constructor.newInstance(*values)
         val domainType = Class.forName("com.eignex.klause.lp.relaxation.RootDomains")
         val domains = domainType.constructors.single().newInstance(problem)
