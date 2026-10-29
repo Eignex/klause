@@ -25,13 +25,17 @@ import com.eignex.klause.solver.search.SearchInvocationResources
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.magnitudeBitLength
 
 internal class LinearIncumbentCompletion(
     private val budget: SourceLpBudget,
     private val originalCheck: ((Sample, BigFraction, Cancellation) -> Boolean)? = null,
     private val observe: (String, Long) -> Unit,
 ) : AutoCloseable {
-    private class Attempt(val source: SourceProofContext, val seed: Sample) {
+    private class Attempt(val source: SourceProofContext, offered: Sample) {
+        val semantics = offered.semantics
+        val frame = offered.coordinateFrame
+        val seed = offered.copy().also { it.witnessCertificate = null }
         var query: LinearAuthorityQuery? = null
         var point: List<BigFraction>? = null
         val progress = LinearPrimalRecoveryProgress()
@@ -49,10 +53,26 @@ internal class LinearIncumbentCompletion(
         if (cancellation()) return null
         if (seed.exactReals != null) return seed
         val token = metered(cancellation, checking = false)
+        if (token()) return null
+        if (seed.algebraicReals != null || seed.symbolicReals != null) {
+            observe("UnsupportedSeed", 1L)
+            return null
+        }
+        var seedBytes = 256L + 16L * seed.numBoolVars + 8L * seed.numRealVars
+        for (id in 0 until seed.numIntVars) {
+            if (token()) return null
+            val bits = seed.exactIntValue(id).magnitudeBitLength()
+            budget.observe(preparation = 1L + bits / 64L)
+            if (bits > 4096) {
+                observe("SeedScalarLimit", 1L)
+                return null
+            }
+            seedBytes += 64L + bits / 4L
+        }
         val previous = attempts.firstOrNull {
             budget.observe(preparation = seed.numBoolVars.toLong() + seed.numIntVars + seed.numRealVars)
             !token() && sameSource(it.source, source, token) && it.seed == seed &&
-                it.seed.semantics == seed.semantics && it.seed.coordinateFrame === seed.coordinateFrame
+                it.semantics == seed.semantics && it.frame === seed.coordinateFrame
         }
         if (previous?.finished == true) {
             observe(if (previous.checked == null) "DeclineReused" else "CheckedReused", 1L)
@@ -63,9 +83,12 @@ internal class LinearIncumbentCompletion(
             observe("RetentionExhausted", 1L)
             return null
         }
+        if (previous == null && budget.funding?.let { seedBytes > it.remainingAllocation } == true) {
+            observe("RetentionAllocation", 1L)
+            return null
+        }
         val attempt = previous ?: Attempt(source, seed).also {
-            budget.funding?.charge(0L, 256L + 16L * seed.numBoolVars + 64L * seed.numIntVars +
-                8L * seed.numRealVars)
+            budget.funding?.charge(0L, seedBytes)
             attempts += it
             observe("Attempts", 1L)
         }
