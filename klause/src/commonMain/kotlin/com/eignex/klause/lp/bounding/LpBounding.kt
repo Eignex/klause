@@ -50,6 +50,7 @@ import com.eignex.klause.lp.engine.newComponentTableauCutSolver
 import com.eignex.klause.lp.engine.newPersistentLpSolver
 import com.eignex.klause.lp.engine.newTableauCutSolver
 import com.eignex.klause.lp.engine.nodeDualCertificate
+import com.eignex.klause.lp.engine.observeLpClaim
 import com.eignex.klause.lp.engine.sourceObjective
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
@@ -803,7 +804,9 @@ private fun LpEngine.pruneWithComponentBound(
             if (cost is LpCertifierCost.Metered) noteNodeOverhead(cost.work)
         }
     }
-    val checked = component.exactBound(charged, solveContext.certificationPolicy) ?: return false
+    val checked = observeLpClaim(LpClaim.BOUND, charged) {
+        component.exactBound(it, solveContext.certificationPolicy)
+    } ?: return false
     if (cancellation()) return false
     val full = checked.value + BigFraction.ofLong(relaxation.objectiveConstant)
     val threshold = sourceObjectiveCutoff(relaxation, cutoff, sourceObjectiveRange(relaxation)) ?: return false

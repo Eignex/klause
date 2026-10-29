@@ -546,23 +546,25 @@ internal class ComponentLpSolver(
     override fun exactBound(observer: LpCertificationObserver?, policy: LpCertificationPolicy): CertifiedLpBound? {
         if (!currentAuthority()) return null
         val results = blockResults ?: return null
-        if (results.any { it == null } && (model.exactState == null || results.all { it == null } ||
-                (lastTermination != LpFloatTermination.WORK && lastTermination != LpFloatTermination.PIVOTS))
-        ) return null
+        if (results.any { it == null }) {
+            if (model.exactState == null) return null
+            if (lastTermination != LpFloatTermination.WORK && lastTermination != LpFloatTermination.PIVOTS) return null
+            if (results.all { it == null } && checkedBounds.none { it?.policy === policy }) return null
+        }
         var value = model.exactConstant()
         val citedRows = HashSet<Int>()
         val citedSides = ArrayList<LpExactCitedSide>()
         for (index in parts.indices) {
             val part = parts[index]
             val result = results[index]
-            val bound = if (result == null) {
-                certifyLpBound(part.model, DoubleArray(part.model.m), observer, policy)
+            val bound = checkedBounds[index]?.takeIf { it.policy === policy }?.bound ?: if (result != null) {
+                certifyLpBound(part.model, result.duals, observer, policy)?.also {
+                    if (part.model.exactState != null) checkedBounds[index] = CheckedBound(policy, it)
+                }
             } else {
-                checkedBounds[index]?.takeIf { it.policy === policy }?.bound
-                    ?: certifyLpBound(part.model, result.duals, observer, policy)?.also {
-                        if (part.model.exactState != null) checkedBounds[index] = CheckedBound(policy, it)
-                    }
-            } ?: return null
+                certifyLpBound(part.model, DoubleArray(part.model.m), observer, policy)
+            }
+            if (bound == null) return null
             value += bound.value - part.model.exactConstant()
             model.exactState?.let { state ->
                 val support = bound.support ?: return null
