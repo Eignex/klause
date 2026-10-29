@@ -263,9 +263,13 @@ internal class ComponentLpSolver(
                 val child = engine(nextParts[index].model, token, remaining)
                 replacements += child
                 nextSolvers[index] = child
+                val warm = (solvers[index] as? PersistentLpSolver)?.retainedBasis()?.extended(
+                    checkNotNull(parts[index].model.exactState).model,
+                    checkNotNull(nextParts[index].model.exactState).model,
+                )
                 activeChild = child
                 val basis = try {
-                    child.prepareLogicals(stop)
+                    if (warm == null) child.prepareLogicals(stop) else child.prepareBasis(warm, stop)
                 } finally {
                     activeChild = null
                     metrics += child.lastMetrics
