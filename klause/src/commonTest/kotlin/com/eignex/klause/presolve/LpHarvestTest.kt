@@ -8,6 +8,8 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpParams
+import com.eignex.klause.lp.relaxation.CpToLpRelaxation
+import com.eignex.klause.lp.relaxation.RootDomains
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
@@ -19,12 +21,36 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpHarvestTest {
     private val shavingParams = LpPlan(bounding = true, variableShaving = true)
     private val objShavingParams = LpPlan(bounding = true, objectiveShaving = true)
+
+    @Test
+    fun `a no op harvest should retain finite templates for the engine bake`() {
+        val source = Problem(0, 4, Array(4) { IntDomain(0, 10) }, arrayOf<Factor>(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 3),
+            Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 3),
+        ))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1, 1))
+        val selection = FactorProjectionProviders.Default.prepare(source)
+        val config = PresolveConfig.parse("off,+lp-harvest")
+        val prepared = PresolvePipeline.prepareSource(source, config, objective, finiteLane = true)
+
+        val outcome = PresolvePipeline.run(prepared, objective, config, false, projections = selection)
+        val engineProblem = source.bake(selection)
+        val consumer = CpToLpRelaxation(engineProblem, objective)
+        consumer.build(RootDomains(engineProblem))
+
+        assertSame(source, outcome.problem)
+        assertFalse(outcome.changed)
+        assertTrue(assertNotNull(consumer.preparationTemplates).reboundSource)
+        assertTrue(assertNotNull(consumer.preparationTemplates).reusedFactors > 0)
+        assertTrue(assertNotNull(consumer.preparationTemplates).reusedBounds > 0)
+    }
 
     @Test
     fun `a consuming LP should reuse templates across incremental presolve preparation`() {
