@@ -11,11 +11,44 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ConflictAnalyzerTest {
+    @Test
+    fun `late derived atoms should not be identified as recorded decisions`() {
+        val state = PropagationState(Problem(0, 1, arrayOf(IntDomain(0, 10)), emptyList()), Assumptions.None)
+        state.undoLogging = true
+        val decision = state.atomVarGe(0, 5)
+        state.currentLevel = 1
+        check(state.tightenIntMin(0, 5))
+        val late = state.atomVarGe(0, 3)
+        val work = state.work
+        val analyzer = ConflictAnalyzer(state)
+
+        assertTrue(analyzer.knownLeaf(decision))
+        assertFalse(analyzer.knownLeaf(late))
+        assertEquals(work, state.work)
+    }
+
+    @Test
+    fun `cancelled reason preflight should discard unfinished analysis`() {
+        val clause = intArrayOf(Lit.make(0, false), Lit.make(1, false))
+        val state = PropagationState(Problem(2, 0, emptyArray(), arrayOf(Clause(clause))), Assumptions.None)
+        state.undoLogging = true
+        state.reasonPreflight = true
+        check(state.pinBoolAsDecision(0, true))
+        check(state.pinBoolAsDecision(1, true))
+        state.finiteWork.cancellation = Cancellation { true }
+
+        val result = state.conflictAnalyzer.analyzeConflictClause(clause)
+
+        assertIs<ConflictAnalyzer.AnalysisResult.NotApplicable>(result)
+        assertTrue(state.runCancelled)
+    }
+
     @Test
     fun `historical table replay should improve the minimized asserting backjump`() {
         val tuples = (0 until 8).flatMap { listOf(0L, (it / 4).toLong(), (it / 2 % 2).toLong(), (it % 2).toLong()) }

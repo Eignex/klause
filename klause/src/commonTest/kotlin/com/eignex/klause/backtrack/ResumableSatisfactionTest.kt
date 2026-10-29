@@ -27,6 +27,30 @@ import kotlin.test.assertTrue
 
 class ResumableSatisfactionTest {
     @Test
+    fun `ordinary and resumed reason preflight should preserve refutation with fifo propagation`() {
+        val solver = BacktrackSolver(pigeonhole(3, 2).bake())
+        for (resumed in listOf(false, true)) {
+            var observed = false
+            val exchange = object : ClauseExchange {
+                override fun onSearchStart(session: PropagationSession) {
+                    assertTrue(session.explanationState.reasonPreflight)
+                    assertNull(session.explanationState.propagationSchedule)
+                    observed = true
+                }
+                override fun onRestart(session: PropagationSession) = Unit
+            }
+            val params = BacktrackParams(randomSeed = 1L, nativeSat = false, pbLearning = false,
+                reasonPreflight = true, clauseExchange = exchange)
+
+            val result = if (resumed) solver.resumableSolve(params).use { runToVerdict(it, 1L) }
+            else solver.solve(params)
+
+            assertIs<SolveResult.Unsat>(result)
+            assertTrue(observed)
+        }
+    }
+
+    @Test
     fun `ordinary and resumed cost aware search should retain a private schedule through learning`() {
         val solver = BacktrackSolver(pigeonhole(3, 2).bake())
         for (resumed in listOf(false, true)) {

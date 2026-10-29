@@ -154,6 +154,15 @@ redundant literal yields a stronger implied clause, so the result stays an asser
 nogood. The redundancy memo is cleared before each conflict, since levels and
 antecedents belong to that analysis.
 
+An opt-in redundancy preflight checks recorded sibling leaves, cycles, coupled
+integer atoms and cached failures before descending into their siblings' reasons.
+Boolean pins and stamped atoms expose a leaf only through a null recorded reason;
+lazy markers, empty premise lists and off-trail derived atoms do not establish a
+leaf. A failed sibling retains the candidate clause literal without constructing
+unneeded historical supports. Preflight visits share the containing propagation
+work and token. It changes no premise's deduction-time trail boundary, and an
+interrupted preflight withholds the unfinished analysis result.
+
 Two analyzers share this construction. The native CP analyzer learns over CP reasons
 and stores into the native clause database. The shared first-UIP analyzer in
 `SearchLearning` learns over component reasons; a shared conflict with usable reasons

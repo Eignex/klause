@@ -20,6 +20,8 @@ internal interface ReasonGraph {
 
     /** Antecedent literals of `v`'s pin, or null when `v` is a decision/leaf. */
     fun antecedentsOf(v: Int): IntArray?
+
+    fun knownLeaf(v: Int): Boolean = false
 }
 
 /**
@@ -195,6 +197,10 @@ internal class ClauseMinimizer(private val state: PropagationState, private val 
             var i = redIdxStack[top]
             var failed = false
             var pushed = false
+            if (state.reasonPreflight && i == 0 && hasFailedSibling(v, ant, inClause, cache)) {
+                rejectPath(cache)
+                return false
+            }
             while (i < ant.size) {
                 val u = Lit.variable(ant[i])
                 i++
@@ -248,11 +254,7 @@ internal class ClauseMinimizer(private val state: PropagationState, private val 
             if (failed) {
                 // A non-redundant antecedent makes v — and therefore every ancestor on the
                 // current path — non-redundant. Mark them all and stop.
-                for (k in 0 until redVarStack.size) {
-                    val a = redVarStack[k]
-                    cache.put(a, 0)
-                    if (a < onPath.size) onPath[a] = false
-                }
+                rejectPath(cache)
                 return false
             }
             cache.put(v, 1) // all antecedents resolved redundant
@@ -262,5 +264,38 @@ internal class ClauseMinimizer(private val state: PropagationState, private val 
             redIdxStack.removeAt(top)
         }
         return true
+    }
+
+    private fun hasFailedSibling(
+        v: Int,
+        antecedents: IntArray,
+        inClause: BooleanArray,
+        cache: MutableIntIntMap,
+    ): Boolean {
+        val bools = state.problem.numBoolVars
+        for (lit in antecedents) {
+            state.checkFiniteWork()
+            val u = Lit.variable(lit)
+            if (u == v) continue
+            if (u >= bools && v >= bools && state.atoms.intVar[u - bools] == state.atoms.intVar[v - bools]) {
+                return true
+            }
+            if (graph.levelOf(u) <= 0 || (u < inClause.size && inClause[u])) continue
+            val cached = cache.getOrDefault(u, -1)
+            val leaf = cached < 0 && graph.knownLeaf(u)
+            if (leaf) cache.put(u, 0)
+            if ((u < onPath.size && onPath[u]) || cached == 0 || leaf) {
+                return true
+            }
+        }
+        return false
+    }
+
+    private fun rejectPath(cache: MutableIntIntMap) {
+        for (k in 0 until redVarStack.size) {
+            val v = redVarStack[k]
+            cache.put(v, 0)
+            if (v < onPath.size) onPath[v] = false
+        }
     }
 }

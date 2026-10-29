@@ -180,6 +180,10 @@ and the historical Table retry. Both default to false. Attribution exports spars
 policy described in [finite propagation](08-search.md#finite-propagation). It
 defaults to false and does not require attribution or historical refinement.
 
+`reason-preflight=true` independently checks recorded redundancy failures before
+historical sibling reconstruction. It defaults to false; see
+[conflict analysis](09-learning.md#conflict-analysis).
+
 Learned-object counters use the `nativeLearning{Kind}{Stage}` and
 `sharedLearning{Kind}{Stage}` names for native and shared stores. Source refutation
 stages use `learningSourceRefutation{Stage}` in complete-search observations.

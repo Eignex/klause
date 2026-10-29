@@ -359,6 +359,7 @@ class PropagationState private constructor(
     internal var integerRowLearning = false
     internal var factorAttribution: FactorAttribution? = null
     internal var historicalTableReasons = false
+    internal var reasonPreflight = false
     internal var historicalTableReason: HistoricalTableReason? = null
     internal var arithmeticLearningTrace: ArithmeticLearningTrace? = null
         get() = field?.takeIf { it.accepting }

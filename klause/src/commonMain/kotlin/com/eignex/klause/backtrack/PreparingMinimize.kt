@@ -33,6 +33,7 @@ internal class PreparingMinimize(
         attribution = params.propagationAttribution,
         historicalTables = params.historicalTableReasons,
         costAware = params.costAwarePropagation,
+        reasonPreflight = params.reasonPreflight,
     )
     private var search: ResumableMinimize? = null
     private var installing: ResumableMinimize? = null
