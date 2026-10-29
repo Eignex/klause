@@ -18,6 +18,25 @@ import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
     @Test
+    fun `initial prepared row revisions should preserve separable component admission`() {
+        val builder = LpBuilder()
+        repeat(2) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(1L), Relation.GE, 1L)
+        }
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        val trail = LpBoundTrail(source)
+        assertTrue(trail.append(LpScopedRow(2L, listOf(0 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-2L),
+            ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L))))), false))
+        LpScopedSolver(trail.state, componentSplit = true).use { owner ->
+            val result = assertNotNull(owner.solve())
+
+            assertEquals(2, assertNotNull(result.float).blocks)
+            assertEquals(BigFraction.ofLong(3L), result.lowerBound)
+        }
+    }
+
+    @Test
     fun `component owners should share the containing basis storage limit`() {
         val builder = LpBuilder()
         repeat(2) {

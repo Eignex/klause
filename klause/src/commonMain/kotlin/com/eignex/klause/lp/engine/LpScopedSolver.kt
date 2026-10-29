@@ -472,7 +472,7 @@ internal class LpScopedSolver(
         if (state.sameMatrix(next.state)) return resetRoot(next.state, token)
         discardFloatProgress()
         editAttempts++
-        val replacement = prepared(next.state, token) ?: return false
+        val replacement = prepared(next.state, token, allowComponents = false) ?: return false
         var published = false
         var failure: Throwable? = null
         try {
@@ -542,7 +542,8 @@ internal class LpScopedSolver(
         } else {
             IntArray(next.state.model.m) { next.state.model.n + it }
         }
-        val replacement = prepared(next.state, token, append, warm, replacementWorkLimit) ?: return false
+        val replacement = prepared(next.state, token, append, warm, replacementWorkLimit,
+            allowComponents = false) ?: return false
         var published = false
         var failure: Throwable? = null
         try {
@@ -696,6 +697,7 @@ internal class LpScopedSolver(
         recordRejectedAppendWork: Boolean = false,
         warm: Basis? = null,
         workBudget: Long = workLimit,
+        allowComponents: Boolean = componentSplit,
     ): Pair<RetainedLpSolver, Basis>? {
         preparationAttempts++
         var candidate: RetainedLpSolver? = null
@@ -723,7 +725,7 @@ internal class LpScopedSolver(
             } ?: return null
             val remainingWork = if (workBudget > 0L) workBudget - projection.work else 0L
             if (workBudget > 0L && remainingWork <= 0L) return null
-            candidate = if (componentSplit && next.matrixRevision == 0L && warm == null) {
+            candidate = if (allowComponents && warm == null) {
                 componentLpSolverOrNull(
                     working, token,
                     { part, childToken ->
