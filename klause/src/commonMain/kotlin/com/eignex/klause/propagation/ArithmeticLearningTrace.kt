@@ -11,6 +11,8 @@ internal class ArithmeticLearningTrace(
     val events = ArrayList<Event>()
     var truncated = false
         private set
+    var truncationCause: String? = null
+        private set
     var words = 0
         private set
     var omittedPayloads = 0
@@ -26,6 +28,7 @@ internal class ArithmeticLearningTrace(
     fun record(kind: String, vararg data: Long) {
         if (!accepting) return
         if (events.size == maxEvents || data.size > maxWords - words) {
+            truncationCause = if (events.size == maxEvents) "events" else "words"
             truncated = true
             return
         }
@@ -74,6 +77,7 @@ internal class ArithmeticLearningTrace(
             val variable = row.variables[index]
             val domain = if (trail == null) state.intDomains[variable] else state.domainAt(variable, trail)
             if (domain.holeCount > 64) {
+                truncationCause = "holes"
                 truncated = true
                 return
             }
@@ -94,7 +98,8 @@ internal class ArithmeticLearningTrace(
         record("integer.endpoint", variable.toLong(), if (lower) 1 else 0)
         if (marker == null) return
         if (marker.size > 32) {
-            truncated = true
+            omittedPayloads++
+            record("integer.marker.omitted", marker.size.toLong())
             return
         }
         record("integer.marker", *LongArray(marker.size) { marker[it].toLong() })
@@ -117,6 +122,7 @@ internal class ArithmeticLearningTrace(
     fun stored(factorId: Int, kind: String) {
         if (!accepting) return
         if (storedIds.size == 64) {
+            truncationCause = "stored-identities"
             truncated = true
             return
         }

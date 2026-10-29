@@ -776,10 +776,11 @@ sha256=HEX timeout-ms=10000 nodes=4096 lp=auto|off`. It runs clause and opt-in
 integer-row arms through ordinary finite preparation and backtrack traversal,
 without a decision replay. The existing bounded arithmetic trace records source
 conflicts, historical endpoint rows, mapped admission, retained consumers and
-retirement. Oversized clause payloads produce explicit omission events and a
+retirement. Oversized clause and endpoint-marker payloads produce omission events and a
 payload-omission count; later events retain the same event and word limits. A
 trace with omissions cannot establish the omitted premises. The selector wrapper
-delegates all decisions and notifications.
+delegates all decisions and notifications. Branch records keep only the chosen
+coordinate and its domain; typed-row records keep their historical endpoints.
 
 Plain source bytes are hashed after corpus decompression with a 1 MiB input limit.
 A hash mismatch retains the bytes and observed digest and stops before solving.
