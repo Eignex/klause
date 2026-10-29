@@ -10,9 +10,10 @@ import kotlin.test.assertTrue
 
 class SearchLearningTest {
     @Test
-    fun `a protected shared unit should protect its stage and queue allocations`() {
+    fun `protected shared clauses should protect their stage and queue allocations`() {
         val session = SearchSession(emptyList(), learnedDb = SearchLearnedDbParams(glueLbd = 0))
         session.learn(SearchExplanation(intArrayOf(0)))
+        session.learn(SearchExplanation(intArrayOf(1, 2)))
         session.propagate()
         val sample = SharingMemoryObservation(100_000L, 1024, { false }, {})
 
