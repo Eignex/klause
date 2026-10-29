@@ -4,6 +4,7 @@ import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
+import java.io.File
 import java.security.MessageDigest
 import java.util.Locale
 
@@ -13,6 +14,19 @@ internal const val REPORTED_RESULT_POLICY = "reported-result-v1"
 internal object SolveEvidence {
     private const val MAX_WITNESS_CHARS = 8 * 1024 * 1024
     private val ASSIGNMENT = Regex("^\\s*[A-Za-z_][A-Za-z_0-9]*\\s*=")
+
+    fun fileHashes(files: Map<String, File>): Map<String, String> = files.mapValues { (_, file) ->
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buffer = ByteArray(65536)
+            while (true) {
+                val size = input.read(buffer)
+                if (size < 0) break
+                digest.update(buffer, 0, size)
+            }
+        }
+        digest.digest().joinToString("") { "%02x".format(Locale.ROOT, it) }
+    }
 
     fun sourceHashes(ref: ProblemRef): Map<String, String> = buildMap {
         val sources = listOfNotNull("model" to ref.source, ref.data?.let { "data" to it })

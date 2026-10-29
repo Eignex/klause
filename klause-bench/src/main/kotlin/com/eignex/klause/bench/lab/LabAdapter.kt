@@ -159,6 +159,7 @@ internal object KlauseLabSuite : BenchSuite {
             )
         }
         val retained = record.copy(
+            comparisonControls = comparisonControls(case),
             buildProvenance = provenance,
             buildFingerprint = provenance?.fingerprint,
             stats = record.stats + mapOf(
@@ -169,6 +170,24 @@ internal object KlauseLabSuite : BenchSuite {
         val recordPath = context.outputDirectory.resolve("report/${Reports.fileStem(ref.name)}.json")
         Files.writeString(recordPath, Reports.json.encodeToString(SolveRecord.serializer(), retained))
         return retained
+    }
+
+    internal fun comparisonControls(case: BenchCase): Map<String, String> = buildMap {
+        val p = case.parameters
+        put("policy", "matched-source-v1")
+        put("series", p["comparison-series"] ?: "sdk-v1")
+        put("solverSeed", p.getValue("seed"))
+        put("compilerSeed", p["compiler-seed"] ?: "1")
+        put("solverBudgetMs", p.getValue("timeout-ms"))
+        put("compilerTimeoutSeconds", p.getValue("compile-timeout-sec"))
+        put("caseTimeoutSeconds", case.resources.timeoutSeconds.toString())
+        put("cpus", case.resources.cpus.toString())
+        put("memoryMiB", case.resources.memoryMiB.toString())
+        for (key in listOf("heap-mib", "gc", "debug", "measurement", "complete-assignment")) {
+            put(key, p.getValue(key))
+        }
+        put("exact", p["exact"] ?: "false")
+        put("deadlinePolicy", "cli-inclusive-v1")
     }
 
     internal fun failure(record: SolveRecord): String? = record.stats["loadError"] ?: record.stats["errorMessage"]

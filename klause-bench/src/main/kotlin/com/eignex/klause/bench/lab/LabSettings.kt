@@ -2,6 +2,7 @@ package com.eignex.klause.bench.lab
 
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.bench.runner.MZN_RANDOM_SEED
 import com.eignex.lab.bench.BenchResources
 
 internal data class LabSettings(val parameters: Map<String, String>) {
@@ -12,6 +13,9 @@ internal data class LabSettings(val parameters: Map<String, String>) {
     val timeout = (parameters["timeout-ms"] ?: "10000").toLong().also { require(it in 1..300_000_000) }
     val memory = (parameters["memory-mib"] ?: "4096").toLong().also { require(it in 2048..Int.MAX_VALUE.toLong()) }
     val compileTimeout = (parameters["compile-timeout-sec"] ?: "60").toInt().also { require(it in 1..3600) }
+    val compilerSeed = (parameters["compiler-seed"] ?: MZN_RANDOM_SEED.toString()).toInt().also {
+        require(it == MZN_RANDOM_SEED) { "The pinned MiniZinc compiler seed is $MZN_RANDOM_SEED" }
+    }
     val repeats = (parameters["repeats"] ?: "1").toInt().also { require(it in 1..10000) }
     val seeds = (parameters["solver-seeds"] ?: "1").split(',').map { it.trim().toLong() }.distinct()
     val engines = (parameters["engines"] ?: "default").split(',').map { it.trim().lowercase() }.distinct()
@@ -22,10 +26,12 @@ internal data class LabSettings(val parameters: Map<String, String>) {
     val measurement = parameters["measurement"] ?: "none"
     val heap = (parameters["heap-mib"] ?: (memory - 1536).toString()).toLong()
     val gc = parameters["gc"] ?: "default"
+    val comparisonSeries = parameters["comparison-series"] ?: "sdk-v1"
     val wallTimeout = (timeout * 2 + 20_999) / 1000 + 2 * compileTimeout + 120
 
     init {
         require(selections.isNotEmpty())
+        require(comparisonSeries.matches(Regex("[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}")))
         if (propagationControls) {
             require(!inputOnly && engines.all {
                 it in setOf("cp", "bt", "backtrack", "fixed", "mixed", "portfolio", "pf")
@@ -73,6 +79,8 @@ internal data class LabSettings(val parameters: Map<String, String>) {
             "seed" to seed.toString(),
             "timeout-ms" to timeout.toString(),
             "compile-timeout-sec" to compileTimeout.toString(),
+            "compiler-seed" to compilerSeed.toString(),
+            "comparison-series" to comparisonSeries,
             "debug" to debug.toString(),
             "measurement" to measurement,
             "heap-mib" to heap.toString(),
@@ -105,7 +113,7 @@ internal data class LabSettings(val parameters: Map<String, String>) {
         private val OPTIONS = setOf(
             "input-only", "selections", "engines", "solver-seeds", "repeats", "cpus", "memory-mib", "timeout-ms", "lp",
             "presolve", "exact", "debug", "measurement", "heap-mib", "gc", "compile-timeout-sec",
-            "complete-assignment", "propagation-controls",
+            "complete-assignment", "propagation-controls", "compiler-seed", "comparison-series",
         )
         private val ENGINES = setOf(
             "default", "fixed", "backtrack", "bt", "cp", "localsearch", "ls", "local-search",
