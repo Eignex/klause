@@ -27,6 +27,26 @@ internal class LongHashSet(initialCapacity: Int = 8) {
         return false
     }
 
+    internal fun containsBounded(
+        value: Long,
+        maxWork: Long,
+        cancelled: () -> Boolean,
+        charge: () -> Unit,
+    ): Boolean? {
+        require(maxWork >= 0L)
+        var work = 0L
+        var slot = mix(value) and mask
+        while (true) {
+            if (work >= maxWork || cancelled()) return null
+            charge()
+            work++
+            if (cancelled()) return null
+            if (!used[slot]) return false
+            if (keys[slot] == value) return true
+            slot = (slot + 1) and mask
+        }
+    }
+
     /** Add [value]; returns true if it was newly inserted, false if already present. */
     fun add(value: Long): Boolean {
         if (used === EMPTY_USED) allocateBacking()

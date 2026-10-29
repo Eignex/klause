@@ -39,7 +39,6 @@ class SharedClause internal constructor(
         fun atomToken(variable: Long, kind: Long, threshold: Long, sign: Long): Long =
             (variable shl 40) xor (kind shl 36) xor (threshold shl 4) xor sign
 
-        /** Order-independent sharing identity; collisions can decline an optional share only. */
         fun contentKey(tokens: LongArray, size: Int = tokens.size): Long {
             tokens.sort(0, size)
             var hash = SEED

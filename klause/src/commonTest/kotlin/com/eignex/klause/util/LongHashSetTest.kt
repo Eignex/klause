@@ -8,6 +8,35 @@ import kotlin.test.assertTrue
 class LongHashSetTest {
 
     @Test
+    fun `bounded lookup should stop a collision chain without changing retained keys`() {
+        val keys = (0L..64L).groupBy { mixLongKey(it) and 15 }.values.first { it.size >= 3 }.take(3)
+        val set = LongHashSet()
+        for (key in keys) set.add(key)
+        var charged = 0
+
+        val found = set.containsBounded(keys.last(), 1L, { false }, { charged++ })
+
+        assertEquals(null, found)
+        assertEquals(1, charged)
+        assertEquals(3, set.size)
+        assertTrue(keys.all { it in set })
+        assertEquals(true, set.containsBounded(keys.last(), 3L, { false }, {}))
+    }
+
+    @Test
+    fun `bounded lookup should honor cancellation after its debit`() {
+        val set = LongHashSet()
+        set.add(7L)
+        var charged = 0
+
+        val found = set.containsBounded(7L, 1L, { charged > 0 }, { charged++ })
+
+        assertEquals(null, found)
+        assertEquals(1, charged)
+        assertTrue(7L in set)
+    }
+
+    @Test
     fun `bounded insertion protects existing keys when growth exceeds its byte allowance`() {
         val set = LongHashSet(1)
         repeat(4) { assertEquals(true, set.tryAddBounded(it.toLong(), 72L, 1000L, 1000L, { false }, {})) }

@@ -223,6 +223,8 @@ reused across the scan and released with it; no second retained duplicate index 
 needed. Only completed export preparation admits publication keys. Pool eviction,
 session reseeding and reason retention follow the same filter lifetime.
 `exportDuplicates` counts previously shared candidates skipped before payload construction.
+With a byte limit, key probes charge work and poll cancellation under one lookup
+allowance per scan. Exhaustion discards the prepared export before admitting keys.
 
 With a shared byte limit, each worker's duplicate filter has a separate allowance
 of that size. Existing key capacity is protected with its retained session, including
