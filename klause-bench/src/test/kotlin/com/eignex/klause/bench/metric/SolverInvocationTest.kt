@@ -491,7 +491,11 @@ class SolverInvocationTest {
             "ls/a quarantined: int 3 = 7 conflicts | bt/b quarantined: claimed infeasible against a verified incumbent",
             StderrDiagnostics().apply { stderr.forEach(::accept); finish() }.quarantines,
         )
-        assertNull(StderrDiagnostics().apply { "WARNING: Using incubator modules\n".forEach(::accept); finish() }.quarantines)
+        val unrelated = StderrDiagnostics().apply {
+            "WARNING: Using incubator modules\n".forEach(::accept)
+            finish()
+        }
+        assertNull(unrelated.quarantines)
     }
 
     @Test
@@ -691,7 +695,7 @@ class SolverInvocationTest {
         override fun getOutputStream(): ByteArrayOutputStream = ByteArrayOutputStream()
         override fun waitFor(): Int = exit
         override fun waitFor(timeout: Long, unit: TimeUnit): Boolean = !this.timeout || destroyed
-        override fun exitValue(): Int = if (isAlive) throw IllegalThreadStateException() else exit
+        override fun exitValue(): Int = if (isAlive()) throw IllegalThreadStateException() else exit
         override fun isAlive(): Boolean = timeout && !destroyed
         override fun descendants(): Stream<ProcessHandle> = Stream.empty()
         override fun destroy() { destroyed = true }
