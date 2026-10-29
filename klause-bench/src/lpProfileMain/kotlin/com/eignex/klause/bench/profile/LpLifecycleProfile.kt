@@ -392,7 +392,7 @@ private fun lifecycle(
             buildJsonObject {
                 put("kind", "lifecycle")
                 put("claim", claim.name)
-                    put("startArbitraryPrecision", arbitraryPrecision)
+                put("startArbitraryPrecision", arbitraryPrecision)
                 put("round", round)
                 put("retained", retained)
                 put("observed", observed)
