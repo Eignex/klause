@@ -30,6 +30,7 @@ internal class PreparingSatisfaction(
         attribution = params.propagationAttribution,
         historicalTables = params.historicalTableReasons,
         costAware = params.costAwarePropagation,
+        reasonPreflight = params.reasonPreflight,
     )
     private var session: PropagationSession? = null
     private var seeding: Iterator<PropagationResult?>? = null

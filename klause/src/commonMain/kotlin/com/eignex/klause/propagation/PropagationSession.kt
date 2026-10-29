@@ -58,6 +58,7 @@ class PropagationSession private constructor(
     attribution: Boolean = false,
     historicalTables: Boolean = false,
     costAware: Boolean = false,
+    reasonPreflight: Boolean = false,
 ) {
     /** Construct a private propagation projection over [problem]. */
     constructor(
@@ -78,9 +79,10 @@ class PropagationSession private constructor(
         attribution: Boolean = false,
         historicalTables: Boolean = false,
         costAware: Boolean = false,
+        reasonPreflight: Boolean = false,
     ) : this(projection.problem, cancellation, propagationCancelFloor, nativeSat, pbLearning, projection,
         cumulativeUnarySubsets = cumulativeUnarySubsets, attribution = attribution, historicalTables = historicalTables,
-        costAware = costAware)
+        costAware = costAware, reasonPreflight = reasonPreflight)
 
     internal fun checkSelectedProjection(
         checks: SelectedProjectionChecks? = projection.selection?.originalChecks,
@@ -103,6 +105,7 @@ class PropagationSession private constructor(
             if (attribution) it.factorAttribution = FactorAttribution()
             it.historicalTableReasons = historicalTables
             if (costAware) it.propagationSchedule = PropagationSchedule()
+            it.reasonPreflight = reasonPreflight
         }
     private val state: PropagationState get() = checkNotNull(retainedState) { "propagation session is released" }
     private var retiredWork = 0L
@@ -1182,10 +1185,16 @@ class PropagationSession private constructor(
             (it.propagationSchedule?.snapshot() ?: emptyMap())
     } ?: retiredLifecycle
 
-    internal fun configureAttribution(enabled: Boolean, historicalTables: Boolean, costAware: Boolean = false) {
+    internal fun configureAttribution(
+        enabled: Boolean,
+        historicalTables: Boolean,
+        costAware: Boolean = false,
+        reasonPreflight: Boolean = false,
+    ) {
         state.factorAttribution = if (enabled) state.factorAttribution ?: FactorAttribution() else null
         state.historicalTableReasons = historicalTables
         state.propagationSchedule = if (costAware) state.propagationSchedule ?: PropagationSchedule() else null
+        state.reasonPreflight = reasonPreflight
     }
 
     internal inline fun <T> withAttribution(families: Int, action: () -> T): T {

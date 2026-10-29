@@ -14,6 +14,7 @@ internal class PropagationPreparation(
     private val attribution: Boolean = false,
     private val historicalTables: Boolean = false,
     private val costAware: Boolean = false,
+    private val reasonPreflight: Boolean = false,
 ) {
     private val projections = PropagationProblem.preparation(problem)
     private var projection: PropagationProblem? = null
@@ -48,6 +49,7 @@ internal class PropagationPreparation(
                 if (attribution) it.factorAttribution = FactorAttribution()
                 it.historicalTableReasons = historicalTables
                 if (costAware) it.propagationSchedule = PropagationSchedule()
+                it.reasonPreflight = reasonPreflight
                 states = null
             }
             return null

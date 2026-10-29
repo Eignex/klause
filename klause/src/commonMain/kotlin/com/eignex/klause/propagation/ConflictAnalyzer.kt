@@ -230,9 +230,13 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
 
     private inline fun boundedAnalysis(analyze: () -> AnalysisResult): AnalysisResult = try {
         state.finiteWork.begin()
-        if (pbResolvent != null || state.integerRowLearning || state.historicalTableReasons) state.finiteWork.checkNow()
+        if (pbResolvent != null || state.integerRowLearning || state.historicalTableReasons || state.reasonPreflight) {
+            state.finiteWork.checkNow()
+        }
         val result = analyze()
-        if (pbResolvent != null || state.integerRowLearning || state.historicalTableReasons) state.finiteWork.checkNow()
+        if (pbResolvent != null || state.integerRowLearning || state.historicalTableReasons || state.reasonPreflight) {
+            state.finiteWork.checkNow()
+        }
         if (state.runCancelled) AnalysisResult.NotApplicable else result
     } catch (_: FinitePropagationInterrupted) {
         state.runCancelled = true
@@ -557,6 +561,13 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
             val atomId = v - numBoolVars
             if (atomId < state.atoms.intVar.size) state.atomAntecedentsDerived(atomId) else null
         }
+    }
+
+    override fun knownLeaf(v: Int): Boolean {
+        val bools = state.problem.numBoolVars
+        if (v < bools) return v >= 0 && state.boolAntecedents[v] == null
+        val atom = v - bools
+        return atom < state.atoms.intVar.size && state.atoms.lvl[atom] >= 0 && state.atoms.ant[atom] == null
     }
 
     /**

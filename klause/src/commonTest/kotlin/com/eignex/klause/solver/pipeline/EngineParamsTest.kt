@@ -113,6 +113,17 @@ class EngineParamsTest {
     }
 
     @Test
+    fun `reason preflight should leave propagation ordering and table refinement independent`() {
+        val base = com.eignex.klause.backtrack.BacktrackParams()
+
+        val configured = applyBacktrackParams(base, EngineParams(listOf("reason-preflight=true")))
+
+        assertTrue(!base.reasonPreflight)
+        assertTrue(configured.reasonPreflight)
+        assertTrue(!configured.costAwarePropagation && !configured.historicalTableReasons)
+    }
+
+    @Test
     fun `directional lp gains remain opt in and survive fixed backtrack overrides`() {
         val base = com.eignex.klause.backtrack.BacktrackParams()
         assertTrue(!base.lpDirectionalGains)

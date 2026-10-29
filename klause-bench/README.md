@@ -478,6 +478,10 @@ compiled input, compiler/runtime bytes, seed, recipe and containing allowances.
 actual ordering opportunities and charged queue cost from later search changes.
 They are subsets and events, without a causal-benefit claim.
 
+Compare `param.reason-preflight=false|true` at fixed queue ordering and with
+historical Table refinement disabled. Preflight visits belong to total propagation
+work; avoided reason attempts do not establish downstream or whole-source benefit.
+
 Use `param.propagation-attribution=true` with
 ordinary `engine=cp` or fixed-work single-lane portfolio runs. Compare
 `param.historical-table-reasons=false|true` at the same source/revision, preparation,
