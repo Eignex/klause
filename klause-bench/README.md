@@ -277,13 +277,32 @@ protected reasons through native/general compaction, and actual satisfaction and
 optimization workers consuming peer imports. They preserve the existing use-based
 reward drain. Sizing, retention age and targeted delivery are separate experiments.
 
-The focused eight-case source diagnostic prepared for F4 did not create a lab job:
-the maintained client at lab revision `53acb28` encountered HTTP400 for
-`bench.sourceValidation`, then for `bench.runTimeoutSec` on the compatible attempt.
-No source solve, independent check, RSS sample or performance result followed.
-The receipts distinguish that API limitation from solver outcomes. Current-source
-outcome and physical-memory qualification remain unclaimed; lifecycle correctness
-is validated by GitHub CI rather than a local build.
+[9222](https://lab.eignex.com/jobs/9222) captures two repeats of `php4` and
+`sporttournament06` at `325dc8d256`, seed 17, one Linux/amd64 processor,
+4,000 work units and retained/reseed controls. Source hashes and installed
+library/CLI/runtime hashes match; path-sensitive build fingerprints remain in
+the records. Each `php4` case imports 17 clauses and drains 16 use-window credits;
+13 retained peer imports have consumed consequences. The pool holds 25 clauses
+with 372 payload bytes, while a consumer's seen filter peaks at 25 keys/576 bytes,
+its learned arena at 512 bytes and metadata at 1,344 bytes. Retirement reports
+zero seen capacity. Primitive samples describe sharing owners, whereas process
+RSS across the eight cases is 111,716–145,420 KiB and includes runtime and model state.
+
+The optimization reseed control retires the main native worker 32 times and the
+private ALNS repair owner 14 times. Its automatic recipe has only one
+clause-sharing backtrack worker, so it supplies no peer-clause import evidence.
+Both `php4` controls and retained optimization repeat their logical trace; forced
+mixed optimization has two distinct traces and establishes no reproducibility
+claim for that configuration. Explicit clause-capable workers separate the sharing
+control from that mixed recipe.
+
+Preparation spends about 549 seconds, including 234 seconds waiting for a compiler.
+All eight native case records are present, but the containing 900-second job ends
+with `Whole-run deadline exhausted` before final artifact/check completion.
+The requested independent checks supply no receipts; native UNSAT and objective -6
+remain unchecked. Earlier HTTP400 schema rejections created no jobs. These records
+demonstrate accounting and consumption, not a speedup, independently checked proof,
+memory bound or basis for changing retention/delivery defaults.
 
 ## LP capture and replay
 
