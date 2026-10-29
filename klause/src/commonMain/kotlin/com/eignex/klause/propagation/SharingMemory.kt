@@ -25,17 +25,21 @@ internal fun PropagationState.sharingMemory(): Map<String, Long> {
         atomBytes += run.mainKeys.allocatedBytes + run.pendKeys.allocatedBytes +
             (run.mainIds.backingData.size.toLong() + run.pendIds.backingData.size) * Int.SIZE_BYTES
     }
-    return retained + mapOf(
+    val indexes = reasonIndexMemory()
+    return retained + indexes + mapOf(
         "atomCapacityBytes" to atomBytes,
         "atomReferenceSlots" to atoms.kind.size.toLong() + atoms.ant.size + atoms.undoAnt.size +
             atoms.watchersByLit.size + atoms.byIntVar.size + atoms.watchedByVar.size,
+        "pendingChannelingPayloadBytes" to pendingChanneling.sumOf { it.size.toLong() * Int.SIZE_BYTES },
+        "pendingChannelingReferenceSlots" to pendingChanneling.size.toLong(),
         "reasonPayloadBytes" to reasons.sumOf { it.size.toLong() * Int.SIZE_BYTES },
         "reasonArrays" to reasons.size.toLong(),
         "reasonReferenceSlots" to boolAntecedents.size.toLong() + intMinAntecedents.size +
             intMaxAntecedents.size + atoms.ant.size + atoms.undoAnt.size + undo.minAnt.size + undo.maxAnt.size +
             holeHistAnt.sumOf { it?.size?.toLong() ?: 0L } + lazyReasonMemo.size.toLong() * 2L,
         "reasonProtectedObjects" to referencedLearned(nativeEngine?.count ?: learned.size).count { it }.toLong(),
-        "memorySampleWork" to retained.getValue("memorySampleWork") + reasons.size + atomRuns.size * 3L +
+        "memorySampleWork" to retained.getValue("memorySampleWork") + indexes.getValue("reasonIndexSampleWork") +
+            reasons.size + atomRuns.size * 3L + pendingChanneling.size +
             boolAntecedents.size + intMinAntecedents.size + intMaxAntecedents.size + atoms.ant.size +
             atoms.undoAnt.size + undo.minAnt.size + undo.maxAnt.size + boolReason.size +
             intMinReason.size + intMaxReason.size + undo.size * 3L + learned.pendingAttach.size +
@@ -73,8 +77,19 @@ private fun PropagationState.learnedSharingMemory(): Map<String, Long> {
     val watchers = watches.byLit.sumOf { it.backingData.size.toLong() * Int.SIZE_BYTES } +
         watches.blockersByLit.sumOf { it.backingData.size.toLong() * Int.SIZE_BYTES } +
         atoms.watchersByLit.sumOf { (it?.backingData?.size?.toLong() ?: 0L) * Int.SIZE_BYTES }
+    val events = intEvents
+    val overflow = events.overflow
+    var eventBytes = (events.baseOffsets.size.toLong() + events.baseFlat.size + events.dirtyKinds.size) * Int.SIZE_BYTES
+    overflow?.forEach { _, list -> eventBytes += list.backingData.size.toLong() * Int.SIZE_BYTES }
+    eventBytes += overflow?.primitiveCapacityBytes ?: 0L
+    eventBytes += events.dirtyVars.sumOf { (it?.backingData?.size?.toLong() ?: 0L) * Int.SIZE_BYTES }
+    eventBytes += events.dirtyMark.sumOf { it?.allocatedBytes ?: 0L }
     return mapOf(
-        "memorySampleWork" to learned.size.toLong() * 5L + ints.size + longs.size + columns.size +
+        "sessionEventCapacityBytes" to eventBytes,
+        "sessionEventIndexReferenceCapacity" to (overflow?.referenceCapacity?.toLong() ?: 0L),
+        "sessionEventLiveReferenceSlots" to events.dirtyVars.size.toLong() + events.dirtyMark.size,
+        "memorySampleWork" to (overflow?.referenceCapacity?.toLong() ?: 0L) + events.dirtyVars.size +
+            events.dirtyMark.size + learned.size.toLong() * 5L + ints.size + longs.size + columns.size +
             watches.byLit.size + watches.blockersByLit.size + atoms.watchersByLit.size,
         "learnedObjects" to learned.size.toLong(),
         "learnedPayloadBytes" to ints.sumOf { it.size.toLong() * Int.SIZE_BYTES } +
@@ -90,5 +105,25 @@ private fun PropagationState.learnedSharingMemory(): Map<String, Long> {
             learned.origins[it] >= 0 && learned.stages[it] and 2 != 0
         }.toLong(),
         "retainedConsumed" to (0 until learned.size).count { learned.stages[it] and 2 != 0 }.toLong(),
+    )
+}
+
+private fun PropagationState.reasonIndexMemory(): Map<String, Long> {
+    val journal = listOf(undo.tag, undo.varId, undo.level, undo.minLvl, undo.maxLvl,
+        undo.minReason, undo.maxReason, undo.holeHistLen)
+    val history = boundMoves.asList() + holeHistLvl.asList() + holeHistPos.asList()
+    val endpoints = boundMovePriorMin.asList() + boundMovePriorMax.asList() + holeHistVal.asList()
+    return mapOf(
+        "reasonIndexCapacityBytes" to
+            (boolReason.size.toLong() + intMinReason.size + intMaxReason.size + boolPinPos.size) * Int.SIZE_BYTES,
+        "reasonJournalCapacityBytes" to undo.carved.allocatedBytes +
+            journal.sumOf { it.backingData.size.toLong() * Int.SIZE_BYTES },
+        "reasonHistoryCapacityBytes" to history.sumOf {
+            (it?.backingData?.size?.toLong() ?: 0L) * Int.SIZE_BYTES
+        } + endpoints.sumOf { it?.allocatedBytes ?: 0L } +
+            holeHistIndex.sumOf { it?.primitiveCapacityBytes ?: 0L },
+        "reasonHistoryReferenceSlots" to history.size.toLong() + endpoints.size + holeHistIndex.size +
+            undo.domain.size + undo.revTrail.size,
+        "reasonIndexSampleWork" to journal.size.toLong() + history.size + endpoints.size + holeHistIndex.size,
     )
 }
