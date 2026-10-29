@@ -222,7 +222,7 @@ and excluded; physical resident memory requires an external process measurement.
 to use the observed fields as a complete sample; it is null for partial or stale
 data. Complete describes traversal coverage of these modeled fields, not a
 deduplicated total across owners or physical bytes. Cancellation, exhausted work
-or exhausted scratch returns partial data without changing solver state. Only
+or exhausted scratch returns partial data without changing deductive state. Only
 finished categories are present. Scratch retains at most the configured number
 of fixed-size linked entries, and each deduplication comparison is charged.
 Sparse primitive maps visit every capacity slot under the same allowance; lazy
