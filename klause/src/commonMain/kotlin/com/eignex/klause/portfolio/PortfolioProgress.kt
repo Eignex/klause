@@ -18,7 +18,7 @@ data class PortfolioProgress(
     val phase: PortfolioPhase,
     /** Native work, including handle initialization. */
     val work: Long,
-    /** Inclusive segment time, including coordinator checking, in nanoseconds. */
+    /** Segment time through reward settlement, including coordinator checking, in nanoseconds. */
     val nanos: Long,
     /** Coordinator verification requests, including rejected and indeterminate claims. */
     val checks: Long,
@@ -50,7 +50,7 @@ data class PortfolioProgress(
 
 /** Opt-in reward experiment. Results must be finite and in `[0, 1]`; coverage and family priors remain intact. */
 fun interface PortfolioRewardPolicy {
-    /** Score a settled segment. Failed segments always receive zero after this call. */
+    /** Score a settled segment or delayed-use credit. Failed and refuted segments receive zero. */
     fun reward(progress: PortfolioProgress): Double
 }
 

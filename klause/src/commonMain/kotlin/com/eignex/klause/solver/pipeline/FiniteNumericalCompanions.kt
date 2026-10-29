@@ -130,7 +130,8 @@ internal class FiniteNumericalCompanions private constructor(
                 val worker = exactNeighborhoodWorker("ls/finite-joint-companion", firstArm + 1, objective,
                     limits.cancellation, limits.timeout, { repair.exhausted },
                     open = { repair.search(adaptive = false, seed = slot.seed) })
-                companion = PortfolioWorker.ofMinimize("ls/finite-joint-companion", firstArm + 1, countsInstructions = true,
+                companion = PortfolioWorker.ofMinimize("ls/finite-joint-companion", firstArm + 1,
+                    countsInstructions = true,
                     resumable = {
                         BoundedCompanionSearch(requireNotNull(worker.newResumableSearch(incumbents::bound)),
                             "finiteJointCompanion", activeLimit = requireNotNull(cost.activeMillis).milliseconds)
@@ -141,12 +142,14 @@ internal class FiniteNumericalCompanions private constructor(
         )
     }
 
-    private fun sharedIncumbent(worker: PortfolioWorker, onVersion: (Long) -> Unit) = incumbents.exchange.current()?.also {
-        onVersion(it.version)
-        worker.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_READ, it.version)
-    }?.assignment
+    private fun sharedIncumbent(worker: PortfolioWorker, onVersion: (Long) -> Unit) =
+        incumbents.exchange.current()?.also {
+            onVersion(it.version)
+            worker.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_READ, it.version)
+        }?.assignment
 
-    private fun numericalSearch(limits: TheoryParams, worker: PortfolioWorker): ResumableSearch = object : ResumableSearch {
+    private fun numericalSearch(limits: TheoryParams, worker: PortfolioWorker): ResumableSearch =
+        object : ResumableSearch {
         private var readVersion = 0L
         private var importedVersion = 0L
         private val search = LinearAuthorityInvocation(context, limits, boundOrdered = true,

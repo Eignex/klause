@@ -11,6 +11,45 @@ import kotlin.test.assertTrue
 
 class PortfolioProgressTest {
     @Test
+    fun `idle sharing use should retain its phase credit without charging a segment`() {
+        val observed = mutableListOf<PortfolioProgress>()
+        val pools = SharedPools(null, null)
+        val workers = listOf(
+            trackingWorker("producer", 0, ScriptedSearch({ false }) { }),
+            trackingWorker("consumer", 1, ScriptedSearch({ it == 0 }) {
+                pools.contributions.note(Contribution.Clause, 0)
+            }),
+        ).onEach { it.sharedPools = pools }
+        workers[0].sharing = setOf(Contribution.Clause)
+
+        val result = Portfolio.thompson(workers, baseSliceWork = 1, maxSliceWork = 1, sliceGrowth = 1.0,
+            diagnostics = PortfolioDiagnostics(3),
+            rewardPolicy = PortfolioRewardPolicy { observed += it; it.ordinaryReward }).use {
+            it.minimize(Cancellation.Never)
+        }
+
+        val idle = observed.single { it.idleCredit }
+        assertEquals(PortfolioPhase.IMPROVEMENT, idle.phase)
+        assertEquals(0L, idle.work)
+        assertEquals(1.0, idle.credit["ClauseUses"])
+        assertEquals(1.0, result.stats.portfolio.arms[0].phases.sumOf { it.credit["ClauseUses"] ?: 0.0 })
+    }
+
+    @Test
+    fun `a failed lifecycle observer should still close retained handles`() {
+        val search = TrackingResumableSearch(null)
+        val worker = trackingWorker("search", 0, search)
+
+        assertFailsWith<IllegalStateException> {
+            Portfolio.thompson(listOf(worker), diagnostics = PortfolioDiagnostics(1), onProgress = {
+                if (it is PortfolioEvent.Lifecycle && it.kind == PortfolioLifecycleKind.RETIRED) error("sink failed")
+            }).use { it.minimize(Cancellation.Never) }
+        }
+
+        assertEquals(1, search.closes)
+    }
+
+    @Test
     fun `reward experiments should retain silent complete worker coverage`() {
         val workers = listOf(
             trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) { }).also { it.family = ArmFamily.LocalSearch },

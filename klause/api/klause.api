@@ -9173,8 +9173,8 @@ public final class com/eignex/klause/portfolio/Portfolio : com/eignex/klause/por
 	public static final field Companion Lcom/eignex/klause/portfolio/Portfolio$Companion;
 	public static final field DEFAULT_HALF_LIFE D
 	public static final field DEFAULT_PHASE_RETENTION D
-	public fun <init> (Ljava/util/List;Lcom/eignex/kumulant/bandit/UnivariateBandit;IJJDJJJDIDLcom/eignex/klause/solver/ProblemProfile;Lcom/eignex/klause/portfolio/WitnessCheck;Lkotlin/jvm/functions/Function1;[DLcom/eignex/klause/portfolio/PortfolioDiagnostics;)V
-	public synthetic fun <init> (Ljava/util/List;Lcom/eignex/kumulant/bandit/UnivariateBandit;IJJDJJJDIDLcom/eignex/klause/solver/ProblemProfile;Lcom/eignex/klause/portfolio/WitnessCheck;Lkotlin/jvm/functions/Function1;[DLcom/eignex/klause/portfolio/PortfolioDiagnostics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/util/List;Lcom/eignex/kumulant/bandit/UnivariateBandit;IJJDJJJDIDLcom/eignex/klause/solver/ProblemProfile;Lcom/eignex/klause/portfolio/WitnessCheck;Lkotlin/jvm/functions/Function1;[DLcom/eignex/klause/portfolio/PortfolioDiagnostics;Lcom/eignex/klause/portfolio/PortfolioRewardPolicy;Lkotlin/jvm/functions/Function1;)V
+	public synthetic fun <init> (Ljava/util/List;Lcom/eignex/kumulant/bandit/UnivariateBandit;IJJDJJJDIDLcom/eignex/klause/solver/ProblemProfile;Lcom/eignex/klause/portfolio/WitnessCheck;Lkotlin/jvm/functions/Function1;[DLcom/eignex/klause/portfolio/PortfolioDiagnostics;Lcom/eignex/klause/portfolio/PortfolioRewardPolicy;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun close ()V
 	public final fun getWorkers ()Ljava/util/List;
 	public fun minimize (Lcom/eignex/klause/util/Cancellation;Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/result/MinimizeResult;
@@ -9182,8 +9182,8 @@ public final class com/eignex/klause/portfolio/Portfolio : com/eignex/klause/por
 }
 
 public final class com/eignex/klause/portfolio/Portfolio$Companion {
-	public final fun thompson (Ljava/util/List;IJDJJDIJJDLcom/eignex/klause/solver/ProblemProfile;Lcom/eignex/klause/portfolio/WitnessCheck;Lkotlin/jvm/functions/Function1;[DJLcom/eignex/klause/portfolio/PortfolioDiagnostics;)Lcom/eignex/klause/portfolio/Portfolio;
-	public static synthetic fun thompson$default (Lcom/eignex/klause/portfolio/Portfolio$Companion;Ljava/util/List;IJDJJDIJJDLcom/eignex/klause/solver/ProblemProfile;Lcom/eignex/klause/portfolio/WitnessCheck;Lkotlin/jvm/functions/Function1;[DJLcom/eignex/klause/portfolio/PortfolioDiagnostics;ILjava/lang/Object;)Lcom/eignex/klause/portfolio/Portfolio;
+	public final fun thompson (Ljava/util/List;IJDJJDIJJDLcom/eignex/klause/solver/ProblemProfile;Lcom/eignex/klause/portfolio/WitnessCheck;Lkotlin/jvm/functions/Function1;[DJLcom/eignex/klause/portfolio/PortfolioDiagnostics;Lcom/eignex/klause/portfolio/PortfolioRewardPolicy;Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/portfolio/Portfolio;
+	public static synthetic fun thompson$default (Lcom/eignex/klause/portfolio/Portfolio$Companion;Ljava/util/List;IJDJJDIJJDLcom/eignex/klause/solver/ProblemProfile;Lcom/eignex/klause/portfolio/WitnessCheck;Lkotlin/jvm/functions/Function1;[DJLcom/eignex/klause/portfolio/PortfolioDiagnostics;Lcom/eignex/klause/portfolio/PortfolioRewardPolicy;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lcom/eignex/klause/portfolio/Portfolio;
 }
 
 public final class com/eignex/klause/portfolio/PortfolioBuilder {
@@ -9252,6 +9252,36 @@ public final class com/eignex/klause/portfolio/PortfolioEvent$Imported : com/eig
 	public final fun getChannel ()Lcom/eignex/klause/solver/result/SharingChannel;
 	public final fun getCount ()I
 	public final fun getCursor ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/portfolio/PortfolioEvent$Lifecycle : com/eignex/klause/portfolio/PortfolioEvent {
+	public fun <init> (ILjava/lang/String;Lcom/eignex/klause/portfolio/PortfolioLifecycleKind;JJ)V
+	public final fun component1 ()I
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Lcom/eignex/klause/portfolio/PortfolioLifecycleKind;
+	public final fun component4 ()J
+	public final fun component5 ()J
+	public final fun copy (ILjava/lang/String;Lcom/eignex/klause/portfolio/PortfolioLifecycleKind;JJ)Lcom/eignex/klause/portfolio/PortfolioEvent$Lifecycle;
+	public static synthetic fun copy$default (Lcom/eignex/klause/portfolio/PortfolioEvent$Lifecycle;ILjava/lang/String;Lcom/eignex/klause/portfolio/PortfolioLifecycleKind;JJILjava/lang/Object;)Lcom/eignex/klause/portfolio/PortfolioEvent$Lifecycle;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getArm ()I
+	public final fun getKind ()Lcom/eignex/klause/portfolio/PortfolioLifecycleKind;
+	public final fun getNanos ()J
+	public final fun getVersion ()J
+	public final fun getWorker ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/portfolio/PortfolioEvent$Progressed : com/eignex/klause/portfolio/PortfolioEvent {
+	public fun <init> (Lcom/eignex/klause/portfolio/PortfolioProgress;)V
+	public final fun component1 ()Lcom/eignex/klause/portfolio/PortfolioProgress;
+	public final fun copy (Lcom/eignex/klause/portfolio/PortfolioProgress;)Lcom/eignex/klause/portfolio/PortfolioEvent$Progressed;
+	public static synthetic fun copy$default (Lcom/eignex/klause/portfolio/PortfolioEvent$Progressed;Lcom/eignex/klause/portfolio/PortfolioProgress;ILjava/lang/Object;)Lcom/eignex/klause/portfolio/PortfolioEvent$Progressed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getProgress ()Lcom/eignex/klause/portfolio/PortfolioProgress;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -9335,12 +9365,82 @@ public final class com/eignex/klause/portfolio/PortfolioExecutor$DefaultImpls {
 	public static synthetic fun solve$default (Lcom/eignex/klause/portfolio/PortfolioExecutor;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/solver/SolveResult;
 }
 
+public final class com/eignex/klause/portfolio/PortfolioLifecycleKind : java/lang/Enum {
+	public static final field CREATED Lcom/eignex/klause/portfolio/PortfolioLifecycleKind;
+	public static final field FIRST_QUERY Lcom/eignex/klause/portfolio/PortfolioLifecycleKind;
+	public static final field INCUMBENT_AVAILABLE Lcom/eignex/klause/portfolio/PortfolioLifecycleKind;
+	public static final field INCUMBENT_CONSUMED Lcom/eignex/klause/portfolio/PortfolioLifecycleKind;
+	public static final field INCUMBENT_IMPORTED Lcom/eignex/klause/portfolio/PortfolioLifecycleKind;
+	public static final field INCUMBENT_READ Lcom/eignex/klause/portfolio/PortfolioLifecycleKind;
+	public static final field RETIRED Lcom/eignex/klause/portfolio/PortfolioLifecycleKind;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/portfolio/PortfolioLifecycleKind;
+	public static fun values ()[Lcom/eignex/klause/portfolio/PortfolioLifecycleKind;
+}
+
+public final class com/eignex/klause/portfolio/PortfolioPhase : java/lang/Enum {
+	public static final field FEASIBILITY Lcom/eignex/klause/portfolio/PortfolioPhase;
+	public static final field IMPROVEMENT Lcom/eignex/klause/portfolio/PortfolioPhase;
+	public static final field PROOF_CLOSURE Lcom/eignex/klause/portfolio/PortfolioPhase;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/portfolio/PortfolioPhase;
+	public static fun values ()[Lcom/eignex/klause/portfolio/PortfolioPhase;
+}
+
+public final class com/eignex/klause/portfolio/PortfolioProgress {
+	public fun <init> (ILcom/eignex/klause/portfolio/PortfolioPhase;JJJZZLjava/util/Map;DJZJJJJZZ)V
+	public synthetic fun <init> (ILcom/eignex/klause/portfolio/PortfolioPhase;JJJZZLjava/util/Map;DJZJJJJZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()I
+	public final fun component10 ()J
+	public final fun component11 ()Z
+	public final fun component12 ()J
+	public final fun component13 ()J
+	public final fun component14 ()J
+	public final fun component15 ()J
+	public final fun component16 ()Z
+	public final fun component17 ()Z
+	public final fun component2 ()Lcom/eignex/klause/portfolio/PortfolioPhase;
+	public final fun component3 ()J
+	public final fun component4 ()J
+	public final fun component5 ()J
+	public final fun component6 ()Z
+	public final fun component7 ()Z
+	public final fun component8 ()Ljava/util/Map;
+	public final fun component9 ()D
+	public final fun copy (ILcom/eignex/klause/portfolio/PortfolioPhase;JJJZZLjava/util/Map;DJZJJJJZZ)Lcom/eignex/klause/portfolio/PortfolioProgress;
+	public static synthetic fun copy$default (Lcom/eignex/klause/portfolio/PortfolioProgress;ILcom/eignex/klause/portfolio/PortfolioPhase;JJJZZLjava/util/Map;DJZJJJJZZILjava/lang/Object;)Lcom/eignex/klause/portfolio/PortfolioProgress;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAcceptedIncumbent ()Z
+	public final fun getAcceptedIncumbents ()J
+	public final fun getArm ()I
+	public final fun getCheckingNanos ()J
+	public final fun getChecks ()J
+	public final fun getConstructionNanos ()J
+	public final fun getCredit ()Ljava/util/Map;
+	public final fun getFailed ()Z
+	public final fun getIdleCredit ()Z
+	public final fun getInitializationNanos ()J
+	public final fun getInitializationWork ()J
+	public final fun getNanos ()J
+	public final fun getOrdinaryReward ()D
+	public final fun getPhase ()Lcom/eignex/klause/portfolio/PortfolioPhase;
+	public final fun getPreparing ()Z
+	public final fun getRefuted ()Z
+	public final fun getWork ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/eignex/klause/portfolio/PortfolioRewardPolicy {
+	public abstract fun reward (Lcom/eignex/klause/portfolio/PortfolioProgress;)D
+}
+
 public final class com/eignex/klause/portfolio/PortfolioScenario {
 	public static final field Companion Lcom/eignex/klause/portfolio/PortfolioScenario$Companion;
 	public static final field DEFAULT_ARMS I
 	public static final field DEFAULT_SLICE_WORK J
-	public fun <init> (IILcom/eignex/klause/portfolio/Kind;Lcom/eignex/klause/portfolio/EngineMix;JDLcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Lkotlin/jvm/functions/Function1;Ljava/util/List;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/backtrack/BacktrackParams;ZIIJDILcom/eignex/klause/backtrack/NodeBudget;ZZJDLjava/lang/Long;ZLcom/eignex/klause/meta/coreguided/CoreRefinementMode;ZZ)V
-	public synthetic fun <init> (IILcom/eignex/klause/portfolio/Kind;Lcom/eignex/klause/portfolio/EngineMix;JDLcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Lkotlin/jvm/functions/Function1;Ljava/util/List;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/backtrack/BacktrackParams;ZIIJDILcom/eignex/klause/backtrack/NodeBudget;ZZJDLjava/lang/Long;ZLcom/eignex/klause/meta/coreguided/CoreRefinementMode;ZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (IILcom/eignex/klause/portfolio/Kind;Lcom/eignex/klause/portfolio/EngineMix;JDLcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Lkotlin/jvm/functions/Function1;Ljava/util/List;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/backtrack/BacktrackParams;ZIIJDILcom/eignex/klause/backtrack/NodeBudget;ZZJDLjava/lang/Long;ZLcom/eignex/klause/meta/coreguided/CoreRefinementMode;ZZJZLcom/eignex/klause/portfolio/PortfolioRewardPolicy;Z)V
+	public synthetic fun <init> (IILcom/eignex/klause/portfolio/Kind;Lcom/eignex/klause/portfolio/EngineMix;JDLcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Lkotlin/jvm/functions/Function1;Ljava/util/List;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/backtrack/BacktrackParams;ZIIJDILcom/eignex/klause/backtrack/NodeBudget;ZZJDLjava/lang/Long;ZLcom/eignex/klause/meta/coreguided/CoreRefinementMode;ZZJZLcom/eignex/klause/portfolio/PortfolioRewardPolicy;ZIILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()I
 	public final fun component10 ()Ljava/util/List;
 	public final fun component11 ()Ljava/util/List;
@@ -9364,14 +9464,18 @@ public final class com/eignex/klause/portfolio/PortfolioScenario {
 	public final fun component28 ()Z
 	public final fun component29 ()Z
 	public final fun component3 ()Lcom/eignex/klause/portfolio/Kind;
+	public final fun component30 ()J
+	public final fun component31 ()Z
+	public final fun component32 ()Lcom/eignex/klause/portfolio/PortfolioRewardPolicy;
+	public final fun component33 ()Z
 	public final fun component4 ()Lcom/eignex/klause/portfolio/EngineMix;
 	public final fun component5 ()J
 	public final fun component6 ()D
 	public final fun component7 ()Lcom/eignex/klause/lp/bounding/LpConfig;
 	public final fun component8 ()Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;
 	public final fun component9 ()Lkotlin/jvm/functions/Function1;
-	public final fun copy (IILcom/eignex/klause/portfolio/Kind;Lcom/eignex/klause/portfolio/EngineMix;JDLcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Lkotlin/jvm/functions/Function1;Ljava/util/List;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/backtrack/BacktrackParams;ZIIJDILcom/eignex/klause/backtrack/NodeBudget;ZZJDLjava/lang/Long;ZLcom/eignex/klause/meta/coreguided/CoreRefinementMode;ZZ)Lcom/eignex/klause/portfolio/PortfolioScenario;
-	public static synthetic fun copy$default (Lcom/eignex/klause/portfolio/PortfolioScenario;IILcom/eignex/klause/portfolio/Kind;Lcom/eignex/klause/portfolio/EngineMix;JDLcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Lkotlin/jvm/functions/Function1;Ljava/util/List;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/backtrack/BacktrackParams;ZIIJDILcom/eignex/klause/backtrack/NodeBudget;ZZJDLjava/lang/Long;ZLcom/eignex/klause/meta/coreguided/CoreRefinementMode;ZZILjava/lang/Object;)Lcom/eignex/klause/portfolio/PortfolioScenario;
+	public final fun copy (IILcom/eignex/klause/portfolio/Kind;Lcom/eignex/klause/portfolio/EngineMix;JDLcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Lkotlin/jvm/functions/Function1;Ljava/util/List;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/backtrack/BacktrackParams;ZIIJDILcom/eignex/klause/backtrack/NodeBudget;ZZJDLjava/lang/Long;ZLcom/eignex/klause/meta/coreguided/CoreRefinementMode;ZZJZLcom/eignex/klause/portfolio/PortfolioRewardPolicy;Z)Lcom/eignex/klause/portfolio/PortfolioScenario;
+	public static synthetic fun copy$default (Lcom/eignex/klause/portfolio/PortfolioScenario;IILcom/eignex/klause/portfolio/Kind;Lcom/eignex/klause/portfolio/EngineMix;JDLcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Lkotlin/jvm/functions/Function1;Ljava/util/List;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/backtrack/BacktrackParams;ZIIJDILcom/eignex/klause/backtrack/NodeBudget;ZZJDLjava/lang/Long;ZLcom/eignex/klause/meta/coreguided/CoreRefinementMode;ZZJZLcom/eignex/klause/portfolio/PortfolioRewardPolicy;ZIILjava/lang/Object;)Lcom/eignex/klause/portfolio/PortfolioScenario;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAnnotationArm ()Lcom/eignex/klause/backtrack/BacktrackParams;
 	public final fun getArms ()I
@@ -9379,6 +9483,8 @@ public final class com/eignex/klause/portfolio/PortfolioScenario {
 	public final fun getBtPool ()Ljava/util/List;
 	public final fun getClauseShareMaxLbd ()I
 	public final fun getClauseShareMaxLen ()I
+	public final fun getCompanionActiveMillis ()J
+	public final fun getCompanionAfterIncumbent ()Z
 	public final fun getCompanionIntegers ()Z
 	public final fun getCoreRefinement ()Lcom/eignex/klause/meta/coreguided/CoreRefinementMode;
 	public final fun getCores ()I
@@ -9395,7 +9501,9 @@ public final class com/eignex/klause/portfolio/PortfolioScenario {
 	public final fun getPhaseRetention ()D
 	public final fun getReportLsPhaseTimes ()Z
 	public final fun getReportLsResiduals ()Z
+	public final fun getReportPortfolioProgress ()Z
 	public final fun getReseedStaleThreshold ()I
+	public final fun getRewardPolicy ()Lcom/eignex/klause/portfolio/PortfolioRewardPolicy;
 	public final fun getSeed ()J
 	public final fun getShareCuts ()Z
 	public final fun getSliceGrowth ()D
@@ -12094,6 +12202,8 @@ public final class com/eignex/klause/solver/pipeline/ExecutionOption$Companion {
 	public final fun getCb ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getClauseShareLbd ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getClauseShareLen ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getCompanionActiveMillis ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getCompanionAfterIncumbent ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getCompanionIntegers ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getCoolingRate ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getCoreEarly ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
@@ -12153,6 +12263,7 @@ public final class com/eignex/klause/solver/pipeline/ExecutionOption$Companion {
 	public final fun getPbObjectiveCutoff ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getPhaseRetention ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getPhaseSaving ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getPortfolioProgress ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getPortfolioWork ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getPresolveAbortFraction ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getPresolveMaxRounds ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
@@ -13853,8 +13964,8 @@ public final class com/eignex/klause/solver/result/ArmFailure {
 }
 
 public final class com/eignex/klause/solver/result/ArmSchedule {
-	public fun <init> (Ljava/lang/String;JJJDJJLjava/util/Map;JJJLcom/eignex/klause/solver/result/SharingStats;JJLcom/eignex/klause/solver/result/ArmFailure;)V
-	public synthetic fun <init> (Ljava/lang/String;JJJDJJLjava/util/Map;JJJLcom/eignex/klause/solver/result/SharingStats;JJLcom/eignex/klause/solver/result/ArmFailure;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;JJJDJJLjava/util/Map;JJJLcom/eignex/klause/solver/result/SharingStats;JJLcom/eignex/klause/solver/result/ArmFailure;Ljava/util/List;Lcom/eignex/klause/solver/result/PortfolioLifecycleStats;)V
+	public synthetic fun <init> (Ljava/lang/String;JJJDJJLjava/util/Map;JJJLcom/eignex/klause/solver/result/SharingStats;JJLcom/eignex/klause/solver/result/ArmFailure;Ljava/util/List;Lcom/eignex/klause/solver/result/PortfolioLifecycleStats;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component10 ()J
 	public final fun component11 ()J
@@ -13862,6 +13973,8 @@ public final class com/eignex/klause/solver/result/ArmSchedule {
 	public final fun component13 ()J
 	public final fun component14 ()J
 	public final fun component15 ()Lcom/eignex/klause/solver/result/ArmFailure;
+	public final fun component16 ()Ljava/util/List;
+	public final fun component17 ()Lcom/eignex/klause/solver/result/PortfolioLifecycleStats;
 	public final fun component2 ()J
 	public final fun component3 ()J
 	public final fun component4 ()J
@@ -13870,8 +13983,8 @@ public final class com/eignex/klause/solver/result/ArmSchedule {
 	public final fun component7 ()J
 	public final fun component8 ()Ljava/util/Map;
 	public final fun component9 ()J
-	public final fun copy (Ljava/lang/String;JJJDJJLjava/util/Map;JJJLcom/eignex/klause/solver/result/SharingStats;JJLcom/eignex/klause/solver/result/ArmFailure;)Lcom/eignex/klause/solver/result/ArmSchedule;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/ArmSchedule;Ljava/lang/String;JJJDJJLjava/util/Map;JJJLcom/eignex/klause/solver/result/SharingStats;JJLcom/eignex/klause/solver/result/ArmFailure;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/ArmSchedule;
+	public final fun copy (Ljava/lang/String;JJJDJJLjava/util/Map;JJJLcom/eignex/klause/solver/result/SharingStats;JJLcom/eignex/klause/solver/result/ArmFailure;Ljava/util/List;Lcom/eignex/klause/solver/result/PortfolioLifecycleStats;)Lcom/eignex/klause/solver/result/ArmSchedule;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/ArmSchedule;Ljava/lang/String;JJJDJJLjava/util/Map;JJJLcom/eignex/klause/solver/result/SharingStats;JJLcom/eignex/klause/solver/result/ArmFailure;Ljava/util/List;Lcom/eignex/klause/solver/result/PortfolioLifecycleStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/ArmSchedule;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getCredit ()Ljava/util/Map;
 	public final fun getFailure ()Lcom/eignex/klause/solver/result/ArmFailure;
@@ -13881,9 +13994,11 @@ public final class com/eignex/klause/solver/result/ArmSchedule {
 	public final fun getInitializationMillis ()J
 	public final fun getInitializationWork ()J
 	public final fun getLabel ()Ljava/lang/String;
+	public final fun getLifecycle ()Lcom/eignex/klause/solver/result/PortfolioLifecycleStats;
 	public final fun getMaxMillis ()J
 	public final fun getMeanReward ()D
 	public final fun getMillis ()J
+	public final fun getPhases ()Ljava/util/List;
 	public final fun getReseeds ()J
 	public final fun getSegments ()J
 	public final fun getSharing ()Lcom/eignex/klause/solver/result/SharingStats;
@@ -14748,21 +14863,92 @@ public final class com/eignex/klause/solver/result/OpenTheoryWorkStats {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/eignex/klause/solver/result/PortfolioLifecycleStats {
+	public fun <init> ()V
+	public fun <init> (JJLjava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;JJJJ)V
+	public synthetic fun <init> (JJLjava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;JJJJILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()J
+	public final fun component10 ()J
+	public final fun component11 ()J
+	public final fun component12 ()J
+	public final fun component2 ()J
+	public final fun component3 ()Ljava/lang/Long;
+	public final fun component4 ()Ljava/lang/Long;
+	public final fun component5 ()Ljava/lang/Long;
+	public final fun component6 ()Ljava/lang/Long;
+	public final fun component7 ()Ljava/lang/Long;
+	public final fun component8 ()Ljava/lang/Long;
+	public final fun component9 ()J
+	public final fun copy (JJLjava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;JJJJ)Lcom/eignex/klause/solver/result/PortfolioLifecycleStats;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/PortfolioLifecycleStats;JJLjava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;JJJJILjava/lang/Object;)Lcom/eignex/klause/solver/result/PortfolioLifecycleStats;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getConstructionNanos ()J
+	public final fun getCreatedNanos ()J
+	public final fun getFirstQueryNanos ()Ljava/lang/Long;
+	public final fun getIncumbentAvailableNanos ()Ljava/lang/Long;
+	public final fun getIncumbentConsumedNanos ()Ljava/lang/Long;
+	public final fun getIncumbentImportedNanos ()Ljava/lang/Long;
+	public final fun getIncumbentImports ()J
+	public final fun getIncumbentReadNanos ()Ljava/lang/Long;
+	public final fun getIncumbentReads ()J
+	public final fun getIncumbentUses ()J
+	public final fun getRetiredNanos ()Ljava/lang/Long;
+	public final fun getRetirementNanos ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/result/PortfolioPhaseStats {
+	public fun <init> (Lcom/eignex/klause/portfolio/PortfolioPhase;JJJJJJJLjava/util/Map;JJJ)V
+	public synthetic fun <init> (Lcom/eignex/klause/portfolio/PortfolioPhase;JJJJJJJLjava/util/Map;JJJILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/eignex/klause/portfolio/PortfolioPhase;
+	public final fun component10 ()J
+	public final fun component11 ()J
+	public final fun component12 ()J
+	public final fun component2 ()J
+	public final fun component3 ()J
+	public final fun component4 ()J
+	public final fun component5 ()J
+	public final fun component6 ()J
+	public final fun component7 ()J
+	public final fun component8 ()J
+	public final fun component9 ()Ljava/util/Map;
+	public final fun copy (Lcom/eignex/klause/portfolio/PortfolioPhase;JJJJJJJLjava/util/Map;JJJ)Lcom/eignex/klause/solver/result/PortfolioPhaseStats;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/PortfolioPhaseStats;Lcom/eignex/klause/portfolio/PortfolioPhase;JJJJJJJLjava/util/Map;JJJILjava/lang/Object;)Lcom/eignex/klause/solver/result/PortfolioPhaseStats;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCheckingNanos ()J
+	public final fun getChecks ()J
+	public final fun getClosures ()J
+	public final fun getCredit ()Ljava/util/Map;
+	public final fun getIncumbents ()J
+	public final fun getInitializationNanos ()J
+	public final fun getInitializationWork ()J
+	public final fun getNanos ()J
+	public final fun getPhase ()Lcom/eignex/klause/portfolio/PortfolioPhase;
+	public final fun getPreparationNanos ()J
+	public final fun getSegments ()J
+	public final fun getWork ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/eignex/klause/solver/result/PortfolioStats {
 	public fun <init> ()V
-	public fun <init> (Ljava/util/List;Lcom/eignex/klause/solver/ProblemProfile;Ljava/lang/Integer;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Double;)V
-	public synthetic fun <init> (Ljava/util/List;Lcom/eignex/klause/solver/ProblemProfile;Ljava/lang/Integer;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Double;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/util/List;Lcom/eignex/klause/solver/ProblemProfile;Ljava/lang/Integer;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Double;J)V
+	public synthetic fun <init> (Ljava/util/List;Lcom/eignex/klause/solver/ProblemProfile;Ljava/lang/Integer;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Double;JILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/util/List;
 	public final fun component2 ()Lcom/eignex/klause/solver/ProblemProfile;
 	public final fun component3 ()Ljava/lang/Integer;
 	public final fun component4 ()Ljava/lang/Long;
 	public final fun component5 ()Ljava/lang/Long;
 	public final fun component6 ()Ljava/lang/Double;
-	public final fun copy (Ljava/util/List;Lcom/eignex/klause/solver/ProblemProfile;Ljava/lang/Integer;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Double;)Lcom/eignex/klause/solver/result/PortfolioStats;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/PortfolioStats;Ljava/util/List;Lcom/eignex/klause/solver/ProblemProfile;Ljava/lang/Integer;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Double;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/PortfolioStats;
+	public final fun component7 ()J
+	public final fun copy (Ljava/util/List;Lcom/eignex/klause/solver/ProblemProfile;Ljava/lang/Integer;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Double;J)Lcom/eignex/klause/solver/result/PortfolioStats;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/PortfolioStats;Ljava/util/List;Lcom/eignex/klause/solver/ProblemProfile;Ljava/lang/Integer;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Double;JILjava/lang/Object;)Lcom/eignex/klause/solver/result/PortfolioStats;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getArms ()Ljava/util/List;
 	public final fun getBaseSliceWork ()Ljava/lang/Long;
+	public final fun getInvocationNanos ()J
 	public final fun getMaxSliceWork ()Ljava/lang/Long;
 	public final fun getProfile ()Lcom/eignex/klause/solver/ProblemProfile;
 	public final fun getReseedStaleThreshold ()Ljava/lang/Integer;
