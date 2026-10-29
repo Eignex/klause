@@ -23,6 +23,7 @@ import com.eignex.klause.lp.engine.LpScopedSolver
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.LpSolvePhase
+import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.RevisedSimplex
@@ -36,6 +37,7 @@ import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.util.Cancellation
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -80,6 +82,7 @@ internal fun main(args: Array<String>) {
         put("editColumn", column)
         put("editLower", edited.toString())
         put("sourceVerdictClaim", false)
+        put("kotlinVersion", KotlinVersion.CURRENT.toString())
     })
     for (round in -1 until repeats) {
         for (retained in if (round % 2 == 0) listOf(true, false) else listOf(false, true)) {
@@ -110,7 +113,6 @@ private fun lifecycle(
     var activeNs = 0L
     try {
         for ((index, stage) in listOf("cold", "bound", "bound-pop", "row", "row-pop").withIndex()) {
-            val before = factory.floatingNanos
             val stageStart = Monotonic.markNow()
             val stageAllocated = profileAllocatedBytes()
             val creationStart = Monotonic.markNow()
@@ -148,6 +150,9 @@ private fun lifecycle(
                 }
             }
             val observer = LifecycleCertificates()
+            val primaryEngine = factory.lastEngine
+            val before = factory.floatingNanos
+            val firstInvocation = factory.invocations.size
             val queryStart = Monotonic.markNow()
             val result = current.solve(observer = observer.takeIf { observed })
             val queryNs = queryStart.elapsedNow().inWholeNanoseconds
@@ -155,7 +160,7 @@ private fun lifecycle(
             activeNs += stageNs
             val stageBytes = stageAllocated?.let { start -> profileAllocatedBytes()?.minus(start) }
             state = current.state
-            val numerical = factory.lastEngine
+            val numerical = primaryEngine
             println(buildJsonObject {
                 put("kind", "query")
                 put("round", round)
@@ -171,6 +176,8 @@ private fun lifecycle(
                 put("editPreparationInclusivePhaseNs", numbers(editPhases))
                 put("queryNs", queryNs)
                 put("floatingNs", factory.floatingNanos - before)
+                put("numericalInvocations", JsonArray(factory.invocations.drop(firstInvocation)))
+                put("droppedInvocations", factory.droppedInvocations)
                 put("queryNonFloatNs", queryNs - (factory.floatingNanos - before))
                 put("allocatedBytes", stageBytes?.let(::JsonPrimitive) ?: JsonNull)
                 put("cancelled", cancellation())
@@ -267,6 +274,17 @@ private class LifecycleCertificates : LpCertificationObserver {
 private class LifecycleFactory(private val observed: Boolean) : LpEngineFactory by ProductionLpEngineFactory {
     var lastEngine: RevisedSimplex? = null
     var floatingNanos = 0L
+    val invocations = mutableListOf<JsonElement>()
+    var droppedInvocations = 0
+    override fun newGeneralSolver(model: LpModel, cancellation: Cancellation, workLimit: Long,
+        pricing: LpPricingOptions): LpSolver {
+        val solver = RevisedSimplex(model, cancellation, workLimit = workLimit, pricing = pricing)
+        if (observed) solver.enableProgressTrace(profile = true)
+        return object : LpSolver by solver {
+            override fun solve(warm: Basis?): FloatLpResult? = timed(solver) { solver.solve(warm) }
+            override fun solvePrimal(warm: Basis?): FloatLpResult? = timed(solver) { solver.solvePrimal(warm) }
+        }
+    }
     override fun newPersistentSolver(model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int,
         iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions): PersistentLpSolver {
         val solver = RevisedSimplex(model, cancellation, refactorUpdateLimit = refactorUpdateLimit,
@@ -274,12 +292,28 @@ private class LifecycleFactory(private val observed: Boolean) : LpEngineFactory 
         if (observed) solver.enableProgressTrace(profile = true)
         lastEngine = solver
         return object : PersistentLpSolver by solver {
-            override fun solve(warm: Basis?): FloatLpResult? = timed { solver.solve(warm) }
-            override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? = timed { solver.resolveBounds(allowance) }
+            override fun solve(warm: Basis?): FloatLpResult? = timed(solver) { solver.solve(warm) }
+            override fun solvePrimal(warm: Basis?): FloatLpResult? = timed(solver) { solver.solvePrimal(warm) }
+            override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? =
+                timed(solver) { solver.resolveBounds(allowance) }
+            override fun resolveGated(enforced: BooleanArray): FloatLpResult? = timed(solver) { solver.resolveGated(enforced) }
         }
     }
-    private inline fun <T> timed(block: () -> T): T {
+    private inline fun <T> timed(solver: RevisedSimplex, block: () -> T): T {
         val started = Monotonic.markNow()
-        try { return block() } finally { floatingNanos += started.elapsedNow().inWholeNanoseconds }
+        try {
+            return block()
+        } finally {
+            val elapsed = started.elapsedNow().inWholeNanoseconds
+            floatingNanos += elapsed
+            if (observed) {
+                if (invocations.size < 256) invocations.add(buildJsonObject {
+                    put("elapsedNs", elapsed)
+                    put("work", solver.lastMetrics.workOps)
+                    put("termination", solver.lastTermination?.name)
+                    put("trace", solver.progressTrace?.let(::traceJson) ?: JsonNull)
+                }) else droppedInvocations++
+            }
+        }
     }
 }

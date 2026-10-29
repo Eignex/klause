@@ -44,6 +44,7 @@ kotlin {
         linuxArm64()
         macosArm64()
     }
+    applyDefaultHierarchyTemplate()
 
     sourceSets {
         commonMain.dependencies {
