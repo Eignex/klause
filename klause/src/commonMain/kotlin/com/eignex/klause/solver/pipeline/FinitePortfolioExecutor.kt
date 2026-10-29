@@ -97,7 +97,7 @@ internal fun FinitePipeline.portfolioExecutor(
         for ((label, requirements) in listOf("numerical/finite-companion" to frontier,
             "ls/finite-joint-companion" to repair)) {
             onEvent?.invoke("portfolio", SearchEvent.WorkerAdmission(label, declines.isEmpty(),
-                requirements.toString(), declines))
+                requirements.toString(), declines, selected = declines.isEmpty()))
         }
     }
     val finiteFactories = PortfolioBuilder.factories(
