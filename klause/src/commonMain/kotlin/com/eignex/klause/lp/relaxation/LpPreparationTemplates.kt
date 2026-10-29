@@ -18,6 +18,7 @@ import com.eignex.klause.lp.engine.ExactLpColumn
 import com.eignex.klause.lp.engine.ExactLpModel
 import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpSide
+import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.rootDomainOf
 import com.eignex.klause.lp.statesLowerBound
@@ -34,22 +35,38 @@ internal fun LpRelaxation.authoritativeWithTemplates(
     cancellation: Cancellation,
     onReuse: (Int) -> Unit = {},
 ): ExactLpModel? {
-    val original = model.authoritativeModel() ?: return null
-    val templates = preparationTemplates ?: return original
+    val templates = preparationTemplates ?: return model.authoritativeModel()
     var reused = 0
+    fun prepared(index: Int): LpIntegerBoundTemplate? = if (index < model.n && colVarId[index] >= 0 &&
+        !colIsBool[index] && colRealId[index] < 0
+    ) templates.bound(colVarId[index]) else null
+    if (templates.objectiveIndependent && model.exactState == null && model.doubleView == null) {
+        val imported = try {
+            model.authoritativeModel { index ->
+                cancellation.charge(1L)
+                if (cancellation()) throw LpTemplateImportCancelled()
+                prepared(index)?.compatibleColumn(model, index)?.also { reused++ }
+            }
+        } catch (_: LpTemplateImportCancelled) {
+            return null
+        }
+        onReuse(reused)
+        return imported
+    }
+    val original = model.authoritativeModel() ?: return null
     val columns = List(original.numVars) { index ->
         cancellation.charge(1L)
         if (cancellation()) return null
         val current = original.column(index)
-        val prepared = if (index < model.n && colVarId[index] >= 0 &&
-            !colIsBool[index] && colRealId[index] < 0
-        ) templates.bound(colVarId[index])?.compatibleColumn(current) else null
+        val prepared = prepared(index)?.compatibleColumn(current)
         if (prepared != null) reused++
         prepared ?: current
     }
     onReuse(reused)
     return if (reused == 0) original else original.withBoundColumns(columns)
 }
+
+private class LpTemplateImportCancelled : RuntimeException()
 
 internal class LpSourceRowTemplate(private val row: LinearRow) {
     private val compactExact = row is ExactLinear && !row.strict && row.activator == LinearRow.ALWAYS &&
@@ -97,6 +114,18 @@ internal data class LpIntegerBoundTemplate(
         openColumn -> openColumn
         else -> null
     }
+
+    fun compatibleColumn(model: LpModel, index: Int): ExactLpColumn? {
+        val width = upper - lower
+        if (model.doubleView != null || model.exactState != null || model.colContinuous[index] ||
+            model.probeClampedLo[index] || model.tag[index] != variable || model.loShift[index] != lower || width < 0L
+        ) return null
+        return if (!model.hasFiniteUpper(index) || model.probeClampedHi[index]) {
+            openColumn
+        } else {
+            column.takeIf { model.upper[index] == width }
+        }
+    }
 }
 
 internal class LpFactorTemplate(
@@ -121,7 +150,7 @@ internal class LpPreparationTemplates private constructor(
     private val finite: Boolean,
     private val dimensions: List<Int>,
     private val objectiveConstant: Long,
-    private val objectiveIndependent: Boolean,
+    val objectiveIndependent: Boolean,
     val factors: List<LpFactorTemplate>,
     val bounds: Map<Int, LpIntegerBoundTemplate>,
     val components: List<LpTemplateComponent>,

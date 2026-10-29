@@ -3,7 +3,9 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.util.BIG_ONE
 
 // Stored normalized Long/IEEE data is authoritative; probe sides are absent, origins stay finite.
-internal fun LpModel.authoritativeModel(): ExactLpModel? {
+internal fun LpModel.authoritativeModel(
+    structuralColumn: ((Int) -> ExactLpColumn?)? = null,
+): ExactLpModel? {
     exactState?.let { return it.model }
     if (!finiteExactInput()) return null
     val dv = doubleView
@@ -32,7 +34,8 @@ internal fun LpModel.authoritativeModel(): ExactLpModel? {
             List(m) { view.shifts.value.rhs(it)?.let(ExactLpNumber::of) ?: ExactLpNumber.ofIeee(view.rhs[it]) }
         } ?: rhs.map(ExactLpNumber::of),
         List(numVars) { column ->
-            ExactLpColumn(
+            // The adapter validates prepared columns against this normalized layout before import.
+            (if (column < n && dv == null) structuralColumn?.invoke(column) else null) ?: ExactLpColumn(
                 legacyBounds(column),
                 origin = if (column >= n) {
                     ExactLpNumber.of(0L)

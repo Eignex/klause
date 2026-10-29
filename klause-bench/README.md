@@ -715,7 +715,7 @@ These controls establish no throughput improvement or independent proof validati
 ### Numerical lifecycle profiles
 
 `scripts/lp-template-preparation-profile.sh <source> [repeats] [steps]` accepts
-`cover-2x3`, `cover-3x3`, `dense-2x12` and `dense-8x24`. It compares disabled
+`cover-2x3` and `cover-3x3`. It compares disabled
 templates, object reuse, complete index reuse and selective metadata reuse on the
 existing MPS component fixtures. Submit as a lab profile script with build task
 `:klause:stageLpProfileJvm`, Linux x86_64 placement and a 180-second runtime cap.
