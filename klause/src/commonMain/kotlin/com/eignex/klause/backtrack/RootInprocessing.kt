@@ -23,7 +23,6 @@ internal class RootSimplificationPass : InprocessingPass {
         if (count == 0) return
         val dropped = IntHashSet()
         var visits = 0L
-        var changed = false
         if (cursor !in 0 until count) cursor = 0
         var examined = 0
         while (examined++ < minOf(params.rootSimplifyBatch, count)) {
@@ -47,12 +46,12 @@ internal class RootSimplificationPass : InprocessingPass {
             }
             if (source) session.retireRootSource(factor, literals)
             else dropped.add(factor - session.problem.numFactors)
-            changed = true
         }
         stats?.observeInprocessing(probes = 0L, visits = visits)
+        val beforeCompaction = session.learnedClauseCount
         if (!dropped.isEmpty()) session.forgetLearnedClauses { index, _ -> index !in dropped }
-        // Learned indices belong to this snapshot; compaction and imports may change them before the next run.
-        if (changed) cursor = 0
+        // Protected reasons can survive retirement requests without renumbering the snapshot.
+        if (session.learnedClauseCount < beforeCompaction) cursor = 0
     }
 }
 

@@ -80,6 +80,24 @@ class RootInprocessingTest {
     }
 
     @Test
+    fun `a retained active reason should not starve later root candidates`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(problem(intArrayOf(1)).bake(), nativeSat = native)
+            session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
+            session.addLearnedClause(Clause(intArrayOf(0, 4, 6)), 3)
+            val pass = RootSimplificationPass()
+            val params = BacktrackParams(rootSimplifyBatch = 2)
+
+            pass.run(session, params, null)
+            pass.run(session, params, null)
+
+            assertTrue((0 until session.learnedClauseCount).any {
+                session.learnedClauseLiterals(it).toSet() == setOf(4, 6)
+            })
+        }
+    }
+
+    @Test
     fun `a satisfied root clause should retain its live historical reason`() {
         for (native in listOf(false, true)) {
             val session = PropagationSession(problem(intArrayOf(1)).bake(), nativeSat = native)
