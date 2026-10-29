@@ -482,7 +482,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 lbdGlue, tieredDb, midLbd, vivification, vivifyBatch,
                 subsumption, subsumeBatch, inprocessingCadence, rootSimplification, rootSimplifyBatch,
                 rootProbeBatch, rootProbeWork, lpObjectiveCone, lpAutoOffReprobe,
-                lpKnapsackLagrangian, lpComponentSplit, lpBoundMaxPivots, lpAdaptiveWork,
+                lpKnapsackLagrangian, lpComponentSplit, lpComponentOwnership, lpBoundMaxPivots, lpAdaptiveWork,
                 lpBranching, lpDirectionalGains,
                 lpVariableShaving, lpPruneHulls, lpRootCuts, pbLearning, integerRowLearning,
                 propagationAttribution, historicalTableReasons, pbObjectiveCutoff,
