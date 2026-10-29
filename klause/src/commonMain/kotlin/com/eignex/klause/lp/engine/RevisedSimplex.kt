@@ -149,9 +149,19 @@ internal class RevisedSimplex(
         if (pricing.basisEntryLimit != Long.MAX_VALUE) SimplexProgressTrace() else null
         private set
 
-    internal fun enableProgressTrace() {
+    internal fun enableProgressTrace(profile: Boolean = false) {
         check(activeSolve == null)
-        progressTrace = SimplexProgressTrace()
+        progressTrace = SimplexProgressTrace(profile)
+    }
+
+    private inline fun <T> profiled(phase: SimplexProfilePhase, block: () -> T): T {
+        val trace = progressTrace?.takeIf { it.profile } ?: return block()
+        val started = TimeSource.Monotonic.markNow()
+        try {
+            return block()
+        } finally {
+            trace.recordPhase(phase, started.elapsedNow().inWholeNanoseconds)
+        }
     }
 
     private fun traceProgress(phase: SimplexPhase, beta: DoubleArray) {
@@ -579,10 +589,10 @@ internal class RevisedSimplex(
      * repair seated a different basis, [RefactorResult.FAILED] when it could not, which leaves this engine
      * unable to solve until a later call succeeds.
      */
-    private fun refactorize(reason: LpRefactorReason): RefactorResult {
+    private fun refactorize(reason: LpRefactorReason): RefactorResult = profiled(SimplexProfilePhase.REFACTOR) {
         if (repairStop != null) {
             observations.termination = repairTermination()
-            return RefactorResult.FAILED
+            return@profiled RefactorResult.FAILED
         }
         observations.refactorizations++
         when (reason) {
@@ -629,7 +639,7 @@ internal class RevisedSimplex(
                 repairCallbackFailure = control.callbackFailure
                 if (repairStop != null) observations.termination = repairTermination()
             }
-            return when (recovery) {
+            return@profiled when (recovery) {
                 is BasisRecoveryResult.Failed -> {
                     numericalFailure = true
                     if (recovery.decline == BasisRepairDecline.CANCELLED) {
@@ -650,7 +660,7 @@ internal class RevisedSimplex(
         basisLifecycle.columns = basicVar.copyOf()
         basisLifecycle.unitRows = IntArray(m) { -1 }
         recordFactorization(solver, basisChanged = false)
-        return RefactorResult.UNCHANGED
+        return@profiled RefactorResult.UNCHANGED
     }
 
     private fun recordFactorization(solver: BasisSolver, basisChanged: Boolean) {
@@ -806,7 +816,7 @@ internal class RevisedSimplex(
         chargeSolve(carrier, SimplexBasisOperation.DENSE_FTRAN)
         val solver = solver()
         val before = operationWork(solver)
-        solver.ftran(carrier, expectedDensity = 1.0)
+        profiled(SimplexProfilePhase.FTRAN) { solver.ftran(carrier, expectedDensity = 1.0) }
         refactorPolicy.recordBasisSolve(
             operationDelta(before, operationWork(solver)) { it.ftran },
             boundUpdateFtran,
@@ -826,7 +836,7 @@ internal class RevisedSimplex(
         chargeSolve(carrier, SimplexBasisOperation.DENSE_BTRAN)
         val solver = solver()
         val before = operationWork(solver)
-        solver.btran(carrier, expectedDensity = 1.0)
+        profiled(SimplexProfilePhase.BTRAN) { solver.btran(carrier, expectedDensity = 1.0) }
         refactorPolicy.recordBasisSolve(operationDelta(before, operationWork(solver)) { it.btran })
         sampleSolveQuality(solver, b, carrier, transpose = true)
         return carrier.gather(out)
@@ -843,7 +853,7 @@ internal class RevisedSimplex(
         chargeSolve(spikeVec, SimplexBasisOperation.ENTERING_FTRAN)
         val solver = solver()
         val before = operationWork(solver)
-        solver.ftran(spikeVec, ftranDensity)
+        profiled(SimplexProfilePhase.FTRAN) { solver.ftran(spikeVec, ftranDensity) }
         refactorPolicy.recordBasisSolve(operationDelta(before, operationWork(solver)) { it.ftran })
         if (shouldSampleQuality()) {
             sampleSolveQuality(solver, denseColumn(q), spikeVec, transpose = false, cadenceChecked = true)
@@ -870,7 +880,7 @@ internal class RevisedSimplex(
         chargeSolve(pivotEtaVec, SimplexBasisOperation.PIVOTAL_BTRAN)
         val solver = solver()
         val before = operationWork(solver)
-        solver.btran(pivotEtaVec, btranDensity)
+        profiled(SimplexProfilePhase.BTRAN) { solver.btran(pivotEtaVec, btranDensity) }
         refactorPolicy.recordBasisSolve(operationDelta(before, operationWork(solver)) { it.btran })
         if (shouldSampleQuality()) {
             val rhs = qualityRhs.also {
@@ -894,7 +904,9 @@ internal class RevisedSimplex(
         nnzB += columnNnz(q) - columnNnz(leaving)
         val solver = solver()
         val before = operationWork(solver)
-        val outcome = solver.update(r, q, spikeVec, if (withPivotEta) pivotEtaVec else null)
+        val outcome = profiled(SimplexProfilePhase.UPDATE) {
+            solver.update(r, q, spikeVec, if (withPivotEta) pivotEtaVec else null)
+        }
         if (outcome != BasisUpdate.SINGULAR) {
             refactorPolicy.recordAcceptedUpdate(operationDelta(before, operationWork(solver)) { it.update })
         }
@@ -1397,7 +1409,7 @@ internal class RevisedSimplex(
     }
 
     private fun resetSolveState(warmAttempted: Boolean) {
-        if (progressTrace != null) progressTrace = SimplexProgressTrace()
+        progressTrace?.let { progressTrace = SimplexProgressTrace(it.profile) }
         solveStarted = true
         clearArtificialBounds()
         repairStop = null
@@ -1761,7 +1773,7 @@ internal class RevisedSimplex(
         enforced: BooleanArray?,
         finiteLower: BooleanArray?,
         finiteUpper: BooleanArray?,
-    ): Int {
+    ): Int = profiled(SimplexProfilePhase.PRICING) {
         var r = -1
         var bestScore = 0.0
         for (i in 0 until m) {
@@ -1789,7 +1801,7 @@ internal class RevisedSimplex(
                 leavingBelowLower = isBelow
             }
         }
-        return r
+        return@profiled r
     }
 
     /**
@@ -1799,7 +1811,7 @@ internal class RevisedSimplex(
      * no candidate by skipping it. Reached columns are stamped with [epoch] rather than cleared: zeroing
      * [pivotRowEntries] between iterations would reintroduce the pass over every column this removes.
      */
-    private fun formPivotRow(epoch: Int): Int {
+    private fun formPivotRow(epoch: Int): Int = profiled(SimplexProfilePhase.PRICING) {
         var touchedCount = 0
         var pivotRowOps = 0L
         pivotEtaVec.forEachStored { i, rhoI ->
@@ -1812,7 +1824,7 @@ internal class RevisedSimplex(
             )
         }
         work.add(pivotRowOps)
-        return touchedCount
+        return@profiled touchedCount
     }
 
     /**
@@ -1824,7 +1836,7 @@ internal class RevisedSimplex(
         y: DoubleArray,
         belowLower: Boolean,
         enforced: BooleanArray?,
-    ) {
+    ) = profiled(SimplexProfilePhase.PRICING) {
         eligibleColumns.clear()
         for (t in 0 until touchedCount) {
             val j = touchedColumns[t]
@@ -2347,7 +2359,7 @@ internal class RevisedSimplex(
         delta: Double,
         leavingRow: Int,
         enforced: BooleanArray?,
-    ): EnteringChoice {
+    ): EnteringChoice = profiled(SimplexProfilePhase.PRICING) {
         sortByRatio(elig, ordered, ratioBuf)
         var acc = 0.0
         var flipCount = 0
@@ -2367,7 +2379,7 @@ internal class RevisedSimplex(
                         pricing.zeroObjective == LpZeroObjectivePricing.MIN_BOUND_SUPPORT && originalZeroCost
                     val selected = if (minimizeBoundSupport) {
                         when (val theory = chooseTheoryEntering(theoryCandidates, leavingRow, enforced)) {
-                            EnteringChoice.ResourceStopped -> return theory
+                            EnteringChoice.ResourceStopped -> return@profiled theory
                             is EnteringChoice.Selected -> theory.column ?: best
                         }
                     } else {
@@ -2375,12 +2387,12 @@ internal class RevisedSimplex(
                     }
                     flipPassedBreakpoints(elig, flipCount)
                     if (ratioBuf[selected] > ratioBuf[j] + harrisTolerance) observations.lastHarrisMinistepSelections++
-                    return EnteringChoice.Selected(selected)
+                    return@profiled EnteringChoice.Selected(selected)
                 }
-                return EnteringChoice.Selected(null)
+                return@profiled EnteringChoice.Selected(null)
             }
         }
-        return EnteringChoice.Selected(null) // defensive: the loop handles the last element
+        return@profiled EnteringChoice.Selected(null) // defensive: the loop handles the last element
     }
 
     // Stable ascending order by ratio.
@@ -2505,7 +2517,7 @@ internal class RevisedSimplex(
         val before = operationWork(solver)
         var failed = false
         try {
-            solver.ftran(pricingSpikeVec, ftranDensity)
+            profiled(SimplexProfilePhase.FTRAN) { solver.ftran(pricingSpikeVec, ftranDensity) }
         } catch (_: BasisArithmeticException) {
             failed = true
         } catch (_: ArithmeticException) {
@@ -2561,7 +2573,7 @@ internal class RevisedSimplex(
         return value xor (value ushr 31)
     }
 
-    private fun optimal(beta: DoubleArray): FloatLpResult {
+    private fun optimal(beta: DoubleArray): FloatLpResult = profiled(SimplexProfilePhase.OUTPUT) {
         basisLifecycle.kept = true
         solvedExactState = model.exactState
         retainBasicValues(beta)
@@ -2591,7 +2603,7 @@ internal class RevisedSimplex(
         recordDegeneracy(scaledDuals)
         val y = DoubleArray(m) { numerical.sourceDual(it, scaledDuals[it]) }
         if (!deferUnscaledSourceDiagnostics || numerical.applied) recordSourceResiduals(beta, y)
-        return FloatLpResult(
+        return@profiled FloatLpResult(
             basis,
             model.objectiveD(obj),
             y.copyOf(),
@@ -2614,6 +2626,11 @@ internal class RevisedSimplex(
             observations.sourceResidualCalls++
             if (numerical.applied) observations.sourceResidualScaledCalls++
             observations.sourceResidualNanos += started.elapsedNow().inWholeNanoseconds
+            progressTrace?.let {
+                it.sourcePrimalResidual = observations.sourcePrimalResidual
+                it.sourceBoundViolation = observations.sourceBoundViolation
+                it.sourceBasicDualResidual = observations.sourceBasicDualResidual
+            }
         }
     }
 
@@ -2670,7 +2687,7 @@ internal class RevisedSimplex(
      * than relying on every caller to remember. Same objective arithmetic as [optimal], since the bound
      * is read the same way.
      */
-    private fun truncated(beta: DoubleArray): FloatLpResult {
+    private fun truncated(beta: DoubleArray): FloatLpResult = profiled(SimplexProfilePhase.OUTPUT) {
         solvedExactState = model.exactState
         var obj = model.objConstantD
         for (j in 0 until numVars) {
@@ -2693,7 +2710,7 @@ internal class RevisedSimplex(
         recordDegeneracy(scaledDuals)
         val y = DoubleArray(m) { numerical.sourceDual(it, scaledDuals[it]) }
         recordSourceResiduals(beta, y)
-        return FloatLpResult(
+        return@profiled FloatLpResult(
             Basis(basicVar.copyOf(), status.copyOf(), captureEligible = basisCaptureEligible),
             model.objectiveD(obj),
             y.copyOf(),
@@ -2870,16 +2887,18 @@ internal class RevisedSimplex(
             var q = -1
             var qAtLower = true
             var best = tolerance
-            for (j in 0 until numVars) {
-                if (status[j] == VarStatus.BASIC || model.fixed(j)) continue
-                progressTrace?.let { it.pricedColumns++ }
-                val pj = dotColumn(pi, j)
-                val atLower = status[j] == VarStatus.AT_LOWER || (status[j] == VarStatus.FREE && pj > 0.0)
-                val gain = if (atLower) pj else -pj
-                if (gain > best) {
-                    best = gain
-                    q = j
-                    qAtLower = atLower
+            profiled(SimplexProfilePhase.PRICING) {
+                for (j in 0 until numVars) {
+                    if (status[j] == VarStatus.BASIC || model.fixed(j)) continue
+                    progressTrace?.let { it.pricedColumns++ }
+                    val pj = dotColumn(pi, j)
+                    val atLower = status[j] == VarStatus.AT_LOWER || (status[j] == VarStatus.FREE && pj > 0.0)
+                    val gain = if (atLower) pj else -pj
+                    if (gain > best) {
+                        best = gain
+                        q = j
+                        qAtLower = atLower
+                    }
                 }
             }
             if (q == -1) {
@@ -2995,7 +3014,8 @@ internal class RevisedSimplex(
         return IterationResult.FAILED // budget exhausted
     }
 
-    private fun phaseOneViolation(beta: DoubleArray, gradient: DoubleArray): Double {
+    private fun phaseOneViolation(beta: DoubleArray, gradient: DoubleArray): Double =
+        profiled(SimplexProfilePhase.FEASIBILITY_REPAIR) {
         var violation = 0.0
         for (i in 0 until m) {
             val column = basicVar[i]
@@ -3013,7 +3033,7 @@ internal class RevisedSimplex(
                 else -> 0.0
             }
         }
-        return violation
+        return@profiled violation
     }
 
     private fun advancePhaseOneValues(
@@ -3138,23 +3158,25 @@ internal class RevisedSimplex(
             var qAtLower = true
             var best = primalPricingTolerance
             traceProgress(SimplexPhase.PRIMAL_OBJECTIVE, beta)
-            for (j in 0 until numVars) {
-                if (status[j] == VarStatus.BASIC || model.fixed(j)) continue
-                progressTrace?.let { it.pricedColumns++ }
-                val dj = cost(j) - dotColumn(y, j)
-                val atLower = status[j] == VarStatus.AT_LOWER || (status[j] == VarStatus.FREE && dj < 0.0)
-                // From lower, increasing improves iff d_j < 0; from upper, decreasing improves iff d_j > 0.
-                val gain = if (atLower) -dj else dj
-                if (gain <= primalPricingTolerance) continue
-                if (bland) {
-                    q = j // first (lowest-index) improving column
-                    qAtLower = atLower
-                    break
-                }
-                if (gain > best) {
-                    best = gain
-                    q = j
-                    qAtLower = atLower
+            profiled(SimplexProfilePhase.PRICING) {
+                for (j in 0 until numVars) {
+                    if (status[j] == VarStatus.BASIC || model.fixed(j)) continue
+                    progressTrace?.let { it.pricedColumns++ }
+                    val dj = cost(j) - dotColumn(y, j)
+                    val atLower = status[j] == VarStatus.AT_LOWER || (status[j] == VarStatus.FREE && dj < 0.0)
+                    // From lower, increasing improves iff d_j < 0; from upper, decreasing improves iff d_j > 0.
+                    val gain = if (atLower) -dj else dj
+                    if (gain <= primalPricingTolerance) continue
+                    if (bland) {
+                        q = j // first (lowest-index) improving column
+                        qAtLower = atLower
+                        break
+                    }
+                    if (gain > best) {
+                        best = gain
+                        q = j
+                        qAtLower = atLower
+                    }
                 }
             }
             if (q == -1) return optimal(beta) // no improving column ⇒ optimal

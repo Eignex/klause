@@ -70,6 +70,37 @@ kotlin {
     }
 }
 
+// Bench-owned sources need internal engine access on each compute target without a published artifact.
+val lpProfileSources = kotlin.sourceSets.create("lpProfile") {
+    kotlin.srcDir(rootProject.file("klause-bench/src/lpProfileMain/kotlin"))
+}
+kotlin.targets.withType<org.jetbrains.kotlin.gradle.targets.jvm.KotlinJvmTarget>().configureEach {
+    val profile = compilations.create("lpProfile") {
+        associateWith(compilations.getByName("main"))
+        defaultSourceSet.dependsOn(lpProfileSources)
+        defaultSourceSet.kotlin.srcDir(rootProject.file("klause-bench/src/lpProfileJvm/kotlin"))
+    }
+    tasks.register<Sync>("stageLpProfileJvm") {
+        dependsOn(profile.compileTaskProvider)
+        into(layout.buildDirectory.dir("lp-profile/jvm"))
+        from(profile.output.allOutputs) { into("classes") }
+        from(compilations.getByName("main").output.allOutputs) { into("classes") }
+        from(profile.runtimeDependencyFiles) { into("lib") }
+    }
+}
+kotlin.targets.withType<org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget>().configureEach {
+    val profile = compilations.create("lpProfile") {
+        associateWith(compilations.getByName("main"))
+        defaultSourceSet.dependsOn(lpProfileSources)
+        defaultSourceSet.kotlin.srcDir(rootProject.file("klause-bench/src/lpProfileNative/kotlin"))
+    }
+    binaries.executable("lpProfile", listOf(org.jetbrains.kotlin.gradle.plugin.mpp.NativeBuildType.RELEASE)) {
+        compilation = profile
+        baseName = "klause-lp-profile"
+        entryPoint = "com.eignex.klause.bench.profile.main"
+    }
+}
+
 // A timestamped KMP root still redirects to mutable platform snapshots. Publish constraints too,
 // so downstream Gradle consumers resolve the same binaries as this build.
 dependencies {

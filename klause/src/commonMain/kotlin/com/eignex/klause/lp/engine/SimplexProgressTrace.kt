@@ -1,5 +1,9 @@
 package com.eignex.klause.lp.engine
 
+internal enum class SimplexProfilePhase {
+    PRICING, FTRAN, BTRAN, UPDATE, REFACTOR, FEASIBILITY_REPAIR, OUTPUT,
+}
+
 internal enum class SimplexPhase { DUAL, BOXED_DUAL, PRIMAL_FEASIBILITY, PRIMAL_OBJECTIVE }
 
 internal enum class SimplexBasisOperation { DENSE_FTRAN, DENSE_BTRAN, ENTERING_FTRAN, PIVOTAL_BTRAN }
@@ -25,7 +29,18 @@ internal data class SimplexProgressSample(
     val violatedBasics: Int,
 )
 
-internal class SimplexProgressTrace {
+internal class SimplexProgressTrace(val profile: Boolean = false) {
+    val phaseNanos = mutableMapOf<SimplexProfilePhase, Long>()
+    val phaseCalls = mutableMapOf<SimplexProfilePhase, Long>()
+    var sourcePrimalResidual: Double? = null
+    var sourceBoundViolation: Double? = null
+    var sourceBasicDualResidual: Double? = null
+
+    fun recordPhase(phase: SimplexProfilePhase, nanos: Long) {
+        phaseNanos[phase] = phaseNanos.getOrElse(phase) { 0L } + nanos
+        phaseCalls[phase] = phaseCalls.getOrElse(phase) { 0L } + 1L
+    }
+
     val samples = mutableListOf<SimplexProgressSample>()
     val iterations = mutableMapOf<SimplexPhase, Int>()
     val degenerateSteps = mutableMapOf<SimplexPhase, Int>()
