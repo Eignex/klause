@@ -284,26 +284,7 @@ internal class NativeSatState(private val state: PropagationState) {
 
     // Learned-clause policy accessors: the native mirror of the LearnedClauseDb columns.
 
-    internal fun sharingMemory(sample: SharingMemoryObservation) {
-        val columns = listOf(learnedStarts, learnedLbd, learnedPermanent, learnedTier,
-            learnedUsed, lifecycleStages, learnedUnits, rechecks, learnedOrigin, learnedScanPos, learnedWatchPos)
-        var metadata = 0L
-        for (column in columns) {
-            sample.step(); metadata += column.backingData.size.toLong() * Int.SIZE_BYTES
-            sample.owned(column.backingData, column.backingData.size.toLong() * Int.SIZE_BYTES)
-        }
-        sample.owned(learnedLits.backingData, learnedLits.backingData.size.toLong() * Int.SIZE_BYTES)
-        sample.owned(arena.lits, arena.lits.size.toLong() * Int.SIZE_BYTES, true, shared = true)
-        sample.owned(arena.starts, arena.starts.size.toLong() * Int.SIZE_BYTES, true, shared = true)
-        sample.owned(watchSizes, watchSizes.size.toLong() * Int.SIZE_BYTES, true)
-        sample.owned(watchPos, watchPos.size.toLong() * Int.SIZE_BYTES, true)
-        sample.owned(baseUnits.backingData, baseUnits.backingData.size.toLong() * Int.SIZE_BYTES, true)
-        sample.ownedReferences(watchEntries, watchEntries.size.toLong(), true)
-        var watchBytes = 0L
-        for (entries in watchEntries) {
-            sample.step(); watchBytes += entries.size.toLong() * Long.SIZE_BYTES
-            sample.owned(entries, entries.size.toLong() * Long.SIZE_BYTES)
-        }
+    internal fun sharingMemory(sample: SharingMemoryObservation, protected: SharingMemoryObservation.Seen<Int>) {
         var peerImports = 0L
         var consumedPeerImports = 0L
         var consumed = 0L
@@ -311,10 +292,42 @@ internal class NativeSatState(private val state: PropagationState) {
             sample.step()
             val peer = learnedOrigin[i] >= 0
             val used = lifecycleStages[i] and 1 != 0
-            if (learnedPermanent[i] == 1) protectMemory(sample)
+            if (learnedPermanent[i] == 1) sample.retain(protected, i)
             if (peer) peerImports++
             if (peer && used) consumedPeerImports++
             if (used) consumed++
+        }
+        for (i in recheckHead until rechecks.size) {
+            sample.step()
+            val index = rechecks[i] - baseCount
+            if (lifecycleStages[index] and 1 == 0) sample.retain(protected, index)
+        }
+        val protectedRows = protected.size > 0
+        val columns = listOf(learnedStarts, learnedLbd, learnedPermanent, learnedTier,
+            learnedUsed, lifecycleStages, learnedUnits, rechecks, learnedOrigin, learnedScanPos, learnedWatchPos)
+        var metadata = 0L
+        for (column in columns) {
+            sample.step(); metadata += column.backingData.size.toLong() * Int.SIZE_BYTES
+            sample.owned(column.backingData, column.backingData.size.toLong() * Int.SIZE_BYTES, protectedRows)
+        }
+        sample.owned(learnedLits.backingData, learnedLits.backingData.size.toLong() * Int.SIZE_BYTES, protectedRows)
+        sample.owned(arena.lits, arena.lits.size.toLong() * Int.SIZE_BYTES, true, shared = true)
+        sample.owned(arena.starts, arena.starts.size.toLong() * Int.SIZE_BYTES, true, shared = true)
+        sample.owned(watchSizes, watchSizes.size.toLong() * Int.SIZE_BYTES, true)
+        sample.owned(watchPos, watchPos.size.toLong() * Int.SIZE_BYTES, true)
+        sample.owned(baseUnits.backingData, baseUnits.backingData.size.toLong() * Int.SIZE_BYTES, true)
+        sample.ownedReferences(watchEntries, watchEntries.size.toLong(), true)
+        var watchBytes = 0L
+        for (literal in watchEntries.indices) {
+            val entries = watchEntries[literal]
+            sample.step(); watchBytes += entries.size.toLong() * Long.SIZE_BYTES
+            var retained = false
+            for (i in 0 until watchSizes[literal]) {
+                sample.step()
+                val handle = entries[i].toInt()
+                if (!retained) retained = handle < baseCount || sample.contains(protected, handle - baseCount)
+            }
+            sample.owned(entries, entries.size.toLong() * Long.SIZE_BYTES, retained)
         }
         sample.record(mapOf(
             "learnedObjects" to learnedCount.toLong(),
@@ -333,14 +346,6 @@ internal class NativeSatState(private val state: PropagationState) {
         ))
         retiredRootSources?.let { sample.owned(it, it.allocatedBytes, true) }
         sample.owned(importUses, importUses.allocatedBytes)
-        for (i in recheckHead until rechecks.size) {
-            sample.step()
-            if (lifecycleStages[rechecks[i] - baseCount] and 1 == 0) protectMemory(sample)
-        }
-    }
-
-    internal fun protectMemory(sample: SharingMemoryObservation) {
-        sample.owned(learnedLits.backingData, learnedLits.backingData.size.toLong() * Int.SIZE_BYTES, true)
     }
 
     val count: Int get() = learnedCount

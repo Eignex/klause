@@ -10,6 +10,19 @@ import kotlin.test.assertTrue
 
 class SearchLearningTest {
     @Test
+    fun `a protected shared unit should protect its stage and queue allocations`() {
+        val session = SearchSession(emptyList(), learnedDb = SearchLearnedDbParams(glueLbd = 0))
+        session.learn(SearchExplanation(intArrayOf(0)))
+        session.propagate()
+        val sample = SharingMemoryObservation(100_000L, 1024, { false }, {})
+
+        val values = requireNotNull(sample.snapshot { session.retainedLearningMemory(sample) }.completeValues)
+
+        assertEquals(values.getValue("ownedPrimitiveBytes"), values.getValue("protectedPrimitiveBytes"))
+        assertEquals(values.getValue("ownedReferenceSlots"), values.getValue("protectedReferenceSlots"))
+    }
+
+    @Test
     fun `one work resumed slices should progress after cancelled optional reclamation`() {
         var limited = false
         var spent = 0L

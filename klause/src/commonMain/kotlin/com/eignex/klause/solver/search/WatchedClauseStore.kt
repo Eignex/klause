@@ -97,7 +97,7 @@ internal class WatchedClauseStore {
         return bytes
     }
 
-    internal fun memory(sample: SharingMemoryObservation, protectedClause: (Int) -> Boolean = { false }) {
+    internal fun memory(sample: SharingMemoryObservation, protectedClause: (Int) -> Boolean = { false }): Boolean {
         var watchBytes = 0L
         var signatureBytes = 0L
         for (value in watchers.valuesInternal) {
@@ -120,27 +120,50 @@ internal class WatchedClauseStore {
             "sharedLearnedReferenceSlots" to clauses.capacity.toLong() + watchers.referenceCapacity +
                 signatures.referenceCapacity,
         ))
+        val protectedIds = sample.seen<Int>()
         for (index in 0 until size) {
             val clause = clauses[index]
-            sample.owned(clause, clause.size.toLong() * Int.SIZE_BYTES, protectedClause(index))
+            val protected = protectedClause(index)
+            if (protected) sample.retain(protectedIds, index)
+            sample.owned(clause, clause.size.toLong() * Int.SIZE_BYTES, protected)
         }
-        sample.ownedReferences(clauses, clauses.capacity.toLong())
-        sample.owned(used.backingData, used.backingData.size.toLong() * Int.SIZE_BYTES)
-        sample.owned(lbds.backingData, lbds.backingData.size.toLong() * Int.SIZE_BYTES)
-        sample.owned(attached.backingData, attached.backingData.size.toLong() * Int.SIZE_BYTES)
-        sample.owned(unitClauses.backingData, unitClauses.backingData.size.toLong() * Int.SIZE_BYTES)
-        sample.owned(watchers, watchers.primitiveCapacityBytes)
-        sample.owned(signatures, signatures.primitiveCapacityBytes)
-        sample.ownedReferences(watchers.valuesInternal, watchers.referenceCapacity.toLong())
-        sample.ownedReferences(signatures.valuesInternal, signatures.referenceCapacity.toLong())
+        val protected = protectedIds.size > 0
+        sample.ownedReferences(clauses, clauses.capacity.toLong(), protected)
+        sample.owned(used.backingData, used.backingData.size.toLong() * Int.SIZE_BYTES, protected)
+        sample.owned(lbds.backingData, lbds.backingData.size.toLong() * Int.SIZE_BYTES, protected)
+        sample.owned(attached.backingData, attached.backingData.size.toLong() * Int.SIZE_BYTES, protected)
+        sample.owned(unitClauses.backingData, unitClauses.backingData.size.toLong() * Int.SIZE_BYTES, protected)
+        var protectedWatches = false
         for (value in watchers.valuesInternal) {
             sample.step()
-            if (value != null) sample.owned(value, (value as IntArrayList).backingData.size.toLong() * Int.SIZE_BYTES)
+            if (value == null) continue
+            val list = value as IntArrayList
+            var protectedPosting = false
+            for (position in 0 until list.size) {
+                sample.step()
+                if (sample.contains(protectedIds, list[position])) protectedPosting = true
+            }
+            protectedWatches = protectedWatches || protectedPosting
+            sample.owned(list, list.backingData.size.toLong() * Int.SIZE_BYTES, protectedPosting)
         }
+        sample.owned(watchers, watchers.primitiveCapacityBytes, protectedWatches)
+        sample.ownedReferences(watchers.valuesInternal, watchers.referenceCapacity.toLong(), protectedWatches)
+        var protectedSignatures = false
         for (value in signatures.valuesInternal) {
             sample.step()
-            if (value != null) sample.owned(value, (value as IntArrayList).backingData.size.toLong() * Int.SIZE_BYTES)
+            if (value == null) continue
+            val list = value as IntArrayList
+            var protectedPosting = false
+            for (position in 0 until list.size) {
+                sample.step()
+                if (sample.contains(protectedIds, list[position])) protectedPosting = true
+            }
+            protectedSignatures = protectedSignatures || protectedPosting
+            sample.owned(list, list.backingData.size.toLong() * Int.SIZE_BYTES, protectedPosting)
         }
+        sample.owned(signatures, signatures.primitiveCapacityBytes, protectedSignatures)
+        sample.ownedReferences(signatures.valuesInternal, signatures.referenceCapacity.toLong(), protectedSignatures)
+        return protected
     }
 
     /** Number of retained clauses. */
