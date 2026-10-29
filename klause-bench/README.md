@@ -793,6 +793,8 @@ entire invocation; discarding diagnostic data resets no solver allowance.
 
 Plain source bytes are hashed after corpus decompression with a 1 MiB input limit.
 A hash mismatch retains the bytes and observed digest and stops before solving.
+Optional `source64=BASE64 format=FORMAT` uses the existing 96 KiB encoded-input
+loader and requires the same source digest, avoiding runtime corpus discovery.
 Original source bytes, canonical original/prepared models and installed provenance
 remain in the capture. Bounded records also go to stdout, including both canonical
 models, so retained live output can expose a capture awaiting file publication.
