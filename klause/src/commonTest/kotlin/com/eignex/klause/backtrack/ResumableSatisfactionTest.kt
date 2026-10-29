@@ -15,15 +15,44 @@ import com.eignex.klause.solver.search.PreparingSearchComponent
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.SharingMemoryStatus
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ResumableSatisfactionTest {
+    @Test
+    fun `close should finish component cleanup before releasing its native generation`() {
+        var native: PropagationSession? = null
+        var closed = 0
+        val exchange = object : ClauseExchange {
+            override fun onSearchStart(session: PropagationSession) { native = session }
+            override fun onRestart(session: PropagationSession) = Unit
+        }
+        val component = object : SearchComponent, AutoCloseable {
+            override fun close() {
+                assertNotNull(native).boolValue(0)
+                closed++
+            }
+        }
+        val search = BacktrackSolver(pigeonhole(3, 2).bake()).resumableSolve(BacktrackParams(
+            clauseExchange = exchange, componentFactory = { listOf(component) },
+        ))
+        repeat(10) { if (native == null) search.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L) }
+
+        search.close()
+        search.close()
+
+        assertEquals(1, closed)
+        assertEquals(SharingMemoryStatus.STALE, assertNotNull(native).sharingMemory().status)
+        assertEquals(0, assertNotNull(native).learnedClauseCount)
+    }
+
     @Test
     fun `ordinary and resumed search should reclaim learned memory without restarts`() {
         for (native in listOf(false, true)) for (resumed in listOf(false, true)) {

@@ -388,12 +388,6 @@ internal class NativeSatState(private val state: PropagationState) {
         learnedUsed[i] = 1
     }
 
-    /**
-     * Drop every learned clause the [keep] predicate rejects and compact the survivors, renumbering
-     * learned handles contiguously. Base clauses and their watches are untouched; surviving learned
-     * clauses keep their drifted watch positions, and every watch-list entry naming a learned handle is
-     * remapped or removed. Called at a restart boundary to bound the learned database.
-     */
     internal fun prepareReclamation(
         budget: ReclamationPreparation,
         retained: BooleanArray,

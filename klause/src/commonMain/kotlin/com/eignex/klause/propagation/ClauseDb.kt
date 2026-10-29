@@ -235,7 +235,8 @@ internal fun PropagationState.noteLearnedUse(fid: Int) {
  *
  * Watchers' positions inside each clause's `refPayload[fid]` are watch *indices*
  * (into `clause.literals`), not factor ids — they survive the compaction unchanged.
- * Cost is amortised across infrequent calls (typically once per restart).
+ * A cancellable preflight must fund the complete atomic remap and its scratch before mutation.
+ * An oversized or cancelled preparation returns false and preserves the generation.
  */
 internal fun PropagationState.forgetLearnedClauses(
     maxWork: Long = 65_536L,
@@ -358,9 +359,7 @@ internal fun PropagationState.forgetLearnedClauses(
         list.trim()
     }
 
-    // The compaction renumbered learned fids and shifted every list position, so the
-    // back-pointer index is stale — rebuild it wholesale from the final lists. Cheap
-    // relative to the rest of forget, which is itself infrequent (≈ once per restart).
+    // Renumbering learned fids and shifting list positions invalidates every back pointer.
     work += watches.pos.size.toLong() * watches.pos.size
     watches.pos = com.eignex.klause.util.MutableLongIntMap()
     for (lit in watches.byLit.indices) {

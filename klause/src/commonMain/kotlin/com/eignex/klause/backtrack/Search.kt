@@ -193,6 +193,7 @@ internal class CpSatisfactionTraversal(
         },
         branching = CpBranching.None,
     ).also {
+        resources.own(AutoCloseable { it.releaseRetainedState() })
         it.conflictStats = sink?.ca
         sink?.search?.let { search ->
             search.propagationWork = { it.session.work }
@@ -252,8 +253,6 @@ internal class CpSatisfactionTraversal(
                     params.clauseExchange?.onSearchClose(cp.session)
                 } finally {
                     cp.session.sharedLearningMemory = null
-                    traversal.releaseRetainedState()
-                    cp.releaseRetainedState()
                 }
             })
             cp.useEnforcingPeers(components.filterIsInstance<FiniteFactorEnforcer>()
@@ -422,10 +421,14 @@ internal class CpSatisfactionTraversal(
         closed = true
         initialization = null
         run = null
-        learningSession?.releaseLearning()
-        learningSession = null
         sharedSession = null
-        resources.close()
+        try {
+            resources.close()
+        } finally {
+            learningSession?.releaseLearning()
+            learningSession = null
+            traversal.releaseRetainedState()
+        }
     }
 
     /** Close after [failure], keeping it primary. */
@@ -434,10 +437,14 @@ internal class CpSatisfactionTraversal(
         closed = true
         initialization = null
         run = null
-        learningSession?.releaseLearning()
-        learningSession = null
         sharedSession = null
-        resources.closeAfter(failure)
+        try {
+            resources.closeAfter(failure)
+        } finally {
+            learningSession?.releaseLearning()
+            learningSession = null
+            traversal.releaseRetainedState()
+        }
     }
 }
 

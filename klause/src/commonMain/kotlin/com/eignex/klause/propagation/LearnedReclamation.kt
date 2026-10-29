@@ -83,6 +83,7 @@ internal fun PropagationState.prepareReclamation(
         budget.visit()
         retained[i] = retained[i] || learned.permanent[i] == 1 || keep(i, learned.lbds[i])
     }
+    if (factorAttribution != null) budget.atomic(count.toLong() * count)
     budget.atomic(propQueue.size.toLong() * 3L + atoms.dirtyFactors.size * 3L + learned.pendingAttach.size,
         (propQueue.size.toLong() + atoms.dirtyFactors.size) * Int.SIZE_BYTES)
     budget.atomic(watches.pos.primitiveCapacityBytes, watches.pos.primitiveCapacityBytes * 2L)
@@ -96,7 +97,7 @@ internal fun PropagationState.prepareReclamation(
     if (learned.integerRows != null) {
         intEvents.overflow?.let { overflow ->
             budget.atomic(overflow.primitiveCapacityBytes + overflow.size.toLong() * overflow.size,
-                overflow.primitiveCapacityBytes * 2L + overflow.referenceCapacity.toLong() * Long.SIZE_BYTES)
+                overflow.primitiveCapacityBytes * 2L + overflow.referenceCapacity.toLong() * Long.SIZE_BYTES * 2L)
             for (value in overflow.valuesInternal) {
                 budget.visit()
                 if (value != null) {

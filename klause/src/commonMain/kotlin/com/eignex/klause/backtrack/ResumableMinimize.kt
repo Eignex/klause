@@ -411,13 +411,15 @@ internal class ResumableMinimize(
         ).also {
             it.conflictStats = sink.ca
             resources.own(AutoCloseable {
+                inprocessing?.reset()
+                if (::searchSession.isInitialized) searchSession.releaseLearning()
+                it.releaseRetainedState()
+            })
+            resources.own(AutoCloseable {
                 try {
                     params.clauseExchange?.onSearchClose(it.session)
                 } finally {
                     it.session.sharedLearningMemory = null
-                    inprocessing?.reset()
-                    if (::searchSession.isInitialized) searchSession.releaseLearning()
-                    it.releaseRetainedState()
                 }
             })
             sink.search.propagationWork = { it.session.work }
