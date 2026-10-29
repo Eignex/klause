@@ -190,7 +190,8 @@ internal class CpSatisfactionTraversal(
             cumulativeUnarySubsets = problem.numRealVars == 0 && params.useCumulativeUnarySubsets,
         )).also {
             if (params.integerRowLearning) it.enableIntegerRowLearning()
-            it.configureAttribution(params.propagationAttribution, params.historicalTableReasons, params.costAwarePropagation)
+            it.configureAttribution(params.propagationAttribution, params.historicalTableReasons,
+                params.costAwarePropagation)
         },
         branching = CpBranching.None,
     ).also {
