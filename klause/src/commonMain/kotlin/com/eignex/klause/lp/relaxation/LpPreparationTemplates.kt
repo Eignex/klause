@@ -10,31 +10,71 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.impliedLinearRows
 import com.eignex.klause.lp.LinearLpProjection
 import com.eignex.klause.lp.RelaxationBuilder
+import com.eignex.klause.lp.compactRelaxationSupported
+import com.eignex.klause.lp.emitExactLpRelaxation
 import com.eignex.klause.lp.emitLpRelaxation
 import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.ExactLpColumn
+import com.eignex.klause.lp.engine.ExactLpModel
 import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpSide
+import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.rootDomainOf
 import com.eignex.klause.lp.statesLowerBound
 import com.eignex.klause.lp.statesUpperBound
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.RelaxationCapability
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.toLongExact
+
+internal fun LpRelaxation.authoritativeWithTemplates(
+    cancellation: Cancellation,
+    onReuse: (Int) -> Unit = {},
+): ExactLpModel? {
+    val original = model.authoritativeModel() ?: return null
+    val templates = preparationTemplates ?: return original
+    var reused = 0
+    val columns = List(original.numVars) { index ->
+        cancellation.charge(1L)
+        if (cancellation()) return null
+        val current = original.column(index)
+        val prepared = if (index < model.n && colVarId[index] >= 0 &&
+            !colIsBool[index] && colRealId[index] < 0
+        ) templates.bound(colVarId[index])?.compatibleColumn(current) else null
+        if (prepared != null) reused++
+        prepared ?: current
+    }
+    onReuse(reused)
+    return if (reused == 0) original else original.withBoundColumns(columns)
+}
 
 internal class LpSourceRowTemplate(private val row: LinearRow) {
-    private val integers = if (row.isLongUnconditional && row.isIntegerOnly) {
+    private val compactExact = row is ExactLinear && !row.strict && row.activator == LinearRow.ALWAYS &&
+        row.isIntegerOnly && row.compactRelaxationSupported()
+    private val integers = if (compactExact ||
+        (row !is ExactLinear && row.isLongUnconditional && row.isIntegerOnly)
+    ) {
         IntArray(row.size) { Term.intVar(row.ref(it)) }
     } else null
-    private val coefficients = integers?.let { LongArray(row.size) { row.coeff(it) } }
+    private val coefficients = integers?.let {
+        LongArray(row.size) {
+            if (compactExact) (row as ExactLinear).constants.exactCoeff(it).toLongExact() else row.coeff(it)
+        }
+    }
+    private val bound = when {
+        compactExact -> (row as ExactLinear).constants.exactBound.toLongExact()
+        integers != null -> row.bound
+        else -> 0L
+    }
     val storageUnits: Long = 2L + (integers?.size ?: 0) * 2L
 
     fun emit(builder: RelaxationBuilder, projection: LinearLpProjection) {
-        if (integers == null) row.emitLpRelaxation(builder, projection)
-        else builder.linearRow(row.relation, integers, requireNotNull(coefficients), row.bound)
+        if (integers != null) builder.linearRow(row.relation, integers, requireNotNull(coefficients), bound)
+        else if (row is ExactLinear) row.emitExactLpRelaxation(builder)
+        else row.emitLpRelaxation(builder, projection)
     }
 }
 
@@ -164,9 +204,10 @@ internal class LpPreparationTemplates private constructor(
                             support.add(Term.ofLit(variable shl 1))
                         }
                         val declared = if (selection.capabilities(factorId).relaxation != RelaxationCapability.SOUND ||
-                            factor is ExactLinear || factor is LinearIndicator ||
+                            factor is LinearIndicator ||
                             factor is ReifiedPseudoBoolean
-                        ) null else factor.impliedLinearRows.takeIf { it.isNotEmpty() }
+                        ) null else if (factor is ExactLinear) listOf(factor)
+                        else factor.impliedLinearRows.takeIf { it.isNotEmpty() }
                         val rows = declared?.map { row ->
                             if (!visit(1L + row.size)) return null
                             LpSourceRowTemplate(row)

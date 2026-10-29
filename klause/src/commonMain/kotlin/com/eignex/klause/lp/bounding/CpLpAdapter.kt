@@ -7,7 +7,6 @@ import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.LpBoundBatchResult
 import com.eignex.klause.lp.engine.LpLayoutRemap
 import com.eignex.klause.lp.engine.LpModel
-import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.engine.strongerThan
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpRelaxation
@@ -15,6 +14,7 @@ import com.eignex.klause.lp.relaxation.LpRetainedCuts
 import com.eignex.klause.lp.relaxation.LpRetainedSources
 import com.eignex.klause.lp.relaxation.LpSourceEdit
 import com.eignex.klause.lp.relaxation.SessionDomains
+import com.eignex.klause.lp.relaxation.authoritativeWithTemplates
 import com.eignex.klause.lp.relaxation.columnBounds
 import com.eignex.klause.lp.relaxation.withCpBounds
 import com.eignex.klause.lp.relaxation.withModel
@@ -206,7 +206,10 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         }
         val core = engine.propagator
         if (!persistentState) core.reset()
-        if (core.state == null && !core.install(base, base.model.authoritativeModel() ?: return null)) return null
+        if (core.state == null && !core.install(base, base.authoritativeWithTemplates(engine.params.cancellation) {
+                engine.sink.lp.observeTemplateUse(exactBounds = it)
+            } ?: return null)
+        ) return null
         val depth = if (session ===
             sharedNative
         ) {
@@ -228,7 +231,10 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         if (weakens) {
             if (!core.resetRoot()) {
                 cuts = LpRetainedCuts()
-                if (!core.install(base, base.model.authoritativeModel() ?: return null)) return null
+                if (!core.install(base, base.authoritativeWithTemplates(engine.params.cancellation) {
+                        engine.sink.lp.observeTemplateUse(exactBounds = it)
+                    } ?: return null)
+                ) return null
             } else {
                 cuts.retract(0)
             }

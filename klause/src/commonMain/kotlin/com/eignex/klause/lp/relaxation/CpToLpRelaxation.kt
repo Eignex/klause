@@ -157,6 +157,7 @@ internal class LpRelaxation(
     /** The factor each row of [model] was emitted for, or -1 for a cut or a row spanning several factors. */
     val rowFactorIds: IntArray = EmptyIntArray,
     val realUpperRows: Map<Int, Int> = emptyMap(),
+    val preparationTemplates: LpPreparationTemplates? = null,
 ) {
     fun column(variable: CpIntId): LpColumnId? =
         intColOf[variable.index].takeIf { it >= 0 }?.let(::LpColumnId)
@@ -1422,6 +1423,7 @@ internal class CpToLpRelaxation(
                 gatedAux = gatedAuxList.toIntArray(),
                 gatedWhenTrue = BooleanArray(gatedWhenTrueList.size) { gatedWhenTrueList[it] == 1 },
                 realUpperRows = realUpperRows.toMap(),
+                preparationTemplates = preparationTemplates,
             ).also { templateStats?.observeTemplateUse(templateRows, templateBounds) }
         }
 
