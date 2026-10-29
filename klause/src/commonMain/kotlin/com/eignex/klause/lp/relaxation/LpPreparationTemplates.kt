@@ -224,6 +224,7 @@ internal class LpPreparationTemplates private constructor(
                     val sameObjective = old.objective === objective
                     val sameConstant = old.objectiveConstant == (objective?.constant ?: 0L)
                     for ((componentId, component) in old.components.withIndex()) {
+                        if (!visit()) return null
                         var componentBounds: MutableMap<Int, LpIntegerBoundTemplate>? = null
                         if (changedBounds != null) for ((variable, bound) in component.bounds) {
                             if (!visit()) return null
