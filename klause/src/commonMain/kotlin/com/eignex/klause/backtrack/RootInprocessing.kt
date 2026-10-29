@@ -104,7 +104,14 @@ internal class RootSimplificationPass : InprocessingPass {
                 if (!budget.visit()) break
                 val factor = cursor++
                 budget.note("Candidates")
-                val literals = session.rootClauseLiterals(factor, ROOT_LITERAL_LIMIT - literalsVisited) ?: continue
+                val literals = session.rootClauseLiterals(factor, ROOT_LITERAL_LIMIT - literalsVisited)
+                if (literals == null) {
+                    if (literalsVisited > 0) {
+                        cursor--
+                        break
+                    }
+                    continue
+                }
                 budget.charge(literals.size)
                 literalsVisited += literals.size
                 if (literals.size < 2) continue

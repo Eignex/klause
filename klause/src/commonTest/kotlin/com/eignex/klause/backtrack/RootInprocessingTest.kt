@@ -123,6 +123,20 @@ class RootInprocessingTest {
     }
 
     @Test
+    fun `a clause beyond the remaining literal space should wait for the next slice`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(problem(IntArray(5000) { it % 2 * 2 },
+                IntArray(5000) { it % 2 * 2 }).bake(), nativeSat = native)
+            val pass = RootSimplificationPass()
+            val stats = SearchStatsSink()
+
+            repeat(2) { pass.run(session, BacktrackParams(), stats) }
+
+            assertEquals(2L, stats.snapshot().learning.getValue("inprocessRootEligible"))
+        }
+    }
+
+    @Test
     fun `root refresh should preserve imported origin through compaction`() {
         for (native in listOf(false, true)) {
             val session = PropagationSession(problem(intArrayOf(1)).bake(), nativeSat = native)
