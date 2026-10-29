@@ -47,6 +47,7 @@ object BooleanProofCoverageProfile {
     /** Capture one pinned DIMACS source under `$OUT`; this is a protocol control, not a production scheduler. */
     @JvmStatic
     fun main(args: Array<String>) {
+        val started = System.nanoTime()
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val required = setOf("suite", "problem", "sha256", "work", "seed", "splits")
         require(options.keys.containsAll(required) && (options.keys - required).all { it == "cost-repeats" })
@@ -63,13 +64,13 @@ object BooleanProofCoverageProfile {
         out.resolve("source.cnf").writeBytes(bytes)
         out.resolve("request.txt").writeText(args.joinToString("\n"))
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
-        val started = System.nanoTime()
+        val preparationStarted = System.nanoTime()
         val document = Dimacs.parse(bytes.decodeToString())
         require(!document.triviallyUnsat && document.numBoolVars in splits..4096)
         val source = document.toProblem()
         val problem = source.bake(cancellation = stop)
         check(!stop())
-        val preparationNs = System.nanoTime() - started
+        val preparationNs = System.nanoTime() - preparationStarted
         val context = BooleanProofContext(
             SourceScope(SourceRevision(sha256(bytes), "dimacs-cnf:" + source.semantics)), "source-identity:0",
         )
@@ -139,36 +140,16 @@ object BooleanProofCoverageProfile {
         if (repeats == 0) return
         val process = ManagementFactory.getOperatingSystemMXBean() as OperatingSystemMXBean
         for (iteration in -2 until repeats) {
-            val modes = if (iteration and 1 == 0) listOf("f1", "cubes") else listOf("cubes", "f1")
+            val order = listOf("f1", "cubes", "pins")
+            val offset = (iteration + 2) % order.size
+            val rotated = order.drop(offset) + order.take(offset)
+            val modes = if (iteration and 1 == 0) rotated else rotated.reversed()
             for (mode in modes) {
                 if (stop()) return
                 val beforeCpu = process.processCpuTime
                 val beforeAllocated = bean.getThreadAllocatedBytes(Thread.currentThread().threadId())
                 val begin = System.nanoTime()
-                val results = ArrayList<SolveResult>()
-                val complete = if (mode == "f1") {
-                    val workers = List(2) { worker ->
-                        PortfolioWorker.of("bt/input-order", worker,
-                            BacktrackSolver(problem).session(), params(seed, stop))
-                    }
-                    val result = Portfolio.thompson(workers, baseSliceWork = 8, maxSliceWork = 64,
-                        sliceGrowth = 1.5, reseedStaleThreshold = 0,
-                        diagnostics = PortfolioDiagnostics(work, seed)).use { it.solve(stop) }
-                    results += result
-                    result is SolveResult.Unsat
-                } else {
-                    val tasks = BooleanProofTasks(context, (0 until splits).toList())
-                    val leases = List(tasks.size) { checkNotNull(tasks.acquire(it)) }
-                    for (lease in leases) {
-                        val result = taskQuery(problem, lease, seed, work, tasks.size, stop)
-                        results += result
-                        tasks.complete(lease) {
-                            if (result is SolveResult.Unsat) BooleanTaskCheck.NativeRefutation
-                            else BooleanTaskCheck.Unresolved
-                        }
-                    }
-                    tasks.nativeCoverageComplete.also { tasks.cancel() }
-                }
+                val (results, complete) = costQueries(mode, problem, context, splits, seed, work, stop)
                 val elapsed = System.nanoTime() - begin
                 val allocated = bean.getThreadAllocatedBytes(Thread.currentThread().threadId()) - beforeAllocated
                 val cpu = process.processCpuTime - beforeCpu
@@ -195,6 +176,43 @@ object BooleanProofCoverageProfile {
                 }.toString() + "\n")
             }
         }
+    }
+
+    private fun costQueries(
+        mode: String, problem: BakedProblem, context: BooleanProofContext,
+        splits: Int, seed: Long, work: Long, stop: Cancellation,
+    ): Pair<List<SolveResult>, Boolean> {
+        if (mode == "f1") {
+            val workers = List(2) { worker ->
+                PortfolioWorker.of("bt/input-order", worker, BacktrackSolver(problem).session(), params(seed, stop))
+            }
+            val result = Portfolio.thompson(workers, baseSliceWork = 8, maxSliceWork = 64,
+                sliceGrowth = 1.5, reseedStaleThreshold = 0,
+                diagnostics = PortfolioDiagnostics(work, seed)).use { it.solve(stop) }
+            return listOf(result) to (result is SolveResult.Unsat)
+        }
+        if (mode == "pins") {
+            val count = 1 shl splits
+            val results = List(count) { mask ->
+                val pins = context.scope.condition.bools + (0 until splits).associate {
+                    it to (mask and (1 shl it) != 0)
+                }
+                BacktrackSolver(problem).solve(params(seed, stop).copy(
+                    assumptions = Assumptions(bools = pins), nodeBudget = NodeBudget(maxOf(1L, work / count)),
+                ))
+            }
+            return results to results.all { it is SolveResult.Unsat }
+        }
+        val tasks = BooleanProofTasks(context, (0 until splits).toList())
+        val leases = List(tasks.size) { checkNotNull(tasks.acquire(it)) }
+        val results = leases.map { lease ->
+            taskQuery(problem, lease, seed, work, tasks.size, stop).also { result ->
+                tasks.complete(lease) {
+                    if (result is SolveResult.Unsat) BooleanTaskCheck.NativeRefutation else BooleanTaskCheck.Unresolved
+                }
+            }
+        }
+        return results to tasks.nativeCoverageComplete.also { tasks.cancel() }
     }
 
     private fun independentReplicas(
