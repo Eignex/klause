@@ -31,5 +31,6 @@
       }
     },
     "referenceFilters": {}
-  }
+  },
+  "parallel": 1
 }

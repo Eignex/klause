@@ -54,6 +54,7 @@ class LabSelectionsTest {
                 val name = recipe.getValue("name").jsonPrimitive.content
                 val sweep = name.startsWith("status-sweep")
                 if (sweep) {
+                    assertEquals("1", recipe.getValue("parallel").jsonPrimitive.content)
                     val tags = recipe.getValue("tags").toString()
                     assertEquals("[\"platform:linux\",\"arch:x86_64\"]", tags)
                     assertEquals("sdk-linux-v1", parameters["comparison-series"])
