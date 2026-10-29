@@ -1,0 +1,31 @@
+{
+  "name": "reference-cvc5",
+  "description": "Second SMT-LIB reference: cvc5 on every SMT problem without a cvc5 verdict, at 60 s, to cross-check z3.",
+  "base": {
+    "backend": "reference",
+    "solver": "cvc5",
+    "timeout": "60000"
+  },
+  "parallel": 6,
+  "priority": 0,
+  "confirm": true,
+  "repository": "Eignex/klause",
+  "bench": {
+    "manifest": "klause-bench/lab/reference.json",
+    "sourceValidation": false,
+    "request": {
+      "parameters": {
+        "selections": "[{\"suite\":\"smtlib-qflia\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qflra\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qfnra\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qfidl\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qfrdl\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qflira\",\"per-family\":\"1000000\"}]",
+        "timeout-ms": "60000"
+      }
+    },
+    "referenceFilters": {
+      "smtlib-qflia": "missing",
+      "smtlib-qflra": "missing",
+      "smtlib-qfnra": "missing",
+      "smtlib-qfidl": "missing",
+      "smtlib-qfrdl": "missing",
+      "smtlib-qflira": "missing"
+    }
+  }
+}

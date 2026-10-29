@@ -1,0 +1,37 @@
+{
+  "name": "reference-qfnra-sweep",
+  "description": "QF_NRA references for the regression schedules and sweep sets: Z3 and cvc5 at 60 s on one core, the budget the klause-reference schedules run at, over the frozen polynomial-real suites (beside the 10 s Z3 baseline of reference-qfnra) and up to 100 per family of the SMT-LIB QF_NRA archive.",
+  "base": {
+    "backend": "reference",
+    "timeout": "60000"
+  },
+  "configs": [
+    {
+      "label": "z3"
+    },
+    {
+      "label": "cvc5"
+    }
+  ],
+  "parallel": 4,
+  "priority": 0,
+  "confirm": true,
+  "repository": "Eignex/klause",
+  "bench": {
+    "manifest": "klause-bench/lab/reference.json",
+    "sourceValidation": false,
+    "request": {
+      "parameters": {
+        "selections": "[{\"suite\":\"smtlib-qfnra-core-v1\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qfnra-holdout-v1\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qfnra-extensions-v1\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qfnra-source-canonical-v1\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qfnra\",\"per-family\":\"100\",\"seed\":\"1\"}]",
+        "timeout-ms": "60000"
+      }
+    },
+    "referenceFilters": {
+      "smtlib-qfnra-core-v1": "any",
+      "smtlib-qfnra-holdout-v1": "any",
+      "smtlib-qfnra-extensions-v1": "any",
+      "smtlib-qfnra-source-canonical-v1": "any",
+      "smtlib-qfnra": "any"
+    }
+  }
+}

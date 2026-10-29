@@ -15,7 +15,7 @@ import java.util.HexFormat
 internal object LabInputs {
     const val RUNTIME = "klause-bench/build/lab-runtime/minizinc"
 
-    fun resolve(ref: ProblemRef): List<BenchInput> = buildList {
+    fun resolve(ref: ProblemRef, inputOnly: Boolean = false): List<BenchInput> = buildList {
         val model = CorpusFetcher.resolve(ref.source).toPath()
         add(input(model, "model"))
         ref.data?.let { add(input(CorpusFetcher.resolve(it).toPath(), "data")) }
@@ -39,9 +39,11 @@ internal object LabInputs {
                 }
             }
             dependencies(model)
-            val runtime = CorpusFetcher.workspaceRoot().toPath().resolve(RUNTIME)
-            require(Files.isExecutable(runtime.resolve("bin/minizinc"))) { "Run :klause-bench:prepareLabRuntime" }
-            add(input(runtime, "compiler"))
+            if (!inputOnly) {
+                val runtime = CorpusFetcher.workspaceRoot().toPath().resolve(RUNTIME)
+                require(Files.isExecutable(runtime.resolve("bin/minizinc"))) { "Run :klause-bench:prepareLabRuntime" }
+                add(input(runtime, "compiler"))
+            }
         }
     }.distinct()
 

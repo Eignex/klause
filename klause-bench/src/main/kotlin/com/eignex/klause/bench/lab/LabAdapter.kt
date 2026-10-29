@@ -23,12 +23,7 @@ import com.eignex.klause.bench.target.BenchCli as KlauseCli
 fun main(args: Array<String>) {
     val protocolOutput = System.out
     System.setOut(System.err)
-    System.getenv("LAB_WORKTREE")?.let { tree ->
-        System.setProperty("klause.workspace.root", tree)
-        System.setProperty("klause.bench.minizinc", Path.of(tree, LabInputs.RUNTIME, "bin/minizinc").toString())
-    }
-    System.getenv("LAB_CORPUS")?.let { System.setProperty("klause.bench.corpusCache", it) }
-    System.setProperty("klause.bench.cache", "false")
+    configureLabPaths()
     if (args.firstOrNull() == "solve-record") {
         require(args.size == 3)
         val case = BenchProtocol.json.decodeFromString<BenchCase>(Files.readString(Path.of(args[1])))
@@ -50,6 +45,15 @@ fun main(args: Array<String>) {
     }
 }
 
+internal fun configureLabPaths() {
+    System.getenv("LAB_WORKTREE")?.let { tree ->
+        System.setProperty("klause.workspace.root", tree)
+        System.setProperty("klause.bench.minizinc", Path.of(tree, LabInputs.RUNTIME, "bin/minizinc").toString())
+    }
+    System.getenv("LAB_CORPUS")?.let { System.setProperty("klause.bench.corpusCache", it) }
+    System.setProperty("klause.bench.cache", "false")
+}
+
 internal object KlauseLabSuite : BenchSuite {
     override fun describe() = BenchDescriptor(
         "klause-bench",
@@ -58,14 +62,15 @@ internal object KlauseLabSuite : BenchSuite {
 
     override fun plan(request: BenchRequest): List<BenchCase> {
         val settings = LabSettings(request.parameters)
-        val selection = request.parameters.filterKeys { it in LabSettings.SELECTORS }
-            .ifEmpty { mapOf("suite" to "dimacs-core", "name" to "php4") }
-        return KlauseCli.selectProblems(selection).flatMap { selected ->
+        val selectedProblems = settings.selections.flatMap { KlauseCli.selectProblems(it) }
+            .distinctBy { it.suite to it.ref.name }
+        return selectedProblems.flatMap { selected ->
             val ref = selected.ref
             require(ref.source !is ProblemSource.InCode) { "Lab subprocess solves require file-backed inputs" }
-            val inputs = LabInputs.resolve(ref)
+            val inputs = LabInputs.resolve(ref, settings.inputOnly)
             val trees = LabInputs.treeHashes(inputs)
             settings.engines.flatMap { engine ->
+                val variant = if (settings.engines.size > 1) "$engine/" else ""
                 settings.seeds.flatMap { seed ->
                     (0 until settings.repeats).map { repeat ->
                         BenchCase(
@@ -75,6 +80,9 @@ internal object KlauseLabSuite : BenchSuite {
                             inputs = inputs,
                             attributes = trees + mapOf(
                                 "suite" to selected.suite,
+                                "comparisonKey" to "${selected.suite}/${ref.name}/$variant$seed/$repeat",
+                                "seed" to seed.toString(),
+                                "budgetMs" to settings.timeout.toString(),
                                 "problem" to ref.name,
                                 "collection" to collectionOf(ref),
                                 "family" to (ref.family ?: ref.name.substringBefore('/')),
@@ -169,6 +177,9 @@ internal object KlauseLabSuite : BenchSuite {
         }
 
     override fun run(case: BenchCase, context: BenchContext): BenchResult {
+        require(case.parameters["input-only"] != "true") {
+            "Input-only plans must run through the lab reference backend"
+        }
         val report = context.reportPath()
         Files.createDirectories(report)
         val input = context.outputDirectory.resolve("input.json")

@@ -1,0 +1,45 @@
+{
+  "name": "reference",
+  "description": "One-off reference run: each suite's reference solver (clasp, z3, SCIP, cp-sat) at 60 s on one core, over every problem without a settled verdict.",
+  "base": {
+    "backend": "reference",
+    "timeout": "60000"
+  },
+  "priority": 0,
+  "confirm": true,
+  "repository": "Eignex/klause",
+  "bench": {
+    "manifest": "klause-bench/lab/reference.json",
+    "sourceValidation": false,
+    "request": {
+      "parameters": {
+        "selections": "[{\"suite\":\"hakank\",\"per-family\":\"1000000\"},{\"suite\":\"mzn-bench\",\"per-family\":\"1000000\"},{\"suite\":\"xcsp3-cop\",\"per-family\":\"1000000\"},{\"suite\":\"xcsp3-csp\",\"per-family\":\"1000000\"},{\"suite\":\"miplib2017\",\"per-family\":\"1000000\"},{\"suite\":\"miplib2010\",\"per-family\":\"1000000\"},{\"suite\":\"miplib2003\",\"per-family\":\"1000000\"},{\"suite\":\"miplib3\",\"per-family\":\"1000000\"},{\"suite\":\"orlib\",\"per-family\":\"1000000\"},{\"suite\":\"pb-comp-2025\",\"per-family\":\"1000000\"},{\"suite\":\"pb-comp-wbo\",\"per-family\":\"1000000\"},{\"suite\":\"pb-comp\",\"per-family\":\"1000000\"},{\"suite\":\"pb07-opb\",\"per-family\":\"1000000\"},{\"suite\":\"maxsat-unweighted\",\"per-family\":\"1000000\"},{\"suite\":\"maxsat-weighted\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qflia\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qflra\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qfnra\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qfidl\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qfrdl\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qflira\",\"per-family\":\"1000000\"},{\"suite\":\"satlib\",\"per-family\":\"1000000\"}]",
+        "timeout-ms": "60000"
+      }
+    },
+    "referenceFilters": {
+      "hakank": "unsettled",
+      "mzn-bench": "unsettled",
+      "xcsp3-cop": "unsettled",
+      "xcsp3-csp": "unsettled",
+      "miplib2017": "unsettled",
+      "miplib2010": "unsettled",
+      "miplib2003": "unsettled",
+      "miplib3": "unsettled",
+      "orlib": "unsettled",
+      "pb-comp-2025": "unsettled",
+      "pb-comp-wbo": "unsettled",
+      "pb-comp": "unsettled",
+      "pb07-opb": "unsettled",
+      "maxsat-unweighted": "unsettled",
+      "maxsat-weighted": "unsettled",
+      "smtlib-qflia": "unsettled",
+      "smtlib-qflra": "unsettled",
+      "smtlib-qfnra": "unsettled",
+      "smtlib-qfidl": "unsettled",
+      "smtlib-qfrdl": "unsettled",
+      "smtlib-qflira": "unsettled",
+      "satlib": "unsettled"
+    }
+  }
+}

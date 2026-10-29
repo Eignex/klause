@@ -1,0 +1,26 @@
+{
+  "name": "reference-qfnra",
+  "description": "Frozen polynomial-real QF_NRA Z3 reference baseline: all 37 core and 24 holdout identities at 10 seconds on one core, three repeats, with original source hashes, exact models and binary identity.",
+  "base": {
+    "backend": "reference",
+    "solver": "z3",
+    "timeout": "10000",
+    "processors": "1"
+  },
+  "parallel": 1,
+  "repeats": 3,
+  "priority": 0,
+  "repository": "Eignex/klause",
+  "bench": {
+    "manifest": "klause-bench/lab/reference.json",
+    "sourceValidation": false,
+    "request": {
+      "parameters": {
+        "selections": "[{\"set\":\"qfnra-core-v1,qfnra-holdout-v1\"}]",
+        "timeout-ms": "10000",
+        "cpus": "1"
+      }
+    },
+    "referenceFilters": {}
+  }
+}

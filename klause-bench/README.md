@@ -124,6 +124,34 @@ limit. No emergency deadline fires. These are mechanism observations: source-che
 receipts are absent, native verdicts remain unverified, and no default activation or
 throughput improvement follows.
 
+This repository owns catalog selection, runtime configuration and build/launch recipes.
+`lab/recipes/` contains the migrated lab recipes. `scripts/convert-lab-recipe.sh`
+translates legacy experiments or schedules from stdin without submitting them;
+exact legacy confirmation lists require a newly pinned SDK plan and are refused.
+
+Profiles use `scripts/lab-profile.sh` with a main class as their first argument.
+The recipe declares build tasks; the script owns CLI paths, corpus properties and
+recording options. After installing the bench, `scripts/draw-sets.sh <features-dir>
+<references.csv> <sets-dir> [set,...]` runs the migrated seeded named-set generator.
+
+The planner accepts `selections`, a JSON-encoded list of independent selector maps,
+merged without duplicate catalog identities. Paired experiments use lab `configs`,
+`grid` and `repeats`: `ref` selects a revision and `param.<key>` overrides an adapter
+request key. Single-engine requests publish comparison identities independent of
+engine; multi-engine requests retain engine in that identity. Reference-only recipes
+use `lab/reference.json`, a portable input-only planner that requires only the bench
+installation and JDK 25. It omits the Linux CLI and MiniZinc compiler requirements;
+the lab reference backend owns execution and its local toolchain.
+
+These workflows require the agnostic lab coordinator and workers (manifest schema 3).
+Reference filtering runs after planning. This planner owns selection caps; the lab
+does not refill them after filtering. Independent checkers remain in Eignex Lab.
+Bench schedules preserve the explicit `bench.sourceValidation` policy.
+
+The adapter accepts `LAB_CORPUS_MIRROR`, `LAB_CORPUS_MIRROR_WRITE`,
+`LAB_CORPUS_KEEP_PACKED` and the preparation-only `LAB_INPUT_SIGNER`, with existing
+local corpus settings as fallbacks. No lab-specific dependency is added to the core.
+
 ## Corpus and build identity
 
 `corpus status` lists cached collections, `corpus gc` applies the cache cap and

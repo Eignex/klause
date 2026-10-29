@@ -1,0 +1,28 @@
+{
+  "name": "reference-chuffed",
+  "description": "Second MiniZinc reference: Chuffed on every MiniZinc problem without a Chuffed verdict, at 60 s on one core, to cross-check cp-sat.",
+  "base": {
+    "backend": "reference",
+    "solver": "chuffed",
+    "timeout": "60000"
+  },
+  "parallel": 6,
+  "priority": 0,
+  "confirm": true,
+  "repository": "Eignex/klause",
+  "bench": {
+    "manifest": "klause-bench/lab/reference.json",
+    "sourceValidation": false,
+    "request": {
+      "parameters": {
+        "selections": "[{\"suite\":\"hakank\",\"per-family\":\"1000000\"},{\"suite\":\"mzn-bench\",\"per-family\":\"1000000\"},{\"suite\":\"libminizinc-tests\",\"per-family\":\"1000000\"}]",
+        "timeout-ms": "60000"
+      }
+    },
+    "referenceFilters": {
+      "hakank": "missing",
+      "mzn-bench": "missing",
+      "libminizinc-tests": "missing"
+    }
+  }
+}

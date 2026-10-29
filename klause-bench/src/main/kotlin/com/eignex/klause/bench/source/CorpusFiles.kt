@@ -1,8 +1,8 @@
 package com.eignex.klause.bench.source
 
-import java.io.File
 import com.github.luben.zstd.ZstdInputStreamNoFinalizer
 import com.github.luben.zstd.ZstdOutputStreamNoFinalizer
+import java.io.File
 import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
@@ -67,7 +67,11 @@ internal object CorpusFiles {
         }
     }
 
-    fun unpack(file: File, keepPacked: Boolean = System.getenv("KLAUSE_BENCH_CORPUS_KEEP_PACKED") == "true"): File {
+    fun unpack(
+        file: File,
+        keepPacked: Boolean =
+            (System.getenv("LAB_CORPUS_KEEP_PACKED") ?: System.getenv("KLAUSE_BENCH_CORPUS_KEEP_PACKED")) == "true",
+    ): File {
         if (!isCompressed(file)) return file
         val plain = File(plainPath(file.path))
         if (keepPacked && plain.isFile) return plain

@@ -1,0 +1,21 @@
+{
+  "name": "status-sweep",
+  "description": "Per-commit regression check: the default engine on the sweep set (147 problems over 11 themes, kept for results that vary from commit to commit) at 10 s.",
+  "base": {},
+  "tags": [
+    "local"
+  ],
+  "priority": 100,
+  "repository": "Eignex/klause",
+  "bench": {
+    "manifest": "klause-bench/lab/bench.json",
+    "sourceValidation": true,
+    "request": {
+      "parameters": {
+        "selections": "[{\"set\":\"sweep\"}]",
+        "timeout-ms": "10000"
+      }
+    },
+    "referenceFilters": {}
+  }
+}

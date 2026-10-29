@@ -1,0 +1,17 @@
+{
+  "main": "com.eignex.klause.bench.lab.ReferenceAdapterKt",
+  "classpath": [
+    "klause-bench/build/install/klause-bench/lib/*"
+  ],
+  "buildTasks": [
+    ":klause-bench:installDist"
+  ],
+  "jvmArgs": [
+    "-Xmx512m",
+    "--enable-native-access=ALL-UNNAMED",
+    "--add-modules=jdk.incubator.vector"
+  ],
+  "runtime": {
+    "java": 25
+  }
+}

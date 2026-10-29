@@ -1,0 +1,45 @@
+{
+  "name": "klause-reference-bt",
+  "description": "Every 3 days: backtracking only on the broad selection at 60 s, to track the CP engine on its own.",
+  "base": {},
+  "priority": 0,
+  "confirm": true,
+  "repository": "Eignex/klause",
+  "bench": {
+    "manifest": "klause-bench/lab/bench.json",
+    "sourceValidation": true,
+    "request": {
+      "parameters": {
+        "selections": "[{\"suite\":\"hakank\",\"per-family\":\"3\",\"max\":\"60\",\"seed\":\"1\"},{\"suite\":\"mzn-bench-compatible-v1\",\"per-family\":\"3\",\"max\":\"60\",\"seed\":\"1\"},{\"suite\":\"xcsp3-cop\",\"per-family\":\"3\",\"max\":\"60\",\"seed\":\"1\"},{\"suite\":\"xcsp3-csp\",\"per-family\":\"3\",\"max\":\"60\",\"seed\":\"1\"},{\"suite\":\"miplib2017\",\"per-family\":\"3\",\"max\":\"60\",\"seed\":\"1\"},{\"suite\":\"miplib2010\",\"per-family\":\"3\",\"max\":\"60\",\"seed\":\"1\"},{\"suite\":\"miplib2003\",\"per-family\":\"3\",\"max\":\"60\",\"seed\":\"1\"},{\"suite\":\"miplib3\",\"per-family\":\"3\",\"max\":\"60\",\"seed\":\"1\"},{\"suite\":\"orlib\",\"per-family\":\"3\",\"max\":\"60\",\"seed\":\"1\"},{\"suite\":\"pb-comp-2025\",\"per-family\":\"3\",\"max\":\"60\",\"seed\":\"1\"},{\"suite\":\"pb-comp-wbo\",\"per-family\":\"3\",\"max\":\"60\",\"seed\":\"1\"},{\"suite\":\"pb-comp\",\"per-family\":\"3\",\"max\":\"60\",\"seed\":\"1\"},{\"suite\":\"pb07-opb\",\"per-family\":\"3\",\"max\":\"60\",\"seed\":\"1\"},{\"suite\":\"maxsat-unweighted\",\"per-family\":\"3\",\"max\":\"60\",\"seed\":\"1\"},{\"suite\":\"maxsat-weighted\",\"per-family\":\"3\",\"max\":\"60\",\"seed\":\"1\"},{\"suite\":\"smtlib-qflia\",\"per-family\":\"3\",\"max\":\"60\",\"seed\":\"1\"},{\"suite\":\"smtlib-qflra\",\"per-family\":\"3\",\"max\":\"60\",\"seed\":\"1\"},{\"suite\":\"smtlib-qfidl\",\"per-family\":\"3\",\"max\":\"60\",\"seed\":\"1\"},{\"suite\":\"smtlib-qfrdl\",\"per-family\":\"3\",\"max\":\"60\",\"seed\":\"1\"},{\"suite\":\"smtlib-qflira\",\"per-family\":\"3\",\"max\":\"60\",\"seed\":\"1\"},{\"suite\":\"smtlib-qfnra\",\"per-family\":\"3\",\"max\":\"60\",\"seed\":\"1\"},{\"suite\":\"smtlib-qfnra-core-v1\",\"per-family\":\"1000000\"},{\"suite\":\"satlib\",\"per-family\":\"3\",\"max\":\"60\",\"seed\":\"1\"},{\"suite\":\"satcomp-compact-v1\",\"per-family\":\"3\",\"max\":\"60\",\"seed\":\"1\"}]",
+        "timeout-ms": "60000",
+        "engines": "cp"
+      }
+    },
+    "referenceFilters": {
+      "hakank": "decided",
+      "mzn-bench-compatible-v1": "decided",
+      "xcsp3-cop": "decided",
+      "xcsp3-csp": "decided",
+      "miplib2017": "decided",
+      "miplib2010": "decided",
+      "miplib2003": "decided",
+      "miplib3": "decided",
+      "orlib": "decided",
+      "pb-comp-2025": "decided",
+      "pb-comp-wbo": "decided",
+      "pb-comp": "decided",
+      "pb07-opb": "decided",
+      "maxsat-unweighted": "decided",
+      "maxsat-weighted": "decided",
+      "smtlib-qflia": "decided",
+      "smtlib-qflra": "decided",
+      "smtlib-qfidl": "decided",
+      "smtlib-qfrdl": "decided",
+      "smtlib-qflira": "decided",
+      "smtlib-qfnra": "decided",
+      "smtlib-qfnra-core-v1": "decided",
+      "satlib": "decided",
+      "satcomp-compact-v1": "any"
+    }
+  }
+}
