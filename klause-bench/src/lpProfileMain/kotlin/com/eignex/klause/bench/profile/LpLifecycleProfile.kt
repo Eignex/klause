@@ -59,7 +59,8 @@ fun main(args: Array<String>) {
     val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
     require(options.keys - "mode" == setOf("source64", "source", "sha256", "repeats"))
     val mode = options["mode"] ?: "lifecycle"
-    val claims = mode == "claims" || mode == "precision" || mode == "checkpoint"
+    val checkpoint = mode == "checkpoint" || mode == "checkpoint-feasibility"
+    val claims = mode == "claims" || mode == "precision" || checkpoint
     require(claims || mode == "lifecycle" || mode == "consumers")
     val bytes = Base64.decode(options.getValue("source64"))
     require(bytes.size in 1..1_048_576)
@@ -119,10 +120,11 @@ fun main(args: Array<String>) {
             }
             continue
         }
-        if (mode == "checkpoint") {
+        if (checkpoint) {
             val arms = if (round % 2 == 0) listOf(false, true) else listOf(true, false)
+            val requested = if (mode == "checkpoint-feasibility") listOf(LpClaim.FEASIBLE_COMPLETION) else LpClaim.entries
             for (preserve in arms) {
-                for (claim in LpClaim.entries) {
+                for (claim in requested) {
                     if (profileExpired(stop)) return
                     lifecycle(initial, column, side, round, true, true, stop, claim, true,
                         preserveOverflowCheckpoint = preserve)
@@ -144,7 +146,7 @@ fun main(args: Array<String>) {
             }
         }
     }
-    if (mode == "checkpoint") {
+    if (checkpoint) {
         for (preserve in listOf(false, true)) {
             if (profileExpired(stop)) return
             sourceWorker(compiled.model, requireNotNull(objective), stop, timeoutSeconds = 5,
