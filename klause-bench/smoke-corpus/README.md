@@ -17,7 +17,7 @@ declaration. See [corpus management](../README.md#catalog-and-corpus).
 | `mps-linear-source-v1` | Self-authored Apache-2.0 exact decimal, indicator, wide-coordinate and mixed primal-point source controls; original sense, constants and integral LP columns retain their source mappings |
 | `product-aliases` | Self-authored MiniZinc repeated-role products and fixed powers, including reified comparisons, zero/identity powers and standard truncated negative powers; Apache-2.0 |
 | `divmod` | Self-authored Apache-2.0 signed quotient/remainder, wide Euclidean, joint conflict and equivalent linear controls; MiniZinc input is `klause-mzn-lib/test-models/divmod.mzn` |
-| `lp-component-split` | Self-authored dense bounded block systems for the explicit measurement suite |
+| `lp-component-split` | Self-authored dense bounded and binary covering block systems for explicit experiments |
 
 MiniZinc smoke models live under
 [klause-mzn-lib/test-models](../../klause-mzn-lib/test-models) and are referenced
@@ -32,6 +32,11 @@ cost exposure and retained output-bound propagation without changing feasibility
 The width-`n` component-split matrix is `nI + 11^T` with RHS `2n`, giving exact
 solution `x = 1`. The linked MiniZinc control adds a redundant row joining blocks.
 These fixtures are explicit experiments rather than CI smoke selection.
+The Apache-2.0 `cover-2x3.mps` and `cover-3x3.mps` sources contain independent
+binary covering blocks with weights `(2,3,3)`, right side 4 and unit costs. A single
+column cannot cover a block, while any pair can, giving exact integer optima 4 and
+6. Their direct additive objectives preserve the independent LP blocks; fractional
+relaxations allow tableau cuts and repeated scoped node-bound controls.
 
 ## Polynomial-real SMT fixtures
 
