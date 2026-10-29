@@ -52,6 +52,7 @@ import com.eignex.klause.solver.search.BooleanBranching
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.FiniteFactorEnforcer
 import com.eignex.klause.solver.search.PreparingSearchComponent
+import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
@@ -470,6 +471,7 @@ internal class ResumableMinimize(
         ).session(
             cancellation = params.cancellation,
             learnedDb = params.sharedLearnedDb(),
+            atoms = if (params.integerRowLearning) SearchAtomRegistry(problem.numBoolVars) else null,
         )
         if (params.clauseExchange != null || params.learnedMemoryBytes != null) {
             session.sharedLearningMemory = searchSession::retainedLearningMemory
