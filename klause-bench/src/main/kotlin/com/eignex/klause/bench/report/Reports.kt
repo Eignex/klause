@@ -6,6 +6,17 @@ import java.io.File
 
 /** The bench's JSON encoder and writer, shared by solve records and profile outputs. */
 object Reports {
+    internal fun fileStem(name: String): String = buildString {
+        for (character in name) {
+            when {
+                character == '/' -> append('_')
+                character in "\\:%" || character.isISOControl() ->
+                    append('%').append(character.code.toString(16).padStart(2, '0'))
+                else -> append(character)
+            }
+        }
+    }
+
     internal val json: Json = Json {
         prettyPrint = true
         encodeDefaults = true
