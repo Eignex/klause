@@ -19,7 +19,7 @@ data class BooleanProofContext(
     }
 }
 
-/** Immutable conjunction in one context's Boolean coordinates. Contradictory pins are rejected. */
+/** Immutable conjunction in original source Boolean coordinates. Contradictory pins are rejected. */
 class BooleanCube(literals: List<Int>) {
     private val pins = literals.also { require(it.size <= 4096) }.distinct().sorted()
 

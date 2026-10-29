@@ -51,6 +51,29 @@ class BooleanProofTasksTest {
     }
 
     @Test
+    fun `caller assumptions should remain conjoined with actual scoped task queries`() {
+        val problem = Problem(2, 0, emptyArray(), arrayOf(Clause(intArrayOf(0, 2)))).bake()
+        val conditioned = context.copy(scope = scope.copy(condition = SourceCondition(bools = mapOf(1 to false))))
+        val tasks = BooleanProofTasks(conditioned, listOf(0))
+
+        repeat(tasks.size) { worker ->
+            val lease = assertNotNull(tasks.acquire(worker))
+            val pins = lease.context.scope.condition.bools + lease.cube.literals.associate {
+                Lit.variable(it) to Lit.isPositive(it)
+            }
+            val result = BacktrackSolver(problem).solve(BacktrackParams(
+                assumptions = Assumptions(bools = pins), nativeSat = false, randomSeed = 17,
+            ))
+            tasks.complete(lease) {
+                if (result is SolveResult.Unsat) BooleanTaskCheck.NativeRefutation else BooleanTaskCheck.Unresolved
+            }
+        }
+
+        assertEquals(1, tasks.closed)
+        assertFalse(tasks.nativeCoverageComplete)
+    }
+
+    @Test
     fun `partition should cover each Boolean assignment exactly once`() {
         val tasks = BooleanProofTasks(context, listOf(0, 2))
         val cubes = List(tasks.size) { assertNotNull(tasks.acquire(it)).cube.literals }
