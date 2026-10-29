@@ -850,7 +850,10 @@ internal object Compiler {
                     val coeffs = coeffsOrUnit(e.child("coeffs")?.textContent, termVars.size)
                     require(coeffs.size == termVars.size) { "objective: <coeffs> length != term count" }
                     val arr = LongArray(domains.size)
-                    termVars.forEachIndexed { i, v -> arr[v] += (if (maximize) -coeffs[i] else coeffs[i]).toLong() }
+                    termVars.forEachIndexed { i, v ->
+                        val coefficient = coeffs[i].toLong()
+                        arr[v] += if (maximize) -coefficient else coefficient
+                    }
                     objective = LinearObjectiveSpec(intCoefficients = arr)
                 }
 

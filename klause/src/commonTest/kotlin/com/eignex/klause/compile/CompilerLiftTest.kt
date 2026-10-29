@@ -17,7 +17,13 @@ import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
+import com.eignex.klause.model.IntAbs
+import com.eignex.klause.model.IntDomainSpec
+import com.eignex.klause.model.IntMul
+import com.eignex.klause.model.IntRef
+import com.eignex.klause.model.IntScale
 import com.eignex.klause.model.IntSpec
+import com.eignex.klause.model.IntSum
 import com.eignex.klause.model.NamedConstraint
 import com.eignex.klause.model.SchemaEntry
 import com.eignex.klause.propagation.Assumptions
@@ -40,6 +46,7 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -91,6 +98,26 @@ class CompilerLiftTest {
             val cap by constraint { (x * y) le 1 }
         }
         assertFails { S().compile() }
+    }
+
+    @Test
+    fun `wide integer domain arithmetic should reject overflow before narrowing`() {
+        val x = IntRef("x")
+        val cases = listOf(
+            (1L shl 32) to IntMul(x, x),
+            (1L shl 62) to IntAbs(IntScale(4, x)),
+            (1L shl 62) to IntAbs(IntSum(listOf(x, x, x, x))),
+        )
+        for ((value, expression) in cases) {
+            val schema = SchemaDef<SchemaEntry>(
+                mapOf(
+                    "x" to IntDomainSpec(value, value),
+                    "constraint" to NamedConstraint(expression eq 0),
+                ),
+            )
+
+            assertFailsWith<ArithmeticException> { schema.compile() }
+        }
     }
 
     @Test

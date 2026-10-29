@@ -165,7 +165,7 @@ object Dimacs {
                     ?: dimacsError("Unparseable wcnf weight: '${tokens[0]}'")
                 dimacsRequire(weight >= 0) { "DIMACS wcnf weight must be non-negative: $weight" }
                 // Keep explicit hard clauses hard when `top` is omitted.
-                isHard = weight >= (top ?: HARD_WEIGHT_SENTINEL)
+                isHard = hasOldHeader && weight >= (top ?: HARD_WEIGHT_SENTINEL)
                 litStart = 1
             }
             val lits = IntArrayList()

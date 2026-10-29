@@ -136,6 +136,22 @@ class Xcsp3Test {
     }
 
     @Test
+    fun `maximizing the minimum 32-bit coefficient should preserve objective direction`() {
+        val parsed = Xcsp3.parse(
+            """
+            <instance type="COP"><variables><var id="x">0..1</var></variables>
+              <objectives><maximize><list>x</list><coeffs>-2147483648</coeffs></maximize></objectives>
+            </instance>
+            """.trimIndent(),
+        )
+
+        val result = BacktrackSolver(parsed.problem.bake()).minimize(requireNotNull(parsed.objective).toLinearObjective())
+
+        assertTrue(result is MinimizeResult.Optimal, "expected Optimal, got $result")
+        assertEquals(0.0, result.objective)
+    }
+
+    @Test
     fun `a star column over a wide domain should parse as a short support below the cap`() {
         // Expanding '*' over a's 1.5M values would exceed the 1M tuple cap.
         val xml = """

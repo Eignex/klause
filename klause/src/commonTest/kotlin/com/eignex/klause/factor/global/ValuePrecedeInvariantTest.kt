@@ -14,6 +14,30 @@ import kotlin.test.assertTrue
 class ValuePrecedeInvariantTest {
 
     @Test
+    fun `equal precedence values should count every occurrence as a violation`() {
+        val state = LocalSearchState(
+            Problem(
+                numBoolVars = 0,
+                numIntVars = 3,
+                intDomains = Array(3) { IntDomain(0, 3) },
+                factors = emptyArray(),
+            ).bake(),
+            Random(0),
+        )
+        state.assignment.setInt(0, 2)
+        state.assignment.setInt(1, 0)
+        state.assignment.setInt(2, 2)
+        val invariant = ValuePrecedeInvariant(s = 2, t = 2, xs = intArrayOf(0, 1, 2))
+
+        val degree = invariant.violationDegree(state, 0)
+        val delta = invariant.deltaIfIntSet(state, 0, intVar = 0, newValue = 0)
+
+        assertTrue(invariant.isViolated(state, 0))
+        assertEquals(2, degree)
+        assertEquals(-1, delta)
+    }
+
+    @Test
     fun `committed cost should use the exact degree after a stateless apply`() {
         val state = LocalSearchState(problem().bake(), Random(0))
         state.assignment.setInt(0, 2)

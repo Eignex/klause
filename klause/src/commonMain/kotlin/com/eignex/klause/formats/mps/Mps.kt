@@ -265,9 +265,9 @@ object Mps {
         }
         val row = rowByName[rest[0]] ?: mpsError("INDICATORS references unknown row '${rest[0]}'")
         val v = varByName[rest[1]] ?: mpsError("INDICATORS references unknown column '${rest[1]}'")
-        val whenOne = when (parseNum(rest[2], "INDICATORS value").double) {
-            1.0 -> true
-            0.0 -> false
+        val whenOne = when (parseNum(rest[2], "INDICATORS value").fraction) {
+            BigFraction.ONE -> true
+            BigFraction.ZERO -> false
             else -> mpsError("INDICATORS value must be 0 or 1, got '${rest[2]}'")
         }
         mpsErrorIf(row.indicator != null) { "INDICATORS has more than one entry for row '${row.name}'" }

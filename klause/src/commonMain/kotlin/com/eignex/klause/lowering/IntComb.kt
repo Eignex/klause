@@ -43,8 +43,8 @@ internal fun IntComb.toWide(): WideLinComb = when (this) {
 
 /** True when this combination has no variable terms (a bare constant). */
 internal fun IntComb.isConstant(): Boolean = when (this) {
-    is IntComb.Narrow -> lin.coeffs.isEmpty()
-    is IntComb.Wide -> lin.coeffs.isEmpty()
+    is IntComb.Narrow -> lin.coeffs.values.all { it == 0L }
+    is IntComb.Wide -> lin.coeffs.values.all { it == BIG_ZERO }
 }
 
 /**

@@ -114,7 +114,7 @@ class SExprReader(private val reader: CharReader) {
             }
 
             else -> while (!reader.eof() && !reader.peek().toChar().isWhitespace() &&
-                reader.peek() != '('.code && reader.peek() != ')'.code
+                reader.peek() != '('.code && reader.peek() != ')'.code && reader.peek() != ';'.code
                 ) {
                     sb.appendCurrent()
                 }

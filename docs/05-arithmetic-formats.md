@@ -16,6 +16,7 @@ skipped, and anything after `ENDATA` is ignored.
 Columns between `'MARKER'` `INTORG` and `INTEND` lines are integers. `BOUNDS` accepts
 `UP`, `LO`, `FX`, `FR`, `MI`, `PL`, `BV`, `UI` and `LI`. `INDICATORS` lines read
 `IF <row> <column> <0|1>`: the row holds when the binary column takes that value.
+The trigger must equal zero or one as an exact rational.
 Numbers are parsed as exact rationals; a decimal scale beyond 10^5 in magnitude is
 rejected. Malformed input raises `MpsFormatException`.
 
@@ -191,7 +192,8 @@ Admission checks declarations and expression sorts with an iterative lexical typ
 walk. Integer-to-real promotion is allowed; Boolean/numeric and real-to-integer
 coercions are rejected. Logic declarations do not choose a representation. Quoted
 and bare spellings of a symbol share one identity, and a negative numeral must be
-written `(- n)`.
+written `(- n)`. A semicolon starts a line comment even when it directly follows a
+bare token.
 
 Parallel `let` values read the enclosing scope. Typed nonrecursive `define-fun`
 macros capture their definition scope and check argument sorts even for unused
