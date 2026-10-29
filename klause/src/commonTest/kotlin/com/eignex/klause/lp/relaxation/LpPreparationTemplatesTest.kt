@@ -38,10 +38,10 @@ class LpPreparationTemplatesTest {
     @Test
     fun `compatible preparation should reuse row and bound objects across consumers`() {
         val first = CpToLpRelaxation(source, objective, projections = selection)
-        first.build(RootDomains(source))
-        val before = assertNotNull(first.preparationTemplates)
         val view = source.withFactors(source.factors.copyOf())
         val next = CpToLpRelaxation(view, objective, projections = selection.forEngineView(view))
+        first.build(RootDomains(source))
+        val before = assertNotNull(first.preparationTemplates)
 
         val reused = next.build(RootDomains(view)).model.authoritativeModel()
         val fresh = CpToLpRelaxation(view, objective, projections = selection.forEngineView(view),
@@ -50,6 +50,7 @@ class LpPreparationTemplatesTest {
 
         assertSame(before.factors[0].rows?.first(), after.factors[0].rows?.first())
         assertSame(before.bounds[0], after.bounds[0])
+        assertTrue(after.reboundSource)
         assertEquals(3, after.reusedComponents)
         assertTrue(assertNotNull(reused).sameAuthority(assertNotNull(fresh)))
     }
@@ -219,7 +220,7 @@ class LpPreparationTemplatesTest {
         val first = CpToLpRelaxation(source, objective, projections = selection)
         first.build(RootDomains(source))
         val before = assertNotNull(first.preparationTemplates)
-        val replacement = assertNotNull(source.factors[0].substituteAffine(0, 1, 2, 1))
+        val replacement = Linear(intArrayOf(2), intArrayOf(1), LinearOp.GE, 1)
         val view = source.withFactors(arrayOf(replacement, source.factors[1], source.factors[2]))
         val changed = CpToLpRelaxation(view, objective, projections = selection.forEngineView(view))
 

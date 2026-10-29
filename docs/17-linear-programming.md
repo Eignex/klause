@@ -70,7 +70,8 @@ custom and unsupported projections retain their ordinary emission paths.
 Template construction polls and charges the containing token, including failed
 attempts, and caps visits and retained storage at 262,144 modeled units each.
 An incomplete attempt publishes no snapshot. Each selection retains one complete
-snapshot, with immutable publication across parallel consumers. Preparation and
+snapshot in an atomic publication slot shared by compatible views, including temporary
+presolve bakes. Preparation and
 actual row/bound emission have separate observations in the existing LP phase ledger;
 they do not establish numerical result reuse or certified deduction consumption.
 Sparse-trial assembly uses the same source templates and keeps its own admission,

@@ -52,11 +52,14 @@ class MpsModeTest {
             .sumOf { it.groupValues[1].toLong() }
         val exactBounds = Regex("lpPhase_TEMPLATE_ASSEMBLY_[A-Z]+_EXACT_BOUND_OBJECTS=(\\d+)").findAll(text)
             .sumOf { it.groupValues[1].toLong() }
+        val rows = Regex("lpPhase_TEMPLATE_ASSEMBLY_[A-Z]+_ROWS=(\\d+)").findAll(text)
+            .sumOf { it.groupValues[1].toLong() }
         val rebound = Regex("lpPhase_TEMPLATE_PREPARATION_[A-Z]+_SOURCE_REBOUND=(\\d+)").findAll(text)
             .sumOf { it.groupValues[1].toLong() }
         val pruned = Regex("lpBoundPruned=(\\d+)").findAll(text).sumOf { it.groupValues[1].toLong() }
         assertTrue(reused > 0L, text)
         assertTrue(exactBounds > 0L, text)
+        assertTrue(rows > 0L, text)
         assertTrue(rebound > 0L, text)
         assertTrue(pruned > 0L, text)
     }
