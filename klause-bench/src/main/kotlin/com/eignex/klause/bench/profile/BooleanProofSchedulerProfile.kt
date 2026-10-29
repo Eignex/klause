@@ -25,11 +25,11 @@ import com.eignex.klause.solver.search.BooleanProofContext
 import com.eignex.klause.util.Cancellation
 import com.sun.management.OperatingSystemMXBean
 import com.sun.management.ThreadMXBean
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.io.File
 import java.lang.management.ManagementFactory
 import kotlin.time.Duration.Companion.seconds
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 /** Remote-only total-cost diagnosis of retained Boolean tasks against independent finite workers. */
 object BooleanProofSchedulerProfile {

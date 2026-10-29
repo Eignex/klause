@@ -107,6 +107,21 @@ class BooleanProofSchedulerTest {
     }
 
     @Test
+    fun `repeated runs should retain the containing charged work cap`() {
+        val budget = NodeBudget(0L)
+        BooleanProofScheduler(contradiction, context, listOf(0), listOf(BacktrackParams(nodeBudget = budget)))
+            .use { scheduler ->
+                scheduler.run(Cancellation.Never, 5000L)
+                val charged = scheduler.chargedWork
+
+                scheduler.run(Cancellation.Never, 5000L)
+
+                assertEquals(charged, scheduler.chargedWork)
+                assertFalse(scheduler.nativeCoverageComplete)
+            }
+    }
+
+    @Test
     fun `cancelled entry should leave every task pending`() {
         BooleanProofScheduler(contradiction, context, listOf(0), listOf(BacktrackParams())).use { scheduler ->
             val step = scheduler.runSlice(0, Cancellation { true }, Long.MAX_VALUE, 5000L)
