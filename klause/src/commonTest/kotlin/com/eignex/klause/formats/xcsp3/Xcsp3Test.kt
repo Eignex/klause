@@ -145,7 +145,8 @@ class Xcsp3Test {
             """.trimIndent(),
         )
 
-        val result = BacktrackSolver(parsed.problem.bake()).minimize(requireNotNull(parsed.objective).toLinearObjective())
+        val result = BacktrackSolver(parsed.problem.bake())
+            .minimize(requireNotNull(parsed.objective).toLinearObjective())
 
         assertTrue(result is MinimizeResult.Optimal, "expected Optimal, got $result")
         assertEquals(0.0, result.objective)
