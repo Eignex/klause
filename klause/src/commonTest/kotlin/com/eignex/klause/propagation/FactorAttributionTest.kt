@@ -1,6 +1,12 @@
 package com.eignex.klause.propagation
 
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.table.Table
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import kotlin.test.Test
@@ -9,6 +15,24 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class FactorAttributionTest {
+    @Test
+    fun `ordinary table conflicts carry family attribution into consumed learning`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) }, arrayOf(
+            Table(intArrayOf(0, 1), longArrayOf(0, 0, 1, 1)),
+            Table(intArrayOf(0, 1), longArrayOf(0, 1, 1, 0)),
+        )).bake()
+        for (refinement in listOf(false, true)) {
+            val result = BacktrackSolver(problem).solve(BacktrackParams(
+                randomSeed = 1L, maxDecisions = 8L, lpConfig = LpConfig.OFF,
+                propagationAttribution = true, historicalTableReasons = refinement,
+            ))
+
+            assertIs<SolveResult.Unsat>(result)
+            assertTrue(result.stats.search.learning.getValue("factorTableUipReasons") > 0)
+            assertTrue(result.stats.search.learning.getValue("factorTableConsumed") > 0)
+        }
+    }
+
     @Test
     fun `reason attribution evicts bounded metadata without changing premises`() {
         val attribution = FactorAttribution(2)
