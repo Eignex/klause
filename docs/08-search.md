@@ -25,6 +25,18 @@ distinct. Complete native coverage alone supplies no independent UNSAT or optima
 verification. Replacing any context invalidates every lease and closure, including after
 an incumbent tightens the cutoff. Accepted closures survive ordinary cancellation.
 
+An internal `BooleanProofScheduler` drives a fixed pool of retained repair workers
+through that board. Each worker keeps its lease and traversal across slices and
+reuses its prepared session across sibling cubes. Only sample-free exhausted
+queries close native coverage; checked witnesses leave their region open. Loss
+retires private state and returns unresolved coverage while retaining work and
+statistics. Caller-condition replacement retires every worker and invalidates
+closures. Changed source or mapping identities require a fresh scheduler. The
+executor admits identity-mapped pure Boolean clause satisfaction only; objectives,
+numeric restrictions, symmetry reductions and additional components decline.
+It runs through an explicit internal entry point; ordinary portfolio selection
+retains its existing policy.
+
 `BooleanCoverageAttribution` retains bounded exact region keys and their first workers.
 It separates repeated entries by one worker, duplicate entries across workers and
 duplicate native refutations. Exact equality gives a lower bound on overlap; entries
