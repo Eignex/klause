@@ -28,7 +28,7 @@ internal object SolverInvocation {
 
     /** klause-cli knobs, each forwarded as is. [engine] maps to `-e` and [params] to repeatable `--param
      *  key=value`; null [engine] passes no `-e`, so the cli's own default applies. [processors] maps to `-p`,
-     *  emitted only above 1 (the cli's default is single-core). [seed] is `-r`. */
+     *  emitted when supplied, including single-core controls. [seed] is `-r`. */
     internal data class Settings(
         val engine: String? = null,
         val processors: Int? = null,
@@ -214,7 +214,7 @@ internal object SolverInvocation {
                 add("-e")
                 add(it)
             }
-            s.processors?.takeIf { it > 1 }?.let {
+            s.processors?.let {
                 add("-p")
                 add(it.toString())
             }
