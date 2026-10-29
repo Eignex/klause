@@ -481,12 +481,14 @@ not a useful deduction or objective gain. No trace is retained in the solver.
 Physical events do not make mixed numerical scheduling reproducible; finite
 single-lane work diagnostics keep their separate restrictions.
 
-Private numerical and repair admission retain bounded `numericalExternal*` and
+Private companion numerical and repair admission retain bounded `numericalExternal*` and
 `jointRepairExternal*` stage counts for missing exact coordinates, rejected or
 unavailable native source checks, and non-improving points. Numerical admission also
 distinguishes cancellation and unavailable objective evaluation. An incumbent can be
 accepted by finite tolerance policy while lacking the exact source authority a
 private numerical cutoff requires; availability and reads do not bypass these guards.
+Only the companion owners enable these counts; child-query anchor points and other
+worker-local warm starts do not count as portfolio peer admissions.
 
 ### Reseeding and arm failures
 

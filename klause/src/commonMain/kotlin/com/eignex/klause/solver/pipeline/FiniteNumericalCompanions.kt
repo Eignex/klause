@@ -126,7 +126,7 @@ internal class FiniteNumericalCompanions private constructor(
                     }, onIncumbentUse = {
                         companion.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_CONSUMED, importedVersion)
                     },
-                    publicationLifetime = limits.cancellation or limits.timeout))
+                    publicationLifetime = limits.cancellation or limits.timeout, observeExternalIncumbents = true))
                 val worker = exactNeighborhoodWorker("ls/finite-joint-companion", firstArm + 1, objective,
                     limits.cancellation, limits.timeout, { repair.exhausted },
                     open = { repair.search(adaptive = false, seed = slot.seed) })
@@ -158,7 +158,7 @@ internal class FiniteNumericalCompanions private constructor(
                     worker.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_IMPORTED, importedVersion)
                 }, onIncumbentUse = {
                     worker.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_CONSUMED, importedVersion)
-                })
+                }, observeExternalIncumbents = true)
             private var result: MinimizeResult? = null
             override val isDone: Boolean get() = result != null
             override val stats get() = search.stats
