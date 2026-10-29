@@ -385,7 +385,6 @@ class Portfolio(
         }
         val pending = MutableList<Candidate<MinimizeResult.WithSample, V>?>(workers.size) { null }
         val start = TimeSource.Monotonic.markNow()
-        val readBound = { incumbents.bound() }
         val observedCutoffs = arrayOfNulls<Double>(workers.size)
         val staleCredits = DoubleArray(workers.size)
         var callbackFailure: Throwable? = null
@@ -467,11 +466,10 @@ class Portfolio(
             val opening = run.handles[arm] == null
             val armToken = segmentToken(worker, run.token, claim)
             val workerBound = {
-                val cutoff = readBound()
+                val current = incumbent.current()
+                val cutoff = incumbents.bound(current)
                 observedCutoffs[arm] = cutoff.takeIf(Double::isFinite)
-                incumbent.current()?.let { current ->
-                    run.locked { run.lifecycle(arm, PortfolioLifecycleKind.INCUMBENT_READ, current.version) }
-                }
+                if (current != null) run.incumbentRead(arm, current.version)
                 cutoff
             }
             val setup = TimeSource.Monotonic.markNow()
@@ -788,6 +786,13 @@ class Portfolio(
         private var initialIncumbentVersion = 0L
         private var executing = false
 
+        fun incumbentRead(arm: Int, version: Long) {
+            // One lane owns a worker's reads; unchanged cutoff polling need not acquire the scheduler lock.
+            if (readVersions[arm] != version) locked {
+                lifecycle(arm, PortfolioLifecycleKind.INCUMBENT_READ, version)
+            }
+        }
+
         fun lifecycle(arm: Int, kind: PortfolioLifecycleKind, version: Long = 0) {
             if (kind == PortfolioLifecycleKind.INCUMBENT_READ) {
                 if (version == readVersions[arm]) return
@@ -895,7 +900,10 @@ class Portfolio(
         fun execute(segment: (Claim) -> Unit) {
             try {
                 for ((arm, worker) in workers.withIndex()) {
-                    worker.onLifecycle = { kind, version -> locked { lifecycle(arm, kind, version) } }
+                    worker.onLifecycle = { kind, version ->
+                        if (kind == PortfolioLifecycleKind.INCUMBENT_READ) incumbentRead(arm, version)
+                        else locked { lifecycle(arm, kind, version) }
+                    }
                     onProgress?.invoke(PortfolioEvent.Lifecycle(arm, worker.label, PortfolioLifecycleKind.CREATED,
                         worker.createdNanos, 0))
                 }
@@ -1244,9 +1252,12 @@ class Portfolio(
                 val idleAccount = ledgerFor(other)
                 if (other == arm || busy[other] || retired[other] || !idleAccount.hasPending(other)) continue
                 val idleCredit = idleAccount.pendingCreditOf(other)
-                val idleReward = rewardFor(PortfolioProgress(other,
+                val idleProgress = PortfolioProgress(other,
                     if (feasibilityComplete) PortfolioPhase.IMPROVEMENT else PortfolioPhase.FEASIBILITY,
-                    0, 0, 0, false, false, idleCredit, idleAccount.settleIdle(other, claim.sliceWork)))
+                    0, 0, 0, false, false, idleCredit, idleAccount.settleIdle(other, claim.sliceWork), idleCredit = true)
+                progressLog.record(idleProgress, 0)
+                onProgress?.invoke(PortfolioEvent.Progressed(idleProgress))
+                val idleReward = rewardFor(idleProgress)
                 if (idleReward > 0.0) productive[other] = true
                 if (!workers[other].auxiliaryProof) {
                     bandit.update(other, idleReward, 1.0)

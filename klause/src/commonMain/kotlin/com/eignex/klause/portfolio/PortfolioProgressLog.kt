@@ -14,7 +14,8 @@ internal class PortfolioProgressLog(workers: List<PortfolioWorker>) {
     fun record(progress: PortfolioProgress, checkingNanos: Long) {
         val old = phases[progress.arm][progress.phase.ordinal]
         phases[progress.arm][progress.phase.ordinal] = old.copy(
-            segments = old.segments + 1, work = old.work + progress.work, nanos = old.nanos + progress.nanos,
+            segments = old.segments + if (progress.idleCredit) 0 else 1,
+            work = old.work + progress.work, nanos = old.nanos + progress.nanos,
             checks = old.checks + progress.checks, checkingNanos = old.checkingNanos + checkingNanos,
             incumbents = old.incumbents + progress.acceptedIncumbents,
             closures = old.closures + if (progress.phase == PortfolioPhase.PROOF_CLOSURE) 1 else 0,
@@ -49,6 +50,6 @@ internal class PortfolioProgressLog(workers: List<PortfolioWorker>) {
         lifecycle[arm] = lifecycle[arm].copy(retirementNanos = lifecycle[arm].retirementNanos + nanos)
     }
 
-    fun phases(arm: Int): List<PortfolioPhaseStats> = phases[arm].filter { it.segments > 0 }
+    fun phases(arm: Int): List<PortfolioPhaseStats> = phases[arm].filter { it.segments > 0 || it.credit.isNotEmpty() }
     fun lifecycle(arm: Int): PortfolioLifecycleStats = lifecycle[arm]
 }

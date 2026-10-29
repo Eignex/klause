@@ -114,11 +114,18 @@ internal class FiniteNumericalCompanions private constructor(
             },
             factory(firstArm + 1, ArmFamily.LocalSearch) { slot ->
                 lateinit var companion: PortfolioWorker
+                var readVersion = 0L
+                var importedVersion = 0L
                 val limits = local(slot)
                 val repair = slot.own(JointLinearRepair(model, context, objective, limits,
-                    boundOrdered = true, external = { sharedIncumbent(companion) },
-                    onIncumbentImport = { companion.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_IMPORTED) },
-                    onIncumbentUse = { companion.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_CONSUMED) },
+                    boundOrdered = true, external = {
+                        sharedIncumbent(companion) { readVersion = it }
+                    }, onIncumbentImport = {
+                        importedVersion = readVersion
+                        companion.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_IMPORTED, importedVersion)
+                    }, onIncumbentUse = {
+                        companion.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_CONSUMED, importedVersion)
+                    },
                     publicationLifetime = limits.cancellation or limits.timeout))
                 val worker = exactNeighborhoodWorker("ls/finite-joint-companion", firstArm + 1, objective,
                     limits.cancellation, limits.timeout, { repair.exhausted },
@@ -134,15 +141,21 @@ internal class FiniteNumericalCompanions private constructor(
         )
     }
 
-    private fun sharedIncumbent(worker: PortfolioWorker) = incumbents.exchange.current()?.also {
+    private fun sharedIncumbent(worker: PortfolioWorker, onVersion: (Long) -> Unit) = incumbents.exchange.current()?.also {
+        onVersion(it.version)
         worker.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_READ, it.version)
     }?.assignment
 
     private fun numericalSearch(limits: TheoryParams, worker: PortfolioWorker): ResumableSearch = object : ResumableSearch {
+        private var readVersion = 0L
+        private var importedVersion = 0L
         private val search = LinearAuthorityInvocation(context, limits, boundOrdered = true,
-            external = { sharedIncumbent(worker) },
-            onIncumbentImport = { worker.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_IMPORTED) },
-            onIncumbentUse = { worker.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_CONSUMED) })
+            external = { sharedIncumbent(worker) { readVersion = it } }, onIncumbentImport = {
+                importedVersion = readVersion
+                worker.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_IMPORTED, importedVersion)
+            }, onIncumbentUse = {
+                worker.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_CONSUMED, importedVersion)
+            })
         private var result: MinimizeResult? = null
         override val isDone: Boolean get() = result != null
         override val stats get() = search.stats
