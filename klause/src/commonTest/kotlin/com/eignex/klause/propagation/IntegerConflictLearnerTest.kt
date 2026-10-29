@@ -51,7 +51,8 @@ class IntegerConflictLearnerTest {
             constraint int_lin_le([2,-1],[x,y],0);
             solve :: seq_search([
                 bool_search([active],input_order,indomain_max,complete),
-                int_search([z,x,y],input_order,indomain_min,complete)
+                int_search([z],input_order,indomain_min,complete),
+                int_search([x,y],input_order,indomain_max,complete)
             ]) satisfy;
         """.trimIndent())
         val prepared = FinitePipeline.prepare(FinitePipelineRequest(
