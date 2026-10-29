@@ -159,6 +159,13 @@ class TabuFilterTest {
     }
 
     @Test
+    fun `random tenure band should include the maximum integer tenure`() {
+        val tenure = TabuFilter.randomBand(Int.MAX_VALUE, Int.MAX_VALUE, seed = 0)
+
+        assertEquals(Int.MAX_VALUE, tenure(0L))
+    }
+
+    @Test
     fun `dynamic tenure should override the static value`() {
         val state = smallState()
         val filter = TabuFilter(tenure = 10, dynamicTenure = { 0 })

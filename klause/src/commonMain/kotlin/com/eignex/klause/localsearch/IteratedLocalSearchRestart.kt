@@ -313,6 +313,7 @@ class IteratedLocalSearchRestart(
         val problem = state.problem
         for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, child.boolValue(b))
         for (i in 0 until problem.numIntVars) state.assignment.setInt(i, child.intValue(i))
+        state.resetStepCounters()
         state.recompute()
     }
 

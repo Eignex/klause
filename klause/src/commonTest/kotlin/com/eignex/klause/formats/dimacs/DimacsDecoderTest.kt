@@ -108,6 +108,14 @@ class DimacsDecoderTest {
     }
 
     @Test
+    fun `headerless maximum weight should retain its soft clause cost`() {
+        val decoded = Dimacs.parseWcnf("${Long.MAX_VALUE} 1 0\n").toProblem()
+        val assignment = Assignment(decoded.problem.numBoolVars, 0)
+
+        assertEquals(Long.MAX_VALUE, decoded.objective.toLinearObjective().evaluateLong(assignment))
+    }
+
+    @Test
     fun `penalty definitions should preserve original costs across weighted and hard clauses`() {
         for (text in listOf(
             "3 1 0\n7 -2 0\n",

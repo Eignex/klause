@@ -5,6 +5,7 @@ import com.eignex.klause.localsearch.schedule.Geometric
 import com.eignex.klause.localsearch.schedule.Schedule
 import kotlin.math.exp
 import kotlin.random.Random
+import kotlin.random.nextInt
 
 /**
  * Reusable tabu-search candidate-set filter that removes moves whose variable was touched within the
@@ -84,7 +85,7 @@ data class TabuFilter(
         fun randomBand(low: Int, high: Int, seed: Long? = null): (Long) -> Int {
             require(low >= 0 && high >= low) { "expected 0 ≤ low ≤ high, got $low..$high" }
             val rng = if (seed != null) Random(seed) else Random.Default
-            return { rng.nextInt(low, high + 1) }
+            return { rng.nextInt(low..high) }
         }
 
         /**

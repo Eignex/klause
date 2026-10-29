@@ -105,7 +105,7 @@ internal class ValuePrecedeInvariant(private val s: Long, private val t: Long, p
         var count = 0
         for (i in xs.indices) {
             val v = if (xs[i] == intVar) newValue else state.assignment.intValue(xs[i])
-            if (v == s) return count
+            if (v == s && s != t) return count
             if (v == t) count++
         }
         return count

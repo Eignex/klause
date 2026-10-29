@@ -18,7 +18,7 @@ internal class DifferenceFragment(val edges: List<DifferenceEdge>) {
 
     fun nodeOf(endpoint: Int): Int = if (endpoint == ZERO) zeroNode else indexOfSorted(nodes, endpoint)
 
-    fun carriesAPotential(): Boolean = numNodes > 0 && edges.all { it.absBound() <= potentialBoundLimit() }
+    fun carriesAPotential(): Boolean = numNodes > 0 && edges.none { it.exceedsPotentialBound() }
 
     /**
      * Discard only declared-range edges too wide for the incremental graph's `Long` potentials.
@@ -29,14 +29,17 @@ internal class DifferenceFragment(val edges: List<DifferenceEdge>) {
      * it is a model row, so no usable fragment exists in that case.
      */
     fun withoutOverHeavyDomainEdges(): DifferenceFragment? {
-        val retained = edges.filterNot { it.domainBound && it.absBound() > potentialBoundLimit() }
+        val retained = edges.filterNot { it.domainBound && it.exceedsPotentialBound() }
         if (retained.size == edges.size) return takeIf(DifferenceFragment::carriesAPotential)
         return DifferenceFragment(retained).takeIf(DifferenceFragment::carriesAPotential)
     }
 
     private fun potentialBoundLimit(): Long = Long.MAX_VALUE / (8L * (numNodes + 1).toLong())
 
-    private fun DifferenceEdge.absBound(): Long = if (bound < 0L) -bound else bound
+    private fun DifferenceEdge.exceedsPotentialBound(): Boolean {
+        val limit = potentialBoundLimit()
+        return bound < -limit || bound > limit
+    }
 
     fun graph(): DifferenceGraph {
         val g = DifferenceGraph(numNodes)

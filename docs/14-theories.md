@@ -123,6 +123,8 @@ integer factor, including declared bounds and both meanings of reified rows. An
 implied difference relaxation alone does not admit a factor. Integer edges are
 tightened exactly: a row with a common coefficient `g` floors its bound by `g`, and
 a row with no integer solution is left to the general linear path.
+Coefficient magnitudes and reversed bounds must fit the graph's signed integer
+range; otherwise the row stays on the general linear path.
 
 SMT-LIB lowering represents a reified unit-coefficient integer difference equality
 as the conjunction of its two comparisons, each keeping both signed guarded

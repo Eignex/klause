@@ -62,6 +62,36 @@ class Xcsp3GlobalsTest {
     private val threeVars = """<var id="x">1..3</var><var id="y">1..3</var><var id="z">1..3</var>"""
 
     @Test
+    fun `inverse channels should preserve list index offsets`() {
+        for ((lists, vars, expected) in listOf(
+            Triple(
+                """<list startIndex="3">x y</list>""",
+                """<var id="x">4</var><var id="y">3</var>""",
+                listOf(4L, 3L),
+            ),
+            Triple(
+                """<list startIndex="3">x y</list><list startIndex="7">u v</list>""",
+                """<var id="x">8</var><var id="y">7</var><var id="u">4</var><var id="v">3</var>""",
+                listOf(8L, 7L, 4L, 3L),
+            ),
+        )) {
+            val parsed = parse("<channel>$lists</channel>", vars)
+
+            assertEquals(setOf(expected), solutions(parsed, expected.size))
+        }
+    }
+
+    @Test
+    fun `partial channels should preserve list index offsets`() {
+        val parsed = parse(
+            """<channel><list startIndex="3">x</list><list startIndex="7">u v</list></channel>""",
+            """<var id="x">8</var><var id="u">99</var><var id="v">3..4</var>""",
+        )
+
+        assertEquals(setOf(listOf(8L, 99L, 3L)), solutions(parsed, 3))
+    }
+
+    @Test
     fun `strict sum conditions should retain thresholds beyond 32-bit limits`() {
         for (condition in listOf("(lt,-2147483648)", "(gt,2147483647)")) {
             val parsed = parse(

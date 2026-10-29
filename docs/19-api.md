@@ -60,6 +60,11 @@ claims. The baked `BacktrackSolver` and `LocalSearchSolver` keep their finite
 sessions, streams, enumeration and resumable APIs, which source strategies do not
 offer for continuous or open models.
 
+`BruteForceSolver` walks finite assignments under `maxSteps` and `maxInstructions`.
+A capped walk without a witness returns `Unknown`; infeasibility requires exhausting
+the assignment space. Optimization certifies the optimum when the entire space is
+visited, including when its size exactly equals the assignment budget.
+
 ### Source setup
 
 Source setup is the one dispatcher every frontend and the CLI use. Attach a

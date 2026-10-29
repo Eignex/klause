@@ -190,17 +190,20 @@ internal fun Compiler.Builder.channel(e: XmlElement) {
     when (lists.size) {
         1 -> {
             val f = refList(lists[0].textContent)
-            factors.add(Inverse(f = f, g = f))
+            val start = lists[0].attr("startIndex").ifBlank { "0" }.toInt()
+            factors.add(Inverse(f = f, g = f, fOffset = start, gOffset = start))
         }
 
         2 -> {
             val f = refList(lists[0].textContent)
             val g = refList(lists[1].textContent)
+            val fStart = lists[0].attr("startIndex").ifBlank { "0" }.toInt()
+            val gStart = lists[1].attr("startIndex").ifBlank { "0" }.toInt()
             // Equal lengths are a bijection (Inverse, Semantics 31: f[i]=j ⟺ g[j]=i). With
             // |X| < |Y| the spec (Semantics 32) is a one-way implication only.
             when {
-                f.size == g.size -> factors.add(Inverse(f = f, g = g))
-                f.size < g.size -> channelPartial(f, g)
+                f.size == g.size -> factors.add(Inverse(f = f, g = g, fOffset = fStart, gOffset = gStart))
+                f.size < g.size -> channelPartial(f, g, fStart, gStart)
                 else -> throw UnsupportedXcsp3Exception("channel: first list longer violates |X|<|Y|")
             }
         }
@@ -224,11 +227,11 @@ internal fun Compiler.Builder.channelValue(xs: IntArray, v: Int, start: Int) {
 /** A two-list `channel` with `|X| < |Y|` (XCSP3 Semantics 32): the one-way implication
  *  `∀i,j: x[i]=j ⟹ y[j]=i`. The reverse does NOT hold — entries `y[j]` for `j` never taken
  *  by any `x[i]` are unconstrained — so unlike the equal-length case this is not a bijection. */
-internal fun Compiler.Builder.channelPartial(x: IntArray, y: IntArray) {
+internal fun Compiler.Builder.channelPartial(x: IntArray, y: IntArray, xStart: Int, yStart: Int) {
     for (i in x.indices) {
         for (j in y.indices) {
-            val xij = reifyLinear(intArrayOf(1), intArrayOf(x[i]), LinearOp.EQ, j) // x[i] = j
-            val yji = reifyLinear(intArrayOf(1), intArrayOf(y[j]), LinearOp.EQ, i) // y[j] = i
+            val xij = reifyLinear(longArrayOf(1L), intArrayOf(x[i]), LinearOp.EQ, j.toLong() + yStart)
+            val yji = reifyLinear(longArrayOf(1L), intArrayOf(y[j]), LinearOp.EQ, i.toLong() + xStart)
             factors.add(Clause(intArrayOf(Lit.negate(xij), yji))) // x[i]=j ⟹ y[j]=i
         }
     }

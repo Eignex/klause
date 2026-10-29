@@ -310,9 +310,11 @@ class MpsTest {
 
     @Test
     fun `an INDICATORS entry whose trigger value is neither zero nor one should be rejected`() {
-        val text = "ROWS\n N COST\n L C1\nCOLUMNS\n X1 COST 1.0 C1 1.0\n B1 COST 0.0\n" +
-            "BOUNDS\n BV BND B1\nINDICATORS\n IF C1 B1 2\nENDATA"
-        assertFailsWith<MpsFormatException> { Mps.parse(text) }
+        for (value in listOf("2", "0.99999999999999999999", "1e-400")) {
+            val text = "ROWS\n N COST\n L C1\nCOLUMNS\n X1 COST 1.0 C1 1.0\n B1 COST 0.0\n" +
+                "BOUNDS\n BV BND B1\nINDICATORS\n IF C1 B1 $value\nENDATA"
+            assertFailsWith<MpsFormatException>(value) { Mps.parse(text) }
+        }
     }
 
     @Test

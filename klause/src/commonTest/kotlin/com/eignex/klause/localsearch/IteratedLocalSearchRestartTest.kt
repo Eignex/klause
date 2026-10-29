@@ -14,10 +14,27 @@ import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class IteratedLocalSearchRestartTest {
+    @Test
+    fun `crossover restarts should clear tabu tenure and preserve write activity`() {
+        val problem = Problem(1, 0, emptyArray(), emptyArray())
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        state.apply(Move.BoolFlip(0))
+        val policy = IteratedLocalSearchRestart(populationSize = 2, crossoverRate = 1.0)
+        val sample = state.assignment.snapshot()
+        policy.onLocalOptimum(state, sample, 0.0)
+        policy.onLocalOptimum(state, sample, 1.0)
+
+        policy.restart(state, sample)
+
+        assertFalse(state.tabu.isTaboo(Move.BoolFlip(0), tenure = 10))
+        assertEquals(1, state.tabu.touchCount[0])
+    }
+
     @Test
     fun `feasible stalls should use the same anchor acceptance and strength adaptation`() {
         val state = LocalSearchState(Problem(1, 0, emptyArray(), emptyArray()).bake(), Random(0))

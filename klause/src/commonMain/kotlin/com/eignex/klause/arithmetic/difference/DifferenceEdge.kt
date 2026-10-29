@@ -28,7 +28,11 @@ internal fun appendDifferenceEdges(
     val n = vars.size
     if (n == 0 || n > 2) return false
     var g = 0L
-    for (k in 0 until n) g = gcdOf(g, coeff(k))
+    for (k in 0 until n) {
+        val coefficient = coeff(k)
+        if (coefficient == Long.MIN_VALUE) return false
+        g = gcdOf(g, coefficient)
+    }
     if (g == 0L) return false
     val c0 = coeff(0) / g
     val c1 = if (n == 2) coeff(1) / g else 0L
@@ -64,12 +68,18 @@ internal fun appendDifferenceEdges(
         LinearOp.LE -> out.add(DifferenceEdge(lo, hi, floorDiv(bound, g), guard))
 
         // `hi − lo ≥ b` is `lo − hi ≤ −b`, and the integer-tight form of `≥` ceils.
-        LinearOp.GE -> out.add(DifferenceEdge(hi, lo, -ceilDiv(bound, g), guard))
+        LinearOp.GE -> {
+            val scaled = ceilDiv(bound, g)
+            if (scaled == Long.MIN_VALUE) return false
+            out.add(DifferenceEdge(hi, lo, -scaled, guard))
+        }
 
         LinearOp.EQ -> {
             if (bound % g != 0L) return false // no integer point satisfies it; leave it to the general path
-            out.add(DifferenceEdge(lo, hi, bound / g, guard))
-            out.add(DifferenceEdge(hi, lo, -(bound / g), guard))
+            val scaled = bound / g
+            if (scaled == Long.MIN_VALUE) return false
+            out.add(DifferenceEdge(lo, hi, scaled, guard))
+            out.add(DifferenceEdge(hi, lo, -scaled, guard))
         }
 
         LinearOp.NE -> return false

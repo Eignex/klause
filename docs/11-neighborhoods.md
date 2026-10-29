@@ -267,7 +267,8 @@ policies; before the first one, random restarts diversify the feasibility walk. 
 policies keep the best assignment in private packed storage, updated only on a strict
 improvement, and each restart receives a fresh copy so a policy cannot alter the
 anchor. Fixed-cadence and Luby policies keep no copy. Anchored perturbations restore
-exact pins after their random draws and clear tabu state.
+exact pins after their random draws and clear tabu state. ILS crossover also
+starts a fresh tabu epoch while preserving cumulative write activity.
 
 ILS also receives zero-score snapshots at feasible stalls and completed descents.
 Those notifications classify the working walk and supply heuristic population

@@ -20,6 +20,8 @@ import com.eignex.klause.model.IntRef
 import com.eignex.klause.model.IntScale
 import com.eignex.klause.model.IntSum
 import com.eignex.klause.model.SetCard
+import com.eignex.klause.util.addExact
+import com.eignex.klause.util.mulExact
 
 /**
  * Affine-fragment lift for [Lowering]. Rewrites a tree of [IntExpr] so the
@@ -83,10 +85,10 @@ internal fun Lowering.liftMul(left: IntExpr, right: IntExpr): IntExpr {
     val aDom = intDomains[intVarOf(aRef.name)]
     val bDom = intDomains[intVarOf(bRef.name)]
     val cornersLong = longArrayOf(
-        aDom.min * bDom.min,
-        aDom.min * bDom.max,
-        aDom.max * bDom.min,
-        aDom.max * bDom.max,
+        mulExact(aDom.min, bDom.min),
+        mulExact(aDom.min, bDom.max),
+        mulExact(aDom.max, bDom.min),
+        mulExact(aDom.max, bDom.max),
     )
     val pMin = cornersLong.min()
     val pMax = cornersLong.max()
@@ -144,11 +146,11 @@ internal fun Lowering.domainOf(expr: IntExpr): IntDomain = when (expr) {
         val lo: Long
         val hi: Long
         if (c >= 0) {
-            lo = c * d.min
-            hi = c * d.max
+            lo = mulExact(c, d.min)
+            hi = mulExact(c, d.max)
         } else {
-            lo = c * d.max
-            hi = c * d.min
+            lo = mulExact(c, d.max)
+            hi = mulExact(c, d.min)
         }
         IntDomain(
             checkedInt(lo) { "IntScale domain min ($c · ${d.min})" }.toLong(),
@@ -161,8 +163,8 @@ internal fun Lowering.domainOf(expr: IntExpr): IntDomain = when (expr) {
         var hi = 0L
         for (ch in expr.children) {
             val d = domainOf(ch)
-            lo += d.min
-            hi += d.max
+            lo = addExact(lo, d.min)
+            hi = addExact(hi, d.max)
         }
         IntDomain(checkedInt(lo) { "IntSum domain min" }.toLong(), checkedInt(hi) { "IntSum domain max" }.toLong())
     }

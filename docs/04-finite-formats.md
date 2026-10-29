@@ -123,7 +123,8 @@ with a 0/1 condition channel. Constant and variable matrix selection retain nati
 `Element` factors with row-major index equalities and per-axis bounds, so an
 invalid column never selects another row's cell. Vector selection and indexed
 extrema read `list@startIndex`; conflicting offsets and `rank="first"`/`"last"`
-selection decline.
+selection decline. Channels preserve each list's index offset in inverse mappings
+and partial implications.
 
 Boolean-valued arithmetic terms use fresh 0/1 integers tied to their source literal
 by a reified equality. Unit equality terms `x = v` of sums and sum objectives and

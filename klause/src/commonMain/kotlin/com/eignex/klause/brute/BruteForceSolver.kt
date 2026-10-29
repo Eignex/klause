@@ -69,10 +69,15 @@ class BruteForceSolver(override val problem: BakedProblem) :
         """.trimIndent()
 
     override fun solve(params: BruteForceParams): SolveResult {
-        for (sample in walk(params)) {
+        val budget = StepBudget(params.effectiveStepCap)
+        for (sample in walkWithBudget(params, budget)) {
             return SolveResult.Sat(sample)
         }
-        return SolveResult.Unsat(semantics = problem.semantics)
+        return if (budget.capped) {
+            SolveResult.Unknown(TerminationReason.BudgetExhausted, semantics = problem.semantics)
+        } else {
+            SolveResult.Unsat(semantics = problem.semantics)
+        }
     }
 
     /**
@@ -92,10 +97,7 @@ class BruteForceSolver(override val problem: BakedProblem) :
                 best = s
             }
         }
-        // budget.remaining > 0 means the walker exhausted the assignment space naturally
-        // (the search proved no better solution exists). Otherwise we hit the step cap
-        // and the result is only best-effort.
-        val exhausted = budget.remaining > 0
+        val exhausted = !budget.capped
         return when {
             best != null && exhausted -> MinimizeResult.Optimal(best, bestObj)
             best != null -> MinimizeResult.BestFound(best, bestObj, TerminationReason.BudgetExhausted)
@@ -138,8 +140,7 @@ class BruteForceSolver(override val problem: BakedProblem) :
         walkWithBudget(params, StepBudget(params.effectiveStepCap))
 
     /** Variant of [walk] that uses a caller-supplied [StepBudget], so the caller can
-     *  read `remaining` after iteration to distinguish "space exhausted naturally"
-     *  from "step budget hit." Used by [minimize]'s Optimal-vs-BestFound verdict. */
+     *  distinguish assignment-space exhaustion from a capped traversal. */
     private fun walkWithBudget(params: BruteForceParams, budget: StepBudget): Sequence<Sample> {
         val seed = params.randomSeed ?: 0L
         val state = LocalSearchState(problem, Random(seed))
@@ -162,9 +163,18 @@ class BruteForceSolver(override val problem: BakedProblem) :
     /** Mutable counter so the recursive [walkChunks] decrements one shared budget across
      *  the cartesian-product walk rather than each depth holding its own. */
     private class StepBudget(var remaining: Long) {
+        var capped: Boolean = false
+            private set
+
+        fun hasRemaining(): Boolean {
+            if (remaining > 0) return true
+            capped = true
+            return false
+        }
+
         /** Decrement the budget; return `false` if it's exhausted (caller should stop). */
         fun consume(): Boolean {
-            if (remaining <= 0) return false
+            if (!hasRemaining()) return false
             remaining--
             return true
         }
@@ -183,7 +193,7 @@ class BruteForceSolver(override val problem: BakedProblem) :
             return@sequence
         }
         for (idx in perms[depth]) {
-            if (budget.remaining <= 0) return@sequence
+            if (!budget.hasRemaining()) return@sequence
             applyChunkIndex(chunks[depth], idx, state)
             yieldAll(walkChunks(perms, depth + 1, state, budget))
         }
