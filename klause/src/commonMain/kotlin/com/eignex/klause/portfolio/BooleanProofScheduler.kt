@@ -49,6 +49,8 @@ internal class BooleanProofScheduler(
     private val workers = parameters.map { Worker() }
     private val objective = LinearObjective(boolWeights = LongArray(problem.numBoolVars))
     private var closed = false
+    var chargedWork: Long = 0L
+        private set
 
     val context: BooleanProofContext get() = tasks.context
     val nativeCoverageComplete: Boolean get() = tasks.nativeCoverageComplete
@@ -86,11 +88,13 @@ internal class BooleanProofScheduler(
             ?: return BooleanProofStep(null)
         try {
             if (slot.search == null) {
-                slot.search = BacktrackSolver(problem).openRepair(objective, parameters[worker].copy(nativeSat = false, assumptions = Assumptions.None))
+                slot.search = BacktrackSolver(problem).openRepair(objective, parameters[worker].copy(
+                    nativeSat = false, assumptions = Assumptions.None,
+                ))
             }
             val search = checkNotNull(slot.search)
             if (started[worker] !== lease) {
-                search.begin(assumptions(lease), Long.MAX_VALUE, Double.POSITIVE_INFINITY, cancellation)
+                search.begin(assumptions(lease), parameters[worker].maxDecisions, Double.POSITIVE_INFINITY, cancellation)
                 started[worker] = lease
             }
             val result = search.runSlice(cancellation, millis, offeredWork)
@@ -131,20 +135,19 @@ internal class BooleanProofScheduler(
         check(!closed)
         require(workLimit >= 0L && baseSliceWork > 0L && maxSliceWork >= baseSliceWork)
         val stopped = BooleanArray(workers.size)
-        var charged = 0L
         var allowance = baseSliceWork
         var cursor = 0
-        while (!cancellation() && charged < workLimit && !nativeCoverageComplete) {
+        while (!cancellation() && chargedWork < workLimit && !nativeCoverageComplete) {
             if (stopped.all { it }) break
             val worker = cursor
             cursor = (cursor + 1) % workers.size
             if (stopped[worker]) continue
-            val offered = minOf(allowance, workLimit - charged)
+            val offered = minOf(allowance, workLimit - chargedWork)
             val before = work
             val step = runSlice(worker, cancellation, Long.MAX_VALUE, offered)
             val spent = (work - before).coerceAtLeast(0L)
             val debit = if (spent == 0L) offered else spent
-            charged = if (debit > Long.MAX_VALUE - charged) Long.MAX_VALUE else charged + debit
+            chargedWork = if (debit > Long.MAX_VALUE - chargedWork) Long.MAX_VALUE else chargedWork + debit
             if (step.sample != null) return SolveResult.Sat(step.sample, stats = stats)
             if (step.reason != null && step.reason != TerminationReason.SearchExhausted) stopped[worker] = true
             allowance = (allowance.toDouble() * 1.5).toLong().coerceIn(baseSliceWork, maxSliceWork)
