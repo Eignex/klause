@@ -114,6 +114,10 @@ internal data class LpSolveMetrics(
     val sourceResidualScaledCalls: Long = 0L,
     val componentSolves: Int = 0,
     val componentReuses: Int = 0,
+    val basisBuildWork: Long = 0L,
+    val basisBuildDeclines: Long = 0L,
+    val basisBuildUnmeasured: Long = 0L,
+    val factorEntriesBuilt: Long = 0L,
 ) {
     operator fun minus(previous: LpSolveMetrics) = LpSolveMetrics(
         pivots = pivots - previous.pivots,
@@ -141,6 +145,10 @@ internal data class LpSolveMetrics(
         sourceResidualScaledCalls = sourceResidualScaledCalls - previous.sourceResidualScaledCalls,
         componentSolves = componentSolves - previous.componentSolves,
         componentReuses = componentReuses - previous.componentReuses,
+        basisBuildWork = basisBuildWork - previous.basisBuildWork,
+        basisBuildDeclines = basisBuildDeclines - previous.basisBuildDeclines,
+        basisBuildUnmeasured = basisBuildUnmeasured - previous.basisBuildUnmeasured,
+        factorEntriesBuilt = factorEntriesBuilt - previous.factorEntriesBuilt,
     )
 
     operator fun plus(other: LpSolveMetrics) = LpSolveMetrics(
@@ -163,6 +171,10 @@ internal data class LpSolveMetrics(
         sourceResidualScaledCalls + other.sourceResidualScaledCalls,
         componentSolves + other.componentSolves,
         componentReuses + other.componentReuses,
+        basisBuildWork + other.basisBuildWork,
+        basisBuildDeclines + other.basisBuildDeclines,
+        basisBuildUnmeasured + other.basisBuildUnmeasured,
+        factorEntriesBuilt + other.factorEntriesBuilt,
     )
 }
 

@@ -56,7 +56,7 @@ internal class LinearAuthorityLp(
     private val onCutMetric: (String, Long) -> Unit = { _, _ -> },
     private val onPhase: (LpPhaseMetrics) -> Unit = {},
 ) : AutoCloseable {
-    private var session = if (retain) LinearAuthoritySession(budget) else null
+    private var session = if (retain) LinearAuthoritySession(budget, onCutMetric) else null
     private var guidanceRows: List<ExactRationalInequality>? = null
     private var guidanceInactive: Set<Int> = emptySet()
     private var guidancePacked: LinearAuthorityModel? = null
@@ -77,6 +77,10 @@ internal class LinearAuthorityLp(
             onCutMetric("ComponentReused", metrics.componentReuses.toLong())
             onCutMetric("ColdFactors", metrics.initialRefactorizations.toLong())
             onCutMetric("WarmFactors", metrics.warmStartRefactorizations.toLong())
+            onCutMetric("BasisBuildWork", metrics.basisBuildWork)
+            onCutMetric("BasisBuildDeclined", metrics.basisBuildDeclines)
+            onCutMetric("BasisBuildUnmeasured", metrics.basisBuildUnmeasured)
+            onCutMetric("FactorEntriesBuilt", metrics.factorEntriesBuilt)
         }
         override fun observeContinuation(metrics: ExactContinuationMetrics) {
             budget.observe(continuation = metrics.work)
@@ -166,7 +170,7 @@ internal class LinearAuthorityLp(
         inactive: Set<Int>,
         unconditionalRows: Boolean,
     ): LinearAuthorityLpGuidance? {
-        val retained = session ?: LinearAuthoritySession(budget).also { session = it }
+        val retained = session ?: LinearAuthoritySession(budget, onCutMetric).also { session = it }
         if (cancellation()) {
             retained.close()
             return null
@@ -191,6 +195,10 @@ internal class LinearAuthorityLp(
         return retained.advance(
             packed, costs, constant, scope, cancellation, policy, observer,
         ) guideResult@{ guide, prepared, token ->
+            guide.maxLuFill?.let {
+                onCutMetric("QueryFillSamples", 1L)
+                onCutMetric("QueryMaxFillRatioMicrosSum", (it * 1_000_000.0).toLong())
+            }
             phase = guide.phase.name
             workingRows = prepared.emittedRowCount
             val bound = guide.bound?.takeIf { listOf(it.value).admittedSourcePoint() }

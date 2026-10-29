@@ -621,6 +621,9 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
                 "COLD_FACTOR" to metrics.initialRefactorizations.toLong(),
                 "WARM_FACTOR" to metrics.warmStartRefactorizations.toLong(),
                 "SINGULAR_FACTOR" to metrics.singularRecoveryRefactorizations.toLong())))
+        cutLifecycle.shared("BASIS_BUILD", LpPhaseStats(work = metrics.basisBuildWork,
+            outcomes = mapOf("DECLINED" to metrics.basisBuildDeclines,
+                "UNMEASURED" to metrics.basisBuildUnmeasured, "FACTOR_ENTRIES" to metrics.factorEntriesBuilt)))
         if (metrics.componentSolves > 0 || metrics.componentReuses > 0) {
             val key = "COMPONENT_LIFECYCLE_${effectiveRoute.name}"
             phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(

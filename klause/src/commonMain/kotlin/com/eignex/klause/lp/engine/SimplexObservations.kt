@@ -35,6 +35,10 @@ internal class SimplexObservations {
     var maxLuFill = 0.0
     var maxLuDensity = 0.0
     var maxLuDim = 0
+    var basisBuildWork = 0L
+    var basisBuildDeclines = 0L
+    var basisBuildUnmeasured = 0L
+    var factorEntriesBuilt = 0L
     var sourcePrimalResidual = 0.0
     var sourceBoundViolation = 0.0
     var sourceBasicDualResidual = 0.0
@@ -49,6 +53,10 @@ internal class SimplexObservations {
         maxLuFill = 0.0
         maxLuDensity = 0.0
         maxLuDim = 0
+        basisBuildWork = 0L
+        basisBuildDeclines = 0L
+        basisBuildUnmeasured = 0L
+        factorEntriesBuilt = 0L
         sourcePrimalResidual = 0.0
         sourceBoundViolation = 0.0
         sourceBasicDualResidual = 0.0
@@ -105,6 +113,10 @@ internal class SimplexObservations {
         sourceResidualCalls = sourceResidualCalls,
         sourceResidualNanos = sourceResidualNanos,
         sourceResidualScaledCalls = sourceResidualScaledCalls,
+        basisBuildWork = basisBuildWork,
+        basisBuildDeclines = basisBuildDeclines,
+        basisBuildUnmeasured = basisBuildUnmeasured,
+        factorEntriesBuilt = factorEntriesBuilt,
     )
 
 }

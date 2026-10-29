@@ -452,7 +452,7 @@ internal class LinearAuthority(
         val closure = solved.result
         closure.float?.let { result ->
             for (family in prepared.cutFamilies.values.toSet()) {
-                cutLifecycle.observe(family, "FactorFillEntries", result.luMaxFill.toLong())
+                cutLifecycle.observe(family, "SolveMaxFillRatioMicrosSum", (result.luMaxFill * 1_000_000.0).toLong())
             }
         }
         if (closure.verdict == LpVerdict.INFEASIBLE) {
