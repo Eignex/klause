@@ -589,7 +589,12 @@ internal class PoolClauseExchange(
     }
 
     private fun exportCandidates(session: PropagationSession): List<SharedClause>? {
-        if (pool.softLimitBytes == null) return session.exportGlueClauses(maxLbd, maxLen, skipPermanent)
+        val alreadyShared: (Long) -> Boolean = { key ->
+            (key in seen).also { if (it) meter?.clauseCount("exportDuplicates", 1L) }
+        }
+        if (pool.softLimitBytes == null) return session.exportGlueClausesBounded(
+            maxLbd, maxLen, skipPermanent, alreadyShared = alreadyShared, cancelled = { false },
+        )
         val count = session.learnedClauseCount.toLong()
         val width = maxLen.coerceAtLeast(0).toLong() + 1L
         val workLimit = pool.reclamationWork
@@ -605,7 +610,9 @@ internal class PoolClauseExchange(
             meter?.clauseCount("exportPreparationDeclined", 1L)
             return null
         }
-        val candidates = session.exportGlueClausesBounded(maxLbd, maxLen, skipPermanent) { session.cancelRequested }
+        val candidates = session.exportGlueClausesBounded(
+            maxLbd, maxLen, skipPermanent, alreadyShared = alreadyShared, cancelled = { session.cancelRequested },
+        )
         if (candidates == null) meter?.clauseCount("exportPreparationDeclined", 1L)
         return candidates
     }

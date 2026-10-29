@@ -19,6 +19,44 @@ import kotlin.test.assertTrue
 
 class PropagationSessionTest {
     @Test
+    fun `glue export should preserve portable identity while suppressing known clauses`() {
+        for (native in listOf(false, true)) {
+            val problem = Problem(8, 0, emptyArray(), listOf(Clause(intArrayOf(0, 1))))
+            val session = PropagationSession(problem, nativeSat = native)
+            assertEquals(native, session.usesNativeSat)
+            val clauses = listOf(intArrayOf(0, 2, 4, 6), intArrayOf(8), intArrayOf(10, 12))
+            for (literals in clauses) session.addLearnedClause(Clause(literals), 1)
+            val expected = clauses.map { session.asSharedClause(it, 1).key }
+
+            val result = session.exportGlueClausesBounded(6, 12, false,
+                alreadyShared = { it == expected[0] }, cancelled = { false })
+
+            assertEquals(expected.drop(1), result?.map { it.key })
+            assertEquals(clauses.drop(1).map { it.toList() }, result?.map { it.boolLits.toList() })
+        }
+    }
+
+    @Test
+    fun `glue export should match portable keys for wide signed integer atoms`() {
+        val session = PropagationSession(Problem(2, 1, arrayOf(IntDomain(-10_000_000_000L, 10_000_000_000L)),
+            emptyList()))
+        val clauses = listOf(
+            intArrayOf(0, session.boundGeLit(0, -9_000_000_000L, true),
+                session.boundLeLit(0, 8_000_000_000L, false)),
+            intArrayOf(session.equalityLit(0, -3L), 3),
+        )
+        for (literals in clauses) session.addLearnedClause(Clause(literals), 2)
+        val expected = clauses.map { session.asSharedClause(it, 2) }
+
+        val result = session.exportGlueClausesBounded(6, 12, false,
+            alreadyShared = { it == expected[0].key }, cancelled = { false })
+
+        assertEquals(listOf(expected[1].key), result?.map { it.key })
+        assertEquals(expected[1].boolLits.toList(), result?.single()?.boolLits?.toList())
+        assertEquals(expected[1].atomQuads.toList(), result?.single()?.atomQuads?.toList())
+    }
+
+    @Test
     fun `popping bound decisions should preserve an earlier exact integer pin`() {
         for (lower in listOf(false, true)) {
             val session = PropagationSession(Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray()))

@@ -1,7 +1,5 @@
 package com.eignex.klause.propagation
 
-import com.eignex.klause.util.LongArrayList
-
 /**
  * A learned CDCL nogood in a **session-portable** form, for sharing across backtrack arms of one
  * `Problem` (a parallel or single-threaded portfolio). All arms share the
@@ -23,26 +21,13 @@ class SharedClause internal constructor(
     internal val boolLits: IntArray,
     internal val atomQuads: LongArray,
     internal val lbd: Int,
-) {
-    /** Order-independent content key for pool de-duplication. A hash collision only drops a *share*
-     *  (the clause is simply not propagated to one arm); it is never unsound. */
-    internal val key: Long = run {
-        val tokens = LongArrayList(boolLits.size + atomQuads.size / QUAD)
-        for (l in boolLits) tokens.add(l.toLong())
-        var i = 0
-        while (i < atomQuads.size) {
-            // Pack a quad into one token; bit layout is arbitrary, only equality/order matters.
-            val t = (atomQuads[i] shl 40) xor (atomQuads[i + 1] shl 36) xor
-                (atomQuads[i + 2] shl 4) xor atomQuads[i + 3]
-            tokens.add(t)
-            i += QUAD
+    internal val key: Long = contentKey(LongArray(boolLits.size + atomQuads.size / QUAD) { i ->
+        if (i < boolLits.size) boolLits[i].toLong() else {
+            val q = (i - boolLits.size) * QUAD
+            atomToken(atomQuads[q], atomQuads[q + 1], atomQuads[q + 2], atomQuads[q + 3])
         }
-        tokens.sort()
-        var h = SEED
-        tokens.forEach { t -> h = h * MULT + t }
-        h
-    }
-
+    }),
+) {
     internal val payloadBytes: Long
         get() = boolLits.size.toLong() * Int.SIZE_BYTES + atomQuads.size.toLong() * Long.SIZE_BYTES
 
@@ -50,6 +35,17 @@ class SharedClause internal constructor(
         const val QUAD = 4
         private const val SEED = 1_125_899_906_842_597L
         private const val MULT = 31L
+
+        fun atomToken(variable: Long, kind: Long, threshold: Long, sign: Long): Long =
+            (variable shl 40) xor (kind shl 36) xor (threshold shl 4) xor sign
+
+        /** Order-independent sharing identity; collisions can decline an optional share only. */
+        fun contentKey(tokens: LongArray, size: Int = tokens.size): Long {
+            tokens.sort(0, size)
+            var hash = SEED
+            for (i in 0 until size) hash = hash * MULT + tokens[i]
+            return hash
+        }
     }
 }
 
