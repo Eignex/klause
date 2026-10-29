@@ -730,21 +730,24 @@ class QfLiraSolverTest {
 
     @Test
     fun `a private operation stop should withhold a Boolean leaf until a live operation`() {
-        var privateStopped = false
-        val component = ExactLiraSearchComponent(partialModel())
-        component.useOperationAllowance { parent -> parent or Cancellation { privateStopped } }
-        component.use { owned ->
-            val session = SearchSession(listOf(owned))
-            assertIs<ComponentResult.Consistent>(session.initialize())
-            privateStopped = true
+        for (incremental in listOf(false, true)) {
+            var privateStopped = false
+            val component = ExactLiraSearchComponent(partialModel())
+            if (incremental) component.useIncrementalLinearPropagation()
+            component.useOperationAllowance { parent -> parent or Cancellation { privateStopped } }
+            component.use { owned ->
+                val session = SearchSession(listOf(owned))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                privateStopped = true
 
-            assertIs<ComponentResult.Indeterminate>(session.push(SearchDecision.Bool(Lit.make(0, false))))
-            assertNull(session.model().valueOf(owned.assignmentKey))
-            session.popTo(0)
-            privateStopped = false
-            assertIs<ComponentResult.Consistent>(session.propagate())
+                assertIs<ComponentResult.Indeterminate>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+                assertNull(session.model().valueOf(owned.assignmentKey))
+                session.popTo(0)
+                privateStopped = false
+                assertIs<ComponentResult.Consistent>(session.propagate())
 
-            assertIs<SearchResult.Satisfied>(session.solve(2))
+                assertIs<SearchResult.Satisfied>(session.solve(2))
+            }
         }
     }
 
