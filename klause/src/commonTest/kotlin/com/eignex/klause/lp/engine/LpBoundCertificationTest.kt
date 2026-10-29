@@ -10,6 +10,40 @@ import kotlin.test.assertTrue
 
 class LpBoundCertificationTest {
     @Test
+    fun `large basis repair should certify only admitted open directions`() {
+        val size = 129
+        val zero = ExactLpNumber.of(0L)
+        val basis = Basis(IntArray(size) { it },
+            Array(size * 2) { if (it < size) VarStatus.BASIC else VarStatus.AT_LOWER })
+        for (boxed in listOf(true, false)) {
+            val source = assertNotNull(LpExactState(ExactLpModel(
+                List(size) { column ->
+                    listOf(column to 2L, (column + 1) % size to 1L).sortedBy { it.first }
+                        .map { (row, coefficient) -> ExactLpEntry(row, ExactLpNumber.of(coefficient)) }
+                },
+                List(size) { zero },
+                List(size) { column -> ExactLpColumn(ExactLpBounds(ExactLpSide(zero),
+                    ExactLpSide(ExactLpNumber.of(1L)).takeIf { boxed && column > 0 })) } +
+                    List(size) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
+                List(size) { ExactLpRow() },
+                ExactLpObjective(List(size) { ExactLpNumber.of(-3L) } + List(size) { zero }),
+            )).toWorkingModel())
+
+            val result = certifyLpBoundOnly(source, DoubleArray(size) { -0.99 },
+                ReconstructionLimits(maxAttempts = 1), basis = basis)
+
+            assertEquals(0, result.metrics.pointChecks)
+            if (boxed) {
+                assertTrue(assertNotNull(result.bound).value < BigFraction.ZERO)
+                assertEquals(1, assertNotNull(result.metrics.basisRepair).restrictedColumns)
+            } else {
+                assertNull(result.bound)
+                assertEquals("DIMENSION", assertNotNull(result.metrics.basisRepair).decline)
+            }
+        }
+    }
+
+    @Test
     fun `retained basis should recover coupled dual equations without a primal`() {
         val zero = ExactLpNumber.of(0L)
         val source = assertNotNull(LpExactState(ExactLpModel(

@@ -67,6 +67,8 @@ internal data class ReconstructionBasisMetrics(
     val factorAllocation: Long = 0L,
     val openBasicColumns: Int = 0,
     val decline: String? = null,
+    val restrictedComponents: Int = 0,
+    val restrictedColumns: Int = 0,
 )
 
 internal data class ReconstructionMetrics(
