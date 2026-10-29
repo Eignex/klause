@@ -445,7 +445,8 @@ optimality proof.
 Profile [9276](https://lab.eignex.com/jobs/9276) reaches preparation but exhausts
 the heap while compiling both targets concurrently. The ordered build in
 [9282](https://lab.eignex.com/jobs/9282) loses its first infrastructure allocation
-before numerical execution. These preparation failures establish no dominant
+before numerical execution; its automatic retry exhausts the thirty-minute
+containing allowance during compilation. These preparation failures establish no dominant
 numerical cost or policy disposition. JVM and Linux Native regressions and profile
 linking pass CI at `d3402479af`; the build-order change passes at `0b37e89770`.
 
