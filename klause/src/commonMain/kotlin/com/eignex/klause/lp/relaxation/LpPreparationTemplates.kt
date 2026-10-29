@@ -110,7 +110,7 @@ internal class LpFactorTemplate(
 internal class LpTemplateComponent(
     val factors: List<LpFactorTemplate>,
     val bounds: Map<Int, LpIntegerBoundTemplate>,
-    val references: List<Int>,
+    val references: IntArray,
     val costs: List<Long>,
 ) {
     private val rowIndex = factors.associateWith { it.rows }
@@ -335,7 +335,10 @@ internal class LpPreparationTemplates private constructor(
                             it.bounds == componentBounds && it.costs == costs
                     }
                     if (retained != null) reusedComponents++
-                    retained ?: LpTemplateComponent(group.toList(), componentBounds, seen.toList(), costs)
+                    retained ?: run {
+                        if (!visit(seen.size.toLong())) return null
+                        LpTemplateComponent(group.toList(), componentBounds, seen.toIntArray(), costs)
+                    }
                 }
                 if (!visit(1L + factors.size * 2L + bounds.size)) return null
                 return LpPreparationTemplates(problem, namespace, problem.semantics, problem is BakedProblem,
