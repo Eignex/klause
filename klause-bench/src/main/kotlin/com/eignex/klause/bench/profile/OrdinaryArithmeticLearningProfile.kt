@@ -14,6 +14,7 @@ import com.eignex.klause.formats.json.ProblemJson
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
 import com.eignex.klause.solver.pipeline.FinitePipelineRequest
@@ -22,6 +23,7 @@ import com.eignex.klause.util.Cancellation
 import java.io.File
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -99,7 +101,7 @@ internal object OrdinaryArithmeticLearningProfile {
                         val result = solver.solve(params)
                         verdict = result::class.simpleName ?: "unknown"
                         stats = result.stats.toString()
-                        result.assignment
+                        (result as? SolveResult.Sat)?.assignment
                     } else {
                         val result = solver.minimize(objective, params)
                         verdict = result::class.simpleName ?: "unknown"
@@ -139,7 +141,7 @@ internal object OrdinaryArithmeticLearningProfile {
                     put("finiteWorkIncludingRetirement", capture?.work())
                     put("invocationElapsedNs", System.nanoTime() - opened)
                     put("cancelled", stop())
-                    put("trace", capture?.export())
+                    put("trace", capture?.export() ?: JsonNull)
                 }.toString())
                 output.flush()
                 capture?.release()
