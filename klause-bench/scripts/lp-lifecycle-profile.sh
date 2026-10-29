@@ -27,6 +27,7 @@ sha256sum "$native" > "$OUT/native-sha256.txt"
 find "$LAB_WORKTREE/klause/build/lp-profile/jvm" -type f -print0 | sort -z | xargs -0 sha256sum > "$OUT/jvm-sha256.txt"
 /usr/bin/time -v -o "$OUT/jvm-resources.txt" \
   "${JAVA_HOME:+$JAVA_HOME/bin/}java" -Xmx1536m -XX:ActiveProcessorCount=1 -XX:+UseSerialGC \
+  -Xlog:jfr+startup=off \
   --enable-native-access=ALL-UNNAMED --add-modules=jdk.incubator.vector \
   "-XX:StartFlightRecording=filename=$OUT/lifecycle.jfr,settings=profile,dumponexit=true" \
   -cp "$LAB_WORKTREE/klause/build/lp-profile/jvm/classes:$LAB_WORKTREE/klause/build/lp-profile/jvm/lib/*" \
