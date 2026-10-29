@@ -38,6 +38,32 @@ class LinearAuthorityInvocationTest {
     )
 
     @Test
+    fun `an advisory discrete seed should reach the retained bound consumer after checked completion`() {
+        val third = BigFraction.ofLong(3).reciprocal()
+        val source = SourceProofContext(scope, setOf(integer, real), mapOf(
+            "integer-lower" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.MINUS_ONE),
+                BigFraction.ZERO)),
+            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ofLong(-3),
+                integer to BigFraction.ONE), BigFraction.ZERO)),
+            "upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ofLong(3),
+                integer to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ), mapOf(real to BigFraction.ONE))
+        val seed = Sample(booleanArrayOf(), longArrayOf(1), doubleArrayOf(0.333))
+        val events = mutableListOf<String>()
+        val accepted = mutableListOf<Sample>()
+
+        val result = LinearAuthorityInvocation(source, TheoryParams(sourceIncumbentCompletion = true),
+            external = { seed }, boundOrdered = true,
+            onIncumbentImport = { events += "import" }, onIncumbentUse = { events += "use" }).use {
+            it.run { sample, _ -> accepted += sample }
+        }
+
+        assertEquals(listOf("import", "use"), events)
+        assertEquals(listOf(third), accepted.first().exactReals)
+        assertEquals(1L, result.stats.smt.completeSearchStages?.get("numericalExternalCompletionChecked"))
+    }
+
+    @Test
     fun `external admission should distinguish missing exact coordinates from rejected points`() {
         val source = SourceProofContext(scope, setOf(real), mapOf(
             "upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ZERO)),

@@ -28,6 +28,30 @@ import kotlin.test.assertTrue
 
 class JointLinearRepairTest {
     @Test
+    fun `an advisory pooled center should be completed before neighborhood consumption`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(2), null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.GE, 0.0),
+            ), numRealVars = 1, realLower = doubleArrayOf(0.75), realUpper = doubleArrayOf(2.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val seed = Sample(booleanArrayOf(), longArrayOf(1), doubleArrayOf(0.75))
+        val events = mutableListOf<String>()
+
+        JointLinearRepair(model, source, objective, TheoryParams(sourceIncumbentCompletion = true, maxFlips = 1),
+            external = { seed }, onIncumbentImport = { events += "import" },
+            onIncumbentUse = { events += "use" }).use { repair ->
+            repair.search(adaptive = false).use { search ->
+                var done = false
+                repeat(32) { if (!done) done = search.advance(Cancellation.Never, 1) }
+            }
+            assertTrue((repair.stats.smt.completeSearchStages?.get("jointRepairExternalCompletionChecked") ?: 0L) > 0L)
+        }
+
+        assertEquals(listOf("import", "use"), events.take(2))
+    }
+
+    @Test
     fun `a freed integer should complete its affine backing at a lower objective`() {
         val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0),
             longArrayOf(1, 1), null, null), factors = arrayOf(

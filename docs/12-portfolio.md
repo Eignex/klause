@@ -89,6 +89,21 @@ An explicit arm count, including the default-sized count, prevents automatic num
 companions. A missing complete affine capture declines both companions without
 removing finite workers.
 
+`source-incumbent-completion=true` lets the numerical and joint-repair companions
+use an approximate incumbent's Boolean and finite integer coordinates as advisory
+pins. The real coordinates carry no authority: connected continuous residuals use
+the existing exact recovery path. Original-source witness and exact objective
+checks precede incumbent admission, cutoff use or neighborhood centering. Supplied
+exact payloads retain their direct admission checks.
+
+Each companion owns at most sixteen source/point attempts without eviction. Identity
+includes the full source restrictions, rows, coordinates, objective, interpretation
+and checker, plus the seed values and coordinate frame. Failed unchanged attempts
+remain declined; paused recovery keeps its progress under the same cumulative
+allowance. Preparation, residual solving, checking and retained allocation spend the
+companion's existing LP funding, and closure releases its residual owners. The
+control defaults to false and changes neither worker admission nor lifetimes.
+
 `companion-integers=true` trials the same bounded companion pair on finite general
 integer/continuous sources. It changes only the binary-fragment restriction; size,
 source capture, objective, LP ceiling, single-lane mixed pool and explicit-recipe

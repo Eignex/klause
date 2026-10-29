@@ -943,6 +943,16 @@ schedule does not reproduce mixed numerical elapsed schedules. Full-trace claims
 require the capture's complete artifact marker; source outcome claims require the
 corresponding independent checker receipts.
 
+`param.source-incumbent-completion=true` trials advisory discrete incumbent
+completion under the existing numerical and joint-repair companion allowances.
+The default is false. `numericalExternalCompletion*` and
+`jointRepairExternalCompletion*` distinguish attempts, reused declines, retention
+exhaustion and source/objective-checked points; ordinary import/consumption events
+remain the downstream evidence. Recovery counters retain preparation, numerical,
+exact and checking work. Compare source-matched on/off arms without changing the
+admission gate, active lifetime, rewards or coverage. A completed point or a pool
+read alone establishes neither consumption nor a performance benefit.
+
 `param.companion-integers=true` trials bounded general-integer/continuous numerical
 companions on the ordinary finite route. `false` retains the binary-only gate.
 Both settings capture `admission` lines with fragment, objective, proof authority,
