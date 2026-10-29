@@ -90,7 +90,10 @@ internal class AlnsWorkerConfig private constructor(
         )
 
     fun withSharingMemory(enabled: Boolean, work: Long, scratch: Int): AlnsWorkerConfig =
-        AlnsWorkerConfig(profile, nodeBudget, numericalCompletion, toleranceCheck, workScheduled, enabled, work, scratch)
+        AlnsWorkerConfig(
+            profile, nodeBudget, numericalCompletion, toleranceCheck,
+            workScheduled, enabled, work, scratch,
+        )
 
     override val label: String get() = "alns-${profile.label}"
 

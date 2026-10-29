@@ -133,7 +133,10 @@ private fun PropagationState.learnedSharingMemory(sample: SharingMemoryObservati
         if (value != null) eventBytes += (value as IntArrayList).backingData.size.toLong() * Int.SIZE_BYTES
     }
     eventBytes += overflow?.primitiveCapacityBytes ?: 0L
-    for (list in events.dirtyVars) { sample.step(); eventBytes += (list?.backingData?.size?.toLong() ?: 0L) * Int.SIZE_BYTES }
+    for (list in events.dirtyVars) {
+        sample.step()
+        eventBytes += (list?.backingData?.size?.toLong() ?: 0L) * Int.SIZE_BYTES
+    }
     for (mark in events.dirtyMark) { sample.step(); eventBytes += mark?.allocatedBytes ?: 0L }
     sample.record(mapOf(
         "sessionEventCapacityBytes" to eventBytes,
