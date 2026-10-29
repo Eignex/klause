@@ -17,6 +17,18 @@ internal class ArithmeticLearningTrace(
         private set
     var omittedPayloads = 0
         private set
+    var captureFirstInteger = false
+    var focusedIntegerId: Int? = null
+        private set
+    var discardedWindows = 0L
+        private set
+    var discardedEvents = 0L
+        private set
+    var discardedWords = 0L
+        private set
+    var omittedObservations = 0L
+        private set
+    private var pendingPick = false
     private val storedIds = mutableMapOf<Int, Int>()
     private var nextId = 0
     val accepting: Boolean get() = !truncated
@@ -25,8 +37,38 @@ internal class ArithmeticLearningTrace(
         require(maxEvents in 1..1024 && maxWords in 1..65536)
     }
 
+    fun beginConflict(factorId: Int, level: Int, trail: Int) {
+        if (captureFirstInteger && focusedIntegerId == null && events.isNotEmpty()) {
+            discardedWindows++
+            discardedEvents += events.size
+            discardedWords += words
+            events.clear()
+            words = 0
+            truncated = false
+            truncationCause = null
+            storedIds.clear()
+            nextId = 0
+        }
+        record("analysis.begin", factorId.toLong(), level.toLong(), trail.toLong())
+    }
+
+    private fun omitFocusedDetails(): Boolean {
+        if (focusedIntegerId == null) return false
+        omittedObservations++
+        return true
+    }
+
     fun record(kind: String, vararg data: Long) {
         if (!accepting) return
+        if (focusedIntegerId != null) {
+            if (kind == "traversal.pick" && pendingPick) pendingPick = false
+            else if (!kind.startsWith("consumer.") && kind != "store.remap" &&
+                kind != "traversal.finished" && kind != "traversal.retirement-checked"
+            ) {
+                omittedObservations++
+                return
+            }
+        }
         if (events.size == maxEvents || data.size > maxWords - words) {
             truncationCause = if (events.size == maxEvents) "events" else "words"
             truncated = true
@@ -37,7 +79,7 @@ internal class ArithmeticLearningTrace(
     }
 
     fun clause(kind: String, literals: IntArray, state: PropagationState) {
-        if (!accepting) return
+        if (!accepting || omitFocusedDetails()) return
         if (literals.size > 64) {
             omittedPayloads++
             record("$kind.omitted", literals.size.toLong())
@@ -67,7 +109,7 @@ internal class ArithmeticLearningTrace(
     }
 
     fun row(kind: String, row: IntegerConflictRow, state: PropagationState, trail: Int? = null) {
-        if (!accepting) return
+        if (!accepting || omitFocusedDetails()) return
         record(kind, row.bound, (trail ?: -1).toLong())
         if (!accepting) return
         record("$kind.guard", row.guard.toLong())
@@ -94,7 +136,7 @@ internal class ArithmeticLearningTrace(
     }
 
     fun marker(variable: Int, lower: Boolean, marker: IntArray?) {
-        if (!accepting) return
+        if (!accepting || omitFocusedDetails()) return
         record("integer.endpoint", variable.toLong(), if (lower) 1 else 0)
         if (marker == null) return
         if (marker.size > 32) {
@@ -106,7 +148,7 @@ internal class ArithmeticLearningTrace(
     }
 
     fun seedEndpoints(variables: IntArray, state: PropagationState) {
-        if (!accepting) return
+        if (!accepting || omitFocusedDetails()) return
         if (variables.size > 16) {
             record("analysis.seed-endpoints-declined", variables.size.toLong())
             return
@@ -120,7 +162,7 @@ internal class ArithmeticLearningTrace(
     }
 
     fun stored(factorId: Int, kind: String) {
-        if (!accepting) return
+        if (!accepting || omitFocusedDetails()) return
         if (storedIds.size == 64) {
             truncationCause = "stored-identities"
             truncated = true
@@ -129,12 +171,17 @@ internal class ArithmeticLearningTrace(
         val id = nextId++
         storedIds[factorId] = id
         record("$kind.stored", id.toLong(), factorId.toLong())
+        if (!truncated && kind == "integer" && captureFirstInteger) {
+            focusedIntegerId = id
+            pendingPick = true
+        }
     }
 
     fun pin(factorId: Int, variable: Int, bound: Long, kind: String, level: Int) {
         if (!accepting) return
         val id = storedIds[factorId] ?: return
         record("consumer.$kind", id.toLong(), factorId.toLong(), variable.toLong(), bound, level.toLong())
+        pendingPick = true
     }
 
     fun remap(base: Int, remap: IntArray) {

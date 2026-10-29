@@ -772,18 +772,24 @@ the investigation cost rather than becoming a solver regression.
 ## Prepared arithmetic learning
 
 `bench.profile.OrdinaryArithmeticLearningProfile` takes `suite=ID problem=NAME
-sha256=HEX timeout-ms=10000 nodes=4096 lp=auto|off trace-start-pick=1`. It runs clause and opt-in
+sha256=HEX timeout-ms=10000 nodes=4096 lp=auto|off trace=first-integer|initial`.
+It runs clause and opt-in
 integer-row arms through ordinary finite preparation and backtrack traversal,
 without a decision replay. The existing bounded arithmetic trace records source
 conflicts, historical endpoint rows, mapped admission, retained consumers and
-retirement. Oversized clause and endpoint-marker payloads produce omission events and a
-payload-omission count; later events retain the same event and word limits. A
+retirement. Its live window admits 1,024 events and 65,536 words. Clauses above
+64 literals and endpoint markers above 32 words produce explicit omission events
+and a payload-omission count. A
 trace with omissions cannot establish the omitted premises. The selector wrapper
 delegates all decisions and notifications. Branch records keep only the chosen
 coordinate and its domain; typed-row records keep their historical endpoints.
-`trace-start-pick` delays only observer attachment, with its starting lifecycle
-counts and pick ordinal in the record. Deadlines, decisions and total work/lifecycle
-counts cover the entire invocation; a later window does not reset any allowance.
+The integer arm's `trace=first-integer` keeps the most recent conflict window until
+an integer object is admitted, then keeps its consumers, branch markers and
+retirement. Other post-admission details are omitted. Discarded-window/event/word
+counts and omitted observations are explicit; the live event and word caps stay
+fixed. `trace=initial` keeps the initial window instead. The clause arm keeps its
+initial window. Deadlines, decisions and total work/lifecycle counts cover the
+entire invocation; discarding diagnostic data resets no solver allowance.
 
 Plain source bytes are hashed after corpus decompression with a 1 MiB input limit.
 A hash mismatch retains the bytes and observed digest and stops before solving.

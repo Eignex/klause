@@ -98,6 +98,36 @@ class ArithmeticLearningTraceTest {
     }
 
     @Test
+    fun `focused capture should retain a derivation and later consumers within its allowance`() {
+        val state = PropagationState(Problem(0, 1, arrayOf(IntDomain(0, 6)), emptyArray()), Assumptions.None)
+        val row = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
+            longArrayOf(1), intArrayOf(0), LinearOp.LE, 6), useLo = true))
+        val trace = ArithmeticLearningTrace().apply { captureFirstInteger = true }
+        trace.record("prefix", 1)
+        trace.beginConflict(0, 1, 0)
+        trace.row("integer.derived", row, state)
+        trace.stored(4, "integer")
+        trace.pin(4, 0, 1, "upper", 1)
+        trace.record("traversal.pick", 2)
+        repeat(2_000) {
+            trace.beginConflict(0, 2, 0)
+            trace.record("traversal.pick", 2)
+        }
+
+        trace.pin(4, 0, 2, "upper", 2)
+        trace.remap(3, intArrayOf(-1, -1))
+
+        assertTrue(trace.events.any { it.kind == "integer.derived.endpoint" })
+        assertContentEquals(longArrayOf(1, 2), trace.events.filter { it.kind == "consumer.upper" }
+            .map { it.data[3] }.toLongArray())
+        assertEquals(1, trace.events.count { it.kind == "traversal.pick" })
+        assertEquals(-1L, trace.events.last().data[2])
+        assertEquals(1L, trace.discardedWindows)
+        assertTrue(trace.omittedObservations >= 2_000L)
+        assertFalse(trace.truncated)
+    }
+
+    @Test
     fun `capture should own payloads and stop at its word allowance`() {
         val trace = ArithmeticLearningTrace(maxEvents = 4, maxWords = 3)
         val payload = longArrayOf(1, 2)
@@ -142,14 +172,14 @@ class ArithmeticLearningTraceTest {
     @Test
     fun `bounded capture should preserve conflict fallback and later row deduction`() {
         val work = mutableListOf<Long>()
-        for (capture in listOf(false, true)) {
+        for (capture in 0..2) {
             val native = PropagationSession(Problem(0, 3,
                 arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)), arrayOf(
                     Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
                     Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
                 )), pbLearning = false).apply { enableIntegerRowLearning() }
-            val trace = ArithmeticLearningTrace()
-            if (capture) native.explanationState.arithmeticLearningTrace = trace
+            val trace = ArithmeticLearningTrace().apply { captureFirstInteger = capture == 2 }
+            if (capture != 0) native.explanationState.arithmeticLearningTrace = trace
             val cp = CpSearchComponent(native)
             val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(0))
             assertIs<ComponentResult.Consistent>(shared.initialize())
@@ -166,7 +196,7 @@ class ArithmeticLearningTraceTest {
             assertTrue(native.learnedLifecycle().getValue("learningIntegerAdmitted") > 0L)
             assertTrue(native.learnedLifecycle().getValue("learningIntegerConsumed") > 0L)
             work.add(native.explanationState.work)
-            if (capture) {
+            if (capture != 0) {
                 assertTrue(trace.events.any { it.kind == "analysis.seed-endpoint" })
                 assertTrue(trace.events.any { it.kind == "integer.pivot-row" })
                 assertTrue(trace.events.any { it.kind == "integer.fallback" })
@@ -175,6 +205,6 @@ class ArithmeticLearningTraceTest {
                 assertFalse(trace.truncated)
             }
         }
-        assertEquals(work[0], work[1])
+        assertEquals(1, work.distinct().size)
     }
 }
