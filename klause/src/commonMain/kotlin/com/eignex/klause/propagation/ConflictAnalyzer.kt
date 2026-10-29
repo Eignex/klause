@@ -246,8 +246,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
      * sit below the literal's level on this one.
      */
     private fun beginAnalysis() {
-        state.arithmeticLearningTrace?.record("analysis.begin", state.currentFactor.toLong(),
-            state.currentLevel.toLong(), state.undo.size.toLong())
+        state.arithmeticLearningTrace?.beginConflict(state.currentFactor, state.currentLevel, state.undo.size)
         state.factorAttribution?.beginAnalysis()
         state.lazyReasonMemo.clear()
         val atomCount = state.atoms.intVar.size

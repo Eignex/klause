@@ -26,7 +26,6 @@ import kotlin.random.Random
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -35,14 +34,15 @@ internal object OrdinaryArithmeticLearningProfile {
     fun main(args: Array<String>) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.keys.all {
-            it in setOf("suite", "problem", "sha256", "timeout-ms", "nodes", "lp", "trace-start-pick")
+            it in setOf("suite", "problem", "sha256", "timeout-ms", "nodes", "lp", "trace")
         })
         val suite = requireNotNull(options["suite"])
         val name = requireNotNull(options["problem"])
         val hash = requireNotNull(options["sha256"])
         val timeout = (options["timeout-ms"] ?: "10000").toLong().also { require(it in 1..30_000L) }
         val nodes = (options["nodes"] ?: "4096").toLong().also { require(it in 1..100_000L) }
-        val traceStart = (options["trace-start-pick"] ?: "1").toInt().also { require(it.toLong() in 1..nodes) }
+        val traceMode = options["trace"] ?: "first-integer"
+        require(traceMode in setOf("initial", "first-integer"))
         val lp = options["lp"] ?: "auto"
         require(lp in setOf("auto", "off"))
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
@@ -98,8 +98,6 @@ internal object OrdinaryArithmeticLearningProfile {
                 var native: PropagationSession? = null
                 var capture: PreparedArithmeticLearningProfile.Capture? = null
                 var picks = 0
-                var captureStarted = false
-                var lifecycleAtCaptureStart: JsonObject? = null
                 val base = entry.searchParams ?: BacktrackPresets.conflictDriven(randomSeed = 3L)
                 val selector = base.variableSelector
                 fun observing(delegate: VariableSelector): VariableSelector = object : VariableSelector by delegate {
@@ -108,25 +106,19 @@ internal object OrdinaryArithmeticLearningProfile {
                         if (native == null) {
                             native = session
                             capture = PreparedArithmeticLearningProfile.Capture(
-                                session, 1024, 65536, attachImmediately = false,
+                                session, 1024, 65536, captureFirstInteger = learning && traceMode == "first-integer",
                             )
                         }
                         check(native === session)
                         val recorder = requireNotNull(capture)
                         picks++
-                        if (picks == traceStart) {
-                            lifecycleAtCaptureStart = recorder.lifecycle()
-                            recorder.attach()
-                            captureStarted = true
-                            recorder.record("traversal.capture-start", picks.toLong(), session.decisionLevel.toLong())
-                        }
                         val picked = delegate.pick(session, rng)
-                        if (captureStarted && recorder.accepting) {
+                        if (recorder.accepting) {
                             val domain = (picked as? VarRef.IntVar)?.let { session.intDomain(it.varId) }
                             recorder.record("traversal.pick", session.decisionLevel.toLong(),
                                 if (picked is VarRef.IntVar) picked.varId.toLong() else -1L,
                                 if (picked is VarRef.Bool) picked.varId.toLong() else -1L,
-                                domain?.min ?: 0L, domain?.max ?: 0L)
+                                domain?.min ?: 0L, domain?.max ?: 0L, picks.toLong())
                         }
                         return picked
                     }
@@ -163,10 +155,10 @@ internal object OrdinaryArithmeticLearningProfile {
                 }
                 val beforeRetirement = native?.learnedClauseCount
                 val beforeLifecycle = capture?.lifecycle()
-                if (captureStarted) capture?.record("traversal.finished")
+                capture?.record("traversal.finished")
                 native?.popToLevel(0)
                 native?.forgetLearnedClauses { _, _ -> false }
-                if (captureStarted) capture?.record("traversal.retirement-checked")
+                capture?.record("traversal.retirement-checked")
                 val record = buildJsonObject {
                     put("revision", Reports.readGitSha())
                     put("provenanceFingerprint", fingerprint)
@@ -181,10 +173,8 @@ internal object OrdinaryArithmeticLearningProfile {
                     put("seed", 3)
                     put("maxDecisions", nodes)
                     put("timeoutMs", timeout)
-                    put("traceStartPick", traceStart)
+                    put("traceMode", traceMode)
                     put("selectorPicks", picks)
-                    put("captureStarted", captureStarted)
-                    put("lifecycleAtCaptureStart", lifecycleAtCaptureStart ?: JsonNull)
                     put("verdict", verdict)
                     put("witness", witness)
                     put("nativeReconstructedPointCheck", checked)
