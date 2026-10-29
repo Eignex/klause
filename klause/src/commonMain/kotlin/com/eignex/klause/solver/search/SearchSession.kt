@@ -912,7 +912,8 @@ class SearchSession(
         val values = reasons.completeValues
         val result = if (values == null) {
             SharedLearningReclamation(
-                if (cancelled()) SharedLearningReclamationStatus.Cancelled else SharedLearningReclamationStatus.Deferred,
+                if (cancelled()) SharedLearningReclamationStatus.Cancelled
+                else SharedLearningReclamationStatus.Deferred,
                 work = reasons.work,
             )
         } else {

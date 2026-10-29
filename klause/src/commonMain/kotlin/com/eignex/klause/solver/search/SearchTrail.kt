@@ -240,6 +240,9 @@ internal class SearchAssertionQueue : Iterable<PendingSearchAssertion> {
     override fun iterator(): Iterator<PendingSearchAssertion> = object : Iterator<PendingSearchAssertion> {
         private var position = 0
         override fun hasNext(): Boolean = position < size
-        override fun next(): PendingSearchAssertion = checkNotNull(data[(head + position++) % data.size])
+        override fun next(): PendingSearchAssertion {
+            if (!hasNext()) throw NoSuchElementException()
+            return checkNotNull(data[(head + position++) % data.size])
+        }
     }
 }

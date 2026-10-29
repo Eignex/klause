@@ -154,7 +154,8 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
                     step()
                     if (remap[index] >= 0) replacementRechecks.addLast(remap[index])
                 }
-                val after = replacement.ownedBytes(::step) + replacementStages.backingData.size.toLong() * Int.SIZE_BYTES +
+                val after = replacement.ownedBytes(::step) +
+                    replacementStages.backingData.size.toLong() * Int.SIZE_BYTES +
                     replacementReasons.primitiveCapacityBytes +
                     replacementPending.capacityBytes + replacementRechecks.capacityBytes +
                     protectedReasonBytes
@@ -181,7 +182,8 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
             }
         } catch (stopped: ReclamationStopped) {
             SharedLearningReclamation(
-                if (stopped.cancelled) SharedLearningReclamationStatus.Cancelled else SharedLearningReclamationStatus.Deferred,
+                if (stopped.cancelled) SharedLearningReclamationStatus.Cancelled
+                else SharedLearningReclamationStatus.Deferred,
                 work = work, scratchBytes = scratchBound,
             )
         }
@@ -219,7 +221,10 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
         override fun iterator(): Iterator<Int> = object : Iterator<Int> {
             private var position = 0
             override fun hasNext(): Boolean = position < size
-            override fun next(): Int = data[(head + position++) % data.size]
+            override fun next(): Int {
+                if (!hasNext()) throw NoSuchElementException()
+                return data[(head + position++) % data.size]
+            }
         }
     }
 

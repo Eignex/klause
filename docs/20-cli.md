@@ -167,7 +167,8 @@ stale status; only complete current samples can support byte accounting. See
 `sharing-memory-bytes` optionally limits each shared learned-clause pool's modeled
 payload and index bytes, including private ALNS repair pools. It accepts zero,
 operates independently of sampling and declines shares when bounded reclamation
-cannot make room. It has no default byte threshold.
+cannot make room. Each worker's duplicate filter has a separate allowance of the
+same size. It has no default byte threshold.
 
 The finite backtrack controls `propagation-attribution=true` and
 `historical-table-reasons=true` independently enable bounded family diagnostics

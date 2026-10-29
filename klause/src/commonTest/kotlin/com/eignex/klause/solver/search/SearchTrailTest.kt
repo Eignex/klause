@@ -15,7 +15,9 @@ class SearchTrailTest {
             session.imply(variable * 2, SearchExplanation(intArrayOf(variable * 2)))
         }
         val beforeSample = SharingMemoryObservation(100_000L, 1024, { false }, {})
-        val before = requireNotNull(beforeSample.snapshot { session.retainedLearningMemory(beforeSample) }.completeValues)
+        val before = requireNotNull(beforeSample.snapshot {
+            session.retainedLearningMemory(beforeSample)
+        }.completeValues)
 
         session.resetRootFacts()
 

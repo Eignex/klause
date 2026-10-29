@@ -121,7 +121,9 @@ internal fun PropagationState.prepareReclamation(
 internal fun PropagationState.ownLearned(sample: com.eignex.klause.util.SharingMemoryObservation,
     index: Int, protected: Boolean) {
     val prop = learned.store[index]
-    fun ints(value: IntArray?) { if (value != null) sample.owned(value, value.size.toLong() * Int.SIZE_BYTES, protected) }
+    fun ints(value: IntArray?) {
+        if (value != null) sample.owned(value, value.size.toLong() * Int.SIZE_BYTES, protected)
+    }
     fun longs(value: LongArray) { sample.owned(value, value.size.toLong() * Long.SIZE_BYTES, protected) }
     ints(prop.boolVars)
     ints(prop.intVars)

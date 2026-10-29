@@ -41,7 +41,9 @@ private fun forgetTiered(session: PropagationSession, params: BacktrackParams, c
     if (prepared.count > residual) {
         session.forgetLearnedClauses { index, _ -> prepared.kept[index] }
         val retired = learnedSize - session.learnedClauseCount
-        if (retired > 0) params.onEvent?.invoke(SearchEvent.LearnedDbSweep(kept = session.learnedClauseCount, dropped = retired))
+        if (retired > 0) {
+            params.onEvent?.invoke(SearchEvent.LearnedDbSweep(kept = session.learnedClauseCount, dropped = retired))
+        }
     }
 }
 
