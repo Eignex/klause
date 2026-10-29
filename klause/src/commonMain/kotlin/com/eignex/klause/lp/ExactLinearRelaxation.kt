@@ -12,7 +12,7 @@ internal fun ExactLinear.finiteRelaxationSupported(): Boolean = relation != Line
     ((compactRelaxationSupported() && (activator == LinearRow.ALWAYS || relation != LinearOp.EQ)) ||
         (!strict && activator == LinearRow.ALWAYS && numericalRow() != null))
 
-private fun ExactLinear.compactRelaxationSupported(): Boolean =
+internal fun ExactLinear.compactRelaxationSupported(): Boolean =
     constants.exactBound.fitsLong() &&
         constants.exactBound.toLongExact() in -9007199254740992L..9007199254740992L &&
         (0 until size).all {

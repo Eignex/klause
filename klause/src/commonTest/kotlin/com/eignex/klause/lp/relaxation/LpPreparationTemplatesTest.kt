@@ -1,15 +1,18 @@
 package com.eignex.klause.lp.relaxation
 
+import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.VarRemap
-import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.engine.LpExactState
+import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
@@ -64,6 +67,60 @@ class LpPreparationTemplatesTest {
         assertSame(before.columns.first().column.bounds, after.columns.first().column.bounds)
         assertSame(assertNotNull(first.preparationTemplates).bounds.getValue(0).column.bounds,
             after.columns.first().column.bounds)
+    }
+
+    @Test
+    fun `fixed layout consumers should adopt exact bound templates without changing authority`() {
+        val relaxation = CpToLpRelaxation(source, objective, projections = selection).build(RootDomains(source))
+        var reused = 0
+
+        val exact = assertNotNull(relaxation.authoritativeWithTemplates(Cancellation.Never) { reused = it })
+
+        assertTrue(relaxation.persistentEligible)
+        assertEquals(6, reused)
+        assertSame(assertNotNull(relaxation.preparationTemplates).bounds.getValue(0).column,
+            exact.column(relaxation.intColOf[0]))
+        assertTrue(exact.sameAuthority(assertNotNull(relaxation.model.authoritativeModel())))
+    }
+
+    @Test
+    fun `exact source rows should retain reusable compact emission templates`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 10) }, arrayOf<Factor>(
+            ExactLinear.of(intArrayOf(Term.ofIntVar(0), Term.ofIntVar(1)),
+                listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.GE, BigFraction.ofLong(3)),
+        ))
+        val captured = FactorProjectionProviders.Default.prepare(problem)
+        val first = CpToLpRelaxation(problem, null, projections = captured)
+        first.build(RootDomains(problem))
+        val view = problem.withFactors(problem.factors.copyOf())
+        val next = CpToLpRelaxation(view, null, projections = captured.forEngineView(view))
+
+        val reused = assertNotNull(next.build(RootDomains(view)).model.authoritativeModel())
+        val fresh = assertNotNull(CpToLpRelaxation(view, null, projections = null)
+            .build(RootDomains(view)).model.authoritativeModel())
+
+        assertSame(assertNotNull(assertNotNull(first.preparationTemplates).factors[0].rows).single(),
+            assertNotNull(assertNotNull(next.preparationTemplates).factors[0].rows).single())
+        assertTrue(reused.sameAuthority(fresh))
+        assertEquals(1, reused.m)
+    }
+
+    @Test
+    fun `wide exact source rows should preserve the ordinary exact projection`() {
+        val coefficient = BigFraction.ofLong(9_007_199_254_740_993L)
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 10) }, arrayOf<Factor>(
+            ExactLinear.of(intArrayOf(Term.ofIntVar(0), Term.ofIntVar(1)),
+                listOf(coefficient, BigFraction.ONE), LinearOp.LE, coefficient),
+        ))
+        val captured = FactorProjectionProviders.Default.prepare(problem)
+
+        val reused = assertNotNull(CpToLpRelaxation(problem, null, projections = captured)
+            .build(RootDomains(problem)).model.authoritativeModel())
+        val fresh = assertNotNull(CpToLpRelaxation(problem, null, projections = null)
+            .build(RootDomains(problem)).model.authoritativeModel())
+
+        assertTrue(reused.sameAuthority(fresh))
+        assertEquals(1, reused.m)
     }
 
     @Test

@@ -54,7 +54,7 @@ reuse their source-coordinate and coefficient buffers in presolve harvest and la
 LP assembly; guarded rows read the current pin on every emission. Each build maps
 those definitions into its own columns, bounds, premises and numerical owner.
 Templates retain neither a basis nor a checked claim.
-Retained-source assembly installs the same immutable exact bound objects after a
+Retained-source assembly and fixed-layout installation adopt the same immutable exact bound objects after a
 complete match against the current normalized column, including its origin, tag,
 integrality and both bound sides.
 
