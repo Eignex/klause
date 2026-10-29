@@ -338,29 +338,37 @@ private fun LpExactState.restrictTo(
 internal fun LpNeighborhood.rebindExact(state: LpExactState, token: Cancellation): LpNeighborhood? {
     val previous = model.exactState ?: return null
     val source = state.model
-    val indices = cols + IntArray(rows.size) { source.n + rows[it] }
-    val columns = ArrayList<ExactLpColumn>(indices.size)
-    for ((local, original) in indices.withIndex()) {
+    fun parentColumn(local: Int): Int = if (local < cols.size) cols[local] else source.n + rows[local - cols.size]
+    var changed = false
+    for (local in 0 until model.numVars) {
         if (token()) return null
+        val original = parentColumn(local)
         val column = source.column(original)
         if (column.origin != previous.model.column(local).origin) return null
-        columns += column
+        if (column != previous.model.column(local) ||
+            source.objective.cost(original) != previous.model.objective.cost(local)
+        ) changed = true
     }
     // Global trail revisions do not invalidate a block whose complete numerical and premise authority is unchanged.
-    if (columns.indices.all { columns[it] == previous.model.column(it) &&
-            source.objective.cost(indices[it]) == previous.model.objective.cost(it) } &&
-        rows.indices.all { source.rhs(rows[it]) == previous.model.rhs(it) &&
-            source.row(rows[it]) == previous.model.row(it) &&
-            state.rows.row(rows[it]).active == previous.rows.row(it).active }
-    ) return this
+    for (local in rows.indices) {
+        if (token()) return null
+        val original = rows[local]
+        if (source.rhs(original) != previous.model.rhs(local) ||
+            source.row(original) != previous.model.row(local) ||
+            state.rows.row(original).active != previous.rows.row(local).active
+        ) changed = true
+    }
+    if (!changed) return this
     val identities = LpScopedRows(
         List(rows.size) { LpRowIdentity(it.toLong(), null, active = state.rows.row(rows[it]).active) },
         rows.size - 1L,
     )
     val next = LpExactState(
         previous.baseModel.copy(
-            rhs = rows.map { source.rhs(it) }, columns = columns, rows = rows.map { source.row(it) },
-            objective = ExactLpObjective(indices.map { source.objective.cost(it) }),
+            rhs = rows.map { source.rhs(it) },
+            columns = List(model.numVars) { source.column(parentColumn(it)) },
+            rows = rows.map { source.row(it) },
+            objective = ExactLpObjective(List(model.numVars) { source.objective.cost(parentColumn(it)) }),
         ),
         matrixRevision = previous.matrixRevision,
         boundRevision = state.boundRevision,
