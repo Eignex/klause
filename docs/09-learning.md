@@ -492,8 +492,8 @@ Each of the four classes has a separate work ceiling inside the scheduled slice'
 total ceiling. Zero withholds that class. Completed atomic copying, sorting and
 compaction can overspend; the class and scheduled loop repay their respective debt
 before admitting more work. Separate containing and per-class debt-added and
-debt-repaid counters retain those charges. Reseeding resets cursors without forgiving
-that debt.
+debt-repaid counters retain those charges without adding work. Reseeding resets
+cursors without forgiving that debt.
 Time and work cancellation retain no partial probe.
 Attachment and root publication are required cleanup once a consequence is admitted:
 local ceilings stop later optional work and retain the cleanup's overspend as debt.

@@ -58,7 +58,10 @@ internal class RootSimplificationPass : InprocessingPass {
     }
 
     private fun simplify(session: PropagationSession, params: BacktrackParams, budget: InprocessingBudget) {
-        if (session.problem.numBoolVars == 0 || session.explanationState.boolPinOrder.isEmpty()) return
+        if (session.problem.numBoolVars == 0 || session.explanationState.boolPinOrder.isEmpty()) {
+            budget.note("NoBooleanFacts")
+            return
+        }
         val count = session.rootClauseCount
         if (revision != session.learnedClauseRevision) {
             dropped = IntHashSet()
