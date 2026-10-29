@@ -1,10 +1,10 @@
 package com.eignex.klause.propagation
 
+import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.LinearPropagator
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.factor.linear.Linear
-import com.eignex.klause.factor.linear.LinearOp
-import com.eignex.klause.factor.linear.LinearPropagator
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.util.Cancellation
@@ -36,20 +36,20 @@ class SharingMemoryTest {
 
     @Test
     fun `cancellation sees each charged diagnostic visit before the next visit`() {
-        for (native in listOf(false, true)) {
+        for (native in listOf(false, true)) for (allowance in listOf(5L, 80L)) {
             var limit = Long.MAX_VALUE
             lateinit var session: PropagationSession
             session = PropagationSession(Problem(32, 0, emptyArray(), emptyList()), nativeSat = native,
                 cancellation = Cancellation { limit != Long.MAX_VALUE && session.work >= limit })
             repeat(8) { session.addLearnedClause(Clause(intArrayOf(it * 2, it * 2 + 2)), 2) }
             val before = session.work
-            limit = before + 5L
+            limit = before + allowance
 
             val sample = session.sharingMemory(maxWork = 10_000L)
 
             assertEquals(SharingMemoryStatus.PARTIAL, sample.status)
-            assertEquals(5L, sample.work)
-            assertEquals(5L, session.work - before)
+            assertEquals(allowance, sample.work)
+            assertEquals(allowance, session.work - before)
             assertNull(sample.completeValues)
         }
     }
@@ -99,6 +99,9 @@ class SharingMemoryTest {
             useLo = true))
         session.addLearnedIntegerRow(row, 2)
         session.pinIntAtMost(0, 4)
+        val complete = session.sharingMemory()
+        assertEquals(SharingMemoryStatus.COMPLETE, complete.status)
+        assertEquals(1L, assertNotNull(complete.completeValues).getValue("reasonProtectedObjects"))
 
         val sample = session.sharingMemory(maxScratchEntries = 1)
         session.forgetLearnedClauses { _, _ -> false }
