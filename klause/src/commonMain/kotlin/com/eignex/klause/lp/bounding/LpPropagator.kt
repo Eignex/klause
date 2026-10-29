@@ -11,6 +11,7 @@ import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpBoundAssertion
 import com.eignex.klause.lp.engine.LpBoundBatchResult
 import com.eignex.klause.lp.engine.LpCertificationObserver
+import com.eignex.klause.lp.engine.LpClaim
 import com.eignex.klause.lp.engine.LpExactCitedSide
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpExactSupport
@@ -415,7 +416,11 @@ internal class LpPropagator(
             current.solveFloat(if (allowance != null) null else warm, token, allowance).also { solved = true }
         }
 
-    fun solve(token: Cancellation = cancellation, sparsePointRecovery: Boolean = false): CertifiedLpResult? =
+    fun solve(
+        token: Cancellation = cancellation,
+        sparsePointRecovery: Boolean = false,
+        claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
+    ): CertifiedLpResult? =
         solveOwned {
             val profile = effort()
             it.solve(
@@ -424,6 +429,7 @@ internal class LpPropagator(
                 fullContinuation = profile.fullContinuation,
                 observer = certificationObserver,
                 sparsePointRecovery = sparsePointRecovery,
+                claim = claim,
             ).also { solved = true }
         }
 

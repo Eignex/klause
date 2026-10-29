@@ -6,7 +6,7 @@ data class LpPhaseStats(
     val calls: Long = 0L,
     /** Inclusive elapsed nanoseconds; nested phases overlap. */
     val nanos: Long = 0L,
-    /** Cleanup simplex work; other phases expose their cost through elapsed time. */
+    /** Modeled phase work. Claim totals include nested certification and must not be added to it. */
     val work: Long = 0L,
     /** Cleanup simplex pivots. */
     val pivots: Long = 0L,

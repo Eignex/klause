@@ -22,6 +22,7 @@ internal class LpSolveSession(
         floatAccept: ((FloatLpResult) -> Boolean)? = null,
         floatOffset: Double = 0.0,
         refinementLimits: LpRefinementLimits = LpRefinementLimits(),
+        claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
     ): CertifiedLpResult {
         check(!closed) { "LP solve session is closed" }
         check(activeSolve == null) { "LP solve session is suspended" }
@@ -36,7 +37,7 @@ internal class LpSolveSession(
                 observer?.observeSolve(current.lastMetrics, current is ComponentLpSolverCapability)
             }
             return certification.certify(model, current, result, cancellation, observer, counterResults,
-                refinementLimits, floatAccept, floatOffset)
+                refinementLimits, floatAccept, floatOffset, claim)
         } catch (primary: Throwable) {
             try {
                 releaseSolvers()
@@ -54,6 +55,7 @@ internal class LpSolveSession(
         observer: LpCertificationObserver? = null,
         floatAccept: ((FloatLpResult) -> Boolean)? = null,
         floatOffset: Double = 0.0,
+        claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
     ): LpSolveCursor<CertifiedLpResult> {
         check(!closed && activeSolve == null) { "LP solve session is closed or suspended" }
         require(workLimit >= 0L)
@@ -74,7 +76,7 @@ internal class LpSolveSession(
                 checkpoint(current.lastMetrics.workOps)
                 if (cancellation()) return@LpSolveCursor cancelledResult()
                 certification.certify(model, current, result, cancellation, observer, null,
-                    floatAccept = floatAccept, floatOffset = floatOffset)
+                    floatAccept = floatAccept, floatOffset = floatOffset, claim = claim)
             } catch (primary: Throwable) {
                 try {
                     releaseSolvers()

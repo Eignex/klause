@@ -137,7 +137,10 @@ internal object NumericalResidualReplay {
         val prepare = if (session) null else ownerType.methods.single {
             it.name == "prepare" && it.parameterCount == 1
         }
-        val defaultSolve = ownerType.methods.single { it.name == "solve\$default" && it.parameterCount == 11 }
+        val claim = Class.forName(ENGINE + "LpClaim").enumConstants.single {
+            it.toString() == "ATTAINED_OPTIMUM"
+        }
+        val defaultSolve = ownerType.methods.single { it.name == "solve\$default" && it.parameterCount == 12 }
         val solverField = if (session) ownerType.getDeclaredField("solver").apply { isAccessible = true } else null
         val model = if (session) {
             val meter = Class.forName(ENGINE + "LpProjectionMeter").getConstructor().newInstance()
@@ -177,11 +180,11 @@ internal object NumericalResidualReplay {
                         driven.result
                     } else if (session) {
                         defaultSolve.invoke(
-                            null, active, model, stop, workLimit, observer, null, null, 0.0, null, 240, null,
+                            null, active, model, stop, workLimit, observer, null, null, 0.0, null, claim, 240, null,
                         )
                     } else {
                         defaultSolve.invoke(
-                            null, active, null, stop, null, null, true, observer, null, false, 221, null,
+                            null, active, null, stop, null, null, true, observer, null, false, claim, 221, null,
                         )
                     }
                 } else {
@@ -296,9 +299,12 @@ internal object NumericalResidualReplay {
         metrics: () -> Any?,
     ): CursorResult {
         val open = owner.javaClass.methods.single {
-            it.name.substringBefore('$') == "openSolve" && it.parameterCount == 6
+            it.name.substringBefore('$') == "openSolve" && it.parameterCount == 7
         }
-        val cursor = requireNotNull(open.invoke(owner, model, cancellation, workLimit, observer, null, 0.0))
+        val claim = Class.forName(ENGINE + "LpClaim").enumConstants.single {
+            it.toString() == "ATTAINED_OPTIMUM"
+        }
+        val cursor = requireNotNull(open.invoke(owner, model, cancellation, workLimit, observer, null, 0.0, claim))
         val advance = cursor.javaClass.methods.single { it.name == "advance" && it.parameterCount == 2 }
         var advances = 0
         var maximumNs = 0L

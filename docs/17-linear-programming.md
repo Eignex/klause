@@ -665,6 +665,32 @@ seam: certifiers always compute and report their observations, and the policy
 decides which results may be used. A source check grants no permission to accept a
 floating optimum.
 
+Model-facing solves state an explicit claim: bound, contradiction, feasible completion or
+attained optimum. Bound requests use dual-only reconstruction without primal recovery;
+feasible completion stops when a checked point is available, retaining the trivial
+exact bound of a constant objective. Contradiction requests
+may stop on a checked counter-witness and never optimize it. Attainment requires the
+same exact witness–bound equality as the result contract. Tolerance acceptance retains
+its separate source-defined verdict and supplies no exact attainment claim.
+
+Retained certification owners reuse the existing single-package counter-result store.
+A checked bound can answer a bound request, but cannot answer a completion or attainment
+request by itself. Reuse requires the identical immutable exact state, complete capture
+key and production acceptance policy. Bounds, scope, active rows, matrix, objective,
+origins, strictness and integrality remain part of that authority. These independent
+packages retain no floating vectors or ordered basis; exact factor reuse still requires
+its existing matrix and ordered-basis compatibility checks. Edits and owner retirement
+invalidate checked packages. Cache admission and arithmetic budgets retain their limits.
+
+Claim phases report inclusive certification time, existing charged work and terminal
+refusal, including unsupported authority, missing bound sides, scalar limits, singularity,
+resource stops and policy refusal. These work totals overlap the certifier ledger and
+must not be added to it. Separate consumption observations count accepted leaf packages
+and actual bound or conflict pruning; a successful check alone is not consumption.
+Source optimization records deterministic claim work and outcomes in its existing stage
+diagnostics; its source budget reports inclusive active time.
+Heuristic LP seeding consumes floating coordinates directly and requests no certificate.
+
 ### Safe objective bounds
 
 The cheapest certificate is a bound from the floating duals alone. Slack-form rows

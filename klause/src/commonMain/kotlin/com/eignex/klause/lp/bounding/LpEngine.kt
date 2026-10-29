@@ -37,6 +37,7 @@ import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpCertifierCost
+import com.eignex.klause.lp.engine.LpClaim
 import com.eignex.klause.lp.engine.LpCounterResults
 import com.eignex.klause.lp.engine.LpFloatTermination
 import com.eignex.klause.lp.engine.LpModel
@@ -59,6 +60,7 @@ import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.lp.relaxation.exactLeafResult
 import com.eignex.klause.lp.relaxation.floatReals
 import com.eignex.klause.lp.relaxation.gatedEnforcement
+import com.eignex.klause.lp.relaxation.observeConsumption
 import com.eignex.klause.lp.relaxation.prepareSchedulingViews
 import com.eignex.klause.lp.relaxation.withCpBounds
 import com.eignex.klause.lp.relaxation.withModel
@@ -812,6 +814,7 @@ internal class LpEngine(
                 { result -> check(leafSample(session, relaxation.floatReals(result.primal, problem))) }
             },
             floatOffset = relaxation.objectiveConstant.toDouble(),
+            claim = if (objective == null) LpClaim.FEASIBLE_COMPLETION else LpClaim.ATTAINED_OPTIMUM,
         )
         certified.float?.let { sink.lp.observeComponentSplit(it.blocks) }
         return when (certified.verdict) {
@@ -839,7 +842,7 @@ internal class LpEngine(
                 LpVerdict.INDETERMINATE,
                 EmptyDoubleArray,
             )
-        }
+        }.also { it.observeConsumption(sink.lp) }
     }
 
     private fun leafSample(session: PropagationSession, reals: DoubleArray): Sample = Sample(

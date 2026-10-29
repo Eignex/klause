@@ -2,6 +2,7 @@ package com.eignex.klause.lp
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.lp.engine.LpCertificationObserver
+import com.eignex.klause.lp.engine.LpClaim
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.Sense
@@ -58,5 +59,10 @@ internal fun openLpInfeasible(
         cancellation = cancellation,
         observer = observer,
         context = context,
-    ).verdict == LpVerdict.INFEASIBLE
+        claim = LpClaim.CONTRADICTION,
+    ).let { result ->
+        (result.verdict == LpVerdict.INFEASIBLE).also { refuted ->
+            if (refuted) LpClaim.CONTRADICTION.consumed(observer)
+        }
+    }
 }

@@ -34,6 +34,7 @@ import com.eignex.klause.lp.engine.LpBoundBatchResult
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpCertifierCost
+import com.eignex.klause.lp.engine.LpClaim
 import com.eignex.klause.lp.engine.LpPhaseMetrics
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolveMetrics
@@ -1396,7 +1397,7 @@ class ExactLiraSearchComponent private constructor(
         val complete = completeTraversalObserved && unassignedBooleans == 0
         if (complete) smtStats?.observeCompleteSearchLinearCheck()
         val result = measurePartialLinearPhase({ partialLinearNumericalNs += it }) {
-            lp.solve(sparsePointRecovery = true)
+            lp.solve(sparsePointRecovery = true, claim = LpClaim.FEASIBLE_COMPLETION)
         }
         if (complete) {
             val key = if (result == null) "NO_RESULT" else listOf(

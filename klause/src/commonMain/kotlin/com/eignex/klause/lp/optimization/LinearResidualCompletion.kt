@@ -7,6 +7,7 @@ import com.eignex.klause.lp.SparseSourceLpPolicy
 import com.eignex.klause.lp.engine.ExactBasisLimits
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpCertifier
+import com.eignex.klause.lp.engine.LpClaim
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpScopedSolver
@@ -144,7 +145,7 @@ internal class LinearResidualCompletion(
                 val limits = ReconstructionLimits(maxWork = 2_000_000L,
                     maxAllocation = 64L * 1024L * 1024L)
                 val reconstructed = reconstructCertificate(model, primal = result.primal, basis = result.basis,
-                    cancellation = token, limits = limits)
+                    cancellation = token, limits = limits, claim = LpClaim.FEASIBLE_COMPLETION)
                 budget.observe(refinement = reconstructed.metrics.work)
                 budget.funding?.charge(0L, reconstructed.metrics.allocation)
                 observe("PrimalRecoverySparsePointWork", reconstructed.metrics.work)
