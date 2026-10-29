@@ -350,6 +350,10 @@ a retained original source avoid a cold download of its entire catalog archive.
 bytes and raw profile records belong in the external evidence directory.
 Failed child runs forward at most 16 KiB of their error stream to the parent log.
 Retained files and complete parent logs still require lab artifact publication.
+`inspect=partial-row-activation-control` runs the same cached producer in both
+arms with those limits and snapshot checks, isolating replay variation from row
+scheduling. Open-work units count policy decisions and checks; they do not count
+primitive arithmetic operations or replace preparation and numerical timings.
 
 The prepared-factory strict-bound, backtrack and compatible-decline controls pass
 on JVM and Linux native at `2337dbd102`; the new JVM cases take at most 5 ms.
@@ -359,12 +363,17 @@ provenance installation. Frozen-source [9230](https://lab.eignex.com/jobs/9230)
 reaches 3 of 8 boundaries in its cached control before the ten-second emergency
 deadline, reporting 3 deductions and 2 deferred numerical queries. Its delayed
 artifacts identify that limit failure; the incremental arm did not run.
-Diagnostic [9244](https://lab.eignex.com/jobs/9244) reports a failed command with
-a committed execution, but its child artifacts remain unavailable through the
-maintained interface. These attempts establish no incremental-source consumption,
-throughput or terminal claim.
-Admission stays opt-in; [#3844](https://github.com/Eignex/klause/issues/3844)
-retains its required original-source consumption criterion.
+Diagnostic [9244](https://lab.eignex.com/jobs/9244) reproduces that control limit.
+With thirty-second deadlines, [9262](https://lab.eignex.com/jobs/9262) reaches the
+first boundary in both arms with identical exact states, shared pins and reasons.
+Incremental mode consumes 16 deduction events with 5 numerical deferrals and
+119,049 source-row visits, versus 396,676 control visits. After continuation,
+shared pins, reasons and source assertion levels still agree, but LP witness IDs
+and five point coordinates differ; the profile rejects that continuation replay.
+Use the same-policy control to isolate this difference before admission changes.
+These observations establish no default throughput or terminal claim. Admission
+stays opt-in while [#3844](https://github.com/Eignex/klause/issues/3844) retains
+its completion audit.
 
 The opt-in basis tool uses the [basis corpus](../klause/src/jvmTest/resources/basis-corpus/README.md):
 
