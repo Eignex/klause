@@ -17,7 +17,9 @@ class InprocessingBudgetTest {
     @Test
     fun `zero class allowances should withhold all enabled passes`() {
         for (native in listOf(false, true)) {
-            val problem = Problem(3, 0, emptyArray(), arrayOf<Factor>(Clause(intArrayOf(1)), Clause(intArrayOf(0, 2, 4))))
+            val problem = Problem(3, 0, emptyArray(), arrayOf<Factor>(
+                Clause(intArrayOf(1)), Clause(intArrayOf(0, 2, 4)),
+            ))
             val session = PropagationSession(problem.bake(), nativeSat = native)
             val stats = SearchStatsSink()
             val params = BacktrackParams(rootSimplification = true, rootProbeBatch = 4, vivification = true,
@@ -49,7 +51,9 @@ class InprocessingBudgetTest {
 
             repeat(100) { loop.onRestart(session, params) }
 
-            assertTrue((0 until session.learnedClauseCount).any { session.learnedClauseLiterals(it).toSet() == setOf(0, 4) })
+            assertTrue((0 until session.learnedClauseCount).any {
+                session.learnedClauseLiterals(it).toSet() == setOf(0, 4)
+            })
             assertTrue(session.work > before)
             assertTrue(stats.snapshot().learning.getValue("inprocessSubsumptionAttachmentWork") > 0L)
             assertTrue(stats.snapshot().learning.getValue("inprocessSubsumptionRetirementWork") > 0L)

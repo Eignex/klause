@@ -510,8 +510,10 @@ private class CpSatisfactionTraversalPolicy(
         val refresh = if (restart) inprocessing?.onRestart(session, params) else inprocessing?.onRoot(session, params)
         if (session.isUnsatAtRoot) return SearchRunDisposition.Exhausted
         if (refresh != true) return SearchRunDisposition.Continue
-        val initialized = cp.initialize(context)
-        val result = if (initialized == ComponentResult.Consistent) (context as SearchSession).propagate() else initialized
+        val result = checkNotNull(inprocessing).refreshRoot(cp, context, params)
+        if (result == null) {
+            return if (slice != null) SearchRunDisposition.Pause else SearchRunDisposition.Indeterminate
+        }
         if (result is ComponentResult.Conflict) return SearchRunDisposition.Exhausted
         if (result == ComponentResult.Indeterminate) {
             return if (slice?.pauses?.invoke() == true) SearchRunDisposition.Pause else SearchRunDisposition.Indeterminate

@@ -1,7 +1,12 @@
 package com.eignex.klause.backtrack
 
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.propagation.CpSearchComponent
+import com.eignex.klause.propagation.PROPAGATION_PREPARATION_BATCH_SIZE
 import com.eignex.klause.solver.result.SearchStatsSink
+import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchContext
+import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.util.Cancellation
 
 /**
@@ -52,6 +57,51 @@ internal class Inprocessing(
     private var lastWork = 0L
     private var lastCount = 0
     private var pendingRoot: InprocessingPass? = null
+    private var remaining = 0L
+    private var publication: Iterator<ComponentResult?>? = null
+    private var publicationVisits = 0L
+    private var needsPublication = false
+    private var publicationReady = false
+
+    private fun <T> publishRoot(session: PropagationSession, operation: () -> T): T {
+        val start = session.work
+        try {
+            return operation()
+        } finally {
+            val used = (session.work - start).coerceAtLeast(0L)
+            spent = saturatedWork(spent, used)
+            debt = saturatedWork(debt, (used - remaining).coerceAtLeast(0L))
+            remaining = (remaining - used).coerceAtLeast(0L)
+            stats?.noteInprocessing("inprocessPublicationWork", used)
+        }
+    }
+
+    fun refreshRoot(cp: CpSearchComponent, context: SearchContext, params: BacktrackParams): ComponentResult? {
+        val session = cp.session
+        if (session.fixpointCancelled || params.cancellation() || session.cancelRequested) return null
+        if (publication == null && !publicationReady) {
+            publication = cp.prepareInitialization(context)
+            publicationVisits = session.problem.numBoolVars.toLong() + session.problem.numIntVars
+        }
+        var result: ComponentResult? = if (publicationReady) ComponentResult.Consistent else null
+        while (result == null) {
+            if (params.cancellation() || session.cancelRequested) return null
+            val visits = minOf(publicationVisits, PROPAGATION_PREPARATION_BATCH_SIZE.toLong())
+            result = publishRoot(session) {
+                checkNotNull(publication).next().also { session.chargeInprocessingWork(visits) }
+            }
+            publicationVisits -= visits
+        }
+        publication = null
+        if (result == ComponentResult.Consistent) {
+            publicationReady = true
+            if (params.cancellation() || session.cancelRequested) return null
+            result = publishRoot(session) { (context as SearchSession).propagate() }
+        }
+        needsPublication = result == ComponentResult.Indeterminate
+        if (!needsPublication) publicationReady = false
+        return result
+    }
 
     fun onRestart(session: PropagationSession, params: BacktrackParams): Boolean = atRoot(session, params, true)
 
@@ -63,17 +113,33 @@ internal class Inprocessing(
             val limit = params.inprocessingWork - minOf(debt, params.inprocessingWork)
             debt = (debt - params.inprocessingWork).coerceAtLeast(0L)
             val token = Cancellation { params.cancellation() || session.work - beforeResume >= limit }
-            session.withCancellation(token) {
-                pendingRoot?.spending?.run(session, params, stats, resumingRoot = true) { session.resumeInprocessingRoot() }
+            session.withCancellation(params.cancellation) {
+                session.withInprocessingCancellation(token) {
+                    pendingRoot?.spending?.run(session, params, stats, resumingRoot = true) {
+                        session.resumeInprocessingRoot()
+                    }
+                }
             }
             val used = (session.work - beforeResume).coerceAtLeast(0L)
+            remaining = (limit - used).coerceAtLeast(0L)
             spent = saturatedWork(spent, used)
             debt = saturatedWork(debt, (used - limit).coerceAtLeast(0L))
             stats?.noteInprocessing("inprocessContinuationWork", used)
             if (!session.fixpointCancelled) pendingRoot = null
+            needsPublication = true
             return true
         }
-        if (!session.canSimplifyRoot || passes.isEmpty()) return false
+        if (needsPublication) {
+            val repaid = minOf(debt, params.inprocessingWork)
+            debt -= repaid
+            remaining = params.inprocessingWork - repaid
+            return true
+        }
+        if (!session.canSimplifyRoot || passes.isEmpty()) {
+            stats?.noteInprocessing("inprocessGuardedRoots", 1L)
+            return false
+        }
+        stats?.noteInprocessing("inprocessRootOpportunities", 1L)
         val restartDue = restart && --restartsUntilRun <= 0
         if (restartDue) restartsUntilRun = cadence
         val work = (session.work - spent).coerceAtLeast(0L)
@@ -90,33 +156,44 @@ internal class Inprocessing(
         if (offered == 0L || params.cancellation() || session.cancelRequested) return false
         stats?.noteInprocessing(if (restartDue) "inprocessRestartTriggers" else "inprocessWorkTriggers", 1L)
         val start = session.work
+        val rootMark = session.explanationState.undoTop
         val token = Cancellation { params.cancellation() || session.work - start >= offered }
         try {
-            session.withCancellation(token) {
-                repeat(passes.size) {
-                    if (session.cancelRequested || session.fixpointCancelled || session.isUnsatAtRoot) return@withCancellation
-                    val pass = passes[nextPass]
-                    nextPass = (nextPass + 1) % passes.size
-                    pass.run(session, params, stats)
-                    if (session.fixpointCancelled) pendingRoot = pass
+            session.withCancellation(params.cancellation) {
+                session.withInprocessingCancellation(token) {
+                    repeat(passes.size) {
+                        if (session.cancelRequested || session.fixpointCancelled || session.isUnsatAtRoot) {
+                            return@withInprocessingCancellation
+                        }
+                        val pass = passes[nextPass]
+                        nextPass = (nextPass + 1) % passes.size
+                        pass.run(session, params, stats)
+                        if (session.fixpointCancelled) pendingRoot = pass
+                    }
                 }
             }
         } finally {
             val used = (session.work - start).coerceAtLeast(0L)
+            remaining = (offered - used).coerceAtLeast(0L)
             spent = saturatedWork(spent, used)
             debt = saturatedWork(debt, (used - offered).coerceAtLeast(0L))
         }
-        return true
+        needsPublication = session.fixpointCancelled || session.isUnsatAtRoot ||
+            session.explanationState.undoTop != rootMark
+        return needsPublication
     }
 
     fun reset() {
         restartsUntilRun = cadence
         nextPass = 0
-        spent = 0L
-        debt = 0L
         lastWork = 0L
         lastCount = 0
         pendingRoot = null
+        remaining = 0L
+        publication = null
+        publicationVisits = 0L
+        needsPublication = false
+        publicationReady = false
         for (pass in passes) pass.reset()
     }
 
@@ -134,7 +211,7 @@ internal class Inprocessing(
                 // the surviving clauses instead of ones about to be dropped.
                 if (params.rootSimplification) add(RootSimplificationPass())
                 if (params.rootProbeBatch > 0) add(RootProbingPass())
-                if (params.subsumption) add(SubsumptionPass())
+                if (params.subsumption) add(Subsumption())
                 if (params.vivification) add(VivificationPass())
             }
             if (passes.isEmpty()) return null

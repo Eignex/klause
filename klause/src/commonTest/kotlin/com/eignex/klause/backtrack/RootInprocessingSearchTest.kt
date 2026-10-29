@@ -5,6 +5,7 @@ import com.eignex.klause.backtrack.selector.InputOrder
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.ClauseExchange
 import com.eignex.klause.propagation.PropagationSession
@@ -12,6 +13,8 @@ import com.eignex.klause.propagation.SharedClause
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
@@ -64,6 +67,47 @@ class RootInprocessingSearchTest {
             val result = search.use { finish(it) }
 
             assertIs<SolveResult.Sat>(result)
+            assertEquals(0.0, result.stats.search.restarts.sum)
+            assertTrue(result.stats.search.learning.getValue("inprocessProbeUnits") > 0L)
+        }
+    }
+
+    @Test
+    fun `root publication should retain its scan across work slices`() {
+        for (native in listOf(false, true)) {
+            val source = Problem(5000, 0, emptyArray(), problem().factors)
+            val configured = params(native).copy(lubyRestartBase = null, inprocessingInterval = 1L,
+                inprocessingWork = 4096L, inprocessingRootWork = 512L, inprocessingProbeWork = 512L)
+            val search = BacktrackSolver(source.bake()).resumableSolve(configured)
+
+            val result = search.use { finish(it) }
+
+            assertIs<SolveResult.Sat>(result)
+            val work = result.stats.search.learning.getValue("inprocessPublicationWork")
+            assertTrue(work in 5000L until 10_000L)
+        }
+    }
+
+    @Test
+    fun `optimization should consume work triggered probing before an incumbent cutoff`() {
+        for ((native, resumed) in listOf(false to false, false to true, true to false, true to true)) {
+            val configured = params(native).copy(lubyRestartBase = null, inprocessingInterval = 1L,
+                inprocessingWork = 4096L, inprocessingRootWork = 512L, inprocessingProbeWork = 512L,
+                lpConfig = LpConfig.OFF)
+            val solver = BacktrackSolver(problem().bake())
+            val objective = LinearObjective(boolWeights = LongArray(6) { 1L })
+
+            val result = if (!resumed) solver.minimize(objective, configured) else {
+                solver.resumable(objective, configured).use { search ->
+                    var result: MinimizeResult? = null
+                    repeat(100) {
+                        if (result == null) result = search.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L) { }
+                    }
+                    assertNotNull(result)
+                }
+            }
+
+            assertIs<MinimizeResult.Optimal>(result)
             assertEquals(0.0, result.stats.search.restarts.sum)
             assertTrue(result.stats.search.learning.getValue("inprocessProbeUnits") > 0L)
         }

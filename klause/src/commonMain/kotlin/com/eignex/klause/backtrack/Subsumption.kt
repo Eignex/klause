@@ -8,7 +8,7 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 
 // Retained preparation avoids buying the same occurrence index on each short slice.
-internal class SubsumptionPass : InprocessingPass {
+internal class Subsumption : InprocessingPass {
     override val preservesVariables: Boolean get() = true
     override val spending = InprocessingSpending(InprocessingKind.Subsumption)
     private var cursor = 0
@@ -17,7 +17,6 @@ internal class SubsumptionPass : InprocessingPass {
     override fun reset() {
         cursor = 0
         pending = null
-        spending.reset()
     }
 
     override fun run(session: PropagationSession, params: BacktrackParams, stats: SearchStatsSink?) {
