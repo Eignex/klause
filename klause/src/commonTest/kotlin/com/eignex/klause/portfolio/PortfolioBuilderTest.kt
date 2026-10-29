@@ -43,6 +43,27 @@ import kotlin.test.assertTrue
 
 class PortfolioBuilderTest {
     @Test
+    fun `materialized workers select the pool layout from integer coordinates`() {
+        for (integerCount in listOf(0, 1)) {
+            val problem = Problem(2, integerCount, Array(integerCount) { IntDomain(0, 1) },
+                listOf(Clause(intArrayOf(0, 2)))).bake()
+            val scenario = PortfolioScenario(1, 2, Kind.CSP, EngineMix.BACKTRACK, sharingMemory = true)
+            val workers = PortfolioBuilder.build(problem, scenario)
+
+            try {
+                workers.forEach { it.solve(Cancellation.Never) }
+
+                val expected = if (integerCount == 0) 1L else 0L
+                assertTrue(workers.all {
+                    requireNotNull(it.sharingMeter).snapshot().clauses.getValue("peakPoolBooleanOnly") == expected
+                })
+            } finally {
+                workers.forEach { it.close() }
+            }
+        }
+    }
+
+    @Test
     fun `materialized workers enforce the configured shared byte limit`() {
         val problem = Problem(2, 0, emptyArray(), listOf(
             Clause(intArrayOf(0, 2)), Clause(intArrayOf(0, 3)),

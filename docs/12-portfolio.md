@@ -206,6 +206,12 @@ Clause accounting is reported per worker in `ArmSchedule.sharing.clauses` and as
 `clause*` fields in the CLI arm record. Pool payload belongs to one shared pool;
 primitive payload arrays are counted once by identity. Private clause-reference,
 global-flag, origin, key and payload-owner array capacities are modeled separately.
+Sources with no integer variables use a Boolean-only pool whose payload-owner
+index reserves one array per clause; atom payloads are declined. Empty export
+arrays use shared immutable zero-length arrays. `poolPayloadOwnerCapacityBytes`
+reports that index allocation, included in `poolPrivateIndexBytes`, and
+`poolBooleanOnly` identifies the layout. Growth and reclamation fund the selected
+layout before publishing it; consumers keep the same clauses, origins and cursors.
 `poolOwnedBytes` combines these modeled owners, excluding headers and allocator
 overhead. Repeated worker observations must not be summed.
 Worker `seenKeys` and `seenCapacityBytes` describe the session-spanning duplicate
