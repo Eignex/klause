@@ -223,6 +223,29 @@ An unsupported or partial observation cannot establish absence of opportunities.
 Qualification of a replacement worker requires the following authority and ownership
 contract. The diagnostic itself creates no replacement or publication authority.
 
+`privateRebuildWork` enables one bounded private Boolean satisfaction trial. An
+unconditional consistent root pauses its canonical traversal, simplifies a private
+copy with the root's global pins and runs source BVE with typed reconstruction.
+The new baked model has a fresh identity; mappings compose through the pinned,
+eliminated and baked objects. Column slots remain stable. Only an actual elimination
+opens a consumer. Assumptions, external components, arithmetic and LP-enabled
+workers retain their canonical traversal. Enumeration and optimization do not use
+this trial.
+
+The private worker owns fresh watches, learning and search state. Canonical exchange
+cursors and pooled incumbent guidance stay with the retained canonical worker;
+unsupported translations never attach to the private model. Every private witness
+reconstructs and completes a canonical clause check before publication. Partial
+checks retain their cursor across slices. Private refutations grant no canonical
+proof authority and resume the retained traversal. Declines and exhausted trials
+also resume it. Closing releases the private consumer, reconstruction and cursors
+after its final drains. Preparation, trial, reconstruction and checks consume the
+original containing deadline/work; cooperative overspend carries to later slices.
+The scratch allowance gates a declared private buffer/reference-slot admission model;
+it excludes object headers, the canonical worker and allocator overhead. Physical
+overlap memory and total cost require separate measurement. Zero disables this
+unqualified trial policy.
+
 - A canonical source handle, its source scope, semantics and exact objective define
   publication identity. Only globally justified facts enter an updated source view;
   an incumbent cutoff, neighborhood, assumption or branch condition remains attached

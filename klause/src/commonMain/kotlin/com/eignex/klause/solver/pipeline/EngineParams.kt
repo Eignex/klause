@@ -165,6 +165,7 @@ val BACKTRACK_OVERRIDE_KEYS = listOf(
     "mid-lbd", "vivification", "vivify-batch", "subsumption", "subsume-batch", "inprocessing-cadence",
     "root-simplification", "root-simplify-batch", "root-probe-batch", "root-probe-work",
     "root-rebuild-capture-visits",
+    "private-rebuild-work",
     "inprocessing-work", "inprocessing-root-work", "inprocessing-probe-work", "inprocessing-subsume-work",
     "inprocessing-vivify-work", "inprocessing-interval", "inprocessing-growth", "inprocessing-cooldown",
     "lp-objective-cone", "lp-auto-off-reprobe",
@@ -214,6 +215,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
     val rootSimplification = p[ExecutionOption.rootSimplification]
     val rootSimplifyBatch = p[ExecutionOption.rootSimplifyBatch]
     val rootRebuildCaptureVisits = p[ExecutionOption.rootRebuildCaptureVisits]
+    val privateRebuildWork = p[ExecutionOption.privateRebuildWork]
     val rootProbeBatch = p[ExecutionOption.rootProbeBatch]
     val rootProbeWork = p[ExecutionOption.rootProbeWork]
     val inprocessingWork = p[ExecutionOption.inprocessingWork]
@@ -252,6 +254,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
         learnedMemoryBytes, learnedMemoryWork, learnedMemoryScratchBytes,
         subsumption, subsumeBatch, inprocessingCadence, rootSimplification, rootSimplifyBatch, rootProbeBatch, rootProbeWork,
         rootRebuildCaptureVisits,
+        privateRebuildWork,
         inprocessingWork, inprocessingRootWork, inprocessingProbeWork, inprocessingSubsumeWork,
         inprocessingVivifyWork, inprocessingInterval, inprocessingGrowth, inprocessingCooldown,
         lpCone, lpAutoOff, lpKnapsack, lpComponentSplit, lpComponentOwnership, lpBoundMaxPivots, lpAdaptiveWork,
@@ -287,6 +290,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
         rootSimplification?.let { out = out.copy(rootSimplification = it) }
         rootSimplifyBatch?.let { out = out.copy(rootSimplifyBatch = it) }
         rootRebuildCaptureVisits?.let { out = out.copy(rootRebuildCaptureVisits = it) }
+        privateRebuildWork?.let { out = out.copy(privateRebuildWork = it) }
         rootProbeBatch?.let { out = out.copy(rootProbeBatch = it) }
         rootProbeWork?.let { out = out.copy(rootProbeWork = it) }
         inprocessingWork?.let { out = out.copy(inprocessingWork = it) }

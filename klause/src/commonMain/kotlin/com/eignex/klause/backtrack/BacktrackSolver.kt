@@ -258,6 +258,13 @@ class BacktrackSolver internal constructor(
     }
 
     override fun solve(params: BacktrackParams): SolveResult {
+        if (PrivateRebuildSatisfaction.eligible(problem, params)) {
+            return resumableSolve(params).use { search ->
+                var result: SolveResult? = null
+                while (result == null) result = search.runSlice(params.cancellation, Long.MAX_VALUE, -1L)
+                result
+            }
+        }
         val sink = SolveStatsSink(backend = "backtrack")
         sink.start()
         return CpSatisfactionTraversal(problem, params, sink, lpSolveContext, singleModel = true).use { traversal ->
@@ -267,7 +274,9 @@ class BacktrackSolver internal constructor(
     }
 
     /** Open a satisfaction search that pauses and resumes across slices. See [ResumableSolve]. */
-    override fun resumableSolve(params: BacktrackParams): ResumableSolve = ResumableSatisfaction(this, params)
+    override fun resumableSolve(params: BacktrackParams): ResumableSolve =
+        if (PrivateRebuildSatisfaction.eligible(problem, params)) PrivateRebuildSatisfaction(this, params)
+        else ResumableSatisfaction(this, params)
 
     /**
      * The verdict a satisfaction [outcome] stands for, stopping [sink] for its counters. A model is re-derived from

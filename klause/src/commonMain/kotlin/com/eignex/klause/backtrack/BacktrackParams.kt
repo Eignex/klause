@@ -450,6 +450,8 @@ data class BacktrackParams(
     val reasonPreflight: Boolean = false,
     /** Bounded propositional rebuild diagnostics within root simplification; zero disables capture. */
     val rootRebuildCaptureVisits: Int = 0,
+    /** Total preparation and trial work for one private Boolean generation; zero disables rebuilding. */
+    val privateRebuildWork: Long = 0L,
     /**
      * Inline diagnostic observer for attempted shared decisions, before propagation can refute them.
      * The caller owns its scope, bounds and retention; callbacks must not mutate the search context.
@@ -458,6 +460,7 @@ data class BacktrackParams(
 ) : SolverParams {
     init {
         require(rootRebuildCaptureVisits in 0..1_048_576) { "rebuild capture visits must be in 0..1048576" }
+        require(privateRebuildWork in 0L..1_048_576L) { "private rebuild work must be in 0..1048576" }
         require(learnedMemoryBytes == null || learnedMemoryBytes >= 0L)
         require(learnedMemoryWork >= 0L && learnedMemoryScratchBytes >= 0L)
         require(rootSimplifyBatch > 0) { "root simplification batch must be positive" }

@@ -47,6 +47,20 @@ applicability or grant diagnosis and cannot support a general no-go.
 
 ## Build and run
 
+`param.private-rebuild-work=65536` selects a bounded private Boolean satisfaction
+trial with actual source BVE and a fresh consuming worker. Zero is the default.
+Use the same source, engine, presolve, seeds, processors, heap, containing allowance
+and deadline in the zero/trial arms. `privateRebuildAttempts`, `Consumers`,
+`Eliminated`, `SourceAccepted`, `RefutationDeferred`, `Declined` and `Retired`
+separate preparation from consumption, canonical publication and fallback.
+Preparation/reconstruction/check/retirement work and timings remain separate from
+ordinary worker statistics; the propagation ledger includes charged preparation
+and checks. `ModeledPrivateBytes` is an admission model excluding the canonical
+worker, headers and allocator overhead; it is not RSS or a simultaneous heap peak.
+The canonical worker retains its warm state during the trial. A private refutation
+resumes it and supplies no independently checked source proof. This control alone
+does not qualify automatic production activation or complete source-cost benefit.
+
 Run from the repository root with JDK 25 or newer:
 
 ```sh

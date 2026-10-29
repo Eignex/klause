@@ -147,7 +147,11 @@ internal fun BacktrackSolver.driveSearch(
  * How a pausable [CpSatisfactionTraversal] meets its slice boundary: whether a fired cancellation is the slice
  * ending rather than the run, and the hook each node runs before it branches.
  */
-internal class TraversalSlice(val pauses: () -> Boolean, val beforeBranch: () -> Boolean)
+internal class TraversalSlice(
+    val pauses: () -> Boolean,
+    val beforeBranch: () -> Boolean,
+    val atRoot: ((PropagationSession) -> Boolean)? = null,
+)
 
 /**
  * Satisfaction path for a CP/theory search, advanced one outcome at a time.
@@ -591,7 +595,7 @@ private class CpSatisfactionTraversalPolicy(
         if (context.decisionLevel != 0) return SearchRunDisposition.Continue
         val refresh = if (restart) inprocessing?.onRestart(session, params) else inprocessing?.onRoot(session, params)
         if (session.isUnsatAtRoot) return SearchRunDisposition.Exhausted
-        if (refresh != true) return SearchRunDisposition.Continue
+        if (refresh != true) return rootDisposition()
         val result = checkNotNull(inprocessing).refreshRoot(cp, context, params)
         if (result == null) {
             return if (slice != null) SearchRunDisposition.Pause else SearchRunDisposition.Indeterminate
@@ -604,8 +608,12 @@ private class CpSatisfactionTraversalPolicy(
                 SearchRunDisposition.Indeterminate
             }
         }
-        return SearchRunDisposition.Continue
+        return rootDisposition()
     }
+
+    private fun rootDisposition(): SearchRunDisposition =
+        if (session.canSimplifyRoot && slice?.atRoot?.invoke(session) == true) SearchRunDisposition.Pause
+        else SearchRunDisposition.Continue
 
     override fun onRestart(context: SearchContext): SearchRunDisposition {
         params.clauseExchange?.onRestart(session)
