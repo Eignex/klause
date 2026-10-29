@@ -6,6 +6,7 @@ import com.eignex.klause.lp.engine.CutFamily
 internal class LinearCutLifecycle(private val budget: SourceLpBudget) {
     private val counts = LinkedHashMap<String, Long>()
     var families: Set<CutFamily> = emptySet()
+    private var ownedFamilies: Set<CutFamily> = emptySet()
     private var recipe: String = "NO_CUT"
     fun snapshot(): Map<String, Long> = counts.toMap()
 
@@ -17,7 +18,13 @@ internal class LinearCutLifecycle(private val budget: SourceLpBudget) {
     fun shared(stage: String, count: Long) {
         val key = "numericalCutLifecycleRECIPE_${recipe}_$stage"
         counts[key] = (counts[key] ?: 0L) + count
-        for (family in families) observe(family, stage, count)
+        val participants = if (stage == "OwnerClosed" || stage == "GuidanceInvalidated") ownedFamilies else families
+        for (family in participants) observe(family, stage, count)
+        when (stage) {
+            "OwnerPrepared" -> ownedFamilies = families
+            "OwnerReused" -> ownedFamilies = ownedFamilies + families
+            "OwnerClosed" -> ownedFamilies = emptySet()
+        }
     }
 
     fun <T> containing(recipe: String, block: () -> T): T {
@@ -27,6 +34,7 @@ internal class LinearCutLifecycle(private val budget: SourceLpBudget) {
             budget.measuredConflictCertificationWork, budget.reservedAllocation, budget.activeNanos)
         val before = costs()
         val attempted = families
+        val owned = ownedFamilies
         try {
             return block()
         } finally {
@@ -37,7 +45,11 @@ internal class LinearCutLifecycle(private val budget: SourceLpBudget) {
                 val delta = after[index] - before[index]
                 val key = "numericalCutLifecycleRECIPE_${recipe}_${stages[index]}"
                 counts[key] = (counts[key] ?: 0L) + delta
-                val participants = if (index == 0 || index == 6) attempted + families else families
+                val participants = when (index) {
+                    0, 6 -> attempted + families
+                    7 -> owned + families
+                    else -> families
+                }
                 for (family in participants) observe(family, stages[index], delta)
             }
         }
