@@ -30,6 +30,37 @@ import kotlin.test.assertTrue
 
 class IntegerConflictLearnerTest {
     @Test
+    fun `a consumed guarded row should retire after its historical reason retracts`() {
+        val native = PropagationSession(Problem(2, 3,
+            arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)), arrayOf(
+                ReifiedLinear(0, intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+                Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+            )), pbLearning = false).apply { enableIntegerRowLearning() }
+        assertIs<PropagationResult.Implied>(native.pinBool(0, true))
+        assertIs<PropagationResult.Implied>(native.pinIntAtMost(2, 7))
+        val conflict = assertIs<PropagationResult.Unsat>(native.pinIntAtLeast(0, 2))
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(conflict.learnedClause)
+        native.popToLevel(learned.backjumpLevel)
+        assertIs<PropagationResult.Implied>(native.addLearnedIntegerRow(learned.row, learned.lbd))
+        val state = native.explanationState
+        val retained = assertNotNull(state.learned.integerRows).single()
+        assertSame(retained, state.factorAt(state.intMaxReason[0]))
+        assertTrue(assertNotNull(state.reasonOf(state.intMaxAntecedents[0])).contains(Lit.make(0, false)))
+
+        native.forgetLearnedClauses { _, _ -> false }
+        assertSame(retained, assertNotNull(state.learned.integerRows).single())
+        native.popToLevel(0)
+        assertIs<PropagationResult.Implied>(native.pinBool(1, true))
+        native.forgetLearnedClauses { _, _ -> false }
+
+        assertTrue(state.learned.integerRows.isNullOrEmpty())
+        assertEquals(1L, native.learnedLifecycle()["learningIntegerRetired"])
+        assertIs<PropagationResult.Implied>(native.pinIntAtMost(2, 11))
+        assertIs<PropagationResult.Implied>(native.pinBool(0, true))
+        assertEquals(5L, native.intDomain(0).max)
+    }
+
+    @Test
     fun `an incidental hole should preserve a learned row guard`() {
         val native = PropagationSession(Problem(1, 3,
             arrayOf(IntDomain(0, 6), IntDomain(0, 12).excludeValue(2), IntDomain(0, 24)), arrayOf(

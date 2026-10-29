@@ -240,7 +240,7 @@ internal object PreparedArithmeticLearningProfile {
     }
 
     internal class Capture(
-        native: PropagationSession,
+        private val native: PropagationSession,
         private val maxEvents: Int = 128,
         private val maxWords: Int = 8192,
     ) {
@@ -250,6 +250,15 @@ internal object PreparedArithmeticLearningProfile {
             .getConstructor(Int::class.javaPrimitiveType, Int::class.javaPrimitiveType).newInstance(maxEvents, maxWords)
 
         init { field.set(state, trace) }
+
+        val accepting: Boolean get() = trace.javaClass.getMethod("getAccepting").invoke(trace) as Boolean
+
+        fun lifecycle(): JsonObject = buildJsonObject {
+            val counts = native.javaClass.declaredMethods.single {
+                it.name.startsWith("learnedLifecycle") && it.parameterCount == 0
+            }.invoke(native) as Map<*, *>
+            for ((key, value) in counts) put(key as String, (value as Number).toLong())
+        }
 
         fun work(): Long = state.javaClass.declaredMethods.single {
             it.name.startsWith("getWork") && it.parameterCount == 0
