@@ -165,7 +165,7 @@ internal object KlauseLabSuite : BenchSuite {
                 "labDebug" to p.getValue("debug"),
             ),
         )
-        val recordPath = context.outputDirectory.resolve("report/${ref.name.replace('/', '_')}.json")
+        val recordPath = context.outputDirectory.resolve("report/${Reports.fileStem(ref.name)}.json")
         Files.writeString(recordPath, Reports.json.encodeToString(SolveRecord.serializer(), retained))
         return retained
     }

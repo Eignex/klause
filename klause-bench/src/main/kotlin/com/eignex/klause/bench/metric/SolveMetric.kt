@@ -83,7 +83,7 @@ internal object SolveMetric {
         outDir.mkdirs()
         val timestamp = Instant.now().toString()
         val sha = Reports.readGitSha()
-        val name = ref.name.replace('/', '_')
+        val name = Reports.fileStem(ref.name)
         val (rec, raw) = runCatching { Runners.resolve(ref, settings.exact) }.fold(
             { entry ->
                 if (ref.format == Format.MINIZINC) {

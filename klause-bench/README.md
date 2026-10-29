@@ -98,10 +98,14 @@ The adapter supports macOS ARM64/x86_64 and Linux x86_64 with JDK 25.
 Preparation stages the checksum-pinned MiniZinc 2.10.1 compiler for its host;
 prepared cases retain that host's platform and architecture requirements.
 Resource recordings require GNU time (`gtime` from Homebrew's `gnu-time` package on macOS).
+Lab source builds disable JVM incremental-compilation indexes because each build
+starts from a fresh source tree and the lab reuses complete verified distributions.
+Developer and CI builds retain their incremental-compilation settings.
 The status sweep and `klause-reference*` schedules use `tags: ["local"]` to stay on the Mac.
 Corpus files with names outside the lab's portable path contract are copied into
 `klause-bench/build/lab-inputs` under their content hash. Selection identities and
 input bytes stay fixed; private workspace cleanup removes these staged files.
+Report filenames escape nonportable characters; records retain original problem identities.
 A minimal lab request is:
 
 ```json
