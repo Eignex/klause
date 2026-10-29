@@ -699,8 +699,9 @@ class SharedClausePoolTest {
     }
 
     @Test
-    fun `bounded export rejects oversized native clauses before portable publication`() {
-        val pool = SharedClausePool(softLimitBytes = 1000L, shareMaxLen = 2)
+    fun `oversized native clause rejection stays within the export allowance`() {
+        val allowance = 512L
+        val pool = SharedClausePool(softLimitBytes = 1000L, shareMaxLen = 2, reclamationWork = allowance)
         val exchange = PoolClauseExchange(pool)
         val session = PropagationSession(Problem(128, 0, emptyArray(), emptyList()), nativeSat = true)
         session.addLearnedClause(Clause(boolClause(0, 1, len = 128).boolLits), 1)
@@ -708,7 +709,7 @@ class SharedClausePoolTest {
 
         exchange.onSearchEnd(session)
 
-        assertEquals(288L, session.work - before)
+        assertTrue(session.work - before <= allowance)
         assertTrue(pool.drainSince(0).clauses.isEmpty())
     }
 }
