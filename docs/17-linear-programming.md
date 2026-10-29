@@ -78,6 +78,8 @@ invocation. A retained invocation replaces its completed observations while
 compatible factors remain owned by the scoped solver. A paused invocation keeps
 its diagnostics alongside the cursor. Observations supply no admission, work
 allowance or certificate authority and do not select numerical policy.
+Completion observers receive the charged invocation totals and completed trace;
+a pause withholds that completion and retains its observations with the cursor.
 
 The exact matrix, costs, objective sense/scale/constant, bounds, strictness,
 integrality, origins, source premises, ordered basis and nonbasic statuses determine

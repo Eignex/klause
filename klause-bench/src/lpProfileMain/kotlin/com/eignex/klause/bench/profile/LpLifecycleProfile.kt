@@ -1,20 +1,19 @@
 package com.eignex.klause.bench.profile
 
+import com.eignex.klause.backtrack.BacktrackPresets
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.toProblem
-import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.ExactBasisMetrics
 import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.ExactLpColumn
 import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpSide
-import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpCertifierCost
 import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpExactState
-import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPhaseMetrics
 import com.eignex.klause.lp.engine.LpPricingOptions
@@ -30,11 +29,15 @@ import com.eignex.klause.lp.engine.RevisedSimplex
 import com.eignex.klause.lp.engine.SimplexPhase
 import com.eignex.klause.lp.engine.SimplexProfilePhase
 import com.eignex.klause.lp.engine.SimplexProgressTrace
+import com.eignex.klause.lp.engine.TableauCutSolver
 import com.eignex.klause.lp.engine.authoritativeModel
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.util.Cancellation
 import kotlinx.serialization.json.JsonArray
@@ -106,6 +109,7 @@ fun main(args: Array<String>) {
             }
         }
     }
+    sourceWorker(compiled.model, requireNotNull(objective), stop)
 }
 
 private fun lifecycle(
@@ -213,10 +217,11 @@ private fun lifecycle(
                     put("prepared", prepared)
                     put("editPreparationInclusivePhaseNs", numbers(editPhases))
                     put("queryNs", queryNs)
-                    put("floatingNs", factory.floatingNanos - before)
+                    put("floatingNs", if (observed) JsonPrimitive(factory.floatingNanos - before) else JsonNull)
                     put("numericalInvocations", JsonArray(factory.invocations.drop(firstInvocation)))
                     put("droppedInvocations", factory.droppedInvocations)
-                    put("queryNonFloatNs", queryNs - (factory.floatingNanos - before))
+                    put("queryNonFloatNs",
+                        if (observed) JsonPrimitive(queryNs - (factory.floatingNanos - before)) else JsonNull)
                     put("allocatedBytes", stageBytes?.let(::JsonPrimitive) ?: JsonNull)
                     put("cancelled", cancellation())
                     put("verdict", result?.verdict?.name)
@@ -305,6 +310,7 @@ private fun traceJson(trace: SimplexProgressTrace): JsonElement = buildJsonObjec
     put("degenerateSteps", trace.degenerateSteps.values.sum())
     put("basisWork", numbers(trace.basisWork))
     put("progressSamples", trace.samples.size)
+    put("iterations", numbers(trace.iterations.mapValues { it.value.toLong() }))
     put("checkpointNs", trace.checkpointNanos)
     put(
         "samples",
@@ -355,25 +361,36 @@ private class LifecycleCertificates : LpCertificationObserver {
     }
 }
 
-private class LifecycleFactory(private val observed: Boolean) : LpEngineFactory by ProductionLpEngineFactory {
+private class LifecycleFactory(
+    private val observed: Boolean,
+    private val classifyOwners: Boolean = true,
+) : LpEngineFactory by ProductionLpEngineFactory {
     var lastEngine: RevisedSimplex? = null
     var queryActive = false
     var floatingNanos = 0L
+    var completedInvocations = 0L
+    var modeledWork = 0L
+    var pivots = 0L
     val invocations = mutableListOf<JsonElement>()
     var droppedInvocations = 0
+
     override fun newGeneralSolver(
         model: LpModel,
         cancellation: Cancellation,
         workLimit: Long,
         pricing: LpPricingOptions,
-    ): LpSolver {
-        val solver = RevisedSimplex(model, cancellation, workLimit = workLimit, pricing = pricing)
-        if (observed) solver.enableProgressTrace(profile = true)
-        return object : LpSolver by solver {
-            override fun solve(warm: Basis?): FloatLpResult? = timed(solver) { solver.solve(warm) }
-            override fun solvePrimal(warm: Basis?): FloatLpResult? = timed(solver) { solver.solvePrimal(warm) }
-        }
-    }
+    ): LpSolver = observe(RevisedSimplex(model, cancellation, workLimit = workLimit, pricing = pricing), false)
+
+    override fun newTableauSolver(
+        model: LpModel,
+        cancellation: Cancellation,
+        iterationLimit: Int,
+        workLimit: Long,
+        trackDegeneracy: Boolean,
+        pricing: LpPricingOptions,
+    ): TableauCutSolver = observe(RevisedSimplex(model, cancellation, iterationLimit = iterationLimit,
+        workLimit = workLimit, trackDegeneracy = trackDegeneracy, pricing = pricing), true)
+
     override fun newPersistentSolver(
         model: LpModel,
         cancellation: Cancellation,
@@ -382,49 +399,86 @@ private class LifecycleFactory(private val observed: Boolean) : LpEngineFactory 
         workLimit: Long,
         trackDegeneracy: Boolean,
         pricing: LpPricingOptions,
-    ): PersistentLpSolver {
-        val solver = RevisedSimplex(
-            model,
-            cancellation,
-            refactorUpdateLimit = refactorUpdateLimit,
-            iterationLimit = iterationLimit,
-            workLimit = workLimit,
-            trackDegeneracy = trackDegeneracy,
-            pricing = pricing,
-        )
-        if (observed) solver.enableProgressTrace(profile = true)
-        if (!queryActive) lastEngine = solver
-        return object : PersistentLpSolver by solver {
-            override fun solve(warm: Basis?): FloatLpResult? = timed(solver) { solver.solve(warm) }
-            override fun solvePrimal(warm: Basis?): FloatLpResult? = timed(solver) { solver.solvePrimal(warm) }
-            override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? =
-                timed(solver) { solver.resolveBounds(allowance) }
-            override fun resolveGated(enforced: BooleanArray): FloatLpResult? =
-                timed(solver) { solver.resolveGated(enforced) }
-        }
-    }
-    private inline fun <T> timed(solver: RevisedSimplex, block: () -> T): T {
-        val started = Monotonic.markNow()
-        try {
-            return block()
-        } finally {
-            val elapsed = started.elapsedNow().inWholeNanoseconds
+    ): PersistentLpSolver = observe(RevisedSimplex(model, cancellation, refactorUpdateLimit = refactorUpdateLimit,
+        iterationLimit = iterationLimit, workLimit = workLimit, trackDegeneracy = trackDegeneracy,
+        pricing = pricing), true)
+
+    private fun observe(solver: RevisedSimplex, primary: Boolean): RevisedSimplex {
+        if (primary && !queryActive) lastEngine = solver
+        if (observed) solver.profileTo { metrics, trace ->
+            val elapsed = trace.phaseNanos.getValue(SimplexProfilePhase.SOLVE)
             floatingNanos += elapsed
-            if (observed) {
-                if (invocations.size < 256) {
-                    invocations.add(
-                        buildJsonObject {
-                            put("elapsedNs", elapsed)
-                        put("primary", solver === lastEngine)
-                            put("work", solver.lastMetrics.workOps)
-                            put("termination", solver.lastTermination?.name)
-                            put("trace", solver.progressTrace?.let(::traceJson) ?: JsonNull)
-                        },
-                    )
-                } else {
-                    droppedInvocations++
-                }
-            }
+            completedInvocations++
+            modeledWork += metrics.workOps
+            pivots += metrics.pivots
+            if (invocations.size < 256) invocations.add(buildJsonObject {
+                put("elapsedNs", elapsed)
+                put("primary", if (classifyOwners) JsonPrimitive(solver === lastEngine) else JsonNull)
+                put("work", metrics.workOps)
+                put("pivots", metrics.pivots)
+                put("termination", solver.lastTermination?.name)
+                put("trace", traceJson(trace))
+            }) else droppedInvocations++
         }
+        return solver
     }
+}
+
+private fun sourceWorker(problem: Problem, objective: LinearObjective, containing: Cancellation) {
+    val deadline = Cancellation.after(2.seconds)
+    val stop = Cancellation { containing() || deadline() }
+    val factory = LifecycleFactory(observed = true, classifyOwners = false)
+    val started = Monotonic.markNow()
+    val allocated = profileAllocatedBytes()
+    val solver = BacktrackSolver(problem.bake(stop), LpSolveContext(engineFactory = factory))
+    val controls = BacktrackPresets.satOptimized(randomSeed = 3L, cancellation = stop)
+        .copy(maxInstructions = 1000L)
+    val result = solver.minimize(objective, controls)
+    val elapsed = started.elapsedNow().inWholeNanoseconds
+    val bytes = allocated?.let { start -> profileAllocatedBytes()?.minus(start) }
+    val lp = result.stats.lp
+    println(buildJsonObject {
+        put("kind", "source-worker")
+        put("entry", "direct satOptimized BacktrackSolver; worker-native coordinates")
+        put("sourceVerdictClaim", false)
+        put("cliRoutingEquivalence", false)
+        put("seed", 3)
+        put("instructionLimit", 1000)
+        put("containingMillis", 2000)
+        put("elapsedNs", elapsed)
+        put("allocatedBytes", bytes?.let(::JsonPrimitive) ?: JsonNull)
+        put("result", result::class.simpleName)
+        put("objective", result.objectiveValue?.let(::profileNumber) ?: JsonNull)
+        put("cancelled", stop())
+        put("numericalNs", factory.floatingNanos)
+        put("numericalInvocations", factory.completedInvocations)
+        put("numericalWork", factory.modeledWork)
+        put("numericalPivots", factory.pivots)
+        put("droppedInvocations", factory.droppedInvocations)
+        put("invocations", JsonArray(factory.invocations))
+        put("lpRootBound", lp.rootBound.takeIf { it.isFinite() }?.let(::JsonPrimitive) ?: JsonNull)
+        put("lpPrunes", lp.pruned.sum)
+        put("lpFixings", lp.fixed.sum)
+        put("basisVerificationWork", numbers(lp.basisVerification.work))
+        put("basisVerificationAllocation", numbers(lp.basisVerification.allocation))
+        put("continuationWork", numbers(lp.continuation.work))
+        put("continuationAllocation", numbers(lp.continuation.allocation))
+        put("certificatePhases", buildJsonObject {
+            lp.phases.forEach { (name, phase) -> put(name, buildJsonObject {
+                put("calls", phase.calls)
+                put("nanos", phase.nanos)
+                put("work", phase.work)
+                put("outcomes", numbers(phase.outcomes))
+            }) }
+        })
+        put("witness", result.assignment?.let { sample -> buildJsonObject {
+            put("bools", JsonArray(sample.bools.map(::JsonPrimitive)))
+            put("ints", JsonArray(sample.exactInts?.map { JsonPrimitive(it.toString()) }
+                ?: sample.ints.map(::JsonPrimitive)))
+            put("reals", JsonArray(sample.reals.map(::profileNumber)))
+            put("exactReals", sample.exactReals?.let { values ->
+                JsonArray(values.map { JsonPrimitive(it.toString()) })
+            } ?: JsonNull)
+        } } ?: JsonNull)
+    })
 }

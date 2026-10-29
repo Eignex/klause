@@ -154,6 +154,13 @@ internal class RevisedSimplex(
         progressTrace = SimplexProgressTrace(profile)
     }
 
+    private var profileSink: ((LpSolveMetrics, SimplexProgressTrace) -> Unit)? = null
+
+    internal fun profileTo(sink: (LpSolveMetrics, SimplexProgressTrace) -> Unit) {
+        enableProgressTrace(profile = true)
+        profileSink = sink
+    }
+
     private inline fun <T> profiled(phase: SimplexProfilePhase, block: () -> T): T {
         val trace = progressTrace?.takeIf { it.profile } ?: return block()
         val started = TimeSource.Monotonic.markNow()
@@ -1272,12 +1279,23 @@ internal class RevisedSimplex(
     private suspend fun runNumericalSolve(
         progress: SolveProgress,
         block: suspend (reset: Boolean) -> FloatLpResult?,
-    ): FloatLpResult? =
+    ): FloatLpResult? {
+        val previous = progressTrace?.takeIf { it.profile }
+        val checkpoints = previous?.checkpointNanos ?: 0L
+        val started = previous?.let { TimeSource.Monotonic.markNow() }
         try {
-            runChargedSolve(progress, block)
+            return runChargedSolve(progress, block)
         } finally {
             chargeWork()
+            val trace = progressTrace
+            if (started != null && trace != null) {
+                val excluded = trace.checkpointNanos - if (trace === previous) checkpoints else 0L
+                trace.recordPhase(SimplexProfilePhase.SOLVE,
+                    maxOf(0L, started.elapsedNow().inWholeNanoseconds - excluded))
+                profileSink?.invoke(lastMetrics, trace)
+            }
         }
+    }
 
     @Suppress("TooGenericExceptionCaught")
     private suspend fun runChargedSolve(
