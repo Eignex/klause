@@ -39,8 +39,9 @@ internal object LinearPrefixInspection {
         integrated: Boolean = false, cached: Boolean = false, reuse: Boolean = false, batching: Boolean = false,
         incremental: Boolean = false,
     ) {
+        val emergencySeconds = if (incremental) 30 else 10
         val captures = (0..1).map { replay ->
-            val stop = Cancellation.after(10.seconds)
+            val stop = Cancellation.after(emergencySeconds.seconds)
             val started = System.nanoTime()
             val invocation = SourceSetup.prepare(SourceSetupRequest(
                 compiled.source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK, cancellation = stop,
@@ -93,6 +94,7 @@ internal object LinearPrefixInspection {
                     put("cached", cachedProducer)
                     put("incrementalRows", incremental && replay == 1)
                     put("openWorkLimit", params.openWorkLimit)
+                    put("emergencySeconds", emergencySeconds)
                     put("sourceBoundBatching", !batching || replay == 1)
                     put("cliEquivalence", "unverified-direct-library-diagnostic")
                     put("ready", ready)
