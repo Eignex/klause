@@ -954,6 +954,8 @@ admission gate, active lifetime, rewards or coverage. A completed point or a poo
 read alone establishes neither consumption nor a performance benefit.
 `*CompletionOriginalChecked` records the reconstructed original-source and adjusted
 objective check before import on ordinary linear-source execution.
+Completed advisory seeds require the original witness check's exact-feasibility
+result. Ordinary tolerance acceptance alone cannot qualify the exact handoff.
 `*CompletionNanos` includes seed preparation, retained-attempt lookup, exact recovery
 and checking for every call, including reused and failed attempts. It is a subset of
 companion active time. Approximate real seed coordinates guide exact rational

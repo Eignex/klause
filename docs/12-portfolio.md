@@ -100,6 +100,9 @@ exact payloads retain their direct admission checks.
 Ordinary linear sources reconstruct the completed point through the captured
 presolve mapping, check the original declarations and rows, and compare the original
 objective with the adjusted working value before import.
+Completed advisory seeds require exact original feasibility even when ordinary
+finite witness admission permits source tolerance. Tolerance-only acceptance cannot
+authorize this exact handoff.
 
 Each companion owns at most sixteen source/point attempts without eviction. Identity
 includes the full source restrictions, rows, coordinates, objective, interpretation
