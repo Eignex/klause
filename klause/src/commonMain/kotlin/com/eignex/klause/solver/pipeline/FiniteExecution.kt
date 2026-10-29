@@ -1127,6 +1127,7 @@ private fun executePortfolio(
             }
         },
         objectiveCoordinates = request.objectiveCoordinates,
+        incumbentCompletionCheck = request.incumbentCompletionCheck(),
     )
     val start = TimeSource.Monotonic.markNow()
     executor.use {

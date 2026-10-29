@@ -952,6 +952,8 @@ remain the downstream evidence. Recovery counters retain preparation, numerical,
 exact and checking work. Compare source-matched on/off arms without changing the
 admission gate, active lifetime, rewards or coverage. A completed point or a pool
 read alone establishes neither consumption nor a performance benefit.
+`*CompletionOriginalChecked` records the reconstructed original-source and adjusted
+objective check before import on ordinary linear-source execution.
 
 `param.companion-integers=true` trials bounded general-integer/continuous numerical
 companions on the ordinary finite route. `false` retains the binary-only gate.

@@ -27,6 +27,7 @@ import com.eignex.klause.util.WorkMeter
 
 internal class LinearIncumbentCompletion(
     private val budget: SourceLpBudget,
+    private val originalCheck: ((Sample, BigFraction, Cancellation) -> Boolean)? = null,
     private val observe: (String, Long) -> Unit,
 ) : AutoCloseable {
     private class Attempt(val source: SourceProofContext, val seed: Sample) {
@@ -112,8 +113,10 @@ internal class LinearIncumbentCompletion(
         val objectiveChecked = exact?.let {
             authority.semanticsChecker?.objectiveEquals(proposed, SourceValue.Rational(it), source.scope, checking)
         }
+        val accepted = objectiveChecked == SourceEvidenceCheck.Checked &&
+            originalCheck?.invoke(proposed, requireNotNull(exact), checking) != false
         if (checking()) return null
-        val accepted = objectiveChecked == SourceEvidenceCheck.Checked
+        if (accepted && originalCheck != null) observe("OriginalChecked", 1L)
         observe(if (accepted) "Checked" else "Rejected", 1L)
         return finish(attempt, proposed.takeIf { accepted })
     }

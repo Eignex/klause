@@ -20,6 +20,8 @@ import com.eignex.klause.portfolio.binaryIntegers
 import com.eignex.klause.portfolio.continuousMajority
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.incumbent.EngineInvocation
@@ -74,6 +76,7 @@ internal fun FinitePipeline.portfolioExecutor(
     sourceHints: ((Set<ExecutionStrategy>) -> PreparedSourceHints?)? = null,
     numericalCompanions: TheoryParams? = null,
     objectiveCoordinates: ObjectiveCoordinateView? = null,
+    incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)? = null,
 ): PortfolioInvocation {
     require(scenario.diagnosticWorkLimit == null || problem.numRealVars == 0) {
         "portfolio-work requires a finite Boolean/integer source without numerical companions"
@@ -86,7 +89,8 @@ internal fun FinitePipeline.portfolioExecutor(
     }
     val companions = if (companionEligibility?.admitted == true) {
         FiniteNumericalCompanions.prepare(problem, requireNotNull(objective), requireNotNull(numericalCompanions),
-            cancellation, companionEligibility.requirements.construction, scenario.companionAfterIncumbent)
+            cancellation, companionEligibility.requirements.construction, scenario.companionAfterIncumbent,
+            incumbentCompletionCheck)
     } else null
     companionEligibility?.let { eligibility ->
         val declines = if (eligibility.admitted && companions == null) listOf("complete-affine-capture-unavailable")
