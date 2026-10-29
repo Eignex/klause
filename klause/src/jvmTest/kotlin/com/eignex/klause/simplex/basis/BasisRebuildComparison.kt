@@ -1,6 +1,5 @@
 package com.eignex.klause.simplex.basis
 
-import com.eignex.koblas.KoblasException
 import com.eignex.koblas.SparseMatrix
 import com.sun.management.ThreadMXBean
 import java.lang.management.ManagementFactory
@@ -121,8 +120,6 @@ internal object BasisRebuildComparison {
         try {
             arm.apply(index, operation, skipBuild)
         } catch (failure: BasisArithmeticException) {
-            arm.fail(index, "numerical failure: ${failure.message}")
-        } catch (failure: KoblasException) {
             arm.fail(index, "numerical failure: ${failure.message}")
         }
     }
