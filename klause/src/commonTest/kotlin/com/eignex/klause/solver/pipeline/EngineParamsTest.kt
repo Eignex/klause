@@ -25,6 +25,20 @@ class EngineParamsTest {
     }
 
     @Test
+    fun `root inprocessing controls should remain opt in and reach backtrack workers`() {
+        val base = com.eignex.klause.backtrack.BacktrackParams()
+        assertEquals(false, base.rootSimplification)
+        assertEquals(0, base.rootProbeBatch)
+        val configured = applyBacktrackParams(base, EngineParams(listOf(
+            "root-simplification=true", "root-simplify-batch=7", "root-probe-batch=3", "root-probe-work=256",
+        )))
+        assertEquals(true, configured.rootSimplification)
+        assertEquals(7, configured.rootSimplifyBatch)
+        assertEquals(3, configured.rootProbeBatch)
+        assertEquals(256L, configured.rootProbeWork)
+    }
+
+    @Test
     fun `directional lp gains remain opt in and survive fixed backtrack overrides`() {
         val base = com.eignex.klause.backtrack.BacktrackParams()
         assertTrue(!base.lpDirectionalGains)

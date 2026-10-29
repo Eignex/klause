@@ -90,6 +90,14 @@ internal class NativeSatState(private val state: PropagationState) {
      *  (truncated) trail size on backtrack, since the surviving prefix is already propagated. */
     var bcpHead = 0
 
+    private var retiredRootSources: IntHashSet? = null
+
+    fun retireRootSource(factor: Int) {
+        check(factor in 0 until baseCount)
+        val retired = retiredRootSources ?: IntHashSet().also { retiredRootSources = it }
+        retired.add(factor)
+    }
+
     private var initialized = false
     private var pendingConflict = false
 
@@ -297,7 +305,7 @@ internal class NativeSatState(private val state: PropagationState) {
         val entries = watchEntries[lit]
         for (i in 0 until watchSizes[lit]) {
             val h = entries[i].toInt()
-            if (clauseLen(h) != 2) continue
+            if (retiredRootSources?.contains(h) == true || clauseLen(h) != 2) continue
             val first = litOf(h, 0)
             action(if (first == lit) litOf(h, 1) else first)
         }
@@ -522,6 +530,10 @@ internal class NativeSatState(private val state: PropagationState) {
             state.work++
             val entry = entries[wi]
             val h = entry.toInt()
+            if (retiredRootSources?.contains(h) == true) {
+                removeWatchAt(falseLit, wi)
+                continue
+            }
             val blocker = (entry ushr 32).toInt()
             if (litTrue(blocker)) {
                 wi++

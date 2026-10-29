@@ -161,6 +161,7 @@ val BACKTRACK_OVERRIDE_KEYS = listOf(
     "max-decisions", "luby", "adaptive-restart", "ema-restart", "mode-switching-restart", "phase-saving",
     "target-phasing", "solution-phasing", "rephase-interval", "max-learned", "lbd-glue", "tiered-db",
     "mid-lbd", "vivification", "vivify-batch", "subsumption", "subsume-batch", "inprocessing-cadence",
+    "root-simplification", "root-simplify-batch", "root-probe-batch", "root-probe-work",
     "lp-objective-cone", "lp-auto-off-reprobe",
     "lp-knapsack-lagrangian", "lp-component-split", "lp-bound-max-pivots", "lp-adaptive-work",
     "lp-branching", "lp-directional-gains", "lp-variable-shaving", "lp-prune-hulls", "lp-root-cuts",
@@ -202,6 +203,10 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
     val subsumption = p[ExecutionOption.subsumption]
     val subsumeBatch = p[ExecutionOption.subsumeBatch]
     val inprocessingCadence = p[ExecutionOption.inprocessingCadence]
+    val rootSimplification = p[ExecutionOption.rootSimplification]
+    val rootSimplifyBatch = p[ExecutionOption.rootSimplifyBatch]
+    val rootProbeBatch = p[ExecutionOption.rootProbeBatch]
+    val rootProbeWork = p[ExecutionOption.rootProbeWork]
     val lpCone = p[ExecutionOption.lpObjectiveCone]
     val lpAutoOff = p[ExecutionOption.lpAutoOffReprobe]
     val lpKnapsack = p[ExecutionOption.lpKnapsackLagrangian]
@@ -222,7 +227,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
     val scalars = listOf(
         maxDecisions, luby, adaptiveRestart, emaRestart, modeSwitchingRestart, phaseSaving, targetPhasing,
         solutionPhasing, rephaseInterval, maxLearned, lbdGlue, tieredDb, midLbd, vivification, vivifyBatch,
-        subsumption, subsumeBatch, inprocessingCadence,
+        subsumption, subsumeBatch, inprocessingCadence, rootSimplification, rootSimplifyBatch, rootProbeBatch, rootProbeWork,
         lpCone, lpAutoOff, lpKnapsack, lpComponentSplit, lpBoundMaxPivots, lpAdaptiveWork, lpBranching, lpVariableShaving, lpPruneHulls, lpRootCuts, pbLearning,
         pbObjectiveCutoff, integerRowLearning,
         objectiveGuidedValues, lpDirectionalGains,
@@ -248,6 +253,10 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
         subsumption?.let { out = out.copy(subsumption = it) }
         subsumeBatch?.let { out = out.copy(subsumeBatch = it) }
         inprocessingCadence?.let { out = out.copy(inprocessingCadence = it) }
+        rootSimplification?.let { out = out.copy(rootSimplification = it) }
+        rootSimplifyBatch?.let { out = out.copy(rootSimplifyBatch = it) }
+        rootProbeBatch?.let { out = out.copy(rootProbeBatch = it) }
+        rootProbeWork?.let { out = out.copy(rootProbeWork = it) }
         lpCone?.let { out = out.copy(lpPlan = out.lpPlan.copy(objectiveCone = it)) }
         lpAutoOff?.let { out = out.copy(lpPlan = out.lpPlan.copy(autoOffReprobe = it)) }
         lpKnapsack?.let { out = out.copy(lpPlan = out.lpPlan.copy(knapsackLagrangian = it)) }

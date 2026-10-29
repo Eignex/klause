@@ -1487,6 +1487,7 @@ internal class ResumableMinimize(
             boundExchange.importGlobalVarBounds()
             forgetIfOverCap(session, params)
             inprocessing?.onRestart(session, params)
+            if (session.isUnsatAtRoot) return SearchRunDisposition.Exhausted
             pooledIncumbents?.poll()?.let { brancher.importPooledSolution(it.assignment) }
             return SearchRunDisposition.Continue
         }

@@ -273,6 +273,18 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** The `inprocessing-cadence` execution setting. */
         val inprocessingCadence: ExecutionOption<Int> = ExecutionOption("inprocessing-cadence", ValueKind.INT)
 
+        /** Enable stable-ID permanent-root clause simplification. */
+        val rootSimplification: ExecutionOption<Boolean> = ExecutionOption("root-simplification", ValueKind.BOOLEAN)
+
+        /** Maximum clauses examined per root simplification slice. */
+        val rootSimplifyBatch: ExecutionOption<Int> = ExecutionOption("root-simplify-batch", ValueKind.INT)
+
+        /** Failed-literal probes per scheduled restart; zero disables probing. */
+        val rootProbeBatch: ExecutionOption<Int> = ExecutionOption("root-probe-batch", ValueKind.INT)
+
+        /** Maximum propagation work per root probe. */
+        val rootProbeWork: ExecutionOption<Long> = ExecutionOption("root-probe-work", ValueKind.POSITIVE_LONG)
+
         /** The `lp-objective-cone` execution setting. */
         val lpObjectiveCone: ExecutionOption<Boolean> = ExecutionOption("lp-objective-cone", ValueKind.BOOLEAN)
 
@@ -450,7 +462,8 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 maxDecisions, luby, adaptiveRestart, emaRestart, modeSwitchingRestart,
                 phaseSaving, targetPhasing, solutionPhasing, rephaseInterval, maxLearned,
                 lbdGlue, tieredDb, midLbd, vivification, vivifyBatch,
-                subsumption, subsumeBatch, inprocessingCadence, lpObjectiveCone, lpAutoOffReprobe,
+                subsumption, subsumeBatch, inprocessingCadence, rootSimplification, rootSimplifyBatch,
+                rootProbeBatch, rootProbeWork, lpObjectiveCone, lpAutoOffReprobe,
                 lpKnapsackLagrangian, lpComponentSplit, lpBoundMaxPivots, lpAdaptiveWork,
                 lpBranching, lpDirectionalGains,
                 lpVariableShaving, lpPruneHulls, lpRootCuts, pbLearning, integerRowLearning, pbObjectiveCutoff,

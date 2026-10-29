@@ -480,6 +480,7 @@ private class CpSatisfactionTraversalPolicy(
         params.clauseExchange?.onRestart(session)
         forgetIfOverCap(session, params)
         inprocessing?.onRestart(session, params)
+        if (session.isUnsatAtRoot) return SearchRunDisposition.Exhausted
         pooledIncumbents?.poll()?.let { brancher.importPooledSolution(it.assignment) }
         return SearchRunDisposition.Continue
     }

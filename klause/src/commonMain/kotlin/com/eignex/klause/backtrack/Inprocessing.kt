@@ -81,7 +81,10 @@ internal class Inprocessing(
     fun onRestart(session: PropagationSession, params: BacktrackParams) {
         if (--restartsUntilRun > 0) return
         restartsUntilRun = cadence
-        for (pass in passes) pass.run(session, params, stats)
+        for (pass in passes) {
+            if (session.cancelRequested || session.fixpointCancelled || session.isUnsatAtRoot) break
+            pass.run(session, params, stats)
+        }
     }
 
     fun reset() {
@@ -101,6 +104,8 @@ internal class Inprocessing(
             val passes = buildList {
                 // Subsumption first: it only shrinks the database, so vivification's probing works
                 // the surviving clauses instead of ones about to be dropped.
+                if (params.rootSimplification) add(RootSimplificationPass())
+                if (params.rootProbeBatch > 0) add(RootProbingPass())
                 if (params.subsumption) add(SubsumptionPass())
                 if (params.vivification) add(VivificationPass())
             }

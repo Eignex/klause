@@ -337,6 +337,31 @@ clauses under stable variable ids and share the native arena read-only; variable
 elimination runs once in [presolve](07-presolve.md) instead. Seeded searches skip
 inprocessing, since derivations under assumption pins would not hold globally.
 
+Opt-in root simplification examines bounded slices of source and learned Boolean
+clauses against permanent root facts. A shortened source clause enters as a permanent
+session-local replacement before its watches retire; immutable source text remains
+available for reasons. Satisfied source watches retire without changing variable IDs.
+Learned replacements retain their imported origin. Compaction protects live and
+historical reasons and removes obsolete watches; attaching a shortened binary installs
+both implication directions and evaluates facts already assigned at the root. There
+is no separate stale binary graph or whole-graph rebuild.
+
+Opt-in failed-literal probing tries a bounded rotating set of Boolean literals at
+scheduled restarts. Each attempt has a propagation-work ceiling within the invocation
+token. A completed root conflict proves the complementary unit, which is attached and
+propagated through ordinary search. Successful and interrupted probes retract to the
+complete root; interruption supplies no deduction. Clause scans and probes enter the
+existing inprocessing and propagation work counters. Cursors survive suspension and
+reset on reseeding; learned indices never survive a pass snapshot.
+
+Both root passes require an unconditional complete decision-level-zero root. Assumptions,
+seed restrictions, permanent objective cutoffs, model blockers and externally implied
+root restrictions withhold these passes. Root premises can therefore be discharged
+without turning a conditional fact into an unconditional clause. The structural
+source replacements themselves introduce no additional scope. Probing and root
+simplification are disabled by default; their batch and per-probe limits are explicit
+execution settings.
+
 ## Theory completion
 
 Arithmetic owners complete or refute the coordinates left by finite search.

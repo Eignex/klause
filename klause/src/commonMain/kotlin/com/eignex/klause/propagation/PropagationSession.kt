@@ -138,6 +138,51 @@ class PropagationSession private constructor(
     private val intPinnedLevel: IntArray = IntArray(problem.numIntVars)
     private val trail: IntArrayList = IntArrayList()
     private var seededRestrictions: DeducedRestrictions = DeducedRestrictions.None
+    private var scopedLearnedAssertion = false
+    private var simplifiedRootSources: MutableSet<Int>? = null
+
+    internal val canSimplifyRoot: Boolean
+        get() = decisionLevel == 0 && seededRestrictions.isEmpty && !scopedLearnedAssertion &&
+            !fixpointCancelled && !isUnsatAtRoot
+
+    internal val rootClauseCount: Int get() = problem.numFactors + learnedClauseCount
+
+    internal fun rootClauseLiterals(factor: Int, limit: Int): IntArray? {
+        if (simplifiedRootSources?.contains(factor) == true) return null
+        if (factor < problem.numFactors) {
+            val literals = if (usesNativeSat) (problem.factors[factor] as? Clause)?.literals
+                else (projection.propagators[factor] as? ClausePropagator)?.literals
+            return literals?.takeIf { it.size <= limit && it.all { lit -> Lit.variable(lit) < problem.numBoolVars } }
+        }
+        val index = factor - problem.numFactors
+        if (!isLearnedClause(index) || learnedClausePermanent(index)) return null
+        if (state.nativeEngine?.literalCountOf(index)?.let { it > limit } == true) return null
+        return learnedClauseLiterals(index).takeIf {
+            it.size <= limit && it.all { lit -> Lit.variable(lit) < problem.numBoolVars }
+        }
+    }
+
+    internal fun addRootDerivedClause(clause: Clause, lbd: Int, origin: Int, sourceReplacement: Boolean): PropagationResult {
+        check(canSimplifyRoot)
+        val result = registerAndPropagate(base = state.undoTop) {
+            state.addLearnedClause(clause, lbd, permanent = sourceReplacement, origin = origin)
+        }
+        if (result is PropagationResult.Unsat) bakedUnsat = result
+        return result
+    }
+
+    internal fun retireRootSource(factor: Int, literals: IntArray) {
+        check(canSimplifyRoot && factor < problem.numFactors)
+        val retired = simplifiedRootSources ?: HashSet<Int>().also { simplifiedRootSources = it }
+        retired.add(factor)
+        val native = state.nativeEngine
+        if (native != null) native.retireRootSource(factor)
+        else for (literal in literals) {
+            if (state.watches.pos.getOrDefault(state.packWatch(factor, literal), -1) >= 0) {
+                state.removeBoolWatch(factor, literal)
+            }
+        }
+    }
     private val impliedIntUndo: IntArray = preparedBuffers?.impliedIntUndo ?: (IntArray(problem.numIntVars) { -1 })
     private fun encBool(v: Int): Int = v
     private fun encInt(v: Int): Int = problem.numBoolVars + v
@@ -749,8 +794,10 @@ class PropagationSession private constructor(
      * learned clause is a constraint over existing variables, not a decision. So no
      * snapshot is pushed and no decision counter is bumped.
      */
-    fun addLearnedClause(clause: Clause, lbd: Int, permanent: Boolean = false): PropagationResult =
-        registerAndPropagate(base = state.undoTop) { state.addLearnedClause(clause, lbd, permanent) }
+    fun addLearnedClause(clause: Clause, lbd: Int, permanent: Boolean = false): PropagationResult {
+        if (permanent) scopedLearnedAssertion = true
+        return registerAndPropagate(base = state.undoTop) { state.addLearnedClause(clause, lbd, permanent) }
+    }
 
     /** [addLearnedClause] for a clause derived from one imported from [origin], which keeps the credit. */
     internal fun addLearnedClause(clause: Clause, lbd: Int, origin: Int): PropagationResult =
@@ -767,8 +814,10 @@ class PropagationSession private constructor(
         degree: Long,
         lbd: Int,
         permanent: Boolean = false,
-    ): PropagationResult =
-        registerAndPropagate(base = state.undoTop) { state.addLearnedPb(weights, literals, degree, lbd, permanent) }
+    ): PropagationResult {
+        if (permanent) scopedLearnedAssertion = true
+        return registerAndPropagate(base = state.undoTop) { state.addLearnedPb(weights, literals, degree, lbd, permanent) }
+    }
 
     /** Enable bounded mandatory integer-row learning for subsequent finite conflicts. */
     fun enableIntegerRowLearning() {
@@ -873,6 +922,7 @@ class PropagationSession private constructor(
         implyAtCurrentLevel { state.tightenIntMax(v, hi, reason) }
 
     private fun implyAtCurrentLevel(apply: () -> Boolean): PropagationResult {
+        if (decisionLevel == 0) scopedLearnedAssertion = true
         bakedUnsat?.let { return it }
         val base = state.undoTop
         state.currentFactor = -1
