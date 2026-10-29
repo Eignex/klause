@@ -42,6 +42,7 @@ internal data class ExactContinuationLimits(
     val maxTimeNs: Long? = null,
     val maxImportPivots: Int = 128,
     val maxPivots: Int = 10000,
+    val startArbitraryPrecision: Boolean = false,
 ) {
     init {
         require(maxRows >= 0 && maxColumns >= 0 && maxCells >= 0 && maxBits >= 24)
@@ -228,6 +229,7 @@ internal class ExactContinuation(private var input: ExactContinuationInput) {
             validate(next, budget)
             restarts += rebind(next, budget)
             eligible = true
+            if (lane == null && limits.startArbitraryPrecision) big = true
             while (result == null) {
                 try {
                     val current = lane ?: run {

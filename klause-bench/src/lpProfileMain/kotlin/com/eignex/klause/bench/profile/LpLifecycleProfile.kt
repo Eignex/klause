@@ -59,7 +59,7 @@ fun main(args: Array<String>) {
     val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
     require(options.keys - "mode" == setOf("source64", "source", "sha256", "repeats"))
     val mode = options["mode"] ?: "lifecycle"
-    val claims = mode == "claims"
+    val claims = mode == "claims" || mode == "precision"
     require(claims || mode == "lifecycle")
     val bytes = Base64.decode(options.getValue("source64"))
     require(bytes.size in 1..1_048_576)
@@ -107,6 +107,16 @@ fun main(args: Array<String>) {
         },
     )
     for (round in -1 until repeats) {
+        if (mode == "precision") {
+            val arms = if (round % 2 == 0) listOf(false, true) else listOf(true, false)
+            for (arbitrary in arms) {
+                for (claim in LpClaim.entries) {
+                    if (profileExpired(stop)) return
+                    lifecycle(initial, column, side, round, true, true, stop, claim, true, arbitrary)
+                }
+            }
+            continue
+        }
         if (claims) {
             for (claim in LpClaim.entries) {
                 if (profileExpired(stop)) return
@@ -145,6 +155,7 @@ private fun lifecycle(
     cancellation: Cancellation,
     claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
     claims: Boolean = false,
+    arbitraryPrecision: Boolean = false,
 ) {
     val factory = LifecycleFactory(observed)
     val context = LpSolveContext(engineFactory = factory)
@@ -235,7 +246,11 @@ private fun lifecycle(
             val queryStart = Monotonic.markNow()
             factory.queryActive = true
             val result = try {
-                if (prepared) current.solve(observer = observer.takeIf { observed }, claim = claim) else null
+                if (prepared) current.solve(
+                    observer = observer.takeIf { observed },
+                    claim = claim,
+                    continuationLimits = ExactContinuationLimits(startArbitraryPrecision = arbitraryPrecision),
+                ) else null
             } finally {
                 factory.queryActive = false
             }
@@ -255,6 +270,7 @@ private fun lifecycle(
                     put("observed", observed)
                     put("stage", stage)
                     put("claim", claim.name)
+                    put("startArbitraryPrecision", arbitraryPrecision)
                     put("sameAuthority", previousState?.let { JsonPrimitive(it === current.state) } ?: JsonNull)
                     put("matrixRevision", current.state.matrixRevision)
                     put("boundRevision", current.state.boundRevision)
@@ -376,6 +392,7 @@ private fun lifecycle(
             buildJsonObject {
                 put("kind", "lifecycle")
                 put("claim", claim.name)
+                    put("startArbitraryPrecision", arbitraryPrecision)
                 put("round", round)
                 put("retained", retained)
                 put("observed", observed)

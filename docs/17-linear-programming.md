@@ -841,7 +841,11 @@ stall heuristics only schedule work; they never authorize proofs.
 | Exact continuation | Import the numerical basis pivot by pivot, repairing unseatable basics with logicals, then run Bland feasibility. |
 
 Rational work escalates from `Frac128` to `BigFraction`; fixed-width overflow
-restarts the operation from authority, and every attempt is charged. Owner-local
+restarts the operation from authority, and every attempt is charged. An internal
+continuation request can opt into arbitrary precision before building its first
+tableau; this selects arithmetic without changing cumulative limits, import identity
+or the current-source verification required for publication. A retained tableau
+keeps its arithmetic across requests. Owner-local
 exact factors require the same matrix and ordered basis. An off-status feasible
 point cannot furnish a claimed warm basis.
 

@@ -217,56 +217,62 @@ class LpExactContinuationTest {
 
     @Test
     fun `unchanged partial imports should retain the exhausted import allowance`() {
-        val model = LpBuilder().apply {
-            repeat(2) { j ->
-                addVar(0L, 10L)
-                addRow(intArrayOf(j), longArrayOf(3L), Relation.EQ, 1L)
-            }
-        }.build(Sense.MINIMIZE)
-        val basis = Basis(intArrayOf(0, 1), arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.FIXED, VarStatus.FIXED))
-        val cache = LpExactContinuationCache()
-        val limits = ExactContinuationLimits(maxImportPivots = 1)
-        val first = continueExactLp(model, basis, cache, limits = limits)
-        val spent = cache.usedWork
+        for (arbitrary in listOf(false, true)) {
+            val model = LpBuilder().apply {
+                repeat(2) { j ->
+                    addVar(0L, 10L)
+                    addRow(intArrayOf(j), longArrayOf(3L), Relation.EQ, 1L)
+                }
+            }.build(Sense.MINIMIZE)
+            val basis = Basis(
+                intArrayOf(0, 1), arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.FIXED, VarStatus.FIXED),
+            )
+            val cache = LpExactContinuationCache()
+            val limits = ExactContinuationLimits(maxImportPivots = 1, startArbitraryPrecision = arbitrary)
+            val first = continueExactLp(model, basis, cache, limits = limits)
+            val spent = cache.usedWork
 
-        val repeated = continueExactLp(model, basis, cache, limits = limits)
+            val repeated = continueExactLp(model, basis, cache, limits = limits)
 
-        assertEquals(ContinuationDecline.IMPORT_LIMIT, first.metrics.decline)
-        assertEquals(1, first.metrics.imports)
-        assertEquals(ContinuationDecline.IMPORT_LIMIT, repeated.metrics.decline)
-        assertEquals(0, repeated.metrics.imports)
-        assertEquals(0, repeated.metrics.builds)
-        assertEquals(first.metrics.importPosition, repeated.metrics.importPosition)
-        assertTrue(repeated.metrics.resumed)
-        assertFalse(repeated.metrics.invalidated)
-        assertTrue(cache.usedWork > spent)
-        assertNull(repeated.witness)
-        assertNull(repeated.conflict)
+            assertEquals(ContinuationDecline.IMPORT_LIMIT, first.metrics.decline)
+            assertEquals(1, first.metrics.imports)
+            assertEquals(ContinuationDecline.IMPORT_LIMIT, repeated.metrics.decline)
+            assertEquals(0, repeated.metrics.imports)
+            assertEquals(0, repeated.metrics.builds)
+            assertEquals(first.metrics.importPosition, repeated.metrics.importPosition)
+            assertTrue(repeated.metrics.resumed)
+            assertFalse(repeated.metrics.invalidated)
+            assertTrue(cache.usedWork > spent)
+            assertNull(repeated.witness)
+            assertNull(repeated.conflict)
+        }
     }
 
     @Test
     fun `a changed ordered target should invalidate an unfinished import`() {
-        val model = LpBuilder().apply {
-            repeat(2) { j ->
-                addVar(0L, 10L)
-                addRow(intArrayOf(j), longArrayOf(3L), Relation.EQ, 1L)
-            }
-        }.build(Sense.MINIMIZE)
-        val statuses = arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.FIXED, VarStatus.FIXED)
-        val cache = LpExactContinuationCache()
-        val limits = ExactContinuationLimits(maxImportPivots = 1)
-        assertEquals(ContinuationDecline.IMPORT_LIMIT,
-            continueExactLp(model, Basis(intArrayOf(0, 1), statuses), cache, limits = limits).metrics.decline)
+        for (arbitrary in listOf(false, true)) {
+            val model = LpBuilder().apply {
+                repeat(2) { j ->
+                    addVar(0L, 10L)
+                    addRow(intArrayOf(j), longArrayOf(3L), Relation.EQ, 1L)
+                }
+            }.build(Sense.MINIMIZE)
+            val statuses = arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.FIXED, VarStatus.FIXED)
+            val cache = LpExactContinuationCache()
+            val limits = ExactContinuationLimits(maxImportPivots = 1, startArbitraryPrecision = arbitrary)
+            assertEquals(ContinuationDecline.IMPORT_LIMIT,
+                continueExactLp(model, Basis(intArrayOf(0, 1), statuses), cache, limits = limits).metrics.decline)
 
-        val changed = continueExactLp(model, Basis(intArrayOf(1, 0), statuses), cache, limits = limits)
+            val changed = continueExactLp(model, Basis(intArrayOf(1, 0), statuses), cache, limits = limits)
 
-        assertEquals(ContinuationDecline.IMPORT_LIMIT, changed.metrics.decline)
-        assertTrue(changed.metrics.invalidated)
-        assertFalse(changed.metrics.resumed)
-        assertEquals(1, changed.metrics.imports)
-        assertEquals(1, changed.metrics.builds)
-        assertNull(changed.witness)
-        assertNull(changed.conflict)
+            assertEquals(ContinuationDecline.IMPORT_LIMIT, changed.metrics.decline)
+            assertTrue(changed.metrics.invalidated)
+            assertFalse(changed.metrics.resumed)
+            assertEquals(1, changed.metrics.imports)
+            assertEquals(1, changed.metrics.builds)
+            assertNull(changed.witness)
+            assertNull(changed.conflict)
+        }
     }
 
     @Test
@@ -470,21 +476,24 @@ class LpExactContinuationTest {
 
     @Test
     fun `a cancelled bound update should allow a current source retry`() {
-        val source = assertNotNull(LpBuilder().apply { addVar(0L, 10L) }
-            .build(Sense.MINIMIZE).authoritativeModel())
-        val trail = LpBoundTrail(source)
-        val basis = Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER))
-        val cache = LpExactContinuationCache()
-        assertNotNull(continueExactLp(assertNotNull(trail.state.toWorkingModel()), basis, cache).witness)
-        assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2L)), 11L))
-        val model = assertNotNull(trail.state.toWorkingModel())
-        val stopped = continueExactLp(model, basis, cache, cancellation = Cancellation { true })
-        assertNull(stopped.witness)
+        for (arbitrary in listOf(false, true)) {
+            val source = assertNotNull(LpBuilder().apply { addVar(0L, 10L) }
+                .build(Sense.MINIMIZE).authoritativeModel())
+            val trail = LpBoundTrail(source)
+            val basis = Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER))
+            val cache = LpExactContinuationCache()
+            val limits = ExactContinuationLimits(startArbitraryPrecision = arbitrary)
+            assertNotNull(continueExactLp(assertNotNull(trail.state.toWorkingModel()), basis, cache, limits = limits).witness)
+            assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2L)), 11L))
+            val model = assertNotNull(trail.state.toWorkingModel())
+            val stopped = continueExactLp(model, basis, cache, limits = limits, cancellation = Cancellation { true })
+            assertNull(stopped.witness)
 
-        val retried = continueExactLp(model, basis, cache)
+            val retried = continueExactLp(model, basis, cache, limits = limits)
 
-        assertEquals(listOf(BigFraction.ofLong(2)), assertNotNull(retried.witness).primal)
-        assertNull(retried.conflict)
+            assertEquals(listOf(BigFraction.ofLong(2)), assertNotNull(retried.witness).primal)
+            assertNull(retried.conflict)
+        }
     }
 
     @Test
