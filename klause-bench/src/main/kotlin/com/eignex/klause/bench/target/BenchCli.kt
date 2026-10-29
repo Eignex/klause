@@ -185,7 +185,9 @@ object BenchCli {
             presolve = f["presolve"],
             exact = f["exact"]?.toBooleanStrict() ?: false,
             captureDirectory = File(out, "diagnostics").takeIf {
-                args.any { argument -> argument.startsWith("param=portfolio-work=") || argument.startsWith("param=companion-integers=") }
+                args.any { argument ->
+                    argument.startsWith("param=portfolio-work=") || argument.startsWith("param=companion-integers=")
+                }
             },
             completeAssignment = f["complete-assignment"]?.toBooleanStrict() ?: false,
         )
