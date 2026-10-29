@@ -91,7 +91,8 @@ class SolveMetricTest {
         val capture = StderrCapture("diagnostic\n".byteInputStream()).start().await(100, processKilled = false)
         val invocation = SolverInvocation.Result(null, null, null, proven = false,
             stats = mapOf("exit" to "7"), rawOutput = "partial\n", command = "fake",
-            stderr = capture.text, stderrComplete = capture.complete, stderrCapture = capture.status)
+            stderr = capture.text, stderrComplete = capture.complete, stderrCapture = capture.status,
+            compiledInputHashes = mapOf("flatzinc" to "retained-input"))
 
         val (result, raw) = SolveMetric.solve(entry(), SolverInvocation.Settings(), Budget(),
             "now", "fixture", installedBuild = { null },
@@ -100,6 +101,7 @@ class SolveMetricTest {
         assertEquals("7", result.stats["exit"])
         assertNotNull(result.stats["errorClass"])
         assertEquals(invocation.stderrCapture, result.stderrCapture)
+        assertEquals(invocation.compiledInputHashes, result.compiledInputHashes)
         assertEquals(invocation.stderr, result.stderr)
         assertEquals("partial\n", raw)
     }

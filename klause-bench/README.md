@@ -1094,3 +1094,34 @@ on macOS arm64, JDK 25.0.4.1+1, with advisory one-CPU / 4,608 MiB resource recei
 The smaller magic-square source's AllDifferent-only conflicts, compressed-byte
 hash refusal, worker network failure, earlier truncated captures and preparation
 timeouts retain their costs and provenance in the external campaign ledger.
+
+## Comparable sweep controls
+
+The status-sweep recipe pins solver/compiler seed 1, one processor, a 10s CLI
+budget, 60s compiler ceiling, 4096 MiB case memory, 2560 MiB heap, default GC,
+debug statistics, uninstrumented measurement and default tolerance. The
+`sdk-linux-v1` comparison series requires Linux x86 and retains complete assignments
+for supported independent witness checks. It starts a separate series from
+historical Mac and legacy-harness sweeps. Preserve their records and fingerprints;
+a seed, compiler, harness, platform or deadline migration needs a bounded bridge
+with identical source and matched seed/repeat blocks before attributing a revision
+regression. A changed seed is not recovered performance.
+
+`compiler-seed=1` makes the fixed MiniZinc lowering seed explicit; other values
+are rejected. `comparison-series=NAME` labels a controlled series. Records retain
+`comparisonControls`, including effective seeds, processors, memory, measurement,
+exact mode and deadlines. `compiledInputHashes` separately hashes the FlatZinc and
+output mapping before invocation, including failed invocations. Empty maps in
+historical or uncompiled records mean unavailable, not equal. Match original
+sources/dependencies, compiler/library identities, these compiled bytes, runtime
+bytes/options and resource/deadline controls before a solver-only comparison.
+Installed solver distribution hashes are expected to change across revisions.
+
+The CLI deadline includes frontend construction/preparation/search; compressed
+source decoding reduces its remaining allowance. MiniZinc compilation, preflight,
+artifact hashing and output reconstruction are outside that deadline and inside
+the containing case/job allowance. Independent checking is separate lab work.
+Retain complete active preparation/execution/checking charges, failures and
+retirement alongside CLI elapsed time; overlapping stage counters must not be
+summed as disjoint costs. Native proof flags do not certify source optimality or
+UNSAT. Unsupported checks stay explicit.

@@ -65,6 +65,7 @@ internal object SolverInvocation {
         val stderr: String? = null,
         val stderrComplete: Boolean = false,
         val stderrCapture: StderrCaptureStatus? = null,
+        val compiledInputHashes: Map<String, String> = emptyMap(),
     )
 
     internal class Failure(val result: Result, message: String, cause: Throwable? = null) :
@@ -74,15 +75,23 @@ internal object SolverInvocation {
     fun run(entry: ResolvedProblem, settings: Settings, budget: Budget, optimize: Boolean): Result {
         val file = if (entry.ref.format == Format.MINIZINC) MiniZincRunner().compileFzn(entry.ref)
             else CorpusFetcher.resolve(entry.ref.source)
+        val compiled = if (entry.ref.format == Format.MINIZINC) SolveEvidence.fileHashes(mapOf(
+            "flatzinc" to file,
+            "outputMapping" to MiniZincRunner().outputFile(file),
+        )) else emptyMap()
         return withSourceInput(file, budget) { plain, remaining ->
             val cmd = klauseCommand(entry, settings, remaining, optimize, plain)
-            invoke(
-                cmd,
-                dialectFor(entry.ref.format),
-                hardTimeoutMs = remaining.timeoutMillis * 2 + 20_000,
-                captureDirectory = settings.captureDirectory,
-                measureResources = settings.measureResources,
-            )
+            try {
+                invoke(
+                    cmd,
+                    dialectFor(entry.ref.format),
+                    hardTimeoutMs = remaining.timeoutMillis * 2 + 20_000,
+                    captureDirectory = settings.captureDirectory,
+                    measureResources = settings.measureResources,
+                ).copy(compiledInputHashes = compiled)
+            } catch (failure: Failure) {
+                throw Failure(failure.result.copy(compiledInputHashes = compiled), failure.message.orEmpty(), failure)
+            }
         }.copy(buildProvenance = InstalledBuild.current)
     }
 

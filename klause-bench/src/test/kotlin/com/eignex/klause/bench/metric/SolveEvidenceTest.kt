@@ -3,11 +3,30 @@ package com.eignex.klause.bench.metric
 import com.eignex.klause.bench.catalog.Format
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 class SolveEvidenceTest {
+    @Test
+    fun `compiled identities follow bytes independently of artifact paths`() {
+        val root = Files.createTempDirectory("compiled-identities-").toFile()
+        try {
+            val first = root.resolve("first.fzn").apply { writeText("abc") }
+            val relocated = root.resolve("second.fzn").apply { writeText("abc") }
+            val mapping = root.resolve("output.ozn").apply { writeText("") }
+
+            val hashes = SolveEvidence.fileHashes(mapOf("flatzinc" to first, "outputMapping" to mapping))
+
+            assertEquals("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", hashes["flatzinc"])
+            assertEquals(hashes["flatzinc"], SolveEvidence.fileHashes(mapOf("flatzinc" to relocated))["flatzinc"])
+            assertEquals("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", hashes["outputMapping"])
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
     @Test
     fun `only the last complete minizinc candidate should be retained`() {
         val raw = "x = 1;\n----------\nx = 2;\n----------\nx = 3;\n"

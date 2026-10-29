@@ -55,10 +55,40 @@ class LabAdapterTest {
     @CsvSource(
         "typo,true", "cpus,0", "memory-mib,2047", "repeats,0", "timeout-ms,0", "engines,no-such-engine",
         "debug,yes", "exact,yes", "measurement,arbitrary", "heap-mib,8192", "gc,arbitrary", "compile-timeout-sec,0",
-        "max,no", "lp,invalid", "presolve,invalid", "param.,value", "complete-assignment,yes",
+        "max,no", "lp,invalid", "presolve,invalid", "param.,value", "complete-assignment,yes", "compiler-seed,3",
     )
     fun `invalid controls fail validation`(key: String, value: String) {
         assertFailsWith<IllegalArgumentException> { LabSettings(mapOf(key to value)) }
+    }
+
+    @Test
+    fun `compiler seed remains explicit in each planned seed and repeat block`() {
+        val cases = KlauseLabSuite.plan(BenchRequest(parameters = mapOf(
+            "suite" to "dimacs-core", "name" to "php4", "compiler-seed" to "1",
+            "solver-seeds" to "1,3", "repeats" to "2",
+        )))
+
+        assertEquals(4, cases.size)
+        assertEquals(setOf("1"), cases.map { it.parameters["compiler-seed"] }.toSet())
+        assertEquals(setOf("1", "3"), cases.map { it.parameters["seed"] }.toSet())
+        assertEquals(4, cases.map { it.attributes["comparisonKey"] }.toSet().size)
+    }
+
+    @Test
+    fun `comparison controls distinguish resource and deadline policies`() {
+        fun controls(parameters: Map<String, String>): Map<String, String> {
+            val settings = LabSettings(parameters)
+            return KlauseLabSuite.comparisonControls(BenchCase("case", settings.caseParameters("cp", 3), settings.resources()))
+        }
+        val baseline = controls(emptyMap())
+
+        assertEquals("matched-source-v1", baseline["policy"])
+        assertEquals("3", baseline["solverSeed"])
+        assertEquals("1", baseline["compilerSeed"])
+        assertEquals("cli-inclusive-v1", baseline["deadlinePolicy"])
+        assertEquals("2", controls(mapOf("cpus" to "2"))["cpus"])
+        assertEquals("5000", controls(mapOf("timeout-ms" to "5000"))["solverBudgetMs"])
+        assertEquals("true", controls(mapOf("exact" to "true"))["exact"])
     }
 
     @ParameterizedTest

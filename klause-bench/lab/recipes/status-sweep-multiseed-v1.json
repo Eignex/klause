@@ -1,0 +1,35 @@
+{
+  "name": "status-sweep-multiseed-v1",
+  "description": "Occasional fixed seeds 1,3,5 baseline under SDK Linux x86 sweep controls. Retain every seed and failed case; qualify only matched controlled blocks.",
+  "base": {},
+  "tags": [
+    "platform:linux",
+    "arch:x86_64"
+  ],
+  "priority": 100,
+  "repository": "Eignex/klause",
+  "bench": {
+    "manifest": "klause-bench/lab/bench.json",
+    "sourceValidation": true,
+    "request": {
+      "parameters": {
+        "selections": "[{\"set\":\"sweep\"}]",
+        "timeout-ms": "10000",
+        "solver-seeds": "1,3,5",
+        "compiler-seed": "1",
+        "repeats": "1",
+        "cpus": "1",
+        "memory-mib": "4096",
+        "heap-mib": "2560",
+        "compile-timeout-sec": "60",
+        "gc": "default",
+        "debug": "true",
+        "measurement": "none",
+        "exact": "false",
+        "complete-assignment": "true",
+        "comparison-series": "sdk-linux-v1"
+      }
+    },
+    "referenceFilters": {}
+  }
+}

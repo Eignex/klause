@@ -1,9 +1,10 @@
 {
   "name": "status-sweep",
-  "description": "Per-commit regression check: the default engine on the sweep set (147 problems over 11 themes, kept for results that vary from commit to commit) at 10 s.",
+  "description": "Per-commit SDK Linux x86 sweep v1: frozen sweep membership, solver/compiler seed 1, CPU1 and a 10s CLI deadline. Platform/compiler/harness migrations require a retained matched bridge; historical Mac/legacy series remain distinct.",
   "base": {},
   "tags": [
-    "local"
+    "platform:linux",
+    "arch:x86_64"
   ],
   "priority": 100,
   "repository": "Eignex/klause",
@@ -13,7 +14,20 @@
     "request": {
       "parameters": {
         "selections": "[{\"set\":\"sweep\"}]",
-        "timeout-ms": "10000"
+        "timeout-ms": "10000",
+        "solver-seeds": "1",
+        "compiler-seed": "1",
+        "repeats": "1",
+        "cpus": "1",
+        "memory-mib": "4096",
+        "heap-mib": "2560",
+        "compile-timeout-sec": "60",
+        "gc": "default",
+        "debug": "true",
+        "measurement": "none",
+        "exact": "false",
+        "complete-assignment": "true",
+        "comparison-series": "sdk-linux-v1"
       }
     },
     "referenceFilters": {}

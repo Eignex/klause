@@ -68,6 +68,9 @@ internal data class SolveRecord(
     val stderrComplete: Boolean = false,
     /** Stream completion and artifact integrity, independent of the retained prefix. */
     val stderrCapture: StderrCaptureStatus? = null,
+    /** Bytes supplied to the CLI and output renderer; absent for historical or uncompiled inputs. */
+    val compiledInputHashes: Map<String, String> = emptyMap(),
+    val comparisonControls: Map<String, String> = emptyMap(),
 )
 
 internal object SolveMetric {
@@ -280,6 +283,7 @@ internal object SolveMetric {
             stderr = r.stderr,
             stderrComplete = r.stderrComplete,
             stderrCapture = r.stderrCapture,
+            compiledInputHashes = r.compiledInputHashes,
         )
     }
 
