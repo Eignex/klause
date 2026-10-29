@@ -277,7 +277,8 @@ internal class LpPreparationTemplates private constructor(
                         reusedComponents--
                     }
                     if (!visit()) return null
-                    return LpPreparationTemplates(problem, namespace, rowScope, problem.semantics, problem is BakedProblem,
+                    return LpPreparationTemplates(
+                        problem, namespace, rowScope, problem.semantics, problem is BakedProblem,
                         0L, true, old.factors, changedBounds ?: old.bounds,
                         changedComponents ?: old.components, old.source !== problem, old.factors.size, reusedBounds,
                         reusedComponents, old.storageUnits, changedBounds == null && changedComponents == null)
@@ -289,7 +290,8 @@ internal class LpPreparationTemplates private constructor(
                 if (!reuseMetadata && reuseIndexes && unchanged()) {
                     if (!visit()) return null
                     return requireNotNull(old).let {
-                        LpPreparationTemplates(problem, namespace, rowScope, problem.semantics, problem is BakedProblem,
+                        LpPreparationTemplates(
+                            problem, namespace, rowScope, problem.semantics, problem is BakedProblem,
                             it.objectiveConstant, false, it.factors, it.bounds, it.components,
                             it.source !== problem, it.factors.size, it.bounds.size, it.components.size,
                             it.storageUnits, true)
@@ -404,16 +406,19 @@ internal class LpPreparationTemplates private constructor(
                         if (Term.isInt(reference)) {
                             val variable = Term.intVar(reference)
                             componentBounds[variable] = bounds.getValue(variable)
-                            if (!reuseMetadata) costs.add(objective?.intCoefficientValues?.getOrElse(variable) { 0L } ?: 0L)
+                            if (!reuseMetadata) {
+                                costs.add(objective?.intCoefficientValues?.getOrElse(variable) { 0L } ?: 0L)
+                            }
                         } else if (!reuseMetadata) {
-                            costs.add(objective?.boolWeightValues?.getOrElse(Term.lit(reference) shr 1) { 0L } ?: 0L)
+                            val variable = Term.lit(reference) shr 1
+                            costs.add(objective?.boolWeightValues?.getOrElse(variable) { 0L } ?: 0L)
                         }
                     }
                     storage += group.size * 3L + seen.size * 4L
                     if (storage > MAX_UNITS) return null
                     val retained = previousComponents[group.firstOrNull()]?.takeIf {
-                        (reuseMetadata || old?.objectiveConstant == (objective?.constant ?: 0L)) && it.factors == group &&
-                            it.bounds == componentBounds && it.costs == costs
+                        (reuseMetadata || old?.objectiveConstant == (objective?.constant ?: 0L)) &&
+                            it.factors == group && it.bounds == componentBounds && it.costs == costs
                     }
                     if (retained != null) reusedComponents++
                     retained ?: run {
