@@ -19,6 +19,7 @@ class SearchRun internal constructor(
     private val branchSelection: SearchBranchSelection,
     private val minimumDecisionLevel: Int,
 ) {
+    private val branchObserver = observer as? SearchBranchAttemptObserver
     private val branchSources = if (branchSelection === SearchBranchSelection.Default) {
         null
     } else {
@@ -309,7 +310,7 @@ class SearchRun internal constructor(
             val decision = frame.decisions[frame.next++]
             if (!decision.tightens(session)) continue
             if (!session.executionControls.canCommitDecision()) return Advance.Budget
-            observer.onAttempt(decision, session)
+            branchObserver?.onAttempt(decision, session)
             when (val result = session.push(decision)) {
                 ComponentResult.Consistent -> {
                     if (!session.lastPushCreatedLevel()) continue
@@ -605,9 +606,6 @@ fun interface SearchDecisionBudget {
 
 /** Observes shared traversal lifecycle events without owning its trail. */
 interface SearchRunObserver {
-    /** A tightening alternative is entering its assertion, including alternatives that conflict immediately. */
-    fun onAttempt(decision: SearchDecision, context: SearchContext) {}
-
     /** A shared decision was accepted at [decisionLevel]. */
     fun onCommit(decision: SearchDecision, decisionLevel: Int) {}
 
@@ -633,6 +631,12 @@ interface SearchRunObserver {
 
     /** No-op lifecycle observer. */
     data object None : SearchRunObserver
+}
+
+/** Opt-in attempt observation, separate from existing lifecycle observers. */
+interface SearchBranchAttemptObserver : SearchRunObserver {
+    /** A tightening alternative is entering its assertion, including alternatives that conflict immediately. */
+    fun onAttempt(decision: SearchDecision, context: SearchContext)
 }
 
 /** Supplies Boolean alternatives before component-owned residual splits. */
