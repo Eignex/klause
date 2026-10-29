@@ -113,8 +113,7 @@ class AffineObjectiveTest {
                 outcome.reconstruct(reduced).ints.toList()
             }.toSet()
 
-            val rebuilt = outcome.mapping.rebuild.steps.filterIsInstance<RebuildStep.AffineValue>()
-            assertTrue(rebuilt.any { it.variable == 0 })
+            assertEquals(2, assertNotNull(outcome.objective).intCoefficients.count { it != 0L })
             assertEquals(
                 setOf(listOf(1L, 3L, 0L), listOf(2L, 2L, 1L), listOf(3L, 1L, 2L), listOf(4L, 0L, 3L)),
                 assignments,
