@@ -48,9 +48,21 @@ val labMiniZinc = configurations.create("labMiniZinc") {
     isCanBeConsumed = false
     isCanBeResolved = true
 }
+val labMiniZincTarget = when {
+    System.getProperty("os.name").startsWith("Mac") -> when (System.getProperty("os.arch")) {
+        "aarch64", "arm64" -> Triple("aarch64-apple-darwin", "dmg", "6ab899c06a06bd7542f4df2b39e5afaa1658d6af30a65548a249048d1b3468bc")
+        "amd64", "x86_64" -> Triple("x86_64-apple-darwin", "dmg", "c5b50d62ab493a354ae2caa5d7fb80ea51ae53a82942b3f358461e1a4a46a2c1")
+        else -> null
+    }
+    System.getProperty("os.name") == "Linux" && System.getProperty("os.arch") in setOf("amd64", "x86_64") ->
+        Triple("x86_64-linux-gnu", "tgz", "b63dd88491d47b05d0eb0ff4aa1112d1e6f77292c023800b20b98851458ce01c")
+    else -> null
+}
 
 dependencies {
-    add(labMiniZinc.name, "org.minizinc:minizinc:2.10.1:x86_64-linux-gnu@tgz")
+    labMiniZincTarget?.let { (target, extension, _) ->
+        add(labMiniZinc.name, "org.minizinc:minizinc:2.10.1:$target@$extension")
+    }
     implementation("com.eignex:lab-bench:$labBenchVersion")
     implementation(project(":klause"))
     implementation("org.jetbrains.kotlin:kotlin-compiler-embeddable:2.4.21")
@@ -120,18 +132,16 @@ tasks.withType<Test> {
 
 val prepareLabRuntime = tasks.register("prepareLabRuntime") {
     group = "build"
-    description = "Stage the pinned Linux x86_64 MiniZinc compiler and standard library for lab jobs."
+    description = "Stage the pinned host MiniZinc compiler and standard library for lab jobs."
     notCompatibleWithConfigurationCache("Uses Gradle archive operations to stage the compiler")
     val destination = layout.buildDirectory.dir("lab-runtime/minizinc")
     val archive = labMiniZinc
-    val checksum = "b63dd88491d47b05d0eb0ff4aa1112d1e6f77292c023800b20b98851458ce01c"
+    val checksum = labMiniZincTarget?.third.orEmpty()
     inputs.files(archive)
     inputs.property("checksum", checksum)
     outputs.dir(destination)
     doLast {
-        require(System.getProperty("os.name") == "Linux" && System.getProperty("os.arch") in setOf("amd64", "x86_64")) {
-            "Lab MiniZinc runtime requires Linux x86_64"
-        }
+        val target = requireNotNull(labMiniZincTarget) { "Lab MiniZinc runtime supports macOS ARM64/x86_64 and Linux x86_64" }
         val file = archive.singleFile
         val digest = MessageDigest.getInstance("SHA-256")
         file.inputStream().use { stream ->
@@ -143,12 +153,31 @@ val prepareLabRuntime = tasks.register("prepareLabRuntime") {
             }
         }
         check(HexFormat.of().formatHex(digest.digest()) == checksum) { "MiniZinc release checksum mismatch" }
-        project.sync {
-            from(tarTree(resources.gzip(file)))
-            include("*/bin/minizinc", "*/share/minizinc/std/**")
-            eachFile { relativePath = RelativePath(!isDirectory, *relativePath.segments.drop(1).toTypedArray()) }
-            includeEmptyDirs = false
-            into(destination)
+        if (target.second == "dmg") {
+            val mount = temporaryDir.resolve("minizinc-mount").apply { mkdirs() }
+            fun diskImage(vararg args: String) {
+                check(ProcessBuilder(listOf("hdiutil") + args).inheritIO().start().waitFor() == 0) { "MiniZinc disk image operation failed" }
+            }
+            diskImage("attach", "-quiet", "-nobrowse", "-readonly", "-mountpoint", mount.absolutePath, file.absolutePath)
+            try {
+                project.sync {
+                    from(mount.resolve("MiniZincIDE.app/Contents/Resources"))
+                    include("minizinc", "share/minizinc/std/**")
+                    eachFile { if (path == "minizinc") relativePath = RelativePath(true, "bin", "minizinc") }
+                    includeEmptyDirs = false
+                    into(destination)
+                }
+            } finally {
+                diskImage("detach", "-quiet", mount.absolutePath)
+            }
+        } else {
+            project.sync {
+                from(tarTree(resources.gzip(file)))
+                include("*/bin/minizinc", "*/share/minizinc/std/**")
+                eachFile { relativePath = RelativePath(!isDirectory, *relativePath.segments.drop(1).toTypedArray()) }
+                includeEmptyDirs = false
+                into(destination)
+            }
         }
         val root = destination.get().asFile
         check(root.resolve("bin/minizinc").setExecutable(true))

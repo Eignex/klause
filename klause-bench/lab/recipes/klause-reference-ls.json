@@ -2,6 +2,7 @@
   "name": "klause-reference-ls",
   "description": "Every 3 days: local search only on the broad selection at 60 s, to track the LS engine on its own.",
   "base": {},
+  "tags": ["local"],
   "priority": 0,
   "confirm": true,
   "repository": "Eignex/klause",

@@ -75,7 +75,12 @@ Its build tasks install the CLI, bench and pinned MiniZinc runtime:
 ./gradlew :klause-cli:installJvmDist :klause-bench:installDist :klause-bench:prepareLabRuntime
 ```
 
-The adapter requires Linux x86_64, JDK 25 and GNU time. A minimal lab request is:
+The adapter supports macOS ARM64/x86_64 and Linux x86_64 with JDK 25.
+Preparation stages the checksum-pinned MiniZinc 2.10.1 compiler for its host;
+prepared cases retain that host's platform and architecture requirements.
+Resource recordings require GNU time (`gtime` from Homebrew's `gnu-time` package on macOS).
+The status sweep and `klause-reference*` schedules use `tags: ["local"]` to stay on the Mac.
+A minimal lab request is:
 
 ```json
 {

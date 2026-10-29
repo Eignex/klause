@@ -216,7 +216,7 @@ internal object SolverInvocation {
         captureDirectory?.mkdirs()
         val measured = if (measureResources) {
             listOf(
-                "/usr/bin/time",
+                if (System.getProperty("os.name").startsWith("Mac")) "gtime" else "/usr/bin/time",
                 "--format=peakRssKiB=%M\nuserSeconds=%U\nsystemSeconds=%S\nwallSeconds=%e\nexit=%x",
                 "--output=${requireNotNull(captureDirectory).resolve("resources.txt")}",
             ) + cmd

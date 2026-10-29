@@ -51,6 +51,10 @@ class LabSelectionsTest {
                     .mapValues { it.value.jsonPrimitive.content }
 
                 assertEquals("Eignex/klause", recipe.getValue("repository").jsonPrimitive.content)
+                val name = recipe.getValue("name").jsonPrimitive.content
+                if (name == "status-sweep" || name.startsWith("klause-reference")) {
+                    assertEquals("[\"local\"]", recipe.getValue("tags").toString())
+                }
                 val reference = recipe["base"]?.jsonObject?.get("backend")?.jsonPrimitive?.content == "reference"
                 val manifest = if (reference) "reference" else "bench"
                 assertEquals("klause-bench/lab/$manifest.json", bench.getValue("manifest").jsonPrimitive.content)
