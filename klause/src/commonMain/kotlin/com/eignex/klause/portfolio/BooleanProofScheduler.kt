@@ -49,6 +49,7 @@ internal class BooleanProofScheduler(
     private val workers = parameters.map { Worker() }
     private val objective = LinearObjective(boolWeights = LongArray(problem.numBoolVars))
     private var closed = false
+    private var witness: Sample? = null
     var chargedWork: Long = 0L
         private set
 
@@ -74,7 +75,9 @@ internal class BooleanProofScheduler(
                 params.assumptions.deductions.isEmpty)
             require(params.componentFactory == null && params.objectiveBoundSupplier == null &&
                 params.objectiveLowerBoundSupplier == null && params.globalVarLowerSupplier == null &&
-                params.globalVarUpperSupplier == null && params.toleranceCheck == null)
+                params.globalVarUpperSupplier == null && params.toleranceCheck == null &&
+                params.clauseExchange == null && params.cutExchange == null &&
+                params.improvedSolutionSink == null && params.pooledIncumbents == null)
         }
     }
 
@@ -82,6 +85,7 @@ internal class BooleanProofScheduler(
     fun runSlice(worker: Int, cancellation: Cancellation, millis: Long, offeredWork: Long): BooleanProofStep {
         check(!closed)
         require(worker in workers.indices && offeredWork > 0L && millis > 0L)
+        witness?.let { return BooleanProofStep(null, sample = it) }
         if (cancellation()) return BooleanProofStep(null, reason = TerminationReason.Cancelled)
         val slot = workers[worker]
         val lease = slot.lease ?: tasks.acquire(worker)?.also { slot.lease = it }
@@ -103,6 +107,7 @@ internal class BooleanProofScheduler(
                 val verdict = finiteWitnessVerifier(problem, null, assumptions(lease), cancellation)
                     .verify(Candidate(sample, null))
                 if (verdict is Verification.Accepted) {
+                    witness = sample
                     tasks.release(lease)
                     slot.lease = null
                     return BooleanProofStep(lease.task, sample, result.reason)
@@ -134,6 +139,7 @@ internal class BooleanProofScheduler(
     ): SolveResult {
         check(!closed)
         require(workLimit >= 0L && baseSliceWork > 0L && maxSliceWork >= baseSliceWork)
+        witness?.let { return SolveResult.Sat(it, stats = stats) }
         val stopped = BooleanArray(workers.size)
         var allowance = baseSliceWork
         var cursor = 0
@@ -177,6 +183,7 @@ internal class BooleanProofScheduler(
         // Private learned state and permanent cutoffs belong to the preceding authority.
         workers.indices.forEach(::loseWorker)
         tasks.replaceContext(replacement)
+        witness = null
     }
 
     private fun validate(value: BooleanProofContext) {
