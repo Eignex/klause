@@ -8,6 +8,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.lp.engine.authoritativeModel
+import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.objective.LinearObjective
@@ -40,13 +41,29 @@ class LpPreparationTemplatesTest {
         val next = CpToLpRelaxation(view, objective, projections = selection.forEngineView(view))
 
         val reused = next.build(RootDomains(view)).model.authoritativeModel()
-        val fresh = CpToLpRelaxation(view, objective, projections = null).build(RootDomains(view)).model.authoritativeModel()
+        val fresh = CpToLpRelaxation(view, objective, projections = selection.forEngineView(view),
+            reuseSourceTemplates = false).build(RootDomains(view)).model.authoritativeModel()
         val after = assertNotNull(next.preparationTemplates)
 
         assertSame(before.factors[0].rows?.first(), after.factors[0].rows?.first())
         assertSame(before.bounds[0], after.bounds[0])
         assertEquals(3, after.reusedComponents)
         assertTrue(assertNotNull(reused).sameAuthority(assertNotNull(fresh)))
+    }
+
+    @Test
+    fun `separate retained consumers should install the same immutable exact bound objects`() {
+        val first = CpToLpRelaxation(source, objective, projections = selection)
+        val before = assertNotNull(LpRetainedSources(source, first)
+            .prepare(LpExactState(LpRetainedSources.emptyModel()), RootDomains(source)))
+        val second = CpToLpRelaxation(source, objective, projections = selection)
+
+        val after = assertNotNull(LpRetainedSources(source, second)
+            .prepare(LpExactState(LpRetainedSources.emptyModel()), RootDomains(source)))
+
+        assertSame(before.columns.first().column.bounds, after.columns.first().column.bounds)
+        assertSame(assertNotNull(first.preparationTemplates).bounds.getValue(0).column.bounds,
+            after.columns.first().column.bounds)
     }
 
     @Test
@@ -141,6 +158,41 @@ class LpPreparationTemplatesTest {
     }
 
     @Test
+    fun `affine row replacement should match fresh authority and retain unrelated rows`() {
+        val first = CpToLpRelaxation(source, objective, projections = selection)
+        first.build(RootDomains(source))
+        val before = assertNotNull(first.preparationTemplates)
+        val replacement = assertNotNull(source.factors[0].substituteAffine(0, 1, 2, 1))
+        val view = source.withFactors(arrayOf(replacement, source.factors[1], source.factors[2]))
+        val changed = CpToLpRelaxation(view, objective, projections = selection.forEngineView(view))
+
+        val reused = assertNotNull(changed.build(RootDomains(view)).model.authoritativeModel())
+        val fresh = assertNotNull(CpToLpRelaxation(view, objective, projections = null)
+            .build(RootDomains(view)).model.authoritativeModel())
+
+        assertTrue(reused.sameAuthority(fresh))
+        assertNotSame(before.factors[0], assertNotNull(changed.preparationTemplates).factors[0])
+        assertSame(before.components[1], assertNotNull(changed.preparationTemplates).components[1])
+    }
+
+    @Test
+    fun `bound metadata should retain integers beyond floating precision`() {
+        val lower = 9_007_199_254_740_993L
+        val problem = Problem(0, 1, arrayOf(IntDomain(lower, lower + 2)), arrayOf<Factor>(
+            Linear(longArrayOf(1), intArrayOf(0), LinearOp.GE, lower),
+        ))
+        val captured = FactorProjectionProviders.Default.prepare(problem)
+        val relaxer = CpToLpRelaxation(problem, null, projections = captured)
+
+        val reused = assertNotNull(relaxer.build(RootDomains(problem)).model.authoritativeModel())
+        val fresh = assertNotNull(CpToLpRelaxation(problem, null, projections = null)
+            .build(RootDomains(problem)).model.authoritativeModel())
+
+        assertEquals(lower, assertNotNull(relaxer.preparationTemplates).bounds.getValue(0).lower)
+        assertTrue(reused.sameAuthority(fresh))
+    }
+
+    @Test
     fun `guarded templates should reconstruct rows from each current pin`() {
         val problem = Problem(1, 1, arrayOf(IntDomain(0, 10)), arrayOf<Factor>(
             ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 8),
@@ -177,5 +229,25 @@ class LpPreparationTemplatesTest {
         assertNull(stopped)
         assertTrue(work >= 3L)
         assertSame(before.components[0], after.components[0])
+    }
+
+    @Test
+    fun `oversized preparation should decline before reading the factor payload`() {
+        var payloadRead = false
+        val expensive = object : Factor by source.factors[0] {
+            override val structuralKeyWeight: Int = 262_144
+            override val intVars: IntArray get() {
+                payloadRead = true
+                return source.factors[0].intVars
+            }
+        }
+        val problem = source.withFactors(arrayOf(expensive))
+        val captured = FactorProjectionProviders.Default.prepare(problem)
+        payloadRead = false
+
+        val result = captured.prepareLpTemplates(objective, Cancellation.Never)
+
+        assertNull(result)
+        assertTrue(!payloadRead)
     }
 }

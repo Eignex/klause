@@ -11,12 +11,17 @@ import com.eignex.klause.ir.impliedLinearRows
 import com.eignex.klause.lp.LinearLpProjection
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.lp.emitLpRelaxation
+import com.eignex.klause.lp.engine.ExactLpBounds
+import com.eignex.klause.lp.engine.ExactLpColumn
+import com.eignex.klause.lp.engine.ExactLpNumber
+import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.rootDomainOf
 import com.eignex.klause.lp.statesLowerBound
 import com.eignex.klause.lp.statesUpperBound
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.RelaxationCapability
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 
@@ -34,11 +39,25 @@ internal class LpSourceRowTemplate(private val row: LinearRow) {
 }
 
 internal data class LpIntegerBoundTemplate(
+    val variable: Int,
     val lower: Long,
     val upper: Long,
     val statedLower: Boolean,
     val statedUpper: Boolean,
-)
+) {
+    val column = ExactLpColumn(
+        ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L)),
+            ExactLpSide(ExactLpNumber.of(BigFraction.ofLong(upper) - BigFraction.ofLong(lower)))),
+        origin = ExactLpNumber.of(lower), integral = true, tag = variable,
+    )
+    private val openColumn = column.copy(bounds = column.bounds.copy(upper = null))
+
+    fun compatibleColumn(current: ExactLpColumn): ExactLpColumn? = when (current) {
+        column -> column
+        openColumn -> openColumn
+        else -> null
+    }
+}
 
 internal class LpFactorTemplate(
     val factor: Factor,
@@ -52,7 +71,11 @@ internal class LpTemplateComponent(
     val factors: List<LpFactorTemplate>,
     val bounds: Map<Int, LpIntegerBoundTemplate>,
     val costs: List<Long>,
-)
+) {
+    private val rowIndex = factors.associateWith { it.rows }
+
+    fun rows(factor: LpFactorTemplate): List<LpSourceRowTemplate>? = rowIndex[factor]
+}
 
 internal class LpPreparationTemplates private constructor(
     private val source: Problem,
@@ -69,9 +92,19 @@ internal class LpPreparationTemplates private constructor(
     val reusedComponents: Int,
     val storageUnits: Long,
 ) {
+    private val factorComponents = buildMap {
+        for (component in components) for (factor in component.factors) put(factor, component)
+    }
+    private val boundComponents = buildMap {
+        for (component in components) for (variable in component.bounds.keys) put(variable, component)
+    }
+
+    fun bound(variable: Int): LpIntegerBoundTemplate? = boundComponents[variable]?.bounds?.get(variable)
+
     fun emit(problem: Problem, factorId: Int, builder: RelaxationBuilder, projection: LinearLpProjection): Boolean {
         require(source === problem) { "LP templates belong to a different prepared source" }
-        val rows = factors[factorId].rows ?: return false
+        val factor = factors[factorId]
+        val rows = factorComponents.getValue(factor).rows(factor) ?: return false
         rows.forEach { it.emit(builder, projection) }
         return true
     }
@@ -148,12 +181,17 @@ internal class LpPreparationTemplates private constructor(
                         val variable = Term.intVar(reference)
                         if (variable in bounds) continue
                         val domain = problem.rootDomainOf(variable)
-                        val value = LpIntegerBoundTemplate(domain.min, domain.max,
-                            problem.statesLowerBound(variable), problem.statesUpperBound(variable))
-                        val retainedBound = old?.bounds?.get(variable)?.takeIf { it == value }
+                        val statedLower = problem.statesLowerBound(variable)
+                        val statedUpper = problem.statesUpperBound(variable)
+                        val retainedBound = old?.bounds?.get(variable)?.takeIf {
+                            it.lower == domain.min && it.upper == domain.max &&
+                                it.statedLower == statedLower && it.statedUpper == statedUpper
+                        }
                         if (retainedBound != null) reusedBounds++
-                        bounds[variable] = retainedBound ?: value
-                        storage += 5L
+                        if (retainedBound == null && !visit(24L)) return null
+                        bounds[variable] = retainedBound ?: LpIntegerBoundTemplate(variable, domain.min, domain.max,
+                            statedLower, statedUpper)
+                        storage += 24L
                     }
                 }
                 val parents = IntArray(factors.size) { it }
@@ -193,7 +231,7 @@ internal class LpPreparationTemplates private constructor(
                             costs.add(objective?.boolWeightValues?.getOrElse(Term.lit(reference) shr 1) { 0L } ?: 0L)
                         }
                     }
-                    storage += group.size + seen.size * 2L
+                    storage += group.size * 3L + seen.size * 3L
                     if (storage > MAX_UNITS) return null
                     val retained = previousComponents[group.firstOrNull()]?.takeIf {
                         old?.objectiveConstant == (objective?.constant ?: 0L) && it.factors == group &&
@@ -202,8 +240,9 @@ internal class LpPreparationTemplates private constructor(
                     if (retained != null) reusedComponents++
                     retained ?: LpTemplateComponent(group.toList(), componentBounds, costs)
                 }
-                if (!visit()) return null
-                return LpPreparationTemplates(problem, namespace, problem.semantics, problem is BakedProblem, dimensions,
+                if (!visit(1L + factors.size * 2L + bounds.size)) return null
+                return LpPreparationTemplates(problem, namespace, problem.semantics, problem is BakedProblem,
+                    dimensions,
                     objective?.constant ?: 0L, factors, bounds, components, reusedFactors, reusedBounds,
                     reusedComponents, storage)
             } finally {

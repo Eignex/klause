@@ -686,6 +686,10 @@ internal class CpToLpRelaxation(
     internal var preparationTemplates: LpPreparationTemplates? = null
         private set
 
+    internal fun observeBoundTemplates(count: Int) {
+        templateStats?.observeTemplateUse(exactBounds = count)
+    }
+
     private fun prepareTemplates(cancellation: Cancellation) {
         if (!reuseSourceTemplates || projections == null) return
         preparationTemplates = null
@@ -877,6 +881,8 @@ internal class CpToLpRelaxation(
     ) : ExactRelaxationBuilder, SharedIndexChoices {
         private val builder = LpBuilder()
         private val exactRows = ExactRelaxationRows()
+        private var templateRows = 0
+        private var templateBounds = 0
         private val intCol = IntArray(if (region == null) problem.numIntVars else 0) { -1 }
         private val boolCol = IntArray(if (region == null) problem.numBoolVars else 0) { -1 }
         private val realCol = IntArray(if (region == null) problem.numRealVars else 0) { -1 }
@@ -1110,11 +1116,11 @@ internal class CpToLpRelaxation(
                 val dom = columnDomains.intDomain(intVar)
                 val intBounds = problem.intBounds
                 val openHi = columnDomains.honorsOpenSides && !intBounds.hasUpper(intVar) && intBounds.hasLower(intVar)
-                val template = preparationTemplates?.bounds?.get(intVar)?.takeIf {
+                val template = preparationTemplates?.bound(intVar)?.takeIf {
                     it.lower == dom.min && it.upper == dom.max &&
                         it.statedLower == intBounds.hasLower(intVar) && it.statedUpper == intBounds.hasUpper(intVar)
                 }
-                if (template != null) templateStats?.observeTemplateUse(bounds = 1)
+                if (template != null) templateBounds++
                 c = if (openHi) {
                     builder.addOpenAboveVar(template?.lower?.takeIf { it == intBounds.lower(intVar) }
                         ?: intBounds.lower(intVar), intCost(intVar), tag = intVar)
@@ -1317,7 +1323,7 @@ internal class CpToLpRelaxation(
                 currentHullEnabled = factorId !in suppressedHullFactors && !objectiveCone &&
                     factor.lpHullEnabled(hullFlags, elementIndexes)
                 if (preparationTemplates?.emit(problem, factorId, this, linearProjection) == true) {
-                    templateStats?.observeTemplateUse(rows = preparationTemplates?.factors?.get(factorId)?.rows?.size ?: 0)
+                    templateRows += preparationTemplates?.factors?.get(factorId)?.rows?.size ?: 0
                     attributeRows(factorId)
                     continue
                 } else if (projections == null) {
@@ -1415,7 +1421,7 @@ internal class CpToLpRelaxation(
                 gatedAux = gatedAuxList.toIntArray(),
                 gatedWhenTrue = BooleanArray(gatedWhenTrueList.size) { gatedWhenTrueList[it] == 1 },
                 realUpperRows = realUpperRows.toMap(),
-            )
+            ).also { templateStats?.observeTemplateUse(templateRows, templateBounds) }
         }
 
         private fun emits(kind: LpEmissionKind): Boolean = region == null || region.kind == kind
