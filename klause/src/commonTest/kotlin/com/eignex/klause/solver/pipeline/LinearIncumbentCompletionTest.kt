@@ -42,6 +42,56 @@ class LinearIncumbentCompletionTest {
     private val seed = Sample(booleanArrayOf(), longArrayOf(1), doubleArrayOf(0.333))
 
     @Test
+    fun `an advisory continuous point should reconstruct without a residual LP operation`() {
+        val offered = seed.copy(reals = doubleArrayOf(third.toDouble()))
+        val funding = SourceLpFunding(2_000_000L, 64L * 1024L * 1024L).also { it.grant(2_000_000L) }
+        val budget = SourceLpBudget(maxOperations = 0, funding = funding)
+        var originalChecks = 0
+
+        val point = LinearIncumbentCompletion(budget, originalCheck = { _, value, _ ->
+            originalChecks++
+            value == BigFraction.ONE + third
+        }) { _, _ -> }.use {
+            assertNotNull(it.complete(source, offered, Cancellation.Never))
+        }
+
+        assertEquals(listOf(third), point.exactReals)
+        assertEquals(1, originalChecks)
+        assertEquals(0, budget.operations)
+        assertTrue(funding.spent > 0L)
+        assertTrue(funding.allocated > 0L)
+    }
+
+    @Test
+    fun `unusable advisory continuous coordinates should retain residual completion`() {
+        for (value in listOf(0.333, Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY)) {
+            val offered = seed.copy(reals = doubleArrayOf(value))
+
+            val point = LinearIncumbentCompletion(SourceLpBudget()) { _, _ -> }.use {
+                assertNotNull(it.complete(source, offered, Cancellation.Never))
+            }
+
+            assertEquals(listOf(third), point.exactReals)
+        }
+    }
+
+    @Test
+    fun `a reconstructed continuous point should still require its original source check`() {
+        val offered = seed.copy(reals = doubleArrayOf(third.toDouble()))
+        var originalChecks = 0
+
+        LinearIncumbentCompletion(SourceLpBudget(maxOperations = 0), originalCheck = { _, _, _ ->
+            originalChecks++
+            false
+        }) { _, _ -> }.use {
+            assertNull(it.complete(source, offered, Cancellation.Never))
+            assertNull(it.complete(source, offered.copy(), Cancellation.Never))
+        }
+
+        assertEquals(1, originalChecks)
+    }
+
+    @Test
     fun `advisory discrete coordinates should complete with an exact original objective`() {
         val funding = SourceLpFunding(2_000_000L, 64L * 1024L * 1024L).also { it.grant(2_000_000L) }
         val budget = SourceLpBudget(funding = funding)

@@ -26,6 +26,7 @@ import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.magnitudeBitLength
+import kotlin.time.TimeSource
 
 internal class LinearIncumbentCompletion(
     private val budget: SourceLpBudget,
@@ -49,6 +50,15 @@ internal class LinearIncumbentCompletion(
     private var closed = false
 
     fun complete(source: SourceProofContext, seed: Sample, cancellation: Cancellation): Sample? {
+        val started = TimeSource.Monotonic.markNow()
+        return try {
+            completeSeed(source, seed, cancellation)
+        } finally {
+            observe("Nanos", started.elapsedNow().inWholeNanoseconds)
+        }
+    }
+
+    private fun completeSeed(source: SourceProofContext, seed: Sample, cancellation: Cancellation): Sample? {
         check(!closed)
         if (cancellation()) return null
         if (seed.exactReals != null) return seed
@@ -99,11 +109,9 @@ internal class LinearIncumbentCompletion(
                 if (!token()) finish(attempt, null)
                 return null
             }
+            val point = seedPoint(prepared, seed, token) ?: return null
             attempt.query = prepared
-            attempt.point = prepared.coordinates.map { coordinate ->
-                if (coordinate.kind == SourceCoordinate.Kind.Integer)
-                    BigFraction.of(seed.exactIntValue(coordinate.id), BIG_ONE) else BigFraction.ZERO
-            }
+            attempt.point = point
         }
         val query = requireNotNull(attempt.query)
         val values = recoverLinearPrimal(query.coordinates, requireNotNull(attempt.point), query.rows,
@@ -143,6 +151,22 @@ internal class LinearIncumbentCompletion(
         if (accepted && originalCheck != null) observe("OriginalChecked", 1L)
         observe(if (accepted) "Checked" else "Rejected", 1L)
         return finish(attempt, proposed.takeIf { accepted })
+    }
+
+    private fun seedPoint(query: LinearAuthorityQuery, seed: Sample, token: Cancellation): List<BigFraction>? {
+        val point = ArrayList<BigFraction>(query.coordinates.size)
+        for (coordinate in query.coordinates) {
+            if (token()) return null
+            // Floating coordinates guide reconstruction; source checks establish exact authority.
+            val value = if (coordinate.kind == SourceCoordinate.Kind.Integer) {
+                BigFraction.of(seed.exactIntValue(coordinate.id), BIG_ONE)
+            } else BigFraction.ofDouble(seed.approximateRealValue(coordinate.id)) ?: BigFraction.ZERO
+            val bits = maxOf(value.num.magnitudeBitLength(), value.den.magnitudeBitLength())
+            budget.observe(preparation = 1L + bits / 64L)
+            budget.funding?.charge(0L, 64L + bits / 4L)
+            point += value
+        }
+        return point.takeUnless { token() }
     }
 
     private fun prepare(source: SourceProofContext, seed: Sample, token: Cancellation): LinearAuthorityQuery? {

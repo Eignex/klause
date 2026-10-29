@@ -954,6 +954,12 @@ admission gate, active lifetime, rewards or coverage. A completed point or a poo
 read alone establishes neither consumption nor a performance benefit.
 `*CompletionOriginalChecked` records the reconstructed original-source and adjusted
 objective check before import on ordinary linear-source execution.
+`*CompletionNanos` includes seed preparation, retained-attempt lookup, exact recovery
+and checking for every call, including reused and failed attempts. It is a subset of
+companion active time. Approximate real seed coordinates guide exact rational
+reconstruction before residual LP completion; reconstruction and original-source
+checking remain charged to the containing funding. A reconstructed point can avoid
+an LP operation, but that alone establishes no source-level benefit.
 
 [9366](https://lab.eignex.com/jobs/9366) exercises ordinary finite producers on
 `bell3a` and `bell5`, with completion off/on at `89d5153cd9`, seed 1, one core and

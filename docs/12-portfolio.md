@@ -91,9 +91,11 @@ removing finite workers.
 
 `source-incumbent-completion=true` lets the numerical and joint-repair companions
 use an approximate incumbent's Boolean and finite integer coordinates as advisory
-pins. The real coordinates carry no authority: connected continuous residuals use
-the existing exact recovery path. Original-source witness and exact objective
-checks precede incumbent admission, cutoff use or neighborhood centering. Supplied
+pins. Approximate real coordinates guide rational reconstruction without carrying
+authority. A reconstructed point must satisfy every active affine row exactly;
+otherwise connected continuous residuals use the existing exact recovery path.
+Original-source witness and exact objective checks precede incumbent admission,
+cutoff use or neighborhood centering. Supplied
 exact payloads retain their direct admission checks.
 Ordinary linear sources reconstruct the completed point through the captured
 presolve mapping, check the original declarations and rows, and compare the original
