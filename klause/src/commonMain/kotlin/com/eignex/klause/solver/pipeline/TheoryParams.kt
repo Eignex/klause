@@ -72,8 +72,6 @@ data class TheoryParams(
      * The theory decides the arithmetic residual at a leaf.
      */
     val openBranching: OpenBranching = OpenBranching.Automatic,
-    /** Schedule touched linear rows and deliver explained interval consequences before numerical checks. */
-    val openLinearIncremental: Boolean = false,
     /**
      * Splits that must consult the hint before its allowance is spent drawing one.
      *
@@ -117,6 +115,8 @@ data class TheoryParams(
     val sourceRefutationResolution: Boolean = false,
     /** Complete advisory discrete incumbent coordinates before exact companion admission. */
     val sourceIncumbentCompletion: Boolean = false,
+    /** Schedule touched linear rows and deliver explained interval consequences before numerical checks. */
+    val openLinearIncremental: Boolean = false,
 ) {
     init {
         require(sourceLpWorkLimit >= 0 && sourceLpAllocationLimit >= 0 && sourceLpOperations >= 0)

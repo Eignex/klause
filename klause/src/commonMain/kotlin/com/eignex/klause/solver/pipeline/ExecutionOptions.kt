@@ -225,7 +225,8 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         val openBranching: ExecutionOption<OpenBranching> = ExecutionOption("open-branching", ValueKind.OPEN_BRANCHING)
 
         /** Incremental source assertions and explained interval propagation in open linear traversal. */
-        val openLinearIncremental: ExecutionOption<Boolean> = ExecutionOption("open-linear-incremental", ValueKind.BOOLEAN)
+        val openLinearIncremental: ExecutionOption<Boolean> =
+            ExecutionOption("open-linear-incremental", ValueKind.BOOLEAN)
 
         /** Optional open Boolean hint producer allowance. */
         val openHintFlips: ExecutionOption<Long> = ExecutionOption("open-hint-flips", ValueKind.LONG)

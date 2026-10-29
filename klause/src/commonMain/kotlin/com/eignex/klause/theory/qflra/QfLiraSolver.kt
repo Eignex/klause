@@ -593,7 +593,8 @@ class ExactLiraSearchComponent private constructor(
             partialLinearDeductions += deductions.size
             if (completeTraversalObserved && partialLinearPropagation) {
                 smtStats?.observeCompleteSearchStage("PARTIAL_LINEAR_VISITED", visited.toLong())
-                smtStats?.observeCompleteSearchStage("PARTIAL_LINEAR_DECLINE_REUSE", partialLinearUnchanged - previousUnchanged)
+                smtStats?.observeCompleteSearchStage("PARTIAL_LINEAR_DECLINE_REUSE",
+                    partialLinearUnchanged - previousUnchanged)
                 smtStats?.observeCompleteSearchStage("PARTIAL_LINEAR_DEDUCTION", deductions.size.toLong())
             }
         }
