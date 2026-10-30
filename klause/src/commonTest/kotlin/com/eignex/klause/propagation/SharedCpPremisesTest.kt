@@ -106,9 +106,12 @@ class SharedCpPremisesTest {
         )), pbLearning = false)
         val peer = object : SearchComponent {
             override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult = when (decision) {
-                SearchDecision.Bool(0) -> context.publish(SearchDecision.IntAtLeast(0, 3), SearchAtomPremise.Unavailable)
-                SearchDecision.Bool(2) -> context.publish(SearchDecision.IntAtLeast(2, 4),
-                    SearchAtomPremise.Asserted(decision))
+                SearchDecision.Bool(0) -> context.publish(
+                    SearchDecision.IntAtLeast(0, 3), SearchAtomPremise.All(listOf(SearchAtomPremise.Unavailable)),
+                )
+                SearchDecision.Bool(2) -> context.publish(
+                    SearchDecision.IntAtLeast(2, 4), SearchAtomPremise.Asserted(decision),
+                )
                 else -> ComponentResult.Consistent
             }
         }
@@ -128,5 +131,4 @@ class SharedCpPremisesTest {
         assertNull(shared.explainAtoms(unavailableAgain))
         assertContentEquals(intArrayOf(3), assertNotNull(shared.explainAtoms(namedAgain)).literals)
     }
-
 }
