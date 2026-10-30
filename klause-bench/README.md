@@ -784,6 +784,10 @@ completion while retaining the same edit controls and real workers. Runtime can
 be `jvm`, `native` or `both`; build `:klause:stageLpProfileJvm` and/or
 `:klause:linkLpProfileReleaseExecutableLinuxX64` accordingly. For a source outside
 the basis manifest, append its original SHA-256 and full HiGHS revision.
+`scripts/lp-lifecycle-qualification.sh jvm|native 3` runs the fixed Afiro,
+Adlittle, Avgas and Blending cohort sequentially from one build, retaining separate
+source directories and runtime-file hashes. Prepare only the selected platform's
+profile target; run platform jobs separately with one processor and outer parallelism one.
 The profile retains cold and unchanged requests, authority/bound/row/objective
 edits, retirement, failed work and conversion charges separately. Its worker
 observations require ordinary source-checked CLI controls for source claims.
