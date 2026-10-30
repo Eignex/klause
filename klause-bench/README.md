@@ -290,6 +290,16 @@ containing observation separate from CLI elapsed time and lab preparation/checki
 receipts. Only `none` and `resources` measurement modes are supported. Independent
 point checks do not certify Native optimality or infeasibility claims.
 
+`lab/library-lp-jvm.json` and `lab/library-lp-native.json` qualify the public baked
+`BacktrackSolver` library consumer separately from CLI source routing. The caller
+parses original MPS bytes with `toExactSourceProblem`, uses production LP dependencies
+and the `satOptimized` preset with 1000 instructions, and checks the returned point
+in original named coordinates before rendering it for the independent lab checker.
+It reports feasible points without upgrading solver statuses to source proofs.
+The subprocess includes parsing, exact lowering, baking, solving and source checking;
+the adapter also records source verification, runtime hashing and output decoding.
+Platform series, executable/library identities and runtime controls remain separate.
+
 `bench.profile.BooleanProofCoverageProfile` accepts `suite=ID problem=NAME sha256=HEX
 work=N seed=N splits=N` for one DIMACS source with at most 4,096 Boolean variables,
 one MiB of input and four partition variables. Its provenance capture requires both
