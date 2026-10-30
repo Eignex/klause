@@ -263,7 +263,7 @@ internal class LpRetainedSources(
                             relaxer.preparationTemplates?.bound(fragment.colVarId[local])
                                 ?.compatibleColumn(current, cancellation)
                         } else null
-                        if (cancellation()) throw LpAssemblyCancelled()
+                        checkCancellation(cancellation)
                         if (prepared != null) boundTemplates++
                         prepared ?: current
                     } else {
@@ -327,7 +327,7 @@ internal class LpRetainedSources(
             if (state.depth > 0 && saved.add(index)) changes.add(Change(state.depth, index, previous))
             next[index] = Binding(emission, mapped, rowIds)
         }
-        if (cancellation()) throw LpAssemblyCancelled()
+        checkCancellation(cancellation)
         relaxer.observeBoundTemplates(boundTemplates)
         val uses = columnUses.copyOf(staged.size)
         var owned = ownedStorageUnits + staged.drop(columns.size).sumOf { it.storageUnits }
@@ -376,6 +376,10 @@ internal class LpRetainedSources(
             cached = null
             compactionView = null
         }
+    }
+
+    private fun checkCancellation(cancellation: Cancellation) {
+        if (cancellation()) throw LpAssemblyCancelled()
     }
 
     private fun Column.reclaimable(): Boolean = variable < 0 && real < 0 && cost.value.isZero

@@ -199,6 +199,19 @@ class LpPreparationTemplatesTest {
     }
 
     @Test
+    fun `first exact import should retain its existing compatible column`() {
+        val consumer = CpToLpRelaxation(source, objective, projections = selection)
+        val relaxation = consumer.build(RootDomains(source))
+        val imported = assertNotNull(relaxation.model.authoritativeModel())
+        val current = imported.column(0)
+        val template = assertNotNull(consumer.preparationTemplates).bounds.getValue(relaxation.colVarId[0])
+
+        val adopted = template.compatibleColumn(current)
+
+        assertSame(current, adopted)
+    }
+
+    @Test
     fun `candidate import should adopt exact columns with unchanged normalized authority`() {
         val consumer = CpToLpRelaxation(source, objective, projections = selection, reuseTemplateMetadata = true)
         val relaxation = consumer.build(RootDomains(source))

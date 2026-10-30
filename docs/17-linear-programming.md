@@ -58,7 +58,8 @@ Exact bound columns materialize only when an import needs them. Each endpoint
 definition retains one completed normalized column; changing an open upper side
 replaces the cached column without linking prior versions. Preparation reserves
 pending construction work and retained storage inside its existing ceilings;
-actual construction charges the consuming import.
+actual construction charges the consuming import. An already exact import retains
+its matching column directly, without constructing a duplicate definition.
 Retained-source assembly and fixed-layout installation adopt the same immutable exact bound objects after a
 complete match against the current normalized column, including its origin, tag,
 integrality and both bound sides.

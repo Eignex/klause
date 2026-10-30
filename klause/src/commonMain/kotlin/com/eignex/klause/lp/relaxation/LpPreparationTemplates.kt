@@ -134,15 +134,28 @@ internal data class LpIntegerBoundTemplate(
     }
 
     fun compatibleColumn(current: ExactLpColumn, cancellation: Cancellation = Cancellation.Never): ExactLpColumn? {
-        if (!current.integral || current.tag != variable || current.origin.legacyLong() != lower) return null
-        val lo = current.bounds.lower ?: return null
-        if (lo.strict || lo.premises != null || lo.number.legacyLong() != 0L) return null
-        val hi = current.bounds.upper
+        val previous = completedColumn.load()
+        if (previous == current) return previous
+        if (!matchesColumn(current, cancellation) || cancellation()) return null
+        completedColumn.compareAndSet(previous, current)
+        return current
+    }
+
+    private fun matchesColumn(current: ExactLpColumn, cancellation: Cancellation): Boolean =
+        current.integral && current.tag == variable && current.origin.legacyLong() == lower &&
+            matchesLower(current.bounds.lower) && matchesUpper(current.bounds.upper, cancellation)
+
+    private fun matchesLower(side: ExactLpSide?): Boolean = side != null &&
+        !side.strict && side.premises == null && side.number.legacyLong() == 0L
+
+    private fun matchesUpper(side: ExactLpSide?, cancellation: Cancellation): Boolean {
+        if (side == null) return true
+        if (side.strict || side.premises != null || side.number.ieeeBits != null) return false
         val width = upper - lower
-        if (hi != null && (hi.strict || hi.premises != null || hi.number.ieeeBits != null ||
-            (width >= 0L && hi.number.legacyLong() != width))
-        ) return null
-        return column(hi == null, cancellation)?.takeIf { it == current }
+        if (width >= 0L) return side.number.legacyLong() == width
+        cancellation.charge(COLUMN_WORK)
+        if (cancellation()) return false
+        return side.number.value == BigFraction.ofLong(upper) - BigFraction.ofLong(lower)
     }
 
     fun compatibleColumn(model: LpModel, index: Int, cancellation: Cancellation): ExactLpColumn? {
