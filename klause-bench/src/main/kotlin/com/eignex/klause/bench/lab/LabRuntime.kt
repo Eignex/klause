@@ -72,7 +72,10 @@ internal object LabRuntime {
             "KLAUSE_CLI_PREFLIGHT_OPTS" to argumentFile("preflight.args", runtime),
             "LAB_WORKTREE" to requireNotNull(context.worktree).toString(),
         ) +
-            context.corpusDirectory?.let { mapOf("LAB_CORPUS" to it.toString()) }.orEmpty()
+            context.corpusDirectory?.let { mapOf("LAB_CORPUS" to it.toString()) }.orEmpty() +
+            if (measurement in setOf("jfr", "compilation", "compilation+log")) {
+                mapOf("KLAUSE_LAB_PROFILE_DIR" to report.toString())
+            } else emptyMap()
     }
 
     fun process(context: BenchContext, argv: List<String>, environment: Map<String, String>): Int {
