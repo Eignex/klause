@@ -592,6 +592,14 @@ containing deadline and probe accounting remain in force. This control does not
 remove a worker, change rewards or renew an allowance. Explicit recipes and arm
 counts reject it; `ordinary` is the default.
 
+With multiple initial workers, `portfolio-probes=leader-half` gives the leading
+initially eligible complete worker half the probe budget; the others share the rest.
+Every sibling still receives a probe. The existing total probe reservation, segment
+caps and containing deadline stay fixed; worker slots and seeds do not change.
+This control requires a containing deadline and curated single-core mixed integer
+optimization without Boolean or real columns. Explicit recipes and work diagnostics
+reject it; `ordinary` is the default. Deferred LP admission retains its separate boundary.
+
 Before the first incumbent, an optimization arm with pending private preparation, or
 a local-search arm that has not executed an instruction, receives preparation
 revisits after all initial siblings have been admitted. Unfinished arms rotate in arm
