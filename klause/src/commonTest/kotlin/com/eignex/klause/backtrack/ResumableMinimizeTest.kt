@@ -747,6 +747,21 @@ class ResumableMinimizeTest {
     }
 
     @Test
+    fun `one-shot root layout cancellation publishes an unknown terminal`() {
+        val fixture = FiniteCutoffKnapsackFixture
+        var cancelled = false
+        val params = fixture.params.copy(
+            cancellation = Cancellation { cancelled },
+            clauseExchange = onSearchStart { cancelled = true },
+            lpPlan = fixture.params.lpPlan.copy(componentOwnership = true),
+        )
+
+        val results = BacktrackSolver(fixture.problem).improvements(fixture.objective, params).toList()
+
+        assertIs<MinimizeResult.Unknown>(results.single())
+    }
+
+    @Test
     fun `optimization should publish the strip energy floor at the root`() {
         val factors = arrayOf<Factor>(
             Diffn(IntArray(6) { it }, IntArray(6) { 6 + it }, LongArray(6) { 1L }, LongArray(6) { 1L }),

@@ -91,7 +91,8 @@ authorize reuse. The new source binding owns no predecessor snapshot, so repeate
 compatible preparations retain no generation chain.
 
 An internal selective-metadata preparation mode validates row identity and exact
-bound sides before retaining the row index. A selected view whose handoff checked
+bound sides before retaining the row index. Node engines use this mode and own
+their numerical component partitions. A selected view whose handoff checked
 ordered factor identities carries the same immutable layout token, so subsequent
 template preparations need no duplicate row scan. Other rewrites and explicit
 namespace remaps carry fresh tokens and validate their actual factor identities.
@@ -259,9 +260,27 @@ expanded hulls stay outside its allowance. Root rounding preserves the ordinary
 admission's probe intent; sources declined by that guard gain no automatic probe.
 The initial root bound and subsequent root propagation share the existing scoped numerical owner;
 handoff requires matching source identities and root scopes, and live bound adoption
-rechecks authority before reusing its basis. A declined retained source layout
+rechecks authority before reusing its basis. Consultations without selected root cuts install
+source-root domain views without constructing a propagation session. They read no live search restriction;
+the compact immutable layout remains available for later node adoption, while other layouts
+retain their source emissions. Cut-bearing consultations keep propagation-derived root bounds,
+preserving completed cut-owner results across later node adoption.
+Completed cold layout construction and template imports debit the containing LP allowance.
+An interrupted cold base charges its materialized columns, rows and coefficient entries before
+discarding them; that charge adds no retained authority.
+Retained source fragments charge each fresh emission before preparing the next region,
+including partial materialization on interruption. Exact-import refusal and abandoned
+publication keep those charges. Unchanged fragments add no assembly fee; restored cached
+fragments retain their source-mapping fee without another emission charge.
+The containing worker token and remaining root work cap bound their preparation. The
+root-local clock gates numerical queries and checking. A completed source layout can
+remain private for later node queries after that consultation expires; a containing-phase
+interruption withholds an incomplete installation. A declined retained source layout
 retires that attempt and uses the existing standalone numerical route within the
 same remaining work and storage limits.
+
+Private construction can pause under [root preparation](#root-preparation), without
+publishing partial numerical authority.
 
 An admitted sparse root advances the scoped owner's floating cursor in adaptive
 work quanta. Pauses publish no point or bound and charge only the new work. A
@@ -321,6 +340,9 @@ children; identical exact authority retains their factors and completed evidence
 An ordinary component root uses the same scoped owner for its initial bound and later
 node queries. Selected global cuts enter through the retained cut adapter before the
 root solve; the passed selection also governs an empty cut list.
+The fixed layout starts from source-root boxes and adopts the query's propagated
+bounds, without a second root fixpoint for that layout.
+Noncompact exact layouts use retained source emissions instead of the compact base adapter.
 When no numerical owner exists, preparation partitions the complete source and cut
 layout together. A declined live component append falls back to the ordinary owner.
 The original node-depth and cut policies remain in force. This root-bound operation
@@ -352,8 +374,9 @@ optima alone supply no global optimum or conflict authority.
 
 Completed exact integer components can retain node deductions separately from their
 numerical results. A query uses the parent's common dual-rounding scale and reuses
-compatible child deductions. The aggregate maps multipliers and reduced costs back
-to the current parent authority; each child alternative is combined with the other
+compatible child deductions. Parent scale inspection charges the shared checking
+meter without materializing parent multipliers. The aggregate maps multipliers and
+reduced costs back to the current parent authority; each child alternative is combined with the other
 children's strongest bounds for fixing. An alternative visits only its changed
 child's columns; its other reduced costs are already covered by the stronger
 primary deduction. Retained deduction payloads occupy at most eight
@@ -498,14 +521,24 @@ Aggregation is disabled by default.
 
 Finite satisfaction and optimization share root hull pruning and cut harvesting;
 objective shaving and incumbent-relative fixings are optimization work. Root
-preparation runs once, under a common time and work allowance, before shared
-initialization publishes its bounds; a cancelled phase contributes only completed
-deductions. Interrupted root rounding retains its relaxation layout and basis for
-later slices. A completed rounding LP can retain its coordinates under the same
-bounded guidance allowance after charging the solve, avoiding another LP solve
+preparation runs once under its containing time and work allowance; a cancelled
+phase contributes only completed deductions. Interrupted root rounding retains its
+relaxation layout and basis for later slices. A completed rounding LP can retain its
+coordinates under the same bounded guidance allowance after charging the solve, avoiding another LP solve
 when pinning resumes. Every retry consumes the remaining root and LP allowances.
 Root rounding and pumping propose discrete assignments for mixed
 models, but a relaxation point supplies a target, never witness authority.
+
+Retained discrete root layouts prepare in private chunks before the first numerical
+consultation. Objective-column batches and factor batches charge materialized construction
+before yielding to the worker's slice. A paused builder retains only its source-root
+assembly buffers; no partial layout, point or certificate is available to consumers.
+Resumption keeps the same builder and cumulative root and LP funding. Containing
+cancellation or spent cumulative funding retires it. Completion prepares the source
+layout and its private exact state before the consultation-local numerical clock starts.
+The consultation adopts that state only while its source-root model, exact state and root scope remain current.
+Incumbent validation can retire pending construction, and engine closure releases its private buffers.
+Atomic projection and row emission retain the worker's ordinary overspend accounting.
 
 The internal root-only preparation policy can give source projection and numerical
 owner construction the remaining cumulative LP allowance while keeping each

@@ -30,6 +30,51 @@ import kotlin.test.assertTrue
 
 class LpRetainedSourcesTest {
     @Test
+    fun `completed source preparation should charge fresh emissions once`() {
+        for (imported in listOf(false, true)) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), arrayOf<Factor>(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 3),
+            ))
+            val sources = LpRetainedSources(
+                problem, CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1)),
+                    retainImportedDefinitions = imported),
+            )
+            var work = 0L
+            LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
+                val edit = assertNotNull(sources.prepare(owner.state, RootDomains(problem)) { work += it })
+
+                assertEquals(edit.emittedExtent, work)
+                assertTrue(owner.replaceRows(edit.retired, edit.columns, edit.rows, false, objective = edit.objective))
+                edit.commit()
+                val charged = work
+                assertNotNull(sources.prepare(owner.state, RootDomains(problem)) { work += it })
+                assertEquals(charged, work)
+            }
+        }
+    }
+
+    @Test
+    fun `cancelled source preparation should retain completed emission charges`() {
+        for (imported in listOf(false, true)) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), arrayOf<Factor>(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 3),
+            ))
+            val sources = LpRetainedSources(
+                problem, CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1)),
+                    retainImportedDefinitions = imported),
+            )
+            var work = 0L
+
+            assertFailsWith<LpAssemblyCancelled> {
+                sources.prepare(LpExactState(LpRetainedSources.emptyModel()), RootDomains(problem),
+                    Cancellation { work > 0L }) { work += it }
+            }
+
+            assertEquals(1L, work)
+        }
+    }
+
+    @Test
     fun `source imports should preserve an unchanged live bound memo during unrelated row churn`() {
         val problem = Problem(1, 2, Array(2) { IntDomain(0, 10) }, arrayOf<Factor>(
             ReifiedLinear(0, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 8),

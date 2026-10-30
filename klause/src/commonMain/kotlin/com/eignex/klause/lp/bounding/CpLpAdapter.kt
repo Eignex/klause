@@ -9,10 +9,12 @@ import com.eignex.klause.lp.engine.LpLayoutRemap
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.strongerThan
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
+import com.eignex.klause.lp.relaxation.CutSourceMap
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.lp.relaxation.LpRetainedCuts
 import com.eignex.klause.lp.relaxation.LpRetainedSources
 import com.eignex.klause.lp.relaxation.LpSourceEdit
+import com.eignex.klause.lp.relaxation.RootDomains
 import com.eignex.klause.lp.relaxation.SessionDomains
 import com.eignex.klause.lp.relaxation.authoritativeWithTemplates
 import com.eignex.klause.lp.relaxation.columnBounds
@@ -26,6 +28,7 @@ import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.util.Cancellation
 
 internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
     // CP decisions reach the LP in a bound batch; its scopes are synchronized when that batch is assembled.
@@ -35,6 +38,7 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
     private var shared: SearchContext? = null
     private var feasibility = false
     private var persistentState = false
+    private var sourceRoot = false
     private var sourceRelaxer: CpToLpRelaxation? = null
     private var sources: LpRetainedSources? = null
     private fun newCuts() = LpRetainedCuts { family, outcome ->
@@ -76,19 +80,22 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
     }
 
     // The source-root probe asserts no search restriction; live adoption checks every changed bound.
-    fun retainRootProbe(probe: PropagationSession): Boolean {
+    fun retainRootProbe(probe: PropagationSession?): Boolean {
         val target = sharedNative ?: return false
-        if (!engine.retainedRootEnabled || native !== probe || !persistentState ||
-            probe.problem !== engine.problem || target.problem !== engine.problem ||
-            probe.decisionLevel != 0 || target.decisionLevel != 0 || shared?.decisionLevel != 0 ||
+        val sameSource = if (probe == null) sourceRoot && native == null
+            else native === probe && probe.problem === engine.problem && probe.decisionLevel == 0
+        if (!engine.retainedRootEnabled || !sameSource || !persistentState ||
+            target.problem !== engine.problem || target.decisionLevel != 0 || shared?.decisionLevel != 0 ||
             engine.propagator.state?.depth != 0
         ) return false
         native = target
+        sourceRoot = false
         return true
     }
 
     fun localModel() {
         persistentState = false
+        sourceRoot = false
         currentModel = null
         sourceRelaxer = null
         sources = null
@@ -108,11 +115,57 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
     fun reset() {
         native = null
         persistentState = false
+        sourceRoot = false
         sourceRelaxer = null
         sources = null
         cuts = newCuts()
         currentModel = null
         engine.propagator.reset()
+    }
+
+    fun isSourceRoot(base: LpRelaxation): Boolean {
+        val state = engine.propagator.state ?: return false
+        return sourceRoot && native == null && currentModel === base.model && state.depth == 0 &&
+            base.model.exactState === state
+    }
+
+    fun sourceRootRelaxation(base: LpRelaxation, cancellation: Cancellation): LpRelaxation? {
+        reset()
+        val exact = base.authoritativeWithTemplates(cancellation, onWork = engine::noteNodeOverhead) {
+            engine.sink.lp.observeTemplateUse(exactBounds = it)
+        } ?: return null
+        if (!engine.propagator.install(base, exact) || cancellation()) return null
+        val model = requireNotNull(engine.propagator.state).ownerWorkingModel() ?: return null
+        val rebound = base.withModel(model)
+        currentModel = model
+        persistentState = true
+        sourceRoot = true
+        return rebound
+    }
+
+    fun sourceRootRelaxation(relaxer: CpToLpRelaxation, cancellation: Cancellation): LpRelaxation? {
+        reset()
+        sourceRelaxer = relaxer
+        val retained = LpRetainedSources(engine.problem, relaxer).also { sources = it }
+        val core = engine.propagator
+        if (!core.install(retained, LpRetainedSources.emptyModel())) return null
+        val domains = RootDomains(engine.problem)
+        val edit = retained.prepare(requireNotNull(core.state), domains, cancellation) {
+            engine.noteNodeOverhead(it * LpNodeOverhead.BUILD)
+        } ?: return null
+        if (cancellation() || !core.editSources(edit) { _, _ -> SearchAtomPremise.Unavailable } || cancellation()) {
+            return null
+        }
+        val rebound = retained.relaxation(requireNotNull(core.state), domains)
+        currentModel = rebound.model
+        persistentState = true
+        sourceRoot = true
+        return rebound
+    }
+
+    fun sourceRootCuts(base: LpRelaxation, selected: List<Cut>, cancellation: Cancellation): LpRelaxation? {
+        if (!sourceRoot || native != null || currentModel !== base.model) return null
+        return applyCuts(base, base.sourceMap ?: return null, selected, null, cancellation)
     }
 
     fun relaxation(relaxer: CpToLpRelaxation, session: PropagationSession): LpRelaxation? {
@@ -134,8 +187,9 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         }
         if (!core.atLevel(depth)) return null
         if (retained.depth > depth) retained.retract(depth)
-        var edit = retained.prepare(requireNotNull(core.state), domains, engine.params.cancellation) ?: return null
-        engine.noteNodeOverhead(edit.emittedExtent * LpNodeOverhead.BUILD)
+        var edit = retained.prepare(requireNotNull(core.state), domains, engine.params.cancellation) {
+            engine.noteNodeOverhead(it * LpNodeOverhead.BUILD)
+        } ?: return null
         weakenedBoundDepth(edit)?.let { assertionDepth ->
             if (assertionDepth < 0) return null
             val target = maxOf(0, assertionDepth - 1)
@@ -147,8 +201,9 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
             retained.retract(minOf(retained.depth, target))
             cuts.retract(minOf(cuts.depth, target))
             if (!core.atLevel(depth)) return null
-            edit = retained.prepare(requireNotNull(core.state), domains, engine.params.cancellation) ?: return null
-            engine.noteNodeOverhead(edit.emittedExtent * LpNodeOverhead.BUILD)
+            edit = retained.prepare(requireNotNull(core.state), domains, engine.params.cancellation) {
+                engine.noteNodeOverhead(it * LpNodeOverhead.BUILD)
+            } ?: return null
         }
         if (!core.editSources(edit) { column, upper -> boundPremise(edit, column, upper, session) }) return null
         val rebound = retained.relaxation(requireNotNull(core.state), domains)
@@ -207,6 +262,7 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
             engine.propagator.reset()
             cuts = newCuts()
             native = session
+            sourceRoot = false
         }
         val core = engine.propagator
         if (!persistentState) core.reset()
@@ -271,11 +327,21 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         selected: List<Cut>? = null,
     ): LpRelaxation? {
         if (currentModel !== base.model || native !== session) return null
+        val map = base.sourceMap?.withCpBounds(base.model, session) ?: return null
+        return applyCuts(base, map, selected, session, engine.params.cancellation)
+    }
+
+    private fun applyCuts(
+        base: LpRelaxation,
+        map: CutSourceMap,
+        selected: List<Cut>?,
+        session: PropagationSession?,
+        cancellation: Cancellation,
+    ): LpRelaxation? {
         val core = engine.propagator
         val before = core.state ?: return null
         if (cuts.depth > before.depth) cuts.retract(before.depth)
-        val map = base.sourceMap?.withCpBounds(base.model, session) ?: return null
-        val edit = cuts.prepare(before, base.withModel(base.model, map), selected, engine.params.cancellation)
+        val edit = cuts.prepare(before, base.withModel(base.model, map), selected, cancellation)
             ?: return null
         engine.noteNodeOverhead(edit.emittedExtent * LpNodeOverhead.BUILD)
         val beforeMetrics = core.metrics
@@ -291,12 +357,12 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
                         "RETIRED_ROWS" to edit.retired.size.toLong(), "ADDED_ROWS" to edit.rows.size.toLong())))
             }
         }
-        if (!applied) return null
+        if (!applied || cancellation()) return null
         val state = requireNotNull(core.state)
         val model = if (state === before) base.model else state.ownerWorkingModel() ?: return null
         val parents = cuts.parentRows(state)
         val rebound = base.withModel(model, map.withParentRows(parents))
-        val compacted = compactRelaxation(rebound, session)
+        val compacted = if (session == null) rebound else compactRelaxation(rebound, session)
         currentModel = compacted.model
         return compacted
     }

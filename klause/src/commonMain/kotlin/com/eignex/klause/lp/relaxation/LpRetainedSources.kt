@@ -236,11 +236,16 @@ internal class LpRetainedSources(
         state: LpExactState,
         domains: RelaxationDomains,
         cancellation: Cancellation = Cancellation.Never,
+        onEmissionWork: ((Long) -> Unit)? = null,
     ): LpSourceEdit? {
         require(state.depth >= depth && state.model.n == columns.size)
         check(generation < Long.MAX_VALUE)
         val expectedGeneration = generation
-        val update = emissions.prepare(domains, state.depth, cancellation)
+        var charged = 0L
+        val update = emissions.prepare(domains, state.depth, cancellation) {
+            charged += it
+            onEmissionWork?.invoke(it)
+        }
         if (update.changed.isEmpty()) {
             return LpSourceEdit(
                 state, emptySet(), emptyList(), emptyList(), emptySet(), null, liveBounds(domains), 0L,
@@ -265,7 +270,12 @@ internal class LpRetainedSources(
         var lastId = state.rows.lastId
         var epoch = columnEpoch
         var constant = state.model.objective.constant.value
-        var emittedExtent = 0L
+        val emittedExtent = update.changed.sumOf { index ->
+            val model = update.emissions[index].relaxation.model
+            model.n.toLong() + model.m + (model.doubleView?.colVal?.size ?: model.csc.rowIdx.size)
+        }
+        // Cached emissions still need source mapping when their enclosing publication is restored.
+        onEmissionWork?.invoke((emittedExtent - charged).coerceAtLeast(0L))
         var boundTemplates = 0
         val onBoundWork = relaxer::observeTemplateWork
         for (index in update.changed) {
@@ -273,8 +283,6 @@ internal class LpRetainedSources(
             check(epoch < Long.MAX_VALUE)
             val emission = update.emissions[index]
             val fragment = emission.relaxation
-            emittedExtent += fragment.model.n.toLong() + fragment.model.m +
-                (fragment.model.doubleView?.colVal?.size ?: fragment.model.csc.rowIdx.size)
             val hints = if (relaxer.reuseRetainedDefinitions && keys.isNotEmpty() &&
                 fragment.model.exactState == null && fragment.model.doubleView == null
             ) IntArray(fragment.model.n) else null

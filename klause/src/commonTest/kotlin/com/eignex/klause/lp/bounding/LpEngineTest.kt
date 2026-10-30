@@ -55,6 +55,168 @@ import kotlin.test.assertTrue
 
 class LpEngineTest {
     @Test
+    fun `paused root layout preparation retains charged construction`() {
+        val problem = boundedProblem().bake()
+        val sink = SolveStatsSink("paused-root-layout")
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
+                probe = false, rootCutHarvest = false)), sink,
+            projections = FactorProjectionProviders.Default.prepare(problem)).use { engine ->
+            val before = engine.totalSolveWork()
+
+            val readyInFirstSlice = engine.prepareRootLayout(Cancellation.Never, Cancellation {
+                engine.totalSolveWork() > before
+            })
+            val paid = engine.totalSolveWork()
+            val prepared = sink.snapshot().lp.phases["TEMPLATE_PREPARATION_NODE"]?.calls
+            val ready = engine.prepareRootLayout(Cancellation.Never, Cancellation.Never)
+            val imported = sink.snapshot().lp.phases["TEMPLATE_ASSEMBLY_NODE"]?.outcomes?.get("EXACT_BOUND_OBJECTS")
+            val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
+
+            assertFalse(readyInFirstSlice)
+            assertTrue(paid > before)
+            assertTrue(ready)
+            assertNotNull(prepared)
+            assertEquals(prepared, sink.snapshot().lp.phases["TEMPLATE_PREPARATION_NODE"]?.calls)
+            assertNotNull(imported)
+            assertEquals(imported,
+                sink.snapshot().lp.phases["TEMPLATE_ASSEMBLY_NODE"]?.outcomes?.get("EXACT_BOUND_OBJECTS"))
+            assertEquals(3.0, bound)
+        }
+    }
+
+    @Test
+    fun `containing cancellation retires a paused root layout`() {
+        var cancelled = false
+        val lifetime = Cancellation { cancelled }
+        val sink = SolveStatsSink("cancelled-root-layout")
+        LpEngine(boundedProblem(), LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
+                probe = false, rootCutHarvest = false)), sink).use { engine ->
+            val before = engine.totalSolveWork()
+            assertFalse(engine.prepareRootLayout(lifetime, Cancellation { engine.totalSolveWork() > before }))
+            val paid = engine.totalSolveWork()
+            cancelled = true
+
+            engine.prepareRootLayout(lifetime, Cancellation.Never)
+            val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList(), lifetime)
+
+            assertTrue(bound.isNaN())
+            assertTrue(engine.totalSolveWork() >= paid)
+            assertEquals(1L, sink.snapshot().lp.phases["ROOT_LAYOUT_PREPARATION_ROOT"]?.outcomes?.get("CANCELLED"))
+        }
+    }
+
+    @Test
+    fun `root layout resumption does not renew spent construction work`() {
+        LpEngine(boundedProblem(), LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true, rootMaxWork = 1L,
+                probe = false, rootCutHarvest = false)), SolveStatsSink("spent-root-layout")).use { engine ->
+            engine.prepareRootLayout(Cancellation.Never, Cancellation.Never)
+            val spent = engine.totalSolveWork()
+
+            engine.prepareRootLayout(Cancellation.Never, Cancellation.Never)
+            val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
+
+            assertTrue(spent > 0L)
+            assertEquals(spent, engine.totalSolveWork())
+            assertTrue(bound.isNaN())
+        }
+    }
+
+    @Test
+    fun `root query cancellation preserves completed preparation for node queries`() {
+        val problem = boundedProblem().bake()
+        val sink = SolveStatsSink("retained-root-preparation")
+        var rootPolls = 0
+        val rootToken = Cancellation { rootPolls++ > 0 }
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
+                probe = false, rootCutHarvest = false)), sink,
+            projections = FactorProjectionProviders.Default.prepare(problem)).use { engine ->
+            val cp = CpSearchComponent(PropagationSession(problem))
+            engine.cpAdapter.attach(cp.session, feasibility = false)
+            SearchSession(listOf(cp, engine.propagator)).initialize()
+            val relaxer = assertNotNull(engine.lpRelaxer)
+
+            val root = engine.rootLpRelaxationBound(relaxer, emptyList(), rootToken,
+                preparationCancellation = Cancellation.Never)
+            val prepared = sink.snapshot().lp.phases["TEMPLATE_PREPARATION_NODE"]?.calls ?: 0L
+            val node = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
+            val bound = assertNotNull(engine.solveNode(node.model, null, Cancellation.Never)?.second).objective
+
+            assertTrue(root.isNaN())
+            assertTrue(prepared > 0L)
+            assertEquals(prepared, sink.snapshot().lp.phases["TEMPLATE_PREPARATION_NODE"]?.calls)
+            assertEquals(3.0, bound)
+        }
+    }
+
+    @Test
+    fun `source root bounds exclude live search restrictions`() {
+        val problem = boundedProblem()
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
+                probe = false, rootCutHarvest = false)),
+            SolveStatsSink("unconditional-source-root")).use { engine ->
+            val cp = CpSearchComponent(PropagationSession(problem))
+            engine.cpAdapter.attach(cp.session, feasibility = false)
+            val shared = SearchSession(listOf(cp, engine.propagator))
+            shared.initialize()
+            assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+            shared.push(SearchDecision.IntAtLeast(0, 1L))
+
+            val root = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
+            val child = assertNotNull(engine.nodeRelaxation(assertNotNull(engine.lpRelaxer), cp.session))
+            val childBound = assertNotNull(engine.solveNode(child.model, null, Cancellation.Never)?.second).objective
+
+            assertEquals(3.0, root)
+            assertEquals(4.0, childBound)
+        }
+    }
+
+    @Test
+    fun `source root bounds accept noncompact exact rows`() {
+        val coefficient = BigFraction.ofLong(Long.MAX_VALUE) + BigFraction.ONE
+        val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) }, (0 until 2).map { block ->
+            ExactLinear.of(intArrayOf(Term.ofIntVar(2 * block), Term.ofIntVar(2 * block + 1)),
+                listOf(coefficient, coefficient + BigFraction.ONE), LinearOp.GE, coefficient)
+        })
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(4) { 1L }),
+            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
+                probe = false, rootCutHarvest = false)),
+            SolveStatsSink("noncompact-source-root")).use { engine ->
+
+            val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
+
+            assertTrue(bound in 1.0..2.0)
+        }
+    }
+
+    @Test
+    fun `root query observations distinguish work cancellation and checked bounds`() {
+        val cases = listOf(
+            Triple(0L, false, "NO_INITIAL_WORK"),
+            Triple(100_000L, true, "CANCELLED_INITIAL"),
+            Triple(100_000L, false, "BOUND"),
+        )
+        for ((grant, cancelled, outcome) in cases) {
+            val sink = SolveStatsSink("root-query-admission")
+            LpEngine(boundedProblem(), LinearObjective(intCoefficients = LongArray(3) { 2L }),
+                LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
+                    probe = false, rootCutHarvest = false)), sink,
+                nodeWorkAllowance = { grant }).use { engine ->
+
+                val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList(),
+                    Cancellation { cancelled })
+
+                if (outcome == "BOUND") assertEquals(3.0, bound) else assertTrue(bound.isNaN())
+                assertEquals(1L, sink.snapshot().lp.phases["ROOT_QUERY_ROOT"]?.outcomes?.get("COMPONENT_$outcome"))
+            }
+        }
+    }
+
+    @Test
     fun `nonpersistent node layouts should emit each factor once`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), arrayOf<Factor>(
             Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2),

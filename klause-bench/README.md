@@ -1182,6 +1182,18 @@ trial or completed lab job alone establishes no useful deduction or source proof
 Keep physical RSS separate from modeled storage reservations. Source checking and
 all preparation, failed work and retirement belong to the containing comparison.
 
+`ROOT_ADMISSION_ROOT` distinguishes duty-cycle skips, declined relaxers and queries.
+`ROOT_LAYOUT_PREPARATION_ROOT` records active cold construction and exact-state
+installation across private worker pauses. Its work and time include completed and
+discarded chunks; waiting between slices is excluded. A ready layout grants no bound.
+These are subsets of containing LP work; nested template costs are not additional totals.
+`ROOT_QUERY_ROOT` records the requested component, sparse or standalone route and
+its work, cancellation, layout, numerical, certification or projection stop.
+A component request does not establish that a component owner was constructed;
+use the component lifecycle counters for that. Query work is the delta of charged
+LP operations and overlaps assembly, numerical and certificate counters. Its time
+also includes nested stages; do not add those observations together.
+
 [9172](https://lab.eignex.com/jobs/9172) compares default and trial at
 `bde182ce9b`, seed 3, ten seconds and one Linux/amd64 processor, with matching
 source and installed-build/runtime hashes. On `cap6000`, 18,243 nonzeros across
