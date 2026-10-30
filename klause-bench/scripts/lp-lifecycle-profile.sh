@@ -40,6 +40,9 @@ uname -a > "$OUT/platform.txt"
 if command -v lscpu >/dev/null; then lscpu > "$OUT/cpu.txt"; fi
 "${JAVA_HOME:+$JAVA_HOME/bin/}java" -version > "$OUT/java-version.txt" 2>&1
 if [[ "$runtime" != native ]]; then
+  java_binary="$(readlink -f "$(command -v "${JAVA_HOME:+$JAVA_HOME/bin/}java")")"
+  java_runtime="$(dirname "$(dirname "$java_binary")")"
+  find "$java_runtime" -type f -print0 | sort -z | xargs -0 sha256sum > "$OUT/jvm-runtime-sha256.txt"
   find "$LAB_WORKTREE/klause/build/lp-profile/jvm" -type f -print0 | sort -z | xargs -0 sha256sum > "$OUT/jvm-sha256.txt"
   /usr/bin/time -v -o "$OUT/jvm-resources.txt" \
   "${JAVA_HOME:+$JAVA_HOME/bin/}java" -Xmx1536m -XX:ActiveProcessorCount=1 -XX:+UseSerialGC \
@@ -53,5 +56,10 @@ fi
 if [[ "$runtime" != jvm ]]; then
   native="$LAB_WORKTREE/klause/build/bin/linuxX64/lpProfileReleaseExecutable/klause-lp-profile.kexe"
   sha256sum "$native" > "$OUT/native-sha256.txt"
+  timeout 10 ldd "$native" > "$OUT/native-ldd.txt"
+  if grep -q 'not found' "$OUT/native-ldd.txt"; then exit 2; fi
+  awk '{ for (i = 1; i <= NF; i++) if ($i ~ /^\//) print $i }' "$OUT/native-ldd.txt" |
+    sort -u | xargs -r sha256sum > "$OUT/native-runtime-sha256.txt"
+  [[ -s "$OUT/native-runtime-sha256.txt" ]] || exit 2
   /usr/bin/time -v -o "$OUT/native-resources.txt" "$native" "${args[@]}" > "$OUT/native.ndjson"
 fi
