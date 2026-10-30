@@ -43,6 +43,7 @@ internal fun libraryCaller(options: Map<String, String>) {
     println("c libraryScope=original-source parse, exact lowering, bake, production solver, source check, render")
     println("c cliRoutingEquivalence=false")
     println("c sourceExact=${compiled.sourceExact}")
+    println("c kotlinVersion=${KotlinVersion.CURRENT}")
     println("c nativeResult=${result::class.simpleName}")
     for ((phase, value) in result.stats.lp.phases) {
         println("c lpPhase_${phase}_Calls=${value.calls}")
