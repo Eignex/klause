@@ -228,6 +228,18 @@ throughput improvement follows.
 
 This repository owns catalog selection, runtime configuration and build/launch recipes.
 
+`lab/native-lp.json` selects original MPS inputs through the same planner and runs
+the Linux x86_64 Native CLI with one processor. Its solve records use the ordinary
+independent source-check protocol. Native executable and ELF dependency hashes
+identify that runtime; the executing JVM harness has a separate byte identity.
+`heap-mib` and JVM GC flags do not describe the Native process. Comparison controls
+record the Native compiled GC policy, the containing memory grant and the harness's
+512-MiB heap separately. `nativeAdapterElapsedNs` includes input verification,
+source decoding, identity capture, CLI execution and witness decoding. Keep that
+containing observation separate from CLI elapsed time and lab preparation/checking
+receipts. Only `none` and `resources` measurement modes are supported. Independent
+point checks do not certify Native optimality or infeasibility claims.
+
 `bench.profile.BooleanProofCoverageProfile` accepts `suite=ID problem=NAME sha256=HEX
 work=N seed=N splits=N` for one DIMACS source with at most 4,096 Boolean variables,
 one MiB of input and four partition variables. Its provenance capture requires both
@@ -749,7 +761,8 @@ These controls establish no throughput improvement or independent proof validati
 HiGHS revision `73cac48c5340d775a477087198611862559be250`, under its MIT license.
 Selection retains original MPS bytes; the lab planner records each source SHA-256.
 Afiro and Adlittle share the source identities in the basis-corpus manifest.
-The other two inputs provide separate original-source controls.
+Avgas supplies a separate linear source. Atwood0 contains a quadratic objective
+and retains its unsupported-input outcome; it does not qualify LP admission.
 
 `scripts/lp-lifecycle-profile.sh mps-NAME 1 both checkpoint` compares complete
 tableau promotion on actual overflow with fixed-width replay under the same
