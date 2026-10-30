@@ -21,6 +21,11 @@ construction; explicit `arms`, `ls` or `bt` settings take precedence. Native
 arithmetic routes reject finite-only explicit policy instead of ignoring it. Recipe
 defaults carry no witness or proof authority.
 
+Named recipe pools retain the selected worker count and repeat their recipes across
+the slots. `bt-arm=X` selects the backtrack recipe; `arms=1` with the `cp` engine
+selects one worker. An explicit pool with one recipe can therefore have several
+private replicas with separate seed offsets.
+
 Explicit `objective-guidance=canonical|functional|geometric` selects local-search
 objective guidance within an explicitly selected recipe pool (`arm`, a named
 `strategy`, or LS axis edits). It cannot construct an automatic pool.

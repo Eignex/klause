@@ -4,6 +4,10 @@ JVM problem catalog and single-case runner for
 [eignex-lab](https://github.com/Eignex/eignex-lab). Use the lab for experiments,
 revision comparisons, reference solvers, witness checks, schedules and profiling.
 
+A standalone `cp` control sets both `param.bt-arm=LABEL` and `param.arms=1`.
+Named recipes repeat across the configured worker slots otherwise. Check the
+emitted `arm.*` entries to verify the actual worker count before comparing controls.
+
 ## Private rebuild qualification capture
 
 Enable `param.root-simplification=true` and

@@ -75,11 +75,11 @@ fun pipelineConfigError(message: String): Nothing = throw PipelineConfigExceptio
  *  - `cp`: `bt-arm=label,label` pins named catalog arms; the per-solver overrides `seed`,
  *    `max-decisions`, `luby`, `phase-saving`, `max-learned`, `lbd-glue`, `pb-learning`, `var-selector`
  *    (see [VarSelectorKind]), `val-selector` (see [ValSelectorKind]), … edit **every** arm of whatever
- *    pool results. The two compose, so `bt-arm=X` with an override is the single-solver heuristic A/B —
- *    one arm, one knob moved — where an override alone spreads that knob across the curated pool and
- *    dilutes it with arms that cannot express it; plus the portfolio knobs below
+ *    pool results. A single-worker heuristic comparison sets both `bt-arm=X` and `arms=1`;
+ *    the named recipe repeats across the selected worker count otherwise. An override without
+ *    `bt-arm` edits the applicable curated recipes; plus the portfolio knobs below
  *  - `ls`: `strategy` (base `auto` (curated pool, default) | `cbls|feasibilityjump|walksat|probsat|sa`
- *    | `bare`), or `arm=<catalog-label>` to run one curated arm in isolation,
+ *    | `bare`), or `arm=<catalog-label>` to select a named recipe pool,
  *    plus per-axis edits applied across the pool — `sources` (bare force-exactly list or
  *    `+`/`-` add/remove), `scoring` (`weighted|raw|break`), `acceptance`
  *    (`greedy|walksat|probsat|skew|sa`), `restart` (`fixed|luby|perturb`); any token may carry an
