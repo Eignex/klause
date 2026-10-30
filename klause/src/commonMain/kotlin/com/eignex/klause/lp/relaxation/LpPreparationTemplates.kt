@@ -36,43 +36,51 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 internal fun LpRelaxation.authoritativeWithTemplates(
     cancellation: Cancellation,
+    onWork: (Long) -> Unit = {},
     onReuse: (Int) -> Unit = {},
 ): ExactLpModel? {
     if (cancellation()) return null
     val templates = preparationTemplates ?: return model.authoritativeModel()
     var reused = 0
+    var work = 0L
+    val token = object : Cancellation by cancellation {
+        override fun charge(units: Long) {
+            work += units
+            cancellation.charge(units)
+        }
+    }
     fun prepared(index: Int): LpIntegerBoundTemplate? = if (index < model.n && colVarId[index] >= 0 &&
         !colIsBool[index] && colRealId[index] < 0
     ) templates.bound(colVarId[index]) else null
-    if (model.exactState == null && model.doubleView == null) {
-        val imported = try {
+    val imported = try {
+        if (model.exactState == null && model.doubleView == null) {
             model.authoritativeModel { index ->
-                cancellation.charge(1L)
-                if (cancellation()) throw LpTemplateImportCancelled()
-                prepared(index)?.compatibleColumn(model, index, cancellation).also {
-                    if (cancellation()) throw LpTemplateImportCancelled()
+                token.charge(1L)
+                if (token()) throw LpTemplateImportCancelled()
+                prepared(index)?.compatibleColumn(model, index, token).also {
+                    if (token()) throw LpTemplateImportCancelled()
                     if (it != null) reused++
                 }
             }
-        } catch (_: LpTemplateImportCancelled) {
-            return null
+        } else {
+            val original = model.authoritativeModel() ?: return null
+            val columns = List(original.numVars) { index ->
+                token.charge(1L)
+                if (token()) return null
+                val current = original.column(index)
+                val prepared = prepared(index)?.compatibleColumn(current, token)
+                if (token()) return null
+                if (prepared != null) reused++
+                prepared ?: current
+            }
+            if (reused == 0) original else original.withBoundColumns(columns)
         }
-        if (cancellation()) return null
-        onReuse(reused)
-        return imported
+    } catch (_: LpTemplateImportCancelled) {
+        null
+    } finally {
+        onWork(work)
     }
-    val original = model.authoritativeModel() ?: return null
-    val columns = List(original.numVars) { index ->
-        cancellation.charge(1L)
-        if (cancellation()) return null
-        val current = original.column(index)
-        val prepared = prepared(index)?.compatibleColumn(current, cancellation)
-        if (cancellation()) return null
-        if (prepared != null) reused++
-        prepared ?: current
-    }
-    val imported = if (reused == 0) original else original.withBoundColumns(columns)
-    if (cancellation()) return null
+    if (cancellation() || imported == null) return null
     onReuse(reused)
     return imported
 }

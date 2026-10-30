@@ -241,7 +241,7 @@ internal class LpRetainedSources(
             val source = if (fragment.preparationTemplates != null &&
                 fragment.model.exactState == null && fragment.model.doubleView == null
             ) {
-                fragment.authoritativeWithTemplates(cancellation)
+                fragment.authoritativeWithTemplates(cancellation, onWork = relaxer::observeTemplateWork)
             } else {
                 fragment.model.authoritativeModel()
             } ?: return null

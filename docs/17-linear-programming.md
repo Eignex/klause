@@ -62,6 +62,9 @@ replaces the cached column without linking prior versions. Preparation reserves
 pending construction work and retained storage inside its existing ceilings;
 actual construction charges the consuming import. An already exact import retains
 its matching column directly, without constructing a duplicate definition.
+Completed and interrupted template preparation and import work also debit the owning
+LP allowance. Import reports its actual charges before publishing authority and
+rechecks cancellation after that debit.
 Retained-source assembly and fixed-layout installation adopt the same immutable exact bound objects after a
 complete match against the current normalized column, including its origin, tag,
 integrality and both bound sides.

@@ -292,6 +292,43 @@ class LpPreparationTemplatesTest {
     }
 
     @Test
+    fun `template imports should report completed and interrupted work once`() {
+        for (limit in listOf(2L, Long.MAX_VALUE)) {
+            val captured = FactorProjectionProviders.Default.prepare(source)
+            val relaxation = CpToLpRelaxation(source, objective, projections = captured).build(RootDomains(source))
+            var charged = 0L
+            val meter = WorkMeter { charged += it }
+            val token = object : Cancellation {
+                override fun isCancelled(): Boolean = charged >= limit
+                override fun workMeter(): WorkMeter = meter
+            }
+            val reported = ArrayList<Long>()
+
+            val imported = relaxation.authoritativeWithTemplates(token, onWork = { reported.add(it) })
+
+            assertTrue(charged > 0L)
+            assertEquals(listOf(charged), reported)
+            assertEquals(limit == Long.MAX_VALUE, imported != null)
+        }
+    }
+
+    @Test
+    fun `import allowance exhaustion should withhold completed authority`() {
+        val relaxation = CpToLpRelaxation(source, objective, projections = selection).build(RootDomains(source))
+        var stopped = false
+        var published = false
+        val token = Cancellation { stopped }
+
+        val imported = relaxation.authoritativeWithTemplates(token, onWork = { stopped = it > 0L }) {
+            published = true
+        }
+
+        assertTrue(stopped)
+        assertNull(imported)
+        assertFalse(published)
+    }
+
+    @Test
     fun `alternating probe upper sides should preserve current exact authority`() {
         val consumer = CpToLpRelaxation(source, objective, projections = selection, reuseTemplateMetadata = true)
         val relaxation = consumer.build(RootDomains(source))

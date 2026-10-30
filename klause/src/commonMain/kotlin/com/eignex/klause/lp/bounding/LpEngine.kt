@@ -415,6 +415,7 @@ internal class LpEngine(
                 elementIndexes = elementIndexes,
                 templateStats = sink.lp,
                 preparationCancellation = params.cancellation,
+                onTemplateWork = ::noteNodeOverhead,
             )
         } else {
             null
