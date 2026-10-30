@@ -123,21 +123,31 @@ internal class LpDirectionalHistory(
         pending = null
     }
 
-    fun score(variable: VarRef, value: Double): Double {
+    fun score(variable: VarRef, value: Double): Double =
+        score(variable, value, initializeUnobserved = false).takeIf { it > 0.0 } ?: Double.NaN
+
+    fun referenceScore(variable: VarRef, value: Double): Double =
+        score(variable, value, initializeUnobserved = true)
+
+    private fun score(variable: VarRef, value: Double, initializeUnobserved: Boolean): Double {
         if (!value.isFinite()) return Double.NaN
         val fraction = value - floor(value)
         if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) return Double.NaN
-        val local = gains[variable] ?: return Double.NaN
+        val local = gains[variable]
         val prior = if (reliable(local) == null) {
-            if (!useClassPriors || local.down.count + local.up.count == 0) return Double.NaN
+            if (!useClassPriors) return Double.NaN
+            if (!initializeUnobserved &&
+                (local == null || local.down.count + local.up.count == 0)
+            ) return Double.NaN
             charge(1L)
             reliable(if (variable is VarRef.Bool) booleanPrior else integerPrior, prior = true)
                 ?: return Double.NaN
         } else null
-        val down = (if (prior == null) local.down.mean else estimate(local.down, prior.down)) * fraction
-        val up = (if (prior == null) local.up.mean else estimate(local.up, prior.up)) * (1.0 - fraction)
+        val samples = local ?: prior ?: return Double.NaN
+        val down = (if (prior == null) samples.down.mean else estimate(samples.down, prior.down)) * fraction
+        val up = (if (prior == null) samples.up.mean else estimate(samples.up, prior.up)) * (1.0 - fraction)
         val score = minOf(down, up) + maxOf(down, up) / 6.0
-        return score.takeIf { it.isFinite() && it > 0.0 } ?: Double.NaN
+        return score.takeIf { it.isFinite() && it >= 0.0 } ?: Double.NaN
     }
 
     fun usesPrior(variable: VarRef): Boolean = !recent(gains[variable])

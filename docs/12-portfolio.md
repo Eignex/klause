@@ -795,9 +795,10 @@ annotated, or execution is parallel or single-engine. See
 [ordinary tableau admission](17-linear-programming.md).
 
 The `lp-default` and `lp-aggressive` optimization recipes consume scoped passive gains.
-Reliable variable estimates take precedence; partially observed variables can use a
-reliable class prior. Unobserved variables keep current scoring. History spends the
-existing LP allowance; other recipes require an explicit directional setting. See
+Reliable variable estimates take precedence; partially observed proposals can replace
+the current LP candidate if their predicted gain exceeds its history or reliable
+class estimate. Unobserved variables keep current scoring. History spends
+the existing LP allowance; other recipes require an explicit directional setting. See
 [finite branching](08-search.md#finite-lp-directional-guidance).
 
 - **Binary packing.** For nonnegative integer capacity rows with an objective that

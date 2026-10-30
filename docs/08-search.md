@@ -260,9 +260,12 @@ its Boolean or integer coordinate class. Each direction weights its own mean by
 `min(count, 2) / 2` and the prior by the remaining weight. A fully observed direction
 uses only its own mean. Unobserved variables retain reduced-cost/fractionality scoring
 and the configured selector's precedence. Reliable variable history takes precedence
-over its class prior.
-Directional scores compete with each other before fallback, so objective units are
-not mixed with reduced costs.
+over its class prior. A partially observed proposal can replace the current LP
+candidate only when its predicted gain exceeds that candidate's history or reliable
+class estimate. Missing reference estimates and ties retain the current candidate. A prior
+used for this comparison does not make an unobserved variable eligible to propose.
+Directional and reference scores use the same objective units; reduced costs remain
+part of the fallback scorer.
 An invocation-local readiness check skips directional candidate lookups when no
 history can yield a score; its bookkeeping uses the same LP work allowance.
 Consumed choices distinguish variable history from class priors and record agreement
