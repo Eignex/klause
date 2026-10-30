@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Table
+import com.eignex.klause.formats.xcsp3.Xcsp3
 import com.eignex.klause.ir.DefinitionHint
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -21,6 +22,7 @@ import com.eignex.klause.propagation.propagate
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.ExecutionStrategy
 import com.eignex.klause.solver.pipeline.FiniteEngine
@@ -39,6 +41,39 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class AffinePivotOrderTest {
+    @Test
+    fun `rewrite cost should reconstruct an xcsp flow input used by a comparison objective`() {
+        val parsed = Xcsp3.parse("""
+            <instance format="XCSP3" type="COP">
+              <variables>
+                <var id="x">0..4</var><var id="a">0..4</var><var id="b">0..4</var>
+              </variables>
+              <constraints>
+                <sum><list>a b x</list><coeffs>1 -1 -1</coeffs><condition>(eq,-2)</condition></sum>
+              </constraints>
+              <objectives>
+                <minimize type="sum"><list>a b gt(x,0)</list><coeffs>1 1 7</coeffs></minimize>
+              </objectives>
+            </instance>
+        """.trimIndent())
+        val objective = assertNotNull(parsed.objective).toLinearObjective()
+
+        val delta = AffineSingletons.eliminateSourceAffineSingletons(parsed.problem, objective = objective,
+            pivotOrder = AffinePivotOrder.REWRITE_COST)
+        val lift = assertNotNull(delta.rebuild.asSampleLift(),
+            "${parsed.problem.factors.map { it::class.simpleName }} $objective")
+        val rebuilt = lift(Sample(
+            BooleanArray(parsed.problem.numBoolVars) { true },
+            LongArray(parsed.problem.numIntVars) { if (it == parsed.intVarNames.getValue("x")) 0L else 1L },
+        ))
+
+        assertEquals(2L, rebuilt.ints[parsed.intVarNames.getValue("x")])
+        var pins = Assumptions.None
+        for (id in rebuilt.ints.indices) pins = pins.withInt(id, rebuilt.ints[id])
+        for (id in rebuilt.bools.indices) pins = pins.withBool(id, rebuilt.bools[id])
+        assertFalse(parsed.problem.propagate(pins) is PropagationResult.Unsat)
+    }
+
     @Test
     fun `channel definitions and gradients should survive a multi input affine reconstruction`() {
         val source = Problem(1, 3, Array(3) { IntDomain(0, 4) }, listOf(
