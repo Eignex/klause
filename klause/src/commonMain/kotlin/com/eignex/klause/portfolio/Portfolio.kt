@@ -1292,7 +1292,10 @@ class Portfolio(
             recorded[arm] = true
             progressLog.record(settled, claim.checkingNanos)
             onProgress?.invoke(PortfolioEvent.Progressed(settled))
-            val reward = if (failed || claim.fault != null) 0.0 else rewardFor(settled)
+            val reward = if (failed || claim.fault != null) {
+                (scopedReward as? SourceRateReward)?.reward(settled)
+                0.0
+            } else rewardFor(settled)
             if ((!failed && claim.fault == null && earned > 0.0) || claim.improved) productive[arm] = true
             val unproductiveTrial = claim.hadIncumbent && arm in incumbentProbeArms && !productive[arm] &&
                 !failed && claim.fault == null

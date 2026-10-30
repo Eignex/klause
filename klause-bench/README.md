@@ -1042,6 +1042,7 @@ and source checks, including initialization, reseeding and retirement, when comp
 it with ordinary rewards. Counter changes alone do not establish a benefit.
 `source-rate` prices finite positive accepted gain per observed factory and segment
 time, retaining unproductive and feasibility setup costs until the next gain.
+Failed and refuted segments earn zero while retaining their costs in peer pricing.
 Initialization and checking are already inside segment time. Compare it separately
 at fixed coverage, admission and reseeding, and retain the full containing-run ledger
 for source preparation, retirement and independent checking. Time-sensitive rewards
