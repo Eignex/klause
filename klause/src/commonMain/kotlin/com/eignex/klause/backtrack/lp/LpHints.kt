@@ -29,11 +29,12 @@ internal class LpHints(
     private val charge: (Long) -> Unit = {},
 ) : LpHintSink {
     private val collect = numIntVars.toLong() + numBoolVars <= 8192L
-    private val history = LpDirectionalHistory(observe)
+    private val history = LpDirectionalHistory(observe, charge = charge, useClassPriors = directionalGains)
     private var freshRecord = false
     private var objectiveRecorded = false
     private var directionalChoice: VarRef? = null
     private var baselineChoice: VarRef? = null
+    private var priorChoice = false
     private var scopeModel: ExactLpModel? = null
     private var scopeRows: LpScopedRows? = null
     private var scopeVariables = IntArray(0)
@@ -49,6 +50,7 @@ internal class LpHints(
         objectiveRecorded = false
         directionalChoice = null
         baselineChoice = null
+        priorChoice = false
         if (collect) history.beginNode(depth)
     }
 
@@ -91,6 +93,7 @@ internal class LpHints(
         if (directionalGains && scopeModel != null) {
             observe(if (directionalChoice == variable) "CONSUMED" else "FALLBACK")
             if (directionalChoice == variable) {
+                observe(if (priorChoice) "PRIOR_CONSUMED" else "VARIABLE_CONSUMED")
                 val comparison = when (baselineChoice) {
                     null -> "BASELINE_MISSING"
                     variable -> "BASELINE_AGREED"
@@ -101,6 +104,7 @@ internal class LpHints(
         }
         directionalChoice = null
         baselineChoice = null
+        priorChoice = false
         if (collect && scopeModel != null) {
             charge(129L)
             history.branch(variable, value(variable))
@@ -123,6 +127,7 @@ internal class LpHints(
     fun selected(variable: VarRef?, baseline: VarRef?) {
         directionalChoice = variable
         baselineChoice = baseline
+        priorChoice = variable != null && history.usesPrior(variable)
     }
 
     private fun value(variable: VarRef): Double = if (!freshRecord) Double.NaN else when (variable) {
@@ -165,6 +170,7 @@ internal class LpHints(
         objectiveRecorded = false
         directionalChoice = null
         baselineChoice = null
+        priorChoice = false
     }
 
     override fun clear() {
