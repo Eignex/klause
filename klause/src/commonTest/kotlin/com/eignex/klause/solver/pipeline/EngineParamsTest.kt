@@ -22,10 +22,12 @@ class EngineParamsTest {
     @Test
     fun `source rate rewards should be an independent opt in`() {
         val ordinary = scenario(cores = 1)
-        val source = scenario(cores = 1, params = listOf("portfolio-reward=source-rate"))
+        for ((option, families) in listOf("source-rate" to false, "source-rate-family" to true)) {
+            val source = scenario(cores = 1, params = listOf("portfolio-reward=$option"))
 
-        assertIs<SourceRateReward>(source.rewardPolicy)
-        assertEquals(ordinary, source.copy(rewardPolicy = null))
+            assertEquals(families, assertIs<SourceRateReward>(source.rewardPolicy).priceFamilies)
+            assertEquals(ordinary, source.copy(rewardPolicy = null))
+        }
     }
 
     @Test
