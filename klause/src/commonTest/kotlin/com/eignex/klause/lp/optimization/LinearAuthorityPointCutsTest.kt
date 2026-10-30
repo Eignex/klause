@@ -48,6 +48,19 @@ class LinearAuthorityPointCutsTest {
     }
 
     @Test
+    fun `closing the numerical owner should preserve final selection observations`() {
+        val authority = LinearAuthority(SourceLpBudget(), retainLp = true)
+        authority.advanceWithPointCuts(source, Cancellation.Never)
+        val before = authority.cutObservations().filterKeys { it.startsWith("numericalCutSelection") }
+        assertTrue(before.isNotEmpty())
+
+        authority.close()
+
+        assertEquals(before,
+            authority.cutObservations().filterKeys { it.startsWith("numericalCutSelection") })
+    }
+
+    @Test
     fun `a checked violated cut should strengthen the retained bound`() {
         val budget = SourceLpBudget()
         val capture = LinearAuthorityCapture(2, 10_000L, 1_000_000L, Cancellation.Never)
