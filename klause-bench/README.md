@@ -94,6 +94,13 @@ allowance. Reconstruction retains its source-entry charge and raises it when the
 actual replay descriptors and composed sample copies require more work.
 `MappingPreparationWork` includes descriptor ownership copies in preparation;
 their modeled storage also joins `ModeledPrivateBytes`.
+`WarmClausesTranslated` counts copied consequences transported through eliminated
+columns. Translation follows the captured BVE parents with one bounded resolvent
+per input and pivot, or a pure-value substitution. `WarmProjectionScratchBytes`
+records its conservative 16 KiB scratch reservation inside the existing byte grant;
+it joins `ModeledPrivateBytes` and is not additional live retained storage or RSS.
+Projection work remains inside `WarmClauseWork` and preparation. Tautological,
+wide or unsupported selected translations contribute no copied consequence.
 
 Run from the repository root with JDK 25 or newer:
 
