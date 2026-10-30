@@ -1099,12 +1099,27 @@ corresponding independent checker receipts.
 
 `finiteCompanionPreparationAttempts`, `finiteCompanionPreparationNs`,
 `finiteCompanionPreparationReady` and `finiteCompanionPreparationUnavailable`
-record the invocation's eager affine capture before worker factories. Retain
+record the invocation's ordinary eager affine capture before worker factories. Retain
 unavailable captures and captures followed by no worker query. This duration is
 inside containing solve time, separate from factory, query and retirement counters;
 it does not fund extra active time. Sampled JFR allocations cannot replace it when
 choosing a construction or useful-lifetime policy. Whole-job costs still retain
 exceptions that prevent a final invocation result.
+
+`param.companion-admission=funded` requires `param.companion-after-incumbent=true`
+and an elapsed deadline. It keeps the capability gate and explicit selections,
+declines a pair without room for both requested active lifetimes, and defers shared
+capture and private service construction until a funded first query. Capture pays
+the current query grant and cannot consume the reserved pair lifetime. Opening a
+later sibling requires room for that worker's requested lifetime. This control does
+not extend any active, work or allocation allowance; ordinary admission is default.
+`finiteCompanionAdmissionDeclined` and `finiteCompanionStartDeclines` distinguish
+initial funding from late opening refusals. Deferred preparation counters are
+inside the opening worker's segment, so do not add them to that segment again.
+Retain zero-query and unavailable captures. Compare ordinary-off, incumbent-gated
+eager construction, funded construction and a useful direct control with the same
+source, budget, reward, coverage and reseed settings before selecting production
+admission. A funded window alone does not establish useful handoff or net benefit.
 
 `param.portfolio-reward=ordinary|source|source-rate|source-rate-family` varies rewards
 independently of admission and coverage. `source` retains ordinary feasibility rewards, then rewards only

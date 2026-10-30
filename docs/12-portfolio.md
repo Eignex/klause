@@ -94,13 +94,29 @@ An explicit arm count, including the default-sized count, prevents automatic num
 companions. A missing complete affine capture declines both companions without
 removing finite workers.
 
-Shared affine preparation precedes worker factories. Final invocation stage
+Ordinary shared affine preparation precedes worker factories. Final invocation stage
 counters report `finiteCompanionPreparationAttempts`, `finiteCompanionPreparationNs`,
 `finiteCompanionPreparationReady` and `finiteCompanionPreparationUnavailable`,
 including captures whose workers receive no query. The time spans duplicate
 difference-factor filtering and immutable capture; it excludes factories, queries,
 candidate checks and retirement. It belongs to containing solve time and grants no
 new allowance or source authority.
+
+`companion-admission=funded` requires incumbent-gated starts and a containing
+deadline. The same capability gate admits candidates only when both requested
+active lifetimes fit. Shared affine capture and private service construction wait
+for the first companion query. Capture obeys that query's time grant, the existing
+construction segment ceiling and the time left after both requested lifetimes.
+Each worker rechecks its own remaining lifetime before opening; a late start or
+unavailable capture retires without a source verdict. Finite recipes, indices and
+seed positions remain intact, including explicit selections.
+
+Deferred capture is attempted once for the pair and charged inside the opening
+worker's query and active lifetime. Its preparation counters are subsets of that
+query's time. `finiteCompanionAdmissionDeclined` records an unfunded initial pair;
+`finiteCompanionStartDeclines` records declined opening attempts. A pair receiving
+no query reports zero capture attempts. Final invocation accounting reads these
+shared counters once; worker summaries do not duplicate the capture.
 
 `source-incumbent-completion=true` lets the numerical and joint-repair companions
 use an approximate incumbent's Boolean and finite integer coordinates as advisory
