@@ -101,6 +101,8 @@ records its conservative 16 KiB scratch reservation inside the existing byte gra
 it joins `ModeledPrivateBytes` and is not additional live retained storage or RSS.
 Projection work remains inside `WarmClauseWork` and preparation. Tautological,
 wide or unsupported selected translations contribute no copied consequence.
+`WarmClauseNormalizationWork` records the final input-normalization reservation;
+it is a subset of transfer and preparation work, rather than another total to add.
 
 Run from the repository root with JDK 25 or newer:
 

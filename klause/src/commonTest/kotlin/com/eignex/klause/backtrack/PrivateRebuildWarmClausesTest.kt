@@ -214,7 +214,7 @@ class PrivateRebuildWarmClausesTest {
 
     @Test
     fun `insufficient transfer grants should preserve the generation without copied learning`() {
-        for ((bytes, work) in listOf(0L to 65_536L, 1_048_576L to 0L)) {
+        for ((bytes, work) in listOf(0L to 65_536L, 1_048_576L to 0L, 1_048_576L to 17L)) {
             val source = Problem(2, 0, emptyArray(), arrayOf(Clause(intArrayOf(0, 2)))).bake()
             val session = PropagationSession(source)
             session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
