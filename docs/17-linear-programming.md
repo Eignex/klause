@@ -195,7 +195,10 @@ closed unconditional linear sources. Emphasis levels leave it disabled. Admissio
 source assembly, then inspects emitted nonzeros, connected-component dimensions,
 exact scalar width and row-intersection fill risk. Custom emitters decline before
 trial assembly because they have no source-size reservation. Sparse storage is reserved
-independently of the ordinary dense cost proxy. The root trial uses the ordinary
+before assembly, along with its construction work. Assembly cancellation and numerical
+admission refusal retain that work charge; cooperative preparation polls cancellation
+before publishing another chunk. The sparse storage allowance is independent of the
+ordinary dense cost proxy. The root trial uses the ordinary
 bound, fixing and conflict consumers with their existing exact checks; cuts and
 expanded hulls stay outside its allowance. Root rounding preserves the ordinary
 admission's probe intent; sources declined by that guard gain no automatic probe.

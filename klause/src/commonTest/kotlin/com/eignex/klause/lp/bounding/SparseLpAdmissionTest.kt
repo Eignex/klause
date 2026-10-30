@@ -33,6 +33,7 @@ import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.RelaxationCapability
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
+import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -40,6 +41,36 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class SparseLpAdmissionTest {
+    @Test
+    fun `cancelled sparse assembly retains its reserved construction charge`() {
+        val row = Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            List(2 * CONSTRUCTION_BATCH_SIZE) { row },
+            settings = ProblemSettings(lpCeilingTableauCells = 1L))
+        val complete = requireNotNull(LpAutoConfig.admission(problem,
+            LpConfig.parse("default,+sparse-trial"), LpPlan()).sparseTrial)
+        assertTrue(complete.admitted)
+        for (chunks in 1..2) {
+            var cancelled = false
+            var interrupted: SparseLpAdmission? = null
+            val preparation = sequence<Unit> {
+                interrupted = prepareSparseLpAdmission(problem, null, Cancellation { cancelled })
+            }.iterator()
+            repeat(problem.factors.size / CONSTRUCTION_BATCH_SIZE + chunks) {
+                assertTrue(preparation.hasNext())
+                preparation.next()
+            }
+            cancelled = true
+
+            while (preparation.hasNext()) preparation.next()
+
+            val result = requireNotNull(interrupted)
+            assertFalse(result.admitted)
+            assertEquals(1L, result.metrics["DeclineCancelled"])
+            assertEquals(complete.work, result.work)
+        }
+    }
+
     @Test
     fun `a sparse root bound does not admit the same model to dense exact continuation`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 2)),
