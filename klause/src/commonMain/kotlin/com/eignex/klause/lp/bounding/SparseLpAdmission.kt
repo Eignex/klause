@@ -29,6 +29,7 @@ internal const val SPARSE_LP_MAX_WORK = 150_000_000L
 internal const val SPARSE_LP_MAX_ALLOCATION = 2L * 1024L * 1024L * 1024L
 internal const val SPARSE_LP_MAX_FACTOR_ENTRIES = 2_000_000L
 internal const val SPARSE_LP_MAX_FACTOR_WORK = 8_000_000L
+internal const val SPARSE_LP_CHECKING_ALLOCATION = 16L * 1024L * 1024L
 private const val MAX_DIMENSION = 65_536L
 private const val MAX_ENTRIES = 1_000_000L
 private const val MAX_PREPARATION_WORK = 8_000_000L
@@ -96,7 +97,7 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
 // Component counts inform diagnosis; this owner remains monolithic.
 private fun sparseLpStorage(rows: Long, columns: Long, entries: Long): Long =
     minOf(rows * rows * 3L, SPARSE_LP_MAX_FACTOR_ENTRIES) * 256L +
-        entries * 512L + (rows + columns) * 4096L
+        entries * 512L + (rows + columns) * 4096L + SPARSE_LP_CHECKING_ALLOCATION
 
 @Suppress("LongMethod", "CyclomaticComplexMethod")
 internal fun estimateSparseLpAdmission(
@@ -189,6 +190,7 @@ internal fun estimateSparseLpAdmission(
         put("FactorEntryLimit", SPARSE_LP_MAX_FACTOR_ENTRIES)
         put("FactorWorkLimit", SPARSE_LP_MAX_FACTOR_WORK)
         put("ReservedBytes", storage)
+        put("CheckingReservedBytes", SPARSE_LP_CHECKING_ALLOCATION)
         put("PreparationWork", preparationWork)
         put("WorkLimit", SPARSE_LP_MAX_WORK)
         put("StorageLimit", SPARSE_LP_MAX_ALLOCATION)
