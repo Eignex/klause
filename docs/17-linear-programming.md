@@ -383,10 +383,12 @@ a new template identity. Full owner and coordinate indices must belong to that
 template, and copying and indexing costs debit the containing source allowance.
 The proposal producer owns and funds derivation construction separately.
 `source-aggregate-cuts=true` enables a template policy for numerical frontier
-traversal when source separation is enabled. It projects a continuous coordinate by combining its
-source row with the first singleton source bound of opposite coefficient sign.
-It applies checked rounding to the residual, using the first source bound sides
-for the remaining continuous coordinates. The cached family retains at most 64
+traversal when source separation is enabled. A sparse index pairs source rows with
+opposite signs on a shared continuous coordinate. Each pair uses its first indexed
+pivot and positive exact weights to cancel that coordinate; singleton source bounds
+participate in the same recipe. At least one row has integer activity. Checked
+rounding uses the first source bound sides for remaining continuous coordinates.
+Rows wider than the support cap are skipped with incomplete coverage. The cached family retains at most 64
 proposals under 500,000 preparation work and 8 MiB modeled allocation, with
 per-attempt limits shared with explicit aggregation. Stopped or limited
 preparation reports its decline and leaves only completed proposals available.

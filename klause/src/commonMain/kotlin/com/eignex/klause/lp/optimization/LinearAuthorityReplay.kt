@@ -79,7 +79,7 @@ internal object LinearAuthorityReplay {
     ): LinearAuthorityReplayResult = solve(query, mask, additional, cuts, false,
         maximumWork, maximumAllocation, stop)
 
-    fun boundProjections(
+    fun generatedAggregates(
         query: LinearAuthorityCapturedQuery, maximumWork: Long, maximumAllocation: Long, stop: Cancellation,
     ): LinearAuthorityReplayResult = solve(query, null, emptyList(), true, true,
         maximumWork, maximumAllocation, stop)

@@ -47,7 +47,7 @@ internal data class LinearAuthorityAggregateProbeResult(
 )
 
 internal object LinearAuthorityAggregateCuts {
-    fun prepareBoundProjections(
+    fun prepareSourcePairs(
         source: SourceProofContext, cancellation: Cancellation,
         observe: (String, Long) -> Unit = { _, _ -> }, maximumCandidates: Int = 64,
         limits: LinearAuthorityAggregateLimits = LinearAuthorityAggregateLimits(
@@ -55,21 +55,39 @@ internal object LinearAuthorityAggregateCuts {
     ): List<LinearAuthorityCut> {
         require(maximumCandidates in 0..64)
         val meter = AggregateMeter(limits, cancellation, observe)
+        val attemptLimits = limits.copy(work = minOf(limits.work, 65_536L),
+            allocation = minOf(limits.allocation, 1_048_576L))
         val candidates = ArrayList<LinearAuthorityCut>()
         var eligibilityKnown = true
         try {
             meter.reserve(source.premises.size.toLong(), source.premises.size * 128L)
-            val rows = ArrayList<LinearAuthorityAggregateTerm>()
+            val rows = ArrayList<ProbeRow>()
             val bounds = HashMap<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm>()
+            val incidence = HashMap<Pair<SourceCoordinate, Boolean>, MutableList<ProbeRow>>()
             for ((owner, entry) in source.premises.entries.withIndex()) {
                 meter.reserve(1L, 128L + entry.key.length * 2L)
                 val term = LinearAuthorityAggregateTerm(owner, entry.key, entry.value.inequality)
-                rows += term
-                if (term.inequality.supportSize != 1) continue
-                val (id, coefficient) = term.inequality.coefficients.entries.single()
-                if (id.kind != SourceCoordinate.Kind.Real) continue
-                meter.reserve(1L, 96L)
-                bounds.getOrPut(id to (coefficient > BigFraction.ZERO)) { term }
+                if (term.inequality.supportSize > limits.support) {
+                    eligibilityKnown = false
+                    observe("AggregatePairSourceSupportLimit", 1L)
+                    continue
+                }
+                meter.reserve(term.inequality.supportSize * 3L, 96L + term.inequality.supportSize * 64L)
+                val coefficients = term.inequality.coefficients
+                if (coefficients.keys.any { it.kind == SourceCoordinate.Kind.Boolean }) continue
+                val row = ProbeRow(term, coefficients)
+                if (row.realCount == 0) continue
+                rows += row
+                for ((id, coefficient) in coefficients) {
+                    meter.reserve(1L)
+                    if (id.kind != SourceCoordinate.Kind.Real) continue
+                    meter.reserve(1L, 160L)
+                    incidence.getOrPut(id to (coefficient > BigFraction.ZERO)) { ArrayList() }.add(row)
+                    if (coefficients.size == 1) {
+                        meter.reserve(1L, 96L)
+                        bounds.getOrPut(id to (coefficient > BigFraction.ZERO)) { term }
+                    }
+                }
             }
             val charge: (String, Long) -> Unit = { name, count ->
                 when (name) {
@@ -87,30 +105,37 @@ internal object LinearAuthorityAggregateCuts {
                 override fun isCancelled(): Boolean = cancellation()
                 override fun deadline() = cancellation.deadline()
             }
-            for (term in rows) {
-                meter.reserve(1L + term.inequality.supportSize, term.inequality.supportSize * 64L)
-                val coefficients = term.inequality.coefficients
-                if (coefficients.keys.none { it.kind == SourceCoordinate.Kind.Integer } ||
-                    coefficients.keys.any { it.kind == SourceCoordinate.Kind.Boolean }) continue
-                for ((id, coefficient) in coefficients) {
+            for (row in rows) {
+                meter.reserve(1L)
+                if (!row.hasInteger) continue
+                meter.reserve(1L, 128L)
+                val paired = HashSet<Int>()
+                for ((id, coefficient) in row.coefficients) {
                     meter.reserve(1L)
                     if (id.kind != SourceCoordinate.Kind.Real) continue
-                    val bound = bounds[id to (coefficient < BigFraction.ZERO)] ?: continue
-                    if (candidates.size >= maximumCandidates) stopAggregate("RetentionLimit")
-                    val pivot = bound.inequality.coefficients.getValue(id)
-                    val boundWeight = meter.number(if (coefficient > BigFraction.ZERO) coefficient
-                        else coefficient.negated())
-                    val sourceWeight = meter.number(if (pivot > BigFraction.ZERO) pivot else pivot.negated())
-                    meter.reserve(1L, 256L)
-                    val cut = derive(listOf(term.copy(weight = sourceWeight), bound.copy(weight = boundWeight)),
-                        derivedStop, charge, allowMixed = true, continuousBounds = bounds) ?: continue
-                    meter.reserve(1L, 128L + cut.inequality.supportSize * 64L)
-                    candidates += cut
+                    for (other in incidence[id to (coefficient < BigFraction.ZERO)].orEmpty()) {
+                        meter.reserve(1L)
+                        if (other.hasInteger && other.term.owner <= row.term.owner) continue
+                        meter.reserve(1L, 64L)
+                        if (!paired.add(other.term.owner)) continue
+                        if (candidates.size >= maximumCandidates) stopAggregate("RetentionLimit")
+                        observe("AggregatePairAttempts", 1L)
+                        val pivot = other.coefficients.getValue(id)
+                        val rightWeight = meter.number(if (coefficient > BigFraction.ZERO) coefficient
+                            else coefficient.negated())
+                        val leftWeight = meter.number(if (pivot > BigFraction.ZERO) pivot else pivot.negated())
+                        meter.reserve(1L, 256L)
+                        val cut = derive(listOf(row.term.copy(weight = leftWeight),
+                            other.term.copy(weight = rightWeight)), derivedStop, charge, attemptLimits,
+                            allowMixed = true, continuousBounds = bounds) ?: continue
+                        meter.reserve(1L, 128L + cut.inequality.supportSize * 64L)
+                        candidates += cut
+                    }
                 }
             }
-            observe(if (eligibilityKnown) "AggregateProjectionComplete" else "AggregateProjectionIncomplete", 1L)
+            observe(if (eligibilityKnown) "AggregatePairComplete" else "AggregatePairIncomplete", 1L)
         } catch (stop: AggregateStop) {
-            observe("AggregateProjection${stop.reason}", 1L)
+            observe("AggregatePair${stop.reason}", 1L)
         }
         return candidates.toList()
     }

@@ -439,7 +439,7 @@ internal class LinearAuthority(
     ): LinearAuthorityTemplate? {
         if (!aggregateCuts && additionalCuts.isEmpty()) return prepared
         val funded = Cancellation { cancellation() || budget.funding?.paused == true }
-        val generated = if (aggregateCuts) LinearAuthorityAggregateCuts.prepareBoundProjections(
+        val generated = if (aggregateCuts) LinearAuthorityAggregateCuts.prepareSourcePairs(
             prepared.numeric, funded, { name, count ->
                 when (name) {
                     "AggregateWork" -> cutCost(count, 0L)
