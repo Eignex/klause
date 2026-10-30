@@ -836,8 +836,10 @@ adoption is reported separately from bound-template lookup. Main-thread CPU time
 is separate from elapsed time and excludes helper, compiler and collector threads;
 whole-process and enforced group resource receipts retain their broader costs.
 The retained route prepares the production source regions, installs their exact
-columns and rows into a private scoped owner, solves and closes that owner within
-the measured total. The wrapper retains actual JDK file hashes and the cost of
+columns and rows into a private scoped owner with source-bound assertions and
+permanent row markers, solves and closes that owner within the measured total.
+It isolates root installation; ordinary CLI preparation, propagation and route
+selection remain separate source-wide costs. The wrapper retains actual JDK file hashes and the cost of
 that shared identity prefix. Its assembly includes fragment import and installation;
 standalone import remains in the solve-and-certification interval. Route timings
 therefore compare modes within one route, not isolated stage names across routes.

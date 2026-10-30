@@ -132,8 +132,10 @@ internal object LpTemplatePreparationProfile {
                                         val edit = sources.prepare(owner.state, RootDomains(view), consumerToken)
                                             ?: if (consumerToken()) throw LpAssemblyCancelled()
                                             else error("retained source import declined")
+                                        val assertions = requireNotNull(edit.boundAssertions(0L, consumerToken))
                                         check(owner.replaceRows(edit.retired, edit.columns, edit.rows, false,
-                                            token = consumerToken, objective = edit.objective))
+                                            token = consumerToken, permanentRows = edit.permanentRows,
+                                            objective = edit.objective, assertions = assertions))
                                         edit.commit()
                                         assemblyNs += System.nanoTime() - opening
                                         val solving = System.nanoTime()
