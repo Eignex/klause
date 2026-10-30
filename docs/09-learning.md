@@ -334,14 +334,15 @@ cells retain their selected index guard, and a result alias supplies no arithmet
 
 Opposite-sign nonnegative combinations use checked signed arithmetic and integer
 gcd normalization. Each combination must remain conflicting. A retained row must
-propagate against the session's historical domains at its native backjump and the
-mapped shared target. The raw assertion target must have been a member of its
-historical domain; a later carve cannot remove that earlier membership, and a
+propagate against the session's historical domains at its first-UIP clause's native
+backjump and the mapped shared target. Each combination checks that same native
+target, preserving clausal backjump selection. The raw assertion target must have
+been a member of its historical domain; a later carve cannot remove that earlier membership, and a
 historical hole cannot supply a raw bound assertion. Literal counts do not establish
 assertion. Foreign unavailable bound premises retain clause analysis. The producer
 admits at most 16 terms, 16 combinations, 64 native levels and 64 stored rows, with
 bounded duplicate lookup.
-Assertion checks reconstruct each historical term domain once per target level and
+Assertion checks reconstruct each historical term domain once per combination and
 reuse its exact activity for the candidate bounds. A retained row with the same
 normalized coefficients and a stronger bound suppresses a new consequence only
 when its guard is unconditional or identical; opposite or unrelated guards retain
