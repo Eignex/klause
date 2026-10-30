@@ -42,6 +42,38 @@ import kotlin.test.assertTrue
 
 class LpPrimalHeuristicsTest {
     @Test
+    fun `completed rounding LP resumes without solving its original objective again`() {
+        for (sameObjective in listOf(true, false)) {
+            val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+                listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)))
+            val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
+            val factory = RecordingLpEngineFactory()
+            var stopped = false
+            val token = Cancellation { stopped }
+
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, probe = true)),
+                SolveStatsSink("resumed-rounding-point"), LpSolveContext(factory)).use { engine ->
+                val first = engine.lpRoundingProbe(objective, token, accept = {
+                    stopped = true
+                    null
+                })
+                assertNull(first)
+                assertTrue(engine.rootRoundingInterrupted)
+                val constructed = factory.calls.size
+                stopped = false
+                val next = if (sameObjective) objective else LinearObjective(intCoefficients = longArrayOf(2, 1))
+
+                val sample = engine.lpRoundingProbe(next, token)
+
+                val expected = if (sameObjective) listOf(1L, 0L) else listOf(0L, 1L)
+                assertEquals(expected, assertNotNull(sample).ints.toList())
+                if (sameObjective) assertEquals(constructed, factory.calls.size)
+                else assertTrue(factory.calls.size > constructed)
+            }
+        }
+    }
+
+    @Test
     fun `completed root guidance avoids another rounding LP solve`() {
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
             listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)))

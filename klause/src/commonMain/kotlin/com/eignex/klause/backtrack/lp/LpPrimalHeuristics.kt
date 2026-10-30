@@ -56,23 +56,27 @@ internal fun LpEngine.lpRoundingProbe(
         }
         val primal = retained?.primal?.also {
             sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "REUSED", started.elapsedNow().inWholeNanoseconds)
-        } ?: try {
-            solvePrimalRelaxation(
-                relaxation.model,
-                cancellation,
-                primal = false,
-                warm = retained?.basis,
-            ) { iterate, termination ->
-                if (iterate?.optimal != true && termination == LpFloatTermination.CANCELLED) {
-                    rootRoundingInterrupted = true
+        } ?: run {
+            val result = try {
+                solvePrimalRelaxation(
+                    relaxation.model,
+                    cancellation,
+                    primal = false,
+                    warm = retained?.basis,
+                ) { iterate, termination ->
+                    if (iterate?.optimal != true && termination == LpFloatTermination.CANCELLED) {
+                        rootRoundingInterrupted = true
+                    }
+                    if (iterate != null && (iterate.optimal || termination == LpFloatTermination.CANCELLED)) {
+                        rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation, iterate.basis)
+                    }
                 }
-                if (iterate != null && (iterate.optimal || termination == LpFloatTermination.CANCELLED)) {
-                    rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation, iterate.basis)
-                }
-            }
-        } catch (_: CheckedLongOverflowException) {
-            return null
-        }?.primal ?: return null
+            } catch (_: CheckedLongOverflowException) {
+                return null
+            } ?: return null
+            retainRootPrimalGuidance(relaxation, result, cancellation, objective)
+            result.primal
+        }
         val reals = if (toleranceReals && problem.numRealVars > 0) relaxation.floatReals(primal, problem) else null
         val seed = initial?.takeIf {
             it.numIntVars == problem.numIntVars && it.numBoolVars == problem.numBoolVars

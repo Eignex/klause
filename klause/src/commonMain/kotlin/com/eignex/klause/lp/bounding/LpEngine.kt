@@ -273,6 +273,7 @@ internal class LpEngine(
         relaxation: LpRelaxation,
         result: FloatLpResult?,
         cancellation: Cancellation,
+        guidanceObjective: LinearObjective = objective,
     ) {
         if (!params.lpPlan.probe || result?.optimal != true || cancellation()) return
         val work = result.primal.size.toLong()
@@ -283,7 +284,7 @@ internal class LpEngine(
         noteNodeOverhead(work)
         val primal = result.primal.copyOf()
         if (cancellation()) return
-        rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation, result.basis, primal)
+        rootRoundingWarmStart = RootRoundingWarmStart(guidanceObjective, relaxation, result.basis, primal)
         sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "RETAINED", started.elapsedNow().inWholeNanoseconds)
     }
 
