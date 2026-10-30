@@ -1379,8 +1379,8 @@ the investigation cost rather than becoming a solver regression.
 ## Prepared arithmetic learning
 
 `bench.profile.OrdinaryArithmeticLearningProfile` takes `suite=ID problem=NAME
-sha256=HEX timeout-ms=10000 nodes=4096 lp=auto|off trace=first-integer|initial
-attribution=false|true recipe=source|satOptimized|conflictDriven seed=3 worker-seed=3
+sha256=HEX timeout-ms=10000 nodes=4096 lp=auto|off trace=first-integer|initial|none
+samples=false|true attribution=false|true recipe=source|satOptimized|conflictDriven seed=3 worker-seed=3
 route=single|portfolio`.
 The source recipe uses its search hints or the conflict-driven preset; the explicit
 recipes use the existing SAT or conflict-driven preset. Preparation uses `seed`,
@@ -1397,7 +1397,14 @@ slot; `recipe` identifies that expected slot rather than replacing the pool. Its
 slot's first native session and reports ignored later session attachments. Captured
 work and lifecycle counts cover that session; invocation CPU, elapsed time and
 thread allocation cover the whole portfolio. Instrumentation supplies no exact
-portfolio replay or performance qualification. The existing bounded arithmetic trace records source
+portfolio replay or performance qualification. `trace=none` leaves session, selector
+and branch observers detached; capture-only fields are null. `samples=true` records
+each whole invocation with the JDK profile settings, a 32 MiB recording cap, and
+the existing CPU/caller/allocation summaries in `<arm>-samples.txt`. Recording setup,
+dump and summary are outside the arm timer and inside the containing profile
+allowance. Samples are statistical; the cap can discard early recording chunks.
+The two arms share a JVM in clause/integer order, so these captures diagnose
+hotspots and do not establish a timing benefit. The existing bounded arithmetic trace records source
 conflicts, historical endpoint rows, mapped admission, retained consumers and
 retirement. Its live window admits 1,024 events and 65,536 words. Clauses above
 64 literals and endpoint markers above 32 words produce explicit omission events
