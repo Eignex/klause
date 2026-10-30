@@ -399,6 +399,8 @@ atom levels from the analyzer's effective conflict level. Historical domain hole
 exclude later journalled carves; endpoint factor ids describe the live reason owner.
 Storage identities survive factor compaction and retire when their constraint is
 forgotten. Only actual changed bounds or Boolean pins count as consumer events.
+Focused windows retain a selector pick or actual branch attempt after each consumer;
+LP-guided attempts can bypass the heuristic selector.
 
 The trace is absent by default. Its fixed event and scalar-word allowances and
 per-payload limits stop capture with explicit truncation. Event lookups withhold a

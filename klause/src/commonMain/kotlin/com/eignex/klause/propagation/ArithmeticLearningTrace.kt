@@ -62,7 +62,7 @@ internal class ArithmeticLearningTrace(
     fun record(kind: String, vararg data: Long) {
         if (!accepting) return
         if (focusedIntegerId != null) {
-            if (kind == "traversal.pick" && pendingPick) pendingPick = false
+            if ((kind == "traversal.pick" || kind == "traversal.attempt") && pendingPick) pendingPick = false
             else if (!kind.startsWith("consumer.") && kind != "store.remap" &&
                 kind != "traversal.finished" && kind != "traversal.retirement-checked"
             ) {
