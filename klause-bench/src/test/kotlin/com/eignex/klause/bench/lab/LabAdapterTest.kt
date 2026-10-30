@@ -190,6 +190,27 @@ class LabAdapterTest {
     }
 
     @ParameterizedTest
+    @CsvSource("none,false", "resources,false", "jfr,true", "compilation,true", "compilation+log,true")
+    fun `only recorded CLI processes should request an in process profile summary`(
+        measurement: String,
+        recordsJfr: Boolean,
+    ) {
+        val root = Files.createTempDirectory("lab profile ")
+        try {
+            val output = root.resolve("out with spaces")
+            val settings = LabSettings(mapOf("measurement" to measurement))
+            val case = BenchCase("case", settings.caseParameters("cp", 7), settings.resources())
+
+            val environment = LabRuntime.environment(case, BenchContext(output, worktree = root))
+
+            assertEquals(if (recordsJfr) output.resolve("report").toString() else null,
+                environment["KLAUSE_LAB_PROFILE_DIR"])
+        } finally {
+            root.toFile().deleteRecursively()
+        }
+    }
+
+    @ParameterizedTest
     @CsvSource("unsupported,false", "killed,false", "loadError,true", "errorMessage,true")
     fun `domain refusals and timeouts remain distinct from failures`(stat: String, failed: Boolean) {
         val ref = ProblemRef("case", Format.DIMACS, ProblemSource.Vendored("absent"), Category.CSP, Expected.Unknown)

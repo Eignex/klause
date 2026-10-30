@@ -224,6 +224,13 @@ Profile mains live in [bench/profile/](src/main/kotlin/com/eignex/klause/bench/p
 and run as lab profile jobs; consult the selected main for its arguments and
 retain its output through `$OUT`.
 
+Suite measurements `jfr`, `compilation` and `compilation+log` retain the CLI recording
+and write CPU, allocation and runtime-event summaries to `cases/N/out/solve.log`.
+Summary generation runs in the bench process after CLI exit, outside the subprocess
+`elapsedMs` and GNU time metrics and inside the containing case and job allowances.
+These instrumented captures support attribution; use separate uninstrumented controls
+for performance comparisons.
+
 Profile reflection reads the session's nullable retained propagation owner through
 `LivePropagationState`; live-only probes fail explicitly after release, and residual
 inspection declines a released session. Captures retain bounded diagnostic traces
