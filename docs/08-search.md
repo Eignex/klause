@@ -36,6 +36,10 @@ executor admits identity-mapped pure Boolean clause satisfaction only; objective
 numeric restrictions, symmetry reductions, cross-worker exchanges and additional
 components decline. A checked witness remains terminal until the caller condition
 changes; it cannot become a later sample-free refutation.
+The executor can use either constant-objective repair or a retained pure Boolean
+satisfaction traversal. Both retain conditioned state across siblings; satisfaction
+reseeding clears the preceding query verdict and trail without renewing its
+containing quota.
 It runs through an explicit internal entry point; ordinary portfolio selection
 retains its existing policy.
 

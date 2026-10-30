@@ -462,7 +462,8 @@ with the same source, full assumptions, objective cutoff and mapping identity. S
 events and read/import/use counts do not establish duplicate region coverage. The task
 board is separate from worker selection: it changes neither these scheduling rules nor
 terminal admission and owns no retained solver state. The internal Boolean task
-executor keeps one repair handle per worker and rotates ordinary-sized bounded
+executor keeps one repair handle per worker, including a direct Boolean satisfaction
+implementation, and rotates ordinary-sized bounded
 slices across disjoint tasks, reusing each private session for sibling cubes.
 Construction, reseeding, failed attempts, checks and retirement remain inside
 its containing work and physical cost observations; it supplies no independent
