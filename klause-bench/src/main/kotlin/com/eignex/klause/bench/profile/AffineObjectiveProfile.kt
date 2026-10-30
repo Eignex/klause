@@ -203,7 +203,10 @@ internal object AffineObjectiveProfile {
         put("reals", model.numRealVars)
         put("realLower", JsonArray(model.realLower.map { JsonPrimitive(it.toString()) }))
         put("realUpper", JsonArray(model.realUpper.map { JsonPrimitive(it.toString()) }))
-        put("semantics", model.semantics.toString())
+        put("semantics", buildJsonObject {
+            put("declared", model.semantics.declared.toString())
+            put("effective", model.semantics.effective.toString())
+        })
         put("integerBounds", buildJsonArray {
             for (variable in 0 until model.numIntVars) add(buildJsonObject {
                 put("lower", model.intBounds.lowerAsBigInteger(variable)?.toString())

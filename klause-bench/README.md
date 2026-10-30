@@ -446,6 +446,9 @@ and finite preparation, then reuses projected source hints, maintained definitio
 networks and core/Table-hull LP assembly. Optional
 `orders=markowitz,rewrite_cost` compares those pivot policies with structure
 protection disabled instead of comparing blanket protection. At most two arms run.
+Optional `source64=BASE64` or `sourceGzip64=BASE64` supplies hash-checked source bytes
+through the existing trajectory input reader. The input receipt records source size,
+load time and cancellation before enforcing the capture's source bounds.
 Each arm has a 30-second containing
 deadline, five million preparation work units and one million consumer-diagnostic
 units; the whole capture has 120 seconds. Sources, lowered coordinates and factors
