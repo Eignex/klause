@@ -52,7 +52,10 @@ diagnosis; these observations do not retire the rebuilding objective.
 ## Build and run
 
 `param.private-rebuild-work=65536` selects a bounded private Boolean satisfaction
-trial with actual source BVE and a fresh consuming worker. Zero is the default.
+trial after new global root pins, with actual source BVE and a fresh consuming
+worker. Zero is the default. `ProgressPins` excludes baked-root facts;
+`RootScanWork` and `RootScanNanos` retain the eligibility cost. An unchanged
+baked root keeps its canonical traversal.
 Use the same source, engine, presolve, seeds, processors, heap, containing allowance
 and deadline in the zero/trial arms. `nativePrivateRebuildAttempts`, `Consumers`,
 `Eliminated`, `SourceAccepted`, `RefutationDeferred`, `Declined` and `Retired`

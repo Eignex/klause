@@ -232,8 +232,11 @@ opens a consumer. Assumptions, external components, arithmetic and LP-enabled
 workers retain their canonical traversal. Enumeration and optimization do not use
 this trial.
 
-An unchanged root trail retains a completed miss. New root deductions release it;
-all attempts share one cumulative preparation, trial and checking allowance. BVE
+A trial requires global root pins beyond the baked root and the last attempted
+view. An unchanged baked root performs no BVE. The root-pin scan charges its full
+column visit count and records its time; an insufficient grant skips the scan.
+An unchanged root trail retains a completed miss. All attempts share one
+cumulative preparation, trial and checking allowance. BVE
 receives half the allowance remaining after the private source copy. Its local cap
 retains complete earlier pivots when later analysis stops; cancellation of the
 containing call declines the generation. Baking, opening and canonical checks
