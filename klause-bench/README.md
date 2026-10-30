@@ -84,6 +84,11 @@ and the remaining modeled scratch grant; canonical learning and exchange state
 remain owned by canonical.
 `BakeConstructionEntries` and `BakePropagationWork` expose the private root bake;
 both debit the containing allowance and are preparation subsets.
+`OpeningConstructionWork` reserves the fresh consumer's setup visits in the same
+allowance. Reconstruction retains its source-entry charge and raises it when the
+actual replay descriptors and composed sample copies require more work.
+`MappingPreparationWork` includes descriptor ownership copies in preparation;
+their modeled storage also joins `ModeledPrivateBytes`.
 
 Run from the repository root with JDK 25 or newer:
 

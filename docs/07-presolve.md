@@ -258,6 +258,14 @@ share the remaining containing allowance.
 Private baking adapts the root engine's construction and propagation meter into
 that allowance; those visits join preparation work rather than remaining on an
 unobserved temporary root state.
+Opening reserves another construction visit count for the fresh consumer before
+allocating its state. Reconstruction charges the larger of the source-entry model
+and a bound covering all composed sample copies and eliminated-clause replay.
+The latter uses the actual reconstruction descriptors; repeated elimination can
+retain more replay literals than one source view contains.
+Mapping composition separately charges its descriptor copies during preparation,
+including trials that produce no witness. The descriptors add their modeled
+primitive/reference storage before composition and copied-learning admission.
 
 Unused BVE allowance can copy globally learned clauses into the private model.
 Only this canonical worker's non-permanent clauses over retained Boolean columns
