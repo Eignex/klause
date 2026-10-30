@@ -228,6 +228,8 @@ internal class BooleanProofPortfolio(
         private fun BakedProblem.matchesPreparedModel(model: Problem?): Boolean = model === this ||
             (model != null && model !is BakedProblem && model.numBoolVars == numBoolVars &&
                 model.numIntVars == 0 && model.numRealVars == 0 && !model.hasSymmetryBreaking &&
+                model.semantics === semantics && model.settings === settings &&
+                model.impliedFactorMask === impliedFactorMask &&
                 model.numFactors == numFactors && factors.indices.all { factors[it] === model.factors[it] })
 
         fun forWorkers(
