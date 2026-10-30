@@ -190,6 +190,7 @@ internal class PrivateRebuildSatisfaction(
         generation = prepared
         if (prepared.passStopped) note("PassStopped")
         note("Eliminated", prepared.eliminated.toLong())
+        note("AdmittedColumns", prepared.admittedColumns.toLong())
         note("ModeledPrivateBytes", prepared.modeledBytes)
         note("WarmClausesRetained", session.learnedClauseCount.toLong())
         note("WarmClausesCopied", prepared.warmClauses.clauses.size.toLong())

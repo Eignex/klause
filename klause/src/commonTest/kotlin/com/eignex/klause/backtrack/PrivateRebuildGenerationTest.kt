@@ -8,10 +8,12 @@ import com.eignex.klause.propagation.OWN_ORIGIN
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNotSame
 import kotlin.test.assertNull
@@ -31,7 +33,8 @@ class PrivateRebuildGenerationTest {
             session.addRootDerivedClause(Clause(intArrayOf(6)), 1, OWN_ORIGIN, false)
 
             val generation = assertNotNull(PrivateRebuildGeneration.prepare(session, 1_048_576L, Cancellation.Never))
-            val point = generation.reconstruct(Sample(BooleanArray(5), longArrayOf()))
+            val reduced = assertIs<SolveResult.Sat>(BacktrackSolver(generation.problem).solve())
+            val point = generation.reconstruct(reduced.assignment)
 
             assertNotSame(source, generation.problem)
             assertTrue(generation.eliminated > 0)
@@ -46,17 +49,18 @@ class PrivateRebuildGenerationTest {
 
     @Test
     fun `completed eliminations should remain consumable when the local pass allowance expires`() {
-        val source = Problem(6, 0, emptyArray(), listOf(
+        val source = Problem(7, 0, emptyArray(), listOf(
             Clause(intArrayOf(0, 2)), Clause(intArrayOf(1, 3)),
         ) + List(16) { Clause(intArrayOf(4, 6, 8)) } +
             List(16) { Clause(intArrayOf(5, 6, 10)) } +
             List(16) { Clause(intArrayOf(4, 7, 9)) } +
-            List(16) { Clause(intArrayOf(5, 7, 11)) }).bake()
+            List(16) { Clause(intArrayOf(5, 7, 11)) } +
+            List(128) { Clause(intArrayOf(12, 4, 6)) }).bake()
 
         val generation = assertNotNull(PrivateRebuildGeneration.prepare(
-            PropagationSession(source), 1_048_576L, Cancellation.Never, passWork = { 10_000L },
+            PropagationSession(source), 1_048_576L, Cancellation.Never, passWork = { 17_000L },
         ))
-        val point = generation.reconstruct(Sample(BooleanArray(6) { it == 2 || it == 3 }, longArrayOf()))
+        val point = generation.reconstruct(Sample(BooleanArray(7) { it == 2 || it == 3 }, longArrayOf()))
 
         assertTrue(generation.passStopped)
         assertTrue(generation.eliminated > 0)

@@ -245,6 +245,11 @@ duplicate savings can admit other useful pivots, so a proxy refusal establishes
 no absence of opportunities. Width and per-pivot budgets still apply. Temporary
 arrays own `24 * columns` primitive bytes inside the declared admission model;
 initialization, disposal and visits consume the containing allowance.
+The scan retains a protected-column set for every refused shape inside that
+model. BVE restricts this trial to the initially admitted columns, so an unrelated
+declined pivot cannot consume its resolution allowance. Later opportunities among
+protected columns wait for a fresh root view. This selection is a heuristic, not
+an exhaustive elimination pass.
 
 BVE receives half the allowance remaining after the private source copy. Its local cap
 retains complete earlier pivots when later analysis stops; cancellation of the
