@@ -222,6 +222,7 @@ class ExactLiraSearchComponent private constructor(
     private val changedSourceBooleans = LinkedHashSet<Int>()
     private val pendingSourceRows = LinkedHashSet<Int>()
     private val recurringSourceRows = ArrayList<Int>()
+    private var assertedRootFixings: List<BigFraction?>? = null
     private var sourceRowVisits = 0L
     private var sourceRowTouches = 0L
     private var sourceRowInvalidations = 0L
@@ -1218,7 +1219,11 @@ class ExactLiraSearchComponent private constructor(
 
     private fun assertSourceWithin(context: SearchContext): Boolean {
         if (!installSource() || !lp.atLevel(context.decisionLevel, operationStop)) return false
-        val selected = sourceRowsToAssert(context.decisionLevel) ?: return false
+        val rootFixings = if (incrementalSourceRows && context.decisionLevel == 0) {
+            sourceRootFixings() ?: return false
+        } else null
+        val refreshRoot = rootFixings != null && rootFixings != assertedRootFixings
+        val selected = sourceRowsToAssert(refreshRoot) ?: return false
         val disequalities = ArrayList<Triple<RowAddress, ExactComparison, SearchAtomPremise>>()
         val comparisons = ArrayList<PremisedSmtComparison>()
         val indices = ArrayList<Int>()
@@ -1228,8 +1233,10 @@ class ExactLiraSearchComponent private constructor(
             sourceRowVisits++
             val prepared = preparedRows[index]
             // Resolved source inputs stay fixed until the LP scope containing their assertion is popped.
-            // Root checks still permit substitution through newly published root-fixed columns.
-            if (context.decisionLevel > 0 && sourceAssertionLevels[index] >= 0) continue
+            // A changed root fixing can simplify an already asserted source expression.
+            if (sourceAssertionLevels[index] >= 0 && (context.decisionLevel > 0 ||
+                    incrementalSourceRows && !refreshRoot)
+            ) continue
             val address = prepared.address
             val asserted = node.rowAssertions[address]
             if (prepared.disjunction && asserted == null) continue
@@ -1265,11 +1272,28 @@ class ExactLiraSearchComponent private constructor(
         }
         if (!assertDisequalities(disequalities)) return false
         if (incrementalSourceRows) pendingSourceRows.removeAll(selected.toSet())
+        // Fixings discovered by this pass must trigger substitution in a later pass.
+        if (rootFixings != null) assertedRootFixings = rootFixings
         nodesByLevel.put(context.decisionLevel, node)
         return true
     }
 
-    private fun sourceRowsToAssert(level: Int): Iterable<Int>? {
+    private fun sourceRootFixings(): List<BigFraction?>? {
+        val state = lp.state ?: return null
+        val fixed = ArrayList<BigFraction?>(model.numRealVars + model.numIntVars)
+        for (column in 0 until model.numRealVars + model.numIntVars) {
+            operationStop.charge(1)
+            if (operationStop()) return null
+            val lower = state.activeSide(column, false)?.side
+            val upper = state.activeSide(column, true)?.side
+            fixed += if (lower != null && upper != null && !lower.strict && !upper.strict &&
+                lower.number.value == upper.number.value && lower.premises == null && upper.premises == null
+            ) lower.number.value else null
+        }
+        return fixed
+    }
+
+    private fun sourceRowsToAssert(refreshRoot: Boolean): Iterable<Int>? {
         if (!incrementalSourceRows) return preparedRows.indices
         if (sourceRowsByBoolean == null) {
             val dependencies = LinkedHashMap<Int, MutableList<Int>>()
@@ -1300,10 +1324,10 @@ class ExactLiraSearchComponent private constructor(
         operationStop.charge(recurringSourceRows.size.toLong() + 1L)
         if (operationStop()) return null
         pendingSourceRows += recurringSourceRows
-        val count = if (level == 0) preparedRows.size else pendingSourceRows.size
+        val count = if (refreshRoot) preparedRows.size else pendingSourceRows.size
         operationStop.charge(count.toLong() * (1L + Int.SIZE_BITS - count.countLeadingZeroBits()))
         if (operationStop()) return null
-        return if (level == 0) preparedRows.indices.toList() else pendingSourceRows.sorted()
+        return if (refreshRoot) preparedRows.indices.toList() else pendingSourceRows.sorted()
     }
 
     private fun assertDisequalities(
