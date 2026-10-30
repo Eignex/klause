@@ -1,6 +1,7 @@
 package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Factor
@@ -37,6 +38,26 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class AffinePivotOrderTest {
+    @Test
+    fun `rewrite cost should preserve propagated channel truth after eliminating its alias`() {
+        val source = Problem(1, 3, arrayOf(IntDomain(1, 3), IntDomain(1, 3), IntDomain(0, 2)), listOf(
+            Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+            Table(intArrayOf(0, 2), longArrayOf(1, 0, 1, 1, 1, 2, 2, 0, 2, 1, 2, 2, 3, 0, 3, 1, 3, 2)),
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, 2),
+        ))
+        val reduced = Presolver.runSource(source,
+            PresolveConfig.parse("off,+affine").withAffinePivotOrder(AffinePivotOrder.REWRITE_COST))
+        assertNotNull(reduced.rebuild.asSampleLift())
+
+        for (value in 1L..3L) {
+            val pins = Assumptions.None.withInt(0, value).withBool(0, value == 2L)
+            val wrongTruth = Assumptions.None.withInt(0, value).withBool(0, value != 2L)
+
+            assertFalse(reduced.problem.propagate(pins) is PropagationResult.Unsat)
+            assertTrue(reduced.problem.propagate(wrongTruth) is PropagationResult.Unsat)
+        }
+    }
+
     @Test
     fun `rewrite cost should avoid extra lp bound rows by eliminating a contained sum partner`() {
         val source = Problem(0, 4,
