@@ -57,6 +57,10 @@ class FiniteExecutionTest {
     @Test
     fun `Boolean proof controls should reach actual source portfolio probing`() {
         for ((enabled, options) in listOf(
+            true to ExecutionOptions.parse(listOf("arms=2", "bt-arm=first-fail")),
+            true to ExecutionOptions(ExecutionOption.arms(2),
+                ExecutionOption.backtrackArmsByLabel(listOf("first-fail"))),
+            false to ExecutionOptions.parse(listOf("arms=2", "bt-arm=clausal-balanced")),
             false to ExecutionOptions.parse(listOf("arms=2", "bt-arm=first-fail", "boolean-proof-tasks=false")),
             true to ExecutionOptions.parse(listOf("arms=2", "bt-arm=first-fail", "boolean-proof-tasks=true")),
             true to ExecutionOptions(ExecutionOption.arms(2),
@@ -87,23 +91,28 @@ class FiniteExecutionTest {
     }
 
     @Test
-    fun `unsupported source models should record a Boolean proof decline and keep ordinary solving`() {
-        val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
-        val shape = FiniteSolveShape(problem, false, false, null, null, 0, null)
-        val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
-            shape, FiniteEngine.BACKTRACK, presolveConfig = PresolveConfig.NONE,
-            executionOptions = ExecutionOptions.parse(listOf("arms=2", "bt-arm=first-fail",
-                "boolean-proof-tasks=true")),
-        )
+    fun `unsupported source models should keep ordinary solving and report only explicit task declines`() {
+        for (explicit in listOf(false, true)) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val shape = FiniteSolveShape(problem, false, false, null, null, 0, null)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+                shape, FiniteEngine.BACKTRACK, presolveConfig = PresolveConfig.NONE,
+                executionOptions = ExecutionOptions.parse(listOf("arms=2", "bt-arm=first-fail") +
+                    if (explicit) listOf("boolean-proof-tasks=true") else emptyList()),
+            )
 
-        val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
-        val completed = assertIs<FiniteSolveOutcome.Completed>(result.outcome)
-        assertEquals(FiniteSolveVerdict.SAT, completed.verdict)
-        val observation = completed.stats.portfolio.booleanProof.single()
+            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+            val completed = assertIs<FiniteSolveOutcome.Completed>(result.outcome)
+            assertEquals(FiniteSolveVerdict.SAT, completed.verdict)
+            val observations = completed.stats.portfolio.booleanProof
 
-        assertEquals("model-ineligible", observation.decline)
-        assertEquals(0, observation.tasks)
-        assertEquals(0, observation.probeSegments)
+            assertEquals(if (explicit) 1 else 0, observations.size)
+            if (explicit) {
+                assertEquals("model-ineligible", observations.single().decline)
+                assertEquals(0, observations.single().tasks)
+                assertEquals(0, observations.single().probeSegments)
+            }
+        }
     }
 
     @Test
@@ -120,6 +129,24 @@ class FiniteExecutionTest {
             assertFailsWith<PipelineConfigException> {
                 FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
             }
+        }
+    }
+
+    @Test
+    fun `automatic Boolean tasks should bypass optimization and parallel execution`() {
+        for ((optimize, cores) in listOf(true to 1, false to 2)) {
+            val problem = Problem(2, 0, emptyArray(), emptyArray())
+            val objective = LinearObjective(boolWeights = longArrayOf(1L, 0L)).takeIf { optimize }
+            val shape = FiniteSolveShape(problem, optimize, false, null, objective, 0, null)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+                shape, FiniteEngine.BACKTRACK, presolveConfig = PresolveConfig.NONE, cores = cores,
+                executionOptions = ExecutionOptions.parse(listOf("arms=2", "bt-arm=first-fail")),
+            )
+
+            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+            val completed = assertIs<FiniteSolveOutcome.Completed>(result.outcome)
+
+            assertTrue(completed.stats.portfolio.booleanProof.isEmpty())
         }
     }
 

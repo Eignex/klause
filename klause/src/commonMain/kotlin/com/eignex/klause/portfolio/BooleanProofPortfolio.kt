@@ -254,6 +254,7 @@ internal class BooleanProofPortfolio private constructor(
         fun forWorkers(
             workers: List<PortfolioWorker>,
             probeFirst: Boolean = false,
+            nativeOnly: Boolean = false,
             newIdentity: () -> String = { Uuid.random().toString() },
             declined: (String) -> Unit = {},
         ): BooleanProofPortfolio? {
@@ -266,7 +267,7 @@ internal class BooleanProofPortfolio private constructor(
                 return decline("workers-not-two-canonical-complete")
             val recipes = workers.map { it.booleanProofRecipe ?: return decline("builder-ownership-unavailable") }
             val problem = recipes.first().problem
-            if (recipes.any { it.problem !== problem || !it.deterministicClauseQuery() ||
+            if (recipes.any { it.problem !== problem || !it.deterministicClauseQuery(nativeOnly) ||
                     !it.matches(recipes.first()) })
                 return decline("worker-model-or-recipe-mismatch")
             if (problem.numBoolVars !in 2..4096 || problem.numIntVars != 0 || problem.numRealVars != 0 ||

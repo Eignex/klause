@@ -154,6 +154,7 @@ class Portfolio(
     internal var reserveBeforeIncumbentOnly: Boolean = false
     internal var disjointBooleanProof: Boolean = false
     internal var disjointBooleanProbe: Boolean = false
+    internal var automaticBooleanProof: Boolean = false
     internal var lastBooleanProofProbeWork: Long = 0L
         private set
     internal var lastBooleanProofProbeSegments: Int = 0
@@ -250,7 +251,8 @@ class Portfolio(
         if (disjointBooleanProof && lanes == 1 && baseSliceWork == 5000L &&
             maxSliceWork == 150000L && sliceGrowth == 1.5) {
             lastBooleanProofDecline = null
-            proofTasks = BooleanProofPortfolio.forWorkers(workers, disjointBooleanProbe) {
+            proofTasks = BooleanProofPortfolio.forWorkers(workers, disjointBooleanProbe,
+                nativeOnly = automaticBooleanProof) {
                 lastBooleanProofDecline = it
             }
             proofTasks?.let { run.restrictAvailability(it::available) }
@@ -381,7 +383,8 @@ class Portfolio(
         }
         cleanup.getOrThrow()
         val stats = run.folded().let { folded ->
-            if (!disjointBooleanProof) folded else folded.copy(portfolio = folded.portfolio.copy(
+            val reportAttempt = disjointBooleanProof && (!automaticBooleanProof || proofTasks != null)
+            if (!reportAttempt) folded else folded.copy(portfolio = folded.portfolio.copy(
                 booleanProof = folded.portfolio.booleanProof + BooleanProofStats(
                     lastBooleanProofTasks, lastBooleanProofCompleted, lastBooleanProofProbeSegments,
                     lastBooleanProofProbeWork, lastBooleanProofWork, lastBooleanProofDecline,

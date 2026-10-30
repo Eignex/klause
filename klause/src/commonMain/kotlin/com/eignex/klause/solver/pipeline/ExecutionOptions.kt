@@ -539,7 +539,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         val portfolioProofWorkers: ExecutionOption<String> =
             ExecutionOption("portfolio-proof-workers", ValueKind.STRING)
 
-        /** Opt-in disjoint queries for eligible single-core Boolean satisfaction portfolios. */
+        /** Override disjoint task admission; omission permits eligible native first-fail satisfaction queries. */
         val booleanProofTasks: ExecutionOption<Boolean> = ExecutionOption("boolean-proof-tasks", ValueKind.BOOLEAN)
 
         /** Select ordinary LP probes or defer them until the other initial probes finish or find an incumbent. */
