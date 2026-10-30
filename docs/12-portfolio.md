@@ -410,11 +410,12 @@ semantics and coordinate frame identify retained attempts; failed attempts canno
 renew their allowance.
 
 Enabled repair's first checked center frees at most two connected integers.
-An available exact-coordinate incumbent requests continuation through root and center
+An available dimension-compatible incumbent requests continuation through root and center
 preparation and the first proposal, behind owed complete-worker coverage and within
 the existing active cap. Availability grants no import authority; the source checks
-still admit the center. A declined center clears the preparation request, and a
-completed or declined first proposal returns to ordinary selection.
+still complete advisory coordinates and admit the center. A declined center clears
+the preparation request, and a completed or declined first proposal returns to
+ordinary selection.
 
 A numerical optimum or refutation can complete the finite
 invocation only after its typed terminal verifies against the same captured working
