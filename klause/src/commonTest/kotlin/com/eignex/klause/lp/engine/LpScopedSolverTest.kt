@@ -18,6 +18,24 @@ import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
     @Test
+    fun `declined component scans retain their preparation cost`() {
+        val builder = LpBuilder()
+        val x = builder.addVar(0L, 5L, cost = 1L)
+        val y = builder.addVar(0L, 5L, cost = 1L)
+        builder.addRow(intArrayOf(x, y), longArrayOf(1L, 1L), Relation.GE, 1L)
+        builder.addRow(intArrayOf(x, y), longArrayOf(1L, -1L), Relation.LE, 2L)
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        val costs = listOf(false, true).map { split ->
+            LpScopedSolver(LpExactState(source), componentSplit = split).use { owner ->
+                assertTrue(owner.prepare())
+                owner.metrics.preparationWork
+            }
+        }
+
+        assertTrue(costs[1] > costs[0])
+    }
+
+    @Test
     fun `initial prepared row revisions should preserve separable component admission`() {
         val builder = LpBuilder()
         repeat(2) {

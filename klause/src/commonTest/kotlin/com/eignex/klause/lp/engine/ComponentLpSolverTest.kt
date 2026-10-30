@@ -15,6 +15,30 @@ import kotlin.test.assertTrue
 
 class ComponentLpSolverTest {
     @Test
+    fun `component preparation reserves its grant before constructing children`() {
+        val builder = LpBuilder()
+        repeat(2) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(1L), Relation.GE, 1L)
+        }
+        val model = builder.build(Sense.MINIMIZE)
+        for (projection in listOf(LpProjectionMeter(workLimit = 50L), LpProjectionMeter(allocationLimit = 64L))) {
+            var constructed = 0
+
+            assertFailsWith<LpProjectionStop> {
+                componentLpSolverOrNull(model, Cancellation.Never, { part, token ->
+                    constructed++
+                    RevisedSimplex(part, token)
+                }, ::ComponentLpSolver, projection)
+            }
+
+            assertEquals(0, constructed)
+            assertTrue(projection.work in 1L..50L)
+            assertTrue(projection.allocation > 0L)
+        }
+    }
+
+    @Test
     fun `tableau component queries should share their pivot allowance`() {
         val builder = LpBuilder()
         repeat(2) {

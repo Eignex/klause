@@ -706,38 +706,37 @@ internal class LpScopedSolver(
         var candidate: RetainedLpSolver? = null
         var accepted = false
         var failure: Throwable? = null
+        val projection = LpProjectionMeter(
+            workLimit = if (workBudget > 0L) workBudget else Long.MAX_VALUE,
+            cancellation = token,
+        )
+        var constructionBound = 0L
         try {
             if (token() || next.model.m > maxRetainedRows) return null
-            val projection = LpProjectionMeter(
-                workLimit = if (workBudget > 0L) workBudget else Long.MAX_VALUE,
-                cancellation = token,
-            )
-            var constructionBound = 0L
-            val working = try {
-                next.ownerWorkingModel(projection)?.also {
-                    // The numerical owner refreshes its scaled vectors while adopting this state.
-                    projection.reserveVectors(next.model)
-                    // Building it scales the matrix. Preparation caps take precedence, so the bound is reserved from
-                    // this preparation's allowance and charged as spent; the ledger records the reported work.
-                    constructionBound = LpScalingView.constructionWorkBound(it)
-                    projection.reserve(constructionBound, 0L, matrix = true)
-                }
-            } finally {
-                preparationWork = saturated(preparationWork, projection.work)
-                reservedConstructionWork = saturated(reservedConstructionWork, constructionBound)
+            val working = next.ownerWorkingModel(projection)?.also {
+                // The numerical owner refreshes its scaled vectors while adopting this state.
+                projection.reserveVectors(next.model)
+                // The reserved scaling bound competes with decomposition and numerical preparation.
+                val bound = LpScalingView.constructionWorkBound(it)
+                projection.reserve(bound, 0L, matrix = true)
+                constructionBound = bound
             } ?: return null
-            val remainingWork = if (workBudget > 0L) workBudget - projection.work else 0L
-            if (workBudget > 0L && remainingWork <= 0L) return null
+            if (workBudget > 0L && projection.work >= workBudget) return null
             candidate = if (allowComponents && warm == null) {
                 componentLpSolverOrNull(
                     working, token,
                     { part, childToken ->
+                        val remaining = if (workBudget > 0L) workBudget - projection.work else 0L
+                        if (workBudget > 0L && remaining <= 0L) throw LpProjectionStop()
                         newPersistentLpSolver(part, childToken, refactorUpdateLimit, iterationLimit,
-                            remainingWork, trackDegeneracy, context.engineFactory, componentPricing(part, working.n))
+                            remaining, trackDegeneracy, context.engineFactory, componentPricing(part, working.n))
                     },
                     ::ComponentLpSolver,
+                    projection,
                 )
             } else null
+            val remainingWork = if (workBudget > 0L) workBudget - projection.work else 0L
+            if (workBudget > 0L && remainingWork <= 0L) return null
             if (candidate == null) candidate = newPersistentLpSolver(
                 working,
                 token,
@@ -781,6 +780,8 @@ internal class LpScopedSolver(
             failure = primary
             throw primary
         } finally {
+            preparationWork = saturated(preparationWork, projection.work)
+            reservedConstructionWork = saturated(reservedConstructionWork, constructionBound)
             if (!accepted && candidate != null) {
                 closeRejectedCandidate(candidate, recordRejectedAppendWork, failure)
             }

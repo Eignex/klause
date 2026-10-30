@@ -48,14 +48,26 @@ internal class LpNeighborhood(
 internal class LpRowIndex(val rowPtr: IntArray, val colIdx: IntArray)
 
 /** Build the row-major union adjacency of this model's structural columns. */
-internal fun LpModel.rowIndex(): LpRowIndex {
+internal fun LpModel.rowIndex(projection: LpProjectionMeter? = null): LpRowIndex {
     // Deduplicate per column across the two patterns (rows ascending within each), then bucket by row.
+    projection?.reserve(m.toLong() + 1L, (m.toLong() + 1L) * 4L, matrix = true)
     val rowPtr = IntArray(m + 1)
-    forEachUnionEntry { _, i -> rowPtr[i + 1]++ }
+    for (column in 0 until n) {
+        projection?.reserve(1L, 0L, matrix = true)
+        forEachColumnRow(column) { i ->
+            projection?.reserve(1L, 0L, matrix = true)
+            rowPtr[i + 1]++
+        }
+    }
+    projection?.reserve(m.toLong(), 0L, matrix = true)
     for (i in 0 until m) rowPtr[i + 1] += rowPtr[i]
+    projection?.reserve(rowPtr[m].toLong(), (rowPtr[m].toLong() + m + 1L) * 4L, matrix = true)
     val colIdx = IntArray(rowPtr[m])
     val cursor = rowPtr.copyOf()
-    forEachUnionEntry { j, i -> colIdx[cursor[i]++] = j }
+    for (column in 0 until n) {
+        projection?.poll()
+        forEachColumnRow(column) { i -> colIdx[cursor[i]++] = column }
+    }
     return LpRowIndex(rowPtr, colIdx)
 }
 
