@@ -166,14 +166,15 @@ internal fun LpEngine.solveNode(
     model: LpModel,
     warm: Basis?,
     cancellation: Cancellation,
+    continuationWorkAllowance: (() -> Long?)? = null,
 ): Pair<LpSolver, FloatLpResult?>? {
     nodeUsesTrail = cpAdapter.currentModel === model
-    if (nodeUsesTrail) return propagator.solveFloat(warm, cancellation)
+    if (nodeUsesTrail) return propagator.solveFloat(warm, cancellation, continuationWorkAllowance)
     model.authoritativeModel()?.let { exact ->
         nodeUsesTrail = true
         cpAdapter.localModel()
         if (!propagator.install(model, exact)) return null
-        return propagator.solveFloat(warm, cancellation)
+        return propagator.solveFloat(warm, cancellation, continuationWorkAllowance)
     }
     noteNodeOverhead(model.extent() * LpNodeOverhead.SETUP)
     val fresh = newPersistentLpSolver(
@@ -1414,7 +1415,7 @@ private fun LpEngine.retainedRootLpRelaxationBound(
     if (relaxation.model.n == 0) return Double.NaN
     try {
         while (retainedRootRemainingWork() > 0L && !cancellation()) {
-            val attempt = solveNode(relaxation.model, null, cancellation)
+            val attempt = solveNode(relaxation.model, null, cancellation, ::retainedRootRemainingWork)
             if (attempt == null) {
                 val metrics = propagator.lastMetrics.copy(preparationOps = 0L)
                 observeRootWork(metrics, finished = !propagator.floatPaused)

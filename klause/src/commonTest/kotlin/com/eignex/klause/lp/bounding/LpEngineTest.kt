@@ -397,6 +397,28 @@ class LpEngineTest {
     }
 
     @Test
+    fun `component preparation without a timed allowance uses the remaining root work grant`() {
+        val problem = boundedProblem()
+        var offered: Long? = null
+        LpEngine(
+            problem,
+            LinearObjective(),
+            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true, rootMaxWork = 80_000L)),
+            SolveStatsSink(backend = "component-preparation-root-grant"),
+            nodeWorkAllowance = { offered },
+        ).use { engine ->
+            engine.observeRootSolve(metricSolver(), LpSolveMetrics(workOps = 5_000L))
+
+            assertEquals(75_000L, engine.nodePreparationWorkBudget())
+            offered = 500L
+            assertEquals(500L, engine.nodePreparationWorkBudget())
+            offered = null
+            engine.observeRootSolve(metricSolver(), LpSolveMetrics(workOps = 75_000L))
+            assertEquals(1L, engine.nodePreparationWorkBudget())
+        }
+    }
+
+    @Test
     fun `separate preparation should respect both remaining containing allowances`() {
         val problem = boundedProblem()
         for (components in listOf(false, true)) {
