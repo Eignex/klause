@@ -251,6 +251,17 @@ retains complete earlier pivots when later analysis stops; cancellation of the
 containing call declines the generation. Baking, opening and canonical checks
 share the remaining containing allowance.
 
+Unused BVE allowance can copy globally learned clauses into the private model.
+Only this canonical worker's non-permanent clauses over retained Boolean columns
+qualify. Clauses mentioning an eliminated column need an unsupported resolution
+translation and are skipped. Global pins remove satisfied clauses and false
+literals. Each copied consequence owns its literal buffer and consumes the same
+work and modeled-memory grants; an exhausted local transfer grant retains the
+completed subset. The mapping composes through the enriched model's exact identity.
+These copies preserve consequences without sharing learned-store indexes or
+exchange cursors. Their work and time are preparation subsets; private baking
+and propagation include the added clauses.
+
 The private worker owns fresh watches, learning and search state. Canonical exchange
 cursors and pooled incumbent guidance stay with the retained canonical worker;
 unsupported translations never attach to the private model. Every private witness

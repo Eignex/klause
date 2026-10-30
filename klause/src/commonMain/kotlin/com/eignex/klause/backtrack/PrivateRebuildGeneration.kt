@@ -14,6 +14,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
+import kotlin.time.TimeSource
 
 internal class PrivateRebuildGeneration private constructor(
     val problem: BakedProblem,
@@ -22,6 +23,8 @@ internal class PrivateRebuildGeneration private constructor(
     val eliminated: Int,
     val reconstructionWork: Long,
     val passStopped: Boolean,
+    val warmClauses: PrivateRebuildWarmClauses,
+    val warmClauseNanos: Long,
 ) {
     fun reconstruct(sample: Sample): Sample = mapping.reconstructFrom(problem, sample)
 
@@ -110,15 +113,22 @@ internal class PrivateRebuildGeneration private constructor(
                 onDecline(if (spent >= allowance) "PassStoppedEmpty" else "PassCompleteEmpty")
                 return null
             }
+            val passStopped = spent >= allowance
             cancellation.charge(entries)
             if (cancellation()) return null
             val reduced = pinned.withSourcePassDelta(delta) ?: return null
             mapping = mapping.then(SourceMapping(pinned, reduced, guarantees, delta.rebuild))
-            val baked = reduced.bake(cancellation)
+            val warmStart = TimeSource.Monotonic.markNow()
+            val warm = PrivateRebuildWarmClauses.capture(session, delta.rebuild, fixed, byteLimit - bytes,
+                (allowance - spent).coerceAtLeast(0L), cancellation) ?: return null
+            val warmNanos = warmStart.elapsedNow().inWholeNanoseconds
+            val enriched = if (warm.clauses.isEmpty()) reduced else reduced.withFactors(reduced.factors + warm.clauses)
+            mapping = mapping.then(SourceMapping(reduced, enriched, TransformationGuarantees.IDENTITY))
+            val baked = enriched.bake(cancellation)
             if (cancellation()) return null
-            mapping = mapping.then(SourceMapping(reduced, baked, TransformationGuarantees.IDENTITY))
-            return PrivateRebuildGeneration(baked, mapping, bytes, delta.rebuild.steps.size, entries * 4L,
-                spent >= allowance)
+            mapping = mapping.then(SourceMapping(enriched, baked, TransformationGuarantees.IDENTITY))
+            return PrivateRebuildGeneration(baked, mapping, bytes + warm.modeledBytes, delta.rebuild.steps.size,
+                entries * 4L, passStopped, warm, warmNanos)
         }
     }
 }
