@@ -200,6 +200,9 @@ internal class PrivateRebuildSatisfaction(
         note("BakeConstructionEntries", prepared.bakeWork.constructionEntries)
         note("BakePropagationWork", prepared.bakeWork.propagationWork)
         note("MappingPreparationWork", prepared.mappingWork)
+        note("ReusedSourceClauses", prepared.reusedSourceClauses.toLong())
+        note("BveIndexedFactors", prepared.indexedFactors.toLong())
+        note("BveSourceFactors", prepared.sourceFactors.toLong())
         charge(prepared.bakeWork.constructionEntries)
         note("OpeningConstructionWork", prepared.bakeWork.constructionEntries)
         if (token()) {
