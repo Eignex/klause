@@ -254,6 +254,10 @@ dependencies. JVM library callers also retain their compiled caller classes and 
 explicitly ordered classpath. Native caller source hashes identify the harness
 compiled into the separately hashed executable; its machine code remains part of
 that executable. Retained source and runtime identities accompany both series.
+Compressed corpus storage is decoded through the ordinary source-invocation path,
+which charges decoding to the remaining source budget and preserves the packed input.
+JVM staged-file identities live in `report/jvm-profile-files.json`; the record binds
+that full manifest by digest instead of repeating thousands of class entries.
 
 `bench.profile.BooleanProofCoverageProfile` accepts `suite=ID problem=NAME sha256=HEX
 work=N seed=N splits=N` for one DIMACS source with at most 4,096 Boolean variables,
