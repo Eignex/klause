@@ -1447,8 +1447,14 @@ private fun LpEngine.retainedRootLpRelaxationBound(
         observeStage("CANCELLED_INITIAL")
         return Double.NaN
     }
+    // Cut owners retain propagation-derived bounds across root-to-node adoption.
+    val root = if (globalCuts.isEmpty()) null else {
+        observeStage("AT_ROOT_PROPAGATION")
+        PropagationSession(problem, cancellation)
+    }
     observeStage("AT_SOURCE_LAYOUT")
-    val relaxation = sourceRootRelaxation(relaxer, globalCuts, cancellation) ?: run {
+    val relaxation = (if (root == null) sourceRootRelaxation(relaxer, globalCuts, cancellation)
+        else nodeRelaxation(relaxer, root, globalCuts)) ?: run {
         if (sparseTrialActive) sink.lp.sparseTrial = sink.lp.sparseTrial + ("RootSourceLayoutDeclined" to 1L)
         cpAdapter.reset()
         if (retainedRootRemainingWork() <= 0L) {
@@ -1509,7 +1515,7 @@ private fun LpEngine.retainedRootLpRelaxationBound(
         observeStage("QUERY_LOOP_STOPPED")
         return Double.NaN
     } finally {
-        val retained = cpAdapter.retainRootProbe()
+        val retained = cpAdapter.retainRootProbe(root)
         if (sparseTrialActive) {
             sink.lp.sparseTrial = sink.lp.sparseTrial + ("RootOwnerRetained" to if (retained) 1L else 0L)
         }

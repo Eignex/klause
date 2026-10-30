@@ -227,10 +227,11 @@ expanded hulls stay outside its allowance. Root rounding preserves the ordinary
 admission's probe intent; sources declined by that guard gain no automatic probe.
 The initial root bound and subsequent root propagation share the existing scoped numerical owner;
 handoff requires matching source identities and root scopes, and live bound adoption
-rechecks authority before reusing its basis. Retained root consultations install source-root
-domain views without constructing a propagation session. They read no live search restriction;
+rechecks authority before reusing its basis. Consultations without selected root cuts install
+source-root domain views without constructing a propagation session. They read no live search restriction;
 the compact immutable layout remains available for later node adoption, while other layouts
-retain their source emissions. Root cuts use the same source authority before handoff.
+retain their source emissions. Cut-bearing consultations keep propagation-derived root bounds,
+preserving completed cut-owner results across later node adoption.
 Completed cold layout construction and template imports debit the containing LP allowance, and
 root cancellation withholds an incomplete installation. A declined retained source layout
 retires that attempt and uses the existing standalone numerical route within the
