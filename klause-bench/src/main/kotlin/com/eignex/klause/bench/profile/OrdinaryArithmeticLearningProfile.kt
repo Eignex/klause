@@ -178,12 +178,12 @@ internal object OrdinaryArithmeticLearningProfile {
                     }
                 }
                 val liveAtInspection = native?.let { LivePropagationState.current(it) != null } == true
-                val beforeRetirement = if (liveAtInspection) native?.learnedClauseCount else null
+                val beforeRetirement = if (liveAtInspection) native.learnedClauseCount else null
                 val beforeLifecycle = capture?.lifecycle()
                 capture?.record("traversal.finished")
                 if (liveAtInspection) {
-                    native?.popToLevel(0)
-                    native?.forgetLearnedClauses { _, _ -> false }
+                    native.popToLevel(0)
+                    native.forgetLearnedClauses { _, _ -> false }
                     capture?.record("traversal.retirement-checked")
                 }
                 val elapsed = System.nanoTime() - opened
@@ -216,7 +216,7 @@ internal object OrdinaryArithmeticLearningProfile {
                     put("lifecycleBeforeRetirement", beforeLifecycle ?: JsonNull)
                     put("lifecycleAfterRetirement", capture?.lifecycle() ?: JsonNull)
                     put("storedBeforeRetirement", beforeRetirement)
-                    put("storedAfterRetirement", if (liveAtInspection) native?.learnedClauseCount else null)
+                    put("storedAfterRetirement", if (liveAtInspection) native.learnedClauseCount else null)
                     put("retirementInspection", when {
                         liveAtInspection -> "manual-retraction"
                         native != null -> "solver-released"
