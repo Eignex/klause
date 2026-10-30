@@ -10,22 +10,26 @@ import kotlin.test.assertTrue
 class LpDirectionalHistoryTest {
     @Test
     fun `both directions need two observations before scoring`() {
-        val history = LpDirectionalHistory({})
-        val variable = VarRef.IntVar(0)
-        repeat(2) {
-            history.beginNode(0)
-            history.record(10.0)
-            history.branch(variable, 2.25)
-            history.commit(SearchDecision.IntAtMost(0, 2), 1)
-            history.beginNode(1)
-            history.record(11.0)
-            assertTrue(history.score(variable, 2.25).isNaN())
-            history.commit(SearchDecision.IntAtLeast(0, 3), 1)
-            history.beginNode(1)
-            history.record(13.0)
-        }
+        for (priors in listOf(false, true)) {
+            val history = LpDirectionalHistory({}, useClassPriors = priors)
+            val variable = VarRef.IntVar(0)
+            repeat(2) {
+                history.beginNode(0)
+                history.record(10.0)
+                history.branch(variable, 2.25)
+                history.commit(SearchDecision.IntAtMost(0, 2), 1)
+                history.beginNode(1)
+                history.record(11.0)
+                assertTrue(history.score(variable, 2.25).isNaN())
+                assertFalse(history.mayHaveScores)
+                history.commit(SearchDecision.IntAtLeast(0, 3), 1)
+                history.beginNode(1)
+                history.record(13.0)
+            }
 
-        assertEquals(1.5, history.score(variable, 2.25), 1e-9)
+            assertEquals(1.5, history.score(variable, 2.25), 1e-9)
+            assertTrue(history.mayHaveScores)
+        }
     }
 
     @Test
@@ -154,12 +158,14 @@ class LpDirectionalHistoryTest {
             history.beginNode(1)
             history.record(11.0)
             assertTrue(history.score(VarRef.IntVar(2), 2.25).isNaN())
+            assertFalse(history.mayHaveScores)
             history.commit(SearchDecision.IntAtLeast(variable, 3), 1)
             history.beginNode(1)
             history.record(13.0)
         }
 
         assertEquals(1.5, history.score(VarRef.IntVar(2), 2.25), 1e-9)
+        assertTrue(history.mayHaveScores)
         assertTrue(history.usesPrior(VarRef.IntVar(2)))
     }
 
@@ -227,6 +233,7 @@ class LpDirectionalHistoryTest {
         repeat(3) { history.beginNode(0) }
 
         assertTrue(history.score(VarRef.Bool(1), 0.5).isNaN())
+        assertFalse(history.mayHaveScores)
     }
 
     @Test
@@ -247,5 +254,6 @@ class LpDirectionalHistoryTest {
         history.clear()
 
         assertTrue(history.score(VarRef.Bool(1), 0.5).isNaN())
+        assertFalse(history.mayHaveScores)
     }
 }
