@@ -1034,6 +1034,9 @@ read alone establishes neither consumption nor a performance benefit.
 objective check before import on ordinary linear-source execution.
 Completed advisory seeds require the original witness check's exact-feasibility
 result. Ordinary tolerance acceptance alone cannot qualify the exact handoff.
+Repair publication uses the same original-source callback when supplied.
+`jointRepairOriginalPublication*` counts checks, acceptance, rejection and unavailable
+checks; their time is included in `jointRepairPublicationNs` and the active cap.
 `*CompletionNanos` includes seed preparation, retained-attempt lookup, exact recovery
 and checking for every call, including reused and failed attempts. It is a subset of
 companion active time. Approximate real seed coordinates guide exact rational

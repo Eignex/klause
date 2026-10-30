@@ -402,6 +402,10 @@ work and allocation ceilings equally and retain their query funding across slice
 They consume the finite scheduler's checked exact incumbent exchange. Joint repair
 has witness authority. Its full-source check of a completed point uses the containing
 lifetime as an atomic publication step; this time belongs to its active allowance.
+When exact incumbent completion supplies an original-source callback, repair also
+checks each completed point's exact original feasibility and adjusted objective
+before publication. This check shares the completion funding and publication lifetime;
+working-model or tolerance acceptance alone cannot admit the point.
 
 Opt-in `source-incumbent-completion=true` reconstructs advisory real coordinates
 before residual LP completion. Reconstructed advisory seeds require exact working
@@ -611,9 +615,9 @@ The scope control accepts only the same curated single-core optimization routes.
 This share protects exhaustive traversal whose progress can stay invisible until a
 proof completes. Only live resumable backtrack workers with source-proof authority
 qualify; improvement-only workers, auxiliary proof workers and unproductive auxiliary
-incumbent trials keep their separate policies. Restarting workers and heuristics
-remain under reward selection. Scheduling grants no proof authority and does not
-change incumbent validation or terminal admission.
+incumbent trials keep their separate policies. Heuristics remain under reward
+selection, as do restarting workers in the ordinary retained scope. Scheduling grants
+no proof authority and does not change incumbent validation or terminal admission.
 
 ### Phase progress and cost
 

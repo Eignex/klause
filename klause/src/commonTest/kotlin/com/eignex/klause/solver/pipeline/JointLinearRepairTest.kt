@@ -4,8 +4,17 @@ import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearSourceObjective
+import com.eignex.klause.ir.LinearSourceProblem
+import com.eignex.klause.ir.LinearSourceTerm
+import com.eignex.klause.ir.LinearSourceVariable
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.ProblemSettings
+import com.eignex.klause.ir.SemanticRational
+import com.eignex.klause.ir.SourceFormat
+import com.eignex.klause.ir.SourceSemantics
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.lp.SparseSourceLpPolicy
 import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.simplex.exact.BigFraction
@@ -19,7 +28,10 @@ import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.validation.LinearSourceCheck
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -29,6 +41,76 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class JointLinearRepairTest {
+    @Test
+    fun `accepted original checks should respect publication lifetime and funding`() {
+        val model = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(-1.0))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
+        val params = TheoryParams(sourceIncumbentCompletion = true)
+
+        for (limit in listOf("none", "lifetime", "funding")) {
+            var cancelled = false
+            var checkedValue: BigFraction? = null
+            JointLinearRepair(model, source, objective, params,
+                publicationLifetime = Cancellation { cancelled },
+                incumbentCompletionCheck = { _, value, token ->
+                    checkedValue = value
+                    token.charge(if (limit == "funding") params.sourceLpWorkLimit else 1L)
+                    cancelled = limit == "lifetime"
+                    true
+                },
+            ).use { repair ->
+                var result = repair.check(condition, Cancellation.Never)
+                repeat(64) {
+                    if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, Cancellation.Never)
+                }
+
+                assertEquals(BigFraction.MINUS_ONE, checkedValue)
+                if (limit != "none") assertEquals(ExactNeighborhoodResult.Undecided, result)
+                else assertEquals(BigFraction.ONE,
+                    assertNotNull(assertIs<ExactNeighborhoodResult.Witness>(result).sample.exactReals).single())
+            }
+        }
+    }
+
+    @Test
+    fun `exact original checking should withhold a tolerance accepted repair point`() {
+        val originalSource = LinearSourceProblem(listOf(LinearSourceVariable("r", false,
+            SemanticRational.ZERO, SemanticRational.ONE)), emptyList(),
+            LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE)), sense = ObjectiveSense.MAXIMIZE),
+            SourceSemantics(SourceFormat.MPS, feasibilityTolerance = SourceTolerance(
+                absolute = SemanticRational.of(BIG_ONE, bigIntOf(1_000_000)))).resolve())
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(originalSource, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED, maximize = true))
+        val original = assertNotNull(invocation.linearSource)
+        val model = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0000005))
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(-1.0))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val endpoint = assertNotNull(BigFraction.ofDouble(1.0000005))
+        val condition = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to endpoint), mapOf(0 to endpoint))
+
+        for (checkOriginal in listOf(false, true)) {
+            JointLinearRepair(model, source, objective, TheoryParams(sourceIncumbentCompletion = true),
+                incumbentCompletionCheck = if (checkOriginal) original.incumbentCompletionCheck(null) else null,
+            ).use { repair ->
+                var result = repair.check(condition, Cancellation.Never)
+                repeat(64) {
+                    if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, Cancellation.Never)
+                }
+
+                if (checkOriginal) assertEquals(ExactNeighborhoodResult.Undecided, result)
+                else {
+                    val point = assertIs<ExactNeighborhoodResult.Witness>(result).sample
+                    val accepted = assertIs<LinearSourceCheck.Accepted>(original.check(point, Cancellation.Never))
+                    assertFalse(accepted.witness.exact)
+                }
+            }
+        }
+    }
+
     @Test
     fun `a rejected center should clear its preparation continuation request`() {
         val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(2), null, null),
