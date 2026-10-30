@@ -902,8 +902,9 @@ its separate source-defined verdict and supplies no exact attainment claim.
 
 Retained certification owners reuse the existing single-package counter-result store.
 A checked bound can answer a bound request, but cannot answer a completion or attainment
-request by itself. Reuse requires the identical immutable exact state, complete capture
-key and production acceptance policy. Bounds, scope, active rows, matrix, objective,
+request by itself. Reuse requires the production acceptance policy. Immutable exact
+authority matches by state identity; mutable working models require a complete
+bounded capture key. Bounds, scope, active rows, matrix, objective,
 origins, strictness and integrality remain part of that authority. These independent
 packages retain no floating vectors or ordered basis; exact factor reuse still requires
 its existing matrix and ordered-basis compatibility checks. Edits and owner retirement
@@ -953,8 +954,9 @@ stall heuristics only schedule work; they never authorize proofs.
 | Rational basis verification | Exact FTRAN gives basics; BTRAN gives duals or Farkas candidates. Singularity requests repair. |
 | Exact continuation | Import the numerical basis pivot by pivot, repairing unseatable basics with logicals, then run Bland feasibility. |
 
-Rational work escalates from `Frac128` to `BigFraction`; fixed-width overflow
-restarts the operation from authority, and every attempt is charged. An internal
+Rational work escalates from `Frac128` to `BigFraction`. Production exact
+continuation promotes a retained complete tableau on fixed-width overflow; other
+bounded operations restart from authority. Every attempt is charged. An internal
 consumer context or continuation request can opt into arbitrary precision before
 the first tableau. This selects arithmetic without changing cumulative limits,
 import identity or current-source verification. A retained tableau keeps its
