@@ -3,6 +3,7 @@ package com.eignex.klause.lp.optimization
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
+import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCondition
@@ -62,11 +63,46 @@ class LinearAuthorityAggregateCutsTest {
                     assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
                 assertEquals(SourceEvidenceCheck.Checked,
                     SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)))
-                if (selection) {
-                    val selected = authority.cutObservations()["numericalCutSelectionSelected"] ?: 0L
-                    assertTrue(selected > 0L)
-                }
+                if (aggregate) assertTrue(CutFamily.SOURCE_AGGREGATION in result.cutBoundFamilies)
             }
+        }
+    }
+
+    @Test
+    fun `installed aggregate cuts should retain their checked numerical recipe across scoped queries`() {
+        val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val triangle = (2..4).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val mixed = SourceInequality(left.coefficients + (residual to BigFraction.MINUS_ONE), left.rhs)
+        val premises = linkedMapOf("left" to SourcePremise(mixed), "right" to SourcePremise(right),
+            "bound" to SourcePremise(SourceInequality(mapOf(residual to BigFraction.MINUS_ONE), BigFraction.ZERO)))
+        for ((index, coordinate) in triangle.withIndex()) {
+            premises["nonnegative $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.MINUS_ONE), BigFraction.ZERO))
+            premises["edge $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.ONE, triangle[(index + 1) % 3] to BigFraction.ONE),
+                BigFraction.ONE))
+        }
+        val source = SourceProofContext(scope.copy(objective = SourceObjective("sum", ObjectiveSense.MINIMIZE)),
+            setOf(x, y, real, residual) + triangle, premises,
+            (triangle + x + y).associateWith { BigFraction.MINUS_ONE } + (residual to BigFraction.ONE))
+        val child = source.atScope(source.scope.copy(condition = SourceCondition(upper = mapOf(x to BigFraction.ZERO))))
+        val capture = LinearAuthorityCapture(4, 10_000L, 1_000_000L, Cancellation.Never)
+        LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = true).use { authority ->
+            authority.capture = capture
+            authority.advanceWithPointCuts(source, Cancellation.Never)
+            val attempts = assertNotNull(authority.cutObservations()["numericalCutAggregatePairAttempts"])
+            assertEquals(1L, authority.cutObservations()["numericalCutSelectionAdoptedInstalled"])
+            assertEquals(1, capture.records.size)
+
+            val result = authority.advanceWithPointCuts(child, Cancellation.Never)
+
+            assertEquals(attempts, authority.cutObservations()["numericalCutAggregatePairAttempts"])
+            assertEquals(2, capture.records.size)
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(-5) * BigFraction.ofLong(2).reciprocal()),
+                assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
+            assertTrue(CutFamily.SOURCE_AGGREGATION in result.cutBoundFamilies)
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(child.withLinearAuthority()).verify(assertNotNull(result.bound)))
         }
     }
 

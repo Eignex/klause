@@ -189,7 +189,11 @@ internal class LinearAuthority(
             }
             val baselineFamily = family
             val baselineQuery = prepared
-            if (!checkNotNull(family.cuts).pointDirected && directedFamily !== family && pointMask == null &&
+            val currentRows = checkNotNull(family.cuts).rows
+            val generatedRecipe = currentRows.isNotEmpty() && currentRows.size <= 64 &&
+                currentRows.all { it.family == CutFamily.SOURCE_AGGREGATION }
+            if (!generatedRecipe && !checkNotNull(family.cuts).pointDirected && directedFamily !== family &&
+                pointMask == null &&
                 ((aggregateCuts && prepared.coordinates.any { it.kind == SourceCoordinate.Kind.Real }) ||
                     checkNotNull(family.cuts).rows.any { it.mixed })) {
                 directedFamily = family
@@ -425,6 +429,7 @@ internal class LinearAuthority(
         val prepared = if (retainLp || cuts) {
             template?.takeIf { it.matches(source) && (it.cuts != null) == cuts &&
                 (!cuts || it.cuts?.complementary == (cutMask != null) ||
+                    pointPolicy?.managesCurrentRecipe(it.cuts?.rows) == true ||
                     it.coordinates.all { coordinate -> coordinate.kind == SourceCoordinate.Kind.Integer }) }
                 ?: LinearAuthorityTemplate.prepare(source, cancellation, cuts, cutMask != null) { work ->
                     cutPreparationWork += work
@@ -449,7 +454,8 @@ internal class LinearAuthority(
         prepared: LinearAuthorityTemplate, cancellation: Cancellation,
         point: Map<SourceCoordinate, Double>? = null,
     ): LinearAuthorityTemplate? {
-        val generateAggregates = aggregateCuts && !deferAggregatePreparation
+        val generateAggregates = aggregateCuts &&
+            (!deferAggregatePreparation || prepared.cuts?.rows?.isEmpty() == true)
         if (!generateAggregates && additionalCuts.isEmpty()) return prepared
         val funded = Cancellation { cancellation() || budget.funding?.paused == true }
         val generated = if (generateAggregates) LinearAuthorityAggregateCuts.prepareSourcePairs(

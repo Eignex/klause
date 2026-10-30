@@ -26,6 +26,7 @@ internal class LinearAuthorityPointCuts(
     private var cooldown = 0
     private var misses = 0
     private var retired = false
+    private var managedCurrent = false
     private val inactiveScans = HashMap<Int, Int>()
     var adoptedCurrent: Boolean = false
         private set
@@ -33,8 +34,12 @@ internal class LinearAuthorityPointCuts(
     fun candidatesRetired(rows: List<LinearAuthorityCut>?): Boolean =
         rows != null && family === rows && retired
 
+    fun managesCurrentRecipe(rows: List<LinearAuthorityCut>?): Boolean =
+        rows != null && family === rows && managedCurrent
+
     fun releaseCandidates() {
         family = null
+        managedCurrent = false
         inactiveScans.clear()
     }
 
@@ -88,6 +93,7 @@ internal class LinearAuthorityPointCuts(
             cooldown = 0
             misses = 0
             retired = false
+            managedCurrent = false
             inactiveScans.clear()
         }
         if (retired) {
@@ -122,7 +128,15 @@ internal class LinearAuthorityPointCuts(
                 objective[coordinates[id]] = cost
                 objectiveNormSquared += cost * cost
             }
-            if (integerOnly && installed.isEmpty() && rows.size <= maximumCuts && checked.size == rows.size) {
+            var aggregateOnly = adoptCurrent && rows.size <= maximumCuts
+            if (aggregateOnly) {
+                for (row in rows) {
+                    if (!meter.charge(1L)) return installed
+                    aggregateOnly = aggregateOnly && row.family == CutFamily.SOURCE_AGGREGATION
+                }
+            }
+            if ((integerOnly || aggregateOnly) && installed.isEmpty() && rows.size <= maximumCuts &&
+                checked.size == rows.size) {
                 if (!meter.charge(rows.size.toLong(), 128L + rows.size * 64L) ||
                     rows.indices.any { it !in checked }) return installed
                 for (row in rows) {
@@ -130,6 +144,7 @@ internal class LinearAuthorityPointCuts(
                     onCut(row.family, "POINT_ADOPTED_INSTALLED", 1L)
                 }
                 adoptedCurrent = true
+                managedCurrent = true
                 observe("AdoptedInstalled", rows.size.toLong())
                 return checked.toSet()
             }

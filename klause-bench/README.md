@@ -745,10 +745,11 @@ Point selection starts from the current checked recipe. `CurrentFallback` and
 `BaseQueries` counts base relaxation attempts. A point-selection arm can therefore
 contain both CURRENT and POINT_SELECTION recipe work; retain the ordinary source
 totals and both disjoint recipe costs.
-`numericalCutSelectionAdoptedInstalled` counts already-installed pure cuts entering
-the bounded mask from an integer-only current recipe. Adoption adds no LP query or
-root miss; later completed points supply aging observations. These rows are not
-newly separated cuts. Keep their subsequent scoring, proof and retirement costs.
+`numericalCutSelectionAdoptedInstalled` counts already-installed cuts entering
+the bounded mask from an integer-only current recipe or an aggregate-only cut
+family. Adoption adds no LP query or root miss; later completed points supply aging
+observations. These rows are not newly separated cuts. Keep their generation,
+adoption, subsequent scoring, proof and retirement costs.
 `numericalCutSelectionPointPrepared` counts one successful point-directed candidate
 preparation per immutable source template. It chooses each available continuous
 endpoint independently from the point. Its generation shares the original
@@ -769,11 +770,13 @@ The generated-aggregate replay includes the ordinary opt-in producer's bounded
 source-pair indexing and discovery. Keep this cost separate from replaying supplied
 diagnostic proposals. `AggregatePair*` reports coverage, attempts and limiting
 stages; a partial generation establishes no general absence of useful cuts.
-With both aggregate and point selection enabled, the initial CURRENT query omits
-generated aggregates. Discovery and fresh candidate checks are charged before
-point scoring; selected rows enter a subsequent masked query. A fallback can retain
-the individual-cut recipe after paying discovery costs, so retain both recipe
-totals and report actual selected/installed/retired rows separately.
+With both aggregate and point selection enabled, an empty individual-cut family
+installs the bounded aggregate family in the initial CURRENT query. A fully checked
+family of at most 64 rows enters aging while retaining that query. With individual
+cuts present, discovery and fresh candidate checks follow the initial point;
+selected rows enter a subsequent masked query. A fallback can retain the individual
+recipe after paying discovery costs, so retain both recipe totals and report actual
+selected/installed/adopted/retired rows separately.
 Point-directed generation applies the ordinary normalized efficacy threshold before
 retaining a proposal. `AggregatePairLowEfficacy` and `AggregatePairPointUnavailable`
 retain rejected projections; `AggregatePairPointEligible` counts proposals admitted

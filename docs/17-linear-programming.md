@@ -392,8 +392,11 @@ Rows wider than the support cap are skipped with incomplete coverage. The cached
 proposals under 500,000 preparation work and 8 MiB modeled allocation, with
 per-attempt limits shared with explicit aggregation. Stopped or limited
 preparation reports its decline and leaves only completed proposals available.
-Point selection obtains its initial point from the current individual-cut recipe,
-then constructs and checks aggregates alongside point-directed row alternatives.
+Point selection obtains its initial point from the current individual-cut recipe.
+When that family is empty, the initial query includes the bounded aggregate family;
+up to 64 fully checked installed aggregate rows enter aging without replacing that
+query. Otherwise, selection constructs and checks aggregates alongside
+point-directed row alternatives.
 When both source endpoints are stated, aggregate rounding selects the endpoint
 nearest the point independently for each continuous coordinate. One-sided coordinates
 retain their stated side; unavailable finite distances retain the ordinary choice.
@@ -401,11 +404,11 @@ Aggregate proposal retention requires the same finite normalized violation used
 by point selection, so satisfied proposals leave room for later separating pairs.
 Projection and declined proposals spend the containing generation allowance.
 Unavailable projections withhold complete eligibility coverage.
-Only proposals selected against that point enter the replacement mask. An
+Only proposals selected against that point enter a replacement mask. An
 unproductive attempt retains the current recipe and its checked bound; selected
 aggregates follow the same bounded scoring, aging and retirement as other rows.
-Masked queries retain the completed point-prepared template, including when its
-individual family is empty. Candidate row IDs belong to that same checked template.
+Masked queries retain their adopted current or completed point-prepared template.
+Candidate row IDs belong to that same checked template.
 Aggregation is disabled by default.
 
 ### Root preparation
@@ -1108,11 +1111,13 @@ A new template first runs the ordinary checked cut recipe; a completed point can
 add one selection round at that node. A trial that admits no candidate retains
 the ordinary template, checked query and numerical owner for later queries of that
 template. Successful selection retains its checked mask instead.
-Integer-only templates with at most 64 fully checked installed cuts adopt that
-mask directly from the current recipe, without another LP query or a root miss.
+Integer-only templates and aggregate-only cut families with at most 64 fully checked
+installed cuts adopt that mask directly from the current recipe, without another
+LP query or a root miss.
 Their later completed points age installed rows under the same scoring limits.
-Complementary endpoint mode shares the integer-only template because it adds no
-continuous bound alternatives.
+Complementary endpoint mode retains an adopted current template; its mask refers
+to the installed definitions. Integer-only templates also share endpoint modes
+because they add no continuous bound alternatives.
 The current baseline, candidate preparation and any replacement keep their
 separate containing costs. The score combines normalized violation,
 inverse square-root support and objective parallelism. The model-facing cut pool
