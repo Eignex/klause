@@ -155,6 +155,7 @@ internal object KlauseLabSuite : BenchSuite {
         }
         val provenance = record.buildProvenance?.let { build ->
             build.copy(
+                harness = ComparisonProvenance.current.retained,
                 runtimeOptions = build.runtimeOptions +
                     ("lab.cli.args" to Files.readString(context.outputDirectory.resolve("cli.args"))),
             )
@@ -162,14 +163,9 @@ internal object KlauseLabSuite : BenchSuite {
         val retained = record.copy(
             comparisonControls = comparisonControls(case) + buildMap {
                 provenance?.let { build ->
-                    put(
-                        "runtimeFingerprint",
-                        build.copy(
-                            distribution = emptyMap(),
-                            harness = emptyMap(),
-                            runtimeOptions = build.runtimeOptions - "KLAUSE_CLI_OPTS" - "KLAUSE_CLI_PREFLIGHT_OPTS",
-                        ).fingerprint,
-                    )
+                    put("runtimeFingerprint", ComparisonProvenance.runtimeFingerprint(build))
+                    put("harnessFingerprint", ComparisonProvenance.current.harnessFingerprint)
+                    put("libraryFingerprint", ComparisonProvenance.current.libraryFingerprint)
                 }
                 record.compilerIdentity?.let { compiler ->
                     put(
