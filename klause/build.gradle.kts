@@ -77,6 +77,9 @@ val lpProfileSources = kotlin.sourceSets.create("lpProfile") {
 }
 kotlin.targets.withType<org.jetbrains.kotlin.gradle.targets.jvm.KotlinJvmTarget>().configureEach {
     val main = compilations.getByName("main")
+    main.compileTaskProvider.configure {
+        mustRunAfter("linkLpProfileReleaseExecutableLinuxX64")
+    }
     val profile = compilations.create("lpProfile") {
         associateWith(main)
         defaultSourceSet.dependsOn(lpProfileSources)
@@ -92,9 +95,6 @@ kotlin.targets.withType<org.jetbrains.kotlin.gradle.targets.jvm.KotlinJvmTarget>
 }
 kotlin.targets.withType<org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget>().configureEach {
     val main = compilations.getByName("main")
-    main.compileTaskProvider.configure {
-        mustRunAfter("stageLpProfileJvm")
-    }
     val profile = compilations.create("lpProfile") {
         associateWith(main)
         defaultSourceSet.dependsOn(lpProfileSources)
