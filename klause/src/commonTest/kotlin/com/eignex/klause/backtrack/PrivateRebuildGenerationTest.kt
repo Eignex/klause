@@ -81,6 +81,32 @@ class PrivateRebuildGenerationTest {
     }
 
     @Test
+    fun `translated learning should enter a reconstructed private consumer`() {
+        for (native in listOf(false, true)) {
+            val source = Problem(6, 0, emptyArray(), arrayOf(
+                Clause(intArrayOf(3, 5, 6)), Clause(intArrayOf(0, 2)),
+                Clause(intArrayOf(3, 5, 7)), Clause(intArrayOf(1, 2)),
+                Clause(intArrayOf(2, 4, 6)), Clause(intArrayOf(2, 4, 7)),
+                Clause(intArrayOf(8, 10)), Clause(intArrayOf(8, 11)),
+            )).bake()
+            val session = PropagationSession(source, nativeSat = native)
+            session.addRootDerivedClause(Clause(intArrayOf(8)), 1, OWN_ORIGIN, false)
+            session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
+
+            val generation = assertNotNull(PrivateRebuildGeneration.prepare(session, 1_048_576L, Cancellation.Never))
+            val reduced = assertIs<SolveResult.Sat>(BacktrackSolver(generation.problem).solve(
+                BacktrackParams(nativeSat = native),
+            ))
+            val point = generation.reconstruct(reduced.assignment)
+
+            assertEquals(1, generation.warmClauses.translated)
+            assertTrue(source.factors.all { factor ->
+                (factor as Clause).literals.any { Lit.evaluate(it, point.boolValue(Lit.variable(it))) }
+            })
+        }
+    }
+
+    @Test
     fun `completed eliminations should remain consumable when the local pass allowance expires`() {
         val source = Problem(7, 0, emptyArray(), listOf(
             Clause(intArrayOf(0, 2)), Clause(intArrayOf(1, 3)),

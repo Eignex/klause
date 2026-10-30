@@ -196,6 +196,8 @@ internal class PrivateRebuildSatisfaction(
         note("WarmClausesCopied", prepared.warmClauses.clauses.size.toLong())
         note("WarmClauseLiterals", prepared.warmClauses.literals)
         note("WarmClauseWork", prepared.warmClauses.work)
+        note("WarmClausesTranslated", prepared.warmClauses.translated.toLong())
+        note("WarmProjectionScratchBytes", prepared.warmClauses.projectionScratchBytes)
         note("WarmClauseNanos", prepared.warmClauseNanos)
         note("BakeConstructionEntries", prepared.bakeWork.constructionEntries)
         note("BakePropagationWork", prepared.bakeWork.propagationWork)
