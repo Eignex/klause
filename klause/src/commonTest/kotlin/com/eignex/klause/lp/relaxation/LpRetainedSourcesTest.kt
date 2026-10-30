@@ -39,7 +39,9 @@ class LpRetainedSourcesTest {
             val sources = LpRetainedSources(problem, consumer)
             LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
                 val edit = assertNotNull(sources.prepare(owner.state, RootDomains(problem)))
-                assertTrue(owner.replaceRows(edit.retired, edit.columns, edit.rows, false, objective = edit.objective))
+                val assertions = assertNotNull(edit.boundAssertions(0L))
+                assertTrue(owner.replaceRows(edit.retired, edit.columns, edit.rows, false,
+                    permanentRows = edit.permanentRows, objective = edit.objective, assertions = assertions))
                 edit.commit()
 
                 val result = assertNotNull(owner.solve())
