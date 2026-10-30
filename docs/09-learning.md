@@ -336,8 +336,11 @@ remain clause reasons. Support filtering keeps its hole-aware semantics. Repeate
 cells retain their selected index guard, and a result alias supplies no arithmetic row.
 
 Opposite-sign nonnegative combinations use checked signed arithmetic and integer
-gcd normalization. Each combination must remain conflicting. A retained row must
-propagate against the session's historical domains at its first-UIP clause's native
+gcd normalization. One analysis retains only its most recent normalized source, keyed
+by projection identity, signed guard and inequality side. Reusing that immutable row
+still validates each endpoint's historical guard, raw requested bound and membership.
+The cached source is released with the analysis. Each combination must remain
+conflicting. A retained row must propagate against the session's historical domains at its first-UIP clause's native
 backjump and the mapped shared target. Each combination checks that same native
 target, preserving clausal backjump selection. The raw assertion target must have
 been a member of its historical domain; a later carve cannot remove that earlier
