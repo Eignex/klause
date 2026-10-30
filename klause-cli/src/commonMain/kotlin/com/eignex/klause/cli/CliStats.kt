@@ -374,6 +374,14 @@ internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> {
         stats.portfolio.maxSliceWork?.let { "portfolioMaxSliceWork" to "$it" },
         stats.portfolio.sliceGrowth?.let { "portfolioSliceGrowth" to "$it" },
     )
+    val proofs = stats.portfolio.booleanProof.flatMapIndexed { index, proof -> listOfNotNull(
+        "booleanProof.$index.tasks" to "${proof.tasks}",
+        "booleanProof.$index.nativeRefutations" to "${proof.nativeRefutations}",
+        "booleanProof.$index.probeSegments" to "${proof.probeSegments}",
+        "booleanProof.$index.probeWork" to "${proof.probeWork}",
+        "booleanProof.$index.workerWork" to "${proof.workerWork}",
+        proof.decline?.let { "booleanProof.$index.decline" to it },
+    ) }
     val schedule = stats.portfolio.arms.map { arm ->
         val credit = arm.credit.entries.joinToString("") { (signal, amount) -> " $signal=${round4(amount)}" }
         val sharing = arm.sharing.channels.entries.joinToString("") { (channel, t) ->
@@ -426,7 +434,7 @@ internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> {
         "alnsBootstrapLsMillis" to "${alns.bootstrapLsMillis}",
         "alnsRepairMillis" to "${alns.repairMillis}",
     )
-    return listOfNotNull(profile, reseeding) + slices + schedule + phases + lifecycle + failures + inner
+    return listOfNotNull(profile, reseeding) + slices + proofs + schedule + phases + lifecycle + failures + inner
 }
 
 private fun diagnosticString(value: String): String = buildString {

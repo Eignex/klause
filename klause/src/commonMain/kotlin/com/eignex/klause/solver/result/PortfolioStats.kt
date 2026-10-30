@@ -21,6 +21,8 @@ data class PortfolioStats(
     val sliceGrowth: Double? = null,
     /** Inclusive construction, scheduling, checking and handle retirement time; source preparation precedes it. */
     val invocationNanos: Long = 0,
+    /** Per-invocation observations for requested Boolean proof sharing. */
+    val booleanProof: List<BooleanProofStats> = emptyList(),
 ) {
     /** Combine two runs' schedules: the arms of both, in order, under the first one's classification. */
     fun mergedWith(o: PortfolioStats): PortfolioStats = PortfolioStats(
@@ -31,6 +33,7 @@ data class PortfolioStats(
         maxSliceWork ?: o.maxSliceWork,
         sliceGrowth ?: o.sliceGrowth,
         invocationNanos + o.invocationNanos,
+        booleanProof + o.booleanProof,
     )
 }
 
