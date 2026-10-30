@@ -39,6 +39,7 @@ internal data class PortfolioInvocationControls(
     val diagnostics: PortfolioDiagnostics? = null,
     val rewardPolicy: PortfolioRewardPolicy? = null,
     val onProgress: ((PortfolioEvent) -> Unit)? = null,
+    val improvementProofShare: Double = 0.5,
 )
 
 internal class PortfolioInvocationPolicy(
@@ -108,6 +109,7 @@ internal class PortfolioInvocation(
             it.reserveBeforeIncumbentOnly = selected.reserveBeforeIncumbentOnly
             it.incumbentProbeArms = selected.probes
             it.initialProbeWeights = selected.probeWeights
+            it.improvementProofShare = controls.improvementProofShare
         }
     } catch (failure: Throwable) {
         for (worker in workers.asReversed()) {

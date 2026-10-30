@@ -18,6 +18,36 @@ import kotlin.time.TestTimeSource
 
 class PortfolioProofCoverageTest {
     @Test
+    fun `configured proof share should cover silent retained siblings in elapsed and work schedules`() {
+        for (share in listOf(0.5, 0.75, 1.0)) {
+            for (workDriven in listOf(false, true)) {
+                val clock = TestTimeSource()
+                val elapsed = LongArray(3)
+                val workers = List(3) { arm ->
+                    trackingWorker("worker$arm", arm, ScriptedSearch({ arm == 0 && it == 0 }) {
+                        elapsed[arm] += 100L
+                        clock += 100.milliseconds
+                    }).also { it.restartingSearch = arm == 0 }
+                }
+
+                Portfolio(workers, fixedBandit(3, 0), reseedStaleThreshold = 0,
+                    baseSliceWork = 1, maxSliceWork = 1,
+                    diagnostics = if (workDriven) PortfolioDiagnostics(64) else null).also {
+                    it.runTimeSource = clock
+                    it.improvementProofShare = share
+                }.use { it.minimize(Cancellation { elapsed.sum() >= 6_400L }) }
+
+                val owed = (elapsed.sum() - 100L) * share / 2
+                for (arm in 1..2) {
+                    assertTrue(elapsed[arm] >= owed - 100L,
+                        "share=$share work=$workDriven arm=$arm received=${elapsed[arm]} owed=$owed")
+                }
+                assertTrue(kotlin.math.abs(elapsed[1] - elapsed[2]) <= 100L)
+            }
+        }
+    }
+
+    @Test
     fun `silent retained traversal should prove before long rewarded segments consume the remaining time`() {
         val clock = TestTimeSource()
         val visits = IntArray(2)

@@ -12315,6 +12315,7 @@ public final class com/eignex/klause/solver/pipeline/ExecutionOption$Companion {
 	public final fun getPhaseRetention ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getPhaseSaving ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getPortfolioProgress ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getPortfolioProofShare ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getPortfolioReward ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getPortfolioWork ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getPresolveAbortFraction ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;

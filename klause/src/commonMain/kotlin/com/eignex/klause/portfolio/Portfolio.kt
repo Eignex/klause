@@ -158,6 +158,11 @@ class Portfolio(
             require(value.all { it > 0 })
             field = value.copyOf()
         }
+    internal var improvementProofShare: Double = 0.5
+        set(value) {
+            require(value.isFinite() && value in 0.5..1.0)
+            field = value
+        }
 
     internal var evidenceVerification: PortfolioEvidence? = workers.firstNotNullOfOrNull { it.evidenceModel }?.let {
         val verifier = PortfolioEvidence(it, CandidateVerifier.trusting())
@@ -1112,7 +1117,7 @@ class Portfolio(
             val total = elapsed.values.sum()
             // Retained exhaustive traversal can close a proof without earning a progress signal.
             // Fund it throughout the incumbent epoch so a long competing segment cannot consume its catch-up time.
-            val owed = total / 2 / complete.size
+            val owed = total * improvementProofShare / complete.size
             return free.minBy { elapsed.getValue(it) }.takeIf { elapsed.getValue(it) < owed }
         }
 

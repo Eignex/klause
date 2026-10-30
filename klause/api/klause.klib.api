@@ -5889,6 +5889,8 @@ final class <#A: kotlin/Any?> com.eignex.klause.solver.pipeline/ExecutionOption 
             final fun <get-phaseSaving>(): com.eignex.klause.solver.pipeline/ExecutionOption<kotlin/Boolean> // com.eignex.klause.solver.pipeline/ExecutionOption.Companion.phaseSaving.<get-phaseSaving>|<get-phaseSaving>(){}[0]
         final val portfolioProgress // com.eignex.klause.solver.pipeline/ExecutionOption.Companion.portfolioProgress|{}portfolioProgress[0]
             final fun <get-portfolioProgress>(): com.eignex.klause.solver.pipeline/ExecutionOption<kotlin/Boolean> // com.eignex.klause.solver.pipeline/ExecutionOption.Companion.portfolioProgress.<get-portfolioProgress>|<get-portfolioProgress>(){}[0]
+        final val portfolioProofShare // com.eignex.klause.solver.pipeline/ExecutionOption.Companion.portfolioProofShare|{}portfolioProofShare[0]
+            final fun <get-portfolioProofShare>(): com.eignex.klause.solver.pipeline/ExecutionOption<kotlin/Double> // com.eignex.klause.solver.pipeline/ExecutionOption.Companion.portfolioProofShare.<get-portfolioProofShare>|<get-portfolioProofShare>(){}[0]
         final val portfolioReward // com.eignex.klause.solver.pipeline/ExecutionOption.Companion.portfolioReward|{}portfolioReward[0]
             final fun <get-portfolioReward>(): com.eignex.klause.solver.pipeline/ExecutionOption<kotlin/String> // com.eignex.klause.solver.pipeline/ExecutionOption.Companion.portfolioReward.<get-portfolioReward>|<get-portfolioReward>(){}[0]
         final val portfolioWork // com.eignex.klause.solver.pipeline/ExecutionOption.Companion.portfolioWork|{}portfolioWork[0]

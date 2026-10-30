@@ -1,13 +1,91 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.formats.smtlib.SmtLib
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 
 class FiniteExecutionTest {
+    @Test
+    fun `typed and parsed proof shares should execute a curated finite optimization`() {
+        for (options in listOf(ExecutionOptions(ExecutionOption.portfolioProofShare(0.75)),
+            ExecutionOptions.parse(listOf("portfolio-proof-share=0.75")))) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val objective = LinearObjective(intCoefficients = longArrayOf(1))
+            val shape = FiniteSolveShape(problem, true, false, null, objective, 0, null)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+                shape, FiniteEngine.BACKTRACK, presolveConfig = PresolveConfig.NONE,
+                executionOptions = options, nodeBudget = NodeBudget(8),
+            )
+
+            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+
+            assertIs<FiniteSolveOutcome.Completed>(result.outcome)
+            assertEquals(true, result.completeSearchAdmitted)
+        }
+    }
+
+    @Test
+    fun `proof share should reject values outside the existing floor and full allocation`() {
+        for (share in listOf(-1.0, 0.49, 1.01, Double.NaN, Double.POSITIVE_INFINITY)) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val shape = FiniteSolveShape(problem, true, false, null,
+                LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
+                executionOptions = ExecutionOptions(ExecutionOption.portfolioProofShare(share)),
+            )
+
+            assertFailsWith<PipelineConfigException> {
+                FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+            }
+        }
+    }
+
+    @Test
+    fun `proof share should reject explicit recipe ownership`() {
+        for (selection in listOf("bt-arm=satOptimized", "arms=1", "var-selector=vsids")) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val shape = FiniteSolveShape(problem, true, false, null,
+                LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
+                executionOptions = ExecutionOptions.parse(listOf("portfolio-proof-share=0.75", selection)),
+            )
+
+            assertFailsWith<PipelineConfigException> {
+                FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+            }
+        }
+    }
+
+    @Test
+    fun `proof share should reject satisfaction parallel and heuristic execution`() {
+        for ((optimize, cores, engine) in listOf(Triple(false, 1, FiniteEngine.MIXED),
+            Triple(true, 2, FiniteEngine.MIXED), Triple(true, 1, FiniteEngine.LOCAL_SEARCH))) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val shape = FiniteSolveShape(problem, optimize, false, null,
+                LinearObjective(intCoefficients = longArrayOf(1)).takeIf { optimize }, 0, null)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+                shape, engine, cores = cores, presolveConfig = PresolveConfig.NONE,
+                executionOptions = ExecutionOptions(ExecutionOption.portfolioProofShare(0.75)),
+            )
+
+            assertFailsWith<PipelineConfigException> {
+                FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+            }
+        }
+    }
+
     @Test
     fun `a mixed request with only heuristic arms should retain its resolved admission`() {
         val invocation = SourceSetup.prepare(SourceSetupRequest(

@@ -569,6 +569,13 @@ do not consume a short run's proof allocation before coverage begins. Initial si
 probes, explicit minimum shares and bounded auxiliary trials retain precedence.
 Segment overruns can delay coverage.
 
+`portfolio-proof-share=S` selects a share from 0.5 through 1 for curated single-core
+finite optimization through the solve facade. The default is 0.5. Explicit recipes,
+arm counts, annotations, satisfaction and parallel execution reject this control.
+It changes only the retained proof floor after an incumbent; rewards, reseeding,
+initial probes, minimum shares and worker admission retain their own policies.
+Work diagnostics apply the same share to charged work.
+
 This share protects exhaustive traversal whose progress can stay invisible until a
 proof completes. Only live resumable backtrack workers with source-proof authority
 qualify; improvement-only workers, auxiliary proof workers and unproductive auxiliary
