@@ -48,9 +48,10 @@ class BacktrackWorkerConfigTest {
     )
 
     @Test
-    fun `a binary integer pool should select one arithmetic worker across repeated recipes`() {
+    fun `a binary cardinality pool should select one arithmetic worker across repeated recipes`() {
         val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile,
-            binaryIntegers = true, integerLinear = true, integerColumnsOnly = true) { true }
+            binaryIntegers = true, integerLinear = true, integerColumnsOnly = true,
+            compactCardinalityEquality = true) { true }
         val count = BacktrackCatalog.ranked(Kind.COP, facts).size * 2
 
         val arms = BacktrackWorkerConfig.diverse(Kind.COP, count, facts = facts,
@@ -65,7 +66,8 @@ class BacktrackWorkerConfigTest {
         for ((binary, columns, linear) in listOf(Triple(false, true, true),
             Triple(true, false, true), Triple(true, true, false))) {
             val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile,
-                binaryIntegers = binary, integerLinear = linear, integerColumnsOnly = columns) { true }
+                binaryIntegers = binary, integerLinear = linear, integerColumnsOnly = columns,
+                compactCardinalityEquality = true) { true }
 
             val arms = BacktrackWorkerConfig.diverse(Kind.COP, 12, facts = facts,
                 automaticIntegerLearning = true)
@@ -76,9 +78,21 @@ class BacktrackWorkerConfigTest {
     }
 
     @Test
+    fun `binary inequality models should retain clausal recipes`() {
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile,
+            binaryIntegers = true, integerLinear = true, integerColumnsOnly = true) { true }
+
+        val arms = BacktrackWorkerConfig.diverse(Kind.COP, 12, facts = facts,
+            automaticIntegerLearning = true)
+
+        assertTrue(arms.none { it.recipe.build(1L, null).integerRowLearning })
+    }
+
+    @Test
     fun `satisfaction pools should retain clausal recipes`() {
         val facts = ProblemFacts(ProblemFacts.assumed(Kind.CSP).profile,
-            binaryIntegers = true, integerLinear = true, integerColumnsOnly = true) { true }
+            binaryIntegers = true, integerLinear = true, integerColumnsOnly = true,
+            compactCardinalityEquality = true) { true }
 
         val arms = BacktrackWorkerConfig.diverse(Kind.CSP, 12, facts = facts,
             automaticIntegerLearning = true)
@@ -89,7 +103,8 @@ class BacktrackWorkerConfigTest {
     @Test
     fun `an LP off ceiling should retain clausal recipes`() {
         val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile,
-            binaryIntegers = true, integerLinear = true, integerColumnsOnly = true) { true }
+            binaryIntegers = true, integerLinear = true, integerColumnsOnly = true,
+            compactCardinalityEquality = true) { true }
 
         val arms = BacktrackWorkerConfig.diverse(Kind.COP, 12, lpCeiling = LpConfig.OFF, facts = facts,
             automaticIntegerLearning = true)
@@ -99,9 +114,11 @@ class BacktrackWorkerConfigTest {
 
     @Test
     fun `explicit arithmetic settings should override automatic diversity`() {
-        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile,
-            binaryIntegers = true, integerLinear = true, integerColumnsOnly = true) { true }
-        for (enabled in listOf(false, true)) {
+        for ((cardinality, enabled) in listOf(false to false, false to true, true to false, true to true)) {
+            val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile,
+                binaryIntegers = true, integerLinear = true, integerColumnsOnly = true,
+                compactCardinalityEquality = cardinality) { true }
+
             val arms = BacktrackWorkerConfig.diverse(Kind.COP, 12, facts = facts,
                 automaticIntegerLearning = true, edit = { it.copy(integerRowLearning = enabled) })
 
@@ -112,7 +129,8 @@ class BacktrackWorkerConfigTest {
     @Test
     fun `a scalar edit should preserve the arithmetic worker`() {
         val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile,
-            binaryIntegers = true, integerLinear = true, integerColumnsOnly = true) { true }
+            binaryIntegers = true, integerLinear = true, integerColumnsOnly = true,
+            compactCardinalityEquality = true) { true }
 
         val arms = BacktrackWorkerConfig.diverse(Kind.COP, 12, facts = facts,
             automaticIntegerLearning = true, edit = { it.copy(maxDecisions = 20) })
