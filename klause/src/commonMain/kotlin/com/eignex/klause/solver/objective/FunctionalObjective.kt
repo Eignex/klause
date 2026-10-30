@@ -47,6 +47,7 @@ internal class FunctionalObjective internal constructor(
     /** Bool decision (leaf) variables the bool cone reads. */
     val boolLeafVars: IntArray = EmptyIntArray,
     definitions: List<Definition> = emptyList(),
+    internal val booleanCostSweep: DefinitionalSweep? = null,
 ) : IncrementalObjective {
 
     /** Single-variable objective (the FlatZinc `defines_var` cone rooted at one variable). */
