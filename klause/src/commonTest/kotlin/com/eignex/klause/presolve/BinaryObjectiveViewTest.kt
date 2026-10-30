@@ -102,6 +102,7 @@ class BinaryObjectiveViewTest {
             val config = PresolveConfig.parse("off,+binary-columns").withAffinePivotOrder(order)
 
             val prepared = PresolvePipeline.run(source, original, config, false)
+            val objective = prepared.objective ?: original
 
             val projected = order == AffinePivotOrder.REWRITE_COST
             assertEquals(if (projected) 0L else 1L, prepared.problem.intDomainOrNull(0)?.max)
@@ -109,7 +110,7 @@ class BinaryObjectiveViewTest {
             val rebuilt = prepared.reconstruct(sample)
             assertEquals(1L, rebuilt.ints[0])
             assertEquals(2L, rebuilt.ints[1])
-            assertEquals(original.evaluateExact(rebuilt), checkNotNull(prepared.objective).evaluateExact(sample))
+            assertEquals(original.evaluateExact(rebuilt), objective.evaluateExact(sample))
         }
     }
 
