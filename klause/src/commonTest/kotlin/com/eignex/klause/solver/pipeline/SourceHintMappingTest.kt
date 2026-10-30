@@ -2,11 +2,14 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.DefinitionHint
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SearchGroup
 import com.eignex.klause.ir.SearchHints
 import com.eignex.klause.ir.ValueSelection
 import com.eignex.klause.ir.VariableSelection
+import com.eignex.klause.localsearch.CapturedBooleanDefinition
+import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.RebuildStep
 import com.eignex.klause.presolve.SourceMapping
 import com.eignex.klause.presolve.SourceRebuilds
@@ -19,6 +22,62 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class SourceHintMappingTest {
+    @Test
+    fun `comparison projection should preserve strict translated predicate truth`() {
+        val hint = DefinitionHint.Comparison(0, longArrayOf(2, -1, 1), arrayOf(
+            DefinitionHint.Operand.Variable(0), DefinitionHint.Operand.Variable(1),
+            DefinitionHint.Operand.Constant(5),
+        ), 10, LinearOp.LE, strict = true)
+        val reconstruction = AffineReconstruction(3, intArrayOf(1, 2), longArrayOf(2, -1), 1)
+        val projected = CapturedBooleanDefinition(assertNotNull(
+            hint.reconstructed(mapOf(0 to reconstruction), Cancellation.Never),
+        ))
+
+        for ((y, z) in listOf(1L to 2L, 0L to 1L, 1L to 1L)) {
+            val truth = projected.holds { id -> when (id) {
+                1 -> y
+                2 -> z
+                else -> error("a retained input is required")
+            } }
+
+            assertEquals(2 * (3 + 2 * y - z) - y + 5 < 10, truth)
+        }
+    }
+
+    @Test
+    fun `comparison projection should decline overflowing reconstructed coefficients`() {
+        val hint = DefinitionHint.Comparison(0, longArrayOf(Long.MAX_VALUE),
+            arrayOf(DefinitionHint.Operand.Variable(0)), 0, LinearOp.LE)
+        val reconstruction = AffineReconstruction(0, intArrayOf(1), longArrayOf(2), 1)
+
+        val projected = hint.reconstructed(mapOf(0 to reconstruction), Cancellation.Never)
+
+        assertNull(projected)
+    }
+
+    @Test
+    fun `comparison projection should withhold an interrupted expansion`() {
+        val hint = DefinitionHint.Comparison(0, longArrayOf(1),
+            arrayOf(DefinitionHint.Operand.Variable(0)), 0, LinearOp.LE)
+        val reconstruction = AffineReconstruction(0, intArrayOf(1, 2), longArrayOf(1, 1), 1)
+        val budget = PresolveBudget(2)
+
+        val projected = hint.reconstructed(mapOf(0 to reconstruction), budget.orSpent(Cancellation.Never))
+
+        assertNull(projected)
+    }
+
+    @Test
+    fun `comparison projection should withhold a divided input`() {
+        val hint = DefinitionHint.Comparison(0, longArrayOf(1),
+            arrayOf(DefinitionHint.Operand.Variable(0)), 0, LinearOp.LE)
+        val reconstruction = AffineReconstruction(0, intArrayOf(1), longArrayOf(1), 2)
+
+        val projected = hint.reconstructed(mapOf(0 to reconstruction), Cancellation.Never)
+
+        assertNull(projected)
+    }
+
     @Test
     fun `ordered minimum and maximum tiers should follow translated aliases through mapping stages`() {
         val source = Problem(0, 3, Array(3) { IntDomain(-10, 10) }, emptyArray())

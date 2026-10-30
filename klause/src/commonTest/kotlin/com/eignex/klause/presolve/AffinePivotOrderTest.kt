@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Table
+import com.eignex.klause.ir.DefinitionHint
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -38,6 +39,35 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class AffinePivotOrderTest {
+    @Test
+    fun `channel definitions and gradients should survive a multi input affine reconstruction`() {
+        val source = Problem(1, 3, Array(3) { IntDomain(0, 4) }, listOf(
+            Linear(intArrayOf(1, -1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
+        ))
+        val hint = DefinitionHint.Comparison(0, longArrayOf(1),
+            arrayOf(DefinitionHint.Operand.Variable(0)), 2, LinearOp.GE)
+        val objective = LinearObjective(boolWeights = longArrayOf(7), intCoefficients = longArrayOf(0, 1, 1))
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, listOf(hint)),
+            ExecutionOperation.OPTIMIZE, FiniteEngine.LOCAL_SEARCH, objective))
+        val shape = invocation.finiteShape()
+        val prepared = FinitePipeline.prepare(FinitePipelineRequest(
+            shape.problem, FiniteEngine.LOCAL_SEARCH, shape.linearObjective,
+            PresolveConfig.parse("off,+affine").withAffinePivotOrder(AffinePivotOrder.REWRITE_COST),
+            explicitPresolveConfig = true, preparedPlan = shape.preparedPlan,
+        ))
+        val view = assertNotNull(invocation.heuristicHints(prepared.problem, prepared.objective,
+            prepared.sourceMapping, Cancellation.Never, setOf(ExecutionStrategy.LOCAL_SEARCH),
+            assertNotNull(prepared.executionPlan).capabilities))
+        val assignment = Assignment(prepared.problem.numBoolVars, prepared.problem.numIntVars)
+        assignment.setInt(2, 1)
+
+        assertNotNull(view.sweep).sweep(assignment, prepared.problem.finiteIntDomains())
+
+        assertFalse(assignment.boolValue(0))
+        assertEquals(8.0, assertNotNull(view.objective).deltaIfApplied(assignment, Move.IntSet(1, 1)))
+    }
+
     @Test
     fun `an inadmissible equality should leave rewrite scoring allowance for a later fold`() {
         var stopped = false

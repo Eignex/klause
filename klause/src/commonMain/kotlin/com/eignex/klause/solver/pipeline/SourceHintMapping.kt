@@ -216,3 +216,45 @@ internal fun DefinitionHint.Linear.reconstructed(
 } catch (_: CheckedLongOverflowException) {
     null
 }
+
+internal fun DefinitionHint.Comparison.reconstructed(
+    reconstructions: Map<Int, AffineReconstruction>,
+    cancellation: Cancellation,
+): DefinitionHint.Comparison? {
+    if (coefficients.size != inputs.size || cancellation()) return null
+    return try {
+        val terms = LinkedHashMap<Int, Long>()
+        var rhs = bound
+        for (k in inputs.indices) {
+            cancellation.charge(1)
+            if (cancellation()) return null
+            val coefficient = coefficients[k]
+            when (val operand = inputs[k]) {
+                is DefinitionHint.Operand.Constant -> rhs = subExact(rhs, mulExact(coefficient, operand.value))
+                is DefinitionHint.Operand.Variable -> {
+                    val reconstruction = reconstructions[operand.id]
+                    if (reconstruction == null) {
+                        terms[operand.id] = addExact(terms[operand.id] ?: 0L, coefficient)
+                    } else {
+                        if (reconstruction.divisor != 1L) return null
+                        rhs = subExact(rhs, mulExact(coefficient, reconstruction.constTerm))
+                        for (j in reconstruction.terms.indices) {
+                            cancellation.charge(1)
+                            if (cancellation()) return null
+                            val term = reconstruction.terms[j]
+                            val added = mulExact(coefficient, reconstruction.coefficients[j])
+                            terms[term] = addExact(terms[term] ?: 0L, added)
+                        }
+                    }
+                }
+            }
+        }
+        cancellation.charge(3L * terms.size)
+        if (cancellation()) return null
+        val kept = terms.filterValues { it != 0L }
+        DefinitionHint.Comparison(output, kept.values.toLongArray(),
+            kept.keys.map { DefinitionHint.Operand.Variable(it) }.toTypedArray(), rhs, relation, strict)
+    } catch (_: CheckedLongOverflowException) {
+        null
+    }
+}

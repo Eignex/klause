@@ -156,6 +156,10 @@ Binary substitution restores later Boolean reductions before reading carrying
 literals, then truncates appended Booleans, preserving the earliest namespace.
 Definition hints can rename retained aliases and substitute a single affine
 reconstruction over retained columns; a rebuilt output passes to its single partner.
+Boolean comparison hints can substitute unit-divisor affine inputs over retained
+columns while preserving their Boolean output, relation and strictness. Expansion
+charges the preparation allowance and declines cancellation or checked overflow;
+other divisors retain ordinary hint admission.
 Ordered search hints can follow `x = y + c` aliases only for translation-invariant
 variable selectors with minimum/maximum values. Bound-based selectors and other
 value choices require direct coordinates. Untouched columns retain their orientation;
