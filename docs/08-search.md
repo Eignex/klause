@@ -253,12 +253,16 @@ subtraction, preserving small gains when the constant exceeds floating precision
 The `lp-default` and `lp-aggressive` optimization recipes enable the finite consumer; direct
 `BacktrackParams` and other recipes opt in through `lpDirectionalGains` or
 `lp-directional-gains=true`. The execution setting can also disable it. LP bounding
-and branching must be enabled. Two recent samples
-in each direction permit a balanced gain score; otherwise reduced-cost/fractionality
-scoring and the configured selector keep their precedence. Directional scores compete
+and branching must be enabled. Two recent samples in each direction permit a
+variable's balanced gain score. Variables without that history use a same-scope prior
+only after two samples in each direction within their Boolean or integer coordinate
+class; otherwise reduced-cost/fractionality scoring and the configured selector keep
+their precedence. Reliable variable history takes precedence over its class prior.
+Directional scores compete
 with each other before fallback, so objective units are not mixed with reduced costs.
-Consumed choices record agreement with the current LP scorer, a changed variable,
-or a missing current LP candidate separately; a rejected proposal earns no consumption.
+Consumed choices distinguish variable history from class priors and record agreement
+with the current LP scorer, a changed variable, or a missing current LP candidate
+separately; a rejected proposal earns no consumption.
 
 Samples share one retained exact base model, active-row identity, objective mapping
 and incumbent cutoff. Changed rows or cuts, layout or objective rescaling invalidate
@@ -266,8 +270,9 @@ history and pending comparisons. Restart and assumption reseeding clear history.
 Ordinary sibling retraction preserves compatible observations and the immediate
 parent split; a skipped child cannot borrow a deeper descendant's objective.
 Directions expire after 256 node visits without a sample. At most 8,192 variable
-histories and 128 ancestor splits are retained; bookkeeping charges the existing LP
-work allowance and creates no extra LP query. Invocation close releases the scope.
+histories, two class priors and 128 ancestor splits are retained; bookkeeping charges
+the existing LP work allowance and creates no extra LP query. Invocation close
+releases the scope.
 
 ### Leaf-completed columns
 
