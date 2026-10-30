@@ -123,6 +123,10 @@ An empty catalog creates no speculative definitions. Each lookup charges the cur
 allowance; interrupted imports report that work and withhold publication after debit.
 These reuses have their own observation, separate from introductions into the owner.
 The catalog retains no additional cache or numerical result authority.
+An internal retained-only admission policy uses this catalog path and omits source
+template preparation from whole-model builds. Its complete layouts keep ordinary
+construction; actual later fragment imports supply the demand for reuse. This policy
+is independent of whole-model selective metadata reuse.
 
 Template construction polls and charges the containing token, including failed
 attempts, and caps visits and retained storage at 262,144 modeled units each.

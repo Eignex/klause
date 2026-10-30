@@ -875,6 +875,8 @@ columns and rows into a private scoped owner with source-bound assertions and
 permanent row markers, solves and closes that owner within the measured total.
 Its candidate mode borrows compatible immutable bound definitions from columns that
 earlier fragments actually introduced, without a whole-source metadata preparation.
+It uses retained-only admission, which also leaves a preceding whole-model build on
+ordinary construction.
 `retainedBoundDefinitionsReused` counts those avoided constructions separately from
 `exactBoundsAdopted`, which counts introductions backed by prepared definitions.
 The standalone candidate uses selective metadata reuse. Pin the revision when

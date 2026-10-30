@@ -416,6 +416,7 @@ internal class LpEngine(
                 elementIndexes = elementIndexes,
                 templateStats = sink.lp,
                 preparationCancellation = params.cancellation,
+                retainImportedDefinitions = false,
                 onTemplateWork = ::noteNodeOverhead,
             )
         } else {

@@ -38,7 +38,7 @@ class LpRetainedSourcesTest {
         var work = 0L
         val consumer = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L)),
             projections = FactorProjectionProviders.Default.prepare(problem), templateStats = sink,
-            reuseTemplateMetadata = true, onTemplateWork = { work += it })
+            retainImportedDefinitions = true, onTemplateWork = { work += it })
         val sources = LpRetainedSources(problem, consumer)
         LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
             val edit = assertNotNull(sources.prepare(owner.state, RootDomains(problem)))
@@ -63,7 +63,7 @@ class LpRetainedSourcesTest {
         val sink = LpStatsSink()
         val consumer = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L)),
             projections = FactorProjectionProviders.Default.prepare(problem), templateStats = sink,
-            reuseTemplateMetadata = true)
+            retainImportedDefinitions = true)
         val sources = LpRetainedSources(problem, consumer)
         LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
             val edit = assertNotNull(sources.prepare(owner.state, RootDomains(problem)))
@@ -88,7 +88,7 @@ class LpRetainedSourcesTest {
         ))
         var cancelled = false
         val consumer = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L)),
-            projections = FactorProjectionProviders.Default.prepare(problem), reuseTemplateMetadata = true,
+            projections = FactorProjectionProviders.Default.prepare(problem), retainImportedDefinitions = true,
             onTemplateWork = { if (it > 0L) cancelled = true })
         val sources = LpRetainedSources(problem, consumer)
         val token = Cancellation { cancelled }
@@ -100,15 +100,17 @@ class LpRetainedSourcesTest {
 
     @Test
     fun `retained template imports should preserve wide exact origins and open sides`() {
-        val modes = listOf(false to false, true to false, true to true)
-        for ((templates, metadata) in modes) for (open in listOf(false, true)) {
+        val modes = listOf(Triple(false, false, false), Triple(true, false, false),
+            Triple(true, true, false), Triple(true, false, true))
+        for ((templates, metadata, imported) in modes) for (open in listOf(false, true)) {
             val origin = 9_007_199_254_740_993L
             val problem = Problem(0, 2, Array(2) { IntDomain(origin, origin + 4L) }, arrayOf<Factor>(
                 Linear(longArrayOf(1L, 1L), intArrayOf(0, 1), LinearOp.GE, 2L * origin + 3L),
             ), openIntHi = booleanArrayOf(false, open))
             val consumer = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L, 1L)),
                 projections = FactorProjectionProviders.Default.prepare(problem),
-                reuseSourceTemplates = templates, reuseTemplateMetadata = metadata)
+                reuseSourceTemplates = templates, reuseTemplateMetadata = metadata,
+                retainImportedDefinitions = imported)
             val sources = LpRetainedSources(problem, consumer)
             LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
                 val edit = assertNotNull(sources.prepare(owner.state, RootDomains(problem)))
@@ -122,7 +124,7 @@ class LpRetainedSourcesTest {
                 assertEquals(BigFraction.ofLong(2L * origin + 3L), result.lowerBound)
                 assertEquals(BigFraction.ofLong(origin), owner.state.model.column(0).origin.value)
                 assertEquals(open, owner.state.model.column(1).bounds.upper == null)
-                if (templates && !metadata) {
+                if (templates && !metadata && !imported) {
                     assertSame(assertNotNull(consumer.preparationTemplates).bounds.getValue(0).column,
                         owner.state.model.column(0))
                 }
@@ -149,7 +151,7 @@ class LpRetainedSourcesTest {
             problem,
             CpToLpRelaxation(
                 problem, LinearObjective(intCoefficients = longArrayOf(0, 1, 1, 0, 1)),
-                elementHull = true, elementIndexes = setOf(0), reuseTemplateMetadata = true,
+                elementHull = true, elementIndexes = setOf(0), retainImportedDefinitions = true,
             ),
         )
         LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->

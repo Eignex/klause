@@ -141,7 +141,9 @@ internal object LpTemplatePreparationProfile {
                             val consumer = CpToLpRelaxation(view, cost,
                                 projections = selectedView, templateStats = sink,
                                 reuseSourceTemplates = mode != "disabled", reuseTemplateIndexes = mode != "object",
-                                reuseTemplateMetadata = mode == "candidate", preparationCancellation = consumerToken)
+                                reuseTemplateMetadata = mode == "candidate" && route == "standalone",
+                                retainImportedDefinitions = mode == "candidate" && route == "retained",
+                                preparationCancellation = consumerToken)
                             val result = try {
                                 if (route == "retained") {
                                     LpScopedSolver(LpExactState(LpRetainedSources.emptyModel()),

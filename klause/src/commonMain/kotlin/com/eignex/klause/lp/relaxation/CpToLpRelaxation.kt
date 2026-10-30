@@ -683,14 +683,16 @@ internal class CpToLpRelaxation(
     private val preparationCancellation: Cancellation = Cancellation.Never,
     private val reuseTemplateIndexes: Boolean = true,
     private val reuseTemplateMetadata: Boolean = false,
+    private val retainImportedDefinitions: Boolean = false,
     private val onTemplateWork: (Long) -> Unit = {},
 ) {
     private val elementIndexes = elementIndexes?.toSet()
     private val linearProjection = LinearLpProjection()
     internal var preparationTemplates: LpPreparationTemplates? = null
         private set
-    internal val reuseRetainedDefinitions: Boolean get() = reuseSourceTemplates && reuseTemplateMetadata &&
-        problem.numRealVars == 0 && projections?.builtInRelaxation != false
+    internal val reuseRetainedDefinitions: Boolean get() = reuseSourceTemplates &&
+        (reuseTemplateMetadata || retainImportedDefinitions) && problem.numRealVars == 0 &&
+        projections?.builtInRelaxation != false
 
     internal fun observeBoundTemplates(count: Int) {
         templateStats?.observeTemplateUse(exactBounds = count)
@@ -705,7 +707,7 @@ internal class CpToLpRelaxation(
     }
 
     private fun prepareTemplates(cancellation: Cancellation) {
-        if (!reuseSourceTemplates || projections == null) return
+        if (!reuseSourceTemplates || retainImportedDefinitions || projections == null) return
         preparationTemplates = null
         val start = TimeSource.Monotonic.markNow()
         var work = 0L

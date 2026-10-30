@@ -17,6 +17,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
@@ -37,6 +38,23 @@ class LpPreparationTemplatesTest {
     ))
     private val selection = FactorProjectionProviders.Default.prepare(source)
     private val objective = LinearObjective(intCoefficients = LongArray(6) { 1L })
+
+    @Test
+    fun `retained only admission should leave whole model builds free of speculative preparation`() {
+        val sink = LpStatsSink()
+        var work = 0L
+        val consumer = CpToLpRelaxation(source, objective, projections = selection, templateStats = sink,
+            retainImportedDefinitions = true, onTemplateWork = { work += it })
+
+        val result = assertNotNull(consumer.build(RootDomains(source))
+            .authoritativeWithTemplates(Cancellation.Never, onWork = { work += it }))
+        val fresh = assertNotNull(CpToLpRelaxation(source, objective, projections = selection,
+            reuseSourceTemplates = false).build(RootDomains(source)).model.authoritativeModel())
+
+        assertTrue(result.sameAuthority(fresh))
+        assertEquals(0L, work)
+        assertFalse(sink.snapshot().phases.containsKey("TEMPLATE_PREPARATION_NODE"))
+    }
 
     @Test
     fun `repeated factor roles should retain one component reference`() {
